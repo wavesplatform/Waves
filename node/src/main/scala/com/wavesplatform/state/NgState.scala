@@ -8,6 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
@@ -42,7 +43,7 @@ class NgState(
 
   def diffFor(totalResBlockSig: BlockId): (Diff, Long, Long) = {
     val (diff, carry, totalFee) =
-      if (totalResBlockSig == base.header.uniqueId)
+      if (totalResBlockSig == base.uniqueId)
         (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
       else
         internalCaches.blockDiffCache.get(
@@ -62,7 +63,7 @@ class NgState(
   }
 
   def bestLiquidBlockId: BlockId =
-    microBlocks.headOption.map(_.totalResBlockSig).getOrElse(base.header.uniqueId)
+    microBlocks.headOption.map(_.totalResBlockSig).getOrElse(base.uniqueId)
 
   def lastMicroBlock: Option[MicroBlock] =
     microBlocks.headOption
@@ -79,8 +80,8 @@ class NgState(
           cachedBlock
 
         case None =>
-          val signerData = base.header.signerData.copy(signature = microBlocks.head.totalResBlockSig)
-          val block = base.copy(header = base.header.copy(signerData = signerData, transactionCount = transactions.length), transactionData = transactions)
+          val signature = microBlocks.head.totalResBlockSig
+          val block = base.copy(signature = signature, header = base.header.copy(signature = signature, transactionCount = transactions.length), transactionData = transactions)
           internalCaches.bestBlockCache = Some(block)
           block
       }
@@ -97,11 +98,11 @@ class NgState(
     */
   def balanceDiffAt(address: Address, blockId: BlockId): Portfolio = cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
 
-  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.header.uniqueId)(_.totalResBlockSig))
+  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.uniqueId)(_.totalResBlockSig))
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
-  def contains(blockId: BlockId): Boolean = base.header.uniqueId == blockId || microDiffs.contains(blockId)
+  def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microDiffs.contains(blockId)
 
   def microBlock(id: BlockId): Option[MicroBlock] = microBlocks.find(_.totalResBlockSig == id)
 
@@ -109,8 +110,8 @@ class NgState(
     val blockId = microBlocks
       .find(micro => microDiffs(micro.totalResBlockSig).timestamp <= maxTimeStamp)
       .map(_.totalResBlockSig)
-      .getOrElse(base.header.uniqueId)
-    BlockMinerInfo(base.header.consensusData, base.header.timestamp, blockId)
+      .getOrElse(base.uniqueId)
+    BlockMinerInfo(NxtLikeConsensusBlockData(base.header.baseTarget, base.header.generationSignature), base.header.timestamp, blockId)
   }
 
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): Unit = {
@@ -127,7 +128,7 @@ class NgState(
       blockId, { () =>
         val microBlocksAsc = microBlocks.reverse
 
-        if (base.header.uniqueId == blockId) {
+        if (base.uniqueId == blockId) {
           Some((base, microBlocksAsc))
         } else if (!microBlocksAsc.exists(_.totalResBlockSig == blockId)) None
         else {
@@ -142,9 +143,8 @@ class NgState(
 
           maybeFound.map {
             case (sig, discarded) =>
-              val signerData   = base.header.signerData.copy(signature = sig)
               val transactions = base.transactionData ++ accumulatedTxs
-              (base.copy(header = base.header.copy(signerData = signerData, transactionCount = transactions.length), transactionData = transactions), discarded)
+              (base.copy(signature = sig, header = base.header.copy(signature = sig, transactionCount = transactions.length), transactionData = transactions), discarded)
           }
         }
       }

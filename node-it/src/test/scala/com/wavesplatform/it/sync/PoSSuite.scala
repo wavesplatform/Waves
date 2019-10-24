@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.consensus.FairPoSCalculator
@@ -61,7 +61,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig sameElements block.header.uniqueId.arr
+    newBlockSig sameElements block.uniqueId.arr
   }
 
   test("Reject block with invalid delay") {
@@ -75,7 +75,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.header.uniqueId.arr
+    newBlockSig should not be block.uniqueId.arr
   }
 
   test("Reject block with invalid BT") {
@@ -90,7 +90,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.header.uniqueId.arr
+    newBlockSig should not be block.uniqueId.arr
   }
 
   test("Reject block with invalid generation signature") {
@@ -111,7 +111,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.header.uniqueId.arr
+    newBlockSig should not be block.uniqueId.arr
   }
 
   test("Reject block with invalid signature") {
@@ -120,10 +120,10 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
-    val signerData = SignerData(signerPK, ByteStr(crypto.sign(otherNodePK, block.bytes())))
+    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
     val resignedBlock =
       block
-        .copy(header = block.header.copy(signerData = signerData))
+        .copy(signature = signature, header = block.header.copy(signature = signature, generator = signerPK))
 
     waitForBlockTime(resignedBlock)
 
@@ -133,7 +133,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be resignedBlock.header.uniqueId.arr
+    newBlockSig should not be resignedBlock.uniqueId.arr
   }
 
   def waitForBlockTime(block: Block): Unit = {
@@ -246,15 +246,14 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         )
     )
 
-    val cData: NxtLikeConsensusBlockData = NxtLikeConsensusBlockData(bastTarget, genSig)
-
     Block
       .buildAndSign(
         version = 3: Byte,
         timestamp = lastBlockTS + validBlockDelay,
         reference = ByteStr(lastBlockId),
-        consensusData = cData,
-        transactionData = Nil,
+        baseTarget = bastTarget,
+        generationSignature = genSig,
+        txs = Nil,
         signer = signerPK,
         featureVotes = Set.empty,
         rewardVote = -1L

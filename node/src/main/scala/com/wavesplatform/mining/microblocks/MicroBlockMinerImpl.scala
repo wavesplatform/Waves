@@ -127,8 +127,9 @@ class MicroBlockMinerImpl(
             version = blockchainUpdater.currentBlockVersion,
             timestamp = accumulatedBlock.header.timestamp,
             reference = accumulatedBlock.header.reference,
-            consensusData = accumulatedBlock.header.consensusData,
-            transactionData = accumulatedBlock.transactionData ++ unconfirmed,
+            baseTarget = accumulatedBlock.header.baseTarget,
+            generationSignature = accumulatedBlock.header.generationSignature,
+            txs = accumulatedBlock.transactionData ++ unconfirmed,
             signer = account,
             featureVotes = accumulatedBlock.header.featureVotes,
             rewardVote = accumulatedBlock.header.rewardVote
@@ -138,8 +139,8 @@ class MicroBlockMinerImpl(
           .buildAndSign(
             account,
             unconfirmed,
-            accumulatedBlock.header.signerData.signature,
-            signedBlock.header.signerData.signature
+            accumulatedBlock.signature,
+            signedBlock.header.signature
           )
           .leftMap(MicroBlockBuildError)
         _ = BlockStats.mined(microBlock)

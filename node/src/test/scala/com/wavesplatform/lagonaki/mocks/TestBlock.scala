@@ -25,8 +25,8 @@ object TestBlock {
         version = b.header.version,
         timestamp = b.header.timestamp,
         reference = b.header.reference,
-        consensusData = b.header.consensusData,
-        transactionData = b.transactionData,
+        consensus = b.header.consensusData,
+        txs = b.transactionData,
         signer = signer,
         featureVotes = b.header.featureVotes,
         rewardVote = b.header.rewardVote

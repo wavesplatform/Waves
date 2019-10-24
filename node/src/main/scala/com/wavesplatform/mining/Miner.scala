@@ -160,7 +160,17 @@ class MinerImpl(
       unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
-        .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version), blockRewardVote(version))
+        .buildAndSign(
+          version.toByte,
+          currentTime,
+          refBlockID,
+          consensusData.baseTarget,
+          consensusData.generationSignature,
+          unconfirmed,
+          account,
+          blockFeatures(version),
+          blockRewardVote(version)
+        )
         .leftMap(_.err)
     } yield (estimators, block, updatedMdConstraint.constraints.head))
   }
@@ -184,12 +194,12 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.header.uniqueId)
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       for {
         expectedTS <- pos
-          .getValidBlockDelay(height, account, block.header.consensusData.baseTarget, balance)
+          .getValidBlockDelay(height, account, block.header.baseTarget, balance)
           .map(_ + block.header.timestamp)
           .leftMap(_.toString)
         result <- Either.cond(

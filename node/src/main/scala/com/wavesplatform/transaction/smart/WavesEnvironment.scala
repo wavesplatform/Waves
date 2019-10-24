@@ -127,10 +127,10 @@ class WavesEnvironment(
     BlockInfo(
       timestamp = blockH.timestamp,
       height = bHeight,
-      baseTarget = blockH.consensusData.baseTarget,
-      generationSignature = blockH.consensusData.generationSignature,
-      generator = blockH.signerData.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.signerData.generator)
+      baseTarget = blockH.baseTarget,
+      generationSignature = blockH.generationSignature,
+      generator = blockH.generator.toAddress.bytes,
+      generatorPublicKey = ByteStr(blockH.generator)
     )
   }
 
@@ -142,11 +142,11 @@ class WavesEnvironment(
         header.timestamp,
         header.version,
         header.reference,
-        header.signerData.generator.toAddress.bytes,
-        header.signerData.generator.bytes,
-        header.signerData.signature,
-        header.consensusData.baseTarget,
-        header.consensusData.generationSignature,
+        header.generator.toAddress.bytes,
+        header.generator.bytes,
+        header.signature,
+        header.baseTarget,
+        header.generationSignature,
         header.transactionCount,
         header.featureVotes.map(_.toLong).toSeq.sorted
       )

@@ -58,7 +58,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
   override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
     val c = current
-    if (c._3.exists(_.header.uniqueId == blockId)) {
+    if (c._3.exists(_.uniqueId == blockId)) {
       c._3.map(b => (b.header, b.bytes().length))
     } else {
       loadBlockHeaderAndSize(blockId)
@@ -78,7 +78,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
     val c = current
-    if (c._3.exists(_.header.uniqueId == blockId)) {
+    if (c._3.exists(_.uniqueId == blockId)) {
       c._3.map(_.bytes())
     } else {
       loadBlockBytes(blockId)
@@ -88,7 +88,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadHeightOf(blockId: ByteStr): Option[Int]
   override def heightOf(blockId: ByteStr): Option[Int] = {
     val c = current
-    if (c._3.exists(_.header.uniqueId == blockId)) {
+    if (c._3.exists(_.uniqueId == blockId)) {
       Some(c._1)
     } else {
       loadHeightOf(blockId)

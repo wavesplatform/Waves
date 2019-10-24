@@ -39,9 +39,8 @@ object BaseTargetChecker {
           val account   = PublicKey(cfg.as[ByteStr]("public-key").arr)
           val address   = account.toAddress
           val balance   = blockchainUpdater.balance(address, Waves)
-          val consensus = genesisBlock.header.consensusData
           val timeDelay = poSSelector
-            .getValidBlockDelay(blockchainUpdater.height, account, consensus.baseTarget, balance)
+            .getValidBlockDelay(blockchainUpdater.height, account, genesisBlock.header.baseTarget, balance)
             .explicitGet()
 
           f"$address: ${timeDelay * 1e-3}%10.3f s"

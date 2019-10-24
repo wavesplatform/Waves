@@ -121,7 +121,7 @@ package object appender extends ScorexLogging {
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either
       .cond(
-        exceptions.contains((height, block.header.uniqueId)),
+        exceptions.contains((height, block.uniqueId)),
         (),
         GenericError(s"Block time ${block.header.timestamp} less than expected")
       )

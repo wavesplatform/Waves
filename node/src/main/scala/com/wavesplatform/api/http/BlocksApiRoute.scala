@@ -44,7 +44,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
                 address <- Address.fromString(address)
                 jsonBlocks = commonApi
                   .blockHeadersRange(start, end)
-                  .filter(_._1.signerData.generator.toAddress == address)
+                  .filter(_._1.generator.toAddress == address)
                   .map {
                     case (_, _, h) =>
                       blockchain.blockAt(h).get.json().addBlockFields(h)
@@ -62,7 +62,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
       val childJson =
-        for ((child, height) <- commonApi.childBlock(block.header.uniqueId))
+        for ((child, height) <- commonApi.childBlock(block.uniqueId))
           yield child.json().addBlockFields(height)
 
       complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
@@ -87,7 +87,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
         Left(CustomValidationError("Block count should be positive"))
       } else {
         commonApi
-          .calcBlocksDelay(block.header.uniqueId, count)
+          .calcBlocksDelay(block.uniqueId, count)
           .map(delay => Json.obj("delay" -> delay))
       }
 
@@ -240,7 +240,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
           .toRight(InvalidSignature)
 
         block <- commonApi.blockBySignature(blockId).toRight(BlockDoesNotExist)
-      } yield block.json().addBlockFields(block.header.uniqueId)
+      } yield block.json().addBlockFields(block.uniqueId)
 
       complete(result)
     }

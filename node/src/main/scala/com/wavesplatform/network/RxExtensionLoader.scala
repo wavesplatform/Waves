@@ -62,7 +62,7 @@ object RxExtensionLoader extends ScorexLogging {
             case LoaderState.Idle =>
               val maybeKnownSigs = state.applierState match {
                 case ApplierState.Idle                => Some((lastBlockIds(), false))
-                case ApplierState.Applying(None, ext) => Some((ext.blocks.map(_.header.uniqueId).reverse, true))
+                case ApplierState.Applying(None, ext) => Some((ext.blocks.map(_.uniqueId).reverse, true))
                 case _                                => None
               }
               maybeKnownSigs match {
@@ -138,9 +138,9 @@ object RxExtensionLoader extends ScorexLogging {
 
     def onBlock(state: State, ch: Channel, block: Block): State = {
       state.loaderState match {
-        case LoaderState.ExpectingBlocks(c, requested, expected, recieved, _) if c == ch && expected.contains(block.header.uniqueId) =>
-          if (expected == Set(block.header.uniqueId)) {
-            val blockById = (recieved + block).map(b => b.header.uniqueId -> b).toMap
+        case LoaderState.ExpectingBlocks(c, requested, expected, recieved, _) if c == ch && expected.contains(block.uniqueId) =>
+          if (expected == Set(block.uniqueId)) {
+            val blockById = (recieved + block).map(b => b.uniqueId -> b).toMap
             val ext       = ExtensionBlocks(requested.map(blockById))
             log.debug(s"${id(ch)} $ext successfully received")
             extensionLoadingFinished(state.withIdleLoader, ext, ch)
@@ -153,7 +153,7 @@ object RxExtensionLoader extends ScorexLogging {
                 else "total=" + totalleft.toString
               }"
             ).runAsyncLogErr
-            state.withLoaderState(LoaderState.ExpectingBlocks(c, requested, expected - block.header.uniqueId, recieved + block, blacklistAsync))
+            state.withLoaderState(LoaderState.ExpectingBlocks(c, requested, expected - block.uniqueId, recieved + block, blacklistAsync))
           }
         case _ =>
           simpleBlocks.onNext((ch, block))
@@ -269,7 +269,7 @@ object RxExtensionLoader extends ScorexLogging {
   }
 
   case class ExtensionBlocks(blocks: Seq[Block]) {
-    override def toString: String = s"ExtensionBlocks(${formatSignatures(blocks.map(_.header.uniqueId))}"
+    override def toString: String = s"ExtensionBlocks(${formatSignatures(blocks.map(_.uniqueId))}"
   }
 
   case class State(loaderState: LoaderState, applierState: ApplierState) {

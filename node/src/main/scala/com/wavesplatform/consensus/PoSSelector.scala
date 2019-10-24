@@ -36,7 +36,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     checkBaseTargetLimit(bt, height).flatMap(
       result =>
         blockchain.lastBlock
-          .map(_.header.consensusData.generationSignature.arr)
+          .map(_.header.generationSignature.arr)
           .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generatorSignature(gs, accountPublicKey))))
           .toRight(GenericError("No blocks in blockchain")))
   }
@@ -50,17 +50,17 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
-    getValidBlockDelay(height, block.header.signerData.generator, parent.consensusData.baseTarget, effectiveBalance)
+    getValidBlockDelay(height, block.header.generator, parent.baseTarget, effectiveBalance)
       .map(_ + parent.timestamp)
       .ensureOr(mvt => GenericError(s"Block timestamp ${block.header.timestamp} less than min valid timestamp $mvt"))(ts => ts <= block.header.timestamp)
       .map(_ => ())
   }
 
   def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, Unit] = {
-    val blockGS = block.header.consensusData.generationSignature.arr
+    val blockGS = block.header.generationSignature.arr
     blockchain.lastBlock
       .toRight(GenericError("No blocks in blockchain"))
-      .map(b => generatorSignature(b.header.consensusData.generationSignature.arr, block.header.signerData.generator))
+      .map(b => generatorSignature(b.header.generationSignature.arr, block.header.generator))
       .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(
         _ sameElements blockGS)
       .map(_ => ())
@@ -84,13 +84,13 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   def validateBaseTarget(height: Int, block: Block, parent: BlockHeader, grandParent: Option[BlockHeader]): Either[ValidationError, Unit] = {
-    val blockBT = block.header.consensusData.baseTarget
+    val blockBT = block.header.baseTarget
     val blockTS = block.header.timestamp
 
     val expectedBT = pos(height).calculateBaseTarget(
       blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
       height,
-      parent.consensusData.baseTarget,
+      parent.baseTarget,
       parent.timestamp,
       grandParent.map(_.timestamp),
       blockTS
@@ -109,7 +109,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       else blockchain.lastBlock
 
     blockForHit.map(b => {
-      val genSig = b.header.consensusData.generationSignature.arr
+      val genSig = b.header.generationSignature.arr
       hit(generatorSignature(genSig, accountPublicKey))
     })
   }

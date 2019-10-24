@@ -65,8 +65,8 @@ package object history {
         version = version,
         timestamp = timestamp,
         reference = refTo,
-        consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
-        transactionData = txs,
+        consensus = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
+        txs = txs,
         signer = signer,
         Set.empty,
         -1L

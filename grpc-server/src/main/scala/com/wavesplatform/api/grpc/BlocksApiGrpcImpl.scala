@@ -30,7 +30,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     } else {
       commonApi
         .blockHeadersRange(request.fromHeight, request.toHeight)
-        .map { case (header, _, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), header.signerData.signature)), height) }
+        .map { case (header, _, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), header.signature)), height) }
     }
 
     val filteredStream = stream.filter {
@@ -52,7 +52,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       case Request.BlockId(blockId) =>
         commonApi
           .blockBySignature(blockId)
-          .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.header.uniqueId).get))
+          .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
 
       case Request.Height(height) =>
         commonApi
