@@ -31,7 +31,7 @@ object PureContext {
   private lazy val defaultThrowMessage = "Explicit script termination"
   lazy val MaxStringResult             = Short.MaxValue
   lazy val MaxBytesResult              = 65536
-  lazy val MaxListResultV4             = MaxBytesResult
+  lazy val MaxListLengthV4             = 1000
 
   lazy val mulLong: BaseFunction[NoContext] =
     createTryOp(MUL_OP, LONG, LONG, MUL_LONG)((a, b) => Math.multiplyExact(a, b))
@@ -282,8 +282,6 @@ object PureContext {
       case xs                                            => notImplemented[Id]("take(xs: String, number: Int)", xs)
     }
 
-  val ListSizeExceedErrorMessage = s"List size should not exceed $MaxListResultV4"
-
   def listConstructor(checkSize: Boolean): NativeFunction[NoContext] =
     NativeFunction(
       "cons",
@@ -293,12 +291,7 @@ object PureContext {
       ("head", TYPEPARAM('A')),
       ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
-      case h :: ARR(t) :: Nil =>
-        Either.cond(
-          if (checkSize) t.size + 1 <= MaxListResultV4 else true,
-          ARR(h +: t),
-          ListSizeExceedErrorMessage
-        )
+      case h :: ARR(t) :: Nil => ARR(h +: t, limited = checkSize)
       case xs => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
     }
 
@@ -311,12 +304,7 @@ object PureContext {
       ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
       ("element", TYPEPARAM('B'))
     ) {
-      case ARR(list) :: element :: Nil =>
-        Either.cond(
-          list.size + 1 <= MaxListResultV4,
-          ARR(list :+ element),
-          ListSizeExceedErrorMessage
-        )
+      case ARR(list) :: element :: Nil => ARR(list :+ element, limited = true)
       case xs => notImplemented[Id](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
     }
 
@@ -329,12 +317,7 @@ object PureContext {
       ("list1", PARAMETERIZEDLIST(TYPEPARAM('A'))),
       ("list2", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
-      case ARR(l1) :: ARR(l2) :: Nil =>
-        Either.cond(
-          l1.size + l2.size <= MaxListResultV4,
-          ARR(l1 ++ l2),
-          ListSizeExceedErrorMessage
-        )
+      case ARR(l1) :: ARR(l2) :: Nil => ARR(l1 ++ l2, limited = true)
       case xs => notImplemented[Id](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
     }
 

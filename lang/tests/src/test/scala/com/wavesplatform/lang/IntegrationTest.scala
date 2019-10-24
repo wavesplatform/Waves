@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -1091,21 +1092,21 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("list result size limit") {
-    val maxLongList = "[1" + ",1" * (PureContext.MaxListResultV4 - 1) + "]"
+    val maxLongList = "[1" + ",1" * (PureContext.MaxListLengthV4 - 1) + "]"
     val consScript =
       s"""
          | let list1 = $maxLongList
          | let list2 = 1 :: list1
-         | list2.size() == ${PureContext.MaxListResultV4 + 1}
+         | list2.size() == ${MaxListLengthV4 + 1}
        """.stripMargin
 
     eval(consScript, version = V3) shouldBe Right(CONST_BOOLEAN(true))
-    eval(consScript, version = V4) should produce(PureContext.ListSizeExceedErrorMessage)
+    eval(consScript, version = V4) should produce(s"exceed $MaxListLengthV4")
 
     val appendScript = s"[1] ++ $maxLongList"
-    eval(appendScript, version = V4) should produce(PureContext.ListSizeExceedErrorMessage)
+    eval(appendScript, version = V4) should produce(s"exceed $MaxListLengthV4")
 
     val concatScript = s"$maxLongList :+ 1"
-    eval(concatScript, version = V4) should produce(PureContext.ListSizeExceedErrorMessage)
+    eval(concatScript, version = V4) should produce(s"exceed $MaxListLengthV4")
   }
 }
