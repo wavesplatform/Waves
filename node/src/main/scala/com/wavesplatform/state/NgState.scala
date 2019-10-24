@@ -80,7 +80,7 @@ class NgState(
 
         case None =>
           val signerData = base.header.signerData.copy(signature = microBlocks.head.totalResBlockSig)
-          val block = base.copy(header = base.header.copy(signerData = signerData), transactionData = transactions)
+          val block = base.copy(header = base.header.copy(signerData = signerData, transactionCount = transactions.length), transactionData = transactions)
           internalCaches.bestBlockCache = Some(block)
           block
       }
@@ -142,8 +142,9 @@ class NgState(
 
           maybeFound.map {
             case (sig, discarded) =>
-              val signerData = base.header.signerData.copy(signature = sig)
-              (base.copy(header = base.header.copy(signerData = signerData), transactionData = base.transactionData ++ accumulatedTxs), discarded)
+              val signerData   = base.header.signerData.copy(signature = sig)
+              val transactions = base.transactionData ++ accumulatedTxs
+              (base.copy(header = base.header.copy(signerData = signerData, transactionCount = transactions.length), transactionData = transactions), discarded)
           }
         }
       }
