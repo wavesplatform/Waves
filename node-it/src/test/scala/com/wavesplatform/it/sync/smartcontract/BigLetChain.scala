@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 
 class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
   test("big let assignment chain") {
