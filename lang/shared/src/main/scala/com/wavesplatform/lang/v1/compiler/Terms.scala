@@ -1,14 +1,13 @@
 package com.wavesplatform.lang.v1.compiler
 
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import monix.eval.Coeval
 import cats.implicits._
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
+import monix.eval.Coeval
 
 object Terms {
   private val DATA_TX_BYTES_MAX = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
@@ -139,7 +138,7 @@ object Terms {
   }
   object ARR {
     def apply(xs: IndexedSeq[EVALUATED], limited: Boolean = false): Either[ExecutionError, ARR] =
-      if (limited && xs.size > PureContext.MaxListLengthV4)
+      if (limited && xs.size > MaxListLengthV4)
         Left(s"List size should not exceed $MaxListLengthV4")
       else
         Right(new ARR(xs))
