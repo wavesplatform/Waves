@@ -150,9 +150,9 @@ class Parser2(val input: ParserInput) extends Parser {
   def GenericTypesAtom: Rule1[Seq[(PART[String], Option[PART[String]])]] = rule { oneOrMore(OneGenericTypeAtom).separatedBy(WS ~ "|" ~ WS) }
   def TypesAtom: Rule1[Seq[PART[String]]]                                = rule { oneOrMore(OneTypeAtom).separatedBy(WS ~ "|" ~ WS) }
   def OneGenericTypeAtom: Rule1[(PART[String], Option[PART[String]])] = rule {
-    capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ OneTypeAtom ~ WS ~ "]" ~ WS) ~> parseGenericTypeAtom _
+    push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ optional(WS ~ "[" ~ WS ~ OneTypeAtom ~ WS ~ "]" ~ WS) ~ push(cursor) ~> parseGenericTypeAtom _
   }
-  def OneTypeAtom: Rule1[PART[String]] = rule { capture(Char ~ zeroOrMore(Char | Digit)) ~> parseOneTypeAtom _ }
+  def OneTypeAtom: Rule1[PART[String]] = rule { push(cursor) ~ capture(Char ~ zeroOrMore(Char | Digit)) ~ push(cursor) ~> parseOneTypeAtom _ }
 
   def ByteVectorAtom: Rule1[EXPR] = rule {
     push(cursor) ~ "base" ~ capture(("58" | "64" | "16")) ~ "'" ~ capture(zeroOrMore(ByteBaseChar)) ~ push(cursor) ~> parseByteVectorAtom _ ~ "'"
@@ -224,9 +224,7 @@ class Parser2(val input: ParserInput) extends Parser {
     Macro.unwrapFold(Pos(startPos, endPos), limitNumStr.toInt, list, acc, f.asInstanceOf[REF])
   }
 
-  // TODO проверить правильность позиции
   def parseGettableExpr(expr: EXPR, accessors: Seq[Accessor], endPos: Int): EXPR = {
-    val pos = Pos(expr.position.start, endPos)
     val res = accessors.foldLeft(expr) { (resExpr, accessor) =>
       accessor match {
         case GetterAcc(pos, name)       => GETTER(Pos(resExpr.position.start, pos.end), resExpr, name)
@@ -238,7 +236,6 @@ class Parser2(val input: ParserInput) extends Parser {
     res
   }
 
-  // TODO проверить правильность позиции
   def parseFunctionCallAccess(funcCall: FUNCTION_CALL, endPos: Int): Accessor = {
     val pos = Pos(funcCall.position.start, endPos)
     MethodAcc(pos, funcCall.name, funcCall.args)
@@ -253,19 +250,14 @@ class Parser2(val input: ParserInput) extends Parser {
     FUNCTION_CALL(Pos(id.position.start, endPos), id, args.toList)
   }
 
-  // TODO проверить правильность позиции
-  def parseListAccess(startPos: Int, accessObj: EXPR, endPos: Int): Accessor = {
-    val pos = Pos(startPos, endPos)
-    accessObj match {
-      case ref: REF   => GetterAcc(pos, ref.key)
-      case expr: EXPR => ListIndexAcc(pos, expr)
-    }
+  def parseListAccess(startPos: Int, accessExpr: EXPR, endPos: Int): Accessor = {
+    ListIndexAcc(Pos(startPos, endPos), accessExpr)
   }
 
   def parseListAtom(startPos: Int, elements: Seq[EXPR], endPos: Int): EXPR = {
     val pos = Pos(startPos, endPos)
-    elements.foldRight(REF(pos, PART.VALID(Pos(0, 0), "nil")): EXPR) { (resultExpr, element) =>
-      FUNCTION_CALL(pos, PART.VALID(Pos(0, 0), "cons"), List(resultExpr, element))
+    elements.foldRight(REF(pos, PART.VALID(pos, "nil")): EXPR) { (resultExpr, element) =>
+      FUNCTION_CALL(pos, PART.VALID(pos, "cons"), List(resultExpr, element))
     }
   }
 
@@ -302,31 +294,30 @@ class Parser2(val input: ParserInput) extends Parser {
   def parseAtomExpr(startPos: Int, unOperationOpt: Option[UnaryOperation], expr: EXPR, endPos: Int): EXPR = {
     unOperationOpt match {
       case Some(POSITIVE_OP) | None => expr
-      case Some(op)                 => FUNCTION_CALL(Pos(startPos, endPos), PART.VALID(Pos(0, 0), op.func), List(expr))
+      case Some(op)                 => FUNCTION_CALL(Pos(startPos, endPos), PART.VALID(Pos(startPos, endPos), op.func), List(expr))
     }
   }
 
   def parseIdentifierAtom(startPos: Int, typeName: String, endPos: Int): PART[String] = {
-    PART.VALID(Pos(0, 0), typeName)
+    PART.VALID(Pos(startPos, endPos), typeName)
   }
 
   def parseReferenceAtom(startPos: Int, typeName: String, endPos: Int): EXPR = {
-    REF(Pos(startPos, endPos), PART.VALID(Pos(0, 0), typeName))
+    REF(Pos(startPos, endPos), PART.VALID(Pos(startPos, endPos), typeName))
   }
 
   def parseTypesAtom(argTypeList: List[PART[String]]): List[PART[String]] = {
     argTypeList
   }
 
-  def parseGenericTypeAtom(genericTypeName: String, typeName: Option[PART[String]]): (PART[String], Option[PART[String]]) = {
-    (PART.VALID(Pos(0, 0), genericTypeName), typeName)
+  def parseGenericTypeAtom(startPos: Int, genericTypeName: String, typeName: Option[PART[String]], endPos: Int): (PART[String], Option[PART[String]]) = {
+    (PART.VALID(Pos(startPos, endPos), genericTypeName), typeName)
   }
 
-  def parseOneTypeAtom(typeName: String): PART[String] = {
-    PART.VALID(Pos(0, 0), typeName)
+  def parseOneTypeAtom(startPos: Int, typeName: String, endPos: Int): PART[String] = {
+    PART.VALID(Pos(startPos, endPos), typeName)
   }
 
-  // TODO ошибка парсинга байт строки
   def parseByteVectorAtom(startPos: Int, base: String, byteStr: String, endPos: Int): EXPR = {
     val decoded = base match {
       case "16" => Global.base16Decode(byteStr)
@@ -336,7 +327,7 @@ class Parser2(val input: ParserInput) extends Parser {
     }
     val result = decoded match {
       case Left(err) => CONST_BYTESTR(Pos(startPos, endPos), PART.INVALID(Pos(startPos, endPos), err.toString))
-      case Right(r) => CONST_BYTESTR(Pos(startPos, endPos), PART.VALID(Pos(0, 0), ByteStr(r)))
+      case Right(r) => CONST_BYTESTR(Pos(startPos, endPos), PART.VALID(Pos(startPos, endPos), ByteStr(r)))
     }
     result
   }
@@ -346,7 +337,7 @@ class Parser2(val input: ParserInput) extends Parser {
   }
 
   def parseFalseAtom(startPos: Int): EXPR = {
-    FALSE(Pos(startPos, startPos + 4))
+    FALSE(Pos(startPos, startPos + 5))
   }
 
   def parseStringAtom(startPos: Int, chars: String, endPos: Int): EXPR = {
