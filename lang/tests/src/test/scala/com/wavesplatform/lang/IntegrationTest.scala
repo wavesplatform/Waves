@@ -14,6 +14,7 @@ import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -1066,5 +1067,46 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(script, version = V3) should produce("Can't find a function")
     eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list append") {
+    val script =
+      """
+        | [1, 2, 3, 4] :+ 5 == [1, 2, 3, 4, 5] &&
+        | 1 :: [] :+ 2 :+ 3 == [1, 2, 3]
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list concat") {
+    val script =
+      """
+        | [1, 2, 3, 4] ++ [5, 6] == [1, 2, 3, 4, 5, 6] &&
+        | nil ++ [1, 2] :+ 3 ++ nil == [1, 2, 3]
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list result size limit") {
+    val maxLongList = "[1" + ",1" * (PureContext.MaxListLengthV4 - 1) + "]"
+    val consScript =
+      s"""
+         | let list1 = $maxLongList
+         | let list2 = 1 :: list1
+         | list2.size() == ${MaxListLengthV4 + 1}
+       """.stripMargin
+
+    eval(consScript, version = V3) shouldBe Right(CONST_BOOLEAN(true))
+    eval(consScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+
+    val appendScript = s"[1] ++ $maxLongList"
+    eval(appendScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+
+    val concatScript = s"$maxLongList :+ 1"
+    eval(concatScript, version = V4) should produce(s"exceed $MaxListLengthV4")
   }
 }
