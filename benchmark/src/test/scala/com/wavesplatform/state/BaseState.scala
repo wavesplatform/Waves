@@ -52,12 +52,12 @@ trait BaseState {
   private def genBlock(base: Block, sender: KeyPair): Gen[Block] =
     for {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
-        txGenP(sender, base.timestamp + i)
+        txGenP(sender, base.header.timestamp + i)
       })
     } yield
       TestBlock.create(
         time = transferTxs.last.timestamp,
-        ref = base.uniqueId,
+        ref = base.header.uniqueId,
         txs = transferTxs
       )
 
@@ -70,7 +70,7 @@ trait BaseState {
 
   protected def nextBlock(txs: Seq[Transaction]): Block = TestBlock.create(
     time = txs.last.timestamp,
-    ref = lastBlock.uniqueId,
+    ref = lastBlock.header.uniqueId,
     txs = txs
   )
 
