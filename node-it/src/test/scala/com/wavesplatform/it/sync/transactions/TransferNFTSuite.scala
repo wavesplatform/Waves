@@ -91,7 +91,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       payment = payment,
       args = args,
       fee = 1300000,
-      waitForTx = true)
+      waitForTx = true)._1
     }
     val nftPayment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset))))
 
