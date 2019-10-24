@@ -15,6 +15,7 @@ import play.api.libs.json._
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
+//noinspection NameBooleanParameters
 class DataTransactionSuite extends BaseTransactionSuite {
 
   test("sender's waves balance is decreased by fee.") {
@@ -114,14 +115,15 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getData(secondAddress) shouldBe boolList ++ reIntList ++ stringList
 
     // define tx with all types
-    val (balance2, eff2) = miner.accountBalances(secondAddress)
-    val intEntry2        = IntegerDataEntry("int", -127)
-    val boolEntry2       = BooleanDataEntry("bool", false)
-    val blobEntry2       = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
-    val stringEntry2     = StringDataEntry("str", "BBBB")
-    val dataAllTypes     = List(intEntry2, boolEntry2, blobEntry2, stringEntry2)
-    val fee              = calcDataFee(dataAllTypes)
-    val txId             = sender.putData(secondAddress, dataAllTypes, fee).id
+    val (balance2, eff2)   = miner.accountBalances(secondAddress)
+    val intEntry2          = IntegerDataEntry("int", -127)
+    val boolEntry2         = BooleanDataEntry("bool", false)
+    val blobEntry2         = BinaryDataEntry("blob", ByteStr(Array[Byte](127.toByte, 0, 1, 1)))
+    val stringEntry2       = StringDataEntry("str", "BBBB")
+    val unicodeStringEntry = StringDataEntry("?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "specïal")
+    val dataAllTypes       = List(intEntry2, boolEntry2, blobEntry2, stringEntry2, unicodeStringEntry)
+    val fee                = calcDataFee(dataAllTypes)
+    val txId               = sender.putData(secondAddress, dataAllTypes, fee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     sender.getDataByKey(secondAddress, "int") shouldBe intEntry2
@@ -137,10 +139,17 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("queries for multiple keys") {
-    val list     = sender.getDataList(secondAddress, json = false, "int", "bool", "str").map(_.value)
-    val jsonList = sender.getDataList(secondAddress, json = true, "int", "bool", "str").map(_.value)
-    list shouldBe jsonList
-    list shouldBe Seq(-127, false, "BBBB")
+    val tooBigKey = "toobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkey"
+    val keys   = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
+    val values = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal","BBBB")
+
+    val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
+    val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)
+    val postList = sender.getDataListPost(secondAddress, keys: _*).map(_.value)
+
+    list shouldBe values
+    jsonList shouldBe list
+    postList shouldBe list
   }
 
   test("queries for nonexistent data") {

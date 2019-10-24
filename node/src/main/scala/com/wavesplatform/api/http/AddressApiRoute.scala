@@ -300,6 +300,14 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         required = false,
         dataType = "string",
         paramType = "query"
+      ),
+      new ApiImplicitParam(
+        name = "key",
+        value = "Exact keys to query",
+        required = false,
+        dataType = "string",
+        paramType = "query",
+        allowMultiple = true
       )
     )
   )
