@@ -91,7 +91,7 @@ object Types {
       List(FieldNames.Data -> LIST(dataEntryType))
     )
 
-  private val scriptTransfer =
+  val scriptTransfer =
     CASETYPEREF(
       FieldNames.ScriptTransfer,
       List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector)
@@ -111,15 +111,12 @@ object Types {
 
   def dAppTypes(version: StdLibVersion) =
     List(
-      writeSetType,
       paymentType,
       scriptTransfer,
-      scriptTransferSetType,
-      scriptResultType,
       invocationType(version),
       assetType,
       blockInfo
-    )
+    ) ++ (if (version == V3) List(writeSetType, scriptTransferSetType, scriptResultType) else Nil)
 
   private def payments(multiPaymentAllowed: Boolean) =
     if (multiPaymentAllowed) "payments" -> listPayment

@@ -21,7 +21,7 @@ package object utils {
 
   private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
-  private val environment = new Environment[Id] {
+  val environment = new Environment[Id] {
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 1: Byte
     override def inputEntity: Environment.InputEntity                                                            = null
