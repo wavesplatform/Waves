@@ -75,23 +75,25 @@ object Schedulers {
     ExecutorScheduler(executor, reporter, executionModel, Features.empty)
   }
 
-  private[this] val m = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
-  m.setAccessible(true)
+  private[this] val stop0Method = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
+  stop0Method.setAccessible(true)
 
   private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] {
+    @volatile
     private[this] var maybeScheduledTimeout     = Option.empty[Timeout]
     override def isPeriodic: Boolean            = delegate.isPeriodic
     override def getDelay(unit: TimeUnit): Long = delegate.getDelay(unit)
     override def compareTo(o: Delayed): Int     = delegate.compareTo(o)
     override def run(): Unit = {
       val workerThread = Thread.currentThread()
-      maybeScheduledTimeout = Some(
-        timer.newTimeout(
-          (t: Timeout) => if (!t.isCancelled) m.invoke(workerThread, new TimeoutException("Timeout executing task")),
+      maybeScheduledTimeout = Some(timer.newTimeout(
+          (t: Timeout) => if (!t.isCancelled) {
+            workerThread.interrupt()
+            stop0Method.invoke(workerThread, new TimeoutException("Timeout executing task"))
+          },
           timeout.toMillis,
           MILLISECONDS
-        )
-      )
+      ))
       delegate.run()
       maybeScheduledTimeout.foreach(_.cancel())
       maybeScheduledTimeout = None
