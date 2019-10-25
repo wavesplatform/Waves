@@ -64,10 +64,14 @@ package object utils {
       .toMap
   }
 
-  private val lazyFunctionCosts: Map[StdLibVersion, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
-    lazyContexts.map(el => (el._1.stdLibVersion, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
+  private val lazyFunctionCosts: Map[DirectiveSet, Coeval[Map[FunctionHeader, Coeval[Long]]]] =
+    lazyContexts.map(el => (el._1, el._2.map(ctx => estimate(el._1.stdLibVersion, ctx.evaluationContext[Id](environment)))))
 
-  def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] = lazyFunctionCosts(version)()
+  def functionCosts(version: StdLibVersion): Map[FunctionHeader, Coeval[Long]] =
+    functionCosts(DirectiveSet(version, Account, Expression).explicitGet())
+
+  def functionCosts(ds: DirectiveSet): Map[FunctionHeader, Coeval[Long]] =
+    lazyFunctionCosts(ds)()
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext[Environment, Id]): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
