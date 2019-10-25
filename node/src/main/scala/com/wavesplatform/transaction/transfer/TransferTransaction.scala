@@ -19,23 +19,22 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 case class TransferTransaction(
-    version: Byte,
-    timestamp: Long,
+    version: TxVersion,
+    timestamp: TxTimestamp,
     sender: PublicKey,
     recipient: AddressOrAlias,
     assetId: Asset,
-    amount: Long,
+    amount: TxAmount,
     feeAssetId: Asset,
-    fee: Long,
-    attachment: Array[Byte],
+    fee: TxAmount,
+    attachment: TxByteArray,
     proofs: Proofs
 ) extends VersionedTransaction
     with SignatureField
-    with FastHashId {
+    with FastHashId
+    with CustomAssetFee {
 
   override val typeId: Byte = TransferTransaction.typeId
-
-  override val assetFee: (Asset, Long) = (feeAssetId, fee)
 
   // TODO: Rework caching
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
@@ -70,7 +69,7 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
   override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = serializer.parseBytes(bytes)
 
   // create
-  def apply(
+  def create(
       version: Byte,
       asset: Asset,
       sender: PublicKey,
@@ -85,7 +84,7 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
     TransferTransaction(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, proofs).validatedEither
 
   // signed
-  def apply(
+  def signed(
       version: Byte,
       asset: Asset,
       sender: PublicKey,
@@ -112,5 +111,5 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
       fee: Long,
       attachment: Array[Byte]
   ): Either[ValidationError, TransferTransaction] =
-    apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, sender)
+    signed(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, sender)
 }

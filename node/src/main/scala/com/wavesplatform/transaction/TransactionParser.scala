@@ -6,23 +6,19 @@ import com.wavesplatform.transaction.description.{ByteEntity, ConstantByte, OneB
 import scala.reflect.ClassTag
 import scala.util.Try
 
-trait TransactionParserLite {
+trait TransactionManifest {
   type TransactionT <: Transaction
 
   def classTag: ClassTag[TransactionT]
   def typeId: Byte
   def supportedVersions: Set[Byte]
+}
+
+trait TransactionParserLite extends TransactionManifest {
   def parseBytes(bytes: Array[Byte]): Try[TransactionT]
 }
 
-trait TransactionParser extends TransactionParserLite {
-  override def parseBytes(bytes: Array[Byte]): Try[TransactionT] =
-    parseHeader(bytes) flatMap (offset => parseTail(bytes drop offset))
-
-  /** @return offset */
-  protected def parseHeader(bytes: Array[Byte]): Try[Int]
-  protected def parseTail(bytes: Array[Byte]): Try[TransactionT]
-
+trait TransactionBytesDescription { self: TransactionManifest =>
   /** Byte description of the header of the transaction */
   val byteHeaderDescription: ByteEntity[Unit]
 
@@ -62,46 +58,17 @@ trait TransactionParser extends TransactionParserLite {
   lazy val byteDescription: ByteEntity[TransactionT] = (byteHeaderDescription, byteTailDescription) mapN { case (_, tx) => tx }
 }
 
-object TransactionParser {
-
-  trait HardcodedVersion1 extends TransactionParser {
-
+object TransactionBytesDescription {
+  trait HardcodedVersion1 { self: TransactionManifest with TransactionBytesDescription =>
     override val supportedVersions: Set[Byte] = Set(1)
-
-    override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
-
-      if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
-
-      val parsedTypeId = bytes.head
-
-      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
-
-      1
-    }
-
     lazy val byteHeaderDescription: ByteEntity[Unit] = {
       ConstantByte(1, typeId, "Transaction type") map (_ => Unit)
     }
   }
 
-  trait OneVersion extends TransactionParser {
-
+  trait OneVersion { self: TransactionManifest with TransactionBytesDescription =>
     def version: Byte
-
     override def supportedVersions: Set[Byte] = Set(version)
-
-    override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
-
-      if (bytes.length < 2) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
-
-      val Array(parsedTypeId, parsedVersion) = bytes.take(2)
-
-      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
-      if (!supportedVersions.contains(parsedVersion))
-        throw new IllegalArgumentException(s"Expected version of transaction: $version, but got '$parsedVersion'")
-
-      2
-    }
 
     lazy val byteHeaderDescription: ByteEntity[Unit] = {
       (
@@ -111,12 +78,58 @@ object TransactionParser {
     }
   }
 
-  trait MultipleVersions extends TransactionParser {
+  trait MultipleVersions { self: TransactionManifest with TransactionBytesDescription =>
+    lazy val byteHeaderDescription: ByteEntity[Unit] = {
+      (
+        ConstantByte(1, value = 0, name = "Transaction multiple version mark"),
+        ConstantByte(2, value = typeId, name = "Transaction type"),
+        OneByte(3, "Version")
+      ) mapN ((_, _, _) => Unit)
+    }
+  }
+}
+
+abstract class TransactionBytesDescriptionFor[+M <: TransactionManifest](m: M) extends TransactionBytesDescription {
+  override final type TransactionT = m.TransactionT
+}
+
+trait TransactionParser extends TransactionParserLite with TransactionBytesDescription {
+  override def parseBytes(bytes: Array[Byte]): Try[TransactionT] =
+    parseHeader(bytes) flatMap (offset => parseTail(bytes drop offset))
+
+  /** @return offset */
+  protected def parseHeader(bytes: Array[Byte]): Try[Int]
+  protected def parseTail(bytes: Array[Byte]): Try[TransactionT]
+}
+
+object TransactionParser {
+
+  trait HardcodedVersion1 extends TransactionBytesDescription.HardcodedVersion1 { self: TransactionParser =>
+    override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
+      if (bytes.length < 1) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
+      val parsedTypeId = bytes.head
+      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
+      1
+    }
+  }
+
+  trait OneVersion extends TransactionBytesDescription.OneVersion { self: TransactionParser =>
+    override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
+      if (bytes.length < 2) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
+      val Array(parsedTypeId, parsedVersion) = bytes.take(2)
+
+      if (parsedTypeId != typeId) throw new IllegalArgumentException(s"Expected type of transaction '$typeId', but got '$parsedTypeId'")
+      if (!supportedVersions.contains(parsedVersion))
+        throw new IllegalArgumentException(s"Expected version of transaction: $version, but got '$parsedVersion'")
+
+      2
+    }
+  }
+
+  trait MultipleVersions extends TransactionBytesDescription.MultipleVersions { self: TransactionParser =>
 
     override protected def parseHeader(bytes: Array[Byte]): Try[Int] = Try {
-
       if (bytes.length < 3) throw new IllegalArgumentException(s"The buffer is too small, it has ${bytes.length} elements")
-
       val Array(parsedMark, parsedTypeId, parsedVersion) = bytes.take(3)
 
       if (parsedMark != 0) throw new IllegalArgumentException(s"Expected the '0' byte, but got '$parsedMark'")
@@ -125,14 +138,6 @@ object TransactionParser {
         throw new IllegalArgumentException(s"Expected version of transaction ${supportedVersions.mkString(", ")}, but got '$parsedVersion'")
 
       3
-    }
-
-    lazy val byteHeaderDescription: ByteEntity[Unit] = {
-      (
-        ConstantByte(1, value = 0, name = "Transaction multiple version mark"),
-        ConstantByte(2, value = typeId, name = "Transaction type"),
-        OneByte(3, "Version")
-      ) mapN ((_, _, _) => Unit)
     }
   }
 }
