@@ -249,7 +249,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce(FieldNames.Error)
+    compiler.ContractCompiler(ctx, expr, V3) should produce(FieldNames.callableResultError(V3))
+    compiler.ContractCompiler(ctx, expr, V4) should produce(FieldNames.callableResultError(V4))
   }
 
   property("annotation binding can have the same name as annotated function") {

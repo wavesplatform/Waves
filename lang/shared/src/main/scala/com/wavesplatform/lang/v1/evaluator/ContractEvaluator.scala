@@ -79,7 +79,7 @@ object ContractEvaluator {
   def apply(ctx: EvaluationContext[Environment, Id], c: DApp, i: Invocation, version: StdLibVersion): Either[(ExecutionError, Log[Id]), ScriptResult] = {
     val (log, result) = EvaluatorV1().evalWithLogging(ctx, eval(c, i, version))
     result
-      .flatMap(ScriptResult.fromObj)
+      .flatMap(v => ScriptResult.fromObj(v, version))
       .leftMap((_, log))
   }
 }

@@ -1,24 +1,38 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.{Id, Show}
 import cats.implicits._
+import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1}
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, FINAL, LIST, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types => WavesTypes}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
 object ContractCompiler {
+  val callableV3ReturnType =
+    UNION(writeSetType, scriptTransferSetType, scriptResultType)
+
+  val callableV4ReturnType =
+    LIST(UNION(dataEntryType, scriptTransfer))
+
+  private def callableReturnType(v: StdLibVersion): Either[Generic, FINAL] =
+    v match {
+      case V3 => Right(callableV3ReturnType)
+      case V4 => Right(callableV4ReturnType)
+      case v  => Left(Generic(0, 0, s"DApp is not supported for V$v"))
+    }
+
   def compileAnnotatedFunc(
     af: Expressions.ANNOTATEDFUNC,
     version: StdLibVersion
@@ -43,19 +57,10 @@ object ContractCompiler {
 
     r flatMap {
       case (List(c: CallableAnnotation), (func, tpe, typedParams)) =>
-        for {
-          _ <- Either
-            .cond(
-              tpe match {
-                case _ if tpe <= UNION(WavesTypes.writeSetType, WavesTypes.scriptTransferSetType, WavesTypes.scriptResultType) =>
-                  true
-                case _ => false
-              },
-              (),
-              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
-            )
-            .toCompileM
-        } yield (CallableFunction(c, func), typedParams)
+        callableReturnType(version)
+          .filterOrElse(tpe <= _, Generic(0, 0, s"${FieldNames.callableResultError(version)}, but got '$tpe'"))
+          .map(_ => (CallableFunction(c, func): AnnotatedFunction, typedParams))
+          .toCompileM
 
       case (List(c: VerifierAnnotation), (func, tpe, typedParams)) =>
         for {
