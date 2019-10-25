@@ -4,10 +4,13 @@ import cats.implicits._
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableFunction, VerifierFunction}
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.FunctionHeader.Native
+import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{ExtractedFuncPrefix, ExtractedFuncPostfix}
 import monix.eval.Coeval
+
+import scala.util.Try
 
 object Decompiler {
 
@@ -167,23 +170,42 @@ object Decompiler {
       case Terms.FUNCTION_CALL(func, args) =>
         val argsCoeval = argsStr(args)
         func match {
-          case FunctionHeader.User(_, name) => argsCoeval.map(as => out(name + "(" + as.mkString(", ") + ")", i))
-          case FunctionHeader.Native(name) =>
-            ctx.binaryOps.get(name) match {
-              case Some(binOp) =>
-                argsCoeval.map(as => out("(" + as.head + " " + binOp + " " + as.tail.head + ")", i))
-              case None =>
-                argsCoeval.map(
-                  as =>
-                    out(ctx.opCodes.getOrElse(name, "Native<" + name + ">") + "(" + as.mkString(", ")
-                          + ")",
-                        i))
-            }
+          case FunctionHeader.Native(id) if ctx.binaryOps.contains(id) =>
+            argsCoeval.map(as => out(s"(${as(0)} ${ctx.binaryOps(id)} ${as(1)})", i))
+
+          case header =>
+            val name = extractFunctionName(ctx, header)
+            argsCoeval.map(as => out(s"$name(${as.mkString(", ")})", i))
         }
       case _: Terms.ARR     => ??? // never happens
       case _: Terms.CaseObj => ??? // never happens
     }
   }
+
+  private val extractedFuncR = s"$ExtractedFuncPrefix(\\w+)\\((.+)\\)".r
+
+  private def extractFunctionName(ctx: DecompilerContext, header: FunctionHeader) =
+    header match {
+      case inner@User(_, name) =>
+        extractedFuncR.findFirstMatchIn(name)
+          .flatMap(m =>
+            (m.group(1), m.group(2)) match {
+              case ("User", name) => Some(User(name))
+              case ("Native", id) => Try(id.toShort).toOption.map(Native)
+              case _              => None
+            }
+          )
+          .map(getFunctionName(ctx, _) + ExtractedFuncPostfix)
+          .getOrElse(getFunctionName(ctx, inner))
+
+      case h => getFunctionName(ctx, h)
+  }
+
+  private def getFunctionName(ctx: DecompilerContext, header: FunctionHeader) =
+    header match {
+      case Native(id)    => ctx.opCodes.getOrElse(id, s"Native<$id>")
+      case User(_, name) => name
+    }
 
   private val nil  = REF("nil")
   private val cons = Native(FunctionIds.CREATE_LIST)
