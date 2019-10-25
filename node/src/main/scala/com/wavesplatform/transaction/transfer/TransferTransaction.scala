@@ -38,9 +38,9 @@ case class TransferTransaction(
   override val assetFee: (Asset, Long) = (feeAssetId, fee)
 
   // TODO: Rework caching
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TxSerializer[TransferTransaction].bodyBytes(this))
-  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(TxSerializer[TransferTransaction].toBytes(this))
-  final val json: Coeval[JsObject]   = Coeval.evalOnce(TxSerializer[TransferTransaction].toJson(this))
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
+  final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
 
   override def checkedAssets(): Seq[IssuedAsset] = assetId match {
     case a: IssuedAsset => Seq(a)
@@ -50,7 +50,7 @@ case class TransferTransaction(
   override def builder: TransactionParserLite = TransferTransaction
 }
 
-object TransferTransaction extends TransactionParserLite {
+object TransferTransaction extends TransactionParserLite with TransactionOps {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
@@ -98,7 +98,7 @@ object TransferTransaction extends TransactionParserLite {
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
     apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, Proofs.empty)
-      .map(_.signWith(signer))
+      .map(this.signer.sign(_, signer))
 
   // selfSigned
   def selfSigned(
