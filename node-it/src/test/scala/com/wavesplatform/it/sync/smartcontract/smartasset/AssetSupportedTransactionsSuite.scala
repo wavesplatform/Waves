@@ -181,12 +181,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val blackTx = TransferTransaction
-      .selfSigned(2.toByte, System.currentTimeMillis + 1.minutes.toMillis, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, Array.emptyByteArray)
+      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, Array.emptyByteArray, System.currentTimeMillis + 1.minutes.toMillis)
       .right
       .get
 
     val incorrectTx = TransferTransaction
-      .selfSigned(2.toByte, System.currentTimeMillis + 10.minutes.toMillis, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, Array.emptyByteArray)
+      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, Array.emptyByteArray, System.currentTimeMillis + 10.minutes.toMillis)
       .right
       .get
 

@@ -88,7 +88,7 @@ class NFTBalanceSuite
       val other = KeyPair("other".getBytes)
 
       val transfer = TransferTransaction
-        .selfSigned(1.toByte, System.currentTimeMillis(), issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, Array.emptyByteArray)
+        .selfSigned(1.toByte, issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, Array.emptyByteArray, System.currentTimeMillis())
         .explicitGet()
 
       val assertion = for {

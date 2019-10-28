@@ -97,11 +97,11 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .explicitGet()
 
       transferFromCompanyToA = TransferTransaction
-        .selfSigned(1.toByte, ts + 20, company, accountA, assetId, 1, Waves, 1000, Array.empty)
+        .selfSigned(1.toByte, company, accountA, assetId, 1, Waves, 1000, Array.empty, ts + 20)
         .explicitGet()
 
       transferFromAToB = TransferTransaction
-        .selfSigned(1.toByte, ts + 30, accountA, accountB, assetId, 1, Waves, 1000, Array.empty)
+        .selfSigned(1.toByte, accountA, accountB, assetId, 1, Waves, 1000, Array.empty, ts + 30)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction

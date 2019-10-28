@@ -158,34 +158,13 @@ class AssetsBroadcastRouteSpec
 
     val transferRequest = createSignedTransferRequest(
       TransferTransaction
-        .selfSigned(
-          1.toByte,
-          System.currentTimeMillis(),
-          senderPrivateKey,
-          receiverPrivateKey.toAddress,
-          Asset.Waves,
-          1 * Waves,
-          Asset.Waves,
-          Waves / 3,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, senderPrivateKey, receiverPrivateKey.toAddress, Asset.Waves, 1 * Waves, Asset.Waves, Waves / 3, Array.emptyByteArray, System.currentTimeMillis())
         .right
         .get
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      TransferTransaction(
-        version = 2.toByte,
-        timestamp = System.currentTimeMillis(),
-        sender = senderPrivateKey,
-        recipient = receiverPrivateKey.toAddress,
-        assetId = Asset.Waves,
-        amount = 1 * Waves,
-        feeAssetId = Asset.Waves,
-        fee = Waves / 3,
-        attachment = Array.emptyByteArray,
-        proofs = Proofs(Seq.empty)
-      )
+      TransferTransaction(version = 2.toByte, sender = senderPrivateKey, recipient = receiverPrivateKey.toAddress, assetId = Asset.Waves, amount = 1 * Waves, feeAssetId = Asset.Waves, fee = Waves / 3, attachment = Array.emptyByteArray, timestamp = System.currentTimeMillis(), proofs = Proofs(Seq.empty))
     )
 
     "/transfer" - {

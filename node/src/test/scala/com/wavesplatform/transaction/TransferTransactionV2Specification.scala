@@ -29,8 +29,8 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
     forAll(accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
       case (acc1, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransaction(2.toByte, 1, acc2, acc2.toAddress, Waves, 1, Waves, 1, attachment, proofs1)
-        val tx2 = TransferTransaction(2.toByte, 1, acc2, acc2.toAddress, Waves, 1, Waves, 1, attachment, proofs2)
+        val tx1 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs1)
+        val tx2 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs2)
         tx1.id() shouldBe tx2.id()
     }
   }
@@ -68,18 +68,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
                        "attachment": "4t2Xazb2SX"}
     """)
 
-    val tx = TransferTransaction(
-      2.toByte,
-      1526641218066L,
-      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-      Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
-      Waves,
-      100000000,
-      Waves,
-      100000000,
-      Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
-      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
-    )
+    val tx = TransferTransaction(2.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(), Waves, 100000000, Waves, 100000000, Base58.tryDecodeWithLimit("4t2Xazb2SX").get, 1526641218066L, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
 
     tx.json() shouldEqual js
   }

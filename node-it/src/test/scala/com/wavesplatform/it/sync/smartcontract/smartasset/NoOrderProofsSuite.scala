@@ -76,18 +76,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       )
       .id
 
-    val incorrectTrTx = TransferTransaction(
-      2.toByte,
-      System.currentTimeMillis + 10.minutes.toMillis,
-      pkByAddress(firstAddress),
-      pkByAddress(thirdAddress),
-      IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
-      1,
-      Waves,
-      smartMinFee,
-      Array.emptyByteArray,
-      Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
-    )
+    val incorrectTrTx = TransferTransaction(2.toByte, pkByAddress(firstAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(assetWProofs).get), 1, Waves, smartMinFee, Array.emptyByteArray, System.currentTimeMillis + 10.minutes.toMillis, Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))))
 
     assertBadRequestAndMessage(
       sender.signedBroadcast(incorrectTrTx.json()),

@@ -34,7 +34,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
 
   "after restarting all the nodes, the duplicate transaction cannot be put into the blockchain" in {
     val txJson = TransferTransaction
-      .selfSigned(1.toByte, System.currentTimeMillis(), nodeB.privateKey, AddressOrAlias.fromString(nodeA.address).explicitGet(), Waves, 1.waves, Waves, minFee, Array[Byte]())
+      .selfSigned(1.toByte, nodeB.privateKey, AddressOrAlias.fromString(nodeA.address).explicitGet(), Waves, 1.waves, Waves, minFee, Array[Byte](), System.currentTimeMillis())
       .explicitGet()
       .json()
 

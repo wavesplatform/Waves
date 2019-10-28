@@ -40,19 +40,19 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, ts + 1, master, alice, Waves, feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee, Waves, transferAssetWavesFee, Array.emptyByteArray)
+      .selfSigned(1.toByte, master, alice, Waves, feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
       .right
       .get
     aliceToBob: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, ts + 2, alice, bob, Asset.fromCompatId(Some(feeAsset.id())), feeAsset.quantity / 2, Waves, transferAssetWavesFee, Array.emptyByteArray)
+      .selfSigned(1.toByte, alice, bob, Asset.fromCompatId(Some(feeAsset.id())), feeAsset.quantity / 2, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 2)
       .right
       .get
     bobToMaster: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, ts + 3, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray)
+      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 3)
       .right
       .get
     bobToMaster2: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, ts + 4, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray)
+      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 4)
       .right
       .get
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToBob, bobToMaster, bobToMaster2)

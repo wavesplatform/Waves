@@ -79,7 +79,7 @@ object Preconditions {
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, time.correctedTime(), settings.faucet, acc, Waves, balance, Waves, Fee, "Generator".getBytes("UTF-8"))
+                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, "Generator".getBytes("UTF-8"), time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))

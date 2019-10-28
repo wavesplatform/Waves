@@ -20,7 +20,6 @@ import scala.util.Try
 
 case class TransferTransaction(
     version: TxVersion,
-    timestamp: TxTimestamp,
     sender: PublicKey,
     recipient: AddressOrAlias,
     assetId: Asset,
@@ -28,6 +27,7 @@ case class TransferTransaction(
     feeAssetId: Asset,
     fee: TxAmount,
     attachment: TxByteArray,
+    timestamp: TxTimestamp,
     proofs: Proofs
 ) extends VersionedTransaction
     with SignatureField
@@ -70,7 +70,6 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
 
   def create(
       version: TxVersion,
-      timestamp: TxTimestamp,
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
@@ -78,13 +77,13 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
       feeAsset: Asset,
       fee: TxTimestamp,
       attachment: Array[TxVersion],
+      timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, proofs).validatedEither
+    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs).validatedEither
 
   def signed(
       version: TxVersion,
-      timestamp: TxTimestamp,
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
@@ -92,21 +91,22 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
       feeAsset: Asset,
       fee: TxTimestamp,
       attachment: Array[TxVersion],
+      timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
-    create(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, Proofs.empty)
+    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty)
       .map(this.signer.sign(_, signer))
 
   def selfSigned(
       version: TxVersion,
-      timestamp: TxTimestamp,
       sender: KeyPair,
       recipient: AddressOrAlias,
       asset: Asset,
       amount: TxTimestamp,
       feeAsset: Asset,
       fee: TxTimestamp,
-      attachment: Array[TxVersion]
+      attachment: Array[TxVersion],
+      timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
-    signed(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, sender)
+    signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)
 }

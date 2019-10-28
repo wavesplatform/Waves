@@ -123,7 +123,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferToRecipient = TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis() + 4, contract, recipient, IssuedAsset(issueTx.id()), ENOUGH_FEE * 3, Waves, ENOUGH_FEE, Array.emptyByteArray)
+        .selfSigned(2.toByte, contract, recipient, IssuedAsset(issueTx.id()), ENOUGH_FEE * 3, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 4)
         .explicitGet()
       setScript = SetScriptTransaction
         .selfSigned(
@@ -134,7 +134,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferTx = TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis() + 8, recipient, accountGen.sample.get, Waves, 1, IssuedAsset(issueTx.id()), ENOUGH_FEE, Array.emptyByteArray)
+        .selfSigned(2.toByte, recipient, accountGen.sample.get, Waves, 1, IssuedAsset(issueTx.id()), ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 8)
         .explicitGet()
     } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToRecipient, setScript)), transferTx)
   }
@@ -173,7 +173,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferToContract = TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis() + 4, sponsor, contract, IssuedAsset(issueTx.id()), ENOUGH_FEE * 3, Waves, ENOUGH_FEE, Array.emptyByteArray)
+        .selfSigned(2.toByte, sponsor, contract, IssuedAsset(issueTx.id()), ENOUGH_FEE * 3, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 4)
         .explicitGet()
       setScript = SetScriptTransaction
         .selfSigned(
@@ -184,7 +184,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferTx = TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis() + 8, contract, sponsor, Waves, 1, IssuedAsset(issueTx.id()), ENOUGH_FEE, Array.emptyByteArray)
+        .selfSigned(2.toByte, contract, sponsor, Waves, 1, IssuedAsset(issueTx.id()), ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 8)
         .explicitGet()
     } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToContract, setScript)), transferTx)
   }

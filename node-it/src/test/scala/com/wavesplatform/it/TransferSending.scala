@@ -114,9 +114,9 @@ trait TransferSending extends ScorexLogging {
         case (x, i) =>
           createSignedTransferRequest(
             TransferTransaction
-              .selfSigned(version = 2.toByte, timestamp = start + i, sender = KeyPair(Base58.decode(x.senderSeed)), recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(), asset = Waves, amount = x.amount, feeAsset = Waves, fee = x.fee, attachment = if (includeAttachment) {
+              .selfSigned(version = 2.toByte, sender = KeyPair(Base58.decode(x.senderSeed)), recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(), asset = Waves, amount = x.amount, feeAsset = Waves, fee = x.fee, attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray)
+                } else Array.emptyByteArray, timestamp = start + i)
               .right
               .get
           )

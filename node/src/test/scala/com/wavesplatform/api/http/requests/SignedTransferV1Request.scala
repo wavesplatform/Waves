@@ -54,6 +54,6 @@ case class SignedTransferV1Request(
       _signature  <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _account    <- AddressOrAlias.fromString(recipient)
-      tx          <- TransferTransaction.create(1.toByte, timestamp, _sender, _account, _assetId, amount, _feeAssetId, fee, _attachment.arr, Proofs(_signature))
+      tx          <- TransferTransaction.create(1.toByte, _sender, _account, _assetId, amount, _feeAssetId, fee, _attachment.arr, timestamp, Proofs(_signature))
     } yield tx
 }

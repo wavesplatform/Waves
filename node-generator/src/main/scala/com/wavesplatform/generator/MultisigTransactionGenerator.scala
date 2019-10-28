@@ -38,7 +38,6 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
     val res = Range(0, settings.transactions).map { i =>
       val tx = TransferTransaction(
         2.toByte,
-        now + i,
         bank,
         owners(1),
         Waves,
@@ -46,6 +45,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         Waves,
         enoughFee,
         Array.emptyByteArray,
+        now + i,
         Proofs.empty
       )
       val signatures = owners.map(crypto.sign(_, tx.bodyBytes())).map(ByteStr(_))

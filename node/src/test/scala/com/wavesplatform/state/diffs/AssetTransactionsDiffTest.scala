@@ -192,7 +192,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransaction.selfSigned(1.toByte, timestamp, issuer, holder, assetId, quantity - 1, Waves, fee, attachment).explicitGet()
+      transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder, assetId, quantity - 1, Waves, fee, attachment, timestamp).explicitGet()
       reissue  = ReissueTransactionV1.selfSigned(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
@@ -252,7 +252,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(1.toByte, timestamp + 2, accountA, accountB, assetId, issue.quantity, Waves, smallFee, Array.empty)
+        .selfSigned(1.toByte, accountA, accountB, assetId, issue.quantity, Waves, smallFee, Array.empty, timestamp + 2)
         .explicitGet()
       reissue = ReissueTransactionV1.selfSigned(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)

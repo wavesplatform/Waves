@@ -53,7 +53,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransaction =
       TransferTransaction
-        .selfSigned(1.toByte, timestamp, sender.privateKey, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, Array.emptyByteArray)
+        .selfSigned(1.toByte, sender.privateKey, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, Array.emptyByteArray, timestamp)
         .right
         .get
 

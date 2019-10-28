@@ -262,14 +262,14 @@ object SyncHttpApi extends Assertions {
       val tx = TransferTransaction
         .selfSigned(
           version = 2.toByte,
-          timestamp = System.currentTimeMillis(),
           sender = source,
           recipient = AddressOrAlias.fromString(recipient).explicitGet(),
           asset = Asset.fromString(assetId),
           amount = amount,
           feeAsset = Asset.fromString(feeAssetId),
           fee = fee,
-          attachment = Array.emptyByteArray
+          attachment = Array.emptyByteArray,
+          timestamp = System.currentTimeMillis()
         )
         .explicitGet()
 

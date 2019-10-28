@@ -26,18 +26,7 @@ case class TransferRequest(
       validFeeAssetId <- toAsset(feeAssetId)
       validAttachment <- toAttachment(attachment)
       validProofs     <- toProofs(version, signature, proofs)
-    } yield TransferTransaction(
-      version.getOrElse(1.toByte),
-      timestamp.getOrElse(0L),
-      sender,
-      validRecipient,
-      validAssetId,
-      amount,
-      validFeeAssetId,
-      fee,
-      validAttachment,
-      validProofs
-    )
+    } yield TransferTransaction(version.getOrElse(1.toByte), sender, validRecipient, validAssetId, amount, validFeeAssetId, fee, validAttachment, timestamp.getOrElse(0L), validProofs)
 }
 
 object TransferRequest {

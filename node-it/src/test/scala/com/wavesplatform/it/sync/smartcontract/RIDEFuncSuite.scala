@@ -54,7 +54,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, System.currentTimeMillis(), pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array())
+          .selfSigned(2.toByte, pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array(), System.currentTimeMillis())
           .explicitGet()
           .json()),
       "Transaction is not allowed by account-script"
@@ -62,7 +62,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis(), acc0, pkNewAddress, IssuedAsset(ByteStr.decodeBase58(asset).get), 100000000, Waves, smartMinFee, Array())
+        .selfSigned(2.toByte, acc0, pkNewAddress, IssuedAsset(ByteStr.decodeBase58(asset).get), 100000000, Waves, smartMinFee, Array(), System.currentTimeMillis())
         .explicitGet()
         .json(),
       waitForTx = true
@@ -70,7 +70,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val transfer = sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis(), pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array())
+        .selfSigned(2.toByte, pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array(), System.currentTimeMillis())
         .explicitGet()
         .json())
     nodes.waitForHeightAriseAndTxPresent(transfer.id)
@@ -93,7 +93,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, System.currentTimeMillis(), pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array())
+          .selfSigned(2.toByte, pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array(), System.currentTimeMillis())
           .explicitGet()
           .json()),
       "Transaction is not allowed by account-script"
@@ -101,7 +101,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis(), acc0, pkNewAddress, IssuedAsset(ByteStr.decodeBase58(asset).get), 800000000, Waves, smartMinFee, Array())
+        .selfSigned(2.toByte, acc0, pkNewAddress, IssuedAsset(ByteStr.decodeBase58(asset).get), 800000000, Waves, smartMinFee, Array(), System.currentTimeMillis())
         .explicitGet()
         .json(),
       waitForTx = true
@@ -109,7 +109,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val transferAfterUpd = sender.signedBroadcast(
       TransferTransaction
-        .selfSigned(2.toByte, System.currentTimeMillis(), pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array())
+        .selfSigned(2.toByte, pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array(), System.currentTimeMillis())
         .explicitGet()
         .json())
     nodes.waitForHeightAriseAndTxPresent(transferAfterUpd.id)
@@ -148,7 +148,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(2.toByte, System.currentTimeMillis(), pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array())
+    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array(), System.currentTimeMillis())
     val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }

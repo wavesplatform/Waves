@@ -93,7 +93,7 @@ object PBTransactions {
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
             for {
               address <- recipient.toAddressOrAlias
-            } yield vt.transfer.TransferTransaction(version.toByte, timestamp, sender, address, amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, proofs)
+            } yield vt.transfer.TransferTransaction(version.toByte, sender, address, amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, timestamp, proofs)
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
         for {
@@ -299,7 +299,7 @@ object PBTransactions {
         vt.PaymentTransaction(sender, PBRecipients.toAddress(recipient).explicitGet(), amount, feeAmount, timestamp, signature)
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
-        vt.transfer.TransferTransaction(version.toByte, timestamp, sender, recipient.toAddressOrAlias.explicitGet(), amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, proofs)
+        vt.transfer.TransferTransaction(version.toByte, sender, recipient.toAddressOrAlias.explicitGet(), amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, timestamp, proofs)
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
         vt.CreateAliasTransaction(version.toByte,

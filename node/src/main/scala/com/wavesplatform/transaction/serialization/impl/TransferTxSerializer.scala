@@ -65,7 +65,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
       val recipient  = buf.getAddressOrAlias
       val attachment = buf.getPrefixedByteArray
 
-      TransferTransaction(version, ts, sender, recipient, assetId, amount, feeAssetId, fee, attachment, Proofs.empty)
+      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, attachment, ts, Proofs.empty)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transfer transaction")
