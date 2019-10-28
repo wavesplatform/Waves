@@ -7,6 +7,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.validation.TxValidator
 
 trait TxBroadcastRequest[TransactionT <: Transaction] {
+  def sender: Option[String]
   def senderPublicKey: Option[String]
 
   def toTxFrom(sender: PublicKey): Either[ValidationError, TransactionT]

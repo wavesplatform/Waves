@@ -28,7 +28,7 @@ object TransactionFactory {
 
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
-      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.signer"))
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
       tx <- transferAsset(request, wallet, request.sender.get, time)
     } yield tx
 
@@ -360,14 +360,16 @@ object TransactionFactory {
 
   def createAlias(request: CreateAliasRequest, wallet: Wallet, time: Time): Either[ValidationError, CreateAliasTransaction] =
     for {
-      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.signer"))
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
       tx <- createAlias(request, wallet, request.sender.get, time)
     } yield tx
 
   def createAlias(request: CreateAliasRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, CreateAliasTransaction] =
     for {
-      signer <- wallet.findPrivateKey(signerAddress)
-      tx     <- request.toValidTx
+      _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
+      sender <- wallet.findPrivateKey(request.sender.get)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toValidTxFrom(sender)
+      signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       signedTx = tx.signWith(signer)
     } yield signedTx
 
