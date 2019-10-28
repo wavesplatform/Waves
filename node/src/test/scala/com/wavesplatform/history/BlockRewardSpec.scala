@@ -108,8 +108,8 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
         case (prev, _) => prev :+ mkEmptyBlock(prev.last.uniqueId, miner)
       }
       .tail
-    thirdTermStart  = BlockRewardActivationHeight + 10 + 10
-    b17             = Range
+    thirdTermStart = BlockRewardActivationHeight + 10 + 10
+    b17 = Range
       .inclusive(thirdTermStart + 1, thirdTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b16.last)) {
         case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
@@ -117,8 +117,8 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
         case (prev, _) => prev :+ mkEmptyBlock(prev.last.uniqueId, miner)
       }
       .tail
-    fourthTermStart  = BlockRewardActivationHeight + 10 + 10 + 10
-    b18             = Range
+    fourthTermStart = BlockRewardActivationHeight + 10 + 10 + 10
+    b18 = Range
       .inclusive(fourthTermStart + 1, fourthTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b17.last)) {
         case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
