@@ -211,7 +211,7 @@ class UserFunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec wi
     est(exprUNot).explicitGet() shouldBe 2
 
     val exprDataByIndex = LET_BLOCK(
-      LET("arr", FUNCTION_CALL(PureContext.listConstructor, List(CONST_STRING("str_1").explicitGet(), REF("nil")))),
+      LET("arr", FUNCTION_CALL(PureContext.listConstructor(checkSize = false), List(CONST_STRING("str_1").explicitGet(), REF("nil")))),
       FUNCTION_CALL(User("getString"), List(REF("arr"), CONST_LONG(0)))
     )
     est(exprDataByIndex).explicitGet() shouldBe 43
