@@ -10,29 +10,16 @@ import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Gene
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, FINAL, LIST, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, FINAL}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
 object ContractCompiler {
-  val callableV3ReturnType =
-    UNION(writeSetType, scriptTransferSetType, scriptResultType)
-
-  val callableV4ReturnType =
-    LIST(UNION(dataEntryType, scriptTransfer))
-
-  private def callableReturnType(v: StdLibVersion): Either[Generic, FINAL] =
-    v match {
-      case V3 => Right(callableV3ReturnType)
-      case V4 => Right(callableV4ReturnType)
-      case v  => Left(Generic(0, 0, s"DApp is not supported for V$v"))
-    }
-
   def compileAnnotatedFunc(
     af: Expressions.ANNOTATEDFUNC,
     version: StdLibVersion
@@ -56,10 +43,13 @@ object ContractCompiler {
     } yield (annotations, compiledBody)
 
     r flatMap {
-      case (List(c: CallableAnnotation), (func, tpe, typedParams)) =>
+      case (List(c: CallableAnnotation), (func, resultType, typedParams)) =>
         callableReturnType(version)
-          .filterOrElse(tpe <= _, Generic(0, 0, s"${FieldNames.callableResultError(version)}, but got '$tpe'"))
-          .map(_ => (CallableFunction(c, func): AnnotatedFunction, typedParams))
+          .ensureOr(expectedType => callableResultError(expectedType, resultType))(resultType <= _)
+          .bimap(
+            Generic(0, 0, _),
+            _ => (CallableFunction(c, func): AnnotatedFunction, typedParams)
+          )
           .toCompileM
 
       case (List(c: VerifierAnnotation), (func, tpe, typedParams)) =>

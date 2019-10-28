@@ -3,7 +3,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx
 import cats.implicits._
 import cats.Monad
 import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, EVALUATED}
-import com.wavesplatform.lang.v1.compiler.Types.UNIT
+import com.wavesplatform.lang.v1.compiler.Types.{FINAL, UNIT}
 
 package object impl {
   def notImplemented[F[_] : Monad](funcName: String, args: List[Any]): F[Either[String, EVALUATED]] =
@@ -11,4 +11,7 @@ package object impl {
         .asLeft[EVALUATED].pure[F]
 
   lazy val unit: CaseObj = CaseObj(UNIT, Map.empty)
+
+  def callableResultError(expected: AnyRef, actual: AnyRef): String =
+    s"CallableFunction needs to return $expected, but got '$actual'"
 }

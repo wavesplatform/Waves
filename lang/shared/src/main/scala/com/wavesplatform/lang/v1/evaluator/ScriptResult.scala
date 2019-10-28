@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.domain.DataItem
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
@@ -13,11 +14,11 @@ case class ScriptResult(ds: List[DataItem[_]], ts: List[(Address, Long, Option[B
 object ScriptResult {
   type E[A] = Either[String, A]
 
-  private def err(actual: AnyRef, version: StdLibVersion, expected: String = "") =
-    Left(
-      s"${FieldNames.callableResultError(version)}, " +
-      s"but got '$actual'${if (expected.isEmpty) "" else s"instead of '$expected"}"
-    )
+  private def err(actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, Nothing] =
+    Types.callableReturnType(version)
+      .flatMap(t => Left(
+        callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of '$expected")
+      ))
 
   private def processDataEntry(dataEntryFields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, DataItem[_]] =
     (dataEntryFields.get(FieldNames.Key), dataEntryFields.get(FieldNames.Value)) match {

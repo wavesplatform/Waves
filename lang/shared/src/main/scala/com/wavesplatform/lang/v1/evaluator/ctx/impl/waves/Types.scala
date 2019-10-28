@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 
@@ -109,14 +111,70 @@ object Types {
       List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType)
     )
 
-  def dAppTypes(version: StdLibVersion) =
+  val issueActionType =
+    CASETYPEREF(
+      FieldNames.Issue,
+      List(
+        FieldNames.IssueScript -> optionByteVector,
+        FieldNames.IssueDecimals -> LONG,
+        FieldNames.IssueDescription -> STRING,
+        FieldNames.IssueIsReissuable -> BOOLEAN,
+        FieldNames.IssueName -> STRING,
+        FieldNames.IssueQuantity -> LONG,
+      )
+    )
+
+  val reissueActionType =
+    CASETYPEREF(
+      FieldNames.Reissue,
+      List(
+        FieldNames.ReissueAssetId -> BYTESTR,
+        FieldNames.ReissueIsReissuable -> BOOLEAN,
+        FieldNames.ReissueQuantity -> LONG
+      )
+    )
+
+  val burnActionType =
+    CASETYPEREF(
+      FieldNames.Burn,
+      List(
+        FieldNames.BurnAssetId  -> BYTESTR,
+        FieldNames.BurnQuantity -> LONG
+      )
+    )
+
+  private val callableV3Results =
+    List(writeSetType, scriptTransferSetType, scriptResultType)
+
+  private val callableV4Actions =
+    List(issueActionType, reissueActionType, burnActionType)
+
+  private def callableTypes(version: StdLibVersion) =
+    if (version == V3) callableV3Results
+    else if (version >= V4) callableV4Actions
+    else Nil
+
+  def dAppTypes(version: StdLibVersion): List[CASETYPEREF] =
     List(
       paymentType,
       scriptTransfer,
       invocationType(version),
       assetType,
       blockInfo
-    ) ++ (if (version == V3) List(writeSetType, scriptTransferSetType, scriptResultType) else Nil)
+    ) ::: callableTypes(version)
+
+  private val callableV3ReturnType =
+    UNION(callableV3Results: _*)
+
+  private val callableV4ReturnType =
+    LIST(UNION.create(dataEntryType :: scriptTransfer :: callableV4Actions))
+
+  def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
+    v match {
+      case V3 => Right(callableV3ReturnType)
+      case V4 => Right(callableV4ReturnType)
+      case v  => Left(s"DApp is not supported for V$v")
+    }
 
   private def payments(multiPaymentAllowed: Boolean) =
     if (multiPaymentAllowed) "payments" -> listPayment

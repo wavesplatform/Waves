@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.compiler
 
+import cats.implicits._
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common
+import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
@@ -235,6 +236,8 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("contract compiles fails when incorrect return type") {
+    import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+
     val ctx = compilerContext
     val expr = {
       val script =
@@ -249,8 +252,14 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce(FieldNames.callableResultError(V3))
-    compiler.ContractCompiler(ctx, expr, V4) should produce(FieldNames.callableResultError(V4))
+
+    compiler.ContractCompiler(ctx, expr, V3) should produce(
+      callableResultError(Types.callableReturnType(V3).explicitGet(), "ByteVector")
+    )
+
+    compiler.ContractCompiler(ctx, expr, V4) should produce(
+      callableResultError(Types.callableReturnType(V4).explicitGet(), "ByteVector")
+    )
   }
 
   property("annotation binding can have the same name as annotated function") {
@@ -770,5 +779,32 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
       Parser.parseContract(script).get.value
     }
     compiler.ContractCompiler(ctx, expr, V3) should produce("Annotated function should not have generic parameter types")
+  }
+
+  property("@Callable V4 result type") {
+    val expr = {
+      val script =
+        """
+          | {-# STDLIB_VERSION 4    #-}
+          | {-#CONTENT_TYPE    DAPP #-}
+          |
+          | @Callable(i)
+          | func foo(a:ByteVector) =
+          |   [
+          |     DataEntry("key", 1),
+          |     ScriptTransfer(i.caller, 1, base58''),
+          |     Issue(base58'', 4, "description", true, "name", 1000),
+          |     Issue(unit,     4, "description", true, "name", 1000),
+          |     Reissue(base58'', false, 1),
+          |     Burn(base58'', 1)
+          |   ]
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    val ctx =
+      PureContext.build(Global, V4).withEnvironment[Environment] |+|
+      WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+
+    compiler.ContractCompiler(ctx.compilerContext, expr, V4) shouldBe 'right
   }
 }

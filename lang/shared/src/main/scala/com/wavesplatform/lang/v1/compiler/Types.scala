@@ -33,6 +33,9 @@ object Types {
 
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)]) extends REAL {
     override def typeList: List[REAL] = List(this)
+
+    override lazy val toString: String =
+      name + (if (fields.nonEmpty) fields.map { case (name, t) => s"$name: $t" }.mkString("(", ", ", ")") else "")
   }
 
   def toFinal(resultType: TYPE, resolvedPlaceholders: Map[TYPEPARAM, FINAL]): FINAL = {
