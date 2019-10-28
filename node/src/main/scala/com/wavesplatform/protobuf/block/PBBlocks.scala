@@ -23,7 +23,7 @@ object PBBlocks {
                signature: ByteStr): VanillaBlock = {
       VanillaBlock(
         BlockHeader(
-          signature, version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionData.size
+          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote
         ),
         signature,
         transactionData

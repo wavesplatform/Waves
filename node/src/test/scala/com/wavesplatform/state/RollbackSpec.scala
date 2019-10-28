@@ -65,13 +65,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             } else {
               val block = TestBlock.create(nextTs + i, d.lastBlockId, Seq())
               d.appendBlock(block)
-              block.header.uniqueId :: newBlocks(i + 1)
+              block.uniqueId :: newBlocks(i + 1)
             }
           }
           val blocks        = newBlocks(0)
           val droppedBlocks = d.removeAfter(genesisSignature)
           droppedBlocks(0).header.reference shouldBe genesisSignature
-          droppedBlocks.map(_.header.uniqueId).toList shouldBe blocks
+          droppedBlocks.map(_.uniqueId).toList shouldBe blocks
           droppedBlocks foreach d.appendBlock
         }
     }

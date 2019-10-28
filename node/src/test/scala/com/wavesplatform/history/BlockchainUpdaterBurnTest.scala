@@ -60,10 +60,10 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     scenario(preconditions, localWavesSettings) {
       case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
         val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1, ts)
-        val block1 = customBuildBlockOfTxs(block0.header.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.header.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.header.uniqueId, Seq(burn), defaultSigner, 1, ts + 350)
-        val block4 = customBuildBlockOfTxs(block3.header.uniqueId, Seq(reissue), defaultSigner, 1, ts + 450)
+        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
+        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn), defaultSigner, 1, ts + 350)
+        val block4 = customBuildBlockOfTxs(block3.uniqueId, Seq(reissue), defaultSigner, 1, ts + 450)
 
         domain.appendBlock(block0)
         domain.appendBlock(block1)
@@ -86,9 +86,9 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     scenario(preconditions, localWavesSettings) {
       case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
         val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1, ts)
-        val block1 = customBuildBlockOfTxs(block0.header.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.header.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.header.uniqueId, Seq(burn, reissue), defaultSigner, 1, ts + 350)
+        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
+        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn, reissue), defaultSigner, 1, ts + 350)
 
         domain.appendBlock(block0)
         domain.appendBlock(block1)

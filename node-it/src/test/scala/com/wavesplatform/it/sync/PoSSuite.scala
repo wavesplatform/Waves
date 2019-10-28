@@ -123,7 +123,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
     val resignedBlock =
       block
-        .copy(signature = signature, header = block.header.copy(signature = signature, generator = signerPK))
+        .copy(signature = signature)
 
     waitForBlockTime(resignedBlock)
 

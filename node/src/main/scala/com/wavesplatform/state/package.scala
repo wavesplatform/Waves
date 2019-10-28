@@ -157,8 +157,9 @@ package object state {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val (block, _)  = blockchain.blockHeaderAndSize(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block.signature)
+      val (_, _, _, signature) =
+        blockchain.blockHeaderAndSize(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
+      val balances = blockchain.balanceSnapshots(address, bottomLimit, signature)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 

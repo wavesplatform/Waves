@@ -83,7 +83,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       b1 = TestBlock
         .create(
           ts + 10,
-          genesisBlock.header.uniqueId,
+          genesisBlock.uniqueId,
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2),
@@ -94,7 +94,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         )
       b2 = TestBlock.create(
         ts + 20,
-        b1.header.uniqueId,
+        b1.uniqueId,
         Seq(
           createTransfer(master, recipient.toAddress, ts + 11),
           createTransfer(recipient, master.toAddress, ts + 12),

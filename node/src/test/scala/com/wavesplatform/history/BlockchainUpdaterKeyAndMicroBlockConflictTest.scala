@@ -50,7 +50,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0) > 0)
 
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, leaseBlock.header.uniqueId) > 0)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, leaseBlock.uniqueId) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
         }
@@ -95,7 +95,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.header.signerData.signature,
+          totalRefTo = genesisBlock.signature,
           base = Seq(transfer1),
           micros = Seq(Seq(transfer2)),
           signer = richAccount,
@@ -104,7 +104,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
-          totalRefTo = keyBlock.header.signerData.signature,
+          totalRefTo = keyBlock.signature,
           base = Seq(transfer3),
           micros = Nil,
           signer = secondAccount,
@@ -137,7 +137,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.header.signerData.signature,
+          totalRefTo = genesisBlock.signature,
           base = Seq(transfer1),
           micros = Seq(Seq(), Seq(transfer2)),
           signer = richAccount,
@@ -179,7 +179,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val leaseBlock = unsafeBlock(
-          genesisBlock.header.signerData.signature,
+          genesisBlock.signature,
           Seq(lease),
           richAccount,
           3,
@@ -187,7 +187,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = leaseBlock.header.signerData.signature,
+          totalRefTo = leaseBlock.signature,
           base = Nil,
           micros = Seq(Seq(leaseCancel)),
           signer = richAccount,
@@ -196,7 +196,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val transferBlock = unsafeBlock(
-          keyBlock.header.signerData.signature,
+          keyBlock.signature,
           Seq(transfer),
           secondAccount,
           3,
@@ -224,7 +224,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val preBlock = unsafeBlock(
-          genesisBlock.header.signerData.signature,
+          genesisBlock.signature,
           Seq(data1),
           richAccount,
           3,
@@ -232,7 +232,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = preBlock.header.signerData.signature,
+          totalRefTo = preBlock.signature,
           base = Seq(),
           micros = Seq(Seq(data2)),
           signer = richAccount,

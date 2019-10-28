@@ -4,7 +4,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.Transaction
 
@@ -20,18 +19,20 @@ object TestBlock {
   def randomSignature(): ByteStr = randomOfLength(SignatureLength)
 
   def sign(signer: KeyPair, b: Block): Block = {
-    Block
+    val x = Block
       .buildAndSign(
         version = b.header.version,
         timestamp = b.header.timestamp,
         reference = b.header.reference,
-        consensus = b.header.consensusData,
+        baseTarget = b.header.baseTarget,
+        generationSignature = b.header.generationSignature,
         txs = b.transactionData,
         signer = signer,
         featureVotes = b.header.featureVotes,
         rewardVote = b.header.rewardVote
       )
-      .explicitGet()
+
+      x.explicitGet()
   }
 
   def create(txs: Seq[Transaction]): Block = create(defaultSigner, txs)
@@ -46,50 +47,68 @@ object TestBlock {
 
   def create(time: Long, txs: Seq[Transaction], signer: KeyPair): Block = create(time, randomSignature(), txs, signer)
 
-  def create(time: Long,
-             ref: ByteStr,
-             txs: Seq[Transaction],
-             signer: KeyPair = defaultSigner,
-             version: Byte = 2,
-             features: Set[Short] = Set.empty[Short],
-             rewardVote: Long = -1L): Block =
+  def create(
+      time: Long,
+      ref: ByteStr,
+      txs: Seq[Transaction],
+      signer: KeyPair = defaultSigner,
+      version: Byte = 2,
+      features: Set[Short] = Set.empty[Short],
+      rewardVote: Long = -1L
+  ): Block =
     sign(
       signer,
       Block(
-        timestamp = time,
-        version = version,
-        reference = ref,
-        signerData = SignerData(signer, ByteStr.empty),
-        consensusData = NxtLikeConsensusBlockData(2L, ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))),
+        BlockHeader(
+          timestamp = time,
+          version = version,
+          reference = ref,
+          baseTarget = 2L,
+          generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte)),
+          generator = signer,
+          featureVotes = features,
+          rewardVote = rewardVote
+        ),
         transactionData = txs,
-        featureVotes = features,
-        rewardVote = rewardVote
+        signature = ByteStr.empty
       )
     )
 
   def withReference(ref: ByteStr): Block =
     sign(
       defaultSigner,
-      Block(0,
-            1,
-            ref,
-            SignerData(defaultSigner, ByteStr.empty),
-            NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
-            Seq.empty,
-            Set.empty,
-            -1L)
+      Block(
+        BlockHeader(
+          1,
+          0,
+          ref,
+          2L,
+          randomOfLength(Block.GeneratorSignatureLength),
+          defaultSigner,
+          Set.empty,
+          -1L
+        ),
+        ByteStr.empty,
+        Seq.empty
+      )
     )
 
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
     sign(
       defaultSigner,
-      Block(0,
-            3,
-            ref,
-            SignerData(defaultSigner, ByteStr.empty),
-            NxtLikeConsensusBlockData(2L, randomOfLength(Block.GeneratorSignatureLength)),
-            Seq.empty,
-            features,
-            -1L)
+      Block(
+        BlockHeader(
+          3,
+          0,
+          ref,
+          2L,
+          randomOfLength(Block.GeneratorSignatureLength),
+          defaultSigner,
+          features,
+          -1L
+        ),
+        ByteStr.empty,
+        Seq.empty
+      )
     )
 }

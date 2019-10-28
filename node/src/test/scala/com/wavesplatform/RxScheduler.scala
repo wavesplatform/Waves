@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, MicroBlock, SignerData}
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
@@ -35,11 +35,7 @@ trait RxScheduler extends BeforeAndAfterAll { _: Suite =>
 
   val signer: KeyPair = TestBlock.defaultSigner
 
-  def block(id: Int): Block = {
-    val testBlock = TestBlock.create(Seq.empty)
-    val signerData = SignerData(signer, byteStr(id))
-    testBlock.copy(header = testBlock.header.copy(signerData =signerData))
-  }
+  def block(id: Int): Block = TestBlock.create(Seq.empty).copy(signature = byteStr(id))
 
   def microBlock(total: Int, prev: Int): MicroBlock = {
     val tx = TransferTransaction.selfSigned(1.toByte, Waves, signer, signer.toAddress, 1, 1, Waves, 1, Array.emptyByteArray).explicitGet()

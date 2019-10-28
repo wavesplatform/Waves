@@ -89,7 +89,7 @@ class LevelDBWriterSpec
 
     def gen(ts: Long): Gen[(KeyPair, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
-        val nextBlock = TestBlock.create(ts + 1, blocks.last.header.uniqueId, Seq())
+        val nextBlock = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq())
         (master, blocks :+ nextBlock)
     }
 
@@ -99,8 +99,8 @@ class LevelDBWriterSpec
           .selfSigned(master, None, 5000000, ts + 1)
           .explicitGet()
 
-        val block1 = TestBlock.create(ts + 1, blocks.last.header.uniqueId, Seq(unsetScriptTx))
-        val block2 = TestBlock.create(ts + 2, block1.header.uniqueId, Seq())
+        val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
+        val block2 = TestBlock.create(ts + 2, block1.uniqueId, Seq())
         (master, blocks ++ List(block1, block2))
     }
 
@@ -175,13 +175,13 @@ class LevelDBWriterSpec
       block1 = TestBlock
         .create(
           ts + 3,
-          genesisBlock.header.uniqueId,
+          genesisBlock.uniqueId,
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2)
           )
         )
-      emptyBlock = TestBlock.create(ts + 5, block1.header.uniqueId, Seq())
+      emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
     } yield (master, List(genesisBlock, block1, emptyBlock))
   }
 
@@ -201,17 +201,17 @@ class LevelDBWriterSpec
       val block1 = TestBlock
         .create(
           ts + 3,
-          genesisBlock.header.uniqueId,
+          genesisBlock.uniqueId,
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2)
           )
         )
-      val block2 = TestBlock.create(ts + 5, block1.header.uniqueId, Seq())
+      val block2 = TestBlock.create(ts + 5, block1.uniqueId, Seq())
       val block3 = TestBlock
         .create(
           ts + 10,
-          block2.header.uniqueId,
+          block2.uniqueId,
           Seq(
             createTransfer(master, recipient.toAddress, ts + 6),
             createTransfer(master, recipient.toAddress, ts + 7)

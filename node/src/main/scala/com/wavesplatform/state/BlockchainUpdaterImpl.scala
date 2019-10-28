@@ -485,12 +485,12 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int)] = ngState.map { s =>
-    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length)
+  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int, Int, ByteStr)] = ngState.map { s =>
+    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length, s.bestLiquidBlock.transactionData.size, s.bestLiquidBlock.signature)
   }
 
-  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int)] = readLock {
-    liquidBlockHeaderAndSize().filter(_._1.signature == blockId) orElse blockchain.blockHeaderAndSize(blockId)
+  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
+    liquidBlockHeaderAndSize().filter(_._4 == blockId) orElse blockchain.blockHeaderAndSize(blockId)
   }
 
   override def height: Int = readLock {
@@ -598,9 +598,9 @@ class BlockchainUpdaterImpl(
       blockchain.totalFee(height)
   }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
     if (height == blockchain.height + 1)
-      ngState.map(x => (x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length))
+      ngState.map(x => (x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length, x.bestLiquidBlock.transactionData.size, x.bestLiquidBlock.signature))
     else
       blockchain.blockHeaderAndSize(height)
   }

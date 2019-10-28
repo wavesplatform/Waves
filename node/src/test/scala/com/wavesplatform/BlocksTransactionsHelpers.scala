@@ -1,9 +1,8 @@
 package com.wavesplatform
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.block.{Block, MicroBlock, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.Waves
@@ -79,7 +78,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
 
     def unsafeMicro(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair, version: Byte, ts: Long): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned      = new MicroBlock(version, signer, txs, prevTotal.header.uniqueId, newTotalBlock.header.uniqueId, ByteStr.empty)
+      val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
       val signature     = crypto.sign(signer, unsigned.bytes())
       val signed        = unsigned.copy(signature = ByteStr(signature))
       (newTotalBlock, signed)
@@ -94,23 +93,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         bTarget: Long = DefaultBaseTarget
     ): Block = {
       val unsigned: Block = Block(
-        version = version,
-        timestamp = timestamp,
-        reference = reference,
-        consensusData = NxtLikeConsensusBlockData(
+        header = BlockHeader(
+          version = version,
+          timestamp = timestamp,
+          reference = reference,
           baseTarget = bTarget,
-          generationSignature = com.wavesplatform.history.generationSignature
-        ),
-        transactionData = txs,
-        signerData = SignerData(
+          generationSignature = com.wavesplatform.history.generationSignature,
           generator = signer,
-          signature = ByteStr.empty
+          featureVotes = Set.empty,
+          rewardVote = -1L
         ),
-        featureVotes = Set.empty,
-        rewardVote = -1L
+        signature = ByteStr.empty,
+        transactionData = txs
       )
-      val signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes())))
-      unsigned.copy(header = unsigned.header.copy(signerData = signerData))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bytes())))
     }
   }
 }

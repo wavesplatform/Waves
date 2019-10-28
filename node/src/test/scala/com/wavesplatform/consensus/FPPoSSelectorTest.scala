@@ -6,7 +6,6 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{WavesSettings, _}
@@ -45,7 +44,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                 .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
                 .getOrElse(fork1.head)
 
-            calcDelay(blockForHit, fork1.head.header.consensusData.baseTarget, miner1, miner1Balance)
+            calcDelay(blockForHit, fork1.head.header.baseTarget, miner1, miner1Balance)
           }
 
           val fork2Delay = {
@@ -55,7 +54,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                 .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
                 .getOrElse(fork2.head)
 
-            calcDelay(blockForHit, fork2.head.header.consensusData.baseTarget, miner1, miner1Balance)
+            calcDelay(blockForHit, fork2.head.header.baseTarget, miner1, miner1Balance)
           }
 
           fork1Delay shouldEqual fork2Delay
@@ -252,7 +251,7 @@ object FPPoSSelectorTest {
       val gs =
         PoSCalculator
           .generatorSignature(
-            blockForHit.header.consensusData.generationSignature.arr,
+            blockForHit.header.generationSignature.arr,
             miner
           )
 
@@ -261,7 +260,7 @@ object FPPoSSelectorTest {
       val bt = FairPoSCalculator.calculateBaseTarget(
         60,
         height + ind - 1,
-        forkChain.head.header.consensusData.baseTarget,
+        forkChain.head.header.baseTarget,
         forkChain.head.header.timestamp,
         (forkChain.lift(2) orElse blockchain.blockAt(height + ind - 3)) map (_.header.timestamp),
         forkChain.head.header.timestamp + delay
@@ -271,8 +270,9 @@ object FPPoSSelectorTest {
         .buildAndSign(
           3: Byte,
           forkChain.head.header.timestamp + delay,
-          forkChain.head.header.uniqueId,
-          NxtLikeConsensusBlockData(bt, ByteStr(gs)),
+          forkChain.head.uniqueId,
+          bt,
+          ByteStr(gs),
           Seq.empty,
           miner,
           Set.empty,
@@ -296,7 +296,7 @@ object FPPoSSelectorTest {
         .getValidBlockDelay(
           height,
           miner,
-          lastBlock.header.consensusData.baseTarget,
+          lastBlock.header.baseTarget,
           minerBalance
         )
         .explicitGet()
@@ -307,17 +307,25 @@ object FPPoSSelectorTest {
         miner,
         height,
         60.seconds,
-        lastBlock.header.consensusData.baseTarget,
+        lastBlock.header.baseTarget,
         lastBlock.header.timestamp,
         ggParentTS,
         lastBlock.header.timestamp + delay
       )
       .explicitGet()
 
-    val updatedCData = cData.copy(updateBT(cData.baseTarget), updateGS(cData.generationSignature))
-
     Block
-      .buildAndSign(3: Byte, lastBlock.header.timestamp + delay, lastBlock.header.uniqueId, updatedCData, Seq.empty, miner, Set.empty, 0.toByte)
+      .buildAndSign(
+        3: Byte,
+        lastBlock.header.timestamp + delay,
+        lastBlock.uniqueId,
+        updateBT(cData.baseTarget),
+        updateGS(cData.generationSignature),
+        Seq.empty,
+        miner,
+        Set.empty,
+        0.toByte
+      )
       .explicitGet()
   }
 
@@ -346,7 +354,7 @@ object FPPoSSelectorTest {
           val newBlock = TestBlock
             .create(
               lastTxTimestamp + 1 + d,
-              blocks.head.header.uniqueId,
+              blocks.head.uniqueId,
               Seq.empty
             )
           newBlock :: blocks
@@ -361,7 +369,7 @@ object FPPoSSelectorTest {
     val gs =
       PoSCalculator
         .generatorSignature(
-          blockForHit.header.consensusData.generationSignature.arr,
+          blockForHit.header.generationSignature.arr,
           minerPK
         )
 

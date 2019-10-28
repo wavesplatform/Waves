@@ -140,7 +140,7 @@ class MicroBlockMinerImpl(
             account,
             unconfirmed,
             accumulatedBlock.signature,
-            signedBlock.header.signature
+            signedBlock.signature
           )
           .leftMap(MicroBlockBuildError)
         _ = BlockStats.mined(microBlock)

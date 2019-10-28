@@ -46,7 +46,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
                   .blockHeadersRange(start, end)
                   .filter(_._1.generator.toAddress == address)
                   .map {
-                    case (_, _, h) =>
+                    case (_, _, _, _, h) =>
                       blockchain.blockAt(h).get.json().addBlockFields(h)
                   }
                 result = jsonBlocks.toListL.map(JsArray(_))
@@ -148,7 +148,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     (if (includeTransactions) {
        commonApi.blockAtHeight(height).map(_.json())
      } else {
-       commonApi.blockHeaderAtHeight(height).map { case (bh, s) => BlockHeader.json(bh, s) }
+       commonApi.blockHeaderAtHeight(height).map { case (bh, s, tc, _) => BlockHeader.json(bh, s, tc) }
      }) match {
       case Some(json) => complete(json.addBlockFields(height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -188,7 +188,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       } else {
         commonApi
           .blockHeadersRange(start, end)
-          .map { case (bh, size, height) => BlockHeader.json(bh, size).addBlockFields(height) }
+          .map { case (bh, size, transactionCount, _, height) => BlockHeader.json(bh, size, transactionCount).addBlockFields(height) }
       }
 
       extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
@@ -211,7 +211,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       (if (includeTransactions) {
          commonApi.lastBlock().map(_.json())
        } else {
-         commonApi.lastBlock().map(block => BlockHeader.json(block.header, block.bytes().length))
+         commonApi.lastBlock().map(block => BlockHeader.json(block.header, block.bytes().length, block.transactionData.size))
        }).map(_.addBlockFields(height))
     }
   }

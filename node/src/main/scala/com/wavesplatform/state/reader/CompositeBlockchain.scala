@@ -196,11 +196,12 @@ final case class CompositeBlockchain(
   private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.uniqueId == blockId)
   private def filterByHeight(height: Int): Option[Block]  = newBlock.filter(_ => this.height == height)
 
-  private def headerAndSize(block: Block): (BlockHeader, Int) = block.header -> block.bytes().length
+  private def headerAndSize(block: Block): (BlockHeader, Int, Int, ByteStr) =
+    (block.header, block.bytes().length, block.transactionData.size, block.signature)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] =
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] =
     filterByHeight(height).map(headerAndSize) orElse inner.blockHeaderAndSize(height)
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] =
+  override def blockHeaderAndSize(blockId: ByteStr): Option[((BlockHeader, Int, Int, ByteStr))] =
     filterById(blockId).map(headerAndSize) orElse inner.blockHeaderAndSize(blockId)
 
   override def blockBytes(height: Int): Option[Array[Byte]]      = filterByHeight(height).map(_.bytes()) orElse inner.blockBytes(height)

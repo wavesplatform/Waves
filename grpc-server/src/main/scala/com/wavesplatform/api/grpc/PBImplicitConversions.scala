@@ -43,7 +43,6 @@ trait PBImplicitConversions {
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
     def toVanilla(signature: ByteStr): vb.BlockHeader = {
       BlockHeader(
-        signature,
         header.version.toByte,
         header.timestamp,
         header.reference.toByteStr,
@@ -51,8 +50,7 @@ trait PBImplicitConversions {
         header.generationSignature.toByteStr,
         header.generator.toPublicKey,
         header.featureVotes.map(intToShort).toSet,
-        header.rewardVote,
-        0,
+        header.rewardVote
       )
     }
   }

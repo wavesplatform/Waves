@@ -150,7 +150,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
             val secondBlock = TestBlock.create(
               ts + 3,
-              genesisBlock.header.uniqueId,
+              genesisBlock.uniqueId,
               Seq.empty,
               account
             )

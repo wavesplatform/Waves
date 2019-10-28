@@ -5,7 +5,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -65,7 +64,8 @@ package object history {
         version = version,
         timestamp = timestamp,
         reference = refTo,
-        consensus = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
+        baseTarget = bTarget,
+        generationSignature = generationSignature,
         txs = txs,
         signer = signer,
         Set.empty,
@@ -84,8 +84,8 @@ package object history {
       .buildAndSign(
         generator = signer,
         transactionData = txs,
-        prevResBlockSig = prevTotal.header.uniqueId,
-        totalResBlockSig = newTotalBlock.header.uniqueId
+        prevResBlockSig = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.uniqueId
       )
       .explicitGet()
     (newTotalBlock, nonSigned)
@@ -97,8 +97,8 @@ package object history {
       .buildAndSign(
         generator = signer,
         transactionData = txs,
-        prevResBlockSig = prevTotal.header.uniqueId,
-        totalResBlockSig = newTotalBlock.header.uniqueId
+        prevResBlockSig = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.uniqueId
       )
       .explicitGet()
     (newTotalBlock, nonSigned)
@@ -110,7 +110,7 @@ package object history {
     def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
       case (x :: xs) =>
         val block = buildBlockOfTxs(refTo, x)
-        block +: chainBlocksR(block.header.uniqueId, xs)
+        block +: chainBlocksR(block.uniqueId, xs)
       case _ => Seq.empty
     }
 
@@ -137,5 +137,5 @@ package object history {
     (block, microBlocks)
   }
 
-  def spoilSignature(b: Block): Block = b.copy(header = b.header.copy(signerData = b.header.signerData.copy(signature = TestBlock.randomSignature())))
+  def spoilSignature(b: Block): Block = b.copy(signature = TestBlock.randomSignature())
 }
