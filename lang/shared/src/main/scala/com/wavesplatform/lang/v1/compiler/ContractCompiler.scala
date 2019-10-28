@@ -5,15 +5,15 @@ import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1}
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, FINAL}
+import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._

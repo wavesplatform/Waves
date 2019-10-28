@@ -77,6 +77,7 @@ object Types {
         l2.typeList.forall(bigger.contains)
       case (_, NOTHING)           => true
       case (NOTHING, _)           => false
+      case (LIST(t1), LIST(t2))   => t1 >= t2
       case (l1: FINAL, l2: FINAL) => l1.union >= l2.union
     }
 
