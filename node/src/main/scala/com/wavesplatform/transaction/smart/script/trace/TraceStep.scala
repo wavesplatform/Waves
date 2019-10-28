@@ -12,6 +12,7 @@ import play.api.libs.json._
 
 sealed abstract class TraceStep {
   def json: JsObject
+  def loggedJson = json
 }
 
 case class AccountVerifierTrace(
@@ -42,16 +43,26 @@ case class AssetVerifierTrace(
 case class InvokeScriptTrace(
     dAppAddressOrAlias: AddressOrAlias,
     functionCall: FUNCTION_CALL,
-    resultE: Either[ValidationError, ScriptResult]
+    resultE: Either[ValidationError, ScriptResult],
+    log: Log[Id]
 ) extends TraceStep {
 
-  override lazy val json: JsObject = {
+  override lazy val json: JsObject = maybeLogged(false)
+
+  override lazy val loggedJson: JsObject = maybeLogged(true)
+
+  private def maybeLogged(logged: Boolean): JsObject = {
     Json.obj(
       "dApp"     -> dAppAddressOrAlias.stringRepr,
       "function" -> functionCall.function.funcName,
       "args"     -> functionCall.args.map(_.toString),
       resultE match {
-        case Right(value) => "result" -> toJson(value)
+        case Right(value) => "result" ->
+           ({v: JsObject => if(logged) {
+              v ++ Json.obj(TraceStep.logJson(log))
+           } else {
+              v
+           }})(toJson(value))
         case Left(e)      => "error"  -> TraceStep.errorJson(e)
       }
     )
@@ -88,7 +99,7 @@ object TraceStep {
   private def logType(isAssetScript: Boolean): (String, JsValueWrapper) =
     "type" -> (if (isAssetScript) "Asset" else "Account")
 
-  private def logJson(l: Log[Id]): (String, JsValueWrapper) =
+  def logJson(l: Log[Id]): (String, JsValueWrapper) =
     "vars" -> l.map {
       case (k, Right(v))  => Json.obj("name" -> k, "value" -> v.toString)
       case (k, Left(err)) => Json.obj("name" -> k, "error" -> err)

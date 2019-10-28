@@ -86,10 +86,10 @@ object ContractEvaluator {
   def verify(decls: List[DECLARATION], v: VerifierFunction, ct: ScriptTransfer): EvalM[Id, Environment, EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.scriptTransfer(ct)))
 
-  def apply(ctx: EvaluationContext[Environment, Id], c: DApp, i: Invocation): Either[(ExecutionError, Log[Id]), ScriptResult] = {
+  def apply(ctx: EvaluationContext[Environment, Id], c: DApp, i: Invocation): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val (log, result) = EvaluatorV1().evalWithLogging(ctx, eval(c, i))
     result
-      .flatMap(ScriptResult.fromObj)
+      .flatMap(r => ScriptResult.fromObj(r).map((_, log)))
       .leftMap((_, log))
   }
 }

@@ -150,7 +150,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
         smartMinFee,
         None,
         waitForTx = true
-      ).id
+      )._1.id
 
     sender.setScript(smartAcc.stringRepr, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }

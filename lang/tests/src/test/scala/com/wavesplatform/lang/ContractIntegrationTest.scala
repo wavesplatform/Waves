@@ -80,7 +80,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         |
       """.stripMargin,
       "foo"
-    ).explicitGet() shouldBe ScriptResult(
+    ).explicitGet()._1 shouldBe ScriptResult(
       List(
         DataItem.Bin("caller", callerAddress),
         DataItem.Bin("callerPk", callerPublicKey),
@@ -102,7 +102,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
       """.stripMargin,
       "foo",
       Range(1, 23).map(i => Terms.CONST_LONG(i)).toList
-    ).explicitGet() shouldBe ScriptResult(List(DataItem.Lng("1", 22)), List())
+    ).explicitGet()._1 shouldBe ScriptResult(List(DataItem.Lng("1", 22)), List())
   }
 
   property("@Callable exception error contains initialised values") {
@@ -150,7 +150,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
   def parseCompileAndEvaluate(script: String,
                               func  : String,
                               args  : List[Terms.EXPR] = List(Terms.CONST_BYTESTR(ByteStr.empty).explicitGet())
-                             ): Either[(ExecutionError, Log[Id]), ScriptResult] = {
+                             ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val parsed   = Parser.parseContract(script).get.value
     val compiled = ContractCompiler(ctx.compilerContext, parsed).explicitGet()
 
@@ -283,7 +283,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         """.stripMargin,
       "test",
       args = Nil
-    ).explicitGet() shouldBe ScriptResult(
+    ).explicitGet()._1 shouldBe ScriptResult(
       List(
         DataItem.Lng("a", 1),
         DataItem.Bool("b", true),
@@ -353,7 +353,7 @@ class ContractIntegrationTest extends PropSpec with PropertyChecks with ScriptGe
         """.stripMargin,
       "test",
       args = Nil
-    ).explicitGet() shouldBe ScriptResult(
+    ).explicitGet()._1 shouldBe ScriptResult(
       List(
         DataItem.Lng("a", 1),
         DataItem.Lng("b", 2)
