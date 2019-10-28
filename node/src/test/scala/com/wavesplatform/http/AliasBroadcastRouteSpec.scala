@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
+import com.wavesplatform.api.http.requests.CreateAliasRequest
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
@@ -40,7 +41,7 @@ class AliasBroadcastRouteSpec
   "returns appropriate error code when validation fails for" - {
 
     "create alias transaction" in forAll(createAliasReq) { req =>
-      import com.wavesplatform.api.http.requests.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat
+      import com.wavesplatform.api.http.requests.SignedCreateAliasV1Request.jsonFormat
 
       def posting(v: JsValue): RouteTestResult = Post(routePath("create"), v) ~> route
 

@@ -7,11 +7,11 @@ import play.api.libs.json.Json
 
 case class CreateAliasRequest(
     alias: String,
-    fee: TxAmount,
     version: Option[TxVersion] = None,
-    timestamp: Option[TxTimestamp] = None,
     sender: Option[String] = None,
     senderPublicKey: Option[String] = None,
+    fee: Option[TxAmount] = None,
+    timestamp: Option[TxTimestamp] = None,
     signature: Option[String] = None,
     proofs: Option[List[String]] = None
 ) extends TxBroadcastRequest[CreateAliasTransaction] {
@@ -24,7 +24,7 @@ case class CreateAliasRequest(
       timestamp.getOrElse(0L),
       sender,
       validAlias,
-      fee,
+      fee.getOrElse(0L),
       validProofs
     )
 }

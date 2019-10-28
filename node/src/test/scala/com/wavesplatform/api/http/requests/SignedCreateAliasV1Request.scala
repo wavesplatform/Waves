@@ -29,5 +29,5 @@ case class SignedCreateAliasV1Request(
 }
 
 object SignedCreateAliasV1Request {
-  implicit val broadcastAliasV1RequestReadsFormat: Format[SignedCreateAliasV1Request] = Json.format
+  implicit val jsonFormat: Format[SignedCreateAliasV1Request] = Json.format
 }
