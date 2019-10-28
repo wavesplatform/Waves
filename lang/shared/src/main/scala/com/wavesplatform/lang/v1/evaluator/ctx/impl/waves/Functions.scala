@@ -385,8 +385,8 @@ object Functions {
       case ((name, ty), _) => ("@" ++ name, ty)
     }
     UserFunction(
-      f.name ++ "Value",
-      "@extr" ++ f.header.toString,
+      f.name ++ ExtractedFuncPostfix,
+      ExtractedFuncPrefix ++ f.header.toString,
       f.costByLibVersion,
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
       args: _*
