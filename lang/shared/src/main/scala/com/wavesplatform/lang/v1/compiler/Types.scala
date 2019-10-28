@@ -33,9 +33,6 @@ object Types {
 
   case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)]) extends REAL {
     override def typeList: List[REAL] = List(this)
-
-    override lazy val toString: String =
-      name + (if (fields.nonEmpty) fields.map { case (name, t) => s"$name: $t" }.mkString("(", ", ", ")") else "")
   }
 
   def toFinal(resultType: TYPE, resolvedPlaceholders: Map[TYPEPARAM, FINAL]): FINAL = {
@@ -80,7 +77,6 @@ object Types {
         l2.typeList.forall(bigger.contains)
       case (_, NOTHING)           => true
       case (NOTHING, _)           => false
-      case (LIST(t1), LIST(t2))   => t1 >= t2
       case (l1: FINAL, l2: FINAL) => l1.union >= l2.union
     }
 
