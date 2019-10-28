@@ -37,6 +37,10 @@ class TraceResultJsonTest extends PropSpec with Matchers {
   ).explicitGet()
 
   property("suitable TracedResult json") {
+    val vars = List(
+      "amount"     -> Right(CONST_LONG(12345)),
+      "invocation" -> CONST_STRING("str")
+    )
     val trace = List(
       InvokeScriptTrace(
         tx.dAppAddressOrAlias,
@@ -45,7 +49,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
           ScriptResult(
             List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
             List((Recipient.Address(tx.dAppAddressOrAlias.bytes), 1, None))
-          ))
+          )),
+        vars
       ))
 
     val result = TracedResult(Right(tx), trace)
@@ -93,6 +98,57 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |  "id" : "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
         |  "timestamp" : 1111
         |}""".stripMargin
+
+   Json.prettyPrint(result.loggedJson) shouldBe
+      """{
+        |  "senderPublicKey" : "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
+        |  "fee" : 10000000,
+        |  "type" : 16,
+        |  "version" : 1,
+        |  "call" : {
+        |    "function" : "func",
+        |    "args" : [ {
+        |      "type" : "string",
+        |      "value" : "param"
+        |    }, {
+        |      "type" : "integer",
+        |      "value" : 1
+        |    } ]
+        |  },
+        |  "trace" : [ {
+        |    "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+        |    "function" : "func",
+        |    "args" : [ "param", "1" ],
+        |    "result" : {
+        |      "data" : [ {
+        |        "key" : "3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To",
+        |        "value" : "700000000"
+        |      } ],
+        |      "transfers" : [ {
+        |        "address" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+        |        "amount" : 1,
+        |        "assetId" : null
+        |      } ],
+        |      "vars" : [ {
+        |        "name" : "amount",
+        |        "value" : "12345"
+        |      }, {
+        |        "name" : "invocation",
+        |        "value" : "str"
+        |      } ]
+        |    }
+        |  } ],
+        |  "dApp" : "3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU",
+        |  "sender" : "3MvtiFpnSA7uYKXV3myLwRK3u2NEV91iJYW",
+        |  "feeAssetId" : null,
+        |  "proofs" : [ "4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ" ],
+        |  "payment" : [ {
+        |    "amount" : 1,
+        |    "assetId" : null
+        |  } ],
+        |  "id" : "2hoMeTHAneLExjFo2a9ei7D4co5zzr9VyT7tmBmAGmeu",
+        |  "timestamp" : 1111
+        |}""".stripMargin
   }
 
   property("suitable TracedResult error json") {
@@ -106,7 +162,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       InvokeScriptTrace(
         tx.dAppAddressOrAlias,
         tx.funcCall,
-        Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false))
+        Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false)),
+        vars
       ))
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)
 

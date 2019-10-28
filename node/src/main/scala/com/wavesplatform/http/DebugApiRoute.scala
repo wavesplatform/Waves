@@ -396,7 +396,7 @@ case class DebugApiRoute(
       val response = Json.obj(
         "valid"          -> tracedDiff.resultE.isRight,
         "validationTime" -> timeSpent,
-        "trace"          -> tracedDiff.trace.map(_.toString)
+        "trace"          -> tracedDiff.trace.map(_.loggedJson.toString)
       )
       tracedDiff.resultE.fold(
         err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),

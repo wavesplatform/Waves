@@ -179,7 +179,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         fee = feeAmount,
         feeAssetId = Some(dAppAsset)
       )
-      .id
+      ._1.id
     val invokeScript2TxId = sender
       .invokeScript(
         caller.stringRepr,
@@ -189,7 +189,7 @@ class InvokeScriptWithSponsorshipSuite extends BaseTransactionSuite with CancelA
         fee = smartFeeAmount,
         feeAssetId = Some(dAppAsset)
       )
-      .id
+      ._1.id
 
     nodes.waitForHeightAriseAndTxPresent(invokeScript2TxId)
     sender.waitForTransaction(invokeScript1TxId)

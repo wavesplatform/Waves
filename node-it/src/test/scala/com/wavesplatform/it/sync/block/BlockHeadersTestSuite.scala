@@ -67,7 +67,7 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
 
     assertBlockInfo(blocks, blocksHeaders)
     nodes.waitForHeight(activationHeight + rewardTerm)
-    println(notMiner.blockSeq(1, activationHeight + rewardTerm).map(_.desiredReward))
+//    println(notMiner.blockSeq(1, activationHeight + rewardTerm).map(_.desiredReward))
 
     notMiner.blockHeadersAt(activationHeight + rewardTerm).reward shouldBe Some(initialReward + minIncrement)
 

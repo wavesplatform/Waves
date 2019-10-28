@@ -35,6 +35,14 @@ final case class TracedResult[+E, +A](
     }
     resultJson ++ Json.obj("trace" -> trace.map(_.json))
   }
+
+  def loggedJson(implicit ev1: E => ApiError, ev2: A => Transaction): JsObject = {
+    val resultJson = resultE match {
+      case Right(value) => value.json()
+      case Left(e)      => e.json
+    }
+    resultJson ++ Json.obj("trace" -> trace.map(_.loggedJson))
+  }
 }
 
 object TracedResult {
