@@ -22,7 +22,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
       "attachment" -> Base58.encode(attachment)
-    )
+    ) ++ ProvenTxJsonLegacySignature.onlyV1(tx)
   }
 
   override def bodyBytes(tx: TransferTransaction): Array[Byte] = {

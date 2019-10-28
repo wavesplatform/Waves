@@ -1,7 +1,6 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
@@ -14,6 +13,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -24,7 +24,8 @@ class AssetsBroadcastRouteSpec
     with RequestGen
     with PathMockFactory
     with PropertyChecks
-    with RestAPISettingsHelper {
+    with RestAPISettingsHelper
+    with NoShrink {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,
@@ -158,13 +159,34 @@ class AssetsBroadcastRouteSpec
 
     val transferRequest = createSignedTransferRequest(
       TransferTransaction
-        .selfSigned(1.toByte, senderPrivateKey, receiverPrivateKey.toAddress, Asset.Waves, 1 * Waves, Asset.Waves, Waves / 3, Array.emptyByteArray, System.currentTimeMillis())
+        .selfSigned(
+          1.toByte,
+          senderPrivateKey,
+          receiverPrivateKey.toAddress,
+          Asset.Waves,
+          1 * Waves,
+          Asset.Waves,
+          Waves / 3,
+          Array.emptyByteArray,
+          System.currentTimeMillis()
+        )
         .right
         .get
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
-      TransferTransaction(version = 2.toByte, sender = senderPrivateKey, recipient = receiverPrivateKey.toAddress, assetId = Asset.Waves, amount = 1 * Waves, feeAssetId = Asset.Waves, fee = Waves / 3, attachment = Array.emptyByteArray, timestamp = System.currentTimeMillis(), proofs = Proofs(Seq.empty))
+      TransferTransaction(
+        version = 2.toByte,
+        sender = senderPrivateKey,
+        recipient = receiverPrivateKey.toAddress,
+        assetId = Asset.Waves,
+        amount = 1 * Waves,
+        feeAssetId = Asset.Waves,
+        fee = Waves / 3,
+        attachment = Array.emptyByteArray,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs(Seq.empty)
+      )
     )
 
     "/transfer" - {
