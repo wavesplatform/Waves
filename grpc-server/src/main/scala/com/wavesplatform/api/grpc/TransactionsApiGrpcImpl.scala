@@ -1,23 +1,21 @@
 package com.wavesplatform.api.grpc
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{Blockchain, TransactionId}
 import com.wavesplatform.transaction.AuthorizedTransaction
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.grpc.stub.StreamObserver
+import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.concurrent.Future
-import scala.util.Try
 
 class TransactionsApiGrpcImpl(
     wallet: Wallet,
@@ -84,15 +82,7 @@ class TransactionsApiGrpcImpl(
   }
 
   override def sign(request: SignRequest): Future[PBSignedTransaction] = Future {
-    def signTransactionWith(tx: PBTransaction, wallet: Wallet, signerAddress: String): Either[ValidationError, PBSignedTransaction] =
-      for {
-        sender <- wallet.findPrivateKey(tx.sender.stringRepr)
-        signer <- if (tx.sender.stringRepr == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-        tx     <- Try(tx.signed(signer.privateKey)).toEither.left.map(GenericError(_))
-      } yield tx
-
-    val signerAddress: PublicKey = if (request.signerPublicKey.isEmpty) request.getTransaction.sender else request.signerPublicKey.toPublicKey
-    signTransactionWith(request.getTransaction, wallet, signerAddress.stringRepr).explicitGetErr()
+    throw new StatusRuntimeException(Status.UNIMPLEMENTED)
   }
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
