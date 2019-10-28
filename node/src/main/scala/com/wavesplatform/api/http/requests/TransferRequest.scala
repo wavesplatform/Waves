@@ -2,12 +2,11 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json._
 
 case class TransferRequest(
-    version: Option[TxVersion],
+    version: Option[Byte],
     sender: Option[String],
     senderPublicKey: Option[String],
     recipient: String,

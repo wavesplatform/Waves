@@ -114,9 +114,19 @@ trait TransferSending extends ScorexLogging {
         case (x, i) =>
           createSignedTransferRequest(
             TransferTransaction
-              .selfSigned(version = 2.toByte, sender = KeyPair(Base58.decode(x.senderSeed)), recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(), asset = Waves, amount = x.amount, feeAsset = Waves, fee = x.fee, attachment = if (includeAttachment) {
+              .selfSigned(
+                version = 2.toByte,
+                sender = KeyPair(Base58.decode(x.senderSeed)),
+                recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
+                asset = Waves,
+                amount = x.amount,
+                feeAsset = Waves,
+                fee = x.fee,
+                attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray, timestamp = start + i)
+                } else Array.emptyByteArray,
+                timestamp = start + i
+              )
               .right
               .get
           )
@@ -139,15 +149,15 @@ trait TransferSending extends ScorexLogging {
     import tx._
     TransferRequest(
       Some(2.toByte),
-      assetId.maybeBase58Repr,
-      feeAssetId.maybeBase58Repr,
-      amount,
-      fee,
-      recipient.stringRepr,
-      Some(timestamp),
       None,
       Some(Base58.encode(tx.sender)),
+      recipient.stringRepr,
+      assetId.maybeBase58Repr,
+      amount,
+      feeAssetId.maybeBase58Repr,
+      fee,
       attachment.headOption.map(_ => Base58.encode(attachment)),
+      Some(timestamp),
       None,
       Some(proofs.base58().toList)
     )

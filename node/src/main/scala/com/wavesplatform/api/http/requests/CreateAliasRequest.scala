@@ -19,14 +19,7 @@ case class CreateAliasRequest(
     for {
       validAlias  <- Alias.create(alias)
       validProofs <- toProofs(version, signature, proofs)
-    } yield CreateAliasTransaction(
-      version.getOrElse(1.toByte),
-      timestamp.getOrElse(0L),
-      sender,
-      validAlias,
-      fee.getOrElse(0L),
-      validProofs
-    )
+    } yield CreateAliasTransaction(version.getOrElse(1.toByte), sender, validAlias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
 }
 
 object CreateAliasRequest {

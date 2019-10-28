@@ -58,7 +58,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val tradeAssetDistribution = {
       (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
         TransferTransaction
-            .selfSigned(2.toByte, issueTransactionSender, acc, IssuedAsset(tradeAssetIssue.id()), 5, Waves, 900000, Array.fill(random.nextInt(100))(random.nextInt().toByte), System.currentTimeMillis())
+          .selfSigned(
+            2.toByte,
+            issueTransactionSender,
+            acc,
+            IssuedAsset(tradeAssetIssue.id()),
+            5,
+            Waves,
+            900000,
+            Array.fill(random.nextInt(100))(random.nextInt().toByte),
+            System.currentTimeMillis()
+          )
           .right
           .get
       })
@@ -120,7 +130,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
                 tx <- logOption(
                   TransferTransaction
-                    .selfSigned(2.toByte, sender, recipient, Asset.fromCompatId(asset), 500, Waves, 500000L, Array.fill(random.nextInt(100))(random.nextInt().toByte), ts)
+                    .selfSigned(
+                      2.toByte,
+                      sender,
+                      recipient,
+                      Asset.fromCompatId(asset),
+                      500,
+                      Waves,
+                      500000L,
+                      Array.fill(random.nextInt(100))(random.nextInt().toByte),
+                      ts
+                    )
                 )
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
@@ -275,7 +295,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransaction.selfSigned(Transaction.V2, ts, sender, Alias.create(aliasString).explicitGet(), 500000L))
+            logOption(CreateAliasTransaction.selfSigned(Transaction.V2, sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
 
           case MassTransferTransaction =>
             (

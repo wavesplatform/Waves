@@ -25,7 +25,7 @@ case class SignedCreateAliasV2Request(
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _alias      <- Alias.create(alias)
-      _t          <- CreateAliasTransaction.create(Transaction.V1, timestamp, _sender, _alias, fee, _proofs)
+      _t          <- CreateAliasTransaction.create(Transaction.V1, _sender, _alias, fee, timestamp, _proofs)
     } yield _t
 }
 

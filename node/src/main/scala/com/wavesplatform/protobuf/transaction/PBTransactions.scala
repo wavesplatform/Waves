@@ -98,7 +98,7 @@ object PBTransactions {
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
         for {
           alias <- com.wavesplatform.account.Alias.createWithChainId(alias, chainId)
-          tx    <- vt.CreateAliasTransaction.create(version.toByte, timestamp, sender, alias, feeAmount, Proofs(Seq(signature)))
+          tx    <- vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, Proofs(Seq(signature)))
         } yield tx
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
@@ -302,12 +302,7 @@ object PBTransactions {
         vt.transfer.TransferTransaction(version.toByte, sender, recipient.toAddressOrAlias.explicitGet(), amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, timestamp, proofs)
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
-        vt.CreateAliasTransaction(version.toByte,
-          timestamp,
-          sender,
-          com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(),
-          feeAmount,
-          Proofs(signature))
+        vt.CreateAliasTransaction(version.toByte, sender, com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(), feeAmount, timestamp, Proofs(signature))
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
         version match {

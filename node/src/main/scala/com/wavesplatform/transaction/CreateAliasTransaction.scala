@@ -15,7 +15,7 @@ import play.api.libs.json.JsObject
 import scala.reflect.ClassTag
 import scala.util.Try
 
-final case class CreateAliasTransaction(version: TxVersion, timestamp: TxTimestamp, sender: PublicKey, alias: Alias, fee: TxAmount, proofs: Proofs)
+final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, alias: Alias, fee: TxAmount, timestamp: TxTimestamp, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves {
@@ -40,30 +40,24 @@ object CreateAliasTransaction extends TransactionParserLite with TransactionOps 
 
   def create(
       version: TxVersion,
-      timestamp: TxTimestamp,
       sender: PublicKey,
       alias: Alias,
       fee: TxAmount,
+      timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
-    CreateAliasTransaction(version, timestamp, sender, alias, fee, proofs).validatedEither
+    CreateAliasTransaction(version, sender, alias, fee, timestamp, proofs).validatedEither
 
   def signed(
       version: TxVersion,
-      timestamp: TxTimestamp,
       sender: PublicKey,
       alias: Alias,
       fee: TxAmount,
+      timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
-    create(version, timestamp, sender, alias, fee, Nil).map(_.signWith(signer))
+    create(version, sender, alias, fee, timestamp, Nil).map(_.signWith(signer))
 
-  def selfSigned(
-      version: TxVersion,
-      timestamp: TxTimestamp,
-      sender: KeyPair,
-      alias: Alias,
-      fee: TxAmount
-  ): Either[ValidationError, TransactionT] =
-    signed(version, timestamp, sender, alias, fee, sender)
+  def selfSigned(version: TxVersion, sender: KeyPair, alias: Alias, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
+    signed(version, sender, alias, fee, timestamp, sender)
 }

@@ -64,7 +64,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
         LongBytes(tailIndex(4), "Timestamp"),
         SignatureBytes(tailIndex(5), "Signature")
       ) mapN { (sender, alias, fee, ts, signature) =>
-        CreateAliasTransaction(Transaction.V1, ts, sender, alias, fee, Proofs(signature))
+        CreateAliasTransaction(Transaction.V1, sender, alias, fee, ts, Proofs(signature))
       }
     }
   }
@@ -78,7 +78,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
         LongBytes(tailIndex(4), "Timestamp"),
         ProofsBytes(tailIndex(5))
       ) mapN { (sender, alias, fee, ts, proofs) =>
-        CreateAliasTransaction(Transaction.V2, ts, sender, alias, fee, proofs)
+        CreateAliasTransaction(Transaction.V2, sender, alias, fee, ts, proofs)
       }
     }
   }

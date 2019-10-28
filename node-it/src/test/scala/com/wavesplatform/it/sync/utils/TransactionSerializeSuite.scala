@@ -125,26 +125,12 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val aliasV1 = CreateAliasTransaction
-    .create(
-      Transaction.V1,
-      ts,
-      publicKey,
-      Alias.create("myalias").right.get,
-      minFee,
-      Proofs(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get)
-    )
+    .create(Transaction.V1, publicKey, Alias.create("myalias").right.get, minFee, ts, Proofs(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get))
     .right
     .get
 
   private val aliasV2 = CreateAliasTransaction
-    .create(
-      Transaction.V2,
-      ts,
-      publicKey,
-      Alias.create("myalias").right.get,
-      minFee,
-      Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))
-    )
+    .create(Transaction.V2, publicKey, Alias.create("myalias").right.get, minFee, ts, Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get)))
     .right
     .get
 

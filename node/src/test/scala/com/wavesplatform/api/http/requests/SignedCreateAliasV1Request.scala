@@ -24,7 +24,7 @@ case class SignedCreateAliasV1Request(
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _alias     <- Alias.create(alias)
-      _t         <- CreateAliasTransaction.create(1: Byte, timestamp, _sender, _alias, fee, Proofs(_signature))
+      _t         <- CreateAliasTransaction.create(1: Byte, _sender, _alias, fee, timestamp, Proofs(_signature))
     } yield _t
 }
 
