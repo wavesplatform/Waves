@@ -259,7 +259,7 @@ object Order {
   def sign(unsigned: Order, sender: KeyPair): Order = {
     require(unsigned.senderPublicKey == sender.publicKey)
     val sig = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.updateProofs(Proofs(Seq(ByteStr(sig))))
+    unsigned.updateProofs(Proofs(sig))
   }
 
   def splitByType(o1: Order, o2: Order): (Order, Order) = {

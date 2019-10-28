@@ -946,7 +946,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
         val t =
           TransferTransaction
-            .selfSigned(2.toByte, IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+            .selfSigned(2.toByte, ts, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, Array[Byte]())
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("NegativeAmount")
@@ -1059,17 +1059,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (ts, acc, amount, genesis, setScript, ci, master, sponsoredAsset, setSponsorship) =>
         val t =
           TransferTransaction
-            .selfSigned(
-              2.toByte,
-              IssuedAsset(sponsoredAsset.id()),
-              master,
-              ci.sender,
-              sponsoredAsset.quantity / 10,
-              ts,
-              Waves,
-              enoughFee,
-              Array[Byte]()
-            )
+            .selfSigned(2.toByte, ts, master, ci.sender, IssuedAsset(sponsoredAsset.id()), sponsoredAsset.quantity / 10, Waves, enoughFee, Array[Byte]())
             .explicitGet()
         assertDiffAndState(
           Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),

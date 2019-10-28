@@ -10,7 +10,7 @@ import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.AccountsApiGrpc
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
@@ -262,11 +262,11 @@ object SyncHttpApi extends Assertions {
       val tx = TransferTransaction
         .selfSigned(
           version = 2.toByte,
-          asset = Asset.fromString(assetId),
+          timestamp = System.currentTimeMillis(),
           sender = source,
           recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+          asset = Asset.fromString(assetId),
           amount = amount,
-          timestamp = System.currentTimeMillis(),
           feeAsset = Asset.fromString(feeAssetId),
           fee = fee,
           attachment = Array.emptyByteArray

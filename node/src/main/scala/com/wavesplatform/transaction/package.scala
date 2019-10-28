@@ -17,17 +17,17 @@ package object transaction {
   type DiscardedMicroBlocks  = Seq[MicroBlock]
   type AuthorizedTransaction = Authorized with Transaction
 
-  type TxVersion = Byte
-  type TxAmount = Long
+  type TxVersion   = Byte
+  type TxAmount    = Long
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
 
-  implicit class TransactionValidationOps[T <: Transaction: TxValidator](private val tx: T) extends AnyVal {
+  implicit class TransactionValidationOps[T <: Transaction: TxValidator](tx: T) {
     def validatedNel: ValidatedNel[ValidationError, T] = implicitly[TxValidator[T]].validate(tx)
     def validatedEither: Either[ValidationError, T]    = this.validatedNel.toEither.left.map(_.head)
   }
 
-  implicit class TransactionSignOps[T <: Transaction: TxSigner](private val tx: T) extends AnyVal {
+  implicit class TransactionSignOps[T <: Transaction: TxSigner](tx: T) {
     def signWith(privateKey: PrivateKey): T = implicitly[TxSigner[T]].sign(tx, privateKey)
   }
 }

@@ -36,8 +36,18 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
     val setScript = SetScriptTransaction.selfSigned(bank, Some(script), enoughFee, now).explicitGet()
 
     val res = Range(0, settings.transactions).map { i =>
-      val tx = TransferTransaction(2.toByte, Waves, bank, owners(1), totalAmountOnNewAccount - 2 * enoughFee - i, now + i, Waves, enoughFee, Array.emptyByteArray, Proofs.empty)
-        .explicitGet()
+      val tx = TransferTransaction(
+        2.toByte,
+        now + i,
+        bank,
+        owners(1),
+        Waves,
+        totalAmountOnNewAccount - 2 * enoughFee - i,
+        Waves,
+        enoughFee,
+        Array.emptyByteArray,
+        Proofs.empty
+      )
       val signatures = owners.map(crypto.sign(_, tx.bodyBytes())).map(ByteStr(_))
       tx.copy(proofs = Proofs(signatures))
     }

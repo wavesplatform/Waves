@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.{Alias, PrivateKey, PublicKey}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.account.{Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.TxSerializer
@@ -17,7 +16,7 @@ import scala.util.Try
 final case class CreateAliasTransaction(version: TxVersion, timestamp: TxTimestamp, sender: PublicKey, alias: Alias, fee: TxAmount, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
-    with OnlyWavesFee
+    with TxWithFee.InWaves
     with FastHashId {
   override def builder: TransactionParserLite      = CreateAliasTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTransaction.serializer.bodyBytes(this))
@@ -31,8 +30,7 @@ object CreateAliasTransaction extends TransactionParserLite with TransactionOps 
   val supportedVersions: Set[TxVersion]          = Set(1, 2)
   val typeId: Byte                               = 10
 
-  implicit val signer: TxSigner[CreateAliasTransaction] = (tx, privateKey) =>
-    tx.copy(proofs = Proofs(Seq(ByteStr(crypto.sign(privateKey, tx.bodyBytes())))))
+  implicit val signer: TxSigner[CreateAliasTransaction]         = (tx, privateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
   implicit val serializer: TxSerializer[CreateAliasTransaction] = CreateAliasTxSerializer
   implicit val validator: TxValidator[CreateAliasTransaction]   = ???
 
@@ -57,4 +55,13 @@ object CreateAliasTransaction extends TransactionParserLite with TransactionOps 
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
     create(version, timestamp, sender, alias, fee, Nil).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      timestamp: TxTimestamp,
+      sender: KeyPair,
+      alias: Alias,
+      fee: TxAmount
+  ): Either[ValidationError, TransactionT] =
+    signed(version, timestamp, sender, alias, fee, sender)
 }

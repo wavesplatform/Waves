@@ -1,9 +1,19 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.api.http.DataRequest
-import com.wavesplatform.api.http.alias.CreateAliasV1Request
-import com.wavesplatform.api.http.assets.{BurnV1Request, IssueV1Request, MassTransferRequest, ReissueV1Request, SponsorFeeRequest, TransferRequest}
-import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import com.wavesplatform.api.http.requests.{
+  BurnV1Request,
+  CreateAliasRequest,
+  DataRequest,
+  IssueV1Request,
+  LeaseCancelV1Request,
+  LeaseV1Request,
+  MassTransferRequest,
+  ReissueV1Request,
+  SignedLeaseCancelV1Request,
+  SignedLeaseV1Request,
+  SponsorFeeRequest,
+  TransferRequest
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
@@ -18,7 +28,7 @@ import play.api.libs.json.{Json, Writes}
 class ObsoleteHandlersSuite extends BaseTransactionSuite {
 
   test("alias create") {
-    val json = sender.postJsonWithApiKey("/alias/create", CreateAliasV1Request(firstAddress, "testalias", minFee))
+    val json = sender.postJsonWithApiKey("/alias/create", CreateAliasRequest("testalias", minFee, Some(1.toByte), None, Some(firstAddress)))
     val tx   = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }

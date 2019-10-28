@@ -9,8 +9,8 @@ object TransferTxValidator extends TxValidator[TransferTransaction] {
   override def validate(transaction: TransferTransaction): ValidatedNel[ValidationError, TransferTransaction] = {
     import transaction._
     Validations.seq(transaction)(
+      TxFeeValidator.validate(transaction),
       validateAmount(amount, assetId.maybeBase58Repr.getOrElse("waves")),
-      validateFee(fee),
       validateAttachment(attachment)
     )
   }

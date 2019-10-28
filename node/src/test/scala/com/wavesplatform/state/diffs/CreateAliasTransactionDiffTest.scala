@@ -9,7 +9,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -23,18 +23,18 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     )
 
   val preconditionsAndAliasCreations
-    : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
+      : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
     master <- accountGen
     ts     <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    alias                    <- aliasGen
-    alias2                   <- aliasGen suchThat (_.name != alias.name)
-    fee                      <- smallFeeGen
-    other: KeyPair <- accountGen
-    aliasTx                  <- createAliasGen(master, alias, fee, ts)
-    sameAliasTx              <- createAliasGen(master, alias, fee + 1, ts)
-    sameAliasOtherSenderTx   <- createAliasGen(other, alias, fee + 2, ts)
-    anotherAliasTx           <- createAliasGen(master, alias2, fee + 3, ts)
+    alias                  <- aliasGen
+    alias2                 <- aliasGen suchThat (_.name != alias.name)
+    fee                    <- smallFeeGen
+    other: KeyPair         <- accountGen
+    aliasTx                <- createAliasGen(master, alias, fee, ts)
+    sameAliasTx            <- createAliasGen(master, alias, fee + 1, ts)
+    sameAliasOtherSenderTx <- createAliasGen(other, alias, fee + 2, ts)
+    anotherAliasTx         <- createAliasGen(master, alias2, fee + 3, ts)
   } yield (genesis, aliasTx, sameAliasTx, sameAliasOtherSenderTx, anotherAliasTx)
 
   property("can create and resolve aliases preserving waves invariant") {
@@ -82,7 +82,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransactionV1.selfSigned(aliasedRecipient, alias, fee, ts).explicitGet()
+    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, ts, aliasedRecipient, alias, fee).explicitGet()
     transfer <- transferGeneratorP(
       master,
       alias,

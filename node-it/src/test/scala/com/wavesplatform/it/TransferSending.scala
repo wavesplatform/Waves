@@ -4,7 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.assets.TransferRequest
+import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -114,19 +114,9 @@ trait TransferSending extends ScorexLogging {
         case (x, i) =>
           createSignedTransferRequest(
             TransferTransaction
-              .selfSigned(
-                version = 2.toByte,
-                asset = Waves,
-                sender = KeyPair(Base58.decode(x.senderSeed)),
-                recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
-                amount = x.amount,
-                timestamp = start + i,
-                feeAsset = Waves,
-                fee = x.fee,
-                attachment = if (includeAttachment) {
+              .selfSigned(version = 2.toByte, timestamp = start + i, sender = KeyPair(Base58.decode(x.senderSeed)), recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(), asset = Waves, amount = x.amount, feeAsset = Waves, fee = x.fee, attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray
-              )
+                } else Array.emptyByteArray)
               .right
               .get
           )

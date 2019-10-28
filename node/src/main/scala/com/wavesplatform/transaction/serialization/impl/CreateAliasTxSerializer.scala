@@ -5,10 +5,10 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.serialization.TxSerializer
-import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionBytesDescription, TransactionBytesDescriptionFor}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TransactionBytesDescription, TransactionBytesDescriptionFor}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.Try
+import scala.util.{Failure, Try}
 
 object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
   override def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
@@ -31,17 +31,18 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
     import tx._
 
     version match {
-      case 1 => Bytes.concat(bodyBytes(tx), tx.signature)
-      case 2 => Bytes.concat(Array(0: Byte), bodyBytes(tx), proofs.bytes())
+      case 1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
+      case 2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = {
     require(bytes.length > 3, "Invalid tx bytes")
     bytes.take(3) match {
-      case Array(0, CreateAliasTransaction.typeId, 2) => ???
+      case Array(CreateAliasTransaction.typeId, _, _) => DescV1.byteDescription.deserializeFromByteArray(bytes)
+      case Array(0, CreateAliasTransaction.typeId, 2) => DescV2.byteDescription.deserializeFromByteArray(bytes)
+      case Array(b1, b2, b3)                          => Failure(new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3"))
     }
-
   }
 
   override def toJson(tx: CreateAliasTransaction): JsObject = {
@@ -63,7 +64,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
         LongBytes(tailIndex(4), "Timestamp"),
         SignatureBytes(tailIndex(5), "Signature")
       ) mapN { (sender, alias, fee, ts, signature) =>
-        CreateAliasTransaction(1.toByte, ts, sender, alias, fee, Vector(signature))
+        CreateAliasTransaction(Transaction.V1, ts, sender, alias, fee, Proofs(signature))
       }
     }
   }
@@ -77,7 +78,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
         LongBytes(tailIndex(4), "Timestamp"),
         ProofsBytes(tailIndex(5))
       ) mapN { (sender, alias, fee, ts, proofs) =>
-        CreateAliasTransaction(2.toByte, ts, sender, alias, fee, proofs)
+        CreateAliasTransaction(Transaction.V2, ts, sender, alias, fee, proofs)
       }
     }
   }

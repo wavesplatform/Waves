@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{PublicKey, Address}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.diffs._
@@ -58,16 +58,16 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
 
     val tx = TransferTransaction(
       1.toByte,
-      Waves,
+      1526552510868L,
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
       Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
+      Waves,
       1900000,
-      1526552510868L,
       Waves,
       100000,
       Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
       Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
-    ).right.get
+    )
 
     tx.json() shouldEqual js
   }
@@ -76,7 +76,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
     for {
       (_, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
       sender                                                              <- accountGen
-    } yield TransferTransaction.selfSigned(1.toByte, Waves, sender, recipient, amount, timestamp, Waves, feeAmount, attachment) should produce(
+    } yield TransferTransaction.selfSigned(1.toByte, timestamp, sender, recipient, Waves, amount, Waves, feeAmount, attachment) should produce(
       "insufficient fee"
     )
   }

@@ -32,7 +32,7 @@ case class TransferTransaction(
 ) extends VersionedTransaction
     with SignatureField
     with FastHashId
-    with CustomAssetFee {
+    with TxWithFee.InCustomAsset {
 
   override val typeId: Byte = TransferTransaction.typeId
 
@@ -68,48 +68,45 @@ object TransferTransaction extends TransactionParserLite with TransactionOps {
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = serializer.parseBytes(bytes)
 
-  // create
   def create(
-      version: Byte,
-      asset: Asset,
+      version: TxVersion,
+      timestamp: TxTimestamp,
       sender: PublicKey,
       recipient: AddressOrAlias,
-      amount: Long,
-      timestamp: Long,
+      asset: Asset,
+      amount: TxTimestamp,
       feeAsset: Asset,
-      fee: Long,
-      attachment: Array[Byte],
+      fee: TxTimestamp,
+      attachment: Array[TxVersion],
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
     TransferTransaction(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, proofs).validatedEither
 
-  // signed
   def signed(
-      version: Byte,
-      asset: Asset,
+      version: TxVersion,
+      timestamp: TxTimestamp,
       sender: PublicKey,
       recipient: AddressOrAlias,
-      amount: Long,
-      timestamp: Long,
+      asset: Asset,
+      amount: TxTimestamp,
       feeAsset: Asset,
-      fee: Long,
-      attachment: Array[Byte],
+      fee: TxTimestamp,
+      attachment: Array[TxVersion],
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
-    apply(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, Proofs.empty)
+    create(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, Proofs.empty)
       .map(this.signer.sign(_, signer))
 
-  // selfSigned
   def selfSigned(
-      version: Byte,
-      asset: Asset,
+      version: TxVersion,
+      timestamp: TxTimestamp,
       sender: KeyPair,
       recipient: AddressOrAlias,
-      amount: Long,
-      timestamp: Long,
+      asset: Asset,
+      amount: TxTimestamp,
       feeAsset: Asset,
-      fee: Long,
-      attachment: Array[Byte]
+      fee: TxTimestamp,
+      attachment: Array[TxVersion]
   ): Either[ValidationError, TransferTransaction] =
-    signed(version, asset, sender, recipient, amount, timestamp, feeAsset, fee, attachment, sender)
+    signed(version, timestamp, sender, recipient, asset, amount, feeAsset, fee, attachment, sender)
 }

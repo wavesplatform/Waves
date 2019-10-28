@@ -5,6 +5,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -94,7 +95,7 @@ object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTran
              timestamp: Long,
              signer: PrivateKey): Either[ValidationError, TransactionT] = {
     create(chainId, sender, asset, script, fee, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(sign(signer, unsigned.bodyBytes())))).explicitGet())
+      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 

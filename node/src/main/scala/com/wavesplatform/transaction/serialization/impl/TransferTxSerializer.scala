@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Proofs
@@ -50,8 +49,8 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
   override def toBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
     version match {
-      case 1 => Bytes.concat(Array(typeId), proofs.proofs.head, bodyBytes(tx))
-      case 2 => Bytes.concat(Array(0: Byte), bodyBytes(tx), proofs.bytes())
+      case 1 => Bytes.concat(Array(typeId), proofs.proofs.head, this.bodyBytes(tx))
+      case 2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
 
@@ -82,7 +81,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
       val signature = buf.getSignature
       require(buf.get == TransferTransaction.typeId, "transaction type mismatch")
-      parseCommonPart(1, buf).copy(proofs = Proofs(Seq(ByteStr(signature))))
+      parseCommonPart(1, buf).copy(proofs = Proofs(signature))
     }
   }
 }

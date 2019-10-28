@@ -40,7 +40,7 @@ class AliasBroadcastRouteSpec
   "returns appropriate error code when validation fails for" - {
 
     "create alias transaction" in forAll(createAliasReq) { req =>
-      import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat
+      import com.wavesplatform.api.http.requests.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat
 
       def posting(v: JsValue): RouteTestResult = Post(routePath("create"), v) ~> route
 

@@ -25,15 +25,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
 
   test("should rebroadcast a transaction if that's allowed in config") {
     val tx = TransferTransaction
-      .selfSigned(2.toByte,
-                  Waves,
-                  nodeA.privateKey,
-                  Address.fromString(nodeB.address).right.get,
-                  transferAmount,
-                  System.currentTimeMillis(),
-                  Waves,
-                  minFee,
-                  Array.emptyByteArray)
+      .selfSigned(2.toByte, System.currentTimeMillis(), nodeA.privateKey, Address.fromString(nodeB.address).right.get, Waves, transferAmount, Waves, minFee, Array.emptyByteArray)
       .explicitGet()
       .json()
 
@@ -50,15 +42,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   test("should not rebroadcast a transaction if that's not allowed in config") {
     dockerNodes().foreach(docker.restartNode(_, configWithRebroadcastNotAllowed))
     val tx = TransferTransaction
-      .selfSigned(2.toByte,
-                  Waves,
-                  nodeA.privateKey,
-                  Address.fromString(nodeB.address).right.get,
-                  transferAmount,
-                  System.currentTimeMillis(),
-                  Waves,
-                  minFee,
-                  Array.emptyByteArray)
+      .selfSigned(2.toByte, System.currentTimeMillis(), nodeA.privateKey, Address.fromString(nodeB.address).right.get, Waves, transferAmount, Waves, minFee, Array.emptyByteArray)
       .explicitGet()
       .json()
 

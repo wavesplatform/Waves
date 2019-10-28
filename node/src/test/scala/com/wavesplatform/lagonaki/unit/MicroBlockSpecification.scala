@@ -26,9 +26,9 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
   test("MicroBlock with txs bytes/parse roundtrip") {
 
     val ts                       = System.currentTimeMillis() - 5000
-    val tr: TransferTransaction  = TransferTransaction.selfSigned(1.toByte, Waves, sender, gen, 5, ts + 1, Waves, 2, Array()).explicitGet()
+    val tr: TransferTransaction  = TransferTransaction.selfSigned(1.toByte, ts + 1, sender, gen, Waves, 5, Waves, 2, Array()).explicitGet()
     val assetId                  = IssuedAsset(ByteStr(Array.fill(AssetIdLength)(Random.nextInt(100).toByte)))
-    val tr2: TransferTransaction = TransferTransaction.selfSigned(1.toByte, assetId, sender, gen, 5, ts + 2, Waves, 2, Array()).explicitGet()
+    val tr2: TransferTransaction = TransferTransaction.selfSigned(1.toByte, ts + 2, sender, gen, assetId, 5, Waves, 2, Array()).explicitGet()
 
     val transactions = Seq(tr, tr2)
 
@@ -56,7 +56,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
 
   test("MicroBlock cannot contain more than Miner.MaxTransactionsPerMicroblock") {
 
-    val transaction  = TransferTransaction.selfSigned(1.toByte, Waves, sender, gen, 5, System.currentTimeMillis(), Waves, 1000, Array()).explicitGet()
+    val transaction  = TransferTransaction.selfSigned(1.toByte, System.currentTimeMillis(), sender, gen, Waves, 5, Waves, 1000, Array()).explicitGet()
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(sender, transactions, prevResBlockSig, totalResBlockSig)

@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransact
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransactionV1, DataTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
@@ -35,7 +35,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
   )
 
   private def transfer(sender: KeyPair, recipient: Address, amount: Long) =
-    TransferTransaction(1.toByte, Waves, sender, recipient, amount, nextTs, Waves, 1, Array.empty[Byte], sender).explicitGet()
+    TransferTransaction.selfSigned(1.toByte, nextTs, sender, recipient, Waves, amount, Waves, 1, Array.empty[Byte]).explicitGet()
 
   private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -49,7 +49,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             .selfSigned(Waves, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
             .explicitGet()
         )
-      case _ => List(TransferTransaction(1.toByte, Waves, sender, recipient, amount, nextTs, Waves, 1000, Array.empty[Byte], sender).explicitGet())
+      case _ => List(TransferTransaction.selfSigned(1.toByte, nextTs, sender, recipient, Waves, amount, Waves, 1000, Array.empty[Byte]).right.get)
     }
   }
 
@@ -218,17 +218,16 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               d.lastBlockId,
               Seq(
-                TransferTransaction(
+                TransferTransaction.selfSigned(
                   1.toByte,
-                  IssuedAsset(issueTransaction.id()),
+                  nextTs,
                   sender,
                   recipient,
+                  IssuedAsset(issueTransaction.id()),
                   assetAmount,
-                  nextTs,
                   Waves,
                   1,
-                  Array.empty[Byte],
-                  sender
+                  Array.empty[Byte]
                 ).explicitGet()
               )
             )
@@ -302,7 +301,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(CreateAliasTransactionV1.selfSigned(sender, alias, 1, nextTs).explicitGet())
+              Seq(CreateAliasTransaction.selfSigned(1.toByte, nextTs, sender, alias, 1).explicitGet())
             )
           )
 

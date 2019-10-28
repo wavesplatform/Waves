@@ -94,7 +94,7 @@ object OrderJson {
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply)))
-        .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
+        .orElse(signature.map(s => Proofs(s)))
         .getOrElse(Proofs.empty)
 
     Order(

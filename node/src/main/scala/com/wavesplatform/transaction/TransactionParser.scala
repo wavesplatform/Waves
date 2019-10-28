@@ -89,8 +89,11 @@ object TransactionBytesDescription {
   }
 }
 
-abstract class TransactionBytesDescriptionFor[+M <: TransactionManifest](m: M) extends TransactionBytesDescription {
-  override final type TransactionT = m.TransactionT
+abstract class TransactionBytesDescriptionFor[M <: TransactionManifest](val manifest: M) extends TransactionManifest with TransactionBytesDescription {
+  override final type TransactionT = manifest.TransactionT
+  override def classTag: ClassTag[manifest.TransactionT] = manifest.classTag
+  override def typeId: TxVersion = manifest.typeId
+  override def supportedVersions: Set[TxVersion] = manifest.supportedVersions
 }
 
 trait TransactionParser extends TransactionParserLite with TransactionBytesDescription {

@@ -24,7 +24,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, timestamp, from, to, Waves, amount, Waves, FeeAmount, Array.empty).explicitGet()
 
     def transferV2(
         from: KeyPair,
@@ -34,7 +34,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(2.toByte, Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(2.toByte, timestamp, from, to, Waves, amount, Waves, FeeAmount, Array.empty).explicitGet()
 
     def lease(
         from: KeyPair,

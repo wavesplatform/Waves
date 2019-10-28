@@ -94,7 +94,7 @@ object OrderV3 {
     val unsigned = OrderV3(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(sig))
   }
 
   def sell(sender: KeyPair,
@@ -110,7 +110,7 @@ object OrderV3 {
     val unsigned = OrderV3(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(sig))
   }
 
   def apply(sender: KeyPair,
@@ -127,7 +127,7 @@ object OrderV3 {
     val unsigned = OrderV3(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(sig))
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Order] = Try {

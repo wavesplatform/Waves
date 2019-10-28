@@ -28,13 +28,13 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.selfSigned(1.toByte, Waves, from, to.toAddress, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
+    } yield TransferTransaction.selfSigned(1.toByte, ts, from, to.toAddress, Waves, amt, Waves, fee, Array.emptyByteArray).explicitGet()
 
   private def scriptedSendGen(from: KeyPair, to: PublicKey, ts: Long): Gen[TransferTransaction] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.selfSigned(2.toByte, Waves, from, to.toAddress, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
+    } yield TransferTransaction.selfSigned(2.toByte, ts, from, to.toAddress, Waves, amt, Waves, fee, Array.emptyByteArray).explicitGet()
 
   private def differentTransfers(typed: EXPR) =
     for {

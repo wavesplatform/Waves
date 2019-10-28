@@ -85,7 +85,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
         .explicitGet()
 
       assetTransferTransaction = TransferTransaction
-        .selfSigned(1.toByte, asset, firstAcc, secondAcc, 1, ts + 20, Waves, 1000, Array.empty)
+        .selfSigned(1.toByte, ts + 20, firstAcc, secondAcc, asset, 1, Waves, 1000, Array.empty)
         .explicitGet()
 
     } yield (genesis, issueTransaction, setAssetScriptTransaction, assetTransferTransaction)

@@ -123,7 +123,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransaction.selfSigned(2.toByte, Waves, src, dst, fee, now + i, Waves, fee, Array.emptyByteArray)
+          TransferTransaction.selfSigned(2.toByte, now + i, src, dst, Waves, fee, Waves, fee, Array.emptyByteArray)
       }
       .collect { case Right(x) => x }
   }

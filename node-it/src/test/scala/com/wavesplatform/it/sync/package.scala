@@ -1,6 +1,6 @@
 package com.wavesplatform.it
 
-import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
@@ -72,7 +72,7 @@ package object sync {
       reissuable,
       fee,
       timestamp,
-      proofs.proofs.map(_.toString),
+      proofs.proofs.map(_.toString).toList,
       tx.script.map(_.bytes().base64)
     )
   }

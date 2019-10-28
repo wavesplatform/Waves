@@ -102,26 +102,16 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient                  <- accountGen
       assetId = issueTx.id()
       assetOverspend = TransferTransaction
-        .selfSigned(1.toByte, Waves, master, recipient.toAddress, 1000000, ts + 1, IssuedAsset(assetId), issueTx.quantity + 1, Array.emptyByteArray)
+        .selfSigned(1.toByte, ts + 1, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), issueTx.quantity + 1, Array.emptyByteArray)
         .right
         .get
       insufficientFee = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          Waves,
-          master,
-          recipient.toAddress,
-          1000000,
-          ts + 2,
-          IssuedAsset(assetId),
-          sponsorTx.minSponsoredAssetFee.get - 1,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, ts + 2, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray)
         .right
         .get
       fee = 3000 * sponsorTx.minSponsoredAssetFee.get
       wavesOverspend = TransferTransaction
-        .selfSigned(1.toByte, Waves, master, recipient.toAddress, 1000000, ts + 3, IssuedAsset(assetId), fee, Array.emptyByteArray)
+        .selfSigned(1.toByte, ts + 3, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), fee, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
@@ -168,7 +158,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId = issueTx.id()
       transferAssetTx: TransferTransaction = TransferTransaction
-        .selfSigned(1.toByte, IssuedAsset(assetId), master, alice.toAddress, issueTx.quantity, ts + 2, Waves, fee, Array.emptyByteArray)
+        .selfSigned(1.toByte, ts + 2, master, alice.toAddress, IssuedAsset(assetId), issueTx.quantity, Waves, fee, Array.emptyByteArray)
         .right
         .get
       leasingTx: LeaseTransactionV1 = LeaseTransactionV1
@@ -180,17 +170,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .right
         .get
       insufficientFee = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          IssuedAsset(assetId),
-          alice,
-          bob.toAddress,
-          issueTx.quantity / 12,
-          ts + 4,
-          IssuedAsset(assetId),
-          sponsorTx.minSponsoredAssetFee.get,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, ts + 4, alice, bob.toAddress, IssuedAsset(assetId), issueTx.quantity / 12, IssuedAsset(assetId), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, genesis2, issueTx, sponsorTx, transferAssetTx, leasingTx, insufficientFee, leasingToMasterTx)
@@ -283,15 +263,15 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       assetId = IssuedAsset(issue.id())
       sponsor = SponsorFeeTransaction.selfSigned(master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransaction
-        .selfSigned(1.toByte, assetId, master, recipient, issue.quantity, ts + 3, Waves, 100000, Array.emptyByteArray)
+        .selfSigned(1.toByte, ts + 3, master, recipient, assetId, issue.quantity, Waves, 100000, Array.emptyByteArray)
         .right
         .get
       wavesTransfer = TransferTransaction
-        .selfSigned(1.toByte, Waves, master, recipient, 99800000, ts + 4, Waves, 100000, Array.emptyByteArray)
+        .selfSigned(1.toByte, ts + 4, master, recipient, Waves, 99800000, Waves, 100000, Array.emptyByteArray)
         .right
         .get
       backWavesTransfer = TransferTransaction
-        .selfSigned(1.toByte, Waves, recipient, master, 100000, ts + 5, assetId, 100, Array.emptyByteArray)
+        .selfSigned(1.toByte, ts + 5, recipient, master, Waves, 100000, assetId, 100, Array.emptyByteArray)
         .right
         .get
     } yield (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer)

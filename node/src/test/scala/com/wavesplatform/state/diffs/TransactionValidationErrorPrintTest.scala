@@ -76,17 +76,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
       .explicitGet()
 
     val transferTransaction = TransferTransaction
-      .selfSigned(
-        version = 2.toByte,
-        asset = IssuedAsset(issueTransaction.id()),
-        sender = KeyPair(master.bytes),
-        recipient = master,
-        amount = 1,
-        timestamp = 0,
-        feeAsset = Waves,
-        fee = 10000000,
-        attachment = Array[Byte]()
-      )
+      .selfSigned(version = 2.toByte, timestamp = 0, sender = KeyPair(master.bytes), recipient = master, asset = IssuedAsset(issueTransaction.id()), amount = 1, feeAsset = Waves, fee = 10000000, attachment = Array[Byte]())
       .explicitGet()
 
     assertDiffEi(

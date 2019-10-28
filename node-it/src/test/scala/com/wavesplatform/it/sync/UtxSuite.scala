@@ -32,7 +32,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     val account = KeyPair(seed)
 
     val transferToAccount = TransferTransaction
-      .selfSigned(1.toByte, Waves, miner.privateKey, account, AMOUNT, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+      .selfSigned(1.toByte, System.currentTimeMillis(), miner.privateKey, account, Waves, AMOUNT, Waves, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
     miner.signedBroadcast(transferToAccount.json())
@@ -40,11 +40,11 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
 
     val firstTransfer = TransferTransaction
-      .selfSigned(1.toByte, Waves, account, miner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+      .selfSigned(1.toByte, System.currentTimeMillis(), account, miner.privateKey, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
     val secondTransfer = TransferTransaction
-      .selfSigned(1.toByte, Waves, account, notMiner.privateKey, AMOUNT - ENOUGH_FEE, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+      .selfSigned(1.toByte, System.currentTimeMillis(), account, notMiner.privateKey, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
     val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id

@@ -135,10 +135,10 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .explicitGet()
       data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
-        .selfSigned(2.toByte, Waves, master, acc, 10000000000L, timestamp, Waves, fee, ByteStr(Array()))
+        .selfSigned(2.toByte, timestamp, master, acc, Waves, 10000000000L, Waves, fee, ByteStr(Array()))
         .explicitGet()
       tr2 = TransferTransaction
-        .selfSigned(2.toByte, IssuedAsset(issueScr.id()), master, acc, 1000000000L, timestamp, Waves, fee, ByteStr(Array()))
+        .selfSigned(2.toByte, timestamp, master, acc, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, ByteStr(Array()))
         .explicitGet()
       mt1 = MassTransferTransaction.selfSigned(Waves, master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array())).explicitGet()
       mt2 = MassTransferTransaction
@@ -268,10 +268,10 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .explicitGet()
       data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
-        .selfSigned(2.toByte, Waves, master, acc, 10000000000L, timestamp, Waves, fee, ByteStr(Array()))
+        .selfSigned(2.toByte, timestamp, master, acc, Waves, 10000000000L, Waves, fee, ByteStr(Array()))
         .explicitGet()
       tr2 = TransferTransaction
-        .selfSigned(2.toByte, IssuedAsset(issueScr.id()), master, acc, 1000000000L, timestamp, Waves, fee, ByteStr(Array()))
+        .selfSigned(2.toByte, timestamp, master, acc, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, ByteStr(Array()))
         .explicitGet()
       mt1 = MassTransferTransaction.selfSigned(Waves, master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array())).explicitGet()
       mt2 = MassTransferTransaction

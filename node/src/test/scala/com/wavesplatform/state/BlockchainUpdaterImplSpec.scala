@@ -70,7 +70,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransaction
-      .selfSigned(1.toByte, Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
+      .selfSigned(1.toByte, ts, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, Array.emptyByteArray)
       .explicitGet()
   }
 

@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.api.http.assets
 
 import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.requests.{SignedBurnV1Request, SignedIssueV1Request, SignedReissueV1Request, SignedSetAssetScriptRequest, SignedSponsorFeeRequest, SignedTransferV1Request}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.script.Script
@@ -164,7 +165,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
   }
 
   test("SponsorFeeRequest json parsing works") {
-    import com.wavesplatform.api.http.assets.SponsorFeeRequest._
+    import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 
     val One = 100000000L
     val js1 = s"""{

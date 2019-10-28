@@ -32,8 +32,10 @@ trait Transaction extends BytesSerializable with JsonSerializable {
 }
 
 object Transaction {
-
   type Type = Byte
+
+  val V1: TxVersion = 1.toByte
+  val V2: TxVersion = 2.toByte
 
   implicit class TransactionExt(tx: Transaction) {
     def feeDiff(): Portfolio = tx.assetFee match {

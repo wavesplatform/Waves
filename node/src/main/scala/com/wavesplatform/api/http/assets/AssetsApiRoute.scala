@@ -14,6 +14,7 @@ import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
+import com.wavesplatform.api.http.requests.{BurnV1Request, IssueV1Request, MassTransferRequest, ReissueV1Request, SignedBurnV1Request, SignedExchangeRequest, SignedIssueV1Request, SignedReissueV1Request, SponsorFeeRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute

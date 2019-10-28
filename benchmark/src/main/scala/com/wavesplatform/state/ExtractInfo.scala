@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Authorized, CreateAliasTransactionV1, DataTransaction, Transaction}
+import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
@@ -66,7 +66,7 @@ object ExtractInfo extends App with ScorexLogging {
     val aliasTxs = nonEmptyBlocks(benchSettings.aliasesFromHeight)
       .flatMap(_.transactionData)
       .collect {
-        case _: CreateAliasTransactionV1 => true
+        case _: CreateAliasTransaction => true
       }
 
     val restTxs = nonEmptyBlocks(benchSettings.restTxsFromHeight)
@@ -82,7 +82,7 @@ object ExtractInfo extends App with ScorexLogging {
     } yield sender.toAddress.stringRepr
     write("accounts", benchSettings.accountsFile, takeUniq(1000, accounts))
 
-    val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransactionV1].alias.stringRepr)
+    val aliasTxIds = aliasTxs.map(_.asInstanceOf[CreateAliasTransaction].alias.stringRepr)
     write("aliases", benchSettings.aliasesFile, aliasTxIds.take(1000))
 
     val restTxIds = restTxs.map(_.id().toString)

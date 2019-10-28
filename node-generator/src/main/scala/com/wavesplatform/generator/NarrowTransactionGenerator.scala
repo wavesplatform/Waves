@@ -58,17 +58,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val tradeAssetDistribution = {
       (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
         TransferTransaction
-            .selfSigned(
-              2.toByte,
-            IssuedAsset(tradeAssetIssue.id()),
-            issueTransactionSender,
-            acc,
-            5,
-            System.currentTimeMillis(),
-            Waves,
-            900000,
-            Array.fill(random.nextInt(100))(random.nextInt().toByte)
-          )
+            .selfSigned(2.toByte, System.currentTimeMillis(), issueTransactionSender, acc, IssuedAsset(tradeAssetIssue.id()), 5, Waves, 900000, Array.fill(random.nextInt(100))(random.nextInt().toByte))
           .right
           .get
       })
@@ -130,17 +120,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
                 tx <- logOption(
                   TransferTransaction
-                    .selfSigned(
-                      2.toByte,
-                      Asset.fromCompatId(asset),
-                      sender,
-                      recipient,
-                      500,
-                      ts,
-                      Waves,
-                      500000L,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
-                    )
+                    .selfSigned(2.toByte, ts, sender, recipient, Asset.fromCompatId(asset), 500, Waves, 500000L, Array.fill(random.nextInt(100))(random.nextInt().toByte))
                 )
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
@@ -292,10 +272,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
-          case CreateAliasTransactionV2 =>
+          case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
+            logOption(CreateAliasTransaction.selfSigned(Transaction.V2, ts, sender, Alias.create(aliasString).explicitGet(), 500000L))
 
           case MassTransferTransaction =>
             (
