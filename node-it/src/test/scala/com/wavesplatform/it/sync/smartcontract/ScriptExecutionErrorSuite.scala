@@ -12,6 +12,8 @@ import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction}
 import org.scalatest.CancelAfterFailure

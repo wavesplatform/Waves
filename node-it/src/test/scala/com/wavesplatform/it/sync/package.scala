@@ -4,7 +4,7 @@ import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2R
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

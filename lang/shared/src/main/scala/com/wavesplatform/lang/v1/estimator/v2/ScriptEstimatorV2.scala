@@ -1,4 +1,4 @@
-package com.wavesplatform.lang.v2.estimator
+package com.wavesplatform.lang.v1.estimator.v2
 
 import cats.{Id, Monad}
 import cats.implicits._
@@ -7,8 +7,8 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.task.imports._
-import com.wavesplatform.lang.v2.estimator.EstimatorContext.EvalM
-import com.wavesplatform.lang.v2.estimator.EstimatorContext.Lenses._
+import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
+import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses._
 import monix.eval.Coeval
 
 object ScriptEstimatorV2 extends ScriptEstimator {
@@ -43,6 +43,13 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       } yield r + 5
     }
 
+  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
+    for {
+      condComplexity  <- evalExpr(cond)
+      rightComplexity <- evalExpr(ifTrue)
+      leftComplexity  <- evalExpr(ifFalse)
+    } yield condComplexity + Math.max(leftComplexity, rightComplexity) + 1
+
   private def evalFuncBlock(func: FUNC, inner: EXPR): EvalM[Long] =
     local {
       for {
@@ -73,13 +80,6 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def setRefEvaluated(key: String, lzy: EvalM[Long]): EvalM[Long] =
     update(lets.modify(_)(_.updated(key, (true, lzy))))
       .flatMap(_ => lzy)
-
-  private def evalIF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR): EvalM[Long] =
-    for {
-      condComplexity  <- evalExpr(cond)
-      rightComplexity <- evalExpr(ifTrue)
-      leftComplexity  <- evalExpr(ifFalse)
-    } yield condComplexity + Math.max(leftComplexity, rightComplexity) + 1
 
   private def evalGetter(expr: EXPR): EvalM[Long] =
     evalExpr(expr).map(_ + 2)
