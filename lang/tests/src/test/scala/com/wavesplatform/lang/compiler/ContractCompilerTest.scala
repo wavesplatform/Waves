@@ -793,8 +793,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |   [
           |     DataEntry("key", 1),
           |     ScriptTransfer(i.caller, 1, base58''),
-          |     Issue(base58'', 4, "description", true, "name", 1000),
-          |     Issue(unit,     4, "description", true, "name", 1000),
+          |     Issue(unit, 4, "description", true, "name", 1000),
           |     Reissue(base58'', false, 1),
           |     Burn(base58'', 1)
           |   ]

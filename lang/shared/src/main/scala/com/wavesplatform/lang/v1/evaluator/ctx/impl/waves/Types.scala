@@ -111,11 +111,13 @@ object Types {
       List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType)
     )
 
+  val issueScriptType = CASETYPEREF(FieldNames.IssueScript, Nil)
+
   val issueActionType =
     CASETYPEREF(
       FieldNames.Issue,
       List(
-        FieldNames.IssueScript -> optionByteVector,
+        FieldNames.IssueScript -> UNION(issueScriptType, UNIT),
         FieldNames.IssueDecimals -> LONG,
         FieldNames.IssueDescription -> STRING,
         FieldNames.IssueIsReissuable -> BOOLEAN,

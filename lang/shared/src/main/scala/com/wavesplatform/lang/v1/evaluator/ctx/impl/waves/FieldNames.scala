@@ -16,12 +16,13 @@ object FieldNames {
   val Key            = "key"
   val Value          = "value"
 
+  val IssueScript = "Script"
   val Issue = "Issue"
   val IssueName         = "name"
-  val IssueScript       = "compiledScript"
   val IssueQuantity     = "quantity"
   val IssueDecimals     = "decimals"
   val IssueDescription  = "description"
+  val IssueScriptField  = "compiledScript"
   val IssueIsReissuable = "isReissuable"
 
   val Reissue = "Reissue"
