@@ -110,7 +110,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       "signature"       -> "A" * 64
     )
 
-    assertBroadcastBadJson(jsonV1, "invalid signature")
+    assertBroadcastBadJson(jsonV1, "Proof doesn't validate")
 
     val jsonV2 = Json.obj(
       "type"            -> CreateAliasTransaction.typeId,
