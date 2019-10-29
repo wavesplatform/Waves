@@ -34,13 +34,13 @@ final case class BurnTransactionV2 private (chainId: Byte,
     (bodyBytes, proofs.bytes)
       .mapN { case (bb, pb) => Bytes.concat(Array(0: Byte), bb, pb) }
 
-  override def version: Byte = 2
+  override def version: TxVersion = 2
 }
 
 object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = BurnTransaction.typeId
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val typeId: TxType                 = BurnTransaction.typeId
+  override val supportedVersions: Set[TxVersion] = Set(2)
 
   override protected def parseTail(bytes: Array[Byte]): Try[BurnTransactionV2] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

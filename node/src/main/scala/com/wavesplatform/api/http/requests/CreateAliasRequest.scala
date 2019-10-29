@@ -14,12 +14,13 @@ case class CreateAliasRequest(
     timestamp: Option[TxTimestamp] = None,
     signature: Option[String] = None,
     proofs: Option[List[String]] = None
-) extends TxBroadcastRequest[CreateAliasTransaction] {
+) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, CreateAliasTransaction] =
     for {
       validAlias  <- Alias.create(alias)
       validProofs <- toProofs(version, signature, proofs)
-    } yield CreateAliasTransaction(version.getOrElse(1.toByte), sender, validAlias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
+      tx          <- CreateAliasTransaction.create(version.getOrElse(1.toByte), sender, validAlias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
+    } yield tx
 }
 
 object CreateAliasRequest {

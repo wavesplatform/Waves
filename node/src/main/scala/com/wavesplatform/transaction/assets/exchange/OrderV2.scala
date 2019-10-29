@@ -29,7 +29,7 @@ case class OrderV2(senderPublicKey: PublicKey,
                    proofs: Proofs)
     extends Order {
 
-  override def version: Byte = 2
+  override def version: TxVersion = 2
 
   override def signature: Array[Byte] = proofs.proofs(0).arr
 

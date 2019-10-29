@@ -27,12 +27,12 @@ case class LeaseCancelTransactionV1 private (sender: PublicKey, leaseId: ByteStr
 
   override val bytes = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
-  override def version: Byte = 1
+  override def version: TxVersion = 1
 }
 
 object LeaseCancelTransactionV1 extends TransactionParserFor[LeaseCancelTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = LeaseCancelTransaction.typeId
+  override val typeId: TxType = LeaseCancelTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

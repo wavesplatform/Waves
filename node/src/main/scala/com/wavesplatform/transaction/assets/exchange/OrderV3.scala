@@ -28,7 +28,7 @@ case class OrderV3(senderPublicKey: PublicKey,
                    proofs: Proofs)
     extends Order {
 
-  def version: Byte = 3
+  def version: TxVersion = 3
 
   override def signature: Array[Byte] = proofs.proofs.head.arr
 

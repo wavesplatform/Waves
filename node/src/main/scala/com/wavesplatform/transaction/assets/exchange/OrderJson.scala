@@ -88,7 +88,7 @@ object OrderJson {
                   matcherFee: Long,
                   signature: Option[Array[Byte]],
                   proofs: Option[Array[Array[Byte]]],
-                  version: Byte,
+                  version: TxVersion,
                   matcherFeeAssetId: Asset): Order = {
 
     val eproofs =

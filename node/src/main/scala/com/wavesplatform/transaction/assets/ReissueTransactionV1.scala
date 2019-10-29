@@ -29,13 +29,13 @@ case class ReissueTransactionV1 private (sender: PublicKey,
   val bodyBytes: Coeval[Array[Byte]]              = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]         = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
 
-  override def version: Byte           = 1
+  override def version: TxVersion           = 1
   override def chainByte: Option[Byte] = None
 }
 
 object ReissueTransactionV1 extends TransactionParserFor[ReissueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = ReissueTransaction.typeId
+  override val typeId: TxType = ReissueTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

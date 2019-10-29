@@ -45,13 +45,13 @@ case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]],
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def version: Byte = 1
+  override def version: TxVersion = 1
 }
 
 object DataTransaction extends TransactionParserFor[DataTransaction] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = 12
-  override val supportedVersions: Set[Byte] = Set(1)
+  override val typeId: TxType                 = 12
+  override val supportedVersions: Set[TxVersion] = Set(1)
 
   val MaxBytes      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
   val MaxEntryCount = 100

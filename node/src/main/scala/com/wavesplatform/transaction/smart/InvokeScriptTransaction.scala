@@ -76,7 +76,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def version: Byte = 1
+  override def version: TxVersion = 1
 }
 
 object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransaction] with TransactionParser.MultipleVersions {
@@ -102,8 +102,8 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     )
   }
 
-  override val typeId: Byte                 = 16
-  override val supportedVersions: Set[Byte] = Set(1)
+  override val typeId: TxType                 = 16
+  override val supportedVersions: Set[TxVersion] = Set(1)
 
   private def currentChainId: Byte = AddressScheme.current.chainId
 

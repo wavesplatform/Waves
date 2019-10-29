@@ -26,15 +26,15 @@ final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, a
   override val id: Coeval[ByteStr]                 = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
 }
 
-object CreateAliasTransaction extends TransactionParserLite with TransactionOps {
+object CreateAliasTransaction extends TransactionParserLite {
   type TransactionT = CreateAliasTransaction
   val classTag: ClassTag[CreateAliasTransaction] = ClassTag(classOf[CreateAliasTransaction])
   val supportedVersions: Set[TxVersion]          = Set(1, 2)
-  val typeId: Byte                               = 10
+  val typeId: TxType                               = 10
 
   implicit val signer: TxSigner[CreateAliasTransaction]         = (tx, privateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-  implicit val serializer: TxSerializer[CreateAliasTransaction] = CreateAliasTxSerializer
   implicit val validator: TxValidator[CreateAliasTransaction]   = TxFeeValidator.asInstanceOf[TxValidator[CreateAliasTransaction]]
+  val serializer: TxSerializer[CreateAliasTransaction] = CreateAliasTxSerializer
 
   override def parseBytes(bytes: Array[TxVersion]): Try[CreateAliasTransaction] = serializer.parseBytes(bytes)
 

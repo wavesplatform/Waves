@@ -34,7 +34,7 @@ case class TransferTransaction(
     with FastHashId
     with TxWithFee.InCustomAsset {
 
-  override val typeId: Byte = TransferTransaction.typeId
+  override val typeId: TxType = TransferTransaction.typeId
 
   // TODO: Rework caching
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
@@ -49,18 +49,18 @@ case class TransferTransaction(
   override def builder: TransactionParserLite = TransferTransaction
 }
 
-object TransferTransaction extends TransactionParserLite with TransactionOps {
+object TransferTransaction extends TransactionParserLite {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  implicit val serializer: TxSerializer[TransferTransaction] = TransferTxSerializer
-  implicit val validator: TxValidator[TransferTransaction]   = TransferTxValidator
+  implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
   implicit val signer: TxSigner[TransferTransaction] = (tx: TransferTransaction, privateKey: PrivateKey) =>
-    tx.copy(proofs = Proofs(Seq(ByteStr(crypto.sign(privateKey, tx.bodyBytes())))))
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+  val serializer: TxSerializer[TransferTransaction] = TransferTxSerializer
 
-  val typeId: Byte = 4.toByte
+  val typeId: TxType = 4.toByte
 
-  override def supportedVersions: Set[Byte] = Set(1.toByte, 2.toByte)
+  override def supportedVersions: Set[TxVersion] = Set(1.toByte, 2.toByte)
 
   override type TransactionT = TransferTransaction
 

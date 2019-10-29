@@ -1,14 +1,14 @@
 package com.wavesplatform.transaction.serialization.impl
 
-import cats.implicits._
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.description._
 import com.wavesplatform.transaction.serialization.TxSerializer
-import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TransactionBytesDescription, TransactionBytesDescriptionFor}
+import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
-import scala.util.{Failure, Try}
+import scala.util.Try
 
 object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
   override def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
@@ -22,8 +22,8 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
     )
 
     version match {
-      case 1 => Bytes.concat(Array(builder.typeId), base)
-      case 2 => Bytes.concat(Array(builder.typeId, version), base)
+      case TxVersion.V1 => Bytes.concat(Array(builder.typeId), base)
+      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version), base)
     }
   }
 
@@ -31,55 +31,41 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
     import tx._
 
     version match {
-      case 1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
-      case 2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = {
+  override def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {
     require(bytes.length > 3, "Invalid tx bytes")
     bytes.take(3) match {
-      case Array(CreateAliasTransaction.typeId, _, _) => DescV1.byteDescription.deserializeFromByteArray(bytes)
-      case Array(0, CreateAliasTransaction.typeId, 2) => DescV2.byteDescription.deserializeFromByteArray(bytes)
-      case Array(b1, b2, b3)                          => Failure(new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3"))
+      case Array(CreateAliasTransaction.typeId, _, _) =>
+        val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
+        val sender    = buf.getPublicKey
+        val alias     = buf.getAlias
+        val fee       = buf.getLong
+        val timestamp = buf.getLong
+        val signature = buf.getSignature
+        CreateAliasTransaction(Transaction.V1, sender, alias, fee, timestamp, Proofs(signature))
+
+      case Array(0, CreateAliasTransaction.typeId, 2) =>
+        val buf       = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+        val sender    = buf.getPublicKey
+        val alias     = buf.getAlias
+        val fee       = buf.getLong
+        val timestamp = buf.getLong
+        val proofs    = buf.getProofs
+        CreateAliasTransaction(Transaction.V2, sender, alias, fee, timestamp, proofs)
+
+      case Array(b1, b2, b3) => throw new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3")
     }
   }
 
   override def toJson(tx: CreateAliasTransaction): JsObject = {
     import tx._
     ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version"   -> version,
-      "alias"     -> alias.name,
-      "fee"       -> fee,
-      "timestamp" -> timestamp
+      "version" -> version.toByte,
+      "alias"   -> alias.name
     )
-  }
-
-  object DescV1 extends TransactionBytesDescriptionFor(CreateAliasTransaction) with TransactionBytesDescription.HardcodedVersion1 {
-    val byteTailDescription: ByteEntity[CreateAliasTransaction] = {
-      (
-        PublicKeyBytes(tailIndex(1), "Sender's public key"),
-        AliasBytes(tailIndex(2), "Alias object"),
-        LongBytes(tailIndex(3), "Fee"),
-        LongBytes(tailIndex(4), "Timestamp"),
-        SignatureBytes(tailIndex(5), "Signature")
-      ) mapN { (sender, alias, fee, ts, signature) =>
-        CreateAliasTransaction(Transaction.V1, sender, alias, fee, ts, Proofs(signature))
-      }
-    }
-  }
-
-  object DescV2 extends TransactionBytesDescriptionFor(CreateAliasTransaction) with TransactionBytesDescription.MultipleVersions {
-    val byteTailDescription: ByteEntity[CreateAliasTransaction] = {
-      (
-        PublicKeyBytes(tailIndex(1), "Sender's public key"),
-        AliasBytes(tailIndex(2), "Alias object"),
-        LongBytes(tailIndex(3), "Fee"),
-        LongBytes(tailIndex(4), "Timestamp"),
-        ProofsBytes(tailIndex(5))
-      ) mapN { (sender, alias, fee, ts, proofs) =>
-        CreateAliasTransaction(Transaction.V2, sender, alias, fee, ts, proofs)
-      }
-    }
   }
 }

@@ -56,7 +56,7 @@ package object history {
   def customBuildBlockOfTxs(refTo: ByteStr,
                             txs: Seq[Transaction],
                             signer: KeyPair,
-                            version: Byte,
+                            version: TxVersion,
                             timestamp: Long,
                             bTarget: Long = DefaultBaseTarget): Block =
     Block
@@ -77,7 +77,7 @@ package object history {
                                  prevTotal: Block,
                                  txs: Seq[Transaction],
                                  signer: KeyPair,
-                                 version: Byte,
+                                 version: TxVersion,
                                  ts: Long): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val nonSigned = MicroBlock
@@ -124,7 +124,7 @@ package object history {
                         base: Seq[Transaction],
                         micros: Seq[Seq[Transaction]],
                         signer: KeyPair,
-                        version: Byte,
+                        version: TxVersion,
                         timestamp: Long): (Block, Seq[MicroBlock]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)
     val microBlocks = micros

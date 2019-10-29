@@ -48,7 +48,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
     def data(entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
              fee: Long = 100000,
              timestamp: Long = System.currentTimeMillis,
-             version: Byte = DataTransaction.supportedVersions.head): DataTransaction =
+             version: TxVersion = DataTransaction.supportedVersions.head): DataTransaction =
       DataTransaction.selfSigned(sender.privateKey, entries, fee, timestamp).explicitGet()
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)

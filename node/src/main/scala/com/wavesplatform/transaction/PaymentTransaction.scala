@@ -42,7 +42,7 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
 
 object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = 2
+  override val typeId: TxType = 2
 
   val RecipientLength: Int = Address.AddressLength
 

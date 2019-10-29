@@ -29,7 +29,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
 
   private def deprecatedRoute: Route =
     path("broadcast" / "create") {
-      broadcast[CreateAliasRequest](_.toValidTx)
+      broadcast[CreateAliasRequest](_.toTx)
     } ~ (path("create") & withAuth) {
       broadcast[CreateAliasRequest](TransactionFactory.createAlias(_, wallet, time))
     }

@@ -1,12 +1,11 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.transaction.serialization.TxJson
 import com.wavesplatform.transaction.{ProvenTransaction, SigProofsSwitch}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
-object ProvenTxJson extends TxJson[ProvenTransaction] {
-  override def toJson(tx: ProvenTransaction): JsObject = {
+object ProvenTxJson {
+  def toJson(tx: ProvenTransaction): JsObject = {
     import tx._
     Json.obj(
       "type"            -> typeId,

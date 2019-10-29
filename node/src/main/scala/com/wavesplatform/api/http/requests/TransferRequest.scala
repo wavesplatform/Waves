@@ -18,7 +18,7 @@ case class TransferRequest(
     timestamp: Option[Long],
     signature: Option[String],
     proofs: Option[List[String]]
-) extends TxBroadcastRequest[TransferTransaction] {
+) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, TransferTransaction] =
     for {
       validRecipient  <- AddressOrAlias.fromString(recipient)
@@ -26,18 +26,19 @@ case class TransferRequest(
       validFeeAssetId <- toAsset(feeAssetId)
       validAttachment <- toAttachment(attachment)
       validProofs     <- toProofs(version, signature, proofs)
-    } yield TransferTransaction(
-      version.getOrElse(1.toByte),
-      sender,
-      validRecipient,
-      validAssetId,
-      amount,
-      validFeeAssetId,
-      fee,
-      validAttachment,
-      timestamp.getOrElse(0L),
-      validProofs
-    )
+      tx <- TransferTransaction.create(
+        version.getOrElse(1.toByte),
+        sender,
+        validRecipient,
+        validAssetId,
+        amount,
+        validFeeAssetId,
+        fee,
+        validAttachment,
+        timestamp.getOrElse(0L),
+        validProofs
+      )
+    } yield tx
 }
 
 object TransferRequest {

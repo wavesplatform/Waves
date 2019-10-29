@@ -52,7 +52,7 @@ object TestBlock {
       ref: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair = defaultSigner,
-      version: Byte = 2,
+      version: TxVersion = 2,
       features: Set[Short] = Set.empty[Short],
       rewardVote: Long = -1L
   ): Block =

@@ -58,13 +58,13 @@ case class SetAssetScriptTransaction private (chainId: Byte,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
   override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
-  override def version: Byte               = 1
+  override def version: TxVersion               = 1
 }
 
 object SetAssetScriptTransaction extends TransactionParserFor[SetAssetScriptTransaction] with TransactionParser.MultipleVersions {
 
-  val typeId: Byte                          = 15
-  override val supportedVersions: Set[Byte] = Set(1)
+  val typeId: TxType                          = 15
+  override val supportedVersions: Set[TxVersion] = Set(1)
 
   private def currentChainId: Byte = AddressScheme.current.chainId
 

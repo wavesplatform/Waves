@@ -30,7 +30,7 @@ trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction
 
 object LeaseCancelTransaction {
 
-  val typeId: Byte = 9
+  val typeId: TxType = 9
 
   def validateLeaseCancelParams(tx: LeaseCancelTransaction): Either[ValidationError, Unit] = {
     validateLeaseCancelParams(tx.leaseId, tx.fee)

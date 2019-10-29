@@ -7,6 +7,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.sign.TxSigner
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
+import io.estatico.newtype.macros.newtype
 
 package object transaction {
   val AssetIdLength: Int       = com.wavesplatform.crypto.DigestSize
@@ -17,7 +18,24 @@ package object transaction {
   type DiscardedMicroBlocks  = Seq[MicroBlock]
   type AuthorizedTransaction = Authorized with Transaction
 
-  type TxVersion   = Byte
+  @newtype case class TxType(toByte: Byte)
+  object TxType {
+    implicit def fromInt(i: Int): Int = TxType(i.toByte)
+    implicit def toInt(v: TxType): Int = v.toByte
+    implicit def fromByte(i: Byte): TxType = TxType(i)
+    implicit def toByte(v: TxType): Byte = v.toByte
+  }
+
+  @newtype case class TxVersion(toByte: Byte)
+  object TxVersion {
+    val V1 = TxVersion(1: Byte)
+    val V2 = TxVersion(2: Byte)
+
+    implicit def fromInt(i: Int): Int = TxVersion(i.toByte)
+    implicit def toInt(v: TxVersion): Int = v.toByte
+    implicit def fromByte(i: Byte): TxVersion = TxVersion(i)
+    implicit def toByte(v: TxVersion): Byte = v.toByte
+  }
   type TxAmount    = Long
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]

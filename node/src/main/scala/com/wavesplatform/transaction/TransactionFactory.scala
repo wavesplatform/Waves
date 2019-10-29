@@ -36,7 +36,7 @@ object TransactionFactory {
     for {
       _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
       sender <- wallet.findPrivateKey(request.sender.get)
-      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toValidTxFrom(sender)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender)
       signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       signedTx = tx.signWith(signer)
     } yield signedTx
@@ -368,7 +368,7 @@ object TransactionFactory {
     for {
       _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
       sender <- wallet.findPrivateKey(request.sender.get)
-      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toValidTxFrom(sender)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender)
       signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       signedTx = tx.signWith(signer)
     } yield signedTx

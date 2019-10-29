@@ -47,7 +47,7 @@ case class SignedExchangeRequestV2(
     @ApiModelProperty(required = true)
     timestamp: Long,
     @ApiModelProperty(required = true, example = "2")
-    version: Byte,
+    version: TxVersion,
     @ApiModelProperty(required = true)
     proofs: List[String]
 ) {

@@ -47,13 +47,13 @@ case class IssueTransactionV2 private (chainId: Byte,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
   override val json: Coeval[JsObject]     = Coeval.evalOnce(issueJson() ++ Json.obj("chainId" -> chainId, "script" -> script.map(_.bytes().base64)))
 
-  override def version: Byte = 2
+  override def version: TxVersion = 2
 }
 
 object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = IssueTransaction.typeId
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val typeId: TxType                 = IssueTransaction.typeId
+  override val supportedVersions: Set[TxVersion] = Set(2)
 
   private def currentChainId = AddressScheme.current.chainId
 

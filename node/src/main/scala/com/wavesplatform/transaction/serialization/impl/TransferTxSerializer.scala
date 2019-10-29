@@ -55,7 +55,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
   }
 
   override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
-    def parseCommonPart(version: Byte, buf: ByteBuffer): TransferTransaction = {
+    def parseCommonPart(version: TxVersion, buf: ByteBuffer): TransferTransaction = {
       val sender     = buf.getPublicKey
       val assetId    = buf.getAsset
       val feeAssetId = buf.getAsset

@@ -33,7 +33,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
   def expiration: Long
   def matcherFee: Long
   def proofs: Proofs
-  def version: Byte
+  def version: TxVersion
   def signature: Array[Byte]   = proofs.toSignature
   def matcherFeeAssetId: Asset = Waves
 
@@ -175,7 +175,7 @@ object Order {
             expiration: Long,
             matcherFee: Long,
             proofs: Proofs,
-            version: Byte = 1,
+            version: TxVersion = 1,
             matcherFeeAssetId: Asset = Asset.Waves): Order = version match {
     case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
@@ -199,7 +199,7 @@ object Order {
           timestamp: Long,
           expiration: Long,
           matcherFee: Long,
-          version: Byte = 1,
+          version: TxVersion = 1,
           matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>
@@ -217,7 +217,7 @@ object Order {
            timestamp: Long,
            expiration: Long,
            matcherFee: Long,
-           version: Byte = 1,
+           version: TxVersion = 1,
            matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>
@@ -236,7 +236,7 @@ object Order {
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
-            version: Byte): Order = {
+            version: TxVersion): Order = {
     val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
     sign(unsigned, sender)
   }
@@ -250,7 +250,7 @@ object Order {
             timestamp: Long,
             expiration: Long,
             matcherFee: Long,
-            version: Byte,
+            version: TxVersion,
             matcherFeeAssetId: Asset): Order = {
     val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
     sign(unsigned, sender)
@@ -272,7 +272,7 @@ object Order {
     assetId.byteRepr
   }
 
-  def fromBytes(version: Byte, xs: Array[Byte]): Order = version match {
+  def fromBytes(version: TxVersion, xs: Array[Byte]): Order = version match {
     case 1     => OrderV1.parseBytes(xs).get
     case 2     => OrderV2.parseBytes(xs).get
     case 3     => OrderV3.parseBytes(xs).get

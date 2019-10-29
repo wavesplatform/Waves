@@ -18,10 +18,10 @@ trait BlockGen extends TransactionGen { _: Suite =>
     signer       <- accountGen
   } yield (transactions, signer)
 
-  def versionedBlockGen(txs: Seq[Transaction], signer: KeyPair, version: Byte): Gen[Block] =
+  def versionedBlockGen(txs: Seq[Transaction], signer: KeyPair, version: TxVersion): Gen[Block] =
     byteArrayGen(Block.BlockIdLength).flatMap(ref => versionedBlockGen(ByteStr(ref), txs, signer, version))
 
-  def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: KeyPair, version: Byte): Gen[Block] =
+  def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: KeyPair, version: TxVersion): Gen[Block] =
     for {
       baseTarget          <- Gen.posNum[Long]
       generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)

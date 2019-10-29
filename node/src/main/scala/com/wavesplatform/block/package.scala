@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import scala.util.Try
 
 package object block {
-  private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
+  private[block] def writeTransactionData(version: TxVersion, txs: Seq[Transaction]): Array[Byte] = {
     val txsCount = version match {
       case GenesisBlockVersion | PlainBlockVersion => Array(txs.size.toByte)
       case NgBlockVersion | RewardBlockVersion     => Ints.toByteArray(txs.size)

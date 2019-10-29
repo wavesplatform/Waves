@@ -47,5 +47,7 @@ package object impl {
     def getPublicKey: PublicKey = PublicKey(getByteArray(KeyLength))
 
     def getProofs: Proofs = Proofs.fromBytes(buf.getByteArray(buf.remaining())).explicitGet()
+
+    def getAlias: Alias = Alias.fromBytes(buf.getPrefixedByteArray).explicitGet()
   }
 }

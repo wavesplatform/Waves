@@ -29,7 +29,7 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
   import ExchangeTransactionV2._
 
-  override def version: Byte = 2
+  override def version: TxVersion = 2
 
   override val builder                 = ExchangeTransactionV2
   override val assetFee: (Asset, Long) = (Waves, fee)
@@ -52,15 +52,15 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
 object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2] with TransactionParser.MultipleVersions {
 
-  private def orderMark(version: Byte): Array[Byte] = {
+  private def orderMark(version: TxVersion): Array[Byte] = {
     if (version == 1) {
       Array(1: Byte)
     } else {
       Array()
     }
   }
-  override val typeId: Byte                 = ExchangeTransaction.typeId
-  override val supportedVersions: Set[Byte] = Set(2)
+  override val typeId: TxType                 = ExchangeTransaction.typeId
+  override val supportedVersions: Set[TxVersion] = Set(2)
 
   def create(matcher: PrivateKey,
              buyOrder: Order,

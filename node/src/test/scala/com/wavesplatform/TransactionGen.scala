@@ -709,13 +709,13 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fixedMatcher: Option[KeyPair] = None
   ): Gen[ExchangeTransactionV2] = {
 
-    def mkBuyOrder(version: Byte): OrderConstructor = version match {
+    def mkBuyOrder(version: TxVersion): OrderConstructor = version match {
       case 1 => OrderV1.buy
       case 2 => OrderV2.buy
       case 3 => OrderV3.buy(_, _, _, _, _, _, _, _, buyMatcherFeeAssetId)
     }
 
-    def mkSellOrder(version: Byte): OrderConstructor = version match {
+    def mkSellOrder(version: TxVersion): OrderConstructor = version match {
       case 1 => OrderV1.sell
       case 2 => OrderV2.sell
       case 3 => OrderV3.sell(_, _, _, _, _, _, _, _, sellMatcherFeeAssetId)

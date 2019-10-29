@@ -10,8 +10,8 @@ trait TransactionManifest {
   type TransactionT <: Transaction
 
   def classTag: ClassTag[TransactionT]
-  def typeId: Byte
-  def supportedVersions: Set[Byte]
+  def typeId: TxType
+  def supportedVersions: Set[TxVersion]
 }
 
 trait TransactionParserLite extends TransactionManifest {
@@ -60,15 +60,15 @@ trait TransactionBytesDescription { self: TransactionManifest =>
 
 object TransactionBytesDescription {
   trait HardcodedVersion1 { self: TransactionManifest with TransactionBytesDescription =>
-    override val supportedVersions: Set[Byte] = Set(1)
+    override val supportedVersions: Set[TxVersion] = Set(1)
     lazy val byteHeaderDescription: ByteEntity[Unit] = {
       ConstantByte(1, typeId, "Transaction type") map (_ => Unit)
     }
   }
 
   trait OneVersion { self: TransactionManifest with TransactionBytesDescription =>
-    def version: Byte
-    override def supportedVersions: Set[Byte] = Set(version)
+    def version: TxVersion
+    override def supportedVersions: Set[TxVersion] = Set(version)
 
     lazy val byteHeaderDescription: ByteEntity[Unit] = {
       (

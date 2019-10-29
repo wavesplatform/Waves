@@ -65,7 +65,7 @@ object TransactionParsers {
   }
 
   def by(name: String): Option[TransactionParserLite]                = byName.get(name)
-  def by(typeId: Byte, version: Byte): Option[TransactionParserLite] = all.get((typeId, version))
+  def by(typeId: Byte, version: TxVersion): Option[TransactionParserLite] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def modernParseBytes: Try[Transaction] = {

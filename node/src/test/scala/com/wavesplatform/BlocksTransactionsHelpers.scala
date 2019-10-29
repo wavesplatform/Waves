@@ -62,7 +62,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         base: Seq[Transaction],
         micros: Seq[Seq[Transaction]],
         signer: KeyPair,
-        version: Byte,
+        version: TxVersion,
         timestamp: Long
     ): (Block, Seq[MicroBlock]) = {
       val block = unsafeBlock(totalRefTo, base, signer, version, timestamp)
@@ -76,7 +76,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
       (block, microBlocks)
     }
 
-    def unsafeMicro(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair, version: Byte, ts: Long): (Block, MicroBlock) = {
+    def unsafeMicro(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair, version: TxVersion, ts: Long): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
       val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
       val signature     = crypto.sign(signer, unsigned.bytes())
@@ -88,7 +88,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         reference: ByteStr,
         txs: Seq[Transaction],
         signer: KeyPair,
-        version: Byte,
+        version: TxVersion,
         timestamp: Long,
         bTarget: Long = DefaultBaseTarget
     ): Block = {

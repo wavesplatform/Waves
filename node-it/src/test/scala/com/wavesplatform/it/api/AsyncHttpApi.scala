@@ -227,7 +227,7 @@ object AsyncHttpApi extends Assertions {
         fee: Long,
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
-        version: Byte = 2
+        version: TxVersion = 2
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -246,7 +246,7 @@ object AsyncHttpApi extends Assertions {
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
-    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long, version: Byte = 2): Future[Transaction] = {
+    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long, version: TxVersion = 2): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"      -> LeaseTransaction.typeId,
@@ -259,7 +259,7 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: Byte = 2): Future[Transaction] = {
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: TxVersion = 2): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"    -> LeaseCancelTransaction.typeId,
@@ -281,7 +281,7 @@ object AsyncHttpApi extends Assertions {
         decimals: Byte,
         reissuable: Boolean,
         fee: Long,
-        version: Byte = 2,
+        version: TxVersion = 2,
         script: Option[String] = None
     ): Future[Transaction] = {
       val js = Json.obj(
@@ -301,7 +301,7 @@ object AsyncHttpApi extends Assertions {
 
     }
 
-    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: Byte = 1): Future[Transaction] = {
+    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: TxVersion = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"    -> SetScriptTransaction.typeId,
@@ -313,7 +313,7 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, version: Byte = 1): Future[Transaction] = {
+    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, version: TxVersion = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"    -> SetAssetScriptTransaction.typeId,
@@ -334,7 +334,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
-        version: Byte = 1
+        version: TxVersion = 1
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -357,7 +357,7 @@ object AsyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: Byte = 2): Future[Transaction] = {
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: TxVersion = 2): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"     -> BurnTransaction.typeId,
@@ -473,7 +473,7 @@ object AsyncHttpApi extends Assertions {
       Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 
-    def createAlias(targetAddress: String, alias: String, fee: Long, version: Byte = 2): Future[Transaction] =
+    def createAlias(targetAddress: String, alias: String, fee: Long, version: TxVersion = 2): Future[Transaction] =
       signAndBroadcast(
         Json.obj(
           "type"    -> CreateAliasTransaction.typeId,
