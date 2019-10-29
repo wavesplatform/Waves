@@ -52,7 +52,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
       "alias"     -> alias.name,
       "fee"       -> fee,
       "timestamp" -> timestamp
-    ) ++ ProvenTxJsonLegacySignature.onlyV1(tx)
+    )
   }
 
   object DescV1 extends TransactionBytesDescriptionFor(CreateAliasTransaction) with TransactionBytesDescription.HardcodedVersion1 {

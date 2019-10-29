@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.ProvenTransaction
-import com.wavesplatform.transaction.serialization.{TxJson, TxBytes}
+import com.wavesplatform.transaction.serialization.TxJson
+import com.wavesplatform.transaction.{ProvenTransaction, SigProofsSwitch}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
 object ProvenTxJson extends TxJson[ProvenTransaction] {
@@ -18,6 +17,10 @@ object ProvenTxJson extends TxJson[ProvenTransaction] {
       "feeAssetId"      -> assetFee._1.maybeBase58Repr,
       "timestamp"       -> timestamp,
       "proofs"          -> JsArray(proofs.proofs.map(p => JsString(p.toString)))
-    )
+    ) ++ (tx match {
+      // Compatibility
+      case s: SigProofsSwitch if s.usesLegacySignature => Json.obj("signature" -> tx.signature.toString)
+      case _                                           => Json.obj()
+    })
   }
 }
