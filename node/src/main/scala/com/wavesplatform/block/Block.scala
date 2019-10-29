@@ -52,8 +52,8 @@ case class BlockHeader(
 }
 
 object BlockHeader {
-  def json(header: BlockHeader, blockSize: Int, transactionCount: Int): JsObject =
-    header.json() ++ Json.obj("blocksize" -> blockSize, "transactionCount" -> transactionCount)
+  def json(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
+    header.json() ++ Json.obj("signature" -> signature.toString, "blocksize" -> blockSize, "transactionCount" -> transactionCount)
 }
 
 case class Block private[block] (
@@ -99,7 +99,7 @@ case class Block private[block] (
   }
 
   val json: Coeval[JsObject] = Coeval.evalOnce {
-    BlockHeader.json(header, bytes().length, transactionData.length) ++
+    BlockHeader.json(header, bytes().length, transactionData.length, signature) ++
       Json.obj("fee"          -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
       Json.obj("transactions" -> JsArray(transactionData.map(_.json())))
   }
