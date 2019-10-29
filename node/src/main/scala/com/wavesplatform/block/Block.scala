@@ -51,7 +51,7 @@ case class BlockHeader(
   }
 }
 
-object BlockHeader extends ScorexLogging {
+object BlockHeader {
   def json(header: BlockHeader, blockSize: Int, transactionCount: Int): JsObject =
     header.json() ++ Json.obj("blocksize" -> blockSize, "transactionCount" -> transactionCount)
 }
@@ -175,26 +175,22 @@ object Block extends ScorexLogging {
       val timestamp = buf.getLong
       val reference = ByteStr(buf.getByteArray(SignatureLength))
 
-      val cBytesLength        = buf.getInt
-      val baseTarget          = Longs.fromByteArray(buf.getByteArray(Block.BaseTargetLength))
-      val generationSignature = ByteStr(buf.getByteArray(cBytesLength - Longs.BYTES))
+      val consensusBytesLength = buf.getInt
+      val baseTarget           = Longs.fromByteArray(buf.getByteArray(Block.BaseTargetLength))
+      val generationSignature  = ByteStr(buf.getByteArray(consensusBytesLength - Longs.BYTES))
 
-      buf.getInt()
+      buf.getInt
 
       val transactionData = readTransactionData(version, buf)
 
-      val featureVotes =
-        if (version > Block.PlainBlockVersion) {
-          val featureSize = buf.getInt
-          buf.getShortArray(featureSize).toSet
-        } else Set.empty[Short]
-
-      val rewardVote = if (version >= Block.RewardBlockVersion) buf.getLong else -1L
+      val featureVotes = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSet else Set.empty[Short]
+      val rewardVote   = if (version > Block.NgBlockVersion) buf.getLong else -1L
 
       val generator = buf.getPublicKey
       val signature = ByteStr(buf.getByteArray(SignatureLength))
 
       val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote)
+
       Block(header, signature, transactionData)
     }.flatMap(validate(_).asTry)
       .recoverWith {

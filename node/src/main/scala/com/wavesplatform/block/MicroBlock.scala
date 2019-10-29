@@ -50,13 +50,6 @@ case class MicroBlock(
 }
 
 object MicroBlock extends ScorexLogging {
-  private def validate(block: MicroBlock): Either[ValidationError, MicroBlock] =
-    if (block.transactionData.isEmpty)
-      Left(GenericError("cannot create empty MicroBlock"))
-    else if (block.transactionData.size > MaxTransactionsPerMicroblock)
-      Left(GenericError(s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: ${block.transactionData.size}"))
-    else
-      Right(block)
 
   def buildAndSign(
       generator: KeyPair,
@@ -87,6 +80,7 @@ object MicroBlock extends ScorexLogging {
       val totalResBlockSig = ByteStr(buf.getByteArray(SignatureLength))
 
       buf.getInt
+
       val transactionData = readTransactionData(version, buf)
 
       val generator = buf.getPublicKey
@@ -99,4 +93,12 @@ object MicroBlock extends ScorexLogging {
           log.error("Error when parsing microblock", t)
           Failure(t)
       }
+
+  private def validate(block: MicroBlock): Either[ValidationError, MicroBlock] =
+    if (block.transactionData.isEmpty)
+      Left(GenericError("cannot create empty MicroBlock"))
+    else if (block.transactionData.size > MaxTransactionsPerMicroblock)
+      Left(GenericError(s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: ${block.transactionData.size}"))
+    else
+      Right(block)
 }
