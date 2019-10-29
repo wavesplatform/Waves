@@ -217,7 +217,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       b4        = mkEmptyBlock(b3.uniqueId, miner)
       (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx)), miner, 3, ntpNow)
       b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
-      b6b       = TestBlock.sign(miner, b6a.copy(consensusData = b6a.consensusData.copy(baseTarget = b6a.consensusData.baseTarget - 1L)))
+      b6b = TestBlock.sign(
+        miner,
+        b6a.copy(header = b6a.header.copy(baseTarget = b6a.header.baseTarget - 1L))
+      )
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
 
     "when received better liquid block" in forAll(betterBlockScenario) {

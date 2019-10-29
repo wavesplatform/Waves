@@ -265,7 +265,7 @@ class LevelDBWriter(
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block, block.bytes().length)))
+    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block.header, block.bytes().length, block.transactionData.size, block.signature)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -419,7 +419,7 @@ class LevelDBWriter(
       val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
       val newlyApprovedFeatures = featureVotes(height)
         .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-        .collect { case (featureId, voteCount) if voteCount + (if (block.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
+        .collect { case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
 
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
@@ -489,7 +489,7 @@ class LevelDBWriter(
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          val (discardedHeader, _) = rw
+          val (discardedHeader, _, _, discardedSignature) = rw
             .get(Keys.blockHeaderAndSizeAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
@@ -593,7 +593,7 @@ class LevelDBWriter(
           }
 
           rw.delete(Keys.blockHeaderAndSizeAt(h))
-          rw.delete(Keys.heightOf(discardedHeader.signerData.signature))
+          rw.delete(Keys.heightOf(discardedSignature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
@@ -603,13 +603,7 @@ class LevelDBWriter(
             DisableHijackedAliases.revert(rw)
           }
 
-          Block
-            .fromHeaderAndTransactions(
-              discardedHeader,
-              transactions
-                .map(_._2)
-            )
-            .explicitGet()
+          createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -799,21 +793,21 @@ class LevelDBWriter(
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
     writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
-  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
+  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
     db.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
-  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
+  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
     writableDB
       .get(Keys.heightOf(blockId))
       .flatMap(loadBlockHeaderAndSize)
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int)] = {
+  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
     db.get(Keys.heightOf(blockId))
       .flatMap(loadBlockHeaderAndSize(_, db))
   }
@@ -892,7 +886,7 @@ class LevelDBWriter(
         db.get(Keys.blockHeaderAndSizeAt(height))
       }
       .collect {
-        case Some((header, _)) => header.signerData.signature
+        case Some((_, _, _, signature)) => signature
       }
   }
 
@@ -904,7 +898,7 @@ class LevelDBWriter(
           db.get(Keys.blockHeaderAndSizeAt(height))
         }
         .collect {
-          case Some((header, _)) => header.signerData.signature
+          case Some((_, _, _, signature)) => signature
         }
     }
   }
@@ -913,7 +907,7 @@ class LevelDBWriter(
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      (block, _) <- loadBlockHeaderAndSize(height, db)
+      (block, _, _, _) <- loadBlockHeaderAndSize(height, db)
     } yield block
   }
 
@@ -964,11 +958,11 @@ class LevelDBWriter(
     val headerKey = Keys.blockHeaderAndSizeAt(height)
 
     for {
-      (header, _) <- db.get(headerKey)
-      txs = (0 until header.transactionCount).toList.flatMap { n =>
+      (header, _, transactionCount, signature) <- db.get(headerKey)
+      txs = (0 until transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }
-      block <- Block.fromHeaderAndTransactions(header, txs).toOption
+      block <- createBlock(header, signature, txs).toOption
     } yield block
   }
 

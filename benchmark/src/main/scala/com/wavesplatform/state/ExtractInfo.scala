@@ -55,8 +55,8 @@ object ExtractInfo extends App with ScorexLogging {
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {
         height     <- randomInts(from, state.height)
-        (block, _) <- state.blockHeaderAndSize(height)
-        if block.transactionCount > 0
+        (_, _, transactionCount, _) <- state.blockHeaderAndSize(height)
+        if transactionCount > 0
       } yield height
 
     def nonEmptyBlocks(from: Int): Iterator[Block] =

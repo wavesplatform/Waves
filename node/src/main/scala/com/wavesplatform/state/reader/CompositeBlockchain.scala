@@ -173,7 +173,7 @@ final case class CompositeBlockchain(
   override def accountDataKeys(acc: Address): Set[String] = {
     val fromInner = inner.accountDataKeys(acc)
     val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    (fromInner ++ fromDiff)
+    fromInner ++ fromDiff
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
@@ -196,11 +196,12 @@ final case class CompositeBlockchain(
   private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.uniqueId == blockId)
   private def filterByHeight(height: Int): Option[Block]  = newBlock.filter(_ => this.height == height)
 
-  private def headerAndSize(block: Block): (BlockHeader, Int) = block -> block.bytes().length
+  private def headerAndSize(block: Block): (BlockHeader, Int, Int, ByteStr) =
+    (block.header, block.bytes().length, block.transactionData.size, block.signature)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] =
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] =
     filterByHeight(height).map(headerAndSize) orElse inner.blockHeaderAndSize(height)
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] =
+  override def blockHeaderAndSize(blockId: ByteStr): Option[((BlockHeader, Int, Int, ByteStr))] =
     filterById(blockId).map(headerAndSize) orElse inner.blockHeaderAndSize(blockId)
 
   override def blockBytes(height: Int): Option[Array[Byte]]      = filterByHeight(height).map(_.bytes()) orElse inner.blockBytes(height)
@@ -216,7 +217,7 @@ final case class CompositeBlockchain(
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] =
     for {
       ids <- inner.blockIdsAfter(parentSignature, howMany)
-      newId = newBlock.filter(_.reference == parentSignature).map(_.uniqueId).fold(Seq.empty[ByteStr])(Seq(_))
+      newId = newBlock.filter(_.header.reference == parentSignature).map(_.uniqueId).fold(Seq.empty[ByteStr])(Seq(_))
     } yield newId ++ ids
 
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)

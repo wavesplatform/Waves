@@ -3,9 +3,8 @@ import cats.instances.all._
 import cats.syntax.traverse._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
-import com.wavesplatform.block.SignerData
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -15,13 +14,20 @@ object PBBlocks {
     def create(version: Int,
                timestamp: Long,
                reference: ByteStr,
-               consensusData: NxtLikeConsensusBlockData,
+               baseTarget: Long,
+               generationSignature: ByteStr,
                transactionData: Seq[VanillaTransaction],
                featureVotes: Set[Short],
                rewardVote: Long,
                generator: PublicKey,
                signature: ByteStr): VanillaBlock = {
-      VanillaBlock(timestamp, version.toByte, reference, SignerData(generator, signature), consensusData, transactionData, featureVotes, rewardVote)
+      VanillaBlock(
+        BlockHeader(
+          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote
+        ),
+        signature,
+        transactionData
+      )
     }
 
     for {
@@ -31,7 +37,8 @@ object PBBlocks {
         header.version,
         header.timestamp,
         ByteStr(header.reference.toByteArray),
-        NxtLikeConsensusBlockData(header.baseTarget, ByteStr(header.generationSignature.toByteArray)),
+        header.baseTarget,
+        ByteStr(header.generationSignature.toByteArray),
         transactions,
         header.featureVotes.map(intToShort).toSet,
         header.rewardVote,
@@ -43,8 +50,7 @@ object PBBlocks {
 
   def protobuf(block: VanillaBlock): PBBlock = {
     import block._
-    import consensusData._
-    import signerData._
+    import block.header._
 
     new PBBlock(
       Some(
@@ -53,13 +59,13 @@ object PBBlocks {
           ByteString.copyFrom(reference),
           baseTarget,
           ByteString.copyFrom(generationSignature),
-          featureVotes.map(shortToInt).toSeq,
-          timestamp,
-          version,
+          header.featureVotes.map(shortToInt).toSeq,
+          header.timestamp,
+          header.version,
           ByteString.copyFrom(generator),
-          rewardVote
+          header.rewardVote
         )),
-      ByteString.copyFrom(signature),
+      ByteString.copyFrom(block.signature),
       transactionData.map(PBTransactions.protobuf)
     )
   }

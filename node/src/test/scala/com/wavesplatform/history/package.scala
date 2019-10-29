@@ -5,7 +5,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -65,8 +64,9 @@ package object history {
         version = version,
         timestamp = timestamp,
         reference = refTo,
-        consensusData = NxtLikeConsensusBlockData(baseTarget = bTarget, generationSignature = generationSignature),
-        transactionData = txs,
+        baseTarget = bTarget,
+        generationSignature = generationSignature,
+        txs = txs,
         signer = signer,
         Set.empty,
         -1L
@@ -137,5 +137,5 @@ package object history {
     (block, microBlocks)
   }
 
-  def spoilSignature(b: Block): Block = b.copy(signerData = b.signerData.copy(signature = TestBlock.randomSignature()))
+  def spoilSignature(b: Block): Block = b.copy(signature = TestBlock.randomSignature())
 }
