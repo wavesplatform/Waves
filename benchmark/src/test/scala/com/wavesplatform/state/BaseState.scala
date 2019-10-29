@@ -57,7 +57,7 @@ trait BaseState {
     } yield
       TestBlock.create(
         time = transferTxs.last.timestamp,
-        ref = base.header.uniqueId,
+        ref = base.uniqueId,
         txs = transferTxs
       )
 
@@ -70,7 +70,7 @@ trait BaseState {
 
   protected def nextBlock(txs: Seq[Transaction]): Block = TestBlock.create(
     time = txs.last.timestamp,
-    ref = lastBlock.header.uniqueId,
+    ref = lastBlock.uniqueId,
     txs = txs
   )
 
