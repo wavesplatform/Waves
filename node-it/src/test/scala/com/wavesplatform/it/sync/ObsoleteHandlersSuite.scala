@@ -28,7 +28,7 @@ import play.api.libs.json.{Json, Writes}
 class ObsoleteHandlersSuite extends BaseTransactionSuite {
 
   test("alias create") {
-    val json = sender.postJsonWithApiKey("/alias/create", CreateAliasRequest("testalias", Some(1.toByte), None, Some(firstAddress), Some(minFee)))
+    val json = sender.postJsonWithApiKey("/alias/create", CreateAliasRequest("testalias", Some(1.toByte), sender = Some(firstAddress), fee = Some(minFee)))
     val tx   = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }

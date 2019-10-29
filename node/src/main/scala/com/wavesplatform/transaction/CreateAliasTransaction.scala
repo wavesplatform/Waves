@@ -16,7 +16,7 @@ import scala.reflect.ClassTag
 import scala.util.Try
 
 final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, alias: Alias, fee: TxAmount, timestamp: TxTimestamp, proofs: Proofs)
-    extends ProvenTransaction
+    extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves {
   override def builder: TransactionParserLite      = CreateAliasTransaction

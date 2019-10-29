@@ -44,7 +44,7 @@ object Verifier extends ScorexLogging {
               .measureForType(stx.typeId)(stx.signaturesValid())
           case (et: ExchangeTransaction, scriptOpt) =>
             verifyExchange(et, blockchain, scriptOpt)
-          case (tx: SignatureField, Some(_)) if tx.isVersion1 => // todo: (NODE-1915) All Signed transactions with Version 1
+          case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature => // todo: (NODE-1915) All Signed transactions with Version 1
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_: SignedTransaction, Some(_)) =>
             Left(GenericError("Can't process transaction with signature from scripted account"))

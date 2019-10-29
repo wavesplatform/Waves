@@ -30,7 +30,7 @@ case class TransferTransaction(
     timestamp: TxTimestamp,
     proofs: Proofs
 ) extends VersionedTransaction
-    with SignatureField
+    with SigProofsSwitch
     with FastHashId
     with TxWithFee.InCustomAsset {
 
