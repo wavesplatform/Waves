@@ -6,26 +6,32 @@ import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.model.StatusCodes.BadRequest
+import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
-import com.wavesplatform.api.grpc.AccountsApiGrpc
+import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, TransactionsApiGrpc}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import io.grpc.Status.Code
+import io.grpc.StatusRuntimeException
 import org.asynchttpclient.Response
 import org.scalactic.source.Position
 import org.scalatest.Matchers._
@@ -81,6 +87,13 @@ object SyncHttpApi extends Assertions {
       case Failure(e) => Assertions.fail(e)
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
+
+  def assertGrpcError[R](f: => R, errorMessage: String, expectedCode: Code): Assertion = Try(f) match {
+    case Failure(GrpcStatusRuntimeException(status, _)) => Assertions.assert(status.getCode == expectedCode
+      && status.getDescription.contains(errorMessage))
+    case Failure(e) => Assertions.fail(e)
+    case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
+  }
 
   def assertApiErrorRaised[R](f: => R, expectedStatusCode: Int = StatusCodes.BadRequest.intValue): Assertion =
     assertApiError(f)(_ => Assertions.succeed)
@@ -599,12 +612,91 @@ object SyncHttpApi extends Assertions {
 
   class NodeExtGrpc(n: Node) {
     import com.wavesplatform.account.{Address => Addr}
+    import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private[this] lazy val accounts = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private[this] lazy val blocks = BlocksApiGrpc.blockingStub(n.grpcChannel)
+    private[this] lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
+
+    def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
+      try Await.result(awaitable, atMost)
+      catch {
+        case gsre: StatusRuntimeException        => throw GrpcStatusRuntimeException(gsre.getStatus, gsre.getTrailers)
+        case te: TimeoutException                => throw te
+        case NonFatal(cause)                     => throw new Exception(cause)
+      }
 
     def resolveAlias(alias: String): Addr = {
       val addr = accounts.resolveAlias(StringValue.of(alias))
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
     }
+
+    def exchange(matcher: KeyPair,
+                 buyOrder: Order,
+                 sellOrder: Order,
+                 amount: Long,
+                 price: Long,
+                 buyMatcherFee: Long,
+                 sellMatcherFee: Long,
+                 fee: Long,
+                 timestamp: Long,
+                 version: Byte,
+                 matcherFeeAssetId: String = "WAVES",
+                 waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.exchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, version, matcherFeeAssetId)), waitForTx)
+    }
+
+    def broadcastIssue(source: KeyPair,
+                       name: String,
+                       quantity: Long,
+                       decimals: Byte,
+                       reissuable: Boolean,
+                       fee: Long,
+                       description: ByteString = ByteString.EMPTY,
+                       script: Option[String] = None,
+                       version: Int = 2,
+                       waitForTx: Boolean = false
+                      ): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastIssue(source, name, quantity, decimals, reissuable, fee, description, script, version)), waitForTx)
+    }
+
+    def broadcastTransfer(source: KeyPair,
+                          recipient: Recipient,
+                          amount: Long,
+                          fee: Long,
+                          version: Int = 2,
+                          assetId: String = "WAVES",
+                          attachment: ByteString = ByteString.EMPTY,
+                          waitForTx: Boolean = false
+                         ): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment)), waitForTx)
+    }
+
+    def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
+      val pbAssetIds = assetIds.map(a => ByteString.copyFrom(Base58.decode(a)))
+      val balances = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
+      balances.map(b => Base58.encode(b.getAsset.assetId.toByteArray) -> b.getAsset.amount).toMap
+    }
+
+    def wavesBalance(address: ByteString): WavesBalances = {
+      sync(async(n).grpc.wavesBalance(address))
+    }
+
+    def transactionInfo(id: String): PBSignedTransaction = {
+      sync(async(n).grpc.transactionInfo(id))
+    }
+
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): PBSignedTransaction =
+      sync(async(n).grpc.waitForTransaction(txId))
+
+    private def maybeWaitForTransaction(tx: PBSignedTransaction, wait: Boolean): PBSignedTransaction = {
+      if (wait) SyncHttpApi.NodeExtSync(n).waitForTransaction(PBTransactions.vanilla(tx).explicitGet().id().base58) //TODO: replace with grpc method
+      tx
+    }
+
+    def height: Int = sync(async(n).grpc.height)
+
+    def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
   }
+
 }
