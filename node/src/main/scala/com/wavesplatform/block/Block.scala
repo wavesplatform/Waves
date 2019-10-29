@@ -33,21 +33,29 @@ case class BlockHeader(
     rewardVote: Long
 ) {
   private[block] val json: Coeval[JsObject] = Coeval.evalOnce {
+
+    val consensusJson =
+      Json.obj(
+        "nxt-consensus" -> Json.obj(
+          "base-target"          -> baseTarget,
+          "generation-signature" -> generationSignature.toString
+        )
+      )
+
     val featuresJson =
       if (version < Block.NgBlockVersion) JsObject.empty else Json.obj("features" -> JsArray(featureVotes.map(id => JsNumber(id.toInt)).toSeq))
 
     val rewardJson =
       if (version < Block.RewardBlockVersion) JsObject.empty else Json.obj("desiredReward" -> JsNumber(rewardVote))
 
-    val generatorJson = Json.obj("generator" -> generator.stringRepr, "generatorPublicKey" -> generator.toString)
+    val generatorJson =
+      Json.obj("generator" -> generator.stringRepr, "generatorPublicKey" -> generator.toString)
 
     Json.obj(
-      "version"              -> version,
-      "timestamp"            -> timestamp,
-      "reference"            -> reference.toString,
-      "base-target"          -> baseTarget,
-      "generation-signature" -> generationSignature.toString
-    ) ++ featuresJson ++ rewardJson ++ generatorJson
+      "version"   -> version,
+      "timestamp" -> timestamp,
+      "reference" -> reference.toString
+    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson
   }
 }
 
