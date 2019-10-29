@@ -8,7 +8,7 @@ import java.util.concurrent.TimeoutException
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
@@ -27,7 +27,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBRecipients, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
@@ -35,7 +35,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, SignedTransaction}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
@@ -765,10 +765,6 @@ object AsyncHttpApi extends Assertions {
 
     import monix.execution.Scheduler.Implicits.global
     import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction}
-    import com.wavesplatform.transaction.{Transaction => VanillaTransaction}
-
-    import com.wavesplatform.protobuf.order.{Order => PBOrder}
-    import io.grpc.{Status => GrpcStatus}
 
 
     private[this] lazy val accounts = AccountsApiGrpc.stub(n.grpcChannel)
@@ -867,7 +863,7 @@ object AsyncHttpApi extends Assertions {
 
 
 
-    def transactionInfo(id: String): Future[PBSignedTransaction] = {
+    def getTransaction(id: String): Future[PBSignedTransaction] = {
       def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
         val subj = ConcurrentSubject.publishToOne[T]
 
@@ -896,9 +892,8 @@ object AsyncHttpApi extends Assertions {
     }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[PBSignedTransaction] = {
-      println(s"wait for transaction $txId")
       val condition = waitFor[Option[PBSignedTransaction]](s"transaction $txId")(
-        _.transactionInfo(txId)
+        _.getTransaction(txId)
           .map(Option(_))
           .recover { case _: NoSuchElementException => None },
         tOpt => tOpt.exists(t => PBTransactions.vanilla(t).explicitGet().id().base58 == txId),

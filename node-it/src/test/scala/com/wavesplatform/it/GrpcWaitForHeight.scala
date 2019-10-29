@@ -17,12 +17,12 @@ trait GrpcWaitForHeight extends BeforeAndAfterAll with ScorexLogging with Report
     Await.result(traverse(nodes)(_.grpc.waitForHeight(2)), 1.minute)
   }
 
-//    def waitForTxsToReachAllNodes(nodes: Seq[Node] = nodes, txIds: Seq[String]): Future[_] = {
-//      val txNodePairs = for {
-//        txId <- txIds
-//        node <- nodes
-//      } yield (node, txId)
-//      traverse(txNodePairs) { case (node, tx) => node.grpc.waitForTransaction(tx) }
-//    }
+  def waitForTxsToReachAllNodes(nodes: Seq[Node] = nodes, txIds: Seq[String]): Future[_] = {
+    val txNodePairs = for {
+      txId <- txIds
+      node <- nodes
+    } yield (node, txId)
+    traverse(txNodePairs) { case (node, tx) => node.grpc.waitForTransaction(tx) }
+  }
 
 }

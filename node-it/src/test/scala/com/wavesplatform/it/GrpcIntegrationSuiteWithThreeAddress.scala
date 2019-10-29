@@ -3,9 +3,6 @@ package com.wavesplatform.it
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
@@ -60,7 +57,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
         node <- nodes
       } yield (node, txId)
 
-      txNodePairs.foreach({ case (node, tx) => node.waitForTransaction(tx) }) //TODO: replace to grpc
+      txNodePairs.foreach({ case (node, tx) => node.grpc.waitForTransaction(tx) })
     }
 
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>

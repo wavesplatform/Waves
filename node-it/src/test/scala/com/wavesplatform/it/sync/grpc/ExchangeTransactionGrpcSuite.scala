@@ -7,7 +7,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order, OrderV1}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.common.utils.EitherExt2
 import io.grpc.Status.Code
 

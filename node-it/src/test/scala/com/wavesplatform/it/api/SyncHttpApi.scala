@@ -615,8 +615,6 @@ object SyncHttpApi extends Assertions {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private[this] lazy val accounts = AccountsApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val blocks = BlocksApiGrpc.blockingStub(n.grpcChannel)
-    private[this] lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
 
     def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
       try Await.result(awaitable, atMost)
@@ -682,15 +680,15 @@ object SyncHttpApi extends Assertions {
       sync(async(n).grpc.wavesBalance(address))
     }
 
-    def transactionInfo(id: String): PBSignedTransaction = {
-      sync(async(n).grpc.transactionInfo(id))
+    def getTransaction(id: String): PBSignedTransaction = {
+      sync(async(n).grpc.getTransaction(id))
     }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): PBSignedTransaction =
       sync(async(n).grpc.waitForTransaction(txId))
 
     private def maybeWaitForTransaction(tx: PBSignedTransaction, wait: Boolean): PBSignedTransaction = {
-      if (wait) SyncHttpApi.NodeExtSync(n).waitForTransaction(PBTransactions.vanilla(tx).explicitGet().id().base58) //TODO: replace with grpc method
+      if (wait) sync(async(n).grpc.waitForTransaction(PBTransactions.vanilla(tx).explicitGet().id().base58))
       tx
     }
 
