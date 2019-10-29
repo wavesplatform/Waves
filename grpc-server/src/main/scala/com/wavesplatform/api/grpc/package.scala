@@ -2,8 +2,10 @@ package com.wavesplatform.api
 
 import java.util.concurrent.LinkedBlockingQueue
 
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.Blockchain
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
@@ -108,5 +110,9 @@ package object grpc extends PBImplicitConversions {
 
   implicit class OptionErrExt[T](e: Option[T]) {
     def explicitGetErr(err: ApiError): T = e.getOrElse(throw GRPCErrors.toStatusException(err))
+  }
+
+  implicit class AddressOrAliasExt(a: AddressOrAlias) {
+    def resolved(blockchain: Blockchain): Option[Address] = blockchain.resolveAlias(a).toOption
   }
 }
