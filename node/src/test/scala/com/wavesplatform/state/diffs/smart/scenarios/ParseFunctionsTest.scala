@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.Id
 import cats.implicits._
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -64,11 +65,13 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
     val expectedSignature    = Base64.encode(signature)
     val expectedGenSignature = Base64.encode(header.generationSignature)
 
+    val headerBytes = database.writeBlockHeaderAndSize((header, 1024, transactionCount, signature)).drop(Ints.BYTES)
+
     s"""
       |{-# STDLIB_VERSION  4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |
-      |let bytes = base64'${Base64.encode(database.writeBlockHeaderAndSize((header, 1024, transactionCount, signature)))}'
+      |let bytes = base64'${Base64.encode(headerBytes)}'
       |
       |match parseBlockHeader(bytes) {
       |  case header: BlockHeader =>
