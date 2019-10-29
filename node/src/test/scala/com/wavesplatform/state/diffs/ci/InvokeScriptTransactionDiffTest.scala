@@ -18,7 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.FunctionIds.{CREATE_LIST, THROW}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator.{FunctionIds, ScriptResult, ScriptResultV3}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
@@ -769,12 +769,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           inside(blockDiffEi.trace) {
             case List(
                 AssetVerifierTrace(attachedAssetId, None),
-                InvokeScriptTrace(_, _, Right(ScriptResult(_, transactions))),
+                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers))),
                 AssetVerifierTrace(transferringAssetId, None)
                 ) =>
               attachedAssetId shouldBe attachedAsset.id.value
               transferringAssetId shouldBe transferringAsset.id.value
-              transactions.head._3.get shouldBe transferringAsset.id.value
+              transfers.head.assetId.get shouldBe transferringAsset.id.value
           }
         }
     }
@@ -873,7 +873,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
             case List(
-                InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResult(_, transactions))),
+                InvokeScriptTrace(dAppAddress, functionCall, Right(ScriptResultV3(_, transfers))),
                 AssetVerifierTrace(allowedAssetId, None),
                 AssetVerifierTrace(bannedAssetId, Some(TransactionNotAllowedByScript(_, _)))
                 ) =>
@@ -883,7 +883,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               allowedAssetId shouldBe asset1.id.value
               bannedAssetId shouldBe asset2.id.value
 
-              transactions.flatMap(_._3.toList) shouldBe List(allowedAssetId, bannedAssetId)
+              transfers.flatMap(_.assetId.toList) shouldBe List(allowedAssetId, bannedAssetId)
           }
         }
     }
@@ -921,10 +921,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           inside(blockDiffEi.trace) {
             case List(
                 AssetVerifierTrace(attachedAssetId, None),
-                InvokeScriptTrace(_, _, Right(ScriptResult(_, transactions)))
+                InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)))
                 ) =>
               attachedAssetId shouldBe attachedAsset.id.value
-              transactions.head._3.get shouldBe transferringAsset.id.value
+              transfers.head.assetId.get shouldBe transferringAsset.id.value
           }
         }
     }
