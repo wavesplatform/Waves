@@ -1,9 +1,8 @@
 package com.wavesplatform
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.block.{Block, MicroBlock, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.Waves
@@ -93,24 +92,21 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         timestamp: Long,
         bTarget: Long = DefaultBaseTarget
     ): Block = {
-      val unsigned = Block(
-        version = version,
-        timestamp = timestamp,
-        reference = reference,
-        consensusData = NxtLikeConsensusBlockData(
+      val unsigned: Block = Block(
+        header = BlockHeader(
+          version = version,
+          timestamp = timestamp,
+          reference = reference,
           baseTarget = bTarget,
-          generationSignature = com.wavesplatform.history.generationSignature
-        ),
-        transactionData = txs,
-        signerData = SignerData(
+          generationSignature = com.wavesplatform.history.generationSignature,
           generator = signer,
-          signature = ByteStr.empty
+          featureVotes = Set.empty,
+          rewardVote = -1L
         ),
-        featureVotes = Set.empty,
-        rewardVote = -1L
+        signature = ByteStr.empty,
+        transactionData = txs
       )
-
-      unsigned.copy(signerData = SignerData(signer, ByteStr(crypto.sign(signer, unsigned.bytes()))))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bytes())))
     }
   }
 }

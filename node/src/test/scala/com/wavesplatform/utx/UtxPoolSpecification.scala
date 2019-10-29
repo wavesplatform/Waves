@@ -328,7 +328,7 @@ class UtxPoolSpecification
         UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false)
       )
 
-      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
+      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.header.timestamp))
     }
 
   private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>

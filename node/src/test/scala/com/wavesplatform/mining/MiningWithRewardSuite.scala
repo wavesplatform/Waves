@@ -51,8 +51,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         } yield {
           blockchain.balance(account) should be(newBalance)
           blockchain.height should be(3)
-          blockchain.blockAt(2).get.version should be(Block.RewardBlockVersion)
-          blockchain.blockAt(3).get.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(2).get.header.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(3).get.header.version should be(Block.RewardBlockVersion)
         }
     }
   }

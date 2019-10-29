@@ -9,9 +9,8 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
-import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.serialization.Deser.{ByteBufferOps, serializeArray}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
@@ -50,7 +49,7 @@ case class TransferTransaction(
       Longs.toByteArray(amount),
       Longs.toByteArray(fee),
       recipient.bytes.arr,
-      Deser.serializeArray(attachment)
+      serializeArray(attachment)
     )
   }
 
@@ -92,43 +91,6 @@ object TransferTransaction extends TransactionParserLite {
   override type TransactionT = TransferTransaction
 
   override def classTag: ClassTag[TransferTransaction] = ClassTag(classOf[TransferTransaction])
-
-  implicit class ByteBufferOps(val buf: ByteBuffer) extends AnyVal {
-    def getPrefixedByteArray: Array[Byte] = {
-      val prefix = buf.getShort
-      require(prefix >= 0, "negative array length")
-      if (prefix > 0) getByteArray(prefix) else Array.emptyByteArray
-    }
-
-    def getAsset: Asset = {
-      val prefix = buf.get
-      if (prefix == 0) Asset.Waves
-      else if (prefix == 1) Asset.IssuedAsset(ByteStr(getByteArray(AssetIdLength)))
-      else throw new IllegalArgumentException(s"Invalid asset id prefix: $prefix")
-    }
-
-    def getAddressOrAlias: AddressOrAlias = {
-      val prefix = buf.get(buf.position())
-      prefix match {
-        case Address.AddressVersion =>
-          Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
-        case Alias.AddressVersion =>
-          val length = buf.getShort(buf.position() + 2)
-          Alias.fromBytes(getByteArray(length + 4)).explicitGet()
-        case _ => throw new IllegalArgumentException(s"Invalid address or alias prefix: $prefix")
-      }
-    }
-
-    def getByteArray(size: Int): Array[Byte] = {
-      val result = new Array[Byte](size)
-      buf.get(result)
-      result
-    }
-
-    def getSignature: Array[Byte] = getByteArray(SignatureLength)
-
-    def getPublicKey: PublicKey = PublicKey(getByteArray(KeyLength))
-  }
 
   private def parseCommonPart(version: Byte, buf: ByteBuffer): TransferTransaction = {
     val sender     = buf.getPublicKey

@@ -61,7 +61,7 @@ object BlockDiffer extends ScorexLogging {
       r <- apply(
         CompositeBlockchain(blockchain, newBlock = Some(block)),
         constraint,
-        maybePrevBlock.map(_.timestamp),
+        maybePrevBlock.map(_.header.timestamp),
         initDiff,
         stateHeight >= ngHeight,
         block.transactionData,
