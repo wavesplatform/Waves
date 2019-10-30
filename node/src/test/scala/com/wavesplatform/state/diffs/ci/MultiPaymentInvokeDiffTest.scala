@@ -112,7 +112,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       dApp(V4, transferPaymentAmount = 1, _),
       accountVerifierGen(V4),
       verifier(V4, Asset),
-      withLowFee = false
+      withEnoughFee = false
     )) { case (genesis, setVerifier, setDApp, ci, issues, _, _, _) =>
       assertDiffEi(
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setVerifier, setDApp))),
@@ -135,13 +135,13 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     commonAssetScript: Script,
     additionalAssetScript: Option[Gen[Script]] = None,
     repeatAdditionalAsset: Boolean = false,
-    withLowFee: Boolean = true
+    withEnoughFee: Boolean = true
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, SetScriptTransaction, InvokeScriptTransaction, List[IssueTransaction], KeyPair, KeyPair, Long)] =
     for {
       master        <- accountGen
       invoker       <- accountGen
       ts            <- timestampGen
-      fee           <- if (withLowFee) ciFee(ContractLimits.MaxAttachedPaymentAmount) else Gen.const(1L)
+      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount) else Gen.const(1L)
       accountScript <- verifier
       commonIssues  <- Gen.listOfN(
         ContractLimits.MaxAttachedPaymentAmount - 1,

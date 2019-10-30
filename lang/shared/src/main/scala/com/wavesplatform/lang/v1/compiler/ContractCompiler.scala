@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.{Id, Show}
 import cats.implicits._
+import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1}
@@ -10,9 +10,10 @@ import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Gene
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types => WavesTypes}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.task.imports._
@@ -42,20 +43,14 @@ object ContractCompiler {
     } yield (annotations, compiledBody)
 
     r flatMap {
-      case (List(c: CallableAnnotation), (func, tpe, typedParams)) =>
-        for {
-          _ <- Either
-            .cond(
-              tpe match {
-                case _ if tpe <= UNION(WavesTypes.writeSetType, WavesTypes.scriptTransferSetType, WavesTypes.scriptResultType) =>
-                  true
-                case _ => false
-              },
-              (),
-              Generic(0, 0, s"${FieldNames.Error}, but got '$tpe'")
-            )
-            .toCompileM
-        } yield (CallableFunction(c, func), typedParams)
+      case (List(c: CallableAnnotation), (func, resultType, typedParams)) =>
+        callableReturnType(version)
+          .ensureOr(expectedType => callableResultError(expectedType, resultType))(resultType <= _)
+          .bimap(
+            Generic(0, 0, _),
+            _ => (CallableFunction(c, func): AnnotatedFunction, typedParams)
+          )
+          .toCompileM
 
       case (List(c: VerifierAnnotation), (func, tpe, typedParams)) =>
         for {

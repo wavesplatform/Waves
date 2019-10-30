@@ -2,8 +2,10 @@ package com.wavesplatform.lang.script
 
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.directives.values.{StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.ContractLimits.{MaxComplexityByVersion, MaxContractSizeInBytes}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -48,7 +50,7 @@ object ContractScript {
         case (annotationArgName, funcExpr) =>
           estimator(
             varNames(version, DAppType),
-            functionCosts(version),
+            functionCosts(DirectiveSet(version, Account, DAppType).explicitGet()),
             constructExprFromFuncAndContext(contract.decs, annotationArgName, funcExpr)
           ).map((funcExpr.name, _))
       }
