@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -284,7 +285,7 @@ object InvokeScriptTransactionDiff {
                 nextDiff.asRight[ValidationError]
               case Some(script) =>
                 val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
-                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
+                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, a.id, nextDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                 TracedResult(
@@ -305,14 +306,14 @@ object InvokeScriptTransactionDiff {
       totalDiff: Diff,
       addressRepr: Recipient.Address,
       amount: Long,
-      asset: Option[ByteStr],
+      assetId: ByteStr,
       nextDiff: Diff,
       script: Script): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
         Coproduct[TxOrd](
           ScriptTransfer(
-            asset,
+            Some(assetId),
             Recipient.Address(tx.dAppAddressOrAlias.bytes),
             Recipient.Address(addressRepr.bytes),
             amount,
@@ -322,7 +323,7 @@ object InvokeScriptTransactionDiff {
         CompositeBlockchain(blockchain, Some(totalDiff)),
         script,
         isAssetScript = true,
-        tx.dAppAddressOrAlias.bytes
+        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
         case (log, Left(error))  => Left(ScriptExecutionError(error, log, isAssetScript = true))
         case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript(log, isAssetScript = true))
