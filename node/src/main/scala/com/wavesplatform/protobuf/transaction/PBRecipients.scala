@@ -1,8 +1,9 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
@@ -13,12 +14,20 @@ object PBRecipients {
     case _          => sys.error("Should not happen " + addressOrAlias)
   }
 
-  def toAddress(bytes: ByteStr): Either[ValidationError, Address] = {
-    if (bytes.length == Address.HashLength) {
+  def toAddress(bytes: ByteStr): Either[ValidationError, Address] = bytes.length match {
+    case Address.HashLength => // Compressed address
       val withHeader = Bytes.concat(Array(Address.AddressVersion, AddressScheme.current.chainId), bytes)
-      Address.fromBytes(Bytes.concat(withHeader, Address.calcCheckSum(withHeader)))
-    } else if (bytes.length == Address.AddressLength) Address.fromBytes(bytes)
-    else Left(GenericError(s"Invalid address length: ${bytes.length}"))
+      val checksum   = Address.calcCheckSum(withHeader)
+      Address.fromBytes(Bytes.concat(withHeader, checksum))
+
+    case Address.AddressLength => // Regular address
+      Address.fromBytes(bytes)
+
+    case crypto.KeyLength => // Public key
+      Right(PublicKey(bytes).toAddress)
+
+    case _ =>
+      Left(GenericError(s"Invalid address length: ${bytes.length}"))
   }
 
   def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {

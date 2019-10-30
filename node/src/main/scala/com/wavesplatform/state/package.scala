@@ -27,27 +27,29 @@ package object state {
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
       address: Address,
-      maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = {
+      maybeAfter: Option[IssuedAsset]
+  ): Observable[IssueTransaction] = {
 
-    def nonZeroBalance(asset: IssuedAsset): Boolean = {
-      val balanceFromDiff = for {
-        diff      <- maybeDiff
-        portfolio <- diff.portfolios.get(address)
-        balance   <- portfolio.assets.get(asset)
-      } yield balance
+    def notWithdrawn(asset: IssuedAsset): Boolean = {
+      val changeFromDiff = for {
+        diff          <- maybeDiff
+        portfolio     <- diff.portfolios.get(address)
+        balanceChange <- portfolio.assets.get(asset)
+      } yield balanceChange
 
-      !balanceFromDiff.exists(_ < 0)
+      changeFromDiff.forall(_ >= 0)
     }
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
+
+    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] =
       diff.transactions.get(id).map(_._1)
-    }
 
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
-      diff.portfolios
-        .get(address)
-        .toIterable
-        .flatMap(_.assets.keys)
-    }
+    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
+      for {
+        portfolio <- diff.portfolios
+          .get(address)
+          .toIterable
+        (asset, balance) <- portfolio.assets if balance > 0
+      } yield asset
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
       maybeAfter
@@ -56,13 +58,13 @@ package object state {
             .dropWhile(_ != after)
             .drop(1)
         }
-        .filter(nonZeroBalance)
+        .filter(notWithdrawn)
         .map { asset =>
           transactionFromDiff(diff, asset.id)
             .orElse(blockchain.transactionInfo(asset.id).map(_._2))
         }
         .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT => itx
+          case Some(itx: IssueTransaction) if itx.isNFT(blockchain) => itx
         }
     }
 
@@ -71,23 +73,23 @@ package object state {
         .nftObservable(address, maybeAfter)
         .filter { itx =>
           val asset = IssuedAsset(itx.assetId)
-          nonZeroBalance(asset)
+          notWithdrawn(asset)
         }
 
     maybeDiff.fold(nftFromBlockchain) { diff =>
       maybeAfter match {
-        case None                                         => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
+        case None                                            => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
         case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case _                                            => nftFromBlockchain
+        case _                                               => nftFromBlockchain
       }
     }
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsCompose(at: AddressTransactions, fromDiffIter: Observable[(Height, Transaction, Set[Address])])(
-      address: Address,
-      types: Set[TransactionParserLite],
-      fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
+  def addressTransactionsCompose(
+      at: AddressTransactions,
+      fromDiffIter: Observable[(Height, Transaction, Set[Address])]
+  )(address: Address, types: Set[TransactionParserLite], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {

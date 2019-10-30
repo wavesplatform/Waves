@@ -94,7 +94,7 @@ class ReplEngine[F[_] : Monad] {
       lets.map { case (name, t) => DeclPrinter.declaredLetStr(name, t) }
 
     val evalStr =
-      resultO.fold("") { case (name, t, result) => s"$name: $t = $result" }
+      resultO.fold("") { case (name, t, result) => s"$name: $t = ${result.prettyString(0)}" }
 
     val delim1 = if (mappedLets.nonEmpty && mappedFuncs.nonEmpty) "\n" else ""
     val delim2 = if ((mappedLets.nonEmpty || mappedFuncs.nonEmpty) && resultO.isDefined) "\n" else ""
