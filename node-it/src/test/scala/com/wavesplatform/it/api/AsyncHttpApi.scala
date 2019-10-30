@@ -813,12 +813,13 @@ object AsyncHttpApi extends Assertions {
                           fee: Long,
                           version: Int = 2,
                           assetId: String = "WAVES",
-                          attachment: ByteString = ByteString.EMPTY): Future[PBSignedTransaction] = {
+                          attachment: ByteString = ByteString.EMPTY,
+                          timestamp: Long = System.currentTimeMillis): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
-        System.currentTimeMillis,
+        timestamp,
         version,
         PBTransaction.Data.Transfer(TransferTransactionData.of(
           Some(recipient),

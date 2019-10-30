@@ -88,9 +88,9 @@ object SyncHttpApi extends Assertions {
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
-  def assertGrpcError[R](f: => R, errorMessage: String, expectedCode: Code): Assertion = Try(f) match {
+  def assertGrpcError[R](f: => R, errorRegex: String, expectedCode: Code): Assertion = Try(f) match {
     case Failure(GrpcStatusRuntimeException(status, _)) => Assertions.assert(status.getCode == expectedCode
-      && status.getDescription.contains(errorMessage))
+      && status.getDescription.matches(s".*$errorRegex.*"))
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
@@ -665,9 +665,10 @@ object SyncHttpApi extends Assertions {
                           version: Int = 2,
                           assetId: String = "WAVES",
                           attachment: ByteString = ByteString.EMPTY,
+                          timestamp: Long = System.currentTimeMillis(),
                           waitForTx: Boolean = false
                          ): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment, timestamp)), waitForTx)
     }
 
     def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
