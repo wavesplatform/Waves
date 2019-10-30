@@ -56,14 +56,14 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
       .get
 
     val tradeAssetDistribution = {
-      (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
+      (Universe.Accounts.map(_.keyPair).toSet - issueTransactionSender).toSeq.map(acc => {
         TransferTransaction
-            .selfSigned(
-              2.toByte,
+          .selfSigned(
+            2.toByte,
             IssuedAsset(tradeAssetIssue.id()),
             issueTransactionSender,
             acc,
-            5,
+            tradeAssetIssue.quantity / Universe.Accounts.size,
             System.currentTimeMillis(),
             Waves,
             900000,
@@ -77,7 +77,9 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val leaseRecipient = GeneratorSettings.toKeyPair("lease recipient")
   }
 
-  override def initial: Seq[Transaction] = preconditions.tradeAssetIssue +: preconditions.tradeAssetDistribution
+  override def initial: Seq[Transaction] = Seq(preconditions.tradeAssetIssue)
+
+  override def tailInitial: Seq[Transaction] = preconditions.tradeAssetDistribution
 
   private[this] def generate(n: Int): Seq[Transaction] = {
 
@@ -186,17 +188,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case ExchangeTransactionV1 =>
             (
               for {
-                matcher <- randomFrom(accounts)
-                seller  <- randomFrom(accounts)
-                buyer   <- randomFrom(accounts)
+                matcher <- randomFrom(Universe.Accounts).map(_.keyPair)
+                seller  <- randomFrom(Universe.Accounts).map(_.keyPair)
+                buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
                 pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
                 delta = random.nextLong(10000)
                 sellOrder = OrderV1.sell(
                   seller,
                   matcher,
                   pair,
-                  100000000 + delta,
-                  1 + random.nextLong(10),
+                  10000000 + delta,
+                  10 + random.nextLong(10),
                   ts,
                   ts + 30.days.toMillis,
                   moreThanStandardFee * 3
@@ -205,8 +207,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   buyer,
                   matcher,
                   pair,
-                  100000000 + delta,
-                  1,
+                  10000000 + delta,
+                  10,
                   ts,
                   ts + 1.day.toMillis,
                   300000L
@@ -216,8 +218,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                     matcher,
                     buyOrder,
                     sellOrder,
-                    100000000 + delta,
-                    1,
+                    10000000 + delta,
+                    10,
                     300000,
                     300000,
                     moreThanStandardFee * 3,
@@ -230,17 +232,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
           case ExchangeTransactionV2 =>
             (
               for {
-                matcher <- randomFrom(accounts)
-                seller  <- randomFrom(accounts)
-                buyer   <- randomFrom(accounts)
+                matcher <- randomFrom(Universe.Accounts).map(_.keyPair)
+                seller  <- randomFrom(Universe.Accounts).map(_.keyPair)
+                buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
                 pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
                 delta = random.nextLong(10000)
                 sellOrder = OrderV2.sell(
                   seller,
                   matcher,
                   pair,
-                  100000000 + delta,
-                  1,
+                  10000000 + delta,
+                  10,
                   ts,
                   ts + 30.days.toMillis,
                   300000L
@@ -249,8 +251,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   buyer,
                   matcher,
                   pair,
-                  100000000 + delta,
-                  1,
+                  10000000 + delta,
+                  10,
                   ts,
                   ts + 1.day.toMillis,
                   300000L
@@ -261,8 +263,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                       matcher,
                       buyOrder,
                       sellOrder,
-                      100000000 + delta,
-                      1,
+                      10000000 + delta,
+                      10,
                       300000L,
                       300000L,
                       700000L,

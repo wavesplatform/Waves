@@ -169,8 +169,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
 
       val estimator = wavesSettings.estimator
 
-      val (universe, initialUniTransactions) = preconditions
-        .fold((UniverseHolder(), List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
+      val (universe, initialUniTransactions, initialTailTransactions) = preconditions
+        .fold((UniverseHolder(), List.empty[Transaction], List.empty[Transaction]))(Preconditions.mk(_, time, estimator))
 
       Universe.Accounts = universe.accounts
       Universe.IssuedAssets = universe.issuedAssets
@@ -210,9 +210,12 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       }
 
       val initialGenTransactions = generator.initial
+      val initialGenTailTransactions = generator.tailInitial
 
       log.info(s"Universe precondition transactions size: ${initialUniTransactions.size}")
       log.info(s"Generator precondition transactions size: ${initialGenTransactions.size}")
+      log.info(s"Universe precondition tail transactions size: ${initialTailTransactions.size}")
+      log.info(s"Generator precondition tail transactions size: ${initialGenTailTransactions.size}")
 
       val workers = finalConfig.sendTo.map {
         case NodeAddress(node, nodeRestUrl) =>
@@ -226,7 +229,8 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
             nodeRestUrl,
             () => canContinue,
             initialUniTransactions ++ initialGenTransactions,
-            finalConfig.privateKeyAccounts.map(_.toAddress.stringRepr)
+            finalConfig.privateKeyAccounts.map(_.toAddress.stringRepr),
+            initialTailTransactions ++ initialGenTailTransactions
           )
       }
 

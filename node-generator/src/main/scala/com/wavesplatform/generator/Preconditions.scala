@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV2}
@@ -39,8 +39,8 @@ object Preconditions {
       leases: List[LeaseTransaction] = Nil
   )
 
-  def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction]) = {
-    settings.actions
+  def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction], List[Transaction]) = {
+    val (holder, headTransactions) = settings.actions
       .sortBy(_.priority)(Ordering[Int].reverse)
       .foldLeft((UniverseHolder(), List.empty[Transaction])) {
         case ((uni, txs), action) =>
@@ -92,6 +92,27 @@ object Preconditions {
               (uni.copy(accounts = CreatedAccount(acc, balance, scriptAndTx.map(_._1)) :: uni.accounts), addTxs ::: txs)
           }
       }
+
+    val tailTransactions = holder.issuedAssets.flatMap { issuedAsset =>
+      val balance = issuedAsset.quantity / holder.accounts.size
+      holder.accounts.map { acc =>
+        TransferTransaction
+          .selfSigned(
+            2.toByte,
+            IssuedAsset(issuedAsset.assetId),
+            settings.faucet,
+            acc.keyPair,
+            balance,
+            time.correctedTime(),
+            Waves,
+            Fee,
+            "Generator".getBytes("UTF-8")
+          )
+          .explicitGet()
+      }
+    }
+
+    (holder, headTransactions, tailTransactions)
   }
 
   private val accountSectionReader = new ValueReader[CreateAccountP] {

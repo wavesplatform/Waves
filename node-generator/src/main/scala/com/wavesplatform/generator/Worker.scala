@@ -32,7 +32,8 @@ class Worker(
     nodeRestAddress: URL,
     canContinue: () => Boolean,
     initial: Seq[Transaction],
-    richAccountAddresses: Seq[String]
+    richAccountAddresses: Seq[String],
+    tailInitial: Seq[Transaction] = Seq()
 )(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
     extends ScorexLogging {
 
@@ -94,17 +95,28 @@ class Worker(
         _            <- logInfo(s"Sending initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
-        r <- if (cntToSend >= txs.size) afterInitial *> Task.now(validChannel)
+        r <- if (cntToSend >= txs.size) afterInitial *> writeTailInitial(validChannel)
         else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
       } yield r
 
   private[this] def afterInitial: Task[Unit] =
-    if (!settings.waitForEmptyUtxAfterInitial) sleep(settings.initialDelay)
+    if (!settings.waitForEmptyUtxAfterInitial && tailInitial.isEmpty) sleep(settings.initialDelay)
     else
       for {
         _ <- sleep(settings.initialDelay)
         _ <- nodeUTXTransactionsToSendCount >>= (cnt => if (cnt == settings.utxLimit) Task.unit else Task.defer(afterInitial))
       } yield ()
+
+  // todo: Partial send
+  private[this] def writeTailInitial(channel: Channel, txs: Seq[Transaction] = tailInitial): Task[Channel] =
+    if (!canContinue())
+      Task.now(channel)
+    else
+      for {
+        validChannel <- validateChannel(channel)
+        _            <- logInfo(s"Sending tail initial transactions to $validChannel")
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.toStream: _*))
+      } yield validChannel
 
   private[this] def pullAndWrite(channel: Channel, state: Ref[Task, State], cnt: Int = 0): Task[Channel] =
     if (!canContinue())
