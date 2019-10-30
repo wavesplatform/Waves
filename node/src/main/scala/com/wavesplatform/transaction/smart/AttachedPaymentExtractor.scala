@@ -16,15 +16,15 @@ object AttachedPaymentExtractor {
     blockchain:   Blockchain,
     targetScript: AttachedPaymentTarget
   ): Either[ExecutionError, AttachedPayments] =
-    if (blockchain.allowsMultiPayment)
-      if (!version.supportsMultiPayment)
+    if (tx.payments.size > 1)
+      if (!blockchain.allowsMultiPayment)
+        Left("Multiple payments isn't allowed now")
+      else if (!version.supportsMultiPayment)
         Left(scriptErrorMessage(targetScript, version))
       else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
         Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
       else
         Right(AttachedPayments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
-    else if (tx.payments.size > 1)
-      Left("Multiple payments isn't allowed now")
     else
       Right(AttachedPayments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
 
