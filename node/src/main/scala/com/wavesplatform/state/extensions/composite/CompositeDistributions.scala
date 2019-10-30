@@ -12,8 +12,16 @@ import monix.reactive.Observable
 private[state] final class CompositeDistributions(blockchain: Blockchain, baseProvider: Distributions, getDiff: () => Option[Diff])
     extends Distributions {
   override def portfolio(a: Address): Portfolio = {
-    val p = getDiff().fold(Portfolio.empty)(_.portfolios.getOrElse(a, Portfolio.empty))
-    Monoid.combine(baseProvider.portfolio(a), p)
+    val diffPf = {
+      val full = getDiff().flatMap(_.portfolios.get(a)).getOrElse(Portfolio.empty)
+      val nonNft = for {
+        (IssuedAsset(id), balance) <- full.assets
+        (_, tx: IssueTransaction)  <- blockchain.transactionInfo(id) if !tx.isNFT(blockchain)
+      } yield (IssuedAsset(id), balance)
+      full.copy(assets = nonNft)
+    }
+
+    Monoid.combine(baseProvider.portfolio(a), diffPf)
   }
 
   override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
@@ -25,10 +33,12 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
     Monoid.combine(fromInner, fromNg)
   }
 
-  override def assetDistributionAtHeight(assetId: IssuedAsset,
-                                         height: Int,
-                                         count: Int,
-                                         fromAddress: Option[Address]): Either[ValidationError, AssetDistributionPage] = {
+  override def assetDistributionAtHeight(
+      assetId: IssuedAsset,
+      height: Int,
+      count: Int,
+      fromAddress: Option[Address]
+  ): Either[ValidationError, AssetDistributionPage] = {
     baseProvider.assetDistributionAtHeight(assetId, height, count, fromAddress)
   }
 

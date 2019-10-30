@@ -25,7 +25,7 @@ class NetworkSeparationTestSuite
   private def nodeB: Node = nodes.last
 
   "node should grow up to 10 blocks together and sync" in {
-    nodes.waitForSameBlockHeadesAt(10)
+    nodes.waitForSameBlockHeadersAt(10)
   }
 
   // Doing all work in one step, because nodes will not be available for requests and ReportingTestName fails here
@@ -40,7 +40,7 @@ class NetworkSeparationTestSuite
   "nodes should sync" in {
     val maxHeight = nodes.map(_.height).max
     log.debug(s"Max height is $maxHeight")
-    nodes.waitForSameBlockHeadesAt(maxHeight + 5)
+    nodes.waitForSameBlockHeadersAt(maxHeight + 5)
   }
 
   "after fork node should apply correct subchain" in {
@@ -52,17 +52,16 @@ class NetworkSeparationTestSuite
     val txId = nodeA.transfer(nodeA.address, nodeB.address, issueAmount / 2, minFee, Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
-    val heightBeforeDis = nodeA.height
     docker.disconnectFromNetwork(dockerNodes().head)
 
     val burnNoOwnerTxTd = nodeB.burn(nodeB.address, issuedAssetId, issueAmount / 2, minFee).id
     Await.ready(waitForTxsToReachAllNodes(Seq(nodeB), Seq(burnNoOwnerTxTd)), 2.minute)
+    val heightAfter = nodeB.height
 
     Thread.sleep(60.seconds.toMillis)
     docker.disconnectFromNetwork(dockerNodes().last)
     docker.connectToNetwork(Seq(dockerNodes().head))
 
-    val heightAfter = heightBeforeDis + 3
     nodeA.waitForHeight(heightAfter)
     val block = nodeA.blockAt(heightAfter)
 

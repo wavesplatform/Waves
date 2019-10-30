@@ -12,14 +12,14 @@ class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDo
   override protected def nodeConfigs: Seq[Config] = Configs
 
   test("blockchain grows with FairPoS activated") {
-    nodes.waitForSameBlockHeadesAt(height = 10, conditionAwaitTime = 11.minutes)
+    nodes.waitForSameBlockHeadersAt(height = 10, conditionAwaitTime = 11.minutes)
 
     val txId = nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee).id
     nodes.last.waitForTransaction(txId)
 
     val heightAfterTransfer = nodes.head.height
 
-    nodes.waitForSameBlockHeadesAt(heightAfterTransfer + 10, conditionAwaitTime = 11.minutes)
+    nodes.waitForSameBlockHeadersAt(heightAfterTransfer + 10, conditionAwaitTime = 11.minutes)
   }
 }
 
