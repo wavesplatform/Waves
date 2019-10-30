@@ -250,7 +250,7 @@ object FPPoSSelectorTest {
 
       val gs =
         PoSCalculator
-          .generatorSignature(
+          .generationSignature(
             blockForHit.header.generationSignature.arr,
             miner
           )
@@ -368,7 +368,7 @@ object FPPoSSelectorTest {
 
     val gs =
       PoSCalculator
-        .generatorSignature(
+        .generationSignature(
           blockForHit.header.generationSignature.arr,
           minerPK
         )

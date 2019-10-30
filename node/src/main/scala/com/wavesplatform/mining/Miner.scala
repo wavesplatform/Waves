@@ -21,6 +21,7 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
+import kamon.metric.CounterMetric
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.{CanBlock, SchedulerService}
@@ -118,7 +119,7 @@ class MinerImpl(
   ): Either[String, NxtLikeConsensusBlockData] = {
     pos
       .consensusData(
-        account.publicKey,
+        account,
         height,
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,
@@ -145,7 +146,7 @@ class MinerImpl(
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
       validBlockDelay <- pos
-        .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
+        .getValidBlockDelay(height, account, refBlockBT, balance)
         .leftMap(_.toString)
         .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
       _ = log.debug(
@@ -161,7 +162,7 @@ class MinerImpl(
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(
-          version.toByte,
+          version,
           currentTime,
           refBlockID,
           consensusData.baseTarget,
@@ -181,7 +182,7 @@ class MinerImpl(
   }
 
   private def blockFeatures(version: Byte): Set[Short] = {
-    if (version <= 2) Set.empty[Short]
+    if (version <= PlainBlockVersion) Set.empty[Short]
     else
       settings.featuresSettings.supported
         .filterNot(blockchainUpdater.approvedFeatures.keySet)
@@ -289,6 +290,7 @@ class MinerImpl(
 
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
+  //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
     val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
@@ -296,14 +298,14 @@ class MinerImpl(
 }
 
 object Miner {
-  val blockMiningStarted = Kamon.counter("block-mining-started")
-  val microMiningStarted = Kamon.counter("micro-mining-started")
+  val blockMiningStarted: CounterMetric = Kamon.counter("block-mining-started")
+  val microMiningStarted: CounterMetric = Kamon.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 500
 
   case object Disabled extends Miner with MinerDebugInfo {
     override def scheduleMining(): Unit                                                         = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
-    override val state                                                                          = MinerDebugInfo.Disabled
+    override val state: MinerDebugInfo.Disabled.type                                            = MinerDebugInfo.Disabled
   }
 }
