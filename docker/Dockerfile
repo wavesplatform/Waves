@@ -53,9 +53,9 @@ RUN                                                                             
     git tag -a "v${WAVES_VERSION}" -m "Docker build"                        &&  \
     SBT_OPTS="-Xmx2g -XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=128m"       \
     sbt "node/assembly"                                                     &&  \
-    for network in $DEB_PACKCAGE_NETWORKS ; do                                  \
+    for network in $DEB_PACKAGE_NETWORKS ; do                                   \
         echo "Building '${network}' package"                                &&  \
-        SBT_OPTS="-XX:MaxPermSize=256m -XX:ReservedCodeCacheSize=128m           \
+        SBT_OPTS="-XX:ReservedCodeCacheSize=128m                                \
             -Xmx2g -Dnetwork=${network}" sbt 'packageAll'                   &&  \
         mkdir -p /out/${network}                                            &&  \
         mv node/target/waves*.deb /out/${network}/                          &&  \

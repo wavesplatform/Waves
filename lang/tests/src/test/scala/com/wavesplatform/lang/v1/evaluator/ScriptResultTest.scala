@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.traits.domain.DataItem
@@ -60,19 +61,19 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
   val transferResult = List((Address(address1), 41L, Some(asset)), (Address(address2), 42L, None))
 
   property("ScriptResult from WriteSet") {
-    ScriptResult.fromObj(writeSetObj) shouldBe Right(ScriptResult(writeResult, List.empty))
+    ScriptResult.fromObj(writeSetObj, V3) shouldBe Right(ScriptResult(writeResult, List.empty))
   }
 
   property("ScriptResult from TransferSet") {
-    ScriptResult.fromObj(transferSetObj) shouldBe Right(ScriptResult(List.empty, transferResult))
+    ScriptResult.fromObj(transferSetObj, V3) shouldBe Right(ScriptResult(List.empty, transferResult))
   }
 
   property("ScriptResult from ScriptResult") {
-    ScriptResult.fromObj(scriptResultObj) shouldBe
+    ScriptResult.fromObj(scriptResultObj, V3) shouldBe
       Right(ScriptResult(writeResult, transferResult))
   }
 
   property("ScriptResult from bad object") {
-    ScriptResult.fromObj(CaseObj(CASETYPEREF("Foo", el), Map.empty)) should produce("CallableFunction needs to return")
+    ScriptResult.fromObj(CaseObj(CASETYPEREF("Foo", el), Map.empty), V3) should produce("CallableFunction needs to return")
   }
 }

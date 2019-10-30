@@ -40,6 +40,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
     val dockerNodeBId = docker.stopContainer(dockerNodes.apply().last)
     val txId          = nodeA.signedBroadcast(tx).id
     docker.startContainer(dockerNodeBId)
+    nodeA.waitForPeers(1)
 
     nodeB.ensureTxDoesntExist(txId)
     nodeA.signedBroadcast(tx)
@@ -65,6 +66,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
     val dockerNodeBId = docker.stopContainer(dockerNodes.apply().last)
     val txId          = nodeA.signedBroadcast(tx).id
     docker.startContainer(dockerNodeBId)
+    nodeA.waitForPeers(1)
 
     nodeB.ensureTxDoesntExist(txId)
     nodeA.signedBroadcast(tx)

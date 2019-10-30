@@ -34,7 +34,7 @@ lazy val lang =
         Seq(
           sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
-          PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared/src/main/protobuf"),
+          PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
           PB.deleteTargetDirectory := false
         )
       )
@@ -107,7 +107,7 @@ inScope(Global)(
     scalaVersion := "2.12.9",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 1, 3),
+    V.fallback := (1, 1, 5),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),

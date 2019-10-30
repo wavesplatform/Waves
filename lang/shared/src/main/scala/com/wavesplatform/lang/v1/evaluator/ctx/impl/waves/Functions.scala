@@ -10,14 +10,14 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{BYTESTR, LIST, LONG, STRING, UNION, UNIT, optionLong}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulNativeFunction, ContextfulUserFunction}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulNativeFunction, ContextfulUserFunction, FunctionIds}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasType, addressType, dataEntryType, optionAddress}
+import Types.{addressOrAliasType, addressType, dataEntryType, optionAddress, scriptTransfer, _}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
-import Bindings._
-import Types._
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import Bindings.{scriptTransfer => _, _}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
+import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters._
 import com.wavesplatform.lang.v1.traits.domain.Recipient
 
@@ -385,8 +385,8 @@ object Functions {
       case ((name, ty), _) => ("@" ++ name, ty)
     }
     UserFunction(
-      f.name ++ "Value",
-      "@extr" ++ f.header.toString,
+      f.name ++ ExtractedFuncPostfix,
+      ExtractedFuncPrefix ++ f.header.toString,
       f.costByLibVersion,
       f.signature.result.asInstanceOf[UNION].typeList.find(_ != UNIT).get,
       args: _*
@@ -477,4 +477,41 @@ object Functions {
           }
       }
     }
+
+  val writeSetIdentityF: BaseFunction[Environment] =
+    UserFunction(
+      FieldNames.WriteSet,
+      1,
+      LIST(dataEntryType),
+      ("@dataEntries", LIST(dataEntryType))
+    )(
+      REF("@dataEntries")
+    )
+
+  val transferSetIdentityF: BaseFunction[Environment] =
+    UserFunction(
+      FieldNames.TransferSet,
+      1,
+      LIST(scriptTransfer),
+      ("@scriptTransfers", LIST(scriptTransfer))
+    )(
+      REF("@scriptTransfers")
+    )
+
+  val scriptResultConcatF: BaseFunction[Environment] =
+    UserFunction(
+      FieldNames.ScriptResult,
+      PureContext.listConcat.costByLibVersion(V4),
+      LIST(UNION(scriptTransfer, dataEntryType)),
+      ("@dataEntries", LIST(dataEntryType)),
+      ("@scriptTransfers", LIST(scriptTransfer)),
+    )(
+      FUNCTION_CALL(
+        Native(FunctionIds.CONCAT_LIST),
+        List(
+          REF("@dataEntries"),
+          REF("@scriptTransfers")
+        )
+      )
+    )
 }
