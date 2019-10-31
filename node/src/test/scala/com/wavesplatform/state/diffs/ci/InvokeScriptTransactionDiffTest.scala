@@ -1225,6 +1225,26 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
+  property("self-payment and self-transfer V3") {
+    forAll(for {
+      acc <- accountGen
+      am <- smallFeeGen
+      contractGen = paymentContractGen(acc, am, assets = List(Waves)) _
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.const(acc),
+        masterGen  = Gen.const(acc),
+        payment = Some(Payment(1, Waves)),
+        feeGen = ciFee(1)
+      )
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ shouldBe 'right
+        }
+    }
+  }
+
   property("self-payment V4") {
     forAll(for {
       acc <- accountGen
