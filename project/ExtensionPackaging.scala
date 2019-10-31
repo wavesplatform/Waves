@@ -67,10 +67,7 @@ object ExtensionPackaging extends AutoPlugin {
              |set -e
              |chown -R ${nodePackageName.value}:${nodePackageName.value} /usr/share/${nodePackageName.value}""".stripMargin
       ),
-      libraryDependencies ++= Seq(
-        Dependencies.logback % Runtime,
-        Dependencies.janino  % Runtime,
-      ),
+      libraryDependencies ++= Dependencies.logDeps,
       javaOptions in run ++= extensionClasses.value.zipWithIndex.map { case (extension, index) => s"-Dwaves.extensions.$index=$extension" }
     ) ++ nameFix ++ inScope(Global)(nameFix) ++ maintainerFix
 

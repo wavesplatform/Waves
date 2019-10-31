@@ -63,14 +63,15 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   test("can't send from acc0 using old pk") {
-    assertBadRequest(
+    assertApiErrorRaised(
       sender.transfer(
         acc0.stringRepr,
         recipient = acc3.stringRepr,
         assetId = None,
         amount = transferAmount,
         fee = minFee + 0.00001.waves + 0.00002.waves,
-      ))
+      )
+    )
   }
 
   test("can send from acc0 using multisig of acc1 and acc2") {
