@@ -477,41 +477,4 @@ object Functions {
           }
       }
     }
-
-  val writeSetIdentityF: BaseFunction[Environment] =
-    UserFunction(
-      FieldNames.WriteSet,
-      1,
-      LIST(dataEntryType),
-      ("@dataEntries", LIST(dataEntryType))
-    )(
-      REF("@dataEntries")
-    )
-
-  val transferSetIdentityF: BaseFunction[Environment] =
-    UserFunction(
-      FieldNames.TransferSet,
-      1,
-      LIST(scriptTransfer),
-      ("@scriptTransfers", LIST(scriptTransfer))
-    )(
-      REF("@scriptTransfers")
-    )
-
-  val scriptResultConcatF: BaseFunction[Environment] =
-    UserFunction(
-      FieldNames.ScriptResult,
-      PureContext.listConcat.costByLibVersion(V4),
-      LIST(UNION(scriptTransfer, dataEntryType)),
-      ("@dataEntries", LIST(dataEntryType)),
-      ("@scriptTransfers", LIST(scriptTransfer)),
-    )(
-      FUNCTION_CALL(
-        Native(FunctionIds.CONCAT_LIST),
-        List(
-          REF("@dataEntries"),
-          REF("@scriptTransfers")
-        )
-      )
-    )
 }
