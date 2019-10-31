@@ -38,7 +38,7 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       generator        <- Gen.containerOfN[Array, Byte](KeyLength, Arbitrary.arbByte.arbitrary)
       signature        <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
       baseTarget       <- Gen.posNum[Long]
-      genSignature     <- Gen.containerOfN[Array, Byte](Block.GeneratorSignatureLength, Arbitrary.arbByte.arbitrary)
+      genSignature     <- Gen.containerOfN[Array, Byte](Block.GenerationSignatureLength, Arbitrary.arbByte.arbitrary)
       transactionCount <- Gen.posNum[Int]
       featureVotes     <- Gen.listOf(Gen.posNum[Short])
       reward           <- Gen.posNum[Long]

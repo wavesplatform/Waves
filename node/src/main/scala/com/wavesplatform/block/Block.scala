@@ -10,6 +10,7 @@ import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser.ByteBufferOps
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
@@ -75,35 +76,37 @@ case class Block private[block] (
   val sender: PublicKey = header.generator
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val consensusBytes        = writeConsensusBytes(header.baseTarget, header.generationSignature)
-    val transactionsDataBytes = writeTransactionData(header.version, transactionData)
+    if (header.version < ProtoBlockVersion) {
+      val consensusBytes        = writeConsensusBytes(header.baseTarget, header.generationSignature)
+      val transactionsDataBytes = writeTransactionData(header.version, transactionData)
 
-    val featureVotesBytes = header.version match {
-      case v if v < NgBlockVersion => Array.empty[Byte]
-      case _ =>
-        val featuresBuf = ByteBuffer.allocate(Ints.BYTES + header.featureVotes.size * Shorts.BYTES)
-        featuresBuf.putInt(header.featureVotes.size).asShortBuffer().put(header.featureVotes.toArray)
-        featuresBuf.array
-    }
+      val featureVotesBytes = header.version match {
+        case v if v < NgBlockVersion => Array.empty[Byte]
+        case _ =>
+          val featuresBuf = ByteBuffer.allocate(Ints.BYTES + header.featureVotes.size * Shorts.BYTES)
+          featuresBuf.putInt(header.featureVotes.size).asShortBuffer().put(header.featureVotes.toArray)
+          featuresBuf.array
+      }
 
-    val rewardVoteBytes = header.version match {
-      case v if v < RewardBlockVersion => Array.empty[Byte]
-      case _                           => Longs.toByteArray(header.rewardVote)
-    }
+      val rewardVoteBytes = header.version match {
+        case v if v < RewardBlockVersion => Array.empty[Byte]
+        case _                           => Longs.toByteArray(header.rewardVote)
+      }
 
-    Bytes.concat(
-      Array(header.version),
-      Longs.toByteArray(header.timestamp),
-      header.reference.arr,
-      Ints.toByteArray(consensusBytes.length),
-      consensusBytes,
-      Ints.toByteArray(transactionsDataBytes.length),
-      transactionsDataBytes,
-      featureVotesBytes,
-      rewardVoteBytes,
-      header.generator.arr,
-      signature.arr
-    )
+      Bytes.concat(
+        Array(header.version),
+        Longs.toByteArray(header.timestamp),
+        Bytes.ensureCapacity(header.reference.arr, SignatureLength, 0),
+        Ints.toByteArray(consensusBytes.length),
+        consensusBytes,
+        Ints.toByteArray(transactionsDataBytes.length),
+        transactionsDataBytes,
+        featureVotesBytes,
+        rewardVoteBytes,
+        header.generator.arr,
+        Bytes.ensureCapacity(signature.arr, SignatureLength, 0)
+      )
+    } else PBBlocks.protobuf(this).toByteArray
   }
 
   val json: Coeval[JsObject] = Coeval.evalOnce {
@@ -131,9 +134,14 @@ case class Block private[block] (
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
+  val bytesToSign: Coeval[Array[Byte]] = Coeval.evalOnce {
+    if (header.version == ProtoBlockVersion) PBBlocks.protobuf(this).header.get.toByteArray
+    else bytes().dropRight(SignatureLength)
+  }
+
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytes().dropRight(SignatureLength), publicKey)
+    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesToSign(), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -173,7 +181,7 @@ object Block extends ScorexLogging {
       rewardVote: Long
   ): Either[GenericError, Block] =
     build(version, timestamp, reference, baseTarget, generationSignature, txs, signer, ByteStr.empty, featureVotes, rewardVote)
-      .map(unsigned => unsigned.copy(signature = crypto.sign(signer, ByteStr(unsigned.bytes()))))
+      .map(unsigned => unsigned.copy(signature = crypto.sign(signer, unsigned.bytesToSign())))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     Try {
@@ -265,7 +273,8 @@ object Block extends ScorexLogging {
   private def validate(b: Block): Either[GenericError, Block] =
     (for {
       _ <- Either.cond(b.header.reference.arr.length == SignatureLength, (), "Incorrect reference")
-      _ <- Either.cond(b.header.generationSignature.arr.length == GeneratorSignatureLength, (), "Incorrect generationSignature")
+      genSigLength = if (b.header.version < ProtoBlockVersion) GenerationSignatureLength else GenerationVRFSignatureLength
+      _ <- Either.cond(b.header.generationSignature.arr.length == genSigLength, (), "Incorrect generationSignature")
       _ <- Either.cond(b.header.generator.length == KeyLength, (), "Incorrect signer")
       _ <- Either.cond(b.header.version > 2 || b.header.featureVotes.isEmpty,(),s"Block version ${b.header.version} could not contain feature votes")
       _ <- Either.cond(b.header.featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
@@ -290,7 +299,8 @@ object Block extends ScorexLogging {
   val MaxTransactionsPerBlockVer3: Int     = 6000
   val MaxFeaturesInBlock: Int              = 64
   val BaseTargetLength: Int                = 8
-  val GeneratorSignatureLength: Int        = 32
+  val GenerationSignatureLength: Int       = 32
+  val GenerationVRFSignatureLength: Int    = 96
   val BlockIdLength: Int                   = SignatureLength
   val TransactionSizeLength                = 4
 

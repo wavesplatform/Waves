@@ -306,7 +306,7 @@ package object database extends ScorexLogging {
 
     val baseTarget = ndi.readLong()
 
-    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    val genSig = new Array[Byte](Block.GenerationSignatureLength)
     ndi.readFully(genSig)
 
     val transactionCount = {

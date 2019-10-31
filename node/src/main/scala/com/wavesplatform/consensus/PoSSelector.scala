@@ -130,11 +130,14 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       if (fairPosActivated(height) && height > 100) blockchain.blockAt(height - 100)
       else blockchain.lastBlock
 
-    blockForHit.map { b =>
-      if (!vrfActivated(height))
-        hit(generationSignature(b.header.generationSignature.arr, accountPublicKey))
+    blockForHit.flatMap { b =>
+      if (!vrfActivated(height) || b.header.version < Block.ProtoBlockVersion)
+        hit(generationSignature(b.header.generationSignature.arr, accountPublicKey)).some
       else
-        hit(crypto.verifyVRF(b.header.generationSignature, b.header.generationSignature, b.header.generator).arr)
+        blockchain
+          .blockHeaderAndSize(b.header.reference)
+          .map { case (header, _, _, _) => header.generationSignature }
+          .map(msg => hit(crypto.verifyVRF(b.header.generationSignature, msg, b.header.generator).arr))
     }
   }
 

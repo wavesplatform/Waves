@@ -364,7 +364,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |
                  | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                   Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                   Array.fill(Block.GenerationSignatureLength)(0: Byte))}'
                  | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
@@ -386,7 +386,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("block info by height") {
-    val generatorSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
+    val generatorSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
 
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>

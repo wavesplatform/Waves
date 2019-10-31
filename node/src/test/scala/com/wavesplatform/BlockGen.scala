@@ -24,7 +24,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
   def versionedBlockGen(reference: ByteStr, txs: Seq[Transaction], signer: KeyPair, version: Byte): Gen[Block] =
     for {
       baseTarget          <- Gen.posNum[Long]
-      generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
+      generationSignature <- byteArrayGen(Block.GenerationSignatureLength)
       timestamp           <- timestampGen
     } yield
       Block

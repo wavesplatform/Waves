@@ -306,6 +306,6 @@ object Miner {
   case object Disabled extends Miner with MinerDebugInfo {
     override def scheduleMining(): Unit                                                         = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
-    override val state: MinerDebugInfo.Disabled.type                                            = MinerDebugInfo.Disabled
+    override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 }

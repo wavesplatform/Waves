@@ -142,7 +142,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         signature = ByteStr.empty,
         transactionData = txs
       )
-      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bytes())))
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bytesToSign())))
     }
   }
 }

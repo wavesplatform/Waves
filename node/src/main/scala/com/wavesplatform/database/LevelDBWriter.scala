@@ -820,7 +820,7 @@ class LevelDBWriter(
     val consensuDataOffset = 1 + 8 + SignatureLength
 
     // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
+    val txCountOffset = consensuDataOffset + 8 + Block.GenerationSignatureLength
 
     val headerKey = Keys.blockHeaderBytesAt(height)
 

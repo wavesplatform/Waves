@@ -64,7 +64,7 @@ object TestBlock {
           version = version,
           reference = ref,
           baseTarget = 2L,
-          generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte)),
+          generationSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte)),
           generator = signer,
           featureVotes = features,
           rewardVote = rewardVote
@@ -83,7 +83,7 @@ object TestBlock {
           0,
           ref,
           2L,
-          randomOfLength(Block.GeneratorSignatureLength),
+          randomOfLength(Block.GenerationSignatureLength),
           defaultSigner,
           Set.empty,
           -1L
@@ -102,7 +102,7 @@ object TestBlock {
           0,
           ref,
           2L,
-          randomOfLength(Block.GeneratorSignatureLength),
+          randomOfLength(Block.GenerationSignatureLength),
           defaultSigner,
           features,
           -1L

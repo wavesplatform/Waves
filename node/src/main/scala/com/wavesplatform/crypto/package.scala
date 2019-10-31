@@ -39,7 +39,7 @@ package object crypto {
     Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
 
   def verifyVRF(signature: ByteStr, message: ByteStr, publicKey: PublicKey): ByteStr =
-    ByteStr(provider.verifyVrfSignature(publicKey.arr, message, signature.arr))
+    ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 
