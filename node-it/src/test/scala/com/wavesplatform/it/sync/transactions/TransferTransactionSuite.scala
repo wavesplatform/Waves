@@ -78,7 +78,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     for (v <- supportedVersions) {
       val (secondBalance, secondEffBalance) = miner.accountBalances(secondAddress)
 
-      assertBadRequest(sender.transfer(secondAddress, firstAddress, secondEffBalance, minFee, version = v))
+      assertApiErrorRaised(sender.transfer(secondAddress, firstAddress, secondEffBalance, minFee, version = v))
       nodes.waitForHeightArise()
 
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)

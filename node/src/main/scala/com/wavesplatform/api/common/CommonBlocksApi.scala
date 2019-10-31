@@ -29,8 +29,8 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
   def calcBlocksDelay(blockId: BlockId, blockNum: Int): Either[ApiError, Long] = {
     getBlockById(blockId).toRight(BlockDoesNotExist).flatMap { block =>
       blockchain
-        .parentHeader(block, blockNum)
-        .map(parent => (block.timestamp - parent.timestamp) / blockNum)
+        .parentHeader(block.header, blockNum)
+        .map(parent => (block.header.timestamp - parent.timestamp) / blockNum)
         .toRight(CustomValidationError(s"Cannot go $blockNum blocks back"))
     }
   }
@@ -47,15 +47,15 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.blockAt(height)
   }
 
-  def blockHeaderAtHeight(height: Int): Option[(BlockHeader, Int)] = {
+  def blockHeaderAtHeight(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
     blockchain.blockHeaderAndSize(height)
   }
 
-  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockHeader, Int, Int)] = {
+  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockHeader, Int, Int, ByteStr, Int)] = {
     Observable
       .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
       .map(height => (height, blockchain.blockHeaderAndSize(height)))
-      .collect { case (height, Some((header, size))) => (header, size, height) }
+      .collect { case (height, Some((header, size, transactionCount, signature))) => (header, size, transactionCount, signature, height) }
   }
 
   def lastBlock(): Option[VanillaBlock] = {

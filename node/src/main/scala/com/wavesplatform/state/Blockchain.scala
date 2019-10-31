@@ -20,8 +20,8 @@ trait Blockchain {
   def height: Int
   def score: BigInt
 
-  def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
-  def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
+  def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
+  def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)]
 
   def lastBlock: Option[Block]
   def carryFee: Long

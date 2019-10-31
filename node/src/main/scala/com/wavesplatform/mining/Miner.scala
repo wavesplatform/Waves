@@ -123,7 +123,7 @@ class MinerImpl(
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,
         refBlockTS,
-        blockchainUpdater.parentHeader(lastBlock, 2).map(_.timestamp),
+        blockchainUpdater.parentHeader(lastBlock.header, 2).map(_.timestamp),
         currentTime
       )
       .leftMap(_.toString)
@@ -139,7 +139,7 @@ class MinerImpl(
     val refBlockTS          = referencedBlockInfo.timestamp
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
-    lazy val blockDelay     = currentTime - lastBlock.timestamp
+    lazy val blockDelay     = currentTime - lastBlock.header.timestamp
     lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
@@ -160,7 +160,17 @@ class MinerImpl(
       unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
-        .buildAndSign(version.toByte, currentTime, refBlockID, consensusData, unconfirmed, account, blockFeatures(version), blockRewardVote(version))
+        .buildAndSign(
+          version.toByte,
+          currentTime,
+          refBlockID,
+          consensusData.baseTarget,
+          consensusData.generationSignature,
+          unconfirmed,
+          account,
+          blockFeatures(version),
+          blockRewardVote(version)
+        )
         .leftMap(_.err)
     } yield (estimators, block, updatedMdConstraint.constraints.head))
   }
@@ -189,8 +199,8 @@ class MinerImpl(
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       for {
         expectedTS <- pos
-          .getValidBlockDelay(height, account, block.consensusData.baseTarget, balance)
-          .map(_ + block.timestamp)
+          .getValidBlockDelay(height, account, block.header.baseTarget, balance)
+          .map(_ + block.header.timestamp)
           .leftMap(_.toString)
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,

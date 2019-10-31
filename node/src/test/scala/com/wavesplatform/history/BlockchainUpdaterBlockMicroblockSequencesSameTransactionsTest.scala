@@ -37,7 +37,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
                   mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
               }
               d.blockchainUpdater.processBlock(last)
-              d.portfolio(last.signerData.generator.toAddress).balance
+              d.portfolio(last.header.generator.toAddress).balance
             }
         }
         finalMinerBalances.toSet.size shouldBe 1

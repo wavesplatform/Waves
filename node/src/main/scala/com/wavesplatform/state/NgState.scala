@@ -8,6 +8,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
@@ -79,7 +80,7 @@ class NgState(
           cachedBlock
 
         case None =>
-          val block = base.copy(signerData = base.signerData.copy(signature = microBlocks.head.totalResBlockSig), transactionData = transactions)
+          val block = base.copy(signature = microBlocks.head.totalResBlockSig, transactionData = transactions)
           internalCaches.bestBlockCache = Some(block)
           block
       }
@@ -109,7 +110,7 @@ class NgState(
       .find(micro => microDiffs(micro.totalResBlockSig).timestamp <= maxTimeStamp)
       .map(_.totalResBlockSig)
       .getOrElse(base.uniqueId)
-    BlockMinerInfo(base.consensusData, base.timestamp, blockId)
+    BlockMinerInfo(NxtLikeConsensusBlockData(base.header.baseTarget, base.header.generationSignature), base.header.timestamp, blockId)
   }
 
   def append(m: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): Unit = {
@@ -141,7 +142,7 @@ class NgState(
 
           maybeFound.map {
             case (sig, discarded) =>
-              (base.copy(signerData = base.signerData.copy(signature = sig), transactionData = base.transactionData ++ accumulatedTxs), discarded)
+              (base.copy(signature = sig, transactionData = base.transactionData ++ accumulatedTxs), discarded)
           }
         }
       }

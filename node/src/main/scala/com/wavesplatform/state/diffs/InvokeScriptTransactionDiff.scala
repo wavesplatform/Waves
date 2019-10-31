@@ -100,10 +100,10 @@ object InvokeScriptTransactionDiff {
         for {
           scriptResult <- TracedResult(
             scriptResultE,
-            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1)))
+            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
           )
           invocationComplexity = scriptResult._2
-          (dss, pss) = scriptResult._1 match {
+          (ds, ps) = scriptResult._1 match {
             case ScriptResultV3(ds, ts) => (ds, ts)
           }
 /*
@@ -118,18 +118,18 @@ object InvokeScriptTransactionDiff {
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
 
           assetsComplexity =
-            (tx.checkedAssets().map(_.id) ++ pss.flatMap(_.assetId))
+            (tx.checkedAssets().map(_.id) ++ ps.flatMap(_.assetId))
               .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
               .map(_._2)
 
-          dataEntriess = dss.map {
+          dataEntries = ds.map {
             case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
             case DataItem.Str(k, b)  => StringDataEntry(k, b)
             case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
             case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
           }
 
-          pmtss: List[Map[Address, Map[Option[ByteStr], Long]]] = pss.map { transfer =>
+          pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map { transfer =>
             Map(Address.fromBytes(transfer.recipient.bytes.arr).explicitGet() -> Map(transfer.assetId -> transfer.amount))
           }
 
@@ -155,12 +155,12 @@ object InvokeScriptTransactionDiff {
           })
           dAppAddress <- TracedResult(dAppAddressEi)
           wavesFee = feeInfo._1
-          dataAndPaymentDiff <- /*diff!*/ TracedResult(payableAndDataPart(blockchain.height, tx, dAppAddress, dataEntriess, feeInfo._2))
-          _                  <- TracedResult(Either.cond(pmtss.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
-          _                  <- TracedResult(validateOverflow(pmtss.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
+          dataAndPaymentDiff <- TracedResult(payableAndDataPart(blockchain.height, tx, dAppAddress, dataEntries, feeInfo._2))
+          _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
+          _                  <- TracedResult(validateOverflow(pmts.flatMap(_.values).flatMap(_.values), "Attempt to transfer unavailable funds in contract payment"))
           _ <- TracedResult(
             Either.cond(
-              pmtss
+              pmts
                 .flatMap(_.values)
                 .flatMap(_.keys)
                 .flatten
@@ -173,7 +173,7 @@ object InvokeScriptTransactionDiff {
               tx.checkedAssets()
                 .collect { case asset @ IssuedAsset(_) => asset }
                 .count(blockchain.hasAssetScript) +
-                pss.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
+                ps.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
@@ -250,46 +250,45 @@ object InvokeScriptTransactionDiff {
   }
 
   private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
-    ps: List[AssetTransfer],
-    dataDiff: Diff
-  ): TracedResult[ValidationError, Diff] = {
-    val foldResult = ps.foldLeft(TracedResult(dataDiff.asRight[ValidationError])) { (tracedDiffAcc, payment) =>
-      val AssetTransfer(addressRepr, amount, asset) = payment
-      val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-      val tracedDiff: TracedResult[ValidationError, Diff] = Asset.fromCompatId(asset) match {
-        case Waves =>
-          Diff
-            .stateOps(
+      ps: List[AssetTransfer],
+      dataDiff: Diff): TracedResult[ValidationError, Diff] = {
+      val foldResult = ps.foldLeft(TracedResult(dataDiff.asRight[ValidationError])) { (tracedDiffAcc, payment) =>
+        val AssetTransfer(addressRepr, amount, asset) = payment
+        val address                      = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+        val tracedDiff: TracedResult[ValidationError, Diff] = Asset.fromCompatId(asset) match {
+          case Waves =>
+            Diff
+              .stateOps(
+                portfolios = Map(
+                  address     -> Portfolio(amount, LeaseBalance.empty, Map.empty),
+                  dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
+                )
+              )
+              .asRight[ValidationError]
+          case a @ IssuedAsset(id) =>
+            val nextDiff = Diff.stateOps(
               portfolios = Map(
-                address -> Portfolio(amount, LeaseBalance.empty, Map.empty),
-                dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
-              )
-            )
-            .asRight[ValidationError]
-        case a@IssuedAsset(id) =>
-          val nextDiff = Diff.stateOps(
-            portfolios = Map(
-              address -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-              dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
-            ))
-          blockchain.assetScript(a) match {
-            case None =>
-              nextDiff.asRight[ValidationError]
-            case Some(script) =>
-              val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
-                d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
-              )
-              val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
-              TracedResult(
-                assetValidationDiff,
-                List(AssetVerifierTrace(id, errorOpt))
-              )
-          }
+                address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
+                dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+              ))
+            blockchain.assetScript(a) match {
+              case None =>
+                nextDiff.asRight[ValidationError]
+              case Some(script) =>
+                val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
+                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
+                )
+                val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+                TracedResult(
+                  assetValidationDiff,
+                  List(AssetVerifierTrace(id, errorOpt))
+                )
+            }
+        }
+        tracedDiffAcc |+| tracedDiff
       }
-      tracedDiffAcc |+| tracedDiff
+      TracedResult(foldResult.resultE.map(_ => Diff.stateOps()), foldResult.trace)
     }
-    TracedResult(foldResult.resultE.map(_ => Diff.stateOps()), foldResult.trace)
-  }
 
   private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       totalDiff: Diff,

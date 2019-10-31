@@ -9,13 +9,13 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import org.iq80.leveldb.{DB, Options, ReadOptions}
 
@@ -264,24 +264,78 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeBlockHeaderAndSize(data: (BlockHeader, Int)): Array[Byte] = {
-    val (bh, size) = data
+  def writeBlockHeaderAndSize(data: (BlockHeader, Int, Int, ByteStr)): Array[Byte] = {
+    val (bh, size, transactionCount, signature) = data
 
     val ndo = newDataOutput()
 
     ndo.writeInt(size)
-    ndo.write(BlockHeader.writeHeaderOnly(bh))
+
+    ndo.writeByte(bh.version)
+    ndo.writeLong(bh.timestamp)
+    ndo.write(bh.reference)
+    ndo.writeLong(bh.baseTarget)
+    ndo.write(bh.generationSignature)
+
+    if (bh.version == Block.GenesisBlockVersion | bh.version == Block.PlainBlockVersion)
+      ndo.writeByte(transactionCount)
+    else
+      ndo.writeInt(transactionCount)
+
+    ndo.writeInt(bh.featureVotes.size)
+    bh.featureVotes.foreach(s => ndo.writeShort(s))
+
+    if (bh.version > Block.NgBlockVersion)
+      ndo.writeLong(bh.rewardVote)
+
+    ndo.write(bh.generator)
+    ndo.write(signature)
 
     ndo.toByteArray
   }
 
-  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int) = {
+  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int, Int, ByteStr) = {
     val ndi = newDataInput(bs)
 
     val size   = ndi.readInt()
-    val header = BlockHeader.readHeaderOnly(bs.drop(4))
+    val version   = ndi.readByte()
+    val timestamp = ndi.readLong()
 
-    (header, size)
+    val referenceArr = new Array[Byte](SignatureLength)
+    ndi.readFully(referenceArr)
+
+    val baseTarget = ndi.readLong()
+
+    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    ndi.readFully(genSig)
+
+    val transactionCount = {
+      if (version == 1 || version == 2) ndi.readByte()
+      else ndi.readInt()
+    }
+    val featureVotesCount = ndi.readInt()
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+
+    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+
+    val generator = new Array[Byte](KeyLength)
+    ndi.readFully(generator)
+
+    val signature = new Array[Byte](SignatureLength)
+    ndi.readFully(signature)
+
+    val header =  new BlockHeader(
+      version,
+      timestamp,
+      ByteStr(referenceArr),
+      baseTarget,
+      ByteStr(genSig),
+      PublicKey(ByteStr(generator)),
+      featureVotes,
+      rewardVote
+    )
+
+    (header, size, transactionCount, ByteStr(signature))
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
@@ -381,4 +435,18 @@ package object database extends ScorexLogging {
       } finally iterator.close()
     }
   }
+
+  def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
+    Block.build(
+      header.version,
+      header.timestamp,
+      header.reference,
+      header.baseTarget,
+      header.generationSignature,
+      txs,
+      header.generator,
+      signature,
+      header.featureVotes,
+      header.rewardVote
+    )
 }

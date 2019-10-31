@@ -921,6 +921,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           inside(blockDiffEi.trace) {
             case List(
                 AssetVerifierTrace(attachedAssetId, None),
+                InvokeScriptTrace(_, _, Right(ScriptResult(_, transactions)), _)
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)))
                 ) =>
               attachedAssetId shouldBe attachedAsset.id.value

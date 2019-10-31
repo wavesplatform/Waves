@@ -138,7 +138,7 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
         fee = fee,
         waitForTx = true
       )
-      .id
+      ._1.id
   }
 
 }

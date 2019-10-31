@@ -58,7 +58,8 @@ case class DebugApiRoute(
     extLoaderStateReporter: Coeval[RxExtensionLoader.State],
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
-    configRoot: ConfigObject
+    configRoot: ConfigObject,
+    loadBalanceHistory: Address => Seq[(Int, Long)]
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -72,7 +73,7 @@ case class DebugApiRoute(
 
   override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    stateChanges ~ withAuth {
+    stateChanges ~ balanceHistory ~ withAuth {
       blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
     }
   }
@@ -154,6 +155,29 @@ case class DebugApiRoute(
           complete(Json.toJson(portfolio))
       }
     }
+  }
+
+  @Path("/balances/history/{address}")
+  @ApiOperation(
+    value = "Waves balance history",
+    notes = "Waves balance history",
+    httpMethod = "GET"
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "address",
+        value = "An address to load waves balance history for",
+        required = true,
+        dataType = "string",
+        paramType = "path"
+      )
+    )
+  )
+  def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
+    complete(Json.toJson(loadBalanceHistory(address).map {
+      case (h, b) => Json.obj("height" -> h, "balance" -> b)
+    }))
   }
 
   @Path("/state")
@@ -371,7 +395,7 @@ case class DebugApiRoute(
       val response = Json.obj(
         "valid"          -> tracedDiff.resultE.isRight,
         "validationTime" -> timeSpent,
-        "trace"          -> tracedDiff.trace.map(_.toString)
+        "trace"          -> tracedDiff.trace.map(_.loggedJson.toString)
       )
       tracedDiff.resultE.fold(
         err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),
