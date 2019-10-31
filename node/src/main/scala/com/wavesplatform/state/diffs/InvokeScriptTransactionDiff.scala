@@ -103,8 +103,9 @@ object InvokeScriptTransactionDiff {
             List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
           )
           invocationComplexity = scriptResult._2
-          (ds, ps) = scriptResult._1 match {
+          (ds, ps) = scriptResult._1._1 match {
             case ScriptResultV3(ds, ts) => (ds, ts)
+            case _ => ???
           }
 /*
           actionsLength = payments.length + issues.length + reissues.length + burns.length
