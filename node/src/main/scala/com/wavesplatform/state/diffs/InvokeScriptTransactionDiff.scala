@@ -231,7 +231,7 @@ object InvokeScriptTransactionDiff {
     Either.cond(
       !ifReject,
       (),
-      GenericError("Self-payment is forbidden")
+      GenericError("DApp self-payment is forbidden")
     )
   }
 
