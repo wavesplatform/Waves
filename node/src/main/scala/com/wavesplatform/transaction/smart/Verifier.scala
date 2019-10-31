@@ -38,7 +38,7 @@ object Verifier extends ScorexLogging {
     val validatedTx: TracedResult[ValidationError, Transaction] = tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
-        (pt, blockchain.accountScript(pt.sender)) match {
+        (pt, blockchain.accountScript(pt.sender).map(_._1)) match {
           case (stx: SignedTransaction, None) =>
             stats.signatureVerification
               .measureForType(stx.typeId)(stx.signaturesValid())
@@ -171,7 +171,7 @@ object Verifier extends ScorexLogging {
     def orderVerification(order: Order): TracedResult[ValidationError, Order] = {
       val verificationResult = blockchain
         .accountScript(order.sender.toAddress)
-        .map { script =>
+        .map { case (script, _) =>
           if (order.version != 1) {
             stats.orderValidation.measure(verifyOrder(blockchain, script, order))
           } else {
@@ -187,7 +187,7 @@ object Verifier extends ScorexLogging {
       case Waves => Right(et)
       case asset: IssuedAsset =>
         blockchain.assetScript(asset).fold[TracedResult[ValidationError, Transaction]](Right(et)) { script =>
-          verifyTx(blockchain, script, et, assetId.compatId) leftMap {
+          verifyTx(blockchain, script._1, et, assetId.compatId) leftMap {
             case x: HasScriptType => x
             case GenericError(x)  => ScriptExecutionError(x, List.empty, isAssetScript = true)
             case x                => ScriptExecutionError(x.toString, List.empty, isAssetScript = true)

@@ -158,7 +158,7 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScriptWithComplexity _)
+    (blockchain.accountScript _)
       .when(allAccounts(1).toAddress)
       .onCall((_: AddressOrAlias) => Some((ExprScript(TRUE).explicitGet(), 1L)))
 
@@ -171,7 +171,7 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    (blockchain.accountScriptWithComplexity _)
+    (blockchain.accountScript _)
       .when(allAccounts(2).toAddress)
       .onCall((_: AddressOrAlias) => None)
 
@@ -211,12 +211,9 @@ class AddressRouteSpec
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
 
-    (blockchain.accountScriptWithComplexity _)
-      .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))
+      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -244,7 +241,7 @@ class AddressRouteSpec
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
     (blockchain.accountScript _)
       .when(allAccounts(4).toAddress)
-      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithoutMeta).explicitGet()))
+      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -306,11 +303,6 @@ class AddressRouteSpec
       "^1aB1cD$",
       "(a|b)c"
     )
-
-    (blockchain.accountDataKeys _)
-      .when(allAccounts(1).toAddress)
-      .returning(dataKeys)
-      .anyNumberOfTimes()
 
     testData.foreach {
       case (k, v) =>

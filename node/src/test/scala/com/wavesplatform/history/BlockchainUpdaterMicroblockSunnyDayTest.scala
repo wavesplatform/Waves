@@ -161,7 +161,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
           da.blockchainUpdater.processBlock(block2a).explicitGet()
           da.blockchainUpdater.processBlock(block3a).explicitGet()
 
-          da.portfolio(miner).balance
+          da.balance(miner)
         }
 
         val minerBBalance = withDomain(MicroblocksActivatedAt0WavesSettings) { db =>
@@ -174,7 +174,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
           db.blockchainUpdater.processBlock(block2b).explicitGet()
           db.blockchainUpdater.processBlock(block3b).explicitGet()
 
-          db.portfolio(miner).balance
+          db.balance(miner)
         }
 
         minerABalance shouldBe minerBBalance

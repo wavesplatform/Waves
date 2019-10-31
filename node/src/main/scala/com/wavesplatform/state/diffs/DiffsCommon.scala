@@ -1,16 +1,16 @@
 package com.wavesplatform.state.diffs
 
+import cats.implicits._
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ProvenTransaction
-import cats.implicits._
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object DiffsCommon {
@@ -69,17 +69,17 @@ object DiffsCommon {
   }
 
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
-    tx.checkedAssets().count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
+    tx.checkedAssets().count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
   def getScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
     val assetsComplexity = tx
       .checkedAssets()
       .toList
-      .flatMap(blockchain.assetScriptWithComplexity)
+      .flatMap(blockchain.assetScript)
       .map(_._2)
 
     val accountComplexity = blockchain
-      .accountScriptWithComplexity(tx.sender.toAddress)
+      .accountScript(tx.sender.toAddress)
       .map(_._2)
 
     assetsComplexity.sum + accountComplexity.getOrElse(0L)

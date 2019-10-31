@@ -7,7 +7,7 @@ import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {
@@ -37,16 +37,12 @@ class CommonAccountApi(blockchain: Blockchain) {
     blockchain.balance(address, asset)
   }
 
-  def portfolio(address: Address): Map[Asset, Long] = {
-    val portfolio = blockchain.portfolio(address)
-    portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
-  }
+  def portfolio(address: Address): Map[Asset, Long] = ???
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
-    blockchain.nftObservable(address, from)
+  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = ???
 
   def script(address: Address): AddressScriptInfo = {
-    val script: Option[(Script, Long)] = blockchain.accountScriptWithComplexity(address)
+    val script: Option[(Script, Long)] = blockchain.accountScript(address)
 
     AddressScriptInfo(
       script = script.map(_._1.bytes()),
@@ -60,22 +56,9 @@ class CommonAccountApi(blockchain: Blockchain) {
     blockchain.accountData(address, key)
   }
 
-  def dataStream(address: Address, keyFilter: String => Boolean = _ => true): Observable[DataEntry[_]] = {
-    Observable
-      .defer(Observable.fromIterable(concurrent.blocking(blockchain.accountDataKeys(address))))
-      .filter(keyFilter)
-      .map(blockchain.accountData(address, _))
-      .flatMap(Observable.fromIterable(_))
-  }
+  def dataStream(address: Address, keyFilter: String => Boolean = _ => true): Observable[DataEntry[_]] = ???
 
-  def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
-    blockchain
-      .addressTransactionsObservable(address, Set(LeaseTransactionV1, LeaseTransactionV2))
-      .collect {
-        case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
-          (height, leaseTransaction)
-      }
-  }
+  def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = ???
 }
 
 object CommonAccountApi {

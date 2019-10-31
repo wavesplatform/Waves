@@ -95,7 +95,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
     b.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
-    b.removeAfter(b.lastBlockIds(2).last).explicitGet()
+    b.removeAfter(b.blockHeaderAndSize(ApprovalPeriod - 2).get._4).explicitGet()
 
     b.height shouldBe ApprovalPeriod - 1
     b.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
@@ -109,7 +109,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
     b.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
-    b.removeAfter(b.lastBlockIds(2).last).explicitGet()
+    b.removeAfter(b.blockHeaderAndSize(b.height - 2).get._4).explicitGet()
 
     b.height shouldBe 2 * ApprovalPeriod - 1
     b.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
@@ -121,13 +121,13 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
     b.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
-    b.removeAfter(b.lastBlockIds(2).last).explicitGet()
+    b.removeAfter(b.blockHeaderAndSize(b.height - 2).get._4).explicitGet()
 
     b.height shouldBe 2 * ApprovalPeriod - 1
     b.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
     b.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    b.removeAfter(b.lastBlockIds(ApprovalPeriod + 1).last).explicitGet()
+    b.removeAfter(b.blockHeaderAndSize(ApprovalPeriod).get._4).explicitGet()
 
     b.height shouldBe ApprovalPeriod - 1
     b.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined

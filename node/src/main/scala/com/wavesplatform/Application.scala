@@ -18,6 +18,7 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -34,7 +35,8 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Portfolio}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -131,7 +133,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val timer = new HashedWheelTimer()
-    val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val utxSynchronizerScheduler =
+      Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
         utxSynchronizerScheduler
@@ -167,7 +170,15 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val historyReplier = new HistoryReplier(blockchainUpdater, settings.synchronizationSettings, historyRepliesScheduler)
+    def score: BigInt                                               = ???
+    def loadBlockBytes(id: ByteStr): Task[Array[Byte]]              = Task.raiseError(new NoSuchElementException)
+    def loadBlockAt(height: Int): Task[Block]                       = Task.raiseError(new NoSuchElementException)
+    def loadMicroBlockBytes(id: ByteStr): Task[Array[Byte]]         = Task.raiseError(new NoSuchElementException)
+    def blockIdsAfter(candidates: Seq[ByteStr]): Task[Seq[ByteStr]] = Task.raiseError(new NoSuchElementException)
+    def lastBlockIds(i: Int): Seq[ByteStr]                          = ???
+    def lastBlocks(i: Int): Seq[Block]                              = ???
+
+    val historyReplier = new HistoryReplier(score, loadBlockBytes, loadMicroBlockBytes, blockIdsAfter)
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
       Task(blockchainUpdater.removeAfter(blockId))
@@ -235,7 +246,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
     val (newBlocks, extLoaderState, sh) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
-      Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
+      Coeval(lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
       blocks,
@@ -292,7 +303,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, loadBlockAt),
         TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
@@ -305,6 +316,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           blockchainUpdater,
           wallet,
           blockchainUpdater,
+          lastBlocks,
+          _ => Left(GenericError("not implemented")),
+          _ => Portfolio.empty,
+          _ => Map.empty,
           peerDatabase,
           establishedConnections,
           (id, returnTxs) => rollbackTask(id, returnTxs).map(_.map(_ => ())),

@@ -10,7 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.{Height, TxNum}
+import com.wavesplatform.state.{Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -26,6 +26,9 @@ import scala.util.Try
 //noinspection ScalaStyle
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
+
+  // todo: replace with actual implementation
+  def portfolio(address: Address): Portfolio = ???
 
   private val keys = Array(
     "version",
@@ -310,9 +313,9 @@ object Explorer extends ScorexLogging {
 
         case "AP" =>
           val address   = Address.fromString(argument(1, "address")).explicitGet()
-          val portfolio = reader.portfolio(address)
-          log.info(s"$address : ${portfolio.balance} WAVES, ${portfolio.lease}, ${portfolio.assets.size} assets")
-          portfolio.assets.toSeq.sortBy(_._1.toString) foreach {
+          val pf = portfolio(address)
+          log.info(s"$address : ${pf.balance} WAVES, ${pf.lease}, ${pf.assets.size} assets")
+          pf.assets.toSeq.sortBy(_._1.toString) foreach {
             case (assetId, balance) => log.info(s"$assetId : $balance")
           }
 
@@ -358,7 +361,7 @@ object Explorer extends ScorexLogging {
 
           println(s"\nAddress balances (${addrs.size} addresses)")
           addrs.toSeq.sortBy(_.toString).foreach { addr =>
-            val p = reader.portfolio(addr)
+            val p = portfolio(addr)
             println(s"\n$addr : ${p.balance} ${p.lease}:")
             p.assets.toSeq.sortBy(_._1.id).foreach {
               case (IssuedAsset(assetId), bal) =>

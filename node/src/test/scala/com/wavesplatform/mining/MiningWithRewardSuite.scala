@@ -13,7 +13,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl, NG}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
@@ -51,8 +51,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         } yield {
           blockchain.balance(account) should be(newBalance)
           blockchain.height should be(3)
-          blockchain.blockAt(2).get.header.version should be(Block.RewardBlockVersion)
-          blockchain.blockAt(3).get.header.version should be(Block.RewardBlockVersion)
+          blockchain.blockHeader(2).get.version should be(Block.RewardBlockVersion)
+          blockchain.blockHeader(3).get.version should be(Block.RewardBlockVersion)
         }
     }
   }
@@ -137,10 +137,10 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
     miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
 
-  private def resources: Resource[Task, (BlockchainUpdater with NG, DB)] =
+  private def resources: Resource[Task, (Blockchain with BlockchainUpdater with NG, DB)] =
     Resource.make {
       val defaultWriter: LevelDbWriterWithReward = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
-      val blockchainUpdater: BlockchainUpdater with NG =
+      val blockchainUpdater: Blockchain with BlockchainUpdater with NG =
         new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, PublishSubject[BlockchainUpdated])
       defaultWriter.saveReward(settings.blockchainSettings.rewardsSettings.initial)
       Task.now((blockchainUpdater, db))
@@ -160,7 +160,7 @@ object MiningWithRewardSuite {
   type BlockProducer       = (Long, ByteStr, KeyPair) => Block
   type TransactionProducer = (Long, KeyPair) => Transaction
 
-  case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: BlockchainUpdater with NG)
+  case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: Blockchain with BlockchainUpdater with NG)
 
   val commonSettings: WavesSettings                    = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
   val minerSettings: MinerSettings                     = commonSettings.minerSettings.copy(quorum = 0, intervalAfterLastBlockThenGenerationIsAllowed = 1 hour)

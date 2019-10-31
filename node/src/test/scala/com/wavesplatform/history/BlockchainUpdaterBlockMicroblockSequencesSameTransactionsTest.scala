@@ -28,7 +28,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     forAll(g(100, 5)) {
       case (gen, rest) =>
         val finalMinerBalances = rest.map {
-          case (a @ (bmb: BlockAndMicroblockSequence, last: Block)) =>
+          case (bmb: BlockAndMicroblockSequence, last: Block) =>
             withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
               d.blockchainUpdater.processBlock(gen).explicitGet()
               bmb.foreach {
@@ -37,7 +37,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
                   mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
               }
               d.blockchainUpdater.processBlock(last)
-              d.portfolio(last.header.generator.toAddress).balance
+              d.balance(last.header.generator.toAddress)
             }
         }
         finalMinerBalances.toSet.size shouldBe 1
@@ -64,8 +64,8 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         domain.blockchainUpdater.processMicroBlock(micros.head).explicitGet()
         domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
 
-        domain.portfolio(miner).balance shouldBe payment.fee
-        domain.portfolio(genesis.recipient).balance shouldBe (genesis.amount - payment.fee)
+        domain.balance(miner) shouldBe payment.fee
+        domain.balance(genesis.recipient) shouldBe (genesis.amount - payment.fee)
     }
   }
 
@@ -132,7 +132,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       t <- if (h < total) genSizes(total - h) else Gen.const(Seq.empty)
     } yield h +: t
 
-  def genSplitSizes(total: Int): Gen[(Int, Seq[Int])] = genSizes(total).map { case (h :: tail) => (h, tail) }
+  def genSplitSizes(total: Int): Gen[(Int, Seq[Int])] = genSizes(total).map { case h :: tail => (h, tail) }
 
   type BlockAndMicroblockSize     = (Int, Seq[Int])
   type BlockAndMicroblockSizes    = Seq[BlockAndMicroblockSize]

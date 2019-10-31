@@ -77,12 +77,15 @@ object Exporter extends ScorexLogging {
     }
   }
 
+  def blockAt(i: Int): Option[Block] = ???
+  def blockBytes(i: Int): Option[Array[Byte]] = ???
+
   private[this] object IO {
     def createOutputStream(filename: String): Try[FileOutputStream] =
       Try(new FileOutputStream(filename))
 
     def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
-      val maybeBlockBytes = blockchain.blockBytes(height)
+      val maybeBlockBytes = blockBytes(height)
       maybeBlockBytes
         .map { oldBytes =>
           val bytes       = if (legacy) oldBytes else PBBlocks.clearChainId(PBBlocks.protobuf(Block.parseBytes(oldBytes).get)).toByteArray
@@ -97,7 +100,7 @@ object Exporter extends ScorexLogging {
     }
 
     def exportBlockToJson(stream: OutputStream, blockchain: Blockchain, height: Int): Int = {
-      val maybeBlock = blockchain.blockAt(height)
+      val maybeBlock = blockAt(height)
       maybeBlock
         .map { block =>
           val len = if (height != 2) {

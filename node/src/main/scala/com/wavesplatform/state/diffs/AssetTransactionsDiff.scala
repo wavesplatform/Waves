@@ -42,7 +42,7 @@ object AssetTransactionsDiff {
                 if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
                   DiffsCommon.countScriptRuns(blockchain, tx)
                 } else {
-                  Some(tx.sender.toAddress).count(blockchain.hasScript)
+                  Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
                 }
             )
           )

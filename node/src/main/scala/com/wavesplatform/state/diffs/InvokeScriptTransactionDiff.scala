@@ -29,7 +29,6 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
@@ -52,7 +51,7 @@ object InvokeScriptTransactionDiff {
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
+      case Right(Some((sc @ ContractScriptImpl(version, contract), _))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -104,11 +103,11 @@ object InvokeScriptTransactionDiff {
           )
           ((ScriptResult(ds, ps), log), invocationComplexity) = scriptResult
 
-          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
+          verifierComplexity = blockchain.accountScript(tx.sender).map(_._2)
 
           assetsComplexity =
             (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
-              .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
+              .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
               .map(_._2)
 
           dataEntries = ds.map {
@@ -164,7 +163,7 @@ object InvokeScriptTransactionDiff {
                 .collect { case asset @ IssuedAsset(_) => asset }
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) 1 else 0)
+                (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
@@ -181,7 +180,7 @@ object InvokeScriptTransactionDiff {
                 .collect { case asset @ IssuedAsset(_) => asset }
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
+                (if (blockchain.hasAccountScript(tx.sender)) { 1 } else { 0 })
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
@@ -282,7 +281,7 @@ object InvokeScriptTransactionDiff {
             blockchain.assetScript(a) match {
               case None =>
                 nextDiff.asRight[ValidationError]
-              case Some(script) =>
+              case Some((script, _)) =>
                 val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
                   d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
                 )

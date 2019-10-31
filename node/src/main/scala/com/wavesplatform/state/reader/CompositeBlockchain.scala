@@ -10,10 +10,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -37,10 +35,10 @@ final case class CompositeBlockchain(
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] =
+  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] =
     maybeDiff
       .flatMap(_.assetScripts.get(asset))
-      .getOrElse(inner.assetScriptWithComplexity(asset))
+      .getOrElse(inner.assetScript(asset))
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
     case Some(s) => s.nonEmpty
@@ -48,7 +46,7 @@ final case class CompositeBlockchain(
   }
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
-    val script: Option[Script] = assetScript(asset)
+    val script: Option[Script] = assetScript(asset).map(_._1)
     inner.assetDescription(asset) match {
       case Some(ad) =>
         diff.issuedAssets
@@ -131,13 +129,6 @@ final case class CompositeBlockchain(
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
-  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = {
-    diff.scriptResults
-      .get(txId)
-      .toRight(GenericError("InvokeScript result not found"))
-      .orElse(inner.invokeScriptResult(txId))
-  }
-
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
@@ -154,32 +145,20 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
+  override def accountScript(address: Address): Option[(Script, Long)] = {
     diff.scripts.get(address) match {
-      case None            => inner.accountScriptWithComplexity(address)
+      case None            => inner.accountScript(address)
       case Some(None)      => None
       case Some(Some(scr)) => Some(scr)
     }
   }
 
-  override def hasScript(address: Address): Boolean = {
+  override def hasAccountScript(address: Address): Boolean = {
     diff.scripts.get(address) match {
-      case None          => inner.hasScript(address)
+      case None          => inner.hasAccountScript(address)
       case Some(None)    => false
       case Some(Some(_)) => true
     }
-  }
-
-  override def accountDataKeys(acc: Address): Set[String] = {
-    val fromInner = inner.accountDataKeys(acc)
-    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    fromInner ++ fromDiff
-  }
-
-  override def accountData(acc: Address): AccountDataInfo = {
-    val fromInner = inner.accountData(acc)
-    val fromDiff  = diff.accountData.get(acc).orEmpty
-    fromInner.combine(fromDiff)
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
@@ -201,28 +180,10 @@ final case class CompositeBlockchain(
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] =
     filterByHeight(height).map(headerAndSize) orElse inner.blockHeaderAndSize(height)
-  override def blockHeaderAndSize(blockId: ByteStr): Option[((BlockHeader, Int, Int, ByteStr))] =
-    filterById(blockId).map(headerAndSize) orElse inner.blockHeaderAndSize(blockId)
-
-  override def blockBytes(height: Int): Option[Array[Byte]]      = filterByHeight(height).map(_.bytes()) orElse inner.blockBytes(height)
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = filterById(blockId).map(_.bytes()) orElse inner.blockBytes(blockId)
 
   override def heightOf(blockId: ByteStr): Option[Int] = filterById(blockId).map(_ => height) orElse inner.heightOf(blockId)
 
-  /** Returns the most recent block IDs, starting from the most recent  one */
-  override def lastBlockIds(howMany: Int): Seq[ByteStr] =
-    if (howMany <= 0) Seq.empty else newBlock.map(_.uniqueId).toSeq ++ inner.lastBlockIds(howMany - 1)
-
-  /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] =
-    for {
-      ids <- inner.blockIdsAfter(parentSignature, howMany)
-      newId = newBlock.filter(_.header.reference == parentSignature).map(_.uniqueId).fold(Seq.empty[ByteStr])(Seq(_))
-    } yield newId ++ ids
-
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
-
-  override def totalFee(height: Int): Option[Long] = inner.totalFee(height)
 
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures
@@ -234,20 +195,12 @@ final case class CompositeBlockchain(
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = reward.filter(_ => this.height == height) orElse inner.blockReward(height)
 
-  override def lastBlockReward: Option[Long] = reward.orElse(inner.lastBlockReward)
-
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 }
 
-object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
-  def addressTransactions(bu: CompositeBlockchain): AddressTransactions =
-    new CompositeAddressTransactions(bu.inner, Height @@ bu.height, () => bu.maybeDiff)
-
-  def distributions(bu: CompositeBlockchain): Distributions =
-    new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
-
+object CompositeBlockchain {
   def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {

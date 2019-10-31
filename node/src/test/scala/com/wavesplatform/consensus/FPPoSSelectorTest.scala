@@ -40,9 +40,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val fork1Delay = {
             val blockForHit =
               fork1
-                .lift(100)
-                .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
-                .getOrElse(fork1.head)
+                .lift(100).map(_.header)
+                .orElse(blockchain.blockHeader(blockchain.height + fork1.length - 100))
+                .getOrElse(fork1.head.header)
+                  .generationSignature
 
             calcDelay(blockForHit, fork1.head.header.baseTarget, miner1, miner1Balance)
           }
@@ -50,11 +51,11 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val fork2Delay = {
             val blockForHit =
               fork2
-                .lift(100)
-                .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
-                .getOrElse(fork2.head)
+                .lift(100).map(_.header)
+                .orElse(blockchain.blockHeader(blockchain.height + fork2.length - 100))
+                .getOrElse(fork2.head.header)
 
-            calcDelay(blockForHit, fork2.head.header.baseTarget, miner1, miner1Balance)
+            calcDelay(blockForHit.generationSignature, fork2.head.header.baseTarget, miner1, miner1Balance)
           }
 
           fork1Delay shouldEqual fork2Delay
@@ -112,7 +113,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
               height + 1,
               block,
               lastBlock.header,
-              blockchain.blockAt(height - 2).map(_.header)
+              blockchain.blockHeader(height - 2)
             ) shouldBe Right(())
       }
     }
@@ -130,7 +131,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
               height + 1,
               block,
               lastBlock.header,
-              blockchain.blockAt(height - 2).map(_.header)
+              blockchain.blockHeader(height - 2)
             ) should produce("does not match calculated baseTarget")
       }
     }
@@ -148,7 +149,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
               height + 1,
               block,
               lastBlock.header,
-              blockchain.blockAt(height - 2).map(_.header)
+              blockchain.blockHeader(height - 2)
             ) should produce("does not match calculated baseTarget")
       }
     }
@@ -188,16 +189,16 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
   "regression" - {
     "delay" in {
-      FairPoSCalculator.calculateDelay(BigInt(1), 100l, 10000000000000l) shouldBe 705491
-      FairPoSCalculator.calculateDelay(BigInt(2), 200l, 20000000000000l) shouldBe 607358
-      FairPoSCalculator.calculateDelay(BigInt(3), 300l, 30000000000000l) shouldBe 549956
+      FairPoSCalculator.calculateDelay(BigInt(1), 100L, 10000000000000L) shouldBe 705491
+      FairPoSCalculator.calculateDelay(BigInt(2), 200L, 20000000000000L) shouldBe 607358
+      FairPoSCalculator.calculateDelay(BigInt(3), 300L, 30000000000000L) shouldBe 549956
     }
 
     "base target" in {
-      FairPoSCalculator.calculateBaseTarget(100l, 30, 100l, 100000000000l, Some(99000l), 100000l) shouldBe 99l
-      FairPoSCalculator.calculateBaseTarget(100l, 10, 100l, 100000000000l, None, 100000000000l) shouldBe 100l
-      FairPoSCalculator.calculateBaseTarget(100l, 10, 100l, 100000000000l, Some(99999700000l), 100000000000l) shouldBe 100l
-      FairPoSCalculator.calculateBaseTarget(100l, 30, 100l, 100000000000l, Some(1l), 1000000l) shouldBe 101l
+      FairPoSCalculator.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(99000L), 100000L) shouldBe 99L
+      FairPoSCalculator.calculateBaseTarget(100L, 10, 100L, 100000000000L, None, 100000000000L) shouldBe 100L
+      FairPoSCalculator.calculateBaseTarget(100L, 10, 100L, 100000000000L, Some(99999700000L), 100000000000L) shouldBe 100L
+      FairPoSCalculator.calculateBaseTarget(100L, 30, 100L, 100000000000L, Some(1L), 1000000L) shouldBe 101L
     }
   }
 
@@ -232,7 +233,7 @@ object FPPoSSelectorTest {
     }
   }
 
-  final case class Env(pos: PoSSelector, blockchain: BlockchainUpdater with NG, miners: Seq[KeyPair])
+  final case class Env(pos: PoSSelector, blockchain: Blockchain with BlockchainUpdater with NG, miners: Seq[KeyPair])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
@@ -244,16 +245,11 @@ object FPPoSSelectorTest {
     ((1 to blockCount) foldLeft List(lastBlock)) { (forkChain, ind) =>
       val blockForHit =
         forkChain
-          .lift(100)
-          .orElse(blockchain.blockAt(height + ind - 100))
-          .getOrElse(forkChain.head)
+          .lift(100).map(_.header)
+          .orElse(blockchain.blockHeader(height + ind - 100))
+          .getOrElse(forkChain.head.header)
 
-      val gs =
-        PoSCalculator
-          .generatorSignature(
-            blockForHit.header.generationSignature.arr,
-            miner
-          )
+      val gs = PoSCalculator.generatorSignature(blockForHit.generationSignature.arr, miner)
 
       val delay: Long = 60000
 
@@ -262,7 +258,7 @@ object FPPoSSelectorTest {
         height + ind - 1,
         forkChain.head.header.baseTarget,
         forkChain.head.header.timestamp,
-        (forkChain.lift(2) orElse blockchain.blockAt(height + ind - 3)) map (_.header.timestamp),
+        (forkChain.lift(2).map(_.header) orElse blockchain.blockHeader(height + ind - 3)) map (_.timestamp),
         forkChain.head.header.timestamp + delay
       )
 
@@ -284,12 +280,14 @@ object FPPoSSelectorTest {
     }
   }
 
-  def forgeBlock(miner: KeyPair, blockchain: Blockchain with NG, pos: PoSSelector)(updateDelay: Long => Long = identity,
-                                                                                             updateBT: Long => Long = identity,
-                                                                                             updateGS: ByteStr => ByteStr = identity): Block = {
+  def forgeBlock(
+      miner: KeyPair,
+      blockchain: Blockchain with NG,
+      pos: PoSSelector
+  )(updateDelay: Long => Long = identity, updateBT: Long => Long = identity, updateGS: ByteStr => ByteStr = identity): Block = {
     val height       = blockchain.height
     val lastBlock    = blockchain.lastBlock.get
-    val ggParentTS   = blockchain.blockAt(height - 2).map(_.header.timestamp)
+    val ggParentTS   = blockchain.blockHeader(height - 2).map(_.timestamp)
     val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
       pos
@@ -364,15 +362,8 @@ object FPPoSSelectorTest {
       }
   }
 
-  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: PublicKey, effBalance: Long): Long = {
-
-    val gs =
-      PoSCalculator
-        .generatorSignature(
-          blockForHit.header.generationSignature.arr,
-          minerPK
-        )
-
+  def calcDelay(generationSignature: ByteStr, prevBT: Long, minerPK: PublicKey, effBalance: Long): Long = {
+    val gs = PoSCalculator.generatorSignature(generationSignature.arr, minerPK)
     val hit = PoSCalculator.hit(gs)
 
     FairPoSCalculator.calculateDelay(hit, prevBT, effBalance)

@@ -68,7 +68,7 @@ package object appender extends ScorexLogging {
                                                time: Time)(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
-        !blockchainUpdater.hasScript(block.sender),
+        !blockchainUpdater.hasAccountScript(block.sender),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )

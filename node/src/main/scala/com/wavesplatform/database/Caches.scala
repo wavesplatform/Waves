@@ -55,36 +55,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)]
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
-    } else {
-      loadBlockHeaderAndSize(blockId)
-    }
-  }
-
-  def loadBlockBytes(height: Int): Option[Array[Byte]]
-  override def blockBytes(height: Int): Option[Array[Byte]] = {
-    val c = current
-    if (height == c._1) {
-      c._3.map(_.bytes())
-    } else {
-      loadBlockBytes(height)
-    }
-  }
-
-  def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
-    val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(_.bytes())
-    } else {
-      loadBlockBytes(blockId)
-    }
-  }
-
   def loadHeightOf(blockId: ByteStr): Option[Int]
   override def heightOf(blockId: ByteStr): Option[Int] = {
     val c = current
@@ -152,8 +122,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def hasScriptBytes(address: Address): Boolean
   protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = scriptCache.get(address)
-  override def hasScript(address: Address): Boolean =
+  override def accountScript(address: Address): Option[(Script, Long)] = scriptCache.get(address)
+  override def hasAccountScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
   private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
@@ -161,7 +131,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = assetScriptCache.get(asset)
+  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = assetScriptCache.get(asset)
   override def hasAssetScript(asset: IssuedAsset): Boolean =
     assetScriptCache.getIfPresent(asset) match {
       case null => hasAssetScriptBytes(asset)
@@ -191,11 +161,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
   protected def loadActivatedFeatures(): Map[Short, Int]
   override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
-
-  @volatile
-  protected var lastBlockRewardCache: Option[Long] = loadLastBlockReward()
-  protected def loadLastBlockReward(): Option[Long]
-  override def lastBlockReward: Option[Long] = loadLastBlockReward()
 
   //noinspection ScalaStyle
   protected def doAppend(

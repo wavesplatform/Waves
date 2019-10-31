@@ -6,26 +6,21 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.state._
-import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
-import monix.execution.Scheduler.Implicits.global
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, DiscardedTransactions, Transaction}
 
-import scala.concurrent.duration.Duration
-
-//noinspection ScalaStyle
-case class Domain(blockchainUpdater: BlockchainUpdater with NG, levelDBWriter: LevelDBWriter) {
+case class Domain(blockchainUpdater: Blockchain with BlockchainUpdater with NG, levelDBWriter: LevelDBWriter) {
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
-  def appendBlock(b: Block) = blockchainUpdater.processBlock(b).explicitGet()
+  def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
 
-  def removeAfter(blockId: ByteStr) = blockchainUpdater.removeAfter(blockId).explicitGet()
+  def removeAfter(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
-  def lastBlockId = blockchainUpdater.lastBlockId.get
+  def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.get
 
-  def portfolio(address: Address) = Distributions(blockchainUpdater).portfolio(address)
+  def carryFee: Long = blockchainUpdater.carryFee
 
-  def addressTransactions(address: Address): Seq[(Height, Transaction)] =
-    blockchainUpdater.addressTransactionsObservable(address, Set.empty).take(128).toListL.runSyncUnsafe(Duration.Inf)
+  def balance(address: Address): Long = blockchainUpdater.balance(address)
+  def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
 
-  def carryFee = blockchainUpdater.carryFee
+  def addressTransactions(address: Address): Seq[(Int, Transaction)] = ???
 }

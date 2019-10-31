@@ -48,7 +48,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
             totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity - burn.quantity))
 
             val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
-            newState.portfolio(issue.sender).assets shouldBe Map(reissue.asset -> totalAssetVolume)
+            newState.balance(issue.sender, reissue.asset) shouldEqual totalAssetVolume
         }
     }
   }
@@ -118,7 +118,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue, assetTransfer, wavesTransfer))), TestBlock.create(Seq(burn)), fs) {
           case (_, newState) =>
-            newState.portfolio(burn.sender).assets shouldBe Map(burn.asset -> 0)
+            newState.balance(burn.sender, burn.asset) shouldEqual 0
         }
     }
   }

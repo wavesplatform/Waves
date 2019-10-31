@@ -17,9 +17,8 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.{DApp => DAppTarget}
-import com.wavesplatform.transaction.smart._
-import com.wavesplatform.transaction.{Authorized, Proven, Transaction, smart}
+import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
+import com.wavesplatform.transaction.{Authorized, Proven, Transaction}
 import monix.eval.Coeval
 import shapeless._
 

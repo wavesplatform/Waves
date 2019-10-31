@@ -19,8 +19,7 @@ private[api] class CommonTransactionsApi(
     wallet: Wallet,
     publishTransaction: VanillaTransaction => TracedResult[ValidationError, Boolean]
 ) {
-  def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] =
-    blockchain.addressTransactionsObservable(address, Set.empty, fromId)
+  def transactionsByAddress(address: Address, fromId: Option[ByteStr] = None): Observable[(Height, VanillaTransaction)] = ???
 
   def transactionById(transactionId: ByteStr): Option[(Int, VanillaTransaction)] =
     blockchain.transactionInfo(transactionId)

@@ -15,13 +15,9 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.concurrent.Await
-import scala.concurrent.duration.Duration
 
 class BlockchainUpdaterNFTTest
     extends PropSpec
@@ -36,8 +32,7 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftTransfer()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)) { d =>
-          def nftList(address: Address): Seq[IssueTransaction] =
-            Await.result(d.blockchainUpdater.nftObservable(address, None).toListL.runToFuture, Duration.Inf)
+          def nftList(address: Address): Seq[IssueTransaction] = ???
 
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
@@ -61,8 +56,7 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftInvokeScript()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.SmartAccounts, BlockchainFeatures.Ride4DApps)) { d =>
-          def nftList(address: Address): Seq[IssueTransaction] =
-            Await.result(d.blockchainUpdater.nftObservable(address, None).toListL.runToFuture, Duration.Inf)
+          def nftList(address: Address): Seq[IssueTransaction] = ???
 
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right

@@ -4,20 +4,17 @@ import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParserLite}
 import com.wavesplatform.{BlockGen, NoShrink}
-import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
 import org.scalactic.source.Position
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-import scala.concurrent.Await
 import scala.concurrent.duration._
 
 class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyChecks with BlockGen with WithDomain with Matchers with NoShrink {
@@ -87,11 +84,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
       sender: Address,
       types: Set[TransactionParserLite] = Set.empty,
       fromId: Option[ByteStr] = None
-  ): Seq[(Int, ByteStr)] =
-    Await
-      .result(blockchain.addressTransactionsObservable(sender, types, fromId).toListL.runToFuture, Duration.Inf)
-      .map { case (h, tx) => (h, tx.id()) }
-      .reverse
+  ): Seq[(Int, ByteStr)] = ???
 
   "Transactions by address returns" - {
     "correct N txs on request" - {

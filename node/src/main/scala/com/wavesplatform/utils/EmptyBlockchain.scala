@@ -1,6 +1,5 @@
 package com.wavesplatform.utils
 
-import cats.kernel.Monoid
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -25,27 +24,13 @@ case object EmptyBlockchain extends Blockchain {
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = None
 
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = None
-
   override def lastBlock: Option[Block] = None
 
   override def carryFee: Long = 0
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = None
-
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = None
-
   override def heightOf(blockId: ByteStr): Option[Int] = None
 
-  /** Returns the most recent block IDs, starting from the most recent  one */
-  override def lastBlockIds(howMany: Int): Seq[ByteStr] = Seq.empty
-
-  /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = None
-
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = None
-
-  override def totalFee(height: Int): Option[Long] = None
 
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = Map.empty
@@ -56,8 +41,6 @@ case object EmptyBlockchain extends Blockchain {
 
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = None
-
-  override def lastBlockReward: Option[Long] = None
 
   override def blockRewardVotes(height: Int): Seq[Long] = Seq.empty
 
@@ -82,17 +65,13 @@ case object EmptyBlockchain extends Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = None
+  override def accountScript(address: Address): Option[(Script, Long)] = None
 
-  override def hasScript(address: Address): Boolean = false
+  override def hasAccountScript(address: Address): Boolean = false
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = None
+  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = None
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
-
-  override def accountDataKeys(acc: Address): Set[String] = Set.empty
-
-  override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
@@ -107,5 +86,4 @@ case object EmptyBlockchain extends Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
-  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 }

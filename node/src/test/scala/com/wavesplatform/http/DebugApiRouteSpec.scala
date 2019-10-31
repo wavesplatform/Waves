@@ -1,5 +1,6 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.{NTPTime, TestWallet}
@@ -10,8 +11,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   private val sampleConfig  = com.typesafe.config.ConfigFactory.load()
   private val wavesSettings = WavesSettings.fromRootConfig(sampleConfig)
   private val configObject  = sampleConfig.root()
-  private val route =
-    DebugApiRoute(wavesSettings, ntpTime, null, null, null, null, null, null, null, null, null, null, null, null, configObject, _ => Seq.empty).route
+  private val route: Route = ???
 
   routePath("/configInfo") - {
     "requires api-key header" in {

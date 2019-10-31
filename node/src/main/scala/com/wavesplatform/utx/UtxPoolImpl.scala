@@ -263,7 +263,7 @@ class UtxPoolImpl(
     }
     def isScripted(transaction: Transaction): Boolean = {
       transaction match {
-        case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)
+        case a: AuthorizedTransaction => blockchain.hasAccountScript(a.sender.toAddress)
         case _                        => false
       }
     }

@@ -300,9 +300,8 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       case (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer) =>
         assertDiffAndState(Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))), block(Seq(backWavesTransfer)), s) {
           case (_, state) =>
-            val portfolio = state.portfolio(genesis.recipient)
-            portfolio.balance shouldBe 0
-            portfolio.assets(IssuedAsset(issue.id())) shouldBe issue.quantity
+            state.balance(genesis.recipient) shouldBe 0
+            state.balance(genesis.recipient, IssuedAsset(issue.id())) shouldBe issue.quantity
         }
     }
   }

@@ -146,7 +146,7 @@ object FeeValidation {
 
   private def feeAfterSmartAccounts(blockchain: Blockchain, tx: Transaction)(inputFee: FeeInfo): FeeInfo = {
     val smartAccountScriptsCount: Int = tx match {
-      case tx: Transaction with Authorized => if (blockchain.hasScript(tx.sender)) 1 else 0
+      case tx: Transaction with Authorized => if (blockchain.hasAccountScript(tx.sender)) 1 else 0
       case _                               => 0
     }
 

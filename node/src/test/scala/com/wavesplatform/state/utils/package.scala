@@ -4,12 +4,9 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
-import com.wavesplatform.transaction.TransactionParsers.all
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParserLite}
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
-
-import scala.concurrent.duration.Duration
 
 package object utils {
   object TestLevelDB {
@@ -30,21 +27,13 @@ package object utils {
       BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
   }
 
-  private def forTypeSet(types: Set[Byte]): Set[TransactionParserLite] =
-    all.values.filter(tp => types.contains(tp.typeId)).toSet
-
   implicit class BlockchainAddressTransactionsList(b: Blockchain) {
     def addressTransactions(address: Address,
                             types: Set[Transaction.Type],
                             count: Int,
                             fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]] = {
-      import monix.execution.Scheduler.Implicits.global
 
-      def createTransactionsList(): Seq[(Height, Transaction)] =
-        b.addressTransactionsObservable(address, forTypeSet(types), fromId)
-          .take(count)
-          .toListL
-          .runSyncUnsafe(Duration.Inf)
+      def createTransactionsList(): Seq[(Height, Transaction)] = ???
 
       fromId match {
         case Some(id) => b.transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())

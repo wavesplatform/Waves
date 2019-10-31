@@ -88,10 +88,11 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
                 val scriptFromCache =
                   bc.accountScript(address)
+                    .map(_._1)
                     .toRight(s"No script for acc: $account")
                     .explicitGet()
 
-                scriptFromCache == script && bc.hasScript(address)
+                scriptFromCache == script && bc.hasAccountScript(address)
             }
             .forall(identity)
 
@@ -131,11 +132,16 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
   }
 
-  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], BlockchainUpdater with NG) => Unit): Unit = {
-    val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-    val settings      = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, settings0.dbSettings.copy(maxCacheSize = CACHE_SIZE))
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
+  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], Blockchain with BlockchainUpdater with NG) => Unit): Unit = {
+    val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+    val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(
+      db,
+      ignoreSpendableBalanceChanged,
+      TestFunctionalitySettings.Stub,
+      settings0.dbSettings.copy(maxCacheSize = CACHE_SIZE)
+    )
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

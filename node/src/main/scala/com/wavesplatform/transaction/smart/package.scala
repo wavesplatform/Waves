@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Asset => AssetType, Expression, StdLibVersion, DApp => DAppType}
+import com.wavesplatform.lang.directives.values.{Account, Expression, Asset => AssetType, DApp => DAppType}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd

@@ -72,18 +72,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       complete(balanceJson(address, assetId))
     }
 
-  def assetDistributionTask(params: DistributionParams): Task[ToResponseMarshallable] = {
-    val (asset, height, limit, maybeAfter) = params
-
-    val distributionTask = Task.eval(
-      blockchain.assetDistributionAtHeight(asset, height, limit, maybeAfter)
-    )
-
-    distributionTask.map {
-      case Right(dst) => Json.toJson(dst): ToResponseMarshallable
-      case Left(err)  => ApiError.fromValidationError(err)
-    }
-  }
+  def assetDistributionTask(params: DistributionParams): Task[ToResponseMarshallable] = Task.raiseError(new NotImplementedError)
 
   @Deprecated
   @Path("/{assetId}/distribution")
@@ -101,9 +90,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       val distributionTask = assetEi match {
         case Left(err) => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
         case Right(asset) =>
-          Task
-            .eval(blockchain.assetDistribution(asset))
-            .map(dst => Json.toJson(dst)(com.wavesplatform.state.dstWrites): ToResponseMarshallable)
+          Task.raiseError(new NotImplementedError)
       }
 
       complete {

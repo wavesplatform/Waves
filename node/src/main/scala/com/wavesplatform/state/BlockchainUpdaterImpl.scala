@@ -18,8 +18,6 @@ import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
@@ -37,7 +35,7 @@ class BlockchainUpdaterImpl(
     wavesSettings: WavesSettings,
     time: Time,
     blockchainUpdated: Observer[BlockchainUpdated]
-) extends BlockchainUpdater
+) extends Blockchain with BlockchainUpdater
     with NG
     with ScorexLogging {
 
@@ -63,6 +61,9 @@ class BlockchainUpdaterImpl(
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
 
   private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
+
+  private def lastBlockReward = this.blockReward(this.height)
+  private def lastBlockId = this.blockHeaderAndSize(this.height).map(_._4)
 
   private def publishLastBlockInfo(): Unit =
     for (id <- lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(blockchain.lastBlockTimestamp)) {
@@ -458,10 +459,6 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def lastBlockReward: Option[Long] = readLock {
-    ngState.flatMap(_.reward) orElse blockchain.lastBlockReward
-  }
-
   override def blockRewardVotes(height: Int): Seq[Long] = readLock {
     activatedFeatures.get(BlockchainFeatures.BlockReward.id) match {
       case Some(activatedAt) if activatedAt <= height =>
@@ -485,22 +482,8 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int, Int, ByteStr)] = ngState.map { s =>
-    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length, s.bestLiquidBlock.transactionData.size, s.bestLiquidBlock.signature)
-  }
-
-  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
-    liquidBlockHeaderAndSize().filter(_._4 == blockId) orElse blockchain.blockHeaderAndSize(blockId)
-  }
-
   override def height: Int = readLock {
     blockchain.height + ngState.fold(0)(_ => 1)
-  }
-
-  override def blockBytes(height: Int): Option[Array[Byte]] = readLock {
-    blockchain
-      .blockBytes(height)
-      .orElse(ngState.collect { case ng if height == blockchain.height + 1 => ng.bestLiquidBlock.bytes() })
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
@@ -509,34 +492,11 @@ class BlockchainUpdaterImpl(
       .orElse(ngState.collect { case ng if ng.contains(blockId) => this.height })
   }
 
-  override def lastBlockIds(howMany: Int): Seq[BlockId] = readLock {
-    ngState.fold(blockchain.lastBlockIds(howMany))(_.bestLiquidBlockId +: blockchain.lastBlockIds(howMany - 1))
-  }
-
   override def microBlock(id: BlockId): Option[MicroBlock] = readLock {
     for {
       ng <- ngState
       mb <- ng.microBlock(id)
     } yield mb
-  }
-
-  def lastBlockTimestamp: Option[Long] = readLock {
-    ngState.map(_.base.header.timestamp).orElse(blockchain.lastBlockTimestamp)
-  }
-
-  def lastBlockId: Option[ByteStr] = readLock {
-    ngState.map(_.bestLiquidBlockId).orElse(blockchain.lastBlockId)
-  }
-
-  def blockAt(height: Int): Option[Block] = readLock {
-    if (height == this.height)
-      ngState.map(_.bestLiquidBlock)
-    else
-      blockchain.blockAt(height)
-  }
-
-  override def lastPersistedBlockIds(count: Int): Seq[BlockId] = readLock {
-    blockchain.lastBlockIds(count)
   }
 
   override def microblockIds: Seq[BlockId] = readLock {
@@ -565,23 +525,6 @@ class BlockchainUpdaterImpl(
     ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
   }
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = readLock {
-    (for {
-      ng                  <- ngState
-      (block, _, _, _, _) <- ng.totalDiffOf(blockId)
-    } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
-  }
-
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readLock {
-    ngState match {
-      case Some(ng) if ng.contains(parentSignature) => Some(Seq.empty[ByteStr])
-      case maybeNg =>
-        blockchain.blockIdsAfter(parentSignature, howMany).map { ib =>
-          if (ib.lengthCompare(howMany) < 0) ib ++ maybeNg.map(_.bestLiquidBlockId) else ib
-        }
-    }
-  }
-
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
@@ -589,13 +532,6 @@ class BlockchainUpdaterImpl(
       case _ =>
         blockchain.parentHeader(block, back)
     }
-  }
-
-  override def totalFee(height: Int): Option[Long] = readLock {
-    if (height == this.height)
-      ngState.map(_.bestLiquidDiffAndFees._3)
-    else
-      blockchain.totalFee(height)
   }
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
@@ -680,29 +616,29 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = readLock {
-    ngState.fold(blockchain.accountScriptWithComplexity(address)) { ng =>
+  override def accountScript(address: Address): Option[(Script, Long)] = readLock {
+    ngState.fold(blockchain.accountScript(address)) { ng =>
       ng.bestLiquidDiff.scripts.get(address) match {
-        case None      => blockchain.accountScriptWithComplexity(address)
+        case None      => blockchain.accountScript(address)
         case Some(scr) => scr
       }
     }
   }
 
-  override def hasScript(address: Address): Boolean = readLock {
+  override def hasAccountScript(address: Address): Boolean = readLock {
     ngState
       .flatMap(
         _.bestLiquidDiff.scripts
           .get(address)
           .map(_.nonEmpty)
       )
-      .getOrElse(blockchain.hasScript(address))
+      .getOrElse(blockchain.hasAccountScript(address))
   }
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = readLock {
-    ngState.fold(blockchain.assetScriptWithComplexity(asset)) { ng =>
+  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+    ngState.fold(blockchain.assetScript(asset)) { ng =>
       ng.bestLiquidDiff.assetScripts.get(asset) match {
-        case None      => blockchain.assetScriptWithComplexity(asset)
+        case None      => blockchain.assetScript(asset)
         case Some(scr) => scr
       }
     }
@@ -714,26 +650,6 @@ class BlockchainUpdaterImpl(
         case None    => blockchain.hasAssetScript(asset)
         case Some(x) => x.nonEmpty
       }
-    }
-  }
-
-  override def accountDataKeys(address: Address): Set[String] = {
-    ngState.fold(blockchain.accountDataKeys(address)) { ng =>
-      val fromInner = blockchain.accountDataKeys(address)
-      val fromDiff = ng.bestLiquidDiff.accountData
-        .getOrElse(address, AccountDataInfo.accountDataInfoMonoid.empty)
-        .data
-        .keySet
-
-      (fromInner ++ fromDiff)
-    }
-  }
-
-  override def accountData(acc: Address): AccountDataInfo = readLock {
-    ngState.fold(blockchain.accountData(acc)) { ng =>
-      val fromInner = blockchain.accountData(acc)
-      val fromDiff  = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      fromInner.combine(fromDiff)
     }
   }
 
@@ -758,15 +674,6 @@ class BlockchainUpdaterImpl(
       }
 
       blockchain.collectLposPortfolios(pf) ++ b.result()
-    }
-  }
-
-  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = readLock {
-    ngState.fold(blockchain.invokeScriptResult(txId)) { ng =>
-      ng.bestLiquidDiff.scriptResults
-        .get(txId)
-        .toRight(GenericError("InvokeScript result not found"))
-        .orElse(blockchain.invokeScriptResult(txId))
     }
   }
 
@@ -804,19 +711,10 @@ class BlockchainUpdaterImpl(
   }
 }
 
-object BlockchainUpdaterImpl
-    extends ScorexLogging
-    with AddressTransactions.Prov[BlockchainUpdaterImpl]
-    with Distributions.Prov[BlockchainUpdaterImpl] {
+object BlockchainUpdaterImpl {
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.header.generator == b2.header.generator &&
       b1.header.baseTarget == b2.header.baseTarget &&
       b1.header.reference == b2.header.reference &&
       b1.header.timestamp == b2.header.timestamp
-
-  def addressTransactions(bu: BlockchainUpdaterImpl): AddressTransactions =
-    new CompositeAddressTransactions(bu.blockchain, Height @@ bu.height, () => bu.bestLiquidDiff)
-
-  def distributions(bu: BlockchainUpdaterImpl): Distributions =
-    new CompositeDistributions(bu, bu.blockchain, () => bu.bestLiquidDiff)
 }

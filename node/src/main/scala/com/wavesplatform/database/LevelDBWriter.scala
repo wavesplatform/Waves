@@ -15,11 +15,10 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
+import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -31,12 +30,12 @@ import monix.reactive.Observer
 import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
 import scala.annotation.tailrec
+import scala.collection.mutable
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
-import scala.collection.{immutable, mutable}
 import scala.util.Try
 import scala.util.control.NonFatal
 
-object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distributions.Prov[LevelDBWriter] {
+object LevelDBWriter {
 
   private def loadLeaseStatus(db: ReadOnlyDB, leaseId: ByteStr): Boolean =
     db.get(Keys.leaseStatusHistory(leaseId)).headOption.fold(false)(h => db.get(Keys.leaseStatus(leaseId)(h)))
@@ -69,12 +68,6 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
         lastChange <- db.get(historyKey).headOption
       } yield db.get(valueKey(lastChange))
   }
-
-  def addressTransactions(ldb: LevelDBWriter): AddressTransactions =
-    new LevelDBWriterAddressTransactions(ldb)
-
-  def distributions(ldb: LevelDBWriter): Distributions =
-    new LevelDBDistributions(ldb)
 }
 
 class LevelDBWriter(
@@ -134,22 +127,6 @@ class LevelDBWriter(
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
-    AccountDataInfo((for {
-      key   <- accountDataKeys(address)
-      value <- accountData(address, key)
-    } yield key -> value).toMap)
-  }
-
-  override def accountDataKeys(address: Address): Set[String] = readOnly { db =>
-    (for {
-      addressId <- addressId(address).toVector
-      keyChunkCount = db.get(Keys.dataKeyChunkCount(addressId))
-      chunkNo <- Range(0, keyChunkCount)
-      key     <- db.get(Keys.dataKeyChunk(addressId, chunkNo))
-    } yield key).toSet
-  }
-
   override protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]] = {
     val (address, key) = addressWithKey
 
@@ -207,8 +184,6 @@ class LevelDBWriter(
     val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
-
-  override protected def loadLastBlockReward(): Option[Long] = blockReward(height)
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
@@ -432,7 +407,6 @@ class LevelDBWriter(
       }
     }
 
-    lastBlockRewardCache = reward
     reward.foreach { lastReward =>
       rw.put(Keys.blockReward(height), Some(lastReward))
       rw.put(Keys.wavesAmount(height), wavesAmount(height - 1) + lastReward)
@@ -801,106 +775,13 @@ class LevelDBWriter(
     db.get(Keys.blockHeaderAndSizeAt(Height(height)))
   }
 
-  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    writableDB
-      .get(Keys.heightOf(blockId))
-      .flatMap(loadBlockHeaderAndSize)
-  }
-
   def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
     db.get(Keys.heightOf(blockId))
       .flatMap(loadBlockHeaderAndSize(_, db))
   }
 
-  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
-    import com.wavesplatform.crypto._
-
-    val height = Height(h)
-
-    val consensuDataOffset = 1 + 8 + SignatureLength
-
-    // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
-
-    val headerKey = Keys.blockHeaderBytesAt(height)
-
-    def readTransactionBytes(count: Int) = {
-      (0 until count).toArray.flatMap { n =>
-        db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
-          .map { txBytes =>
-            Ints.toByteArray(txBytes.length) ++ txBytes
-          }
-          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
-      }
-    }
-
-    db.get(headerKey)
-      .map { headerBytes =>
-        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
-        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
-        val version            = headerBytes.head
-        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
-          val byte = headerBytes(txCountOffset)
-          (byte.toInt, Array[Byte](byte))
-        } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
-          (Ints.fromByteArray(bytes), bytes)
-        }
-
-        val bytesAfterTxs =
-          if (version > 2) {
-            headerBytes.drop(txCountOffset + txCountBytes.length)
-          } else {
-            headerBytes.takeRight(SignatureLength + KeyLength)
-          }
-
-        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
-
-        val bytes = bytesBeforeCData ++
-          Ints.toByteArray(consensusDataBytes.length) ++
-          consensusDataBytes ++
-          Ints.toByteArray(txBytes.length) ++
-          txBytes ++
-          bytesAfterTxs
-
-        bytes
-      }
-  }
-
-  override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
-    readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockBytes(h))
-  }
-
   override def loadHeightOf(blockId: ByteStr): Option[Int] = {
     readOnly(_.get(Keys.heightOf(blockId)))
-  }
-
-  override def lastBlockIds(howMany: Int): immutable.IndexedSeq[ByteStr] = readOnly { db =>
-    // since this is called from outside of the main blockchain updater thread, instead of using cached height,
-    // explicitly read height from storage to make this operation atomic.
-    val currentHeight = db.get(Keys.height)
-
-    (currentHeight until (currentHeight - howMany).max(0) by -1)
-      .map { h =>
-        val height = Height(h)
-        db.get(Keys.blockHeaderAndSizeAt(height))
-      }
-      .collect {
-        case Some((_, _, _, signature)) => signature
-      }
-  }
-
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readOnly { db =>
-    db.get(Keys.heightOf(parentSignature)).map { parentHeight =>
-      (parentHeight + 1 to (parentHeight + howMany))
-        .map { h =>
-          val height = Height(h)
-          db.get(Keys.blockHeaderAndSizeAt(height))
-        }
-        .collect {
-          case Some((_, _, _, signature)) => signature
-        }
-    }
   }
 
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readOnly { db =>
@@ -909,10 +790,6 @@ class LevelDBWriter(
       height = Height(h - back + 1)
       (block, _, _, _) <- loadBlockHeaderAndSize(height, db)
     } yield block
-  }
-
-  override def totalFee(height: Int): Option[Long] = readOnly { db =>
-    Try(db.get(Keys.blockTransactionsFee(height))).toOption
   }
 
   override def featureVotes(height: Int): Map[Short, Int] = readOnly { db =>
@@ -940,15 +817,6 @@ class LevelDBWriter(
       case _ => Seq()
     }
   }
-
-  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] =
-    for {
-      _ <- Either.cond(dbSettings.storeInvokeScriptResults, (), GenericError("InvokeScript results are disabled"))
-      result <- Try(readOnly { db =>
-        val (height, txNum) = db.get(Keys.transactionHNById(txId)).getOrElse(throw new IllegalArgumentException("No such transaction"))
-        db.get(Keys.invokeScriptResult(height, txNum))
-      }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
-    } yield result
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

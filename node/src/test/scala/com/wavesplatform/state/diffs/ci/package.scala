@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, ScriptType, StdLibVersion, V3, DApp => DAppType}
@@ -10,7 +11,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.{DAPP, EXPR}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.{Common, Global}
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.scalacheck.Gen

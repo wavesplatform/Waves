@@ -2,110 +2,23 @@ package com.wavesplatform
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Paged
-import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
 
-import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
-
-  private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
-      address: Address,
-      maybeAfter: Option[IssuedAsset]
-  ): Observable[IssueTransaction] = {
-
-    def notWithdrawn(asset: IssuedAsset): Boolean = {
-      val changeFromDiff = for {
-        diff          <- maybeDiff
-        portfolio     <- diff.portfolios.get(address)
-        balanceChange <- portfolio.assets.get(asset)
-      } yield balanceChange
-
-      changeFromDiff.forall(_ >= 0)
-    }
-
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] =
-      diff.transactions.get(id).map(_._1)
-
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
-      for {
-        portfolio <- diff.portfolios
-          .get(address)
-          .toIterable
-        (asset, balance) <- portfolio.assets if balance > 0
-      } yield asset
-
-    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
-      maybeAfter
-        .fold(assetStreamFromDiff(diff)) { after =>
-          assetStreamFromDiff(diff)
-            .dropWhile(_ != after)
-            .drop(1)
-        }
-        .filter(notWithdrawn)
-        .map { asset =>
-          transactionFromDiff(diff, asset.id)
-            .orElse(blockchain.transactionInfo(asset.id).map(_._2))
-        }
-        .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT(blockchain) => itx
-        }
-    }
-
-    def nftFromBlockchain: Observable[IssueTransaction] =
-      distr
-        .nftObservable(address, maybeAfter)
-        .filter { itx =>
-          val asset = IssuedAsset(itx.assetId)
-          notWithdrawn(asset)
-        }
-
-    maybeDiff.fold(nftFromBlockchain) { diff =>
-      maybeAfter match {
-        case None                                            => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case _                                               => nftFromBlockchain
-      }
-    }
-  }
-
-  // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsCompose(
-      at: AddressTransactions,
-      fromDiffIter: Observable[(Height, Transaction, Set[Address])]
-  )(address: Address, types: Set[TransactionParserLite], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
-
-    def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
-      fromId match {
-        case None     => txs
-        case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
-      }
-
-    def withFilterAndLimit(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] =
-      txs
-        .collect { case (h, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (h, tx) }
-
-    Observable(
-      withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
-      at.addressTransactionsObservable(address, types, fromId)
-    ).concat
-  }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
@@ -128,17 +41,9 @@ package object state {
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
-    def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
-    def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
-
     def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
     def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.header.timestamp)
 
-    def lastBlocks(howMany: Int): Seq[Block] = {
-      (Math.max(1, blockchain.height - howMany + 1) to blockchain.height).flatMap(blockchain.blockAt).reverse
-    }
-
-    def genesis: Block = blockchain.blockAt(1).get
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
         case a: Address => Right(a)
@@ -165,17 +70,9 @@ package object state {
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
-    def aliasesOfAddress(address: Address): Seq[Alias] = {
-      import monix.execution.Scheduler.Implicits.global
+    def blockHeader(atHeight: Int): Option[BlockHeader] = blockchain.blockHeaderAndSize(atHeight).map(_._1)
 
-      blockchain
-        .addressTransactionsObservable(address, Set(CreateAliasTransactionV1, CreateAliasTransactionV2), None)
-        .collect {
-          case (_, a: CreateAliasTransaction) => a.alias
-        }
-        .toListL
-        .runSyncUnsafe(Duration.Inf)
-    }
+    def aliasesOfAddress(address: Address): Seq[Alias] = ???
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain
@@ -198,6 +95,8 @@ package object state {
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
+
+    def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]

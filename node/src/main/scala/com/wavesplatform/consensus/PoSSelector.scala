@@ -24,13 +24,15 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     if (fairPosActivated(height)) FairPoSCalculator
     else NxtPoSCalculator
 
-  def consensusData(accountPublicKey: PublicKey,
-                    height: Int,
-                    targetBlockDelay: FiniteDuration,
-                    refBlockBT: Long,
-                    refBlockTS: Long,
-                    greatGrandParentTS: Option[Long],
-                    currentTime: Long): Either[ValidationError, NxtLikeConsensusBlockData] = {
+  def consensusData(
+      accountPublicKey: PublicKey,
+      height: Int,
+      targetBlockDelay: FiniteDuration,
+      refBlockBT: Long,
+      refBlockTS: Long,
+      greatGrandParentTS: Option[Long],
+      currentTime: Long
+  ): Either[ValidationError, NxtLikeConsensusBlockData] = {
     val bt = pos(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
 
     checkBaseTargetLimit(bt, height).flatMap(
@@ -38,7 +40,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
         blockchain.lastBlock
           .map(_.header.generationSignature.arr)
           .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generatorSignature(gs, accountPublicKey))))
-          .toRight(GenericError("No blocks in blockchain")))
+          .toRight(GenericError("No blocks in blockchain"))
+    )
   }
 
   def getValidBlockDelay(height: Int, accountPublicKey: PublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
@@ -52,7 +55,9 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
     getValidBlockDelay(height, block.header.generator, parent.baseTarget, effectiveBalance)
       .map(_ + parent.timestamp)
-      .ensureOr(mvt => GenericError(s"Block timestamp ${block.header.timestamp} less than min valid timestamp $mvt"))(ts => ts <= block.header.timestamp)
+      .ensureOr(mvt => GenericError(s"Block timestamp ${block.header.timestamp} less than min valid timestamp $mvt"))(
+        ts => ts <= block.header.timestamp
+      )
       .map(_ => ())
   }
 
@@ -62,14 +67,16 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .toRight(GenericError("No blocks in blockchain"))
       .map(b => generatorSignature(b.header.generationSignature.arr, block.header.generator))
       .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(
-        _ sameElements blockGS)
+        _ sameElements blockGS
+      )
       .map(_ => ())
   }
 
   def checkBaseTargetLimit(baseTarget: Long, height: Int): Either[ValidationError, Unit] = {
     def stopNode(): ValidationError = {
       log.error(
-        s"Base target reached maximum value (settings: synchronization.max-base-target=${syncSettings.maxBaseTargetOpt.getOrElse(-1)}). Anti-fork protection.")
+        s"Base target reached maximum value (settings: synchronization.max-base-target=${syncSettings.maxBaseTargetOpt.getOrElse(-1)}). Anti-fork protection."
+      )
       log.error("FOR THIS REASON THE NODE WAS STOPPED AUTOMATICALLY")
       forceStopApplication(BaseTargetReachedMaximum)
       GenericError("Base target reached maximum")
@@ -104,14 +111,13 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   private def getHit(height: Int, accountPublicKey: PublicKey): Option[BigInt] = {
-    val blockForHit =
-      if (fairPosActivated(height) && height > 100) blockchain.blockAt(height - 100)
-      else blockchain.lastBlock
+    val generationSignatureForHit =
+      if (fairPosActivated(height) && height > 100) blockchain.blockHeaderAndSize(height - 100).map(_._1.generationSignature)
+      else blockchain.lastBlock.map(_.header.generationSignature)
 
-    blockForHit.map(b => {
-      val genSig = b.header.generationSignature.arr
-      hit(generatorSignature(genSig, accountPublicKey))
-    })
+    generationSignatureForHit.map { genSig =>
+      hit(generatorSignature(genSig.arr, accountPublicKey))
+    }
   }
 
   private def fairPosActivated(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)

@@ -11,6 +11,7 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
+import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -20,8 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult, LeaseBalance, NG, Portfolio, TransactionId}
 import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -48,7 +48,11 @@ case class DebugApiRoute(
     time: Time,
     blockchain: Blockchain,
     wallet: Wallet,
-    ng: NG,
+    ng: Blockchain with NG,
+    lastBlocks: Int => Seq[Block],
+    invokeScriptResult: TransactionId => Either[ValidationError, InvokeScriptResult],
+    portfolio: Address => Portfolio,
+    wavesDistribution: Int => Map[Address, Long],
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
@@ -66,7 +70,6 @@ case class DebugApiRoute(
 
   import DebugApiRoute._
 
-  private[this] val dst                  = Distributions(ng)
   private lazy val configStr             = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
@@ -78,16 +81,9 @@ case class DebugApiRoute(
     }
   }
 
-  @Path("/blocks/{howMany}")
-  @ApiOperation(value = "Blocks", notes = "Get sizes and full hashes for last blocks", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "howMany", value = "How many last blocks to take", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def blocks: Route = {
     (path("blocks" / IntNumber) & get) { howMany =>
-      complete(JsArray(ng.lastBlocks(howMany).map { block =>
+      complete(JsArray(lastBlocks(howMany).map { block =>
         val bytes = block.bytes()
         Json.obj(bytes.length.toString -> Base58.encode(crypto.fastHash(bytes)))
       }))
@@ -150,9 +146,9 @@ case class DebugApiRoute(
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val base      = dst.portfolio(address)
-          val portfolio = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
-          complete(Json.toJson(portfolio))
+          val base      = portfolio(address)
+          val p = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
+          complete(Json.toJson(p))
       }
     }
   }
@@ -184,7 +180,7 @@ case class DebugApiRoute(
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(dst.wavesDistribution(ng.height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    complete(wavesDistribution(ng.height).map { case (a, b) => a.stringRepr -> b })
   }
 
   @Path("/stateWaves/{height}")
@@ -195,7 +191,7 @@ case class DebugApiRoute(
     )
   )
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    complete(wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
@@ -227,9 +223,9 @@ case class DebugApiRoute(
   )
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
     jsonPost[RollbackParams] { params =>
-      ng.blockAt(params.rollbackTo) match {
-        case Some(block) =>
-          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+      ng.blockHeaderAndSize(params.rollbackTo) match {
+        case Some((_, _, _, uniqueId)) =>
+          rollbackToBlock(uniqueId, params.returnTransactionsToUtx)
         case None =>
           (StatusCodes.BadRequest, "Block at height not found")
       }
@@ -266,7 +262,7 @@ case class DebugApiRoute(
   def minerInfo: Route = (path("minerInfo") & get) {
     complete(
       wallet.privateKeyAccounts
-        .filterNot(account => ng.hasScript(account.toAddress))
+        .filterNot(account => ng.hasAccountScript(account.toAddress))
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
         }
@@ -293,10 +289,7 @@ case class DebugApiRoute(
     )
   )
   def historyInfo: Route = (path("historyInfo") & get) {
-    val a = ng.lastPersistedBlockIds(10)
-    val b = ng.microblockIds
-    complete(HistoryInfo(a, b))
-
+    complete(???)
   }
 
   @Path("/configInfo")
@@ -415,8 +408,7 @@ case class DebugApiRoute(
   def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment)) { id =>
     blockchain.transactionInfo(id) match {
       case Some((h, tx: InvokeScriptTransaction)) =>
-        val resultE = blockchain
-          .invokeScriptResult(TransactionId(tx.id()))
+        val resultE = invokeScriptResult(TransactionId(tx.id()))
           .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
         complete(resultE)
 
@@ -452,24 +444,7 @@ case class DebugApiRoute(
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, afterOpt) =>
       (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) {
         implicit sc =>
-          import cats.implicits._
-
-          val result = blockchain
-            .addressTransactionsObservable(address, Set.empty, afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption))
-            .map {
-              case (height, tx: InvokeScriptTransaction) =>
-                blockchain
-                  .invokeScriptResult(TransactionId(tx.id()))
-                  .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
-
-              case (height, tx) =>
-                Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
-            }
-            .take(limit)
-            .toListL
-            .map(_.sequence)
-
-          complete(result.runAsyncLogErr)
+          ???
       }
     }
 }

@@ -46,7 +46,7 @@ object MinerDebugInfo {
 
 class MinerImpl(
     allChannels: ChannelGroup,
-    blockchainUpdater: BlockchainUpdater with NG,
+    blockchainUpdater: Blockchain with BlockchainUpdater with NG,
     settings: WavesSettings,
     timeService: Time,
     utx: UtxPoolImpl,
@@ -96,7 +96,7 @@ class MinerImpl(
       )
 
   private def checkScript(account: KeyPair): Either[String, Unit] = {
-    Either.cond(!blockchainUpdater.hasScript(account), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
+    Either.cond(!blockchainUpdater.hasAccountScript(account), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
   }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
@@ -264,7 +264,7 @@ class MinerImpl(
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
-    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasScript(_))
+    val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasAccountScript(_))
     scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
     microBlockAttempt := SerialCancelable()
 
