@@ -65,8 +65,9 @@ object Types {
   val optionPayment = UNION(paymentType, UNIT)
   val listPayment   = LIST(paymentType)
 
-  lazy val verifierInput = UNION.create(
-    buildOrderType(true) :: buildActiveTransactionTypes(true, V3),
+  def verifierInput(version: StdLibVersion) =
+    UNION.create(
+    buildOrderType(true) :: buildActiveTransactionTypes(proofsEnabled = true, v = version),
     Some("VerifierInput")
   )
 
