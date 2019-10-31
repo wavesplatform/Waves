@@ -16,7 +16,12 @@ object AttachedPaymentExtractor {
     blockchain:   Blockchain,
     targetScript: AttachedPaymentTarget
   ): Either[ExecutionError, AttachedPayments] =
-    if (tx.payments.size > 1)
+    if (tx.payments.size <= 1)
+      if (version.supportsMultiPayment)
+        multiple(tx)
+      else
+        single(tx)
+    else
       if (!blockchain.allowsMultiPayment)
         Left("Multiple payments isn't allowed now")
       else if (!version.supportsMultiPayment)
@@ -24,9 +29,13 @@ object AttachedPaymentExtractor {
       else if (tx.payments.size > ContractLimits.MaxAttachedPaymentAmount)
         Left(s"Script payment amount=${tx.payments.size} should not exceed ${ContractLimits.MaxAttachedPaymentAmount}")
       else
-        Right(AttachedPayments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
-    else
-      Right(AttachedPayments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
+        multiple(tx)
+
+  private def single(tx: InvokeScriptTransaction) =
+    Right(AttachedPayments.Single(tx.payments.headOption.map(p => (p.amount, p.assetId.compatId))))
+
+  private def multiple(tx: InvokeScriptTransaction) =
+    Right(AttachedPayments.Multi(tx.payments.map(p => (p.amount, p.assetId.compatId))))
 
   private def scriptErrorMessage(apt: AttachedPaymentTarget, version: StdLibVersion): String = {
     val name = apt match {

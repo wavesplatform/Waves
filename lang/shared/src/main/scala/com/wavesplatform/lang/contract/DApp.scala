@@ -48,7 +48,7 @@ object DApp {
 
   case class VerifierAnnotation(invocationArgName: String) extends Annotation {
     override def dic(version: StdLibVersion): Map[String, FINAL] =
-      Map(invocationArgName -> Types.verifierInput)
+      Map(invocationArgName -> Types.verifierInput(version))
   }
 
   sealed trait AnnotatedFunction {

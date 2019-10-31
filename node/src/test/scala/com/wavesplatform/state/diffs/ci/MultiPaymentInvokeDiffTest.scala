@@ -261,7 +261,18 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     ContractScript(version, contract).explicitGet()
   }
 
-  private def dAppVerifier(version: StdLibVersion): Script = {
+  private def dAppVerifier(version: StdLibVersion, usePaymentsField: Boolean): Script = {
+    val paymentsField = if (version >= V4) "payments" else "payment"
+    val verifierExpr =
+      if (usePaymentsField)
+        s"""
+          | match tx {
+          |   case ist: InvokeScriptTransaction => ist.$paymentsField == ist.$paymentsField
+          |   case _ => true
+          | }
+        """.stripMargin
+      else "true"
+
     val script =
       s"""
          | {-# STDLIB_VERSION ${version.id} #-}
@@ -269,7 +280,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          | {-# SCRIPT_TYPE    ACCOUNT       #-}
          |
          | @Verifier(tx)
-         | func verify() = true
+         | func verify() = $verifierExpr
          |
        """.stripMargin
 
@@ -295,10 +306,13 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
   }
 
   private def accountVerifierGen(version: StdLibVersion) =
-    if (version >= V3)
-      Gen.oneOf(verifier(version, Account), dAppVerifier(version))
-    else
-      Gen.const(verifier(version, Account))
+    for {
+      usePaymentsField <- Gen.oneOf(true, false)
+      verifier <- if (version >= V3)
+                    Gen.oneOf(verifier(version, Account), dAppVerifier(version, usePaymentsField))
+                  else
+                    Gen.const(verifier(version, Account))
+    } yield verifier
 
   private val features = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Seq(
