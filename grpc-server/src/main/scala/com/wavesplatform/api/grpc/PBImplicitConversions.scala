@@ -82,7 +82,7 @@ trait PBImplicitConversions {
   implicit class PBByteStringConversions(bytes: ByteString) {
     def toByteStr          = ByteStr(bytes.toByteArray)
     def toPublicKey        = PublicKey(bytes.toByteArray)
-    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).explicitGet()
+    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

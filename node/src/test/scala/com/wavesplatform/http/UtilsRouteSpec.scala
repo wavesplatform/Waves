@@ -94,6 +94,18 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "true"
     }
 
+    val compiled = "AAIDAAAAAAAAAAIIAQAAAAEAAAAAAWEJAQAAABFAZXh0ck5hdGl2ZSgxMDQwKQAAAAIFAAAAA25pbAIAAAAAAAAAAAAAAACl8TPJ"
+    Post(routePath("/script/decompile"), compiled) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "script").as[String].trim shouldBe
+        """
+          |{-# STDLIB_VERSION 3 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |let a = getIntegerValue(nil, "")
+        """.stripMargin.trim
+    }
+
     val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64
 
     testdAppDirective(dappVerBytesStr)

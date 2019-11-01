@@ -40,6 +40,16 @@ trait ApiMarshallers {
             ae.json
         ))
 
+  implicit lazy val tracedJsValueMarshaller: ToResponseMarshaller[TracedResult[ApiError, JsValue]] =
+    fromStatusCodeAndValue[StatusCode, JsValue]
+      .compose(
+        ae =>
+          (
+            ae.resultE.fold(_.code, _ => StatusCodes.OK),
+            ae.resultE.fold(_.json, (j => j))
+        ))
+
+
   private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
       .forContentTypes(`application/json`)

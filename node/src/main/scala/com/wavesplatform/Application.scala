@@ -21,7 +21,7 @@ import com.wavesplatform.api.http.leasing.LeaseApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -43,6 +43,7 @@ import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import io.netty.channel.group.DefaultChannelGroup
+import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
@@ -129,7 +130,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings)
     maybeUtx = Some(utxStorage)
 
-    val utxSynchronizerScheduler = Schedulers.fixedPool(settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val timer = new HashedWheelTimer()
+    val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
         utxSynchronizerScheduler
@@ -244,7 +246,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     ) {
       case (c, b) =>
         processFork(c, b.blocks).doOnFinish {
-          case None => Task.now(())
+          case None    => Task.now(())
           case Some(e) => Task(stopOnAppendError(e))
         }
     }
@@ -280,6 +282,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         forceStopApplication(InvalidApiKey)
       }
 
+      def loadBalanceHistory(address: Address): Seq[(Int, Long)] = db.readOnly { rdb =>
+        rdb.get(Keys.addressId(address)).fold(Seq.empty[(Int, Long)]) { aid =>
+          rdb.get(Keys.wavesBalanceHistory(aid)).map { h =>
+            h -> rdb.get(Keys.wavesBalance(aid)(h))
+          }
+        }
+      }
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
@@ -304,7 +314,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           extLoaderState,
           mbSyncCacheSizes,
           scoreStatsReporter,
-          configRoot
+          configRoot,
+          loadBalanceHistory
         ),
         AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
@@ -338,6 +349,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     // on unexpected shutdown
     sys.addShutdownHook {
+      timer.stop()
       shutdown(utxStorage, network)
     }
   }

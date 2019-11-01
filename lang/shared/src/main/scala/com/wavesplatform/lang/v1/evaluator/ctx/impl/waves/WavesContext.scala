@@ -63,19 +63,21 @@ object WavesContext {
     CTX(
       variableTypes(version, proofsEnabled),
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
-      variableFuncs(version, proofsEnabled)
+      variableFuncs(version, ds.contentType, proofsEnabled)
     )
   }
 
   private lazy val fromV3Funcs =
     extractedFuncs ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
 
-  private def variableFuncs(version: StdLibVersion, proofsEnabled: Boolean) =
+  private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
+    lazy val v4Funcs = fromV3Funcs :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
     version match {
-      case V1 | V2 => Array(txByIdF(proofsEnabled, version))
-      case V3 => fromV3Funcs :+ transferTxByIdF(proofsEnabled, version)
-      case V4 => fromV3Funcs :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
+      case V1 | V2 =>         Array(txByIdF(proofsEnabled, version))
+      case V3 =>              fromV3Funcs :+ transferTxByIdF(proofsEnabled, version)
+      case V4 =>              v4Funcs
     }
+  }
 
   private def variableVars(
     isTokenContext: Boolean,

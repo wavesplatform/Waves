@@ -1,13 +1,17 @@
 package com.wavesplatform.api
 
-import java.util.concurrent.atomic.AtomicReference
+import java.util.concurrent.LinkedBlockingQueue
 
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.Blockchain
 import io.grpc.stub.{CallStreamObserver, ServerCallStreamObserver, StreamObserver}
 import monix.eval.Task
 import monix.execution.{Cancelable, Scheduler}
 import monix.reactive.Observable
+
+import scala.util.control.NonFatal
 
 package object grpc extends PBImplicitConversions {
   implicit class StreamObserverMonixOps[T](streamObserver: StreamObserver[T])(implicit sc: Scheduler) {
@@ -16,18 +20,16 @@ package object grpc extends PBImplicitConversions {
       import org.reactivestreams.{Subscriber, Subscription}
 
       val rxs = new Subscriber[T] with Cancelable {
-        private[this] val element = new AtomicReference[Option[T]](None)
+        private[this] val queue = new LinkedBlockingQueue[T](32)
 
         @volatile
         private[this] var subscription: Subscription = _
 
         private[this] val observerReadyFunc: () => Boolean = streamObserver match {
           case callStreamObserver: CallStreamObserver[_] =>
-            () =>
-              callStreamObserver.isReady
+            () => callStreamObserver.isReady
           case _ =>
-            () =>
-              true
+            () => true
         }
 
         def isReady: Boolean = observerReadyFunc()
@@ -35,14 +37,11 @@ package object grpc extends PBImplicitConversions {
         override def onSubscribe(subscription: Subscription): Unit = {
           this.subscription = subscription
 
-          def pushElement(): Unit = element.get() match {
-            case v @ Some(value) if this.isReady =>
-              if (element.compareAndSet(v, None)) {
-                streamObserver.onNext(value)
-                subscription.request(1)
-              } else {
-                pushElement()
-              }
+          def pushElement(): Unit = Option(queue.peek()) match {
+            case Some(_) if this.isReady =>
+              val qv = queue.poll()
+              streamObserver.onNext(qv)
+              subscription.request(1)
 
             case None if this.isReady =>
               subscription.request(1)
@@ -56,12 +55,10 @@ package object grpc extends PBImplicitConversions {
               scso.disableAutoInboundFlowControl()
               scso.setOnCancelHandler(() => subscription.cancel())
               scso.setOnReadyHandler(() => pushElement())
-            // subscription.request(1)
 
             case cso: CallStreamObserver[T] =>
               cso.disableAutoInboundFlowControl()
               cso.setOnReadyHandler(() => pushElement())
-            // subscription.request(1)
 
             case _ =>
               subscription.request(Long.MaxValue)
@@ -69,17 +66,11 @@ package object grpc extends PBImplicitConversions {
         }
 
         override def onNext(t: T): Unit = {
+          queue.add(t)
           if (isReady) {
-            val value = element.get()
-            if (value.nonEmpty) {
-              if (element.compareAndSet(value, Some(t))) streamObserver.onNext(value.get)
-              else onNext(t)
-            } else {
-              streamObserver.onNext(t)
-            }
+            val value = Option(queue.poll())
+            value.foreach(streamObserver.onNext)
             if (isReady) subscription.request(1)
-          } else if (!element.compareAndSet(None, Some(t))) {
-            throw new IllegalArgumentException("Buffer overflow")
           }
         }
 
@@ -107,6 +98,10 @@ package object grpc extends PBImplicitConversions {
     def failWith(error: ApiError): Unit = {
       streamObserver.onError(GRPCErrors.toStatusException(error))
     }
+
+    def interceptErrors(f: => Unit): Unit =
+      try f
+      catch { case NonFatal(e) => streamObserver.onError(GRPCErrors.toStatusException(e)) }
   }
 
   implicit class EitherVEExt[T](e: Either[ValidationError, T]) {
@@ -115,5 +110,9 @@ package object grpc extends PBImplicitConversions {
 
   implicit class OptionErrExt[T](e: Option[T]) {
     def explicitGetErr(err: ApiError): T = e.getOrElse(throw GRPCErrors.toStatusException(err))
+  }
+
+  implicit class AddressOrAliasExt(a: AddressOrAlias) {
+    def resolved(blockchain: Blockchain): Option[Address] = blockchain.resolveAlias(a).toOption
   }
 }

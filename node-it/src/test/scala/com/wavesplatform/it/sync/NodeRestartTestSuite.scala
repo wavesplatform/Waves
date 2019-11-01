@@ -20,7 +20,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
   private def nodeB = nodes(1)
 
   "node should grow up to 5 blocks together and sync" in {
-    nodes.waitForSameBlockHeadesAt(height = 5)
+    nodes.waitForSameBlockHeadersAt(height = 5)
   }
 
   "create many addresses and check them after node restart" in {
@@ -29,7 +29,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
     val nodeAWithOtherPorts = docker.restartContainer(dockerNodes().head)
     val maxHeight           = nodes.map(_.height).max
     nodeAWithOtherPorts.getAddresses should contain theSameElementsAs setOfAddresses
-    nodes.waitForSameBlockHeadesAt(maxHeight + 2)
+    nodes.waitForSameBlockHeadersAt(maxHeight + 2)
   }
 
   "after restarting all the nodes, the duplicate transaction cannot be put into the blockchain" in {

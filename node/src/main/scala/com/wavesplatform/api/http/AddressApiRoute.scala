@@ -15,6 +15,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.meta.Dic
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.TransactionFactory
@@ -33,7 +34,8 @@ import scala.util.{Failure, Success, Try}
 case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
-    with AuthRoute {
+    with AuthRoute
+    with AutoParamsDirective {
 
   import AddressApiRoute._
 
@@ -71,7 +73,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   )
   def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
     complete(
-      Address.fromString(address)
+      Address
+        .fromString(address)
         .flatMap(scriptMetaJson)
         .map(ToResponseMarshallable(_))
     )
@@ -282,22 +285,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     complete(Validity(address, Address.fromString(address).isRight))
   }
 
-  @Path("/data")
-  @ApiOperation(value = "Post Data to Blockchain", httpMethod = "POST", produces = "application/json", consumes = "application/json")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataType = "com.wavesplatform.api.http.DataRequest",
-        defaultValue =
-          "{\n\t\"version\": 1,\n\t\"sender\": \"3Mx2afTZ2KbRrLNbytyzTtXukZvqEB8SkW7\",\n\t\"fee\": 100000,\n\t\"data\": [{\"key\":\"intValue\", \"type\":\"integer\", \"value\":17},{\"key\":\"stringValue\", \"type\":\"string\", \"value\":\"seventeen\"},{\"key\":\"boolValue\", \"type\":\"boolean\", \"value\":false},{\"key\":\"binaryArray\", \"type\":\"binary\", \"value\":\"EQ==\"}]\n}"
-      )
-    )
-  )
-  @ApiResponses(Array(new ApiResponse(code = 200, message = "Json with response or error")))
+  // TODO: Remove from API
   def postData: Route = (path("data") & withAuth) {
     broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
   }
@@ -313,24 +301,33 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
         required = false,
         dataType = "string",
         paramType = "query"
+      ),
+      new ApiImplicitParam(
+        name = "key",
+        value = "Exact keys to query",
+        required = false,
+        dataType = "string",
+        paramType = "query",
+        allowMultiple = true
       )
     )
   )
   def getData: Route =
     extractScheduler(
       implicit sc =>
-        (path("data" / Segment) & parameter('matches.?) & get) { (address, maybeRegex) =>
-          maybeRegex match {
-            case None => complete(accountData(address))
-            case Some(regex) =>
+        path("data" / Segment) { address =>
+          protobufEntity(api.DataRequest) { request =>
+            if (request.matches.nonEmpty)
               complete(
-                Try(regex.r)
+                Try(request.matches.r)
                   .fold(
                     _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
                     r => accountData(address, r.pattern)
                   )
               )
-
+            else complete(accountDataList(address, request.keys: _*))
+          } ~ get {
+            complete(accountData(address))
           }
         }
     )
@@ -424,7 +421,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
     import cats.implicits._
-    blockchain.accountScript(account)
+    blockchain
+      .accountScript(account)
       .traverse(Global.dAppFuncTypes)
       .map(AccountScriptMeta(account.stringRepr, _))
   }
@@ -466,6 +464,14 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
       value <- commonAccountApi.data(addr, key).toRight(DataKeyDoesNotExist)
     } yield value
+    ToResponseMarshallable(result)
+  }
+
+  private def accountDataList(address: String, keys: String*): ToResponseMarshallable = {
+    val result = for {
+      addr <- Address.fromString(address).left.map(_ => InvalidAddress)
+      dataList = keys.flatMap(commonAccountApi.data(addr, _))
+    } yield dataList
     ToResponseMarshallable(result)
   }
 
@@ -548,5 +554,5 @@ object AddressApiRoute {
 
   case class AccountScriptMeta(address: String, meta: Option[Dic])
   implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
-  implicit lazy val dicFormat: Writes[Dic] = metaConverter.foldRoot
+  implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
 }

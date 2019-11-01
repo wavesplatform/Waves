@@ -43,7 +43,6 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
       )
 
       posting(req) ~> check {
-        println(responseAs[JsObject])
         status shouldBe StatusCodes.OK
 
         responseAs[TransferTransaction]
