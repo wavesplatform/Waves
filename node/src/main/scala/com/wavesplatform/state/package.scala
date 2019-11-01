@@ -38,11 +38,16 @@ package object state {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
+    def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
+      blockchain.heightOf(block.reference).map(_ - (back - 1).max(0)).flatMap(h => blockchain.blockHeaderAndSize(h).map(_._1))
+    def lastBlockHeader: Option[BlockHeader] = blockchain.blockHeaderAndSize(blockchain.height).map(_._1)
+    def lastBlockHeaderAndSize: Option[(BlockHeader, Int, Int, ByteStr)] = blockchain.blockHeaderAndSize(blockchain.height)
+
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
-    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
-    def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.header.timestamp)
+    def lastBlockId: Option[ByteStr]     = blockchain.blockHeaderAndSize(blockchain.height).map(_._4)
+    def lastBlockTimestamp: Option[Long] = blockchain.lastBlockHeader.map(_.timestamp)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
@@ -71,8 +76,6 @@ package object state {
     }
 
     def blockHeader(atHeight: Int): Option[BlockHeader] = blockchain.blockHeaderAndSize(atHeight).map(_._1)
-
-    def aliasesOfAddress(address: Address): Seq[Alias] = ???
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain

@@ -3,20 +3,21 @@ package com.wavesplatform.state.diffs
 import java.nio.charset.StandardCharsets
 
 import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
-import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
+import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{Inside, PropSpec}
 
-class TransactionValidationErrorPrintTest extends PropSpec with Inside {
+class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
   property("output transaction error should be easy to read") {
     val assetScript =
       s"""

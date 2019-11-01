@@ -203,11 +203,11 @@ object InvokeScriptTransactionDiff {
           val isr = InvokeScriptResult(data = dataEntries, transfers = paymentReceiversMap.toVector.flatMap {
             case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
           })
-          val dataAndPaymentDiffTx              = dataAndPaymentDiff.transactions(tx.id())
+          val dataAndPaymentDiffTx              = dataAndPaymentDiff.transactions.head
           val dataAndPaymentDiffTxWithTransfers = dataAndPaymentDiffTx.copy(_2 = dataAndPaymentDiffTx._2 ++ transfers.keys)
           val transferSetDiff                   = Diff.stateOps(portfolios = transfers, scriptResults = Map(tx.id() -> isr))
           dataAndPaymentDiff.copy(
-            transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
+            transactions = Seq(dataAndPaymentDiffTxWithTransfers),
             scriptsRun = scriptsInvoked + 1,
             scriptsComplexity = invocationComplexity + verifierComplexity.getOrElse(0L) + assetsComplexity.sum
           ) |+| transferSetDiff

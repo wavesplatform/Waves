@@ -6,9 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, DiscardedTransactions, Transaction}
+import com.wavesplatform.transaction._
 
-case class Domain(blockchainUpdater: Blockchain with BlockchainUpdater with NG, levelDBWriter: LevelDBWriter) {
+case class Domain(blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
@@ -21,6 +21,4 @@ case class Domain(blockchainUpdater: Blockchain with BlockchainUpdater with NG, 
 
   def balance(address: Address): Long = blockchainUpdater.balance(address)
   def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
-
-  def addressTransactions(address: Address): Seq[(Int, Transaction)] = ???
 }

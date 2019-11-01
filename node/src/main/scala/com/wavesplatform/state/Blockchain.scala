@@ -2,7 +2,7 @@ package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -21,12 +21,9 @@ trait Blockchain {
 
   def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
 
-  def lastBlock: Option[Block]
   def carryFee: Long
 
   def heightOf(blockId: ByteStr): Option[Int]
-
-  def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader]
 
   /** Features related */
   def approvedFeatures: Map[Short, Int]

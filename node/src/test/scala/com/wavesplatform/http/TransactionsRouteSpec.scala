@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
@@ -22,7 +23,6 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
-import monix.execution.Scheduler
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -40,13 +40,14 @@ class TransactionsRouteSpec
     with PropertyChecks
     with NoShrink {
 
-  implicit def scheduler = Scheduler.global
-
   private val wallet              = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain          = mock[Blockchain]
   private val utx                 = mock[UtxPool]
   private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
-  private val route               = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+  private val addressTransactions = mock[CommonTransactionsApi]
+
+  private val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
+
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -71,7 +72,7 @@ class TransactionsRouteSpec
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -107,7 +108,7 @@ class TransactionsRouteSpec
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -139,7 +140,7 @@ class TransactionsRouteSpec
         (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
         (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -186,7 +187,7 @@ class TransactionsRouteSpec
           )
           .anyNumberOfTimes()
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -234,7 +235,7 @@ class TransactionsRouteSpec
           )
           .anyNumberOfTimes()
 
-        val route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -280,7 +281,7 @@ class TransactionsRouteSpec
       def routeGen: Gen[Route] =
         Gen.const({
           val b = mock[Blockchain]
-          TransactionsApiRoute(restAPISettings, wallet, b, utx, utxPoolSynchronizer, new TestTime).route
+          new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, b, 0, utxPoolSynchronizer, new TestTime).route
         })
 
       "address and limit" in {

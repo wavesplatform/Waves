@@ -109,8 +109,8 @@ object AssetTransactionsDiff {
     def validIssuer(issuerOnly: Boolean, sender: PublicKey, issuer: PublicKey) =
       !issuerOnly || sender == issuer
 
-    blockchain.transactionInfo(assetId.id) match {
-      case Some((_, sitx: IssueTransaction)) if !validIssuer(issuerOnly, tx.sender, sitx.sender) =>
+    blockchain.assetDescription(assetId) match {
+      case Some(ad) if !validIssuer(issuerOnly, tx.sender, ad.issuer) =>
         Left(GenericError("Asset was issued by other address"))
       case None =>
         Left(GenericError("Referenced assetId not found"))

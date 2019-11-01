@@ -18,12 +18,10 @@ import play.api.libs.json.JsNumber
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountApi: CommonAccountApi)
     extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
-
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
 
   override val route = pathPrefix("leasing") {
     active ~ deprecatedRoute

@@ -1,16 +1,22 @@
 package com.wavesplatform.api.common
+
+import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
+import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
+import org.iq80.leveldb.DB
 
-class CommonAccountApi(blockchain: Blockchain) {
+import scala.collection.mutable
+
+class CommonAccountApi(diff: => Diff, db: DB, blockchain: Blockchain) {
   import CommonAccountApi._
 
   def balance(address: Address, confirmations: Int = 0): Long = {
@@ -33,20 +39,18 @@ class CommonAccountApi(blockchain: Blockchain) {
     )
   }
 
-  def assetBalance(address: Address, asset: IssuedAsset): Long = {
-    blockchain.balance(address, asset)
-  }
+  def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
   def portfolio(address: Address): Map[Asset, Long] = ???
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = ???
+  def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = ???
 
   def script(address: Address): AddressScriptInfo = {
     val script: Option[(Script, Long)] = blockchain.accountScript(address)
 
     AddressScriptInfo(
       script = script.map(_._1.bytes()),
-      scriptText = script.map(_._1.expr.toString), // [WAIT] script.map(Script.decompile),
+      scriptText = script.map(_._1.expr.toString),
       complexity = script.map(_._2).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
@@ -56,7 +60,21 @@ class CommonAccountApi(blockchain: Blockchain) {
     blockchain.accountData(address, key)
   }
 
-  def dataStream(address: Address, keyFilter: String => Boolean = _ => true): Observable[DataEntry[_]] = ???
+  def dataStream(address: Address, keyFilter: String => Boolean = _ => true): Observable[DataEntry[_]] = {
+    val entriesFromDiff = diff.accountData.get(address).fold[Map[String, DataEntry[_]]](Map.empty)(_.data)
+    val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
+
+    db.readOnly { ro =>
+      val addressId = db.get(Keys.addressId(address)).get
+      db.iterateOver(Keys.DataHistoryPrefix) { e =>
+        val key = new String(e.getKey.drop(2), Charsets.UTF_8)
+        if (keyFilter(key) && !entriesFromDiff.contains(key)) {
+          ro.get(Keys.data(addressId, key)(ro.get(Keys.dataHistory(addressId, key)).head)).foreach(entries += _)
+        }
+      }
+    }
+    Observable.fromIterable(entries)
+  }
 
   def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = ???
 }

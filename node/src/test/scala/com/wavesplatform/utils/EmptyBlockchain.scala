@@ -2,7 +2,7 @@ package com.wavesplatform.utils
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -24,13 +24,9 @@ case object EmptyBlockchain extends Blockchain {
 
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = None
 
-  override def lastBlock: Option[Block] = None
-
   override def carryFee: Long = 0
 
   override def heightOf(blockId: ByteStr): Option[Int] = None
-
-  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = None
 
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = Map.empty

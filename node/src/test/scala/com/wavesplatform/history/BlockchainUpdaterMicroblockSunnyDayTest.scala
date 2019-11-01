@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{KeyPair, Address, AddressOrAlias}
+import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
@@ -54,7 +54,6 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(1)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(2)) should produce("unavailable funds")
-        domain.blockchainUpdater.lastBlock.get.transactionData shouldBe Seq(genesis, masterToAlice, aliceToBob)
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
@@ -17,13 +18,13 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with TransactionGen with NoShrink with WithState {
 
   def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
     for {
@@ -278,7 +279,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
                 0L
               )
             )
-            blockDiff.transactions.get(issue.id()).isDefined shouldBe true
+            blockDiff.transactionMap().get(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldEqual true
         }

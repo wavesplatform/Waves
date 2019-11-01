@@ -105,70 +105,6 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     } yield (master, List(genesisBlock, b1, b2))
   }
 
-  "addressTransactions" - {
-    "correctly applies transaction type filter" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "without pagination" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-        val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 10, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 9
-        txs.sorted(ordering) shouldEqual txs
-      }
-    }
-
-    "with pagination" - {
-      val LIMIT = 8
-      def paginationTest(firstPageLength: Int): Unit = {
-        baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-          // using pagination
-          val firstPage = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), firstPageLength, None)
-            .explicitGet()
-
-          val rest = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT - firstPageLength, Some(firstPage.last._2.id()))
-            .explicitGet()
-
-          // without pagination
-          val txs = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT, None)
-            .explicitGet()
-
-          (firstPage ++ rest) shouldBe txs
-        }
-      }
-
-      "after txs is in the middle of ngState" in paginationTest(3)
-      "after txs is the last of ngState" in paginationTest(4)
-      "after txs is in levelDb" in paginationTest(6)
-    }
-  }
-
   "blochain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
@@ -186,7 +122,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              txIds shouldBe block.transactionData.map(_.id())
             case _ => fail()
           }
 
@@ -203,7 +139,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT / 5
               transactionsStateUpdates.head.balances.last._3 shouldBe (ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT)
 
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              txIds shouldBe block.transactionData.map(_.id())
             case _ => fail()
           }
         }
@@ -226,7 +162,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               block.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              txIds shouldBe block.transactionData.map(_.id())
             case _ => fail()
           }
 
@@ -239,7 +175,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               // miner reward, with NG — 40% of all txs fees
               blockStateUpdate.balances.length shouldBe 1
               blockStateUpdate.balances.head._3 shouldBe FEE_AMT * 5 * 0.4
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              txIds shouldBe block.transactionData.map(_.id())
             case _ => fail()
           }
 
@@ -256,7 +192,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
                   + FEE_AMT * 4 * 0.4 // carry from prev block
                   + FEE_AMT * 5 * 0.6 // current block reward
               )
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              txIds shouldBe block.transactionData.map(_.id())
             case _ => fail()
           }
         }
@@ -306,7 +242,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               b.transactionData.length shouldBe 1
               blockStateUpdate.balances.length shouldBe 0
               transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
-              txIds shouldBe b.transactionData.map(_.id.apply)
+              txIds shouldBe b.transactionData.map(_.id())
             case _ => fail()
           }
 
@@ -317,7 +253,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               // microBlock transactions miner reward
               microBlockStateUpdate.balances.length shouldBe 1
               microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 2 * 0.4
-              txIds shouldBe microBlock.transactionData.map(_.id.apply)
+              txIds shouldBe microBlock.transactionData.map(_.id())
             case _ => fail()
           }
 
@@ -328,7 +264,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               // microBlock transactions miner reward
               microBlockStateUpdate.balances.length shouldBe 1
               microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 0.4
-              txIds shouldBe microBlock.transactionData.map(_.id.apply)
+              txIds shouldBe microBlock.transactionData.map(_.id())
             case _ => fail()
           }
 

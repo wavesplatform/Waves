@@ -14,12 +14,12 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils.{BlockchainAddressTransactionsList, _}
+import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -245,79 +245,6 @@ class LevelDBWriterSpec
   }
 
   "addressTransactions" - {
-
-    "return txs in correct ordering without fromId" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 2
-
-        txs.sorted(ordering) shouldBe txs
-      }
-    }
-
-    "correctly applies transaction type filter" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "return txs in correct ordering starting from a given id" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        // using pagination
-        val firstTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, None)
-          .explicitGet()
-          .head
-
-        val secondTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, Some(firstTx._2.id()))
-          .explicitGet()
-          .head
-
-        // without pagination
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
-          .explicitGet()
-
-        txs shouldBe Seq(firstTx, secondTx)
-      }
-    }
-
-    "return an empty Seq when paginating from the last transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
-          .explicitGet()
-
-        val txsFromLast = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, Some(txs.last._2.id()))
-          .explicitGet()
-
-        txs.length shouldBe 2
-        txsFromLast shouldBe Seq.empty
-      }
-    }
 
     "don't parse irrelevant transactions in transferById" in {
       val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)

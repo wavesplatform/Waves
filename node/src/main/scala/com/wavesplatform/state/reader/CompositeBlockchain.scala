@@ -70,7 +70,7 @@ final case class CompositeBlockchain(
           case SponsorshipValue(sp) => sp
           case SponsorshipNoInfo    => 0L
         }
-        diff.transactions
+        diff.transactionMap()
           .get(asset.id)
           .collectFirst {
             case (it: IssueTransaction, _) =>
@@ -82,14 +82,14 @@ final case class CompositeBlockchain(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
-      diff.transactions.get(leaseId).collect {
+      diff.transactionMap().get(leaseId).collect {
         case (lt: LeaseTransaction, _) =>
           LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = {
-    diff.transactions
+    diff.transactionMap()
       .get(id)
       .collect {
         case (tx: TransferTransaction, _) => (height, tx)
@@ -98,13 +98,13 @@ final case class CompositeBlockchain(
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
-    diff.transactions
+    diff.transactionMap()
       .get(id)
       .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
-    diff.transactions
+    diff.transactionMap()
       .get(id)
       .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
@@ -129,7 +129,7 @@ final case class CompositeBlockchain(
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
-  override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
+  override def containsTransaction(tx: Transaction): Boolean = diff.transactionMap().contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
@@ -166,24 +166,17 @@ final case class CompositeBlockchain(
     diffData.data.get(key).orElse(inner.accountData(acc, key))
   }
 
-  override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)
-
   override def carryFee: Long = carry
 
   override def score: BigInt = newBlock.fold(BigInt(0))(_.blockScore()) + inner.score
 
-  private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.uniqueId == blockId)
-  private def filterByHeight(height: Int): Option[Block]  = newBlock.filter(_ => this.height == height)
-
-  private def headerAndSize(block: Block): (BlockHeader, Int, Int, ByteStr) =
-    (block.header, block.bytes().length, block.transactionData.size, block.signature)
-
   override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] =
-    filterByHeight(height).map(headerAndSize) orElse inner.blockHeaderAndSize(height)
+    newBlock match {
+      case Some(b) if this.height == height => Some((b.header, b.bytes().length, b.transactionData.length, b.signature))
+      case _ => inner.blockHeaderAndSize(height)
+    }
 
-  override def heightOf(blockId: ByteStr): Option[Int] = filterById(blockId).map(_ => height) orElse inner.heightOf(blockId)
-
-  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)
+  override def heightOf(blockId: ByteStr): Option[Int] = newBlock.filter(_.uniqueId == blockId).map(_ => height) orElse inner.heightOf(blockId)
 
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures
@@ -201,7 +194,9 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain {
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {
       case Some(ng) if to == height =>
@@ -209,7 +204,7 @@ object CompositeBlockchain {
           case (id, false) => id
         }.toSet
         val addedInLiquidBlock = ng.transactions.collect {
-          case (id, (lt: LeaseTransaction, _)) if !cancelledInLiquidBlock(id) => lt
+          case (lt: LeaseTransaction, _) if !cancelledInLiquidBlock(lt.id()) => lt
         }
         innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
       case _ => innerActiveLeases

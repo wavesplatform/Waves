@@ -46,9 +46,8 @@ import scala.util.{Failure, Success}
 case class DebugApiRoute(
     ws: WavesSettings,
     time: Time,
-    blockchain: Blockchain,
+    blockchain: Blockchain with NG,
     wallet: Wallet,
-    ng: Blockchain with NG,
     lastBlocks: Int => Seq[Block],
     invokeScriptResult: TransactionId => Either[ValidationError, InvokeScriptResult],
     portfolio: Address => Portfolio,
@@ -180,7 +179,7 @@ case class DebugApiRoute(
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(wavesDistribution(ng.height).map { case (a, b) => a.stringRepr -> b })
+    complete(wavesDistribution(blockchain.height).map { case (a, b) => a.stringRepr -> b })
   }
 
   @Path("/stateWaves/{height}")
@@ -223,7 +222,7 @@ case class DebugApiRoute(
   )
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
     jsonPost[RollbackParams] { params =>
-      ng.blockHeaderAndSize(params.rollbackTo) match {
+      blockchain.blockHeaderAndSize(params.rollbackTo) match {
         case Some((_, _, _, uniqueId)) =>
           rollbackToBlock(uniqueId, params.returnTransactionsToUtx)
         case None =>
@@ -242,7 +241,7 @@ case class DebugApiRoute(
   def info: Route = (path("info") & get) {
     complete(
       Json.obj(
-        "stateHeight"                      -> ng.height,
+        "stateHeight"                      -> blockchain.height,
         "extensionLoaderState"             -> extLoaderStateReporter().toString,
         "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
         "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -262,7 +261,7 @@ case class DebugApiRoute(
   def minerInfo: Route = (path("minerInfo") & get) {
     complete(
       wallet.privateKeyAccounts
-        .filterNot(account => ng.hasAccountScript(account.toAddress))
+        .filterNot(account => blockchain.hasAccountScript(account.toAddress))
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
         }
@@ -270,10 +269,10 @@ case class DebugApiRoute(
           case (address, Right(offset)) =>
             AccountMiningInfo(
               address.stringRepr,
-              ng.effectiveBalance(
+              blockchain.effectiveBalance(
                 address,
-                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
-                ng.microblockIds.lastOption.getOrElse(ByteStr.empty)
+                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
+                blockchain.microblockIds.lastOption.getOrElse(ByteStr.empty)
               ),
               System.currentTimeMillis() + offset.toMillis
             )

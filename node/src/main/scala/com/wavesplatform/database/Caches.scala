@@ -41,7 +41,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def score: BigInt = current._2
 
   protected def loadLastBlock(): Option[Block]
-  override def lastBlock: Option[Block] = current._3
+  def lastBlock: Option[Block] = current._3
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
@@ -86,7 +86,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       0 -> Long.MaxValue
     }
     oldestStoredBlockTimestamp = oldestTs
-    val bts = lastBlock.fold(0L)(_.header.timestamp) - dbSettings.rememberBlocks.toMillis
+    val bts = this.lastBlock.fold(0L)(_.header.timestamp) - dbSettings.rememberBlocks.toMillis
     blocksTs.entrySet().removeIf(_.getValue < bts)
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
@@ -169,7 +169,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       newAddresses: Map[Address, BigInt],
       balances: Map[BigInt, Map[Asset, Long]],
       leaseBalances: Map[BigInt, LeaseBalance],
-      addressTransactions: Map[AddressId, List[TransactionId]],
+      addressTransactions: Map[AddressId, Seq[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
       reissuedAssets: Map[IssuedAsset, AssetInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
@@ -187,7 +187,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for ((_, addresses) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for ((_, addresses) <- diff.transactions; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
 
@@ -199,9 +199,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     lastAddressId += newAddressIds.size
 
-    log.trace(s"CACHE newAddressIds = $newAddressIds")
-    log.trace(s"CACHE lastAddressId = $lastAddressId")
-
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
     val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
@@ -212,17 +209,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
-    val transactionList = diff.transactions.toList
+    val transactionList = diff.transactions
 
     transactionList.foreach {
-      case (_, (tx, _)) =>
+      case (tx, _) =>
         transactionIds.put(tx.id(), newHeight)
     }
 
-    val addressTransactions: Map[AddressId, List[TransactionId]] =
+    val addressTransactions: Map[AddressId, Seq[TransactionId]] =
       transactionList
         .flatMap {
-          case (_, (tx, addrs)) =>
+          case (tx, addrs) =>
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>

@@ -3,8 +3,9 @@ package com.wavesplatform.mining
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block._
+import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
@@ -110,7 +111,7 @@ class MinerImpl(
   private def consensusData(
       height: Int,
       account: KeyPair,
-      lastBlock: Block,
+      lastBlock: BlockHeader,
       refBlockBT: Long,
       refBlockTS: Long,
       balance: Long,
@@ -123,7 +124,7 @@ class MinerImpl(
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,
         refBlockTS,
-        blockchainUpdater.parentHeader(lastBlock.header, 2).map(_.timestamp),
+        blockchainUpdater.parentHeader(lastBlock, 2).map(_.timestamp),
         currentTime
       )
       .leftMap(_.toString)
@@ -133,13 +134,13 @@ class MinerImpl(
     // should take last block right at the time of mining since microblocks might have been added
     val height              = blockchainUpdater.height
     val version             = blockchainUpdater.currentBlockVersion
-    val lastBlock           = blockchainUpdater.lastBlock.get
+    val lastBlock           = blockchainUpdater.lastBlockHeader.get
     val referencedBlockInfo = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
     val refBlockBT          = referencedBlockInfo.consensus.baseTarget
     val refBlockTS          = referencedBlockInfo.timestamp
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
-    lazy val blockDelay     = currentTime - lastBlock.header.timestamp
+    lazy val blockDelay     = currentTime - lastBlock.timestamp
     lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
@@ -193,14 +194,14 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: BlockHeader, blockUniqueId: ByteStr, account: PublicKey): Either[String, Long] = {
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, blockUniqueId)
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       for {
         expectedTS <- pos
-          .getValidBlockDelay(height, account, block.header.baseTarget, balance)
-          .map(_ + block.header.timestamp)
+          .getValidBlockDelay(height, account, block.baseTarget, balance)
+          .map(_ + block.timestamp)
           .leftMap(_.toString)
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,
@@ -213,11 +214,11 @@ class MinerImpl(
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
     val height    = blockchainUpdater.height
-    val lastBlock = blockchainUpdater.lastBlock.get
+    val (lastBlock, _, _, uniqueId) = blockchainUpdater.blockHeaderAndSize(height).get
     for {
-      _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get) // lastBlock ?
+      _  <- checkAge(height, lastBlock.timestamp)
       _  <- checkScript(account)
-      ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
+      ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, uniqueId, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
 

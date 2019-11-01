@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountApi: CommonAccountApi)
     extends ApiRoute
     with BroadcastRoute
     with AuthRoute
@@ -38,7 +38,6 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   import AddressApiRoute._
 
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   val MaxAddressesPerRequest         = 1000
 
   override lazy val route =
@@ -320,7 +319,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
               complete(
                 Try(request.matches.r)
                   .fold(
-                    _ => ApiError.fromValidationError(GenericError(s"Cannot compile regex")),
+                    { e =>
+                      log.error(s"Error compiling regex ${request.matches}", e)
+                      ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
+                    },
                     r => accountData(address, r.pattern)
                   )
               )

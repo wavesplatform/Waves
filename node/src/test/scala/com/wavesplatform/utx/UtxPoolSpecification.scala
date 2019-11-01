@@ -33,7 +33,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
-import monix.reactive.subjects.Subject
+import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.DB
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -94,7 +94,7 @@ class UtxPoolSpecification
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), ignoreSpendableBalanceChanged, ignoreBlockchainUpdated)
+    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), PublishSubject(), PublishSubject())
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }
@@ -327,7 +327,7 @@ class UtxPoolSpecification
         UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false)
       )
 
-      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.header.timestamp))
+      (sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
     }
 
   private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>

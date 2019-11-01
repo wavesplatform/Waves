@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
@@ -12,7 +11,7 @@ import scala.util.{Left, Right}
 
 object BalanceDiffValidation extends ScorexLogging {
 
-  def apply(b: Blockchain, fs: FunctionalitySettings)(d: Diff): Either[AccountBalanceError, Diff] = {
+  def apply(b: Blockchain)(d: Diff): Either[AccountBalanceError, Diff] = {
     val changedAccounts = d.portfolios.keySet
 
     def check(acc: Address): Option[(Address, String)] = {
@@ -27,7 +26,7 @@ object BalanceDiffValidation extends ScorexLogging {
 
          if (newB < 0) {
            Some(acc -> s"negative waves balance: $acc, old: $oldWaves, new: $newB")
-         } else if (newB < lease.out && b.height > fs.allowLeasedBalanceTransferUntilHeight) {
+         } else if (newB < lease.out && b.height > b.settings.functionalitySettings.allowLeasedBalanceTransferUntilHeight) {
            Some(acc -> (if (newB + lease.in - lease.out < 0) {
                           s"negative effective balance: $acc, old: ${(oldWaves, oldLease)}, new: ${(newB, lease)}"
                         } else if (portfolioDiff.lease.out == 0) {
@@ -47,7 +46,7 @@ object BalanceDiffValidation extends ScorexLogging {
           val newB = oldB + c
           newB < 0
       } map { _ =>
-        acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(acc, portfolioDiff)}"
+        acc -> s"negative asset balance: $acc, new portfolio: ${negativeAssetsInfo(b, acc, portfolioDiff)}"
       })
     }
 
@@ -60,5 +59,6 @@ object BalanceDiffValidation extends ScorexLogging {
     }
   }
 
-  private def negativeAssetsInfo(acc: Address, p: Portfolio): Map[ByteStr, Long] = ???
+  private def negativeAssetsInfo(b: Blockchain, acc: Address, diff: Portfolio): Map[ByteStr, Long] =
+    diff.assets.map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
 }

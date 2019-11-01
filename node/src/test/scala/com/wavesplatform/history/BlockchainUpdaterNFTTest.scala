@@ -2,6 +2,7 @@ package com.wavesplatform.history
 
 import com.wavesplatform._
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -9,7 +10,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.state.diffs
+import com.wavesplatform.state.{Height, diffs}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -32,7 +33,12 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftTransfer()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)) { d =>
-          def nftList(address: Address): Seq[IssueTransaction] = ???
+          def nftList(address: Address): Seq[IssueTransaction] =
+            common.nftList(
+              db,
+              d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff),
+              d.blockchainUpdater.balance
+            )(address, Int.MaxValue, None)
 
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
@@ -55,8 +61,20 @@ class BlockchainUpdaterNFTTest
   property("nft list should be consistent with invokescript") {
     forAll(Preconditions.nftInvokeScript()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
-        withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee, BlockchainFeatures.SmartAccounts, BlockchainFeatures.Ride4DApps)) { d =>
-          def nftList(address: Address): Seq[IssueTransaction] = ???
+        withDomain(
+          settingsWithFeatures(
+            BlockchainFeatures.NG,
+            BlockchainFeatures.ReduceNFTFee,
+            BlockchainFeatures.SmartAccounts,
+            BlockchainFeatures.Ride4DApps
+          )
+        ) { d =>
+          def nftList(address: Address): Seq[IssueTransaction] =
+            common.nftList(
+              db,
+              d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff),
+              d.blockchainUpdater.balance
+            )(address, Int.MaxValue, None)
 
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
@@ -168,7 +186,10 @@ class BlockchainUpdaterNFTTest
       } yield {
         val genesisBlock = unsafeBlock(
           reference = randomSig,
-          txs = Seq(GenesisTransaction.create(richAccount, diffs.ENOUGH_AMT, 0).explicitGet(), GenesisTransaction.create(secondAccount, 1000000, 0).explicitGet()),
+          txs = Seq(
+            GenesisTransaction.create(richAccount, diffs.ENOUGH_AMT, 0).explicitGet(),
+            GenesisTransaction.create(secondAccount, 1000000, 0).explicitGet()
+          ),
           signer = TestBlock.defaultSigner,
           version = 3,
           timestamp = 0

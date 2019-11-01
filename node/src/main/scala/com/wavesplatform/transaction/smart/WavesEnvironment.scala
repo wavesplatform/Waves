@@ -27,12 +27,12 @@ object WavesEnvironment {
 }
 
 class WavesEnvironment(
-  nByte: Byte,
-  in: Coeval[Environment.InputEntity],
-  h: Coeval[Int],
-  blockchain: Blockchain,
-  address: Coeval[ByteStr],
-  ds: DirectiveSet
+    nByte: Byte,
+    in: Coeval[Environment.InputEntity],
+    h: Coeval[Int],
+    blockchain: Blockchain,
+    address: Coeval[ByteStr],
+    ds: DirectiveSet
 ) extends Environment[Id] {
 
   override def height: Long = h()
@@ -119,8 +119,10 @@ class WavesEnvironment(
     }
   }
 
-  override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock.map(block => toBlockInfo(block.header, height.toInt))
+  override def lastBlockOpt(): Option[BlockInfo] = {
+    val height = blockchain.height
+    blockchain.blockHeaderAndSize(height).map { case (header, _, _, _) => toBlockInfo(header, height) }
+  }
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
     blockchain.blockHeaderAndSize(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize._1, blockHeight))
@@ -175,7 +177,7 @@ class WavesEnvironment(
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
 
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote = if (version > 3) ndi.readLong() else -1L
 
     val generator = new Array[Byte](crypto.KeyLength)
     ndi.readFully(generator)

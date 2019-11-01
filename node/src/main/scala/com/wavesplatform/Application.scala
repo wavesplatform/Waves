@@ -14,6 +14,7 @@ import cats.syntax.option._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
@@ -35,7 +36,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Diff, Portfolio}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
@@ -172,7 +173,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     def score: BigInt                                               = ???
     def loadBlockBytes(id: ByteStr): Task[Array[Byte]]              = Task.raiseError(new NoSuchElementException)
-    def loadBlockAt(height: Int): Task[Block]                       = Task.raiseError(new NoSuchElementException)
+    def loadBlockAt(height: Int): Option[Block]                       = None
     def loadMicroBlockBytes(id: ByteStr): Task[Array[Byte]]         = Task.raiseError(new NoSuchElementException)
     def blockIdsAfter(candidates: Seq[ByteStr]): Task[Seq[ByteStr]] = Task.raiseError(new NoSuchElementException)
     def lastBlockIds(i: Int): Seq[ByteStr]                          = ???
@@ -220,7 +221,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     checkGenesis(settings, blockchainUpdater)
 
     val network =
-      NetworkServer(settings, lastBlockInfo, blockchainUpdater, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
+      NetworkServer(settings, lastBlockInfo, historyReplier, utxStorage, peerDatabase, allChannels, establishedConnections)
     maybeNetwork = Some(network)
     val (signatures, blocks, blockchainScores, microblockInvs, microblockResponses, transactions) = network.messages
 
@@ -301,21 +302,25 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       }
 
+      val cta: CommonTransactionsApi = ???
+      val cba: CommonBlocksApi = new CommonBlocksApi(blockchainUpdater, loadBlockAt)
+      val cca: CommonAccountApi = new CommonAccountApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      val csa: CommonAssetsApi = new CommonAssetsApi(blockchainUpdater)
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, loadBlockAt),
-        TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
-        NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
+        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, cba),
+        new TransactionsApiRoute(settings.restAPISettings, cta, wallet, blockchainUpdater, utxStorage.size, utxSynchronizer, time),
+        NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, cba),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, cca),
         DebugApiRoute(
           settings,
           time,
           blockchainUpdater,
           wallet,
-          blockchainUpdater,
           lastBlocks,
           _ => Left(GenericError("not implemented")),
           _ => Portfolio.empty,
@@ -332,10 +337,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot,
           loadBalanceHistory
         ),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time, cca, csa),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
-        AliasApiRoute(settings.restAPISettings, wallet, utxSynchronizer, time, blockchainUpdater),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, cca),
+        AliasApiRoute(settings.restAPISettings, cta, wallet, utxSynchronizer, time, blockchainUpdater),
         RewardApiRoute(blockchainUpdater)
       )
 

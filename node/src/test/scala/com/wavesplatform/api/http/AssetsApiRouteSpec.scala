@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
 
+import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
@@ -25,7 +26,7 @@ class AssetsApiRouteSpec
   private val blockchain = stub[Blockchain]
 
   private val route =
-    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime).route
+    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime, mock[CommonAccountApi], mock[CommonAssetsApi]).route
 
   private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(

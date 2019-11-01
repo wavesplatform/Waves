@@ -2,7 +2,9 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.common.aliasesOfAddress
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
@@ -12,10 +14,10 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val fs =
     TestFunctionalitySettings.Enabled.copy(
@@ -23,18 +25,18 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
     )
 
   val preconditionsAndAliasCreations
-    : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
+      : Gen[(GenesisTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction, CreateAliasTransaction)] = for {
     master <- accountGen
     ts     <- timestampGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    alias                    <- aliasGen
-    alias2                   <- aliasGen suchThat (_.name != alias.name)
-    fee                      <- smallFeeGen
-    other: KeyPair <- accountGen
-    aliasTx                  <- createAliasGen(master, alias, fee, ts)
-    sameAliasTx              <- createAliasGen(master, alias, fee + 1, ts)
-    sameAliasOtherSenderTx   <- createAliasGen(other, alias, fee + 2, ts)
-    anotherAliasTx           <- createAliasGen(master, alias2, fee + 3, ts)
+    alias                  <- aliasGen
+    alias2                 <- aliasGen suchThat (_.name != alias.name)
+    fee                    <- smallFeeGen
+    other: KeyPair         <- accountGen
+    aliasTx                <- createAliasGen(master, alias, fee, ts)
+    sameAliasTx            <- createAliasGen(master, alias, fee + 1, ts)
+    sameAliasOtherSenderTx <- createAliasGen(other, alias, fee + 2, ts)
+    anotherAliasTx         <- createAliasGen(master, alias2, fee + 3, ts)
   } yield (genesis, aliasTx, sameAliasTx, sameAliasOtherSenderTx, anotherAliasTx)
 
   property("can create and resolve aliases preserving waves invariant") {
@@ -49,7 +51,10 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             val senderAcc = anotherAliasTx.sender.toAddress
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-            newState.aliasesOfAddress(senderAcc).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
+            aliasesOfAddress(db, Some(Height(newState.height + 1) -> blockDiff))(senderAcc).map(_._2.alias).toSet shouldBe Set(
+              anotherAliasTx.alias,
+              aliasTx.alias
+            )
             newState.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
             newState.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
         }

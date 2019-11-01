@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -15,12 +16,12 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with TransactionGen with NoShrink with WithState {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(BlockchainFeatures.SmartAccounts.id -> 0, BlockchainFeatures.Ride4DApps.id -> 0))
@@ -38,7 +39,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       case (genesis, setScript) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender) shouldBe setScript.script
+            newState.accountScript(setScript.sender).map(_._1) shouldBe setScript.script
         }
     }
   }
@@ -65,7 +66,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Mat
       case (genesis, setScript) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender) shouldBe setScript.script
+            newState.accountScript(setScript.sender).map(_._1) shouldBe setScript.script
         }
     }
   }

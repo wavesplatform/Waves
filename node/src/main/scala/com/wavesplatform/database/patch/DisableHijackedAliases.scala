@@ -2,7 +2,6 @@ package com.wavesplatform.database.patch
 
 import java.util
 
-import com.google.common.primitives.Shorts
 import com.wavesplatform.account.Alias
 import com.wavesplatform.database.{Keys, RW}
 import com.wavesplatform.state._
@@ -12,7 +11,7 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.JavaConverters._
 
 object DisableHijackedAliases extends ScorexLogging {
-  def apply(rw: RW): Unit = {
+  def apply(rw: RW): Set[Alias] = {
     log.info("Collecting hijacked aliases")
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
     val height  = Height(rw.get(Keys.height))
@@ -44,28 +43,20 @@ object DisableHijackedAliases extends ScorexLogging {
       }
     }
 
-    val hijackedAliases = for {
+    val hijackedAliases: Set[Alias] = (for {
       (alias, txs) <- aliases.asScala
       if txs.size > 1
-    } yield alias
+    } yield alias).toSet
 
     log.info(s"Collected ${aliases.size()} aliases, of which ${hijackedAliases.size} were hijacked")
 
-    for (alias <- hijackedAliases) rw.put(Keys.aliasIsDisabled(alias), true)
+    rw.put(Keys.disabledAliases, hijackedAliases)
+
+    hijackedAliases
   }
 
   def revert(rw: RW): Unit = {
     log.info("Discarding the list of hijacked aliases")
-    val prefixBytes = Shorts.toByteArray(Keys.AliasIsDisabledPrefix)
-    val iterator    = rw.iterator
-
-    try {
-      iterator.seek(prefixBytes)
-      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefixBytes)) {
-        rw.delete(iterator.next().getKey, "hijacked-aliases")
-      }
-    } finally {
-      iterator.close()
-    }
+    rw.put(Keys.disabledAliases, Set.empty: Set[Alias])
   }
 }

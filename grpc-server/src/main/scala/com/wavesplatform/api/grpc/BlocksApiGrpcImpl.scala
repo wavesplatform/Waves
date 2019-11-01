@@ -29,7 +29,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .blocksRange(request.fromHeight, request.toHeight)
           .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) } else
         commonApi
-          .blockHeadersRange(request.fromHeight, request.toHeight)
+          .metaRange(request.fromHeight, request.toHeight)
           .map { case (header, _, _, signature, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), signature)), height) }
 
     responseObserver.completeWith(request.filter.generator match {
@@ -42,7 +42,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
     val result = request.request match {
       case Request.BlockId(blockId) =>
         commonApi
-          .blockBySignature(blockId)
+          .block(blockId)
           .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
 
       case Request.Height(height) =>

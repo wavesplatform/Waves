@@ -12,30 +12,27 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.concurrent.Future
 import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-case class TransactionsApiRoute(
-    settings: RestAPISettings,
+class TransactionsApiRoute(
+    val settings: RestAPISettings,
+    commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
-    utx: UtxPool,
-    utxPoolSynchronizer: UtxPoolSynchronizer,
+    utxPoolSize: => Int,
+    val utxPoolSynchronizer: UtxPoolSynchronizer,
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
-
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
   override lazy val route =
     pathPrefix("transactions") {
@@ -105,7 +102,7 @@ case class TransactionsApiRoute(
     httpMethod = "GET"
   )
   def utxSize: Route = (pathPrefix("size") & get) {
-    complete(Json.obj("size" -> JsNumber(utx.size)))
+    complete(Json.obj("size" -> JsNumber(utxPoolSize)))
   }
 
   @Path("/unconfirmed/info/{id}")
@@ -228,9 +225,10 @@ case class TransactionsApiRoute(
 
   def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
       implicit sc: Scheduler
-  ): Either[ApiError, Future[JsArray]] = {
-    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
+  ): Either[ApiError, JsArray] = {
+    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): JsArray = {
+      lazy val addressesCached =
+        concurrent.blocking(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias } :+ address).toSet
 
       /**
         * Produces compact representation for large transactions by stripping unnecessary data.
@@ -244,12 +242,8 @@ case class TransactionsApiRoute(
         }
       }
 
-      commonApi
-        .transactionsByAddress(address, fromId)
-        .take(limit)
-        .toListL
-        .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
-        .runToFuture
+      val txs = commonApi.transactionsByAddress(address, Set.empty, limit, fromId)
+      Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }))
     }
 
     for {

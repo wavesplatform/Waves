@@ -4,24 +4,21 @@ import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.eval.Task
 import play.api.libs.json._
-
-import scala.concurrent.Future
 
 @Path("/blocks")
 @Api(value = "/blocks")
-case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, blockAt: Int => Task[Block]) extends ApiRoute with CommonApiFunctions {
+case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, commonApi: CommonBlocksApi) extends ApiRoute {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
-  private[this] val commonApi           = new CommonBlocksApi(blockchain, blockAt)
 
   override lazy val route =
     pathPrefix("blocks") {
@@ -74,20 +71,16 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, blo
     )
   )
   def delay: Route = (path("delay" / Segment / IntNumber) & get) { (encodedSignature, count) =>
-    extractExecutionContext { implicit ec =>
-      withBlock(blockchain, encodedSignature) { block =>
-        val result: Future[Either[ApiError, JsObject]] = if (count <= 0) {
-          Future(Left(CustomValidationError("Block count should be positive")))
-        } else {
-          commonApi
-            .calcBlocksDelay(block.uniqueId, count)
-            .map(delay => Right(Json.obj("delay" -> delay)))
-            .runToFuture(???)
-        }
-
-        complete(result)
-      }
+    val result: Either[ApiError, JsObject] = if (count <= 0) {
+      Left(CustomValidationError("Block count should be positive"))
+    } else {
+      commonApi
+        .blockDelay(ByteStr.decodeBase58(encodedSignature).get, count)
+        .map(delay => Json.obj("delay" -> delay))
+        .toRight(BlockDoesNotExist)
     }
+
+    complete(result)
   }
 
   @Path("/height/{signature}")
@@ -107,7 +100,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, blo
           .toOption
           .toRight(InvalidSignature)
 
-        height <- commonApi.blockHeight(signature).toRight(BlockDoesNotExist)
+        height <- blockchain.heightOf(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> height)
 
       complete(result)
@@ -172,10 +165,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, blo
           .map(bh => bh._1.json().addBlockFields(bh._2))
       } else {
         commonApi
-          .blockHeadersRange(start, end)
-          .map {
-            case (bh, size, transactionCount, signature, height) =>
-              BlockHeader.json(bh, size, transactionCount, signature).addBlockFields(height)
+          .metaRange(start, end)
+          .map { meta =>
+            BlockHeader.json(meta.header, meta.size, meta.transactionCount, meta.signature).addBlockFields(meta.height)
           }
       }
 
@@ -193,21 +185,19 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, blo
   @ApiOperation(value = "Last block header", notes = "Get last block header", httpMethod = "GET")
   def lastHeaderOnly: Route = (path("headers" / "last") & get)(last(includeTransactions = false))
 
-  def last(includeTransactions: Boolean): StandardRoute = {
-    complete {
-      val height = blockchain.height
-      (if (includeTransactions) {
-         commonApi.lastBlock().map(_.json())
-       } else {
-         commonApi.lastBlock().map(block => BlockHeader.json(block.header, block.bytes().length, block.transactionData.size, block.signature))
-       }).map(_.addBlockFields(height))
-    }
+  private def last(includeTransactions: Boolean) = complete {
+    val height = commonApi.currentHeight()
+    (if (includeTransactions) {
+       commonApi.blockAtHeight().map(_.json())
+     } else {
+       commonApi.metaAtHeight().map(block => BlockHeader.json(block.header, block.size, block.transactionCount, block.signature))
+     }).map(_.addBlockFields(height))
   }
 
   @Path("/first")
   @ApiOperation(value = "Genesis block", notes = "Get genesis block", httpMethod = "GET")
   def first: Route = (path("first") & get) {
-    complete(commonApi.blockAtHeight(1).map(_.json().addBlockFields(1)).runToFuture(???))
+    complete(commonApi.blockAtHeight(1).map(_.json().addBlockFields(1)))
   }
 
   @Path("/signature/{signature}")
@@ -220,20 +210,11 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, blo
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
     if (encodedSignature.length > TransactionParsers.SignatureStringLength) {
       complete(InvalidSignature)
-    } else {
-
+    } else
       complete(???)
-    }
   }
 
   private[this] implicit class JsonObjectOps(json: JsObject) {
-    import com.wavesplatform.features.FeatureProvider._
-
-    def addBlockFields(blockId: ByteStr): JsObject =
-      json ++ blockchain
-        .heightOf(blockId)
-        .map(height => createFields(height))
-        .getOrElse(JsObject.empty)
 
     def addBlockFields(height: Int): JsObject =
       json ++ createFields(height)

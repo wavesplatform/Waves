@@ -20,6 +20,7 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 import scala.util.Random
+import com.wavesplatform.state.BlockchainExt
 
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
 
@@ -34,8 +35,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
           val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
 
-          val fork1 = mkFork(10, miner1, blockchain)
-          val fork2 = mkFork(10, miner2, blockchain)
+          val fork1 = mkFork(10, miner1, blockchain, ???)
+          val fork2 = mkFork(10, miner2, blockchain, ???)
 
           val fork1Delay = {
             val blockForHit =
@@ -70,11 +71,11 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val miner        = miners.head
           val height       = blockchain.height
           val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
-          val lastBlock    = blockchain.lastBlock.get
+          val lastBlock    = blockchain.lastBlockHeader.get
           val block        = forgeBlock(miner, blockchain, pos)()
 
           pos
-            .validateBlockDelay(height + 1, block, lastBlock.header, minerBalance)
+            .validateBlockDelay(height + 1, block, lastBlock, minerBalance)
             .explicitGet()
       }
     }
@@ -85,14 +86,14 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
           val miner        = miners.head
           val height       = blockchain.height
           val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
-          val lastBlock    = blockchain.lastBlock.get
+          val lastBlock    = blockchain.lastBlockHeader.get
           val block        = forgeBlock(miner, blockchain, pos)(updateDelay = _ - 1)
 
           pos
             .validateBlockDelay(
               height + 1,
               block,
-              lastBlock.header,
+              lastBlock,
               minerBalance
             ) should produce("less than min valid timestamp")
       }
@@ -105,14 +106,14 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner     = miners.head
           val height    = blockchain.height
-          val lastBlock = blockchain.lastBlock.get
+          val lastBlock = blockchain.lastBlockHeader.get
           val block     = forgeBlock(miner, blockchain, pos)()
 
           pos
             .validateBaseTarget(
               height + 1,
               block,
-              lastBlock.header,
+              lastBlock,
               blockchain.blockHeader(height - 2)
             ) shouldBe Right(())
       }
@@ -123,14 +124,14 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner     = miners.head
           val height    = blockchain.height
-          val lastBlock = blockchain.lastBlock.get
+          val lastBlock = blockchain.lastBlockHeader.get
           val block     = forgeBlock(miner, blockchain, pos)(updateBT = _ - 1)
 
           pos
             .validateBaseTarget(
               height + 1,
               block,
-              lastBlock.header,
+              lastBlock,
               blockchain.blockHeader(height - 2)
             ) should produce("does not match calculated baseTarget")
       }
@@ -141,14 +142,14 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         case Env(pos, blockchain, miners) =>
           val miner     = miners.head
           val height    = blockchain.height
-          val lastBlock = blockchain.lastBlock.get
+          val lastBlock = blockchain.lastBlockHeader.get
           val block     = forgeBlock(miner, blockchain, pos)(updateBT = _ + 1)
 
           pos
             .validateBaseTarget(
               height + 1,
               block,
-              lastBlock.header,
+              lastBlock,
               blockchain.blockHeader(height - 2)
             ) should produce("does not match calculated baseTarget")
       }
@@ -233,14 +234,12 @@ object FPPoSSelectorTest {
     }
   }
 
-  final case class Env(pos: PoSSelector, blockchain: Blockchain with BlockchainUpdater with NG, miners: Seq[KeyPair])
+  final case class Env(pos: PoSSelector, blockchain: Blockchain with BlockchainUpdater, miners: Seq[KeyPair])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  def mkFork(blockCount: Int, miner: KeyPair, blockchain: Blockchain): List[Block] = {
+  def mkFork(blockCount: Int, miner: KeyPair, blockchain: Blockchain, lastBlock: Block): List[Block] = {
     val height = blockchain.height
-
-    val lastBlock = blockchain.lastBlock.get
 
     ((1 to blockCount) foldLeft List(lastBlock)) { (forkChain, ind) =>
       val blockForHit =
@@ -282,11 +281,11 @@ object FPPoSSelectorTest {
 
   def forgeBlock(
       miner: KeyPair,
-      blockchain: Blockchain with NG,
+      blockchain: Blockchain,
       pos: PoSSelector
   )(updateDelay: Long => Long = identity, updateBT: Long => Long = identity, updateGS: ByteStr => ByteStr = identity): Block = {
     val height       = blockchain.height
-    val lastBlock    = blockchain.lastBlock.get
+    val (lastBlock, _, _, uniqueId)    = blockchain.lastBlockHeaderAndSize.get
     val ggParentTS   = blockchain.blockHeader(height - 2).map(_.timestamp)
     val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
@@ -294,7 +293,7 @@ object FPPoSSelectorTest {
         .getValidBlockDelay(
           height,
           miner,
-          lastBlock.header.baseTarget,
+          lastBlock.baseTarget,
           minerBalance
         )
         .explicitGet()
@@ -305,18 +304,18 @@ object FPPoSSelectorTest {
         miner,
         height,
         60.seconds,
-        lastBlock.header.baseTarget,
-        lastBlock.header.timestamp,
+        lastBlock.baseTarget,
+        lastBlock.timestamp,
         ggParentTS,
-        lastBlock.header.timestamp + delay
+        lastBlock.timestamp + delay
       )
       .explicitGet()
 
     Block
       .buildAndSign(
         3: Byte,
-        lastBlock.header.timestamp + delay,
-        lastBlock.uniqueId,
+        lastBlock.timestamp + delay,
+        uniqueId,
         updateBT(cData.baseTarget),
         updateGS(cData.generationSignature),
         Seq.empty,

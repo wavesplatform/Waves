@@ -10,6 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
+import monix.eval.Coeval
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -112,21 +113,23 @@ object Sponsorship {
       .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
       .getOrElse(Int.MaxValue)
 
-  def toWaves(assetFee: Long, sponsorship: Long): Long = {
-    if (sponsorship == 0) return Long.MaxValue
-    val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
-    waves.bigInteger.longValueExact()
-  }
+  def toWaves(assetFee: Long, sponsorship: Long): Long =
+    if (sponsorship == 0) Long.MaxValue
+    else {
+      val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
+      waves.bigInteger.longValueExact()
+    }
 
-  def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
-    if (wavesFee == 0 || sponsorship == 0) return 0
-    val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
-    assetFee.bigInteger.longValueExact()
-  }
+  def fromWaves(wavesFee: Long, sponsorship: Long): Long =
+    if (wavesFee == 0 || sponsorship == 0) 0
+    else {
+      val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
+      assetFee.bigInteger.longValueExact()
+    }
 }
 
 case class Diff(
-    transactions: Map[ByteStr, (Transaction, Set[Address])],
+    transactions: Seq[(Transaction, Set[Address])],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, AssetInfo],
     aliases: Map[Alias, Address],
@@ -139,7 +142,10 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult]
-)
+) {
+  val transactionMap: Coeval[Map[ByteStr, (Transaction, Set[Address])]] =
+    Coeval.evalOnce(transactions.map { case v @ (tx, _) => tx.id() -> v }.toMap)
+}
 
 object Diff {
   def stateOps(
@@ -155,7 +161,7 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
-      transactions = Map(),
+      transactions = Seq.empty,
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,
@@ -186,7 +192,7 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
-      transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
+      transactions = Seq((tx, (portfolios.keys ++ accountData.keys).toSet)),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,
@@ -201,7 +207,7 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+  val empty = new Diff(Seq.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty

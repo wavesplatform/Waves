@@ -338,7 +338,7 @@ package object database extends ScorexLogging {
     (header, size, transactionCount, ByteStr(signature))
   }
 
-  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
+  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum, ByteStr)]) = {
     val ndi          = newDataInput(bs)
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
@@ -346,11 +346,11 @@ package object database extends ScorexLogging {
     (height, List.fill(numSeqLength) {
       val tp  = ndi.readByte()
       val num = TxNum(ndi.readShort())
-      (tp, num)
+      (tp, num, bs.drop(6))
     })
   }
 
-  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
+  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum, ByteStr)])): Array[Byte] = {
     val (height, numSeq) = v
     val numSeqLength     = numSeq.length
 
@@ -360,9 +360,10 @@ package object database extends ScorexLogging {
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
     numSeq.foreach {
-      case (tp, num) =>
+      case (tp, num, id) =>
         ndo.writeByte(tp)
         ndo.writeShort(num)
+        ndo.write(id.arr)
     }
 
     ndo.toByteArray

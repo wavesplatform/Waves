@@ -36,9 +36,9 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     val bt = pos(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
 
     checkBaseTargetLimit(bt, height).flatMap(
-      result =>
-        blockchain.lastBlock
-          .map(_.header.generationSignature.arr)
+      _ =>
+        blockchain.lastBlockHeader
+          .map(_.generationSignature.arr)
           .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generatorSignature(gs, accountPublicKey))))
           .toRight(GenericError("No blocks in blockchain"))
     )
@@ -63,9 +63,9 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
   def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, Unit] = {
     val blockGS = block.header.generationSignature.arr
-    blockchain.lastBlock
+    blockchain.lastBlockHeader
       .toRight(GenericError("No blocks in blockchain"))
-      .map(b => generatorSignature(b.header.generationSignature.arr, block.header.generator))
+      .map(b => generatorSignature(b.generationSignature.arr, block.header.generator))
       .ensureOr(vgs => GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(vgs)}; Found = ${Base58.encode(blockGS)}"))(
         _ sameElements blockGS
       )
@@ -113,7 +113,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   private def getHit(height: Int, accountPublicKey: PublicKey): Option[BigInt] = {
     val generationSignatureForHit =
       if (fairPosActivated(height) && height > 100) blockchain.blockHeaderAndSize(height - 100).map(_._1.generationSignature)
-      else blockchain.lastBlock.map(_.header.generationSignature)
+      else blockchain.lastBlockHeader.map(_.generationSignature)
 
     generationSignatureForHit.map { genSig =>
       hit(generatorSignature(genSig.arr, accountPublicKey))

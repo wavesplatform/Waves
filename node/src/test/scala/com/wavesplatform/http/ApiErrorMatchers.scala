@@ -1,11 +1,11 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.testkit.RouteTest
+import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.http.ApiMarshallers._
+import org.scalatest.Matchers
 import org.scalatest.matchers.{MatchResult, Matcher}
 import play.api.libs.json._
-import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.api.http.ApiError
-import org.scalatest.Matchers
 
 trait ApiErrorMatchers extends Matchers { this: RouteTest =>
   class ProduceError(error: ApiError, matchMsg: Boolean) extends Matcher[RouteTestResult] {

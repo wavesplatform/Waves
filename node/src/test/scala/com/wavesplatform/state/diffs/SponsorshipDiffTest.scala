@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
@@ -11,10 +12,10 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransactionV1
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen {
 
   def settings(sponsorshipActivationHeight: Int): FunctionalitySettings =
     TestFunctionalitySettings.Enabled.copy(

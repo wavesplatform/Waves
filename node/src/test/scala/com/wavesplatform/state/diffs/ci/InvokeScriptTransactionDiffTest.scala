@@ -4,6 +4,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -26,8 +27,7 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi, assertDiffEiTraced, produce}
-import com.wavesplatform.state.utils._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
 import com.wavesplatform.transaction.assets._
@@ -36,14 +36,14 @@ import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, Inv
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.immutable
 
-class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -544,10 +544,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
-            newState.accountData(genesis(0).recipient, "sender") shouldBe BinaryDataEntry("sender", ci.sender.toAddress.bytes)
-            newState.accountData(genesis(0).recipient, "argument") shouldBe BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
+            newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
+            newState.accountData(genesis(0).recipient, "argument") shouldBe Some(BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs))
 
-            blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
+            blockDiff.transactionMap()(ci.id())._2.contains(setScript.sender) shouldBe true
           }
 
     }
@@ -587,10 +587,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       contractGen = (paymentContractGen(a, am) _)
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
-      case (acc, amount, genesis, setScript, ci) =>
+      case (_, _, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          case (blockDiff, newState) =>
-            newState.addressTransactions(acc.toAddress, Set.empty, Int.MaxValue, None).right.get.head._2 shouldBe ci
+          case (blockDiff, _) =>
+            blockDiff.transactionMap() should contain key (ci.id())
         }
     }
   }

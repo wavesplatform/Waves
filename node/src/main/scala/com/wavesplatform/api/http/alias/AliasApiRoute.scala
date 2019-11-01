@@ -3,6 +3,7 @@ package com.wavesplatform.api.http.alias
 import akka.http.scaladsl.server.Route
 import cats.syntax.either._
 import com.wavesplatform.account.Alias
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -17,8 +18,14 @@ import play.api.libs.json.Json
 
 @Path("/alias")
 @Api(value = "/alias")
-case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
-    extends ApiRoute
+case class AliasApiRoute(
+    settings: RestAPISettings,
+    commonApi: CommonTransactionsApi,
+    wallet: Wallet,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    time: Time,
+    blockchain: Blockchain
+) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
 
@@ -65,7 +72,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     complete {
       com.wavesplatform.account.Address
         .fromString(addressString)
-        .map(acc => blockchain.aliasesOfAddress(acc).map(_.stringRepr).toVector)
+        .map(addr => commonApi.aliasesOfAddress(addr).map(_._2.alias.stringRepr))
     }
   }
 }

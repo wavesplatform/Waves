@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.RequestGen
+import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
@@ -25,7 +26,7 @@ class LeaseBroadcastRouteSpec
     with PropertyChecks
     with RestAPISettingsHelper {
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(t => TransactionValidationError(GenericError("foo"), t))
-  private[this] val route               = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], utxPoolSynchronizer, stub[Time]).route
+  private[this] val route               = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], utxPoolSynchronizer, stub[Time], stub[CommonAccountApi]).route
   "returns StateCheckFailed" - {
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](

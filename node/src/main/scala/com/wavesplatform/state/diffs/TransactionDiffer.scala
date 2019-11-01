@@ -55,7 +55,7 @@ object TransactionDiffer {
       diff <- unverified(currentBlockTimestamp)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
         .measureForType(tx.typeId) {
-          BalanceDiffValidation(blockchain, blockchain.settings.functionalitySettings)(diff)
+          BalanceDiffValidation(blockchain)(diff)
         }
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
@@ -74,13 +74,8 @@ object TransactionDiffer {
       }
     }
 
-  private def complexityDiff(
-      blockchain: Blockchain,
-      tx: ProvenTransaction
-  ): Diff = {
-    val complexity = DiffsCommon.getScriptsComplexity(blockchain, tx)
-    Diff(tx, scriptsComplexity = complexity)
-  }
+  private def complexityDiff(blockchain: Blockchain, tx: ProvenTransaction): Diff =
+    Diff.empty.copy(scriptsComplexity = DiffsCommon.getScriptsComplexity(blockchain, tx))
 
   private def unverifiedWithEstimate(
       currentBlockTimestamp: Long

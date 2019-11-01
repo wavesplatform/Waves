@@ -141,7 +141,6 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
         {
           domain.blockchainUpdater.processBlock(block0) shouldBe 'right
-          // todo
 //          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee)
         }
 
@@ -154,9 +153,8 @@ class BlockchainUpdaterSponsoredFeeBlockTest
             .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
             .sum
 
-          // todo
 //          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee + microBlocksWavesFee)
-          fail()
+          fail("blockFee??")
         }
     }
   }

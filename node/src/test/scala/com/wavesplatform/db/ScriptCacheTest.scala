@@ -24,9 +24,9 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
   val AMOUNT     = 10000000000L
   val FEE        = 5000000
 
-  def mkScripts(num: Int): List[Script] = {
+  def mkScripts(num: Int): List[(Script, Long)] = {
     (0 until num).map { ind =>
-      val (script, _) = ScriptCompiler(
+      ScriptCompiler(
         s"""
            |let ind = $ind
            |true
@@ -34,12 +34,10 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         isAssetScript = false,
         ScriptEstimatorV2
       ).explicitGet()
-
-      script
     }.toList
   }
 
-  def blockGen(scripts: List[Script], t: Time): Gen[(Seq[KeyPair], Seq[Block])] = {
+  def blockGen(scripts: List[(Script, Long)], t: Time): Gen[(Seq[KeyPair], Seq[Block])] = {
     val ts = t.correctedTime()
     Gen
       .listOfN(scripts.length, accountGen)
@@ -55,7 +53,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         val setScriptTxs =
           (accounts zip scripts)
             .map {
-              case (account, script) =>
+              case (account, (script, _)) =>
                 SetScriptTransaction
                   .selfSigned(account, Some(script), FEE, ts + accounts.length + accounts.indexOf(account) + 1)
                   .explicitGet()
@@ -83,7 +81,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         case (accounts, bc) =>
           val allScriptCorrect = (accounts zip scripts)
             .map {
-              case (account, script) =>
+              case (account, (script, _)) =>
                 val address = account.toAddress
 
                 val scriptFromCache =
@@ -107,16 +105,16 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         case (List(account), bcu) =>
           bcu.accountScript(account.toAddress) shouldEqual Some(script)
 
-          val lastBlock = bcu.lastBlock.get
+          val (lastBlock, _, _, uniqueId) = bcu.lastBlockHeaderAndSize.get
 
           val newScriptTx = SetScriptTransaction
-            .selfSigned(account, None, FEE, lastBlock.header.timestamp + 1)
+            .selfSigned(account, None, FEE, lastBlock.timestamp + 1)
             .explicitGet()
 
           val blockWithEmptyScriptTx = TestBlock
             .create(
-              time = lastBlock.header.timestamp + 2,
-              ref = lastBlock.uniqueId,
+              time = lastBlock.timestamp + 2,
+              ref = uniqueId,
               txs = Seq(newScriptTx)
             )
 
@@ -125,14 +123,14 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             .explicitGet()
 
           bcu.accountScript(account.toAddress) shouldEqual None
-          bcu.removeAfter(lastBlock.uniqueId)
+          bcu.removeAfter(uniqueId)
           bcu.accountScript(account.toAddress) shouldEqual Some(script)
       }
     }
 
   }
 
-  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], Blockchain with BlockchainUpdater with NG) => Unit): Unit = {
+  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], Blockchain with BlockchainUpdater) => Unit): Unit = {
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val defaultWriter = TestLevelDB.withFunctionalitySettings(

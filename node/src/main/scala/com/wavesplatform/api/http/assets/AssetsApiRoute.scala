@@ -41,13 +41,17 @@ import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
-case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
-    extends ApiRoute
+case class AssetsApiRoute(
+    settings: RestAPISettings,
+    wallet: Wallet,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    blockchain: Blockchain,
+    time: Time,
+    commonAccountApi: CommonAccountApi,
+    commonAssetsApi: CommonAssetsApi
+) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
-
-  private[this] val commonAccountApi = new CommonAccountApi(blockchain)
-  private[this] val commonAssetsApi  = new CommonAssetsApi(blockchain)
 
   private[this] val distributionTaskScheduler = {
     val executor = new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue[Runnable](AssetsApiRoute.MAX_DISTRIBUTION_TASKS))
@@ -196,7 +200,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
             }
           } yield {
             commonAccountApi
-              .portfolioNFT(addr, maybeAfter)
+              .nftPortfolio(addr, maybeAfter)
               .take(limit)
               .map(_.json())
               .toListL
