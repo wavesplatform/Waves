@@ -134,9 +134,9 @@ case class Block private[block] (
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  val bytesToSign: Coeval[Array[Byte]] = Coeval.evalOnce {
-    if (header.version == ProtoBlockVersion) PBBlocks.protobuf(this).header.get.toByteArray
-    else bytes().dropRight(SignatureLength)
+  private val bytesToSign: Coeval[Array[Byte]] = Coeval.evalOnce {
+    if (header.version < ProtoBlockVersion) bytes().dropRight(SignatureLength)
+    else PBBlocks.protobuf(this).header.get.toByteArray
   }
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
