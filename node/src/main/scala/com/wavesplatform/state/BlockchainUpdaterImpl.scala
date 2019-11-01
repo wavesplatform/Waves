@@ -42,15 +42,12 @@ class BlockchainUpdaterImpl(
   import com.wavesplatform.state.BlockchainUpdaterImpl._
   import wavesSettings.blockchainSettings.functionalitySettings
 
-  private def inLock[R](l: Lock, f: => R) = {
-    try {
-      l.lock()
-      val res = f
-      res
-    } finally {
-      l.unlock()
-    }
+  private def inLock[R](l: Lock, f: => R): R = {
+    l.lockInterruptibly()
+    try f
+    finally l.unlock()
   }
+
   private val lock                     = new ReentrantReadWriteLock
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
   private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
@@ -708,7 +705,7 @@ class BlockchainUpdaterImpl(
         .data
         .keySet
 
-      (fromInner ++ fromDiff)
+      fromInner ++ fromDiff
     }
   }
 
