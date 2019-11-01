@@ -70,15 +70,11 @@ object WavesContext {
   private lazy val fromV3Funcs =
     extractedFuncs ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
 
-  private lazy val dAppBackwardCompatibilityFuncs =
-    Array(writeSetIdentityF, transferSetIdentityF, scriptResultConcatF)
-
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
     lazy val v4Funcs = fromV3Funcs :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
     version match {
       case V1 | V2 =>         Array(txByIdF(proofsEnabled, version))
       case V3 =>              fromV3Funcs :+ transferTxByIdF(proofsEnabled, version)
-      case V4 if c == DApp => v4Funcs ++ dAppBackwardCompatibilityFuncs
       case V4 =>              v4Funcs
     }
   }

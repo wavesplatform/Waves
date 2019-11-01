@@ -241,6 +241,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
     }
 
   private def dApp(version: StdLibVersion, transferPaymentAmount: Int, transferRecipient: KeyPair): Script = {
+    val resultSyntax = if (version >= V4) "" else "TransferSet"
     val script =
       s"""
          | {-# STDLIB_VERSION ${version.id} #-}
@@ -248,7 +249,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
          | {-# SCRIPT_TYPE    ACCOUNT       #-}
          |
          | @Callable(i)
-         | func default() = TransferSet([ScriptTransfer(
+         | func default() = $resultSyntax([ScriptTransfer(
          |    Address(base58'${transferRecipient.stringRepr}'),
          |    $transferPaymentAmount,
          |    unit
