@@ -45,7 +45,7 @@ case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]],
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def version: TxVersion = 1
+  override def version: TxVersion = TxVersion.V1
 }
 
 object DataTransaction extends TransactionParserFor[DataTransaction] with TransactionParser.MultipleVersions {

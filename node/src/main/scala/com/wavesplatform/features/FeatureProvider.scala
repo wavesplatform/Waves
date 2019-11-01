@@ -2,7 +2,6 @@ package com.wavesplatform.features
 
 import com.wavesplatform.block.Block.{NgBlockVersion, PlainBlockVersion, RewardBlockVersion}
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.assets.IssueTransaction
 
 object FeatureProvider {
   final implicit class FeatureProviderExt(private val blockchain: Blockchain) extends AnyVal {

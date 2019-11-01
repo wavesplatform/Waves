@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -28,7 +28,7 @@ case class OrderV3(senderPublicKey: PublicKey,
                    proofs: Proofs)
     extends Order {
 
-  def version: TxVersion = 3
+  def version: TxVersion = 3.toByte
 
   override def signature: Array[Byte] = proofs.proofs.head.arr
 

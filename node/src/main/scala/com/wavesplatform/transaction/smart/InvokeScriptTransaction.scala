@@ -6,11 +6,10 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.{ExecutionError, ValidationError}
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
-import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
@@ -23,16 +22,17 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class InvokeScriptTransaction private (chainId: Byte,
-                                            sender: PublicKey,
-                                            dAppAddressOrAlias: AddressOrAlias,
-                                            funcCallOpt: Option[Terms.FUNCTION_CALL],
-                                            payments: Seq[Payment],
-                                            fee: Long,
-                                            feeAssetId: Asset,
-                                            timestamp: Long,
-                                            proofs: Proofs)
-    extends ProvenTransaction
+case class InvokeScriptTransaction private (
+    chainId: Byte,
+    sender: PublicKey,
+    dAppAddressOrAlias: AddressOrAlias,
+    funcCallOpt: Option[Terms.FUNCTION_CALL],
+    payments: Seq[Payment],
+    fee: Long,
+    feeAssetId: Asset,
+    timestamp: Long,
+    proofs: Proofs
+) extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
 
@@ -76,7 +76,7 @@ case class InvokeScriptTransaction private (chainId: Byte,
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def version: TxVersion = 1
+  override def version: TxVersion = TxVersion.V1
 }
 
 object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransaction] with TransactionParser.MultipleVersions {
@@ -102,7 +102,7 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     )
   }
 
-  override val typeId: TxType                 = 16
+  override val typeId: TxType                    = 16
   override val supportedVersions: Set[TxVersion] = Set(1)
 
   private def currentChainId: Byte = AddressScheme.current.chainId
@@ -115,14 +115,16 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
     }
   }
 
-  def create(sender: PublicKey,
-             dappAddress: AddressOrAlias,
-             fc: Option[Terms.FUNCTION_CALL],
-             p: Seq[Payment],
-             fee: Long,
-             feeAssetId: Asset,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(
+      sender: PublicKey,
+      dappAddress: AddressOrAlias,
+      fc: Option[Terms.FUNCTION_CALL],
+      p: Seq[Payment],
+      fee: Long,
+      feeAssetId: Asset,
+      timestamp: Long,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] = {
     for {
       _ <- validate(fc, p, fee)
       tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
@@ -139,28 +141,33 @@ object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransact
           NonPositiveAmount(
             p.amount,
             p.assetId.fold("Waves")(_.toString)
-          ).asLeft[Unit])
+          ).asLeft[Unit]
+      )
 
-  def signed(sender: PublicKey,
-             dappAddress: AddressOrAlias,
-             fc: Option[Terms.FUNCTION_CALL],
-             p: Seq[Payment],
-             fee: Long,
-             feeAssetId: Asset,
-             timestamp: Long,
-             signer: PrivateKey): Either[ValidationError, TransactionT] =
+  def signed(
+      sender: PublicKey,
+      dappAddress: AddressOrAlias,
+      fc: Option[Terms.FUNCTION_CALL],
+      p: Seq[Payment],
+      fee: Long,
+      feeAssetId: Asset,
+      timestamp: Long,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
     for {
       tx     <- create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty)
       proofs <- Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes()))))
     } yield tx.copy(proofs = proofs)
 
-  def selfSigned(sender: KeyPair,
-                 dappAddress: AddressOrAlias,
-                 fc: Option[Terms.FUNCTION_CALL],
-                 p: Seq[Payment],
-                 fee: Long,
-                 feeAssetId: Asset,
-                 timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(
+      sender: KeyPair,
+      dappAddress: AddressOrAlias,
+      fc: Option[Terms.FUNCTION_CALL],
+      p: Seq[Payment],
+      fee: Long,
+      feeAssetId: Asset,
+      timestamp: Long
+  ): Either[ValidationError, TransactionT] = {
     signed(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
   }
 

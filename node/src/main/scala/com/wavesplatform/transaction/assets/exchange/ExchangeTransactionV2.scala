@@ -29,7 +29,7 @@ case class ExchangeTransactionV2(buyOrder: Order,
 
   import ExchangeTransactionV2._
 
-  override def version: TxVersion = 2
+  override def version: TxVersion = TxVersion.V2
 
   override val builder                 = ExchangeTransactionV2
   override val assetFee: (Asset, Long) = (Waves, fee)

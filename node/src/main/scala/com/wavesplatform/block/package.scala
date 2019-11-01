@@ -6,7 +6,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.block.Block.{GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, RewardBlockVersion}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser.ByteBufferOps
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxVersion}
 
 import scala.util.Try
 

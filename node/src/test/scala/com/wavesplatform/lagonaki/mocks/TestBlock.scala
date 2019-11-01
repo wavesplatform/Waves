@@ -52,7 +52,7 @@ object TestBlock {
       ref: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair = defaultSigner,
-      version: TxVersion = 2,
+      version: Byte = 2,
       features: Set[Short] = Set.empty[Short],
       rewardVote: Long = -1L
   ): Block =
@@ -79,7 +79,7 @@ object TestBlock {
       defaultSigner,
       Block(
         BlockHeader(
-          1,
+          1.toByte,
           0,
           ref,
           2L,
@@ -98,7 +98,7 @@ object TestBlock {
       defaultSigner,
       Block(
         BlockHeader(
-          3,
+          3.toByte,
           0,
           ref,
           2L,

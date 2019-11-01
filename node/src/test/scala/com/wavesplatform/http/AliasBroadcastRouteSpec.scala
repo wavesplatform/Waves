@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
-import com.wavesplatform.api.http.requests.CreateAliasRequest
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction

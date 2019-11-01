@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import com.wavesplatform.transaction.serialization.TxSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json.{JsObject, Json}

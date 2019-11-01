@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.DataTransaction
+import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 

@@ -27,7 +27,7 @@ case class LeaseCancelTransactionV2 private (chainId: Byte, sender: PublicKey, l
 
   override val bytes = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def version: TxVersion = 2
+  override def version: TxVersion = TxVersion.V2
 }
 
 object LeaseCancelTransactionV2 extends TransactionParserFor[LeaseCancelTransactionV2] with TransactionParser.MultipleVersions {

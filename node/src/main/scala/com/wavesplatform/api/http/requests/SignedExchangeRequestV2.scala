@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http.requests
 
 import cats.implicits._
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransactionV2, Order}
@@ -47,13 +46,12 @@ case class SignedExchangeRequestV2(
     @ApiModelProperty(required = true)
     timestamp: Long,
     @ApiModelProperty(required = true, example = "2")
-    version: TxVersion,
+    version: Byte,
     @ApiModelProperty(required = true)
     proofs: List[String]
 ) {
   def toTx: Either[ValidationError, ExchangeTransaction] =
     for {
-      _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       _t          <- ExchangeTransactionV2.create(order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _proofs)

@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}

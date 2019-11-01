@@ -1,7 +1,13 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.api.http.assets._
-import com.wavesplatform.api.http.requests.{SignedBurnV1Request, SignedIssueV1Request, SignedReissueV1Request, SignedSetAssetScriptRequest, SignedSponsorFeeRequest, SignedTransferV1Request}
+import com.wavesplatform.api.http.requests.{
+  SignedBurnV1Request,
+  SignedIssueV1Request,
+  SignedReissueV1Request,
+  SignedSetAssetScriptRequest,
+  SignedSponsorFeeRequest,
+  SignedTransferV1Request
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.script.Script

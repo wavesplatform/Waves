@@ -175,7 +175,7 @@ object Order {
             expiration: Long,
             matcherFee: Long,
             proofs: Proofs,
-            version: TxVersion = 1,
+            version: TxVersion = TxVersion.V1,
             matcherFeeAssetId: Asset = Asset.Waves): Order = version match {
     case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
@@ -199,7 +199,7 @@ object Order {
           timestamp: Long,
           expiration: Long,
           matcherFee: Long,
-          version: TxVersion = 1,
+          version: TxVersion = TxVersion.V1,
           matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>
@@ -217,7 +217,7 @@ object Order {
            timestamp: Long,
            expiration: Long,
            matcherFee: Long,
-           version: TxVersion = 1,
+           version: TxVersion = TxVersion.V1,
            matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>

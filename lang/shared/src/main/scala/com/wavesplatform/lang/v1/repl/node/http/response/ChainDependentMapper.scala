@@ -77,7 +77,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
     ByteStr(bytes)
   }
 
-  private val typeId: TxType = 4
+  private val typeId: Byte = 4
 
   private def bodyBytes(tx: TransferTransaction): Array[Byte] =
     tx match {

@@ -84,7 +84,7 @@ case class MassTransferTransaction private (
 object MassTransferTransaction extends TransactionParserFor[MassTransferTransaction] with TransactionParser.OneVersion {
 
   override val typeId: TxType  = 11
-  override val version: TxVersion = 1
+  override val version: TxVersion = TxVersion.V1
   val MaxTransferCount       = 100
 
   @ApiModel

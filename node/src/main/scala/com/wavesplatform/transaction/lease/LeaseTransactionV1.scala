@@ -22,7 +22,7 @@ case class LeaseTransactionV1 private (sender: PublicKey, amount: Long, fee: Lon
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(bodyBytes(), signature.arr))
 
-  override def version: TxVersion = 1
+  override def version: TxVersion = TxVersion.V1
 }
 
 object LeaseTransactionV1 extends TransactionParserFor[LeaseTransactionV1] with TransactionParser.HardcodedVersion1 {

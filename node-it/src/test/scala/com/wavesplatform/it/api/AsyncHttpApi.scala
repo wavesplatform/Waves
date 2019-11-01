@@ -3,14 +3,23 @@ package com.wavesplatform.it.api
 import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
 import java.nio.charset.StandardCharsets
-import java.util.{NoSuchElementException, UUID}
 import java.util.concurrent.TimeoutException
+import java.util.{NoSuchElementException, UUID}
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{
+  AccountsApiGrpc,
+  BalanceResponse,
+  BalancesRequest,
+  BlockRequest,
+  BlocksApiGrpc,
+  TransactionResponse,
+  TransactionsApiGrpc,
+  TransactionsRequest
+}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{ReissueV1Request, SignedIssueV1Request, SignedIssueV2Request, TransferRequest}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
@@ -27,7 +36,17 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
+import com.wavesplatform.protobuf.transaction.{
+  ExchangeTransactionData,
+  IssueTransactionData,
+  PBOrders,
+  PBSignedTransaction,
+  PBTransactions,
+  Recipient,
+  Script,
+  SignedTransaction,
+  TransferTransactionData
+}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
@@ -35,7 +54,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
@@ -248,7 +267,7 @@ object AsyncHttpApi extends Assertions {
         fee: Long,
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
-        version: TxVersion = 2
+        version: TxVersion = TxVersion.V2
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -267,7 +286,7 @@ object AsyncHttpApi extends Assertions {
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson("/waves/payment", PaymentRequest(amount, fee, sourceAddress, recipient)).as[Transaction]
 
-    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long, version: TxVersion = 2): Future[Transaction] = {
+    def lease(sourceAddress: String, recipient: String, amount: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"      -> LeaseTransaction.typeId,
@@ -280,7 +299,7 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: TxVersion = 2): Future[Transaction] = {
+    def cancelLease(sourceAddress: String, leaseId: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"    -> LeaseCancelTransaction.typeId,
@@ -302,7 +321,7 @@ object AsyncHttpApi extends Assertions {
         decimals: Byte,
         reissuable: Boolean,
         fee: Long,
-        version: TxVersion = 2,
+        version: TxVersion = TxVersion.V2,
         script: Option[String] = None
     ): Future[Transaction] = {
       val js = Json.obj(
@@ -322,7 +341,7 @@ object AsyncHttpApi extends Assertions {
 
     }
 
-    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: TxVersion = 1): Future[Transaction] = {
+    def setScript(sender: String, script: Option[String] = None, fee: Long = 1000000, version: TxVersion = TxVersion.V1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"    -> SetScriptTransaction.typeId,
@@ -334,7 +353,13 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def setAssetScript(assetId: String, sender: String, fee: Long, script: Option[String] = None, version: TxVersion = 1): Future[Transaction] = {
+    def setAssetScript(
+        assetId: String,
+        sender: String,
+        fee: Long,
+        script: Option[String] = None,
+        version: TxVersion = TxVersion.V1
+    ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"    -> SetAssetScriptTransaction.typeId,
@@ -355,7 +380,7 @@ object AsyncHttpApi extends Assertions {
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = 500000,
         feeAssetId: Option[String] = None,
-        version: TxVersion = 1
+        version: TxVersion = TxVersion.V1
     ): Future[(Transaction, JsValue)] = {
       signAndTraceBroadcast(
         Json.obj(
@@ -378,7 +403,7 @@ object AsyncHttpApi extends Assertions {
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
       postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: TxVersion = 2): Future[Transaction] = {
+    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
           "type"     -> BurnTransaction.typeId,
@@ -510,7 +535,7 @@ object AsyncHttpApi extends Assertions {
       Future.sequence(transfers.map(v => signedBroadcast(toJson(v).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))))
     }
 
-    def createAlias(targetAddress: String, alias: String, fee: Long, version: TxVersion = 2): Future[Transaction] =
+    def createAlias(targetAddress: String, alias: String, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] =
       signAndBroadcast(
         Json.obj(
           "type"    -> CreateAliasTransaction.typeId,
@@ -766,86 +791,98 @@ object AsyncHttpApi extends Assertions {
   }
   class NodeExtGrpc(n: Node) {
 
-    import monix.execution.Scheduler.Implicits.global
     import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction}
+    import monix.execution.Scheduler.Implicits.global
 
-
-    private[this] lazy val accounts = AccountsApiGrpc.stub(n.grpcChannel)
-    private[this] lazy val blocks = BlocksApiGrpc.stub(n.grpcChannel)
+    private[this] lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
+    private[this] lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)
     private[this] lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
 
     val chainId: Byte = AddressScheme.current.chainId
 
     def blockAt(height: Int): Future[Block] = {
-      blocks.getBlock(
-        BlockRequest.of(
-          includeTransactions = true, BlockRequest.Request.Height.apply(height))).map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
+      blocks
+        .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height)))
+        .map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
     }
 
-    def broadcastIssue(source: KeyPair,
-                       name: String,
-                       quantity: Long,
-                       decimals: Byte,
-                       reissuable: Boolean,
-                       fee: Long,
-                       description: ByteString = ByteString.EMPTY,
-                       script: Option[String] = None,
-                       version: Int = 2): Future[PBSignedTransaction] = {
+    def broadcastIssue(
+        source: KeyPair,
+        name: String,
+        quantity: Long,
+        decimals: Byte,
+        reissuable: Boolean,
+        fee: Long,
+        description: ByteString = ByteString.EMPTY,
+        script: Option[String] = None,
+        version: Int = 2
+    ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis(),
         version,
-        PBTransaction.Data.Issue(IssueTransactionData.of(
-          ByteString.copyFrom(name.getBytes(StandardCharsets.UTF_8)),
-          description,
-          quantity,
-          decimals,
-          reissuable,
-          if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes))) else None)))
+        PBTransaction.Data.Issue(
+          IssueTransactionData.of(
+            ByteString.copyFrom(name.getBytes(StandardCharsets.UTF_8)),
+            description,
+            quantity,
+            decimals,
+            reissuable,
+            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes)))
+            else None
+          )
+        )
+      )
 
       val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
 
-      transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
     }
 
-    def broadcastTransfer(source: KeyPair,
-                          recipient: Recipient,
-                          amount: Long,
-                          fee: Long,
-                          version: Int = 2,
-                          assetId: String = "WAVES",
-                          attachment: ByteString = ByteString.EMPTY): Future[PBSignedTransaction] = {
+    def broadcastTransfer(
+        source: KeyPair,
+        recipient: Recipient,
+        amount: Long,
+        fee: Long,
+        version: Int = 2,
+        assetId: String = "WAVES",
+        attachment: ByteString = ByteString.EMPTY
+    ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis,
         version,
-        PBTransaction.Data.Transfer(TransferTransactionData.of(
-          Some(recipient),
-          Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-          attachment
-        ))
+        PBTransaction.Data.Transfer(
+          TransferTransactionData.of(
+            Some(recipient),
+            Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
+            attachment
+          )
+        )
       )
-      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
+      val proofs      = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
       val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
 
       transactions.broadcast(transaction)
     }
 
-    def exchange(matcher: KeyPair,
-                 buyOrder: Order,
-                 sellOrder: Order,
-                 amount: Long,
-                 price: Long,
-                 buyMatcherFee: Long,
-                 sellMatcherFee: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 version: Byte,
-                 matcherFeeAssetId: String = "WAVES"): Future[PBSignedTransaction] = {
+    def exchange(
+        matcher: KeyPair,
+        buyOrder: Order,
+        sellOrder: Order,
+        amount: Long,
+        price: Long,
+        buyMatcherFee: Long,
+        sellMatcherFee: Long,
+        fee: Long,
+        timestamp: Long,
+        version: Byte,
+        matcherFeeAssetId: String = "WAVES"
+    ): Future[PBSignedTransaction] = {
 
       val unsigned = PBTransaction(
         chainId,
@@ -853,34 +890,38 @@ object AsyncHttpApi extends Assertions {
         Some(Amount.of(if (matcherFeeAssetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(matcherFeeAssetId)), fee)),
         timestamp,
         version,
-        PBTransaction.Data.Exchange(ExchangeTransactionData.of(
-          amount,price,buyMatcherFee,sellMatcherFee,
-          Seq(PBOrders.protobuf(buyOrder),PBOrders.protobuf(sellOrder))
-        )))
+        PBTransaction.Data.Exchange(
+          ExchangeTransactionData.of(
+            amount,
+            price,
+            buyMatcherFee,
+            sellMatcherFee,
+            Seq(PBOrders.protobuf(buyOrder), PBOrders.protobuf(sellOrder))
+          )
+        )
+      )
 
-      val proofs = crypto.sign(matcher, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
+      val proofs      = crypto.sign(matcher, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
       val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
 
       transactions.broadcast(transaction)
     }
-
-
 
     def getTransaction(id: String): Future[PBSignedTransaction] = {
       def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
         val subj = ConcurrentSubject.publishToOne[T]
 
         val observer = new StreamObserver[T] {
-          override def onNext(value: T): Unit = subj.onNext(value)
+          override def onNext(value: T): Unit      = subj.onNext(value)
           override def onError(t: Throwable): Unit = subj.onError(t)
-          override def onCompleted(): Unit = subj.onComplete()
+          override def onCompleted(): Unit         = subj.onComplete()
         }
 
         (observer, subj.toListL)
       }
       val (obs, result) = createCallObserver[TransactionResponse]
-      val req = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))))
-      transactions.getTransactions(req,obs)
+      val req           = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))))
+      transactions.getTransactions(req, obs)
       result.map(_.headOption.getOrElse(throw new NoSuchElementException("Transaction not found")).getTransaction).runToFuture
     }
 
@@ -917,16 +958,16 @@ object AsyncHttpApi extends Assertions {
         val subj = ConcurrentSubject.publishToOne[T]
 
         val observer = new StreamObserver[T] {
-          override def onNext(value: T): Unit = subj.onNext(value)
+          override def onNext(value: T): Unit      = subj.onNext(value)
           override def onError(t: Throwable): Unit = subj.onError(t)
-          override def onCompleted(): Unit = subj.onComplete()
+          override def onCompleted(): Unit         = subj.onComplete()
         }
 
         (observer, subj.toListL)
       }
       val (obs, result) = createCallObserver[BalanceResponse]
-      val req = BalancesRequest.of(address, Seq(ByteString.EMPTY))
-      accounts.getBalances(req,obs)
+      val req           = BalancesRequest.of(address, Seq(ByteString.EMPTY))
+      accounts.getBalances(req, obs)
       result.map(_.headOption.getOrElse(throw new NoSuchElementException("Balances not found for address")).getWaves).runToFuture
     }
   }

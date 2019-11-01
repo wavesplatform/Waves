@@ -12,7 +12,7 @@ import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{RequestGen, TestTime}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.concurrent.Eventually
-import play.api.libs.json.{JsObject, Writes}
+import play.api.libs.json.Writes
 
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually with RestAPISettingsHelper {
 

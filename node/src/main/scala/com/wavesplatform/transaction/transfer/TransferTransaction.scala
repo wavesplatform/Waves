@@ -37,8 +37,8 @@ case class TransferTransaction(
   override val typeId: TxType = TransferTransaction.typeId
 
   // TODO: Rework caching
-  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
-  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
+  val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
+  val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
 
   override def checkedAssets(): Seq[IssuedAsset] = assetId match {
@@ -66,7 +66,7 @@ object TransferTransaction extends TransactionParserLite {
 
   override def classTag: ClassTag[TransferTransaction] = ClassTag(classOf[TransferTransaction])
 
-  override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = serializer.parseBytes(bytes)
+  override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
@@ -76,7 +76,7 @@ object TransferTransaction extends TransactionParserLite {
       amount: TxTimestamp,
       feeAsset: Asset,
       fee: TxTimestamp,
-      attachment: Array[TxVersion],
+      attachment: TxByteArray,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
@@ -90,7 +90,7 @@ object TransferTransaction extends TransactionParserLite {
       amount: TxTimestamp,
       feeAsset: Asset,
       fee: TxTimestamp,
-      attachment: Array[TxVersion],
+      attachment: TxByteArray,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
@@ -105,7 +105,7 @@ object TransferTransaction extends TransactionParserLite {
       amount: TxTimestamp,
       feeAsset: Asset,
       fee: TxTimestamp,
-      attachment: Array[TxVersion],
+      attachment: TxByteArray,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
     signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)

@@ -14,7 +14,7 @@ private[node] trait TransferTransaction {
   def timestamp: Long
   def height: Int
   def `type`: Byte
-  def version: TxVersion
+  def version: Byte
   def senderPublicKey: ByteString
   def proofs: List[ByteString]
 }
@@ -30,7 +30,7 @@ private[node] case class TransferTransactionV1(
   timestamp: Long,
   height: Int,
   `type`: Byte,
-  version: TxVersion,
+  version: Byte,
   senderPublicKey: ByteString,
   signature: ByteString
 ) extends TransferTransaction {
@@ -48,7 +48,7 @@ private[node] case class TransferTransactionV2(
   timestamp: Long,
   height: Int,
   `type`: Byte,
-  version: TxVersion,
+  version: Byte,
   senderPublicKey: ByteString,
   proofs: List[ByteString]
 ) extends TransferTransaction

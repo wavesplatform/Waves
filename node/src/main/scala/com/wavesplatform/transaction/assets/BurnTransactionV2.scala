@@ -34,7 +34,7 @@ final case class BurnTransactionV2 private (chainId: Byte,
     (bodyBytes, proofs.bytes)
       .mapN { case (bb, pb) => Bytes.concat(Array(0: Byte), bb, pb) }
 
-  override def version: TxVersion = 2
+  override def version: TxVersion = TxVersion.V2
 }
 
 object BurnTransactionV2 extends TransactionParserFor[BurnTransactionV2] with TransactionParser.MultipleVersions {
