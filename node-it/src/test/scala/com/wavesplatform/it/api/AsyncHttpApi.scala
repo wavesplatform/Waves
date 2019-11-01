@@ -22,12 +22,13 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
@@ -764,7 +765,7 @@ object AsyncHttpApi extends Assertions {
   class NodeExtGrpc(n: Node) {
 
     import monix.execution.Scheduler.Implicits.global
-    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction}
+    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction, Script => PBScript}
 
 
     private[this] lazy val accounts = AccountsApiGrpc.stub(n.grpcChannel)
@@ -776,7 +777,7 @@ object AsyncHttpApi extends Assertions {
     def blockAt(height: Int): Future[Block] = {
       blocks.getBlock(
         BlockRequest.of(
-          includeTransactions = true, BlockRequest.Request.Height.apply(height))).map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
+          includeTransactions = true, BlockRequest.Request.Height(height))).map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
     }
 
     def broadcastIssue(source: KeyPair,
@@ -800,9 +801,9 @@ object AsyncHttpApi extends Assertions {
           quantity,
           decimals,
           reissuable,
-          if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes))) else None)))
+          script.map(s => PBScript.of(ByteString.copyFrom(Script.fromBase64String(s).explicitGet().bytes()))))))
 
-      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
+      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
 
       transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
     }
