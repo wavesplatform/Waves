@@ -801,11 +801,14 @@ object AsyncHttpApi extends Assertions {
           quantity,
           decimals,
           reissuable,
-          script.map(s => PBScript.of(ByteString.copyFrom(Script.fromBase64String(s).explicitGet().bytes()))))))
+          script.map(s => PBScript.of(ByteString.copyFrom(Base64.decode(s)))))))
 
-      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-
-      transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      script match {
+        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.EMPTY)))
+        case _ =>
+          val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      }
     }
 
     def broadcastTransfer(source: KeyPair,

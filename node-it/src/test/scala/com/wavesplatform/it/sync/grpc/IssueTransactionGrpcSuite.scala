@@ -78,20 +78,20 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val assetName        = "myasset"
       val assetDescription = "my asset description"
 
-      val thrown = intercept[RuntimeException]{
-        sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Some(script))
-      }
-      val thrownMessage = thrown.getMessage
-      assert(thrownMessage.contains(s"$error"))
+      assertGrpcError(
+      sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Some(script)),
+        error,
+        Code.INTERNAL
+      )
     }
   }
 
   val invalidAssetValue =
     Table(
-      ("assetVal", "decimals", "error"),
-      (0L, 2, NonPositiveAmount(0,"assets")),
+      ("assetVal", "decimals", "message"),
+      (0L, 2, NonPositiveAmount(0, "assets")),
       (1L, 9, TooBigArray),
-      (-1L, 1, NonPositiveAmount(-1,"assets")),
+      (-1L, 1, NonPositiveAmount(-1, "assets")),
       (1L, -1, TooBigArray)
     )
 
@@ -101,11 +101,11 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val assetDescription   = "my asset description 2"
       val decimalBytes: Byte = decimals.toByte
 
-      val thrown = intercept[RuntimeException]{
-        sender.grpc.broadcastIssue(issuer, assetName, assetVal, decimalBytes, false, issueFee)
-      }
-      val thrownMessage = thrown.getMessage
-      assert(thrownMessage.contains(s"$error"))
+      assertGrpcError(
+      sender.grpc.broadcastIssue(issuer, assetName, assetVal, decimalBytes, reissuable = false, issueFee),
+        s"$error",
+        Code.INTERNAL
+      )
     }
   }
 
@@ -118,11 +118,11 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
 
   forAll(invalid_assets_names) { invalidAssetName: String =>
     test(s"Not able to create asset named $invalidAssetName") {
-      val thrown = intercept[RuntimeException]{
-        sender.grpc.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee)
-      }
-      val thrownMessage = thrown.getMessage
-      assert(thrownMessage.contains(s"$InvalidName"))
+      assertGrpcError(
+        sender.grpc.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee),
+        s"$InvalidName",
+        Code.INTERNAL
+      )
     }
   }
 
