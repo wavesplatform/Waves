@@ -14,7 +14,7 @@ import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesReq
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage._
@@ -22,7 +22,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -801,11 +801,14 @@ object AsyncHttpApi extends Assertions {
           quantity,
           decimals,
           reissuable,
-          script.map(s => PBScript.of(ByteString.copyFrom(Script.fromBase64String(s).explicitGet().bytes()))))))
+          script.map(s => PBScript.of(ByteString.copyFrom(Base64.decode(s)))))))
 
-      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-
-      transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      script match {
+        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.EMPTY)))
+        case _ =>
+          val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      }
     }
 
     def broadcastTransfer(source: KeyPair,

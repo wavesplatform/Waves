@@ -596,7 +596,6 @@ object PBTransactions {
         import tx._
         val data = IssueTransactionData(ByteStr(name), ByteStr(description), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
-
       case tx: vt.assets.ReissueTransaction =>
         import tx._
         val data = ReissueTransactionData(Some(Amount(asset.id, quantity)), reissuable)
