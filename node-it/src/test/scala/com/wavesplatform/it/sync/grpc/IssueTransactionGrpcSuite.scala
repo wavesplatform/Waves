@@ -76,8 +76,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   forAll(invalidScript) { (script: String, error: String) =>
     test(s"Try to put incorrect script=$script") {
       val assetName        = "myasset"
-      val assetDescription = "my asset description"
-
+      
       assertGrpcError(
       sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Some(script)),
         error,
@@ -98,7 +97,6 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: ValidationError) =>
     test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
       val assetName          = "myasset2"
-      val assetDescription   = "my asset description 2"
       val decimalBytes: Byte = decimals.toByte
 
       assertGrpcError(
