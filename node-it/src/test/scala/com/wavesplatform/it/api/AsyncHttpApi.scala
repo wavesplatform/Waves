@@ -8,7 +8,7 @@ import java.util.concurrent.TimeoutException
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
@@ -27,7 +27,11 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
+<<<<<<< HEAD
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, ReissueTransactionData, Script, SignedTransaction, TransferTransactionData}
+=======
+import com.wavesplatform.protobuf.transaction.{CreateAliasTransactionData, ExchangeTransactionData, IssueTransactionData, LeaseTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
+>>>>>>> alias tx grpc tests and additional methods in http api
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
@@ -832,7 +836,7 @@ object AsyncHttpApi extends Assertions {
 
       transactions.broadcast(transaction)
     }
-
+    
     def broadcastReissue(source: KeyPair,
                          fee: Long,
                          assetId: String,
@@ -854,6 +858,43 @@ object AsyncHttpApi extends Assertions {
       val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
 
       transactions.broadcast(transaction)
+    }
+
+    def broadcastCreateAlias(source: KeyPair,
+                             alias: String,
+                             fee: Long,
+                             version: Int = 2): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(source.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.CreateAlias(CreateAliasTransactionData(alias))
+      )
+      if (Alias.create(alias).isLeft) {
+        transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.EMPTY)))
+      } else {
+        val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+        transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+      }
+    }
+
+    def broadcastLease(source: KeyPair,
+                       recipient: Recipient,
+                       amount: Long,
+                       fee: Long,
+                       version: Int = 2): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(source.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.Lease(LeaseTransactionData.of(Some(recipient), amount))
+      )
+      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
     }
 
     def exchange(matcher: KeyPair,
