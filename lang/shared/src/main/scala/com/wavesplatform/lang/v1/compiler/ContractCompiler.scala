@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types => WavesTypes}
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser, Parser2}
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
@@ -308,7 +308,7 @@ object ContractCompiler {
       ctx: CompilerContext,
       version: StdLibVersion
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
-    Parser2.parseDAPP(input) match {
+    ParserV2.parseDAPP(input) match {
       case Right((parseResult, removedCharPosOpt)) =>
         compileContract(ctx, parseResult, version)
           .run(ctx)

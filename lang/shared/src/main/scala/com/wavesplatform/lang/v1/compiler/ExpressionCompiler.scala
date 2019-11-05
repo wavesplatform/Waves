@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions.{BINARY_OP, MATCH_CASE, PART, Pos, TypeParam}
-import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, Parser2}
+import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
 
@@ -47,7 +47,7 @@ object ExpressionCompiler {
   }
 
   def compileWithParseResult(input: String, ctx: CompilerContext): Either[String, (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] = {
-    val res = Parser2.parseExpression(input)
+    val res = ParserV2.parseExpression(input)
     res match {
       case Right((parseResult, removedCharPosOpt)) =>
         compileExprWithCtx(parseResult.expr)
