@@ -4,7 +4,6 @@ import cats.data.ValidatedNel
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.sign.TxSigner
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
 
@@ -33,7 +32,7 @@ package object transaction {
     def validatedEither: Either[ValidationError, T]    = this.validatedNel.toEither.left.map(_.head)
   }
 
-  implicit class TransactionSignOps[T <: Transaction: TxSigner](tx: T) {
-    def signWith(privateKey: PrivateKey): T = implicitly[TxSigner[T]].sign(tx, privateKey)
+  implicit class TransactionSignOps[T <: Transaction](tx: T)(implicit sign: (T, PrivateKey) => T) {
+    def signWith(privateKey: PrivateKey): T = sign(tx, privateKey)
   }
 }

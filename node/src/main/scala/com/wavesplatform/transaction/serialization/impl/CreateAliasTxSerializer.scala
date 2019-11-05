@@ -4,14 +4,13 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.serialization.TxSerializer
 import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
-  override def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
+object CreateAliasTxSerializer {
+  def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
 
     val base = Bytes.concat(
@@ -27,7 +26,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
     }
   }
 
-  override def toBytes(tx: CreateAliasTransaction): Array[Byte] = {
+  def toBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
 
     version match {
@@ -36,7 +35,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
     }
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {
     require(bytes.length > 3, "Invalid tx bytes")
     bytes.take(3) match {
       case Array(CreateAliasTransaction.typeId, _, _) =>
@@ -61,7 +60,7 @@ object CreateAliasTxSerializer extends TxSerializer[CreateAliasTransaction] {
     }
   }
 
-  override def toJson(tx: CreateAliasTransaction): JsObject = {
+  def toJson(tx: CreateAliasTransaction): JsObject = {
     import tx._
     ProvenTxJson.toJson(tx) ++ Json.obj(
       "version" -> version.toByte,

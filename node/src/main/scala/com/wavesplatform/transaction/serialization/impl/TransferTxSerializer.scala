@@ -5,15 +5,14 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.{Proofs, TxVersion}
-import com.wavesplatform.transaction.serialization.TxSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-object TransferTxSerializer extends TxSerializer[TransferTransaction] {
-  override def toJson(tx: TransferTransaction): JsObject = {
+object TransferTxSerializer {
+  def toJson(tx: TransferTransaction): JsObject = {
     import tx._
     ProvenTxJson.toJson(tx) ++ Json.obj(
       "version"    -> version,
@@ -25,7 +24,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
     )
   }
 
-  override def bodyBytes(tx: TransferTransaction): Array[Byte] = {
+  def bodyBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
     val baseBytes = {
       Bytes.concat(
@@ -46,7 +45,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
     }
   }
 
-  override def toBytes(tx: TransferTransaction): Array[Byte] = {
+  def toBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
     version match {
       case 1 => Bytes.concat(Array(typeId), proofs.proofs.head, this.bodyBytes(tx))
@@ -54,7 +53,7 @@ object TransferTxSerializer extends TxSerializer[TransferTransaction] {
     }
   }
 
-  override def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
+  def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): TransferTransaction = {
       val sender     = buf.getPublicKey
       val assetId    = buf.getAsset

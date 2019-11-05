@@ -1,14 +1,11 @@
 package com.wavesplatform.transaction.transfer
 
 import com.wavesplatform.account._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.serialization.TxSerializer
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
-import com.wavesplatform.transaction.sign.TxSigner
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.TransferTxValidator
 import com.wavesplatform.utils.base58Length
@@ -54,9 +51,8 @@ object TransferTransaction extends TransactionParserLite {
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
-  implicit val signer: TxSigner[TransferTransaction] = (tx: TransferTransaction, privateKey: PrivateKey) =>
-    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-  val serializer: TxSerializer[TransferTransaction] = TransferTxSerializer
+  implicit val signer                                      = (tx: TransferTransaction, privateKey: PrivateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+  val serializer                                           = TransferTxSerializer
 
   val typeId: TxType = 4.toByte
 
@@ -94,8 +90,7 @@ object TransferTransaction extends TransactionParserLite {
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
-    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty)
-      .map(this.signer.sign(_, signer))
+    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,

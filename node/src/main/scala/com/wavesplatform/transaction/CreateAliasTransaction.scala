@@ -4,9 +4,7 @@ import com.wavesplatform.account.{Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.serialization.TxSerializer
 import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
-import com.wavesplatform.transaction.sign.TxSigner
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.TxFeeValidator
 import monix.eval.Coeval
@@ -30,11 +28,11 @@ object CreateAliasTransaction extends TransactionParserLite {
   type TransactionT = CreateAliasTransaction
   val classTag: ClassTag[CreateAliasTransaction] = ClassTag(classOf[CreateAliasTransaction])
   val supportedVersions: Set[TxVersion]          = Set(1, 2)
-  val typeId: TxType                               = 10
+  val typeId: TxType                             = 10
 
-  implicit val signer: TxSigner[CreateAliasTransaction]         = (tx, privateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-  implicit val validator: TxValidator[CreateAliasTransaction]   = TxFeeValidator.asInstanceOf[TxValidator[CreateAliasTransaction]]
-  val serializer: TxSerializer[CreateAliasTransaction] = CreateAliasTxSerializer
+  implicit val validator = TxFeeValidator.asInstanceOf[TxValidator[CreateAliasTransaction]]
+  implicit val signer    = (tx: CreateAliasTransaction, privateKey: PrivateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+  val serializer         = CreateAliasTxSerializer
 
   override def parseBytes(bytes: Array[TxVersion]): Try[CreateAliasTransaction] = serializer.parseBytes(bytes)
 
