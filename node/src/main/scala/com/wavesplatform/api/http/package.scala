@@ -65,6 +65,7 @@ package object http extends ApiMarshallers with ScorexLogging {
                 x match {
                   case TransferTransaction       => txJson.as[TransferRequest].toTxFrom(senderPk)
                   case CreateAliasTransaction    => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
+                  case LeaseTransaction          => txJson.as[LeaseRequest].toTxFrom(senderPk)
                   case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
                   case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
                   case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)
@@ -72,8 +73,6 @@ package object http extends ApiMarshallers with ScorexLogging {
                   case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], senderPk)
                   case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], senderPk)
                   case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], senderPk)
-                  case LeaseTransactionV1        => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], senderPk)
-                  case LeaseTransactionV2        => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], senderPk)
                   case LeaseCancelTransactionV1  => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], senderPk)
                   case LeaseCancelTransactionV2  => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], senderPk)
                   case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], senderPk)

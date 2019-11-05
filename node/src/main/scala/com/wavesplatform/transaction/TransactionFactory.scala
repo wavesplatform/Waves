@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, UnsupportedTypeAndVersion, WrongChain}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.Time
@@ -234,67 +234,20 @@ object TransactionFactory {
     EmptySignature
   )
 
-  def leaseV1(request: LeaseV1Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransactionV1] =
-    leaseV1(request, wallet, request.sender, time)
-
-  def leaseV1(request: LeaseV1Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, LeaseTransactionV1] =
+  def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] =
     for {
-      sender       <- wallet.findPrivateKey(request.sender)
-      signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx <- LeaseTransactionV1.signed(
-        sender,
-        request.amount,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        recipientAcc,
-        signer
-      )
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
+      tx <- lease(request, wallet, request.sender.get, time)
     } yield tx
 
-  def leaseV1(request: LeaseV1Request, sender: PublicKey): Either[ValidationError, LeaseTransactionV1] =
+  def lease(request: LeaseRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, LeaseTransaction] =
     for {
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx <- LeaseTransactionV1.create(
-        sender,
-        request.amount,
-        request.fee,
-        request.timestamp.getOrElse(0),
-        recipientAcc,
-        EmptySignature
-      )
-    } yield tx
-
-  def leaseV2(request: LeaseV2Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransactionV2] =
-    leaseV2(request, wallet, request.sender, time)
-
-  def leaseV2(request: LeaseV2Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, LeaseTransactionV2] =
-    for {
-      sender       <- wallet.findPrivateKey(request.sender)
-      signer       <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx <- LeaseTransactionV2.signed(
-        sender,
-        request.amount,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        recipientAcc,
-        signer
-      )
-    } yield tx
-
-  def leaseV2(request: LeaseV2Request, sender: PublicKey): Either[ValidationError, LeaseTransactionV2] =
-    for {
-      recipientAcc <- AddressOrAlias.fromString(request.recipient)
-      tx <- LeaseTransactionV2.create(
-        sender,
-        request.amount,
-        request.fee,
-        request.timestamp.getOrElse(0),
-        recipientAcc,
-        Proofs.empty
-      )
-    } yield tx
+      _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
+      sender <- wallet.findPrivateKey(request.sender.get)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender)
+      signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      signedTx = tx.signWith(signer)
+    } yield signedTx
 
   def leaseCancelV1(request: LeaseCancelV1Request, wallet: Wallet, time: Time): Either[ValidationError, LeaseCancelTransactionV1] =
     leaseCancelV1(request, wallet, request.sender, time)
@@ -653,6 +606,7 @@ object TransactionFactory {
     val pf: PartialFunction[TransactionParserLite, Either[ValidationError, Transaction]] = {
       case TransferTransaction       => jsv.as[TransferRequest].toTx
       case CreateAliasTransaction    => jsv.as[CreateAliasRequest].toTx
+      case LeaseTransaction          => jsv.as[CreateAliasRequest].toTx
       case IssueTransactionV1        => jsv.as[SignedIssueV1Request].toTx
       case IssueTransactionV2        => jsv.as[SignedIssueV2Request].toTx
       case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
@@ -660,8 +614,6 @@ object TransactionFactory {
       case ReissueTransactionV2      => jsv.as[SignedReissueV2Request].toTx
       case BurnTransactionV1         => jsv.as[SignedBurnV1Request].toTx
       case BurnTransactionV2         => jsv.as[SignedBurnV2Request].toTx
-      case LeaseTransactionV1        => jsv.as[SignedLeaseV1Request].toTx
-      case LeaseTransactionV2        => jsv.as[SignedLeaseV2Request].toTx
       case LeaseCancelTransactionV1  => jsv.as[SignedLeaseCancelV1Request].toTx
       case LeaseCancelTransactionV2  => jsv.as[SignedLeaseCancelV2Request].toTx
       case DataTransaction           => jsv.as[SignedDataRequest].toTx
@@ -699,6 +651,7 @@ object TransactionFactory {
             x match {
               case TransferTransaction       => TransactionFactory.transferAsset(txJson.as[TransferRequest], wallet, signerAddress, time)
               case CreateAliasTransaction    => TransactionFactory.createAlias(txJson.as[CreateAliasRequest], wallet, signerAddress, time)
+              case LeaseTransaction          => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
               case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], wallet, signerAddress, time)
               case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], wallet, signerAddress, time)
               case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
@@ -706,8 +659,6 @@ object TransactionFactory {
               case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
               case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
               case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
-              case LeaseTransactionV1        => TransactionFactory.leaseV1(txJson.as[LeaseV1Request], wallet, signerAddress, time)
-              case LeaseTransactionV2        => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], wallet, signerAddress, time)
               case LeaseCancelTransactionV1  => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], wallet, signerAddress, time)
               case LeaseCancelTransactionV2  => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], wallet, signerAddress, time)
               case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)

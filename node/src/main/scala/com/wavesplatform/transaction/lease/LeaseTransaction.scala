@@ -4,8 +4,7 @@ import com.wavesplatform.account.{AddressOrAlias, KeyPair, PrivateKey, PublicKey
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
-import com.wavesplatform.transaction.validation.TxValidator
-import com.wavesplatform.transaction.validation.impl.TxFeeValidator
+import com.wavesplatform.transaction.validation.impl.LeaseTxValidator
 import com.wavesplatform.transaction.{
   FastHashId,
   Proofs,
@@ -48,7 +47,7 @@ object LeaseTransaction extends TransactionParserLite {
   val supportedVersions: Set[TxVersion]    = Set(1, 2)
   val typeId: TxType                       = 8
 
-  implicit val validator = TxFeeValidator.asInstanceOf[TxValidator[LeaseTransaction]]
+  implicit val validator = LeaseTxValidator
   val serializer         = LeaseTxSerializer
 
   implicit def sign(tx: LeaseTransaction, privateKey: PrivateKey): LeaseTransaction =

@@ -15,7 +15,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction}
@@ -41,7 +41,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
     op match {
       case 1 =>
-        val lease = LeaseTransactionV1.selfSigned(sender, amount, 100000, nextTs, recipient).explicitGet()
+        val lease = LeaseTransaction.selfSigned(1.toByte, sender, recipient, amount, 100000, nextTs).explicitGet()
         List(lease, LeaseCancelTransactionV1.selfSigned(sender, lease.id(), 1, nextTs).explicitGet())
       case 2 =>
         List(
@@ -161,7 +161,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val genesisBlockId = d.lastBlockId
 
           val leaseAmount = initialBalance - 2
-          val lt          = LeaseTransactionV1.selfSigned(sender, leaseAmount, 1, nextTs, recipient).explicitGet()
+          val lt          = LeaseTransaction.selfSigned(1.toByte, sender, recipient, leaseAmount, 1, nextTs).explicitGet()
           d.appendBlock(TestBlock.create(nextTs, genesisBlockId, Seq(lt)))
           d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
@@ -218,7 +218,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               d.lastBlockId,
               Seq(
-                TransferTransaction.selfSigned(1.toByte, sender, recipient, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, Array.empty[Byte], nextTs).explicitGet()
+                TransferTransaction
+                  .selfSigned(1.toByte, sender, recipient, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, Array.empty[Byte], nextTs)
+                  .explicitGet()
               )
             )
           )
