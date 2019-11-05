@@ -791,7 +791,10 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func foo(a:ByteVector) =
           |   [
-          |     DataEntry("key", 1),
+          |     IntEntry("key", 1),
+          |     BooleanEntry("key", true),
+          |     StringEntry("key", "str"),
+          |     BinaryEntry("key", base58''),
           |     ScriptTransfer(i.caller, 1, base58''),
           |     Issue(unit, 4, "description", true, "name", 1000),
           |     Reissue(base58'', false, 1),

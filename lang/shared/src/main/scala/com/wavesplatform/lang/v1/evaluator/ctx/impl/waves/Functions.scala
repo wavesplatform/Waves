@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulNativeFunction, ContextfulUserFunction, FunctionIds}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
-import Types.{addressOrAliasType, addressType, dataEntryType, optionAddress, scriptTransfer, _}
+import Types.{addressOrAliasType, addressType, commonDataEntryType, optionAddress, scriptTransfer, _}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import Bindings.{scriptTransfer => _, _}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V4}
@@ -57,13 +57,13 @@ object Functions {
   val getBinaryFromStateF: BaseFunction[Environment]  = getDataFromStateF("getBinary", DATA_BYTES_FROM_STATE, DataType.ByteArray)
   val getStringFromStateF: BaseFunction[Environment]  = getDataFromStateF("getString", DATA_STRING_FROM_STATE, DataType.String)
 
-  private def getDataFromArrayF(name: String, internalName: Short, dataType: DataType): BaseFunction[Environment] =
+  private def getDataFromArrayF(name: String, internalName: Short, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction(
       name,
       10,
       internalName,
       UNION(dataType.innerType, UNIT),
-      ("data", LIST(dataEntryType)),
+      ("data", LIST(commonDataEntryType(version))),
       ("key", STRING)
     ) {
       case ARR(data: IndexedSeq[CaseObj] @unchecked) :: CONST_STRING(key: String) :: Nil =>
@@ -81,17 +81,17 @@ object Functions {
       case xs => notImplemented[Id](s"$name(s: String)", xs)
     }
 
-  val getIntegerFromArrayF: BaseFunction[Environment] = getDataFromArrayF("getInteger", DATA_LONG_FROM_ARRAY, DataType.Long)
-  val getBooleanFromArrayF: BaseFunction[Environment] = getDataFromArrayF("getBoolean", DATA_BOOLEAN_FROM_ARRAY, DataType.Boolean)
-  val getBinaryFromArrayF: BaseFunction[Environment]  = getDataFromArrayF("getBinary", DATA_BYTES_FROM_ARRAY, DataType.ByteArray)
-  val getStringFromArrayF: BaseFunction[Environment]  = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String)
+  def getIntegerFromArrayF(v: StdLibVersion): BaseFunction[Environment] = getDataFromArrayF("getInteger", DATA_LONG_FROM_ARRAY, DataType.Long, v)
+  def getBooleanFromArrayF(v: StdLibVersion): BaseFunction[Environment] = getDataFromArrayF("getBoolean", DATA_BOOLEAN_FROM_ARRAY, DataType.Boolean, v)
+  def getBinaryFromArrayF(v: StdLibVersion): BaseFunction[Environment]  = getDataFromArrayF("getBinary", DATA_BYTES_FROM_ARRAY, DataType.ByteArray, v)
+  def getStringFromArrayF(v: StdLibVersion): BaseFunction[Environment]  = getDataFromArrayF("getString", DATA_STRING_FROM_ARRAY, DataType.String, v)
 
-  private def getDataByIndexF(name: String, dataType: DataType): BaseFunction[Environment] =
+  private def getDataByIndexF(name: String, dataType: DataType, version: StdLibVersion): BaseFunction[Environment] =
     UserFunction(
       name,
       30,
       UNION(dataType.innerType, UNIT),
-      ("@data", LIST(dataEntryType)),
+      ("@data", LIST(commonDataEntryType(version))),
       ("@index", LONG)
     ) {
       LET_BLOCK(
@@ -107,10 +107,10 @@ object Functions {
       )
     }
 
-  val getIntegerByIndexF: BaseFunction[Environment] = getDataByIndexF("getInteger", DataType.Long)
-  val getBooleanByIndexF: BaseFunction[Environment] = getDataByIndexF("getBoolean", DataType.Boolean)
-  val getBinaryByIndexF: BaseFunction[Environment]  = getDataByIndexF("getBinary", DataType.ByteArray)
-  val getStringByIndexF: BaseFunction[Environment]  = getDataByIndexF("getString", DataType.String)
+  def getIntegerByIndexF(v: StdLibVersion): BaseFunction[Environment] = getDataByIndexF("getInteger", DataType.Long, v)
+  def getBooleanByIndexF(v: StdLibVersion): BaseFunction[Environment] = getDataByIndexF("getBoolean", DataType.Boolean, v)
+  def getBinaryByIndexF(v: StdLibVersion): BaseFunction[Environment]  = getDataByIndexF("getBinary", DataType.ByteArray, v)
+  def getStringByIndexF(v: StdLibVersion): BaseFunction[Environment]  = getDataByIndexF("getString", DataType.String, v)
 
   private def secureHashExpr(xs: EXPR): EXPR = FUNCTION_CALL(
     FunctionHeader.Native(KECCAK256),
@@ -395,20 +395,20 @@ object Functions {
     }
   }
 
-  val extractedFuncs: Array[BaseFunction[Environment]] =
+  def extractedFuncs(v: StdLibVersion): Array[BaseFunction[Environment]] =
     Array(
       getIntegerFromStateF,
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      getIntegerFromArrayF,
-      getBooleanFromArrayF,
-      getBinaryFromArrayF,
-      getStringFromArrayF,
-      getIntegerByIndexF,
-      getBooleanByIndexF,
-      getBinaryByIndexF,
-      getStringByIndexF,
+      getIntegerFromArrayF(v),
+      getBooleanFromArrayF(v),
+      getBinaryFromArrayF(v),
+      getStringFromArrayF(v),
+      getIntegerByIndexF(v),
+      getBooleanByIndexF(v),
+      getBinaryByIndexF(v),
+      getStringByIndexF(v),
       addressFromStringF
     ).map(withExtract)
 
