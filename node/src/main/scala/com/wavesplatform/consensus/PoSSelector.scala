@@ -1,6 +1,6 @@
 package com.wavesplatform.consensus
 
-import cats.implicits._
+import cats.syntax.either._
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -35,16 +35,11 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   ): Either[ValidationError, NxtLikeConsensusBlockData] = {
     val bt = pos(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
 
-    checkBaseTargetLimit(bt, height).flatMap(
-      _ =>
-        blockchain.lastBlock
-          .map(_.header.generationSignature.arr)
-          .map { gs =>
-            val signature = if (vrfActivated(height)) generationVRFSignature(gs, account.privateKey) else generationSignature(gs, account.publicKey)
-            NxtLikeConsensusBlockData(bt, ByteStr(signature))
-          }
-          .toRight(GenericError("No blocks in blockchain"))
-    )
+    checkBaseTargetLimit(bt, height).flatMap { _ =>
+      blockchain
+        .blockProofsAtHeight(height)
+        .map(parentProofs => NxtLikeConsensusBlockData(bt, blockProofs(height, parentProofs, account)))
+    }
   }
 
   def getValidBlockDelay(height: Int, accountPublicKey: PublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
@@ -52,8 +47,14 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
     getHit(height, accountPublicKey)
       .map(pc.calculateDelay(_, refBlockBT, balance))
-      .toRight(GenericError("No blocks in blockchain"))
   }
+
+  def validateTimestamp(height: Int, proofs: ByteStr, timestamp: Long, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] =
+    for {
+      _ <- Either.cond(proofs.size == ProofsSize, (), GenericError("Illegal size of block generation proofs"))
+      valid = pos(height).calculateDelay(hit(proofs.arr), parent.baseTarget, effectiveBalance) + parent.timestamp
+      _ <- if (valid <= timestamp) Right(()) else Left(GenericError(s"Block timestamp $timestamp less than min valid timestamp $valid"))
+    } yield ()
 
   def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
     getValidBlockDelay(height, block.header.generator, parent.baseTarget, effectiveBalance)
@@ -64,24 +65,24 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .map(_ => ())
   }
 
-  def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, Unit] = {
-    val blockGS = block.header.generationSignature.arr
+  def validateGeneratorSignature(height: Int, block: Block): Either[ValidationError, ByteStr] = {
+    val blockGS        = block.header.generationSignature.arr
+    val blockGenerator = block.header.generator
 
     blockchain.lastBlock
       .toRight(GenericError("No blocks in blockchain"))
       .flatMap {
-        case b if vrfActivated(height) =>
-          val gs = crypto.verifyVRF(b.header.generationSignature, b.header.generationSignature, block.header.generator).arr
-          Either.cond(
-            gs sameElements blockGS,
-            (),
-            GenericError("Generation VRF signatures is not valid")
-          )
+        case _ if vrfActivated(height) => // todo: (NODE-1927) always last block or by height?
+          for {
+            msg <- blockchain.blockProofsAtHeight(blockchain.height - 1)
+            // msg <- blockchain.blockHitAtHeight(height)
+            vrf <- crypto.verifyVRF(blockGS, msg, blockGenerator)
+          } yield vrf
         case b =>
-          val gs = generationSignature(b.header.generationSignature.arr, block.header.generator)
+          val gs = generationSignature(b.header.generationSignature.arr, blockGenerator)
           Either.cond(
             gs sameElements blockGS,
-            (),
+            ByteStr(gs),
             GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(gs)}; Found = ${Base58.encode(blockGS)}")
           )
       }
@@ -125,21 +126,19 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     )
   }
 
-  private def getHit(height: Int, accountPublicKey: PublicKey): Option[BigInt] = {
-    val blockForHit =
-      if (fairPosActivated(height) && height > 100) blockchain.blockAt(height - 100)
-      else blockchain.lastBlock
+  private def getHit(height: Int, accountPublicKey: PublicKey): Either[ValidationError, BigInt] = {
+    val message =
+      if (fairPosActivated(height) && height > 100) blockchain.blockProofsAtHeight(height - 1)
+      else blockchain.blockProofsAtHeight(blockchain.height)
 
-    blockForHit.flatMap { b =>
-      if (!vrfActivated(height) || b.header.version < Block.ProtoBlockVersion)
-        hit(generationSignature(b.header.generationSignature.arr, accountPublicKey)).some
-      else
-        blockchain
-          .blockHeaderAndSize(b.header.reference)
-          .map { case (header, _, _, _) => header.generationSignature }
-          .map(msg => hit(crypto.verifyVRF(b.header.generationSignature, msg, b.header.generator).arr))
-    }
+    message.map(msg => if (vrfActivated(height)) msg.arr else generationSignature(msg, accountPublicKey)).map(msg => hit(msg))
   }
+
+  private def blockProofs(height: Int, parentProofs: ByteStr, account: KeyPair): ByteStr =
+    if (vrfActivated(height))
+      generationVRFSignature(parentProofs.arr, account.privateKey)
+    else
+      generationSignature(parentProofs.arr, account.publicKey)
 
   private def fairPosActivated(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
   private def vrfActivated(height: Int): Boolean     = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.BlockV5.id)

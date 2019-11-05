@@ -4,12 +4,14 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.consensus.PoSCalculator
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state.extensions.{AddressTransactions, BlockchainExtensions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -93,6 +95,14 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
+
+  /**
+    * Retrieves Blake2b256 signature or VRF (after feature activation) for the block at height.
+    */
+  def blockProofsAtHeight(height: Int): Either[ValidationError, ByteStr] =
+    blockHeaderAndSize(height)
+    .map { case (header, _, _, _) => header.generationSignature }
+    .toRight(GenericError("No blocks in blockchain"))
 }
 
 object Blockchain extends BlockchainExtensions {

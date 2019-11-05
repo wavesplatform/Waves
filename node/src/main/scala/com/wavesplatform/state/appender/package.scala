@@ -108,8 +108,8 @@ package object appender extends ScorexLogging {
           _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          _                <- pos.validateGeneratorSignature(height, block)
-          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
+          proof            <- pos.validateGeneratorSignature(height, block)
+          _                <- pos.validateTimestamp(height, proof, block.header.timestamp, parent, effectiveBalance).orElse(checkExceptions(height, block))
         } yield ()
       }
       .left
@@ -138,6 +138,7 @@ package object appender extends ScorexLogging {
     )
   }
 
+  //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block")
