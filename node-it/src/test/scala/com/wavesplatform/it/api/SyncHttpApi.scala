@@ -670,6 +670,23 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment)), waitForTx)
     }
 
+    def broadcastCreateAlias(source: KeyPair,
+                             alias: String,
+                             fee: Long,
+                             version: Int = 2,
+                             waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastCreateAlias(source, alias, fee, version)), waitForTx)
+    }
+
+    def broadcastLease(source: KeyPair,
+                       recipient: Recipient,
+                       amount: Long,
+                       fee: Long,
+                       version: Int = 2,
+                       waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastLease(source, recipient, amount, fee, version)), waitForTx)
+    }
+
     def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
       val pbAssetIds = assetIds.map(a => ByteString.copyFrom(Base58.decode(a)))
       val balances = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
