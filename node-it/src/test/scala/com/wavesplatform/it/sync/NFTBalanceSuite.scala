@@ -85,17 +85,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
       val other = KeyPair("other".getBytes)
 
       val transfer = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          randomTokenToTransfer,
-          issuer,
-          other,
-          1,
-          System.currentTimeMillis(),
-          Waves,
-          0.001.waves,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, Array.emptyByteArray, System.currentTimeMillis())
         .explicitGet()
 
       val assertion = for {

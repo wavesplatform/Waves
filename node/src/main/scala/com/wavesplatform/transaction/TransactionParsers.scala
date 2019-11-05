@@ -26,7 +26,7 @@ object TransactionParsers {
     ExchangeTransactionV1,
     LeaseTransactionV1,
     LeaseCancelTransactionV1,
-    CreateAliasTransactionV1,
+    CreateAliasTransaction,
     MassTransferTransaction,
     TransferTransaction
   ).map { x =>
@@ -37,7 +37,7 @@ object TransactionParsers {
     DataTransaction,
     SetScriptTransaction,
     IssueTransactionV2,
-    CreateAliasTransactionV2,
+    CreateAliasTransaction,
     ReissueTransactionV2,
     BurnTransactionV2,
     ExchangeTransactionV2,
@@ -65,7 +65,7 @@ object TransactionParsers {
   }
 
   def by(name: String): Option[TransactionParserLite]                = byName.get(name)
-  def by(typeId: Byte, version: Byte): Option[TransactionParserLite] = all.get((typeId, version))
+  def by(typeId: Byte, version: TxVersion): Option[TransactionParserLite] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def modernParseBytes: Try[Transaction] = {

@@ -214,30 +214,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val ngEmptyScenario = for {
       (sourceAddress, issuer, miner1, miner2, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          Waves,
-          issuer,
-          sourceAddress,
-          10 * Constants.UnitsInWave,
-          ntpTime.getTimestamp(),
-          Waves,
-          OneTotalFee,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          Waves,
-          issuer,
-          sourceAddress,
-          10 * Constants.UnitsInWave,
-          ntpTime.getTimestamp(),
-          Waves,
-          OneTotalFee,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner1)
       b3        = mkEmptyBlock(b2.uniqueId, miner1)
@@ -279,17 +259,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val betterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          Waves,
-          issuer,
-          sourceAddress,
-          10 * Constants.UnitsInWave,
-          ntpTime.getTimestamp(),
-          Waves,
-          OneTotalFee,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)
@@ -325,30 +295,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val sameButBetterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          Waves,
-          issuer,
-          sourceAddress,
-          10 * Constants.UnitsInWave,
-          ntpTime.getTimestamp(),
-          Waves,
-          OneTotalFee,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          Waves,
-          issuer,
-          sourceAddress,
-          10 * Constants.UnitsInWave,
-          ntpTime.getTimestamp(),
-          Waves,
-          OneTotalFee,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)

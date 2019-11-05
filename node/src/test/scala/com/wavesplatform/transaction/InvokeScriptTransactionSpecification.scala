@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.{InvokeScriptRequest, SignedInvokeScriptRequest}
+import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
@@ -70,14 +70,16 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       .selfSigned(
         KeyPair("test3".getBytes("UTF-8")),
         KeyPair("test4".getBytes("UTF-8")),
-        Some(Terms.FUNCTION_CALL(
-          FunctionHeader.User("foo"),
-          List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
-        )),
+        Some(
+          Terms.FUNCTION_CALL(
+            FunctionHeader.User("foo"),
+            List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
+          )
+        ),
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        1526910778245L,
+        1526910778245L
       )
       .right
       .get
@@ -116,7 +118,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
         100000,
         Waves,
-        1526910778245L,
+        1526910778245L
       )
       .right
       .get
@@ -133,10 +135,12 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      call = Some(InvokeScriptRequest.FunctionCallPart(
-        "bar",
-        List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
-      )),
+      call = Some(
+        InvokeScriptRequest.FunctionCallPart(
+          "bar",
+          List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
+        )
+      ),
       payment = Some(Seq(Payment(1, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
@@ -171,7 +175,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
-        )),
+        )
+      ),
       Seq(),
       1,
       Waves,
@@ -190,7 +195,8 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
-        )),
+        )
+      ),
       Seq(),
       1,
       Waves,
@@ -221,10 +227,12 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      call = Some(InvokeScriptRequest.FunctionCallPart(
-        "bar",
-        List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
-      )),
+      call = Some(
+        InvokeScriptRequest.FunctionCallPart(
+          "bar",
+          List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
+        )
+      ),
       payment = Some(Seq(Payment(0, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,
@@ -240,10 +248,12 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
-      call = Some(InvokeScriptRequest.FunctionCallPart(
-        "bar",
-        List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
-      )),
+      call = Some(
+        InvokeScriptRequest.FunctionCallPart(
+          "bar",
+          List(Terms.CONST_BYTESTR(ByteStr.decodeBase64("YWxpY2U=").get).explicitGet())
+        )
+      ),
       payment = Some(Seq(Payment(-1, Waves))),
       dApp = "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
       timestamp = 11,

@@ -61,7 +61,7 @@ case class OrderV1(@ApiModelProperty(
     with Signed {
 
   @ApiModelProperty(required = true, dataType = "long", example = "1")
-  override def version: Byte = 1
+  override def version: TxVersion = TxVersion.V1
 
   @ApiModelProperty(hidden = true)
   override def signature: Array[Byte] = proofs.proofs(0).arr

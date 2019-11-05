@@ -20,7 +20,7 @@ import monix.eval.Coeval
 import scala.util.{Failure, Try}
 
 case class MicroBlock(
-    version: Byte,
+    version: TxVersion,
     sender: PublicKey,
     transactionData: Seq[Transaction],
     prevResBlockSig: BlockId,

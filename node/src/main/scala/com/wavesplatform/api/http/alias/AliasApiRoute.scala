@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.Route
 import cats.syntax.either._
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.requests.CreateAliasRequest
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -28,9 +29,9 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
 
   private def deprecatedRoute: Route =
     path("broadcast" / "create") {
-      broadcast[SignedCreateAliasV1Request](_.toTx)
+      broadcast[CreateAliasRequest](_.toTx)
     } ~ (path("create") & withAuth) {
-      broadcast[CreateAliasV1Request](TransactionFactory.aliasV1(_, wallet, time))
+      broadcast[CreateAliasRequest](TransactionFactory.createAlias(_, wallet, time))
     }
 
   @Path("/by-alias/{alias}")

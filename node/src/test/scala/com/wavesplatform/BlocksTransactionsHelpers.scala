@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV
 import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -27,7 +27,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, from, to, Waves, amount, Waves, FeeAmount, Array.empty, timestamp).explicitGet()
 
     def transferV2(
         from: KeyPair,
@@ -37,7 +37,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(2.toByte, Waves, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(2.toByte, from, to, Waves, amount, Waves, FeeAmount, Array.empty, timestamp).explicitGet()
 
     def transferAsset(
         asset: IssuedAsset,
@@ -48,7 +48,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, asset, from, to, amount, timestamp, Waves, FeeAmount, Array.empty).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, from, to, asset, amount, Waves, FeeAmount, Array.empty, timestamp).explicitGet()
 
     def lease(
         from: KeyPair,
@@ -112,7 +112,14 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
       (block, microBlocks)
     }
 
-    def unsafeMicro(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair, version: Byte, ts: Long): (Block, MicroBlock) = {
+    def unsafeMicro(
+        totalRefTo: ByteStr,
+        prevTotal: Block,
+        txs: Seq[Transaction],
+        signer: KeyPair,
+        version: TxVersion,
+        ts: Long
+    ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
       val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
       val signature     = crypto.sign(signer, unsigned.bytes())

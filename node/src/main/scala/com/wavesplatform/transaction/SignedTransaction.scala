@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import monix.eval.Coeval
 import play.api.libs.json._
@@ -15,7 +14,7 @@ trait SignedTransaction extends ProvenTransaction with Signed {
 
   val signature: ByteStr
 
-  def proofs: Proofs = Proofs.create(Seq(signature)).explicitGet()
+  def proofs: Proofs = Proofs(signature)
 
   val signatureValid: Coeval[Boolean] = Coeval.evalOnce(crypto.verify(signature.arr, bodyBytes(), sender))
 }

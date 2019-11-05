@@ -4,7 +4,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{Address, AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxValidationError, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, TxValidationError, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -31,7 +31,7 @@ trait LeaseTransaction extends ProvenTransaction with VersionedTransaction {
 
 object LeaseTransaction {
 
-  val typeId: Byte = 8
+  val typeId: TxType = 8.toByte
 
   object Status {
     val Active   = "active"

@@ -29,14 +29,14 @@ case class LeaseTransactionV2 private (sender: PublicKey, amount: Long, fee: Lon
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def version: Byte = 2
+  override def version: TxVersion = TxVersion.V2
 }
 
 object LeaseTransactionV2 extends TransactionParserFor[LeaseTransactionV2] with TransactionParser.MultipleVersions {
 
-  override def supportedVersions: Set[Byte] = Set(2)
+  override def supportedVersions: Set[TxVersion] = Set(2)
 
-  override val typeId: Byte = LeaseTransaction.typeId
+  override val typeId: TxType = LeaseTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

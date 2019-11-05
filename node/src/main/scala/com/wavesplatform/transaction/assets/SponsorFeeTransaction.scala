@@ -54,14 +54,14 @@ case class SponsorFeeTransaction private (sender: PublicKey,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()))
 
   override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
-  override def version: Byte               = SponsorFeeTransaction.version
+  override def version: TxVersion               = SponsorFeeTransaction.version
 }
 
 object SponsorFeeTransaction extends TransactionParserFor[SponsorFeeTransaction] with TransactionParser.MultipleVersions {
 
-  val version: Byte                         = 1
-  override val typeId: Byte                 = 14
-  override val supportedVersions: Set[Byte] = Set(version)
+  val version: TxVersion                         = 1
+  override val typeId: TxType                 = 14
+  override val supportedVersions: Set[TxVersion] = Set(version)
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

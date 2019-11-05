@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -88,13 +88,13 @@ object OrderJson {
                   matcherFee: Long,
                   signature: Option[Array[Byte]],
                   proofs: Option[Array[Array[Byte]]],
-                  version: Byte,
+                  version: TxVersion,
                   matcherFeeAssetId: Asset): Order = {
 
     val eproofs =
       proofs
         .map(p => Proofs(p.map(ByteStr.apply)))
-        .orElse(signature.map(s => Proofs(Seq(ByteStr(s)))))
+        .orElse(signature.map(s => Proofs(s)))
         .getOrElse(Proofs.empty)
 
     Order(

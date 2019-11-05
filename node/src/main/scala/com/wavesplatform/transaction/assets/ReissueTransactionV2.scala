@@ -40,13 +40,13 @@ case class ReissueTransactionV2 private (chainId: Byte,
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
   override def chainByte: Option[Byte] = Some(chainId)
-  override def version: Byte           = 2
+  override def version: TxVersion           = 2
 }
 
 object ReissueTransactionV2 extends TransactionParserFor[ReissueTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = ReissueTransaction.typeId
-  override def supportedVersions: Set[Byte] = Set(2)
+  override val typeId: TxType                 = ReissueTransaction.typeId
+  override def supportedVersions: Set[TxVersion] = Set(2)
   private def currentChainId: Byte          = AddressScheme.current.chainId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {

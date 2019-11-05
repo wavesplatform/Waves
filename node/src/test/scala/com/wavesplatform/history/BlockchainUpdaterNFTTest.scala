@@ -97,7 +97,7 @@ class BlockchainUpdaterNFTTest
           reference = randomSig,
           txs = Seq(GenesisTransaction.create(richAccount, diffs.ENOUGH_AMT, 0).explicitGet()),
           signer = TestBlock.defaultSigner,
-          version = 3,
+          version = 3.toByte,
           timestamp = 0
         )
 
@@ -105,7 +105,7 @@ class BlockchainUpdaterNFTTest
           genesisBlock.signature,
           Seq(issue),
           richAccount,
-          3,
+          3.toByte,
           blockTime
         )
 
@@ -114,7 +114,7 @@ class BlockchainUpdaterNFTTest
           base = Seq(),
           micros = Seq(Seq(transfer)),
           signer = richAccount,
-          version = 3,
+          version = 3.toByte,
           blockTime
         )
 
@@ -123,7 +123,7 @@ class BlockchainUpdaterNFTTest
           base = Seq(),
           micros = Seq(),
           signer = richAccount,
-          version = 3,
+          version = 3.toByte,
           blockTime
         )
         (issue, Seq(richAccount.toAddress, secondAccount.toAddress), Seq(genesisBlock, issueBlock, keyBlock, postBlock), microBlocks)

@@ -58,16 +58,16 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val tradeAssetDistribution = {
       (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
         TransferTransaction
-            .selfSigned(
-              2.toByte,
-            IssuedAsset(tradeAssetIssue.id()),
+          .selfSigned(
+            2.toByte,
             issueTransactionSender,
             acc,
+            IssuedAsset(tradeAssetIssue.id()),
             5,
-            System.currentTimeMillis(),
             Waves,
             900000,
-            Array.fill(random.nextInt(100))(random.nextInt().toByte)
+            Array.fill(random.nextInt(100))(random.nextInt().toByte),
+            System.currentTimeMillis()
           )
           .right
           .get
@@ -132,14 +132,14 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   TransferTransaction
                     .selfSigned(
                       2.toByte,
-                      Asset.fromCompatId(asset),
                       sender,
                       recipient,
+                      Asset.fromCompatId(asset),
                       500,
-                      ts,
                       Waves,
                       500000L,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
+                      Array.fill(random.nextInt(100))(random.nextInt().toByte),
+                      ts
                     )
                 )
               } yield tx
@@ -292,10 +292,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
-          case CreateAliasTransactionV2 =>
+          case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
+            logOption(CreateAliasTransaction.selfSigned(Transaction.V2, sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
 
           case MassTransferTransaction =>
             (
