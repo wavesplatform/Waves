@@ -8,6 +8,8 @@ import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
+import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -21,6 +23,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptRe
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, DataItem, Recipient}
+import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, DataItem, Recipient}
 import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
@@ -29,7 +32,6 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.smart.BlockchainContext.In
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
@@ -155,6 +157,7 @@ object InvokeScriptTransactionDiff {
               }
           })
           dAppAddress <- TracedResult(dAppAddressEi)
+          _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, ps))
           wavesFee = feeInfo._1
           dataAndPaymentDiff <- TracedResult(payableAndDataPart(blockchain.height, tx, dAppAddress, dataEntries, feeInfo._2))
           _                  <- TracedResult(Either.cond(pmts.flatMap(_.values).flatMap(_.values).forall(_ >= 0), (), NegativeAmount(-42, "")))
@@ -210,6 +213,22 @@ object InvokeScriptTransactionDiff {
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
     }
+  }
+
+  private def checkSelfPayments(
+    dAppAddress: Address,
+    blockchain: Blockchain,
+    tx: InvokeScriptTransaction,
+    transfers: List[(Recipient.Address, Long, Option[ByteStr])]
+): Either[GenericError, Unit] = {
+    val ifReject =
+      blockchain.disallowSelfPayment &&
+      (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress || transfers.exists(_._1.bytes == dAppAddress.bytes))
+    Either.cond(
+      !ifReject,
+      (),
+      GenericError("DApp self-payment is forbidden")
+    )
   }
 
   private def payableAndDataPart(height: Int,
@@ -278,7 +297,7 @@ object InvokeScriptTransactionDiff {
                 nextDiff.asRight[ValidationError]
               case Some(script) =>
                 val assetValidationDiff = tracedDiffAcc.resultE.flatMap(
-                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, asset, nextDiff, script)
+                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, a.id, nextDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                 TracedResult(
@@ -298,14 +317,14 @@ object InvokeScriptTransactionDiff {
       totalDiff: Diff,
       addressRepr: Recipient.Address,
       amount: Long,
-      asset: Option[ByteStr],
+      assetId: ByteStr,
       nextDiff: Diff,
       script: Script): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
         Coproduct[TxOrd](
           ScriptTransfer(
-            asset,
+            Some(assetId),
             Recipient.Address(tx.dAppAddressOrAlias.bytes),
             Recipient.Address(addressRepr.bytes),
             amount,
@@ -315,7 +334,7 @@ object InvokeScriptTransactionDiff {
         CompositeBlockchain(blockchain, Some(totalDiff)),
         script,
         isAssetScript = true,
-        tx.dAppAddressOrAlias.bytes
+        scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
         case (log, Left(error))  => Left(ScriptExecutionError(error, log, isAssetScript = true))
         case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript(log, isAssetScript = true))

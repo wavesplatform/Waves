@@ -3,8 +3,9 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.unit
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.Invocation
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.converters
 import com.wavesplatform.lang.v1.traits.domain.Tx._
@@ -237,24 +238,28 @@ object Bindings {
           combine(Map("assetId" -> assetId, "minSponsoredAssetFee" -> minSponsoredAssetFee), provenTxPart(p, proofsEnabled))
         )
       case Data(p, data) =>
-        def mapValue(e: Any): EVALUATED = e match {
-          case s: String  => c(s)
-          case s: Boolean => c(s)
-          case s: Long    => c(s)
-          case s: ByteStr => c(s)
-          case _          => ???
+        def mapValue(e: Any): (EVALUATED, CASETYPEREF) =
+          e match {
+            case s: String  => (c(s), stringDataEntry)
+            case s: Boolean => (c(s), booleanDataEntry)
+            case s: Long    => (c(s), intDataEntry)
+            case s: ByteStr => (c(s), binaryDataEntry)
+            case _          => ???
+         }
+
+        def mapDataEntry(d: DataItem[_]): EVALUATED = {
+          val (entryValue, entryType) = mapValue(d.value)
+          val fields = Map("key" -> CONST_STRING(d.key).explicitGet(), "value" -> entryValue)
+          if (version >= V4)
+            CaseObj(entryType, fields)
+          else
+            CaseObj(genericDataEntry, fields)
         }
 
         CaseObj(
-          buildDataTransactionType(proofsEnabled),
+          buildDataTransactionType(proofsEnabled, version),
           combine(
-            Map(
-              "data" -> data.map(
-                e =>
-                  CaseObj(
-                    dataEntryType,
-                    Map("key" -> CONST_STRING(e.key).explicitGet(), "value" -> mapValue(e.value))
-                ))),
+            Map("data" -> data.map(mapDataEntry)),
             provenTxPart(p, proofsEnabled)
           )
         )
