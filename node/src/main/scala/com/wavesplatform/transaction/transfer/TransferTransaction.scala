@@ -51,7 +51,6 @@ object TransferTransaction extends TransactionParserLite {
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
-  implicit val signer                                      = (tx: TransferTransaction, privateKey: PrivateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
   val serializer                                           = TransferTxSerializer
 
   val typeId: TxType = 4.toByte
@@ -61,6 +60,9 @@ object TransferTransaction extends TransactionParserLite {
   override type TransactionT = TransferTransaction
 
   override def classTag: ClassTag[TransferTransaction] = ClassTag(classOf[TransferTransaction])
+
+  implicit def sign(tx: TransferTransaction, privateKey: PrivateKey): TransferTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
   override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
 

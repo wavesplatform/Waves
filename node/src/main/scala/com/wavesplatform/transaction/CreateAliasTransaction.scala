@@ -31,10 +31,13 @@ object CreateAliasTransaction extends TransactionParserLite {
   val typeId: TxType                             = 10
 
   implicit val validator = TxFeeValidator.asInstanceOf[TxValidator[CreateAliasTransaction]]
-  implicit val signer    = (tx: CreateAliasTransaction, privateKey: PrivateKey) => tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
   val serializer         = CreateAliasTxSerializer
 
-  override def parseBytes(bytes: Array[TxVersion]): Try[CreateAliasTransaction] = serializer.parseBytes(bytes)
+  implicit def sign(tx: CreateAliasTransaction, privateKey: PrivateKey): CreateAliasTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
+  override def parseBytes(bytes: Array[TxVersion]): Try[CreateAliasTransaction] =
+    serializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
