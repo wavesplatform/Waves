@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -92,7 +93,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(secondAddress, balance2, eff2)
 
       val status2 = getStatus(createdLeaseTxId)
-      status2 shouldBe Canceled
+      status2 shouldBe TransactionsApiRoute.LeaseStatus.Canceled
 
       val leases2 = sender.activeLeases(firstAddress)
       assert(leases2.forall(_.id != createdLeaseTxId))
