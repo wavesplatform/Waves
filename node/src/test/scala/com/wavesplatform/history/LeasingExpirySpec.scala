@@ -13,6 +13,7 @@ import com.wavesplatform.state.{Blockchain, LeaseBalance}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalactic.source.Position
 import org.scalatest.{FreeSpec, Matchers}

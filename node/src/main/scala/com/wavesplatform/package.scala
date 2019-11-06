@@ -12,7 +12,7 @@ import com.wavesplatform.utils.ScorexLogging
 package object wavesplatform extends ScorexLogging {
   private def checkOrAppend(block: Block, blockchainUpdater: BlockchainUpdater with NG): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
-      blockchainUpdater.processBlock(block).right.map { _ =>
+      blockchainUpdater.processBlock(block, block.header.generationSignature).right.map { _ =>
         log.info(s"Genesis block ${blockchainUpdater.blockHeaderAndSize(1).get._1} has been added to the state")
       }
     } else {

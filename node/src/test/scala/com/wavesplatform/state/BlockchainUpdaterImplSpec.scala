@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings, loadConfig}

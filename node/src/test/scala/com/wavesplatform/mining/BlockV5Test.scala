@@ -47,7 +47,7 @@ class BlockV5Test
   "Miner" should "generate valid blocks" in forAll(activationScenario) {
     case (minerAcc, bs) =>
       withBlockchain { blockchain =>
-        bs.foreach(blockchain.processBlock(_).explicitGet())
+        bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature).explicitGet())
         blockchain.height shouldBe bs.size
         blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
         withMiner(blockchain) {
@@ -59,7 +59,7 @@ class BlockV5Test
             val blockAtActivationHeight = forgedAtActivationHeight.right.value._2
             blockAtActivationHeight.header.version shouldBe Block.RewardBlockVersion
 
-            blockchain.processBlock(blockAtActivationHeight).explicitGet()
+            blockchain.processBlock(blockAtActivationHeight, blockAtActivationHeight.header.generationSignature).explicitGet()
             blockchain.height shouldBe bs.size + 1
             blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
             blockAtActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
@@ -71,7 +71,7 @@ class BlockV5Test
             val blockAfterActivationHeight = forgedAfterActivationHeight.right.value._2
             blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-            blockchain.processBlock(blockAfterActivationHeight).explicitGet()
+            blockchain.processBlock(blockAfterActivationHeight,  blockAfterActivationHeight.header.generationSignature).explicitGet()
             blockchain.height shouldBe bs.size + 2
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
@@ -83,7 +83,7 @@ class BlockV5Test
             val blockAfterVRFUsing = forgedAfterVRFUsing.right.value._2
             blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
-            blockchain.processBlock(blockAfterVRFUsing).explicitGet()
+            blockchain.processBlock(blockAfterVRFUsing, blockAfterVRFUsing.header.generationSignature).explicitGet()
             blockchain.height shouldBe bs.size + 3
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterVRFUsing.signature shouldBe blockchain.lastBlock.value.signature

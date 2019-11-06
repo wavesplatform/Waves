@@ -56,10 +56,11 @@ package object appender extends ScorexLogging {
                                     pos: PoSSelector,
                                     time: Time,
                                     verify: Boolean)(block: Block): Either[ValidationError, Option[Int]] = {
-    val append: Block => Either[ValidationError, Option[Int]] =
-      if (verify) validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)
-      else appendBlock(blockchainUpdater, utxStorage, verify = false)
-    append(block)
+      if (verify)
+        validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(block)
+      else
+        blockchainUpdater.blockProofsAtHeight(blockchainUpdater.height)
+          .flatMap(proofs => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, proofs))
   }
 
   private[appender] def validateAndAppendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
@@ -72,7 +73,7 @@ package object appender extends ScorexLogging {
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      _ <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
+      proofs <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
         val balance = blockchainUpdater.generatingBalance(block.sender, parent)
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
@@ -80,12 +81,12 @@ package object appender extends ScorexLogging {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
-      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block)
+      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, proofs)
     } yield baseHeight
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
-      block: Block): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, verify)).map { maybeDiscardedTxs =>
+      block: Block, proofs: ByteStr): Either[ValidationError, Option[Int]] =
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, proofs, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
         metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
@@ -94,7 +95,7 @@ package object appender extends ScorexLogging {
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
-      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, Unit] =
+      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, ByteStr] =
     metrics.blockConsensusValidation
       .measureSuccessful {
 
@@ -108,9 +109,9 @@ package object appender extends ScorexLogging {
           _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          proof            <- pos.validateGeneratorSignature(height, block)
-          _                <- pos.validateTimestamp(height, proof, block.header.timestamp, parent, effectiveBalance).orElse(checkExceptions(height, block))
-        } yield ()
+          proofs           <- pos.validateGeneratorSignature(height, block)
+          _                <- pos.validateTimestamp(height, proofs, block.header.timestamp, parent, effectiveBalance).orElse(checkExceptions(height, block))
+        } yield proofs
       }
       .left
       .map {

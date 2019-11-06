@@ -74,9 +74,9 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .flatMap {
         case _ if vrfActivated(height) => // todo: (NODE-1927) always last block or by height?
           for {
-            msg <- blockchain.blockProofsAtHeight(blockchain.height - 1)
-            // msg <- blockchain.blockHitAtHeight(height)
-            vrf <- crypto.verifyVRF(blockGS, msg, blockGenerator)
+            proofs <- blockchain.blockProofsAtHeight(blockchain.height)
+            // proofs <- blockchain.blockHitAtHeight(height)
+            vrf <- crypto.verifyVRF(blockGS, proofs, blockGenerator)
           } yield vrf
         case b =>
           val gs = generationSignature(b.header.generationSignature.arr, blockGenerator)
