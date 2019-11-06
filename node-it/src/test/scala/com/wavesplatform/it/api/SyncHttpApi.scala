@@ -25,7 +25,7 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -435,7 +435,7 @@ object SyncHttpApi extends Assertions {
       sync(async(n).activeLeases(sourceAddress))
 
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long, waitForTx: Boolean = false): Transaction = {
-      val tx = LeaseCancelTransactionV2
+      val tx = LeaseCancelTransaction
         .selfSigned(
           chainId = AddressScheme.current.chainId,
           sender = source,

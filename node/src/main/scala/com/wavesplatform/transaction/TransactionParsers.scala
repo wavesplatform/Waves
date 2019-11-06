@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.base58Length
@@ -25,7 +25,7 @@ object TransactionParsers {
     BurnTransactionV1,
     ExchangeTransactionV1,
     LeaseTransaction,
-    LeaseCancelTransactionV1,
+    LeaseCancelTransaction,
     CreateAliasTransaction,
     MassTransferTransaction,
     TransferTransaction
@@ -42,7 +42,7 @@ object TransactionParsers {
     BurnTransactionV2,
     ExchangeTransactionV2,
     LeaseTransaction,
-    LeaseCancelTransactionV2,
+    LeaseCancelTransaction,
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
     InvokeScriptTransaction,

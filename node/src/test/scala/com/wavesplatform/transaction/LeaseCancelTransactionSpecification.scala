@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransactionV1, LeaseCancelTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseCancelTransaction, LeaseCancelTransaction}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
@@ -32,7 +32,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
     first.bytes() shouldEqual second.bytes()
   }
 
-  property("JSON format validation for LeaseCancelTransactionV1") {
+  property("JSON format validation for LeaseCancelTransaction") {
     val js = Json.parse("""{
                        "type": 9,
                        "id": "7hmabbFS8a2z79a29pzZH1s8LHxrsEAnnLjJxNdZ1gGw",
@@ -49,7 +49,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
                        }
     """)
 
-    val tx = LeaseCancelTransactionV1
+    val tx = LeaseCancelTransaction
       .create(
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         ByteStr.decodeBase58("EXhjYjy8a1dURbttrGzfcft7cddDnPnoa3vqaBLCTFVY").get,
@@ -63,7 +63,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
     js shouldEqual tx.json()
   }
 
-  property("JSON format validation for LeaseCancelTransactionV2") {
+  property("JSON format validation for LeaseCancelTransaction") {
     val js = Json.parse("""{
                         "type": 9,
                         "id": "4nvUUiQjTH7D2LFyzaxs8JwaZYZHDggJgq1iP99TvVDM",
@@ -81,7 +81,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
                        }
     """)
 
-    val tx = LeaseCancelTransactionV2
+    val tx = LeaseCancelTransaction
       .create(
         'T',
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),

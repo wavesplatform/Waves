@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -72,7 +72,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     miner.assertBalances(thirdAddress, balance2, eff2 + transferAmount)
 
     val unsignedCancelLeasing =
-      LeaseCancelTransactionV2
+      LeaseCancelTransaction
         .create(
           chainId = AddressScheme.current.chainId,
           sender = acc0,

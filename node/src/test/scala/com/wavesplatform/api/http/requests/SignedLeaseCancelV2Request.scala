@@ -5,7 +5,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
-import com.wavesplatform.transaction.lease.LeaseCancelTransactionV2
+import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -23,13 +23,13 @@ case class SignedLeaseCancelV2Request(@ApiModelProperty(required = true)
                                       @ApiModelProperty(required = true)
                                       fee: Long)
     {
-  def toTx: Either[ValidationError, LeaseCancelTransactionV2] =
+  def toTx: Either[ValidationError, LeaseCancelTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _leaseTx    <- parseBase58(leaseId, "invalid.leaseTx", SignatureStringLength)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _t          <- LeaseCancelTransactionV2.create(chainId, _sender, _leaseTx, fee, timestamp, _proofs)
+      _t          <- LeaseCancelTransaction.create(2.toByte, _sender, _leaseTx, fee, timestamp, _proofs)
     } yield _t
 }
 object SignedLeaseCancelV2Request {
