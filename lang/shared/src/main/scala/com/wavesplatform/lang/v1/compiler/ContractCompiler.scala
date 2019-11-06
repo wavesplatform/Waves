@@ -9,9 +9,10 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, FINAL, UNION}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types => WavesTypes}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
@@ -30,19 +31,13 @@ object ContractCompiler {
         compiledBody: CompilationStepResultDec
     ): CompileM[AnnotatedFunction] = annListWithErr._1 match {
       case Some(List(c: CallableAnnotation)) =>
-        for {
-          _ <- Either
-            .cond(
-              compiledBody.t match {
-                case _ if compiledBody.t <= UNION(WavesTypes.writeSetType, WavesTypes.scriptTransferSetType, WavesTypes.scriptResultType) =>
-                  true
-                case _ => false
-              },
-              (),
-              Generic(0, 0, s"${FieldNames.Error}, but got '${compiledBody.t}'")
-            )
-            .toCompileM
-        } yield CallableFunction(c, compiledBody.dec.asInstanceOf[Terms.FUNC])
+        callableReturnType(version)
+          .ensureOr(expectedType => callableResultError(expectedType, compiledBody.t))(compiledBody.t <= _)
+          .bimap(
+            Generic(0, 0, _),
+            _ => CallableFunction(c, compiledBody.dec.asInstanceOf[Terms.FUNC]): AnnotatedFunction
+          )
+          .toCompileM
 
       case Some(List(c: VerifierAnnotation)) =>
         for {
