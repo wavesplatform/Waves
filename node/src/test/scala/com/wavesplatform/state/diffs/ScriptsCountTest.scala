@@ -144,7 +144,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       mt2 = MassTransferTransaction
         .selfSigned(IssuedAsset(issueScr.id()), master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array()))
         .explicitGet()
-      l  = LeaseTransactionV2.selfSigned(master, 1, fee, timestamp, acc).explicitGet()
+      l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
       lc = LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
@@ -277,7 +277,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       mt2 = MassTransferTransaction
         .selfSigned(IssuedAsset(issueScr.id()), master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array()))
         .explicitGet()
-      l  = LeaseTransactionV2.selfSigned(master, 1, fee, timestamp, acc).explicitGet()
+      l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
       lc = LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))

@@ -139,7 +139,6 @@ object CommonValidation {
           }
         }
 
-      case _: LeaseTransactionV1       => Right(tx)
       case _: LeaseCancelTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
@@ -166,9 +165,9 @@ object CommonValidation {
 
       case t: TransferTransaction      => generic1or2Barrier(t, "transfer")
       case t: CreateAliasTransaction   => generic1or2Barrier(t, "create alias")
+      case t: LeaseTransaction         => generic1or2Barrier(t, "lease")
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)

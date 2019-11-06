@@ -9,7 +9,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
-import com.wavesplatform.transaction.lease.LeaseTransactionV1
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -106,7 +106,17 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .right
         .get
       insufficientFee = TransferTransaction
-        .selfSigned(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray, ts + 2)
+        .selfSigned(
+          1.toByte,
+          master,
+          recipient.toAddress,
+          Waves,
+          1000000,
+          IssuedAsset(assetId),
+          sponsorTx.minSponsoredAssetFee.get - 1,
+          Array.emptyByteArray,
+          ts + 2
+        )
         .right
         .get
       fee = 3000 * sponsorTx.minSponsoredAssetFee.get
@@ -161,16 +171,26 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .selfSigned(1.toByte, master, alice.toAddress, IssuedAsset(assetId), issueTx.quantity, Waves, fee, Array.emptyByteArray, ts + 2)
         .right
         .get
-      leasingTx: LeaseTransactionV1 = LeaseTransactionV1
-        .selfSigned(master, amount - issueTx.fee - sponsorTx.fee - 2 * fee, fee, ts + 3, bob)
+      leasingTx = LeaseTransaction
+        .selfSigned(1.toByte, master, bob, amount - issueTx.fee - sponsorTx.fee - 2 * fee, fee, ts + 3)
         .right
         .get
-      leasingToMasterTx: LeaseTransactionV1 = LeaseTransactionV1
-        .selfSigned(bob, amount / 2, fee, ts + 3, master)
+      leasingToMasterTx = LeaseTransaction
+        .selfSigned(1.toByte, bob, master, amount / 2, fee, ts + 3)
         .right
         .get
       insufficientFee = TransferTransaction
-        .selfSigned(1.toByte, alice, bob.toAddress, IssuedAsset(assetId), issueTx.quantity / 12, IssuedAsset(assetId), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 4)
+        .selfSigned(
+          1.toByte,
+          alice,
+          bob.toAddress,
+          IssuedAsset(assetId),
+          issueTx.quantity / 12,
+          IssuedAsset(assetId),
+          sponsorTx.minSponsoredAssetFee.get,
+          Array.emptyByteArray,
+          ts + 4
+        )
         .right
         .get
     } yield (genesis, genesis2, issueTx, sponsorTx, transferAssetTx, leasingTx, insufficientFee, leasingToMasterTx)

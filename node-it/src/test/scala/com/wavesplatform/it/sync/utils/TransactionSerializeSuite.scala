@@ -15,7 +15,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseCancelTransactionV2, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
@@ -125,12 +125,26 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val aliasV1 = CreateAliasTransaction
-    .create(Transaction.V1, publicKey, Alias.create("myalias").right.get, minFee, ts, Proofs(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get))
+    .create(
+      Transaction.V1,
+      publicKey,
+      Alias.create("myalias").right.get,
+      minFee,
+      ts,
+      Proofs(ByteStr.decodeBase58("CC1jQ4qkuVfMvB2Kpg2Go6QKXJxUFC8UUswUxBsxwisrR8N5s3Yc8zA6dhjTwfWKfdouSTAnRXCxTXb3T6pJq3T").get)
+    )
     .right
     .get
 
   private val aliasV2 = CreateAliasTransaction
-    .create(Transaction.V2, publicKey, Alias.create("myalias").right.get, minFee, ts, Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get)))
+    .create(
+      Transaction.V2,
+      publicKey,
+      Alias.create("myalias").right.get,
+      minFee,
+      ts,
+      Proofs(Seq(ByteStr.decodeBase58("26U7rQTwpdma5GYSZb5bNygVCtSuWL6DKet1Nauf5J57v19mmfnq434YrkKYJqvYt2ydQBUT3P7Xgj5ZVDVAcc5k").get))
+    )
     .right
     .get
 
@@ -200,26 +214,28 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val leaseV1 = LeaseTransactionV1
+  private val leaseV1 = LeaseTransaction
     .create(
+      1.toByte,
       publicKey,
+      Address.fromString(sender.address).right.get,
       10000000,
       minFee,
       ts,
-      Address.fromString(sender.address).right.get,
-      ByteStr.decodeBase58("iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ").get
+      Proofs(ByteStr.decodeBase58("iy3TmfbFds7pc9cDDqfjEJhfhVyNtm3GcxoVz8L3kJFvgRPUmiqqKLMeJGYyN12AhaQ6HvE7aF1tFgaAoCCgNJJ").get)
     )
     .right
     .get
 
-  private val leaseV2 = LeaseTransactionV2
+  private val leaseV2 = LeaseTransaction
     .create(
+      2.toByte,
       publicKey,
+      Address.fromString(sender.address).right.get,
       10000000,
       minFee,
       ts,
-      Address.fromString(sender.address).right.get,
-      Proofs(Seq(ByteStr.decodeBase58("5Fr3yLwvfKGDsFLi8A8JbHqToHDojrPbdEGx9mrwbeVWWoiDY5pRqS3rcX1rXC9ud52vuxVdBmGyGk5krcgwFu9q").get))
+      Proofs(ByteStr.decodeBase58("5Fr3yLwvfKGDsFLi8A8JbHqToHDojrPbdEGx9mrwbeVWWoiDY5pRqS3rcX1rXC9ud52vuxVdBmGyGk5krcgwFu9q").get)
     )
     .right
     .get
@@ -314,9 +330,31 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val transferV1 = TransferTransaction(1.toByte, publicKey, Address.fromString(sender.address).right.get, Waves, 1900000, Waves, minFee, Base58.tryDecodeWithLimit("").get, ts, Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)))
+  private val transferV1 = TransferTransaction(
+    1.toByte,
+    publicKey,
+    Address.fromString(sender.address).right.get,
+    Waves,
+    1900000,
+    Waves,
+    minFee,
+    Base58.tryDecodeWithLimit("").get,
+    ts,
+    Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
+  )
 
-  private val transferV2 = TransferTransaction(2.toByte, publicKey, Address.fromString(sender.address).right.get, Waves, 100000000, Waves, minFee, Base58.tryDecodeWithLimit("").get, ts, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
+  private val transferV2 = TransferTransaction(
+    2.toByte,
+    publicKey,
+    Address.fromString(sender.address).right.get,
+    Waves,
+    100000000,
+    Waves,
+    minFee,
+    Base58.tryDecodeWithLimit("").get,
+    ts,
+    Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+  )
 
   private val invokeScript = InvokeScriptTransaction
     .create(
