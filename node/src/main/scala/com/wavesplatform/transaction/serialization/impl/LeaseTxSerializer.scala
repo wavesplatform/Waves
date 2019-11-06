@@ -55,6 +55,7 @@ object LeaseTxSerializer {
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseTransaction.typeId, "transaction type mismatch")
       val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      require(buf.getAsset == Waves, "Leasing assets is not supported yet")
       val tx     = parseCommonPart(TxVersion.V2, buf)
       val proofs = buf.getProofs
       tx.copy(proofs = proofs)

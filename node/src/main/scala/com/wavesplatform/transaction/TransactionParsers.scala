@@ -41,6 +41,7 @@ object TransactionParsers {
     ReissueTransactionV2,
     BurnTransactionV2,
     ExchangeTransactionV2,
+    LeaseTransaction,
     LeaseCancelTransactionV2,
     SponsorFeeTransaction,
     SetAssetScriptTransaction,
