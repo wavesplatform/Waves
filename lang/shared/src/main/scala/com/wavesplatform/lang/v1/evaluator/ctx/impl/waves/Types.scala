@@ -1,6 +1,8 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
+import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
+import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 
@@ -63,8 +65,9 @@ object Types {
   val optionPayment = UNION(paymentType, UNIT)
   val listPayment   = LIST(paymentType)
 
-  lazy val verifierInput = UNION.create(
-    buildOrderType(true) :: buildActiveTransactionTypes(true, V3),
+  def verifierInput(version: StdLibVersion) =
+    UNION.create(
+    buildOrderType(true) :: buildActiveTransactionTypes(proofsEnabled = true, v = version),
     Some("VerifierInput")
   )
 
@@ -83,15 +86,30 @@ object Types {
 
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
 
-  val dataEntryType = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+  val genericDataEntry =
+    CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+
+  private def buildTypedEntry(name: String, valueType: REAL) =
+    CASETYPEREF(name, List("key" -> STRING, "value" -> valueType))
+
+  val booleanDataEntry: CASETYPEREF = buildTypedEntry("BooleanEntry", BOOLEAN)
+  val stringDataEntry: CASETYPEREF  = buildTypedEntry("StringEntry", STRING)
+  val binaryDataEntry: CASETYPEREF  = buildTypedEntry("BinaryEntry", BYTESTR)
+  val intDataEntry: CASETYPEREF     = buildTypedEntry("IntEntry", LONG)
+
+  private val typedDataEntries =
+    List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry)
+
+  def commonDataEntryType(v: StdLibVersion): FINAL =
+    if (v >= V4) UNION(typedDataEntries) else genericDataEntry
 
   val writeSetType =
     CASETYPEREF(
       FieldNames.WriteSet,
-      List(FieldNames.Data -> LIST(dataEntryType))
+      List(FieldNames.Data -> LIST(commonDataEntryType(V3)))
     )
 
-  private val scriptTransfer =
+  val scriptTransfer =
     CASETYPEREF(
       FieldNames.ScriptTransfer,
       List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector)
@@ -109,17 +127,72 @@ object Types {
       List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType)
     )
 
-  def dAppTypes(version: StdLibVersion) =
+  val issueScriptType = CASETYPEREF(FieldNames.IssueScript, Nil)
+
+  val issueActionType =
+    CASETYPEREF(
+      FieldNames.Issue,
+      List(
+        FieldNames.IssueScript -> UNION(issueScriptType, UNIT),
+        FieldNames.IssueDecimals -> LONG,
+        FieldNames.IssueDescription -> STRING,
+        FieldNames.IssueIsReissuable -> BOOLEAN,
+        FieldNames.IssueName -> STRING,
+        FieldNames.IssueQuantity -> LONG,
+      )
+    )
+
+  val reissueActionType =
+    CASETYPEREF(
+      FieldNames.Reissue,
+      List(
+        FieldNames.ReissueAssetId -> BYTESTR,
+        FieldNames.ReissueIsReissuable -> BOOLEAN,
+        FieldNames.ReissueQuantity -> LONG
+      )
+    )
+
+  val burnActionType =
+    CASETYPEREF(
+      FieldNames.Burn,
+      List(
+        FieldNames.BurnAssetId  -> BYTESTR,
+        FieldNames.BurnQuantity -> LONG
+      )
+    )
+
+  private val callableV3Results =
+    List(writeSetType, scriptTransferSetType, scriptResultType)
+
+  private val callableV4Actions =
+    List(issueActionType, reissueActionType, burnActionType)
+
+  private def callableTypes(version: StdLibVersion) =
+    if (version == V3) callableV3Results
+    else if (version >= V4) callableV4Actions
+    else Nil
+
+  def dAppTypes(version: StdLibVersion): List[CASETYPEREF] =
     List(
-      writeSetType,
       paymentType,
       scriptTransfer,
-      scriptTransferSetType,
-      scriptResultType,
       invocationType(version),
       assetType,
       blockInfo
-    )
+    ) ::: callableTypes(version)
+
+  private val callableV3ReturnType =
+    UNION(callableV3Results: _*)
+
+  private val callableV4ReturnType =
+    LIST(UNION.create(commonDataEntryType(V4) :: scriptTransfer :: callableV4Actions))
+
+  def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
+    v match {
+      case V3 => Right(callableV3ReturnType)
+      case V4 => Right(callableV4ReturnType)
+      case v  => Left(s"DApp is not supported for V$v")
+    }
 
   private def payments(multiPaymentAllowed: Boolean) =
     if (multiPaymentAllowed) "payments" -> listPayment
@@ -334,25 +407,27 @@ object Types {
   )
 
 
-  def buildDataTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
-    "DataTransaction",
-    addProofsIfNeeded(List("data" -> LIST(dataEntryType)) ++ header ++ proven, proofsEnabled)
-  )
-
-  def buildMassTransferTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
-    "MassTransferTransaction",
-    addProofsIfNeeded(
-      List(
-        "feeAssetId"    -> optionByteVector,
-        "assetId"       -> optionByteVector,
-        "totalAmount"   -> LONG,
-        "transfers"     -> listTransfers,
-        "transferCount" -> LONG,
-        "attachment"    -> BYTESTR
-      ) ++ header ++ proven,
-      proofsEnabled
+  def buildDataTransactionType(proofsEnabled: Boolean, v: StdLibVersion) =
+    CASETYPEREF(
+      "DataTransaction",
+      addProofsIfNeeded(List("data" -> LIST(commonDataEntryType(v))) ++ header ++ proven, proofsEnabled)
     )
-  )
+
+  def buildMassTransferTransactionType(proofsEnabled: Boolean) =
+    CASETYPEREF(
+      "MassTransferTransaction",
+      addProofsIfNeeded(
+        List(
+          "feeAssetId"    -> optionByteVector,
+          "assetId"       -> optionByteVector,
+          "totalAmount"   -> LONG,
+          "transfers"     -> listTransfers,
+          "transferCount" -> LONG,
+          "attachment"    -> BYTESTR
+        ) ++ header ++ proven,
+        proofsEnabled
+      )
+    )
 
   def buildSetScriptTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "SetScriptTransaction",
@@ -387,7 +462,7 @@ object Types {
         buildCreateAliasTransactionType(proofsEnabled),
         buildSetScriptTransactionType(proofsEnabled),
         buildSponsorFeeTransactionType(proofsEnabled),
-        buildDataTransactionType(proofsEnabled)
+        buildDataTransactionType(proofsEnabled, v)
       )
   }
 
@@ -402,11 +477,11 @@ object Types {
       aliasType,
       transfer,
       assetPairType,
-      dataEntryType,
+      commonDataEntryType(v),
       buildOrderType(proofsEnabled),
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v == V4) List(blockHeader) else Nil)
+      (if (v >= V4) blockHeader :: typedDataEntries else Seq(genericDataEntry))
   }
 }

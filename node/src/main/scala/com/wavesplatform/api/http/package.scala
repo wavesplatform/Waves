@@ -9,11 +9,9 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.http.ApiError.WrongJson
-import com.wavesplatform.api.http.DataRequest._
-import com.wavesplatform.api.http.alias.{CreateAliasV1Request, CreateAliasV2Request}
-import com.wavesplatform.api.http.assets.SponsorFeeRequest._
-import com.wavesplatform.api.http.assets._
-import com.wavesplatform.api.http.leasing._
+import com.wavesplatform.api.http.requests.DataRequest._
+import com.wavesplatform.api.http.requests.SponsorFeeRequest._
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
@@ -65,10 +63,10 @@ package object http extends ApiMarshallers with ScorexLogging {
               case None => Left(GenericError(s"Bad transaction type ($typeId) and version ($version)"))
               case Some(x) =>
                 x match {
+                  case TransferTransaction       => txJson.as[TransferRequest].toTxFrom(senderPk)
+                  case CreateAliasTransaction    => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
                   case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
                   case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
-                  case TransferTransactionV1     => TransactionFactory.transferAssetV1(txJson.as[TransferV1Request], senderPk)
-                  case TransferTransactionV2     => TransactionFactory.transferAssetV2(txJson.as[TransferV2Request], senderPk)
                   case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)
                   case ReissueTransactionV2      => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], senderPk)
                   case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], senderPk)
@@ -78,8 +76,6 @@ package object http extends ApiMarshallers with ScorexLogging {
                   case LeaseTransactionV2        => TransactionFactory.leaseV2(txJson.as[LeaseV2Request], senderPk)
                   case LeaseCancelTransactionV1  => TransactionFactory.leaseCancelV1(txJson.as[LeaseCancelV1Request], senderPk)
                   case LeaseCancelTransactionV2  => TransactionFactory.leaseCancelV2(txJson.as[LeaseCancelV2Request], senderPk)
-                  case CreateAliasTransactionV1  => TransactionFactory.aliasV1(txJson.as[CreateAliasV1Request], senderPk)
-                  case CreateAliasTransactionV2  => TransactionFactory.aliasV2(txJson.as[CreateAliasV2Request], senderPk)
                   case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], senderPk)
                   case InvokeScriptTransaction   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], senderPk)
                   case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
@@ -126,6 +122,15 @@ package object http extends ApiMarshallers with ScorexLogging {
     post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
       entity(as[A]) { a =>
         complete(f(a))
+      }
+    }) ~ get(complete(StatusCodes.MethodNotAllowed))
+
+  def jsonParammedPost[A: Reads](f: (A, Map[String, String]) => ToResponseMarshallable): Route =
+    post((handleExceptions(jsonExceptionHandler) & handleRejections(jsonRejectionHandler)) {
+      parameterMap { params =>
+        entity(as[A]) { a =>
+          complete(f(a, params))
+        }
       }
     }) ~ get(complete(StatusCodes.MethodNotAllowed))
 

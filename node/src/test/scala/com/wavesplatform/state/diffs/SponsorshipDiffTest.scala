@@ -17,9 +17,11 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   def settings(sponsorshipActivationHeight: Int): FunctionalitySettings =
-    TestFunctionalitySettings.Enabled.copy(preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight),
-                                           featureCheckBlocksPeriod = 1,
-                                           blocksForFeatureActivation = 1)
+    TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> sponsorshipActivationHeight),
+      featureCheckBlocksPeriod = 1,
+      blocksForFeatureActivation = 1
+    )
 
   property("work") {
     val s = settings(0)
@@ -99,24 +101,17 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       recipient                  <- accountGen
       assetId = issueTx.id()
-      assetOverspend = TransferTransactionV1
-        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 1, IssuedAsset(assetId), issueTx.quantity + 1, Array.emptyByteArray)
+      assetOverspend = TransferTransaction
+        .selfSigned(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), issueTx.quantity + 1, Array.emptyByteArray, ts + 1)
         .right
         .get
-      insufficientFee = TransferTransactionV1
-        .selfSigned(Waves,
-                    master,
-                    recipient.toAddress,
-                    1000000,
-                    ts + 2,
-                    IssuedAsset(assetId),
-                    sponsorTx.minSponsoredAssetFee.get - 1,
-                    Array.emptyByteArray)
+      insufficientFee = TransferTransaction
+        .selfSigned(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), sponsorTx.minSponsoredAssetFee.get - 1, Array.emptyByteArray, ts + 2)
         .right
         .get
       fee = 3000 * sponsorTx.minSponsoredAssetFee.get
-      wavesOverspend = TransferTransactionV1
-        .selfSigned(Waves, master, recipient.toAddress, 1000000, ts + 3, IssuedAsset(assetId), fee, Array.emptyByteArray)
+      wavesOverspend = TransferTransaction
+        .selfSigned(1.toByte, master, recipient.toAddress, Waves, 1000000, IssuedAsset(assetId), fee, Array.emptyByteArray, ts + 3)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, assetOverspend, insufficientFee, wavesOverspend)
@@ -130,7 +125,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         assertDiffEi(setupBlocks, block(Seq(insufficientFee)), s) { blockDiffEi =>
           val minFee = Sponsorship
             .fromWaves(
-              FeeValidation.FeeConstants(insufficientFee.builder.typeId) * FeeValidation.FeeUnit,
+              FeeValidation.FeeConstants(insufficientFee.typeId) * FeeValidation.FeeUnit,
               sponsor.minSponsoredAssetFee.get
             )
 
@@ -162,8 +157,8 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       genesis2: GenesisTransaction = GenesisTransaction.create(bob, amount, ts).explicitGet()
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId = issueTx.id()
-      transferAssetTx: TransferTransactionV1 = TransferTransactionV1
-        .selfSigned(IssuedAsset(assetId), master, alice.toAddress, issueTx.quantity, ts + 2, Waves, fee, Array.emptyByteArray)
+      transferAssetTx: TransferTransaction = TransferTransaction
+        .selfSigned(1.toByte, master, alice.toAddress, IssuedAsset(assetId), issueTx.quantity, Waves, fee, Array.emptyByteArray, ts + 2)
         .right
         .get
       leasingTx: LeaseTransactionV1 = LeaseTransactionV1
@@ -174,15 +169,8 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .selfSigned(bob, amount / 2, fee, ts + 3, master)
         .right
         .get
-      insufficientFee = TransferTransactionV1
-        .selfSigned(IssuedAsset(assetId),
-                    alice,
-                    bob.toAddress,
-                    issueTx.quantity / 12,
-                    ts + 4,
-                    IssuedAsset(assetId),
-                    sponsorTx.minSponsoredAssetFee.get,
-                    Array.emptyByteArray)
+      insufficientFee = TransferTransaction
+        .selfSigned(1.toByte, alice, bob.toAddress, IssuedAsset(assetId), issueTx.quantity / 12, IssuedAsset(assetId), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 4)
         .right
         .get
     } yield (genesis, genesis2, issueTx, sponsorTx, transferAssetTx, leasingTx, insufficientFee, leasingToMasterTx)
@@ -274,16 +262,16 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       sponsor = SponsorFeeTransaction.selfSigned(master, assetId, Some(100), 100000000, ts + 2).explicitGet()
-      assetTransfer = TransferTransactionV1
-        .selfSigned(assetId, master, recipient, issue.quantity, ts + 3, Waves, 100000, Array.emptyByteArray)
+      assetTransfer = TransferTransaction
+        .selfSigned(1.toByte, master, recipient, assetId, issue.quantity, Waves, 100000, Array.emptyByteArray, ts + 3)
         .right
         .get
-      wavesTransfer = TransferTransactionV1
-        .selfSigned(Waves, master, recipient, 99800000, ts + 4, Waves, 100000, Array.emptyByteArray)
+      wavesTransfer = TransferTransaction
+        .selfSigned(1.toByte, master, recipient, Waves, 99800000, Waves, 100000, Array.emptyByteArray, ts + 4)
         .right
         .get
-      backWavesTransfer = TransferTransactionV1
-        .selfSigned(Waves, recipient, master, 100000, ts + 5, assetId, 100, Array.emptyByteArray)
+      backWavesTransfer = TransferTransaction
+        .selfSigned(1.toByte, recipient, master, Waves, 100000, assetId, 100, Array.emptyByteArray, ts + 5)
         .right
         .get
     } yield (genesis, issue, sponsor, assetTransfer, wavesTransfer, backWavesTransfer)

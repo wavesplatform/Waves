@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.api.http.assets.SignedTransferV1Request
+import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
@@ -110,7 +110,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       "signature"       -> "A" * 64
     )
 
-    assertBroadcastBadJson(jsonV1, "invalid signature")
+    assertBroadcastBadJson(jsonV1, "Proof doesn't validate")
 
     val jsonV2 = Json.obj(
       "type"            -> CreateAliasTransaction.typeId,
@@ -320,8 +320,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     val signedRequestResponse = sender.postJsonWithApiKey(s"/transactions/sign/$thirdAddress", json)
     assert(signedRequestResponse.getStatusCode == HttpConstants.ResponseStatusCodes.OK_200)
     val signedRequestJson = Json.parse(signedRequestResponse.getResponseBody)
-    val signedRequest     = signedRequestJson.as[SignedTransferV1Request]
-    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey).explicitGet().stringRepr == firstAddress)
+    val signedRequest     = signedRequestJson.as[TransferRequest]
+    assert(PublicKey.fromBase58String(signedRequest.senderPublicKey.get).explicitGet().stringRepr == firstAddress)
     assert(signedRequest.recipient == secondAddress)
     assert(signedRequest.fee == minFee)
     assert(signedRequest.amount == transferAmount)
@@ -422,7 +422,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
     }
   }
 
-  private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: Byte): String = {
+  private def signBroadcastAndCalcFee(json: JsObject, usesProofs: Boolean, version: TxVersion): String = {
     val jsWithPK  = json ++ Json.obj("senderPublicKey" -> sender.publicKey.toString)
     val jsWithFee = jsWithPK ++ Json.obj("fee" -> sender.calculateFee(jsWithPK).feeAmount)
     val js        = if (Option(version).isDefined) jsWithFee ++ Json.obj("version" -> version) else jsWithFee

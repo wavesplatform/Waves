@@ -26,13 +26,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
   private val amtTx = 100000
 
   type Setup =
-    (GenesisTransaction,
-     TransferTransactionV1,
-     IssueTransaction,
-     SponsorFeeTransaction,
-     TransferTransactionV1,
-     TransferTransactionV1,
-     TransferTransactionV1)
+    (GenesisTransaction, TransferTransaction, IssueTransaction, SponsorFeeTransaction, TransferTransaction, TransferTransaction, TransferTransaction)
 
   val sponsorPreconditions: Gen[Setup] = for {
 
@@ -45,63 +39,32 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(Waves,
-                  master,
-                  alice,
-                  feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
-                  ts + 1,
-                  Waves,
-                  transferAssetWavesFee,
-                  Array.emptyByteArray)
+    masterToAlice: TransferTransaction = TransferTransaction
+      .selfSigned(1.toByte, master, alice, Waves, feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
       .right
       .get
-    aliceToBob: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(
-        Asset.fromCompatId(Some(feeAsset.id())),
-        alice,
-        bob,
-        feeAsset.quantity / 2,
-        ts + 2,
-        Waves,
-        transferAssetWavesFee,
-        Array.emptyByteArray
-      )
+    aliceToBob: TransferTransaction = TransferTransaction
+      .selfSigned(1.toByte, alice, bob, Asset.fromCompatId(Some(feeAsset.id())), feeAsset.quantity / 2, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 2)
       .right
       .get
-    bobToMaster: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(
-        Asset.fromCompatId(Some(feeAsset.id())),
-        bob,
-        master,
-        amtTx,
-        ts + 3,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
-        Array.emptyByteArray
-      )
+    bobToMaster: TransferTransaction = TransferTransaction
+      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 3)
       .right
       .get
-    bobToMaster2: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(
-        Asset.fromCompatId(Some(feeAsset.id())),
-        bob,
-        master,
-        amtTx,
-        ts + 4,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
-        Array.emptyByteArray
-      )
+    bobToMaster2: TransferTransaction = TransferTransaction
+      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 4)
       .right
       .get
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToBob, bobToMaster, bobToMaster2)
 
   val SponsoredFeeActivatedAt0BlockchainSettings: BlockchainSettings = DefaultBlockchainSettings.copy(
     functionalitySettings = DefaultBlockchainSettings.functionalitySettings
-      .copy(featureCheckBlocksPeriod = 1,
-            blocksForFeatureActivation = 1,
-            preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0, BlockchainFeatures.NG.id -> 0)))
+      .copy(
+        featureCheckBlocksPeriod = 1,
+        blocksForFeatureActivation = 1,
+        preActivatedFeatures = Map(BlockchainFeatures.FeeSponsorship.id -> 0, BlockchainFeatures.NG.id -> 0)
+      )
+  )
 
   val SponsoredActivatedAt0WavesSettings: WavesSettings = settings.copy(blockchainSettings = SponsoredFeeActivatedAt0BlockchainSettings)
 
@@ -109,11 +72,8 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {
       case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
-        val block1 = customBuildBlockOfTxs(microBlocks.last.totalResBlockSig,
-                                           Seq.empty,
-                                           KeyPair(Array.fill(KeyLength)(1: Byte)),
-                                           3: Byte,
-                                           sponsor.timestamp + 1)
+        val block1 =
+          customBuildBlockOfTxs(microBlocks.last.totalResBlockSig, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
         val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
         val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
         val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))

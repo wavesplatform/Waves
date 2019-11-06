@@ -2,14 +2,16 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import cats.Id
 import cats.implicits._
+import com.google.common.primitives.Ints
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.{Block, BlockHeader, SignerData}
+import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
+import com.wavesplatform.database
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, Expression, V3, V4}
+import com.wavesplatform.lang.directives.values.{Account, Expression, V4}
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
@@ -28,7 +30,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
 
-  val blockheaderGen: Gen[BlockHeader] = {
+  val blockheaderGen: Gen[(BlockHeader, ByteStr, Int)] = {
     for {
       timestamp        <- Gen.posNum[Long]
       version          <- Gen.posNum[Byte]
@@ -40,32 +42,36 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       transactionCount <- Gen.posNum[Int]
       featureVotes     <- Gen.listOf(Gen.posNum[Short])
       reward           <- Gen.posNum[Long]
-    } yield {
-      new BlockHeader(
-        timestamp,
-        version,
-        reference,
-        SignerData(PublicKey(generator), signature),
-        NxtLikeConsensusBlockData(baseTarget, genSignature),
-        transactionCount,
-        featureVotes.toSet,
-        reward
+    } yield (
+        new BlockHeader(
+          version,
+          timestamp,
+          reference,
+          baseTarget,
+          genSignature,
+          PublicKey(ByteStr(generator)),
+          featureVotes.toSet,
+          reward
+        ),
+        signature,
+        transactionCount
       )
-    }
   }
 
-  def scriptSrc(header: BlockHeader): String = {
+  def scriptSrc(header: BlockHeader, signature: ByteStr, transactionCount: Int): String = {
     val expectedReference    = Base64.encode(header.reference)
-    val expectedGenerator    = Base64.encode(header.signerData.generator.bytes)
-    val expectedGeneratorPK  = Base64.encode(header.signerData.generator.toAddress.bytes)
-    val expectedSignature    = Base64.encode(header.signerData.signature)
-    val expectedGenSignature = Base64.encode(header.consensusData.generationSignature)
+    val expectedGenerator    = Base64.encode(header.generator.bytes)
+    val expectedGeneratorPK  = Base64.encode(header.generator.toAddress.bytes)
+    val expectedSignature    = Base64.encode(signature)
+    val expectedGenSignature = Base64.encode(header.generationSignature)
+
+    val headerBytes = database.writeBlockHeaderAndSize((header, 1024, transactionCount, signature)).drop(Ints.BYTES)
 
     s"""
       |{-# STDLIB_VERSION  4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |
-      |let bytes = base64'${Base64.encode(BlockHeader.writeHeaderOnly(header))}'
+      |let bytes = base64'${Base64.encode(headerBytes)}'
       |
       |match parseBlockHeader(bytes) {
       |  case header: BlockHeader =>
@@ -75,9 +81,9 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       |      header.generator == base64'$expectedGenerator' &&
       |      header.generatorPublicKey == base64'$expectedGeneratorPK' &&
       |      header.signature == base64'$expectedSignature' &&
-      |      header.baseTarget == ${header.consensusData.baseTarget} &&
+      |      header.baseTarget == ${header.baseTarget} &&
       |      header.generationSignature == base64'$expectedGenSignature' &&
-      |      header.transactionCount == ${header.transactionCount}
+      |      header.transactionCount == $transactionCount
       |  case _ => throw("Can't parse header")
       |}
       |
@@ -85,8 +91,8 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("should parse blockheader bytes") {
-    forAll(blockheaderGen) { header =>
-      eval(scriptSrc(header)) shouldBe Right(Terms.TRUE)
+    forAll(blockheaderGen) { data =>
+      eval((scriptSrc _).tupled(data)) shouldBe Right(Terms.TRUE)
     }
   }
 

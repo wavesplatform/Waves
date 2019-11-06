@@ -4,7 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.assets.SignedTransferV2Request
+import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -113,18 +113,19 @@ trait TransferSending extends ScorexLogging {
       .map {
         case (x, i) =>
           createSignedTransferRequest(
-            TransferTransactionV2
+            TransferTransaction
               .selfSigned(
-                assetId = Waves,
+                version = 2.toByte,
                 sender = KeyPair(Base58.decode(x.senderSeed)),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
+                asset = Waves,
                 amount = x.amount,
-                timestamp = start + i,
-                feeAssetId = Waves,
-                feeAmount = x.fee,
+                feeAsset = Waves,
+                fee = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray
+                } else Array.emptyByteArray,
+                timestamp = start + i
               )
               .right
               .get
@@ -144,18 +145,21 @@ trait TransferSending extends ScorexLogging {
       .map(_.flatten)
   }
 
-  protected def createSignedTransferRequest(tx: TransferTransactionV2): SignedTransferV2Request = {
+  protected def createSignedTransferRequest(tx: TransferTransaction): TransferRequest = {
     import tx._
-    SignedTransferV2Request(
-      Base58.encode(tx.sender),
-      assetId.maybeBase58Repr,
+    TransferRequest(
+      Some(2.toByte),
+      None,
+      Some(Base58.encode(tx.sender)),
       recipient.stringRepr,
+      assetId.maybeBase58Repr,
       amount,
       feeAssetId.maybeBase58Repr,
       fee,
-      timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.base58().toList
+      Some(timestamp),
+      None,
+      Some(proofs.base58().toList)
     )
   }
 

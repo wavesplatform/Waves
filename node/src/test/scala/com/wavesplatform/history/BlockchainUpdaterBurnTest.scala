@@ -7,7 +7,7 @@ import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransactionV1, ReissueTransactionV1}
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -18,7 +18,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   val Waves: Long = 100000000
 
   type Setup =
-    (Long, GenesisTransaction, TransferTransactionV1, IssueTransactionV1, BurnTransactionV1, ReissueTransactionV1)
+    (Long, GenesisTransaction, TransferTransaction, IssueTransactionV1, BurnTransactionV1, ReissueTransactionV1)
 
   val preconditions: Gen[Setup] = for {
     master                                                   <- accountGen
@@ -27,8 +27,8 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     alice                                                    <- accountGen
     (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransactionV1 = TransferTransactionV1
-      .selfSigned(Asset.Waves, master, alice, 3 * Waves, ts + 1, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray)
+    masterToAlice: TransferTransaction = TransferTransaction
+      .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
       .explicitGet()
     issue: IssueTransactionV1 = IssueTransactionV1.selfSigned(alice, assetName, description, quantity, decimals, false, Waves, ts + 100).explicitGet()
     burn: BurnTransactionV1   = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
@@ -43,7 +43,8 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         featureCheckBlocksPeriod = 1,
         blocksForFeatureActivation = 1,
         preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0, BlockchainFeatures.DataTransaction.id -> 0)
-      ))
+      )
+  )
   val localWavesSettings: WavesSettings = settings.copy(blockchainSettings = localBlockchainSettings)
 
   property("issue -> burn -> reissue in sequential blocks works correctly") {

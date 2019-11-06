@@ -9,18 +9,20 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 
-case class GeneratorSettings(chainId: String,
-                             accounts: Seq[String],
-                             sendTo: Seq[NodeAddress],
-                             worker: Worker.Settings,
-                             mode: Mode.Value,
-                             narrow: NarrowTransactionGenerator.Settings,
-                             wide: WideTransactionGenerator.Settings,
-                             dynWide: DynamicWideTransactionGenerator.Settings,
-                             multisig: MultisigTransactionGenerator.Settings,
-                             oracle: OracleTransactionGenerator.Settings,
-                             swarm: SmartGenerator.Settings) {
-  val addressScheme: Char                        = chainId.head
+case class GeneratorSettings(
+    chainId: String,
+    accounts: Seq[String],
+    sendTo: Seq[NodeAddress],
+    worker: Worker.Settings,
+    mode: Mode.Value,
+    narrow: NarrowTransactionGenerator.Settings,
+    wide: WideTransactionGenerator.Settings,
+    dynWide: DynamicWideTransactionGenerator.Settings,
+    multisig: MultisigTransactionGenerator.Settings,
+    oracle: OracleTransactionGenerator.Settings,
+    swarm: SmartGenerator.Settings
+) {
+  val addressScheme: Char              = chainId.head
   val privateKeyAccounts: Seq[KeyPair] = accounts.map(s => GeneratorSettings.toKeyPair(s))
 }
 

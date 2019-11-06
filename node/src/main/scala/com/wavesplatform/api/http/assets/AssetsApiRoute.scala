@@ -14,6 +14,7 @@ import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
+import com.wavesplatform.api.http.requests.{BurnV1Request, IssueV1Request, MassTransferRequest, ReissueV1Request, SignedBurnV1Request, SignedExchangeRequest, SignedIssueV1Request, SignedReissueV1Request, SponsorFeeRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
@@ -27,7 +28,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory, TxValidationError}
+import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -54,7 +55,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     Scheduler(executor)
   }
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("assets") {
       balance ~ balances ~ nft ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ deprecatedRoute
     }
@@ -94,7 +95,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     )
   )
   def balanceDistribution: Route =
-    (get & path(Segment / "distribution")) { (assetParam) =>
+    (get & path(Segment / "distribution")) { assetParam =>
       val assetEi = AssetsApiRoute
         .validateAssetId(assetParam)
 
@@ -223,12 +224,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
 
   private def deprecatedRoute: Route =
     (path("transfer") & withAuth) {
-      broadcast[TransferRequests](
-        _.eliminate(
-          v1 => TransactionFactory.transferAssetV1(v1, wallet, time),
-          _.eliminate(v2 => TransactionFactory.transferAssetV2(v2, wallet, time), _ => Left(TxValidationError.UnsupportedTransactionType))
-        )
-      )
+      broadcast[TransferRequest](TransactionFactory.transferAsset(_, wallet, time))
     } ~ (path("masstransfer") & withAuth) {
       broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
     } ~ (path("issue") & withAuth) {
@@ -246,17 +242,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
         path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
         path("exchange")(broadcast[SignedExchangeRequest](_.toTx)) ~
-        path("transfer")(
-          broadcast[SignedTransferRequests](
-            _.eliminate(
-              _.toTx,
-              _.eliminate(
-                _.toTx,
-                _ => Left(TxValidationError.UnsupportedTransactionType)
-              )
-            )
-          )
-        )
+        path("transfer")(broadcast[TransferRequest](_.toTx))
     )
 
   private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
@@ -315,7 +301,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     } yield {
       JsObject(
         Seq(
-          "assetId" -> JsString(id.toString),
+          "assetId"        -> JsString(id.toString),
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
           "issuer"         -> JsString(tx.sender.stringRepr),

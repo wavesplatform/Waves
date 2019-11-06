@@ -1,6 +1,13 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.requests.{
+  SignedBurnV1Request,
+  SignedIssueV1Request,
+  SignedReissueV1Request,
+  SignedSetAssetScriptRequest,
+  SignedSponsorFeeRequest,
+  SignedTransferV1Request
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.script.Script
@@ -105,7 +112,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.assetId.maybeBase58Repr.get shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
-    tx.signature.toString shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
+    tx.proofs.toSignature.toString shouldBe "4dPRTW6XyRQUTQwwpuZDCNy1UDHYG9WGsEQnn5v49Lj5uyh4XGDdwtEq3t6ZottweAXHieK32UokHwiTxGFtz9bQ"
   }
 
   test("AssetTransfer with a fee in an asset json parsing works") {
@@ -142,7 +149,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     tx.feeAssetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000
     tx.fee shouldBe 100
-    tx.signature.toString shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
+    tx.proofs.toSignature.toString shouldBe "UAhYXYdkFAFBuwAuUFP3yw7E8aRTyx56ZL4UPbT4ufomBzVLMRpdW2dCtJmfpCuPPMhGTvdzhXwb7o4ER6HAUpJ"
   }
 
   test("AssetBurnRequest json parsing works") {
@@ -164,7 +171,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
   }
 
   test("SponsorFeeRequest json parsing works") {
-    import com.wavesplatform.api.http.assets.SponsorFeeRequest._
+    import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 
     val One = 100000000L
     val js1 = s"""{
@@ -225,7 +232,8 @@ class SignedRequestsTest extends FunSuite with Matchers {
 
     val req = Json.parse(js1).validate[SignedSponsorFeeRequest].get.toTx.right.get
     req.proofs shouldBe Proofs(
-      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
+      Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get)
+    )
     req.fee shouldBe 100000000L
     req.minSponsoredAssetFee shouldBe Some(100000)
 

@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.requests.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings

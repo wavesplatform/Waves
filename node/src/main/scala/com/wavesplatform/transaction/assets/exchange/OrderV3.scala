@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto.KeyLength
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.{Asset, Proofs}
+import com.wavesplatform.transaction.{Asset, Proofs, TxVersion}
 import com.wavesplatform.utils.byteStrWrites
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -28,7 +28,7 @@ case class OrderV3(senderPublicKey: PublicKey,
                    proofs: Proofs)
     extends Order {
 
-  def version: Byte = 3
+  def version: TxVersion = 3.toByte
 
   override def signature: Array[Byte] = proofs.proofs.head.arr
 
@@ -94,7 +94,7 @@ object OrderV3 {
     val unsigned = OrderV3(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(sig))
   }
 
   def sell(sender: KeyPair,
@@ -110,7 +110,7 @@ object OrderV3 {
     val unsigned = OrderV3(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(sig))
   }
 
   def apply(sender: KeyPair,
@@ -127,7 +127,7 @@ object OrderV3 {
     val unsigned = OrderV3(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, Proofs.empty)
     val sig      = crypto.sign(sender, unsigned.bodyBytes())
 
-    unsigned.copy(proofs = Proofs(Seq(ByteStr(sig))))
+    unsigned.copy(proofs = Proofs(sig))
   }
 
   def parseBytes(bytes: Array[Byte]): Try[Order] = Try {

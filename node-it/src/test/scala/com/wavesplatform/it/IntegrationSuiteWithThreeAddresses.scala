@@ -4,7 +4,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer._
@@ -59,7 +59,7 @@ trait IntegrationSuiteWithThreeAddresses
     }
 
     def makeTransfers(accounts: Seq[String]): Seq[String] = accounts.map { acc =>
-      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransactionV1.typeId)).id
+      sender.transfer(sender.address, acc, defaultBalance, sender.fee(TransferTransaction.typeId)).id
 
     }
 

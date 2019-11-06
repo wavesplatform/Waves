@@ -12,7 +12,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySetti
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{NTPTime, RequestGen, WithDB}
@@ -40,10 +40,12 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     )
   private def withNg(settings: WavesSettings): WavesSettings =
     settings.copy(
-      blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings)))
+      blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings))
+    )
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Observer[BlockchainUpdated] = Observer.empty)(
-      f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
+      f: (BlockchainUpdaterImpl, KeyPair) => Unit
+  ): Unit = {
     val (fs, settings) =
       if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
 
@@ -67,8 +69,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   }
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
-    TransferTransactionV1
-      .selfSigned(Waves, master, recipient, ENOUGH_AMT / 5, ts, Waves, 1000000, Array.emptyByteArray)
+    TransferTransaction
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, Array.emptyByteArray, ts)
       .explicitGet()
   }
 
@@ -119,7 +121,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
 
         val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 3, Some(nonExistentTxId))
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
 
         txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
       }
@@ -128,7 +130,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     "without pagination" in {
       baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
         val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), 10, None)
+          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 10, None)
           .explicitGet()
 
         val ordering = Ordering
@@ -145,16 +147,16 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
           // using pagination
           val firstPage = updater
-            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), firstPageLength, None)
+            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), firstPageLength, None)
             .explicitGet()
 
           val rest = updater
-            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), LIMIT - firstPageLength, Some(firstPage.last._2.id()))
+            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT - firstPageLength, Some(firstPage.last._2.id()))
             .explicitGet()
 
           // without pagination
           val txs = updater
-            .addressTransactions(account.toAddress, Set(TransferTransactionV1.typeId), LIMIT, None)
+            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT, None)
             .explicitGet()
 
           (firstPage ++ rest) shouldBe txs
@@ -271,7 +273,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               createTransfer(master, recipient.toAddress, ts + 2),
               createTransfer(master, recipient.toAddress, ts + 3),
               createTransfer(recipient, master.toAddress, ts + 4),
-              createTransfer(master, recipient.toAddress, ts + 5),
+              createTransfer(master, recipient.toAddress, ts + 5)
             )
           } yield (genesis, transfers)
 

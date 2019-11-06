@@ -57,16 +57,17 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
 
     val tradeAssetDistribution = {
       (accounts.toSet - issueTransactionSender).toSeq.map(acc => {
-        TransferTransactionV2
+        TransferTransaction
           .selfSigned(
-            IssuedAsset(tradeAssetIssue.id()),
+            2.toByte,
             issueTransactionSender,
             acc,
+            IssuedAsset(tradeAssetIssue.id()),
             5,
-            System.currentTimeMillis(),
             Waves,
             900000,
-            Array.fill(random.nextInt(100))(random.nextInt().toByte)
+            Array.fill(random.nextInt(100))(random.nextInt().toByte),
+            System.currentTimeMillis()
           )
           .right
           .get
@@ -121,23 +122,24 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 )
             )
 
-          case TransferTransactionV2 =>
+          case TransferTransaction =>
             (
               for {
                 (sender, asset) <- randomSenderAndAsset(validIssueTxs)
                 useAlias = random.nextBoolean()
                 recipient <- if (useAlias && aliases.nonEmpty) randomFrom(aliases).map(_.alias) else randomFrom(accounts).map(_.toAddress)
                 tx <- logOption(
-                  TransferTransactionV2
+                  TransferTransaction
                     .selfSigned(
-                      Asset.fromCompatId(asset),
+                      2.toByte,
                       sender,
                       recipient,
+                      Asset.fromCompatId(asset),
                       500,
-                      ts,
                       Waves,
                       500000L,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
+                      Array.fill(random.nextInt(100))(random.nextInt().toByte),
+                      ts
                     )
                 )
               } yield tx
@@ -290,10 +292,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
-          case CreateAliasTransactionV2 =>
+          case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransactionV2.selfSigned(sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
+            logOption(CreateAliasTransaction.selfSigned(Transaction.V2, sender, Alias.create(aliasString).explicitGet(), 500000L, ts))
 
           case MassTransferTransaction =>
             (
@@ -486,7 +488,7 @@ object NarrowTransactionGenerator {
     }
   }
 
-  final case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
+  final case class Settings(transactions: Int, probabilities: Map[TransactionParserLite, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30

@@ -9,7 +9,7 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -93,16 +93,17 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
   test("step3 - Alice makes transfer to swapBC1") {
     val txToSwapBC1 =
-      TransferTransactionV2
+      TransferTransaction
         .selfSigned(
-          assetId = Waves,
+          version = 2.toByte,
           sender = pkByAddress(AliceBC1),
           recipient = AddressOrAlias.fromString(swapBC1).explicitGet(),
+          asset = Waves,
           amount = transferAmount + setScriptFee + smartFee,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray
+          feeAsset = Waves,
+          fee = setScriptFee + smartFee,
+          attachment = Array.emptyByteArray,
+          timestamp = System.currentTimeMillis()
         )
         .explicitGet()
 
@@ -114,20 +115,21 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
 
   test("step4 - Alice cannot make transfer from swapBC1 if height is incorrect") {
     val txToSwapBC1 =
-      TransferTransactionV2
+      TransferTransaction
         .selfSigned(
-          assetId = Waves,
+          version = 2.toByte,
           sender = pkByAddress(swapBC1),
           recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),
+          asset = Waves,
           amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray
+          feeAsset = Waves,
+          fee = setScriptFee + smartFee,
+          attachment = Array.emptyByteArray,
+          timestamp = System.currentTimeMillis()
         )
         .explicitGet()
 
-    assertBadRequest(sender.signedBroadcast(txToSwapBC1.json()))
+    assertApiErrorRaised(sender.signedBroadcast(txToSwapBC1.json()))
   }
 
   test("step5 - Bob makes transfer; after revert Alice takes funds back") {
@@ -138,19 +140,18 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val (swapBalance, swapEffBalance)   = miner.accountBalances(swapBC1)
 
     val unsigned =
-      TransferTransactionV2
-        .create(
-          assetId = Waves,
-          sender = pkByAddress(swapBC1),
-          recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
-          amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray,
-          proofs = Proofs.empty
-        )
-        .explicitGet()
+      TransferTransaction(
+        version = 2.toByte,
+        sender = pkByAddress(swapBC1),
+        recipient = AddressOrAlias.fromString(BobBC1).explicitGet(),
+        assetId = Waves,
+        amount = transferAmount,
+        feeAssetId = Waves,
+        fee = setScriptFee + smartFee,
+        attachment = Array.emptyByteArray,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs.empty
+      )
 
     val proof    = ByteStr(secretText.getBytes("UTF-8"))
     val sigAlice = ByteStr(crypto.sign(AlicesPK, unsigned.bodyBytes()))
@@ -160,9 +161,11 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     val versionedTransferId = sender.signedBroadcast(signed.json()).id
     nodes.waitForHeightAriseAndTxPresent(versionedTransferId)
 
-    miner.assertBalances(swapBC1,
-                         swapBalance - transferAmount - (setScriptFee + smartFee),
-                         swapEffBalance - transferAmount - (setScriptFee + smartFee))
+    miner.assertBalances(
+      swapBC1,
+      swapBalance - transferAmount - (setScriptFee + smartFee),
+      swapEffBalance - transferAmount - (setScriptFee + smartFee)
+    )
     miner.assertBalances(BobBC1, bobBalance + transferAmount, bobEffBalance + transferAmount)
     miner.assertBalances(AliceBC1, aliceBalance, aliceEffBalance)
 
@@ -173,16 +176,17 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     miner.accountBalances(swapBC1)
     assertBadRequestAndMessage(miner.transactionInfo(versionedTransferId), "transactions does not exist", 404)
 
-    val selfSignedToAlice = TransferTransactionV2
+    val selfSignedToAlice = TransferTransaction
       .selfSigned(
-        assetId = Waves,
+        version = 2.toByte,
         sender = pkByAddress(swapBC1),
         recipient = AddressOrAlias.fromString(AliceBC1).explicitGet(),
+        asset = Waves,
         amount = transferAmount,
-        timestamp = System.currentTimeMillis(),
-        feeAssetId = Waves,
-        feeAmount = setScriptFee + smartFee,
-        attachment = Array.emptyByteArray
+        feeAsset = Waves,
+        fee = setScriptFee + smartFee,
+        attachment = Array.emptyByteArray,
+        timestamp = System.currentTimeMillis()
       )
       .explicitGet()
 
@@ -190,9 +194,11 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
       sender.signedBroadcast(selfSignedToAlice.json()).id
     nodes.waitForHeightAriseAndTxPresent(transferToAlice)
 
-    miner.assertBalances(swapBC1,
-                         swapBalance - transferAmount - (setScriptFee + smartFee),
-                         swapEffBalance - transferAmount - (setScriptFee + smartFee))
+    miner.assertBalances(
+      swapBC1,
+      swapBalance - transferAmount - (setScriptFee + smartFee),
+      swapEffBalance - transferAmount - (setScriptFee + smartFee)
+    )
     miner.assertBalances(BobBC1, bobBalance, bobEffBalance)
     miner.assertBalances(AliceBC1, aliceBalance + transferAmount, aliceEffBalance + transferAmount)
   }

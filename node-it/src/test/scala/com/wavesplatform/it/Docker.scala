@@ -255,7 +255,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .build()
 
       val containerId = {
-        val containerName = s"${wavesNetwork.name()}-$nodeName"
+        val jenkinsJobIdFromEnv = sys.env.get("JENKINS_JOB_ID").fold("")(s => s"-$s")
+        val containerName = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
         dumpContainers(
           client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
           "Containers with same name"

@@ -105,7 +105,7 @@ object Keys {
 
   val BlockHeaderPrefix: Short = 50
 
-  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int)]] =
+  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int, Int, ByteStr)]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
 
   def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =

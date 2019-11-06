@@ -15,7 +15,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -51,8 +51,8 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
         } yield {
           blockchain.balance(account) should be(newBalance)
           blockchain.height should be(3)
-          blockchain.blockAt(2).get.version should be(Block.RewardBlockVersion)
-          blockchain.blockAt(3).get.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(2).get.header.version should be(Block.RewardBlockVersion)
+          blockchain.blockAt(3).get.header.version should be(Block.RewardBlockVersion)
         }
     }
   }
@@ -76,11 +76,9 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       (ts, reference, account) => {
         val recipient1 = createAccount.toAddress
         val recipient2 = createAccount.toAddress
-        val tx1 = TransferTransactionV2
-          .selfSigned(Waves, account, recipient1, 10 * Constants.UnitsInWave, ts, Waves, 400000, Array())
+        val tx1 = TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, Array(), ts)
           .explicitGet()
-        val tx2 = TransferTransactionV2
-          .selfSigned(Waves, account, recipient2, 5 * Constants.UnitsInWave, ts, Waves, 400000, Array())
+        val tx2 = TransferTransaction.selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, Array(), ts)
           .explicitGet()
         TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
       }
@@ -89,8 +87,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     val txs: Seq[TransactionProducer] = Seq(
       (ts, account) => {
         val recipient1 = createAccount.toAddress
-        TransferTransactionV2
-          .selfSigned(Waves, account, recipient1, 10 * Constants.UnitsInWave, ts, Waves, 400000, Array())
+        TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, Array(), ts)
           .explicitGet()
       }
     )
@@ -142,8 +139,9 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
 
   private def resources: Resource[Task, (BlockchainUpdater with NG, DB)] =
     Resource.make {
-      val defaultWriter: LevelDbWriterWithReward       = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
-      val blockchainUpdater: BlockchainUpdater with NG = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, PublishSubject[BlockchainUpdated])
+      val defaultWriter: LevelDbWriterWithReward = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
+      val blockchainUpdater: BlockchainUpdater with NG =
+        new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, PublishSubject[BlockchainUpdated])
       defaultWriter.saveReward(settings.blockchainSettings.rewardsSettings.initial)
       Task.now((blockchainUpdater, db))
     } {

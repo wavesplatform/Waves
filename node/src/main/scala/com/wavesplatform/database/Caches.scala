@@ -45,21 +45,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
-  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int)]
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = {
+  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b, b.bytes().length))
+      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
     } else {
       loadBlockHeaderAndSize(height)
     }
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)]
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int)] = {
+  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)]
+  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b, b.bytes().length))
+      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
     } else {
       loadBlockHeaderAndSize(blockId)
     }
@@ -116,7 +116,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       0 -> Long.MaxValue
     }
     oldestStoredBlockTimestamp = oldestTs
-    val bts = lastBlock.fold(0L)(_.timestamp) - dbSettings.rememberBlocks.toMillis
+    val bts = lastBlock.fold(0L)(_.header.timestamp) - dbSettings.rememberBlocks.toMillis
     blocksTs.entrySet().removeIf(_.getValue < bts)
     transactionIds.entrySet().removeIf(_.getValue < oldestBlock)
   }
@@ -313,7 +313,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)
-    blocksTs.put(newHeight, block.timestamp)
+    blocksTs.put(newHeight, block.header.timestamp)
 
     accountDataCache.putAll(newData.asJava)
 

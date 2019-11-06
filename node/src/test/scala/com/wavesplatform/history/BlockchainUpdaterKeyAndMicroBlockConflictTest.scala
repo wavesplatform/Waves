@@ -95,7 +95,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.signerData.signature,
+          totalRefTo = genesisBlock.signature,
           base = Seq(transfer1),
           micros = Seq(Seq(transfer2)),
           signer = richAccount,
@@ -104,7 +104,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
-          totalRefTo = keyBlock.signerData.signature,
+          totalRefTo = keyBlock.signature,
           base = Seq(transfer3),
           micros = Nil,
           signer = secondAccount,
@@ -137,7 +137,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = genesisBlock.signerData.signature,
+          totalRefTo = genesisBlock.signature,
           base = Seq(transfer1),
           micros = Seq(Seq(), Seq(transfer2)),
           signer = richAccount,
@@ -179,7 +179,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val leaseBlock = unsafeBlock(
-          genesisBlock.signerData.signature,
+          genesisBlock.signature,
           Seq(lease),
           richAccount,
           3,
@@ -187,7 +187,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = leaseBlock.signerData.signature,
+          totalRefTo = leaseBlock.signature,
           base = Nil,
           micros = Seq(Seq(leaseCancel)),
           signer = richAccount,
@@ -196,7 +196,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val transferBlock = unsafeBlock(
-          keyBlock.signerData.signature,
+          keyBlock.signature,
           Seq(transfer),
           secondAccount,
           3,
@@ -224,7 +224,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val preBlock = unsafeBlock(
-          genesisBlock.signerData.signature,
+          genesisBlock.signature,
           Seq(data1),
           richAccount,
           3,
@@ -232,7 +232,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock, microBlocks) = unsafeChainBaseAndMicro(
-          totalRefTo = preBlock.signerData.signature,
+          totalRefTo = preBlock.signature,
           base = Seq(),
           micros = Seq(Seq(data2)),
           signer = richAccount,

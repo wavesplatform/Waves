@@ -32,7 +32,7 @@ class AliasBroadcastRouteSpec
 
     "when state validation fails" in {
       forAll(createAliasGen.retryUntil(_.version == 1)) { t: Transaction =>
-        posting("create", t.json()) should produce(StateCheckFailed(CustomValidationError("foo"), t))
+        posting("create", t.json()) should produce(StateCheckFailed(t, "foo"))
       }
     }
   }
@@ -40,7 +40,7 @@ class AliasBroadcastRouteSpec
   "returns appropriate error code when validation fails for" - {
 
     "create alias transaction" in forAll(createAliasReq) { req =>
-      import com.wavesplatform.api.http.alias.SignedCreateAliasV1Request.broadcastAliasV1RequestReadsFormat
+      import com.wavesplatform.api.http.requests.SignedCreateAliasV1Request.jsonFormat
 
       def posting(v: JsValue): RouteTestResult = Post(routePath("create"), v) ~> route
 

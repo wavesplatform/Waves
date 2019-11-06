@@ -22,7 +22,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class OracleDataTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions
-    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransactionV2)] =
+    : Gen[(GenesisTransaction, GenesisTransaction, CreateAliasTransaction, SetScriptTransaction, DataTransaction, TransferTransaction)] =
     for {
       master <- accountGen
       oracle <- accountGen

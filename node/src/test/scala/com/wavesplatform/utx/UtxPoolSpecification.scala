@@ -1,6 +1,6 @@
 package com.wavesplatform.utx
 
-import java.nio.file.Files
+import java.nio.file.{Files, Path}
 
 import cats.data.NonEmptyList
 import com.typesafe.config.ConfigFactory
@@ -11,7 +11,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
@@ -35,6 +35,7 @@ import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
 import monix.reactive.subjects.Subject
+import org.iq80.leveldb.DB
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
@@ -47,9 +48,9 @@ private object UtxPoolSpecification {
   private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
-    val path   = Files.createTempDirectory("leveldb-test")
-    val db     = openDB(path.toAbsolutePath.toString)
-    val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val path: Path            = Files.createTempDirectory("leveldb-test")
+    val db: DB                = openDB(path.toAbsolutePath.toString)
+    val writer: LevelDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
 
     sys.addShutdownHook {
       db.close()
@@ -67,7 +68,7 @@ class UtxPoolSpecification
     with NoShrink
     with BlocksTransactionsHelpers
     with WithDomain {
-  val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
+  private val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
   import FunctionalitySettings.TESTNET.{maxTransactionTimeBackOffset => maxAge}
@@ -104,14 +105,18 @@ class UtxPoolSpecification
       amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
+    } yield TransferTransaction
+      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, Array.empty[Byte], time.getTimestamp())
+      .explicitGet())
       .label("transferTransaction")
 
   private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
-    } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
+    } yield TransferTransaction
+      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, Array.empty[Byte], time.getTimestamp())
+      .explicitGet())
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
@@ -262,7 +267,7 @@ class UtxPoolSpecification
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
 
-  private def utxTest(utxSettings: UtxSettings, txCount: Int = 10)(f: (Seq[TransferTransactionV1], UtxPool, TestTime) => Unit): Unit =
+  private def utxTest(utxSettings: UtxSettings, txCount: Int = 10)(f: (Seq[TransferTransaction], UtxPool, TestTime) => Unit): Unit =
     forAll(stateGen, chooseNum(2, txCount).label("txCount")) {
       case ((sender, senderBalance, bcu), count) =>
         val time = new TestTime()
@@ -323,15 +328,15 @@ class UtxPoolSpecification
         UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false)
       )
 
-      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
+      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.header.timestamp))
     }
 
-  private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransactionV1] = accountGen.map { recipient =>
-    TransferTransactionV1.selfSigned(Waves, sender, recipient, waves(1), ts, Waves, feeAmount, Array.emptyByteArray).explicitGet()
+  private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
+    TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, Array.emptyByteArray, ts).explicitGet()
   }
 
-  private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransactionV2] = accountGen.map { recipient =>
-    TransferTransactionV2.selfSigned(Waves, sender, recipient, waves(1), ts, Waves, feeAmount, Array.emptyByteArray).explicitGet()
+  private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
+    TransferTransaction.selfSigned(2.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, Array.emptyByteArray, ts).explicitGet()
   }
 
   "UTX Pool" - {

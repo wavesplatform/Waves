@@ -17,13 +17,14 @@ object Dependencies {
   private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
+  private val paradise      = compilerPlugin("org.scalamacros" % "paradise" % "2.1.1" cross CrossVersion.full)
 
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
   private val kamonCore          = kamonModule("core", "1.1.5")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
-  val logback            = "ch.qos.logback" % "logback-classic" % "1.2.3"
+  val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
 
   private val catsEffect = catsModule("effect")
@@ -126,12 +127,16 @@ object Dependencies {
     "org.scalamock" %% "scalamock-scalatest-support" % "3.6.0"
   ).map(_ % Test)
 
+  lazy val logDeps = Seq(
+    logback                % Runtime,
+    janino                 % Runtime,
+    akkaModule("slf4j") % Runtime
+  )
+
   lazy val node = Def.setting(
     Seq(
       "commons-net"          % "commons-net" % "3.6",
       "com.iheart"           %% "ficus" % "1.4.2",
-      logback                % Runtime,
-      janino                 % Runtime,
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
       kamonModule("system-metrics", "1.0.0"),
@@ -145,14 +150,15 @@ object Dependencies {
       "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
       "org.bitlet"        % "weupnp" % "0.1.4",
-      akkaModule("slf4j") % Runtime,
       kindProjector,
+      paradise,
       monixModule("reactive").value,
       nettyModule("handler"),
+      "io.estatico"                       %% "newtype" % "0.4.3",
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console
+    ) ++ protobuf.value ++ test ++ console ++ logDeps
   )
 
   private[this] val protoSchemasLib =
@@ -162,7 +168,8 @@ object Dependencies {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
-      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf"
+      "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
+      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
     )
   }
 

@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -63,36 +63,34 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   }
 
   test("can't send from acc0 using old pk") {
-    assertBadRequest(
+    assertApiErrorRaised(
       sender.transfer(
         acc0.stringRepr,
         recipient = acc3.stringRepr,
         assetId = None,
         amount = transferAmount,
-        fee = minFee + 0.00001.waves + 0.00002.waves,
-      ))
+        fee = minFee + 0.00001.waves + 0.00002.waves
+      )
+    )
   }
 
   test("can send from acc0 using multisig of acc1 and acc2") {
     val unsigned =
-      TransferTransactionV2
-        .create(
-          assetId = Waves,
-          sender = acc0,
-          recipient = acc3,
-          amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAssetId = Waves,
-          feeAmount = minFee + 0.004.waves,
-          attachment = Array.emptyByteArray,
-          proofs = Proofs.empty
-        )
-        .explicitGet()
-    val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
-    val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
-
-    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
-
+      TransferTransaction(
+        version = 2.toByte,
+        sender = acc0,
+        recipient = acc3,
+        assetId = Waves,
+        amount = transferAmount,
+        feeAssetId = Waves,
+        fee = minFee + 0.004.waves,
+        attachment = Array.emptyByteArray,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs.empty
+      )
+    val sig1   = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
+    val sig2   = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
+    val signed = unsigned.copy(proofs = Proofs(sig1, sig2))
     sender.signedBroadcast(signed.json(), waitForTx = true).id
 
   }
@@ -112,8 +110,9 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
-    val removeScriptId =  sender
-      .signedBroadcast(signed.json(), waitForTx = true).id
+    val removeScriptId = sender
+      .signedBroadcast(signed.json(), waitForTx = true)
+      .id
 
     sender.transactionInfo(removeScriptId).script shouldBe None
 

@@ -37,6 +37,8 @@ object FunctionIds {
   val BOOLEAN_TO_STRING: Short = 421
 
   val CREATE_LIST: Short = 1100
+  val APPEND_LIST: Short = 1101
+  val CONCAT_LIST: Short = 1102
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201

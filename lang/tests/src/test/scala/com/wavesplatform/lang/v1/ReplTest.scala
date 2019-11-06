@@ -42,7 +42,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
   property("syntax errors") {
     val repl = Repl()
     await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
-    await(repl.execute(""" 1 ++ 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
+    await(repl.execute(""" 1 %% 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
   }
 
   property("logic errors") {
@@ -165,6 +165,40 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     val url = "testnodes.wavesnodes.com"
     val settings = NodeConnectionSettings(url + "///", 'T'.toByte, "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun")
     settings.normalizedUrl shouldBe url
+  }
+
+  property("bytevector format display") {
+    val repl = Repl()
+    await(repl.execute("sha256(base58'')")) shouldBe Right("res1: ByteVector = base58'GKot5hBsd81kMupNCXHaqbhv3huEbxAFMLnpcX2hniwn'")
+  }  
+    
+  property("reconfigure") {
+    val address1 = "3MpLKVSnWSY53bSNTECuGvESExzhV9ppcun"
+    val settings = NodeConnectionSettings("testnodes.wavesnodes.com", 'T'.toByte, address1)
+    val repl = Repl(Some(settings))
+
+    await(repl.execute("let a = 1"))
+    await(repl.execute("func inc(a: Int) = a + 1"))
+    await(repl.execute("this")) shouldBe Right(
+      s"""
+         |res1: Address = Address(
+         |	bytes = base58'$address1'
+         |)
+       """.trim.stripMargin
+    )
+
+    val address2 = "3PDjjLFDR5aWkKgufika7KSLnGmAe8ueDpC"
+    val reconfiguredRepl = repl.reconfigure(settings.copy(address = address2))
+
+    await(reconfiguredRepl.execute("a")) shouldBe Right("res2: Int = 1")
+    await(reconfiguredRepl.execute("inc(1)")) shouldBe Right("res3: Int = 2")
+    await(reconfiguredRepl.execute("this")) shouldBe Right(
+      s"""
+         |res4: Address = Address(
+         |	bytes = base58'$address2'
+         |)
+       """.trim.stripMargin
+    )
   }
 
   ignore("waves context") {

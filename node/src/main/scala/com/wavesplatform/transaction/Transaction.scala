@@ -10,7 +10,8 @@ import play.api.libs.json.Json
 trait Transaction extends BytesSerializable with JsonSerializable {
   val id: Coeval[ByteStr]
 
-  def builder: TransactionParser
+  def typeId: Byte = builder.typeId
+  def builder: TransactionParserLite
   def assetFee: (Asset, Long)
   def timestamp: Long
   def chainByte: Option[Byte] = None
@@ -31,8 +32,10 @@ trait Transaction extends BytesSerializable with JsonSerializable {
 }
 
 object Transaction {
-
   type Type = Byte
+
+  val V1: TxVersion = TxVersion.V1
+  val V2: TxVersion = TxVersion.V2
 
   implicit class TransactionExt(tx: Transaction) {
     def feeDiff(): Portfolio = tx.assetFee match {

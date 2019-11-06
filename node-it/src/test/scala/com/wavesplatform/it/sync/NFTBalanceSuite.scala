@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import com.wavesplatform.transaction.transfer.TransferTransactionV1
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.FreeSpec
 import play.api.libs.json._
 
@@ -19,11 +19,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class NFTBalanceSuite
-    extends FreeSpec with BaseTransactionSuiteLike {
-
+class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
   import NFTBalanceSuite._
-
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -87,22 +84,14 @@ class NFTBalanceSuite
     "returns only nft with balance > 0 on /nft/{address}/limit/{limit}" in {
       val other = KeyPair("other".getBytes)
 
-      val transfer = TransferTransactionV1
-        .selfSigned(
-          randomTokenToTransfer,
-          issuer,
-          other,
-          1,
-          System.currentTimeMillis(),
-          Waves,
-          0.001.waves,
-          Array.emptyByteArray
-        )
+      val transfer = TransferTransaction
+        .selfSigned(1.toByte, issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, Array.emptyByteArray, System.currentTimeMillis())
         .explicitGet()
 
       val assertion = for {
         tx         <- node.signedBroadcast(transfer.json())
         _          <- node.waitForTransaction(tx.id)
+        _          <- node.waitForHeightArise
         issuerNFTs <- getNFTPage(node, issuer.stringRepr, 1000, None)
         otherNFTs  <- getNFTPage(node, other.stringRepr, 1000, None)
       } yield {
@@ -110,7 +99,7 @@ class NFTBalanceSuite
         otherNFTs should contain(randomTokenToTransfer.id.toString)
       }
 
-      Await.result(assertion, 10.seconds)
+      Await.result(assertion, 50.seconds)
     }
   }
 
@@ -130,7 +119,8 @@ class NFTBalanceSuite
       }
 
       Await.result(
-        assertion, 1.minute
+        assertion,
+        1.minute
       )
     }
 

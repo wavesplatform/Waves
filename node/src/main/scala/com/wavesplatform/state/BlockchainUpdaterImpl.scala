@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -64,7 +65,7 @@ class BlockchainUpdaterImpl(
   private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
 
   private def publishLastBlockInfo(): Unit =
-    for (id <- lastBlockId; ts <- ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)) {
+    for (id <- lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(blockchain.lastBlockTimestamp)) {
       val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
       internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
     }
@@ -94,7 +95,7 @@ class BlockchainUpdaterImpl(
     if (height % featuresCheckPeriod == 0) {
       val approvedFeatures = blockchain
         .featureVotes(height)
-        .map { case (feature, votes) => feature -> (if (block.featureVotes.contains(feature)) votes + 1 else votes) }
+        .map { case (feature, votes) => feature -> (if (block.header.featureVotes.contains(feature)) votes + 1 else votes) }
         .filter { case (_, votes) => votes >= blocksForFeatureActivation }
         .keySet
 
@@ -176,9 +177,9 @@ class BlockchainUpdaterImpl(
           (ngState match {
             case None =>
               blockchain.lastBlockId match {
-                case Some(uniqueId) if uniqueId != block.reference =>
-                  val logDetails = s"The referenced block(${block.reference})" +
-                    s" ${if (blockchain.contains(block.reference)) "exits, it's not last persisted" else "doesn't exist"}"
+                case Some(uniqueId) if uniqueId != block.header.reference =>
+                  val logDetails = s"The referenced block(${block.header.reference})" +
+                    s" ${if (blockchain.contains(block.header.reference)) "exits, it's not last persisted" else "doesn't exist"}"
                   Left(BlockAppendError(s"References incorrect or non-existing block: " + logDetails, block))
                 case lastBlockId =>
                   val height            = lastBlockId.fold(0)(blockchain.unsafeHeightOf)
@@ -195,12 +196,12 @@ class BlockchainUpdaterImpl(
                     .map(r => Option((r, Seq.empty[Transaction], reward)))
               }
             case Some(ng) =>
-              if (ng.base.reference == block.reference) {
+              if (ng.base.header.reference == block.header.reference) {
                 if (block.blockScore() > ng.base.blockScore()) {
-                  val height            = blockchain.unsafeHeightOf(ng.base.reference)
+                  val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                   val miningConstraints = MiningConstraints(blockchain, height)
 
-                  BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.reference, height)
+                  BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.header.reference, height)
 
                 BlockDiffer
                   .fromBlock(CompositeBlockchain(blockchain, carry = blockchain.carryFee, reward = ng.reward),
@@ -221,11 +222,11 @@ class BlockchainUpdaterImpl(
                     Right(None)
                   } else {
                     log.trace(s"New liquid block is better version of existing, swapping")
-                    val height            = blockchain.unsafeHeightOf(ng.base.reference)
+                    val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(blockchain, height)
 
                     BlockchainUpdateNotifier
-                    .notifyMicroBlockRollback(blockchainUpdated, block.reference, height)
+                    .notifyMicroBlockRollback(blockchainUpdated, block.header.reference, height)
 
                   BlockDiffer
                     .fromBlock(CompositeBlockchain(blockchain, carry = blockchain.carryFee, reward = ng.reward),
@@ -244,11 +245,11 @@ class BlockchainUpdaterImpl(
                     )
                   )
               } else
-                metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.reference)) match {
+                metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                     if (!verify || referencedForgedBlock.signaturesValid().isRight) {
-                      val height = blockchain.heightOf(referencedForgedBlock.reference).getOrElse(0)
+                      val height = blockchain.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                     if (discarded.nonEmpty) {
                       BlockchainUpdateNotifier
@@ -282,7 +283,7 @@ class BlockchainUpdaterImpl(
                         Some((hardenedDiff, discarded.flatMap(_.transactionData), reward))
                       }
                     } else {
-                      val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.reference}"
+                      val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.header.reference}"
                       log.error(errorText)
                       Left(BlockAppendError(errorText, block))
                     }
@@ -308,7 +309,7 @@ class BlockchainUpdaterImpl(
                 notifyChangedSpendable(prevNgState, ngState)
                 publishLastBlockInfo()
 
-                if ((block.timestamp > time
+                if ((block.header.timestamp > time
                       .getTimestamp() - wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis) || (newHeight % 100 == 0)) {
                   log.info(s"New height: $newHeight")
               }
@@ -390,7 +391,7 @@ class BlockchainUpdaterImpl(
     ngState match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
-      case Some(ng) if ng.base.signerData.generator.toAddress != microBlock.sender.toAddress =>
+      case Some(ng) if ng.base.header.generator.toAddress != microBlock.sender.toAddress =>
         Left(MicroBlockAppendError("Base block has been generated by another account", microBlock))
       case Some(ng) =>
         ng.lastMicroBlock match {
@@ -404,7 +405,7 @@ class BlockchainUpdaterImpl(
             for {
               _ <- microBlock.signaturesValid()
               blockDifferResult <- {
-                BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.timestamp, restTotalConstraint, verify)
+                BlockDiffer.fromMicroBlock(this, blockchain.lastBlockTimestamp, microBlock, ng.base.header.timestamp, restTotalConstraint, verify)
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
@@ -441,7 +442,7 @@ class BlockchainUpdaterImpl(
     val innerVotes = blockchain.featureVotes(height)
     ngState match {
       case Some(ng) if this.height <= height =>
-        val ngVotes = ng.base.featureVotes.map { featureId =>
+        val ngVotes = ng.base.header.featureVotes.map { featureId =>
           featureId -> (innerVotes.getOrElse(featureId, 0) + 1)
         }.toMap
 
@@ -469,7 +470,7 @@ class BlockchainUpdaterImpl(
           case Some(ng) =>
             val innerVotes = blockchain.blockRewardVotes(height)
             if (height == this.height && settings.rewardsSettings.votingWindow(activatedAt, height).contains(height))
-              innerVotes :+ ng.base.rewardVote
+              innerVotes :+ ng.base.header.rewardVote
             else innerVotes
         }
       case None => Seq()
@@ -484,12 +485,12 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def liquidBlockHeaderAndSize() = ngState.map { s =>
-    (s.bestLiquidBlock, s.bestLiquidBlock.bytes().length)
+  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int, Int, ByteStr)] = ngState.map { s =>
+    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length, s.bestLiquidBlock.transactionData.size, s.bestLiquidBlock.signature)
   }
 
-  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int)] = readLock {
-    liquidBlockHeaderAndSize().filter(_._1.uniqueId == blockId) orElse blockchain.blockHeaderAndSize(blockId)
+  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
+    liquidBlockHeaderAndSize().filter(_._4 == blockId) orElse blockchain.blockHeaderAndSize(blockId)
   }
 
   override def height: Int = readLock {
@@ -520,7 +521,7 @@ class BlockchainUpdaterImpl(
   }
 
   def lastBlockTimestamp: Option[Long] = readLock {
-    ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)
+    ngState.map(_.base.header.timestamp).orElse(blockchain.lastBlockTimestamp)
   }
 
   def lastBlockId: Option[ByteStr] = readLock {
@@ -545,7 +546,11 @@ class BlockchainUpdaterImpl(
   override def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo] = readLock {
     ngState
       .map(_.bestLastBlockInfo(maxTimestamp))
-      .orElse(blockchain.lastBlock.map(b => BlockMinerInfo(b.consensusData, b.timestamp, b.uniqueId)))
+      .orElse(
+        blockchain.lastBlock.map(
+          b => BlockMinerInfo(NxtLikeConsensusBlockData(b.header.baseTarget, b.header.generationSignature), b.header.timestamp, b.uniqueId)
+        )
+      )
   }
 
   override def score: BigInt = readLock {
@@ -580,7 +585,7 @@ class BlockchainUpdaterImpl(
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = readLock {
     ngState match {
       case Some(ng) if ng.contains(block.reference) =>
-        if (back == 1) Some(ng.base) else blockchain.parentHeader(ng.base, back - 1)
+        if (back == 1) Some(ng.base.header) else blockchain.parentHeader(ng.base.header, back - 1)
       case _ =>
         blockchain.parentHeader(block, back)
     }
@@ -593,9 +598,9 @@ class BlockchainUpdaterImpl(
       blockchain.totalFee(height)
   }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int)] = readLock {
+  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
     if (height == blockchain.height + 1)
-      ngState.map(x => (x.bestLiquidBlock, x.bestLiquidBlock.bytes().length))
+      ngState.map(x => (x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length, x.bestLiquidBlock.transactionData.size, x.bestLiquidBlock.signature))
     else
       blockchain.blockHeaderAndSize(height)
   }
@@ -804,10 +809,10 @@ object BlockchainUpdaterImpl
     with AddressTransactions.Prov[BlockchainUpdaterImpl]
     with Distributions.Prov[BlockchainUpdaterImpl] {
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
-    b1.signerData.generator == b2.signerData.generator &&
-      b1.consensusData.baseTarget == b2.consensusData.baseTarget &&
-      b1.reference == b2.reference &&
-      b1.timestamp == b2.timestamp
+    b1.header.generator == b2.header.generator &&
+      b1.header.baseTarget == b2.header.baseTarget &&
+      b1.header.reference == b2.header.reference &&
+      b1.header.timestamp == b2.header.timestamp
 
   def addressTransactions(bu: BlockchainUpdaterImpl): AddressTransactions =
     new CompositeAddressTransactions(bu.blockchain, Height @@ bu.height, () => bu.bestLiquidDiff)

@@ -41,7 +41,7 @@ object TransactionDiffer {
       _ <- Verifier(blockchain)(tx)
       _ <- TracedResult(
         stats.commonValidation
-          .measureForType(tx.builder.typeId) {
+          .measureForType(tx.typeId) {
             for {
               _ <- CommonValidation.disallowTxFromFuture(blockchain.settings.functionalitySettings, currentBlockTimestamp, tx)
               _ <- CommonValidation.disallowTxFromPast(blockchain.settings.functionalitySettings, prevBlockTimestamp, tx)
@@ -54,14 +54,14 @@ object TransactionDiffer {
       )
       diff <- unverified(currentBlockTimestamp)(blockchain, tx)
       positiveDiff <- stats.balanceValidation
-        .measureForType(tx.builder.typeId) {
+        .measureForType(tx.typeId) {
           BalanceDiffValidation(blockchain, blockchain.settings.functionalitySettings)(diff)
         }
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
   private def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
-    stats.transactionDiffValidation.measureForType(tx.builder.typeId) {
+    stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx)

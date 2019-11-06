@@ -45,7 +45,9 @@ object CommonValidation {
             GenericError(
               "Attempt to transfer unavailable funds: Transaction application leads to " +
                 s"negative waves balance to (at least) temporary negative state, current balance equals $oldWavesBalance, " +
-                s"spends equals ${spendings.balance}, result is $newWavesBalance"))
+                s"spends equals ${spendings.balance}, result is $newWavesBalance"
+            )
+          )
         } else {
           val balanceError = spendings.assets.collectFirst {
             case (aid, delta) if delta < 0 && blockchain.balance(sender, aid) + delta < 0 =>
@@ -53,7 +55,8 @@ object CommonValidation {
               GenericError(
                 "Attempt to transfer unavailable funds: Transaction application leads to negative asset " +
                   s"'$aid' balance to (at least) temporary negative state, current balance is $availableBalance, " +
-                  s"spends equals $delta, result is ${availableBalance + delta}")
+                  s"spends equals $delta, result is ${availableBalance + delta}"
+              )
           }
           balanceError.fold[Either[ValidationError, T]](Right(tx))(Left(_))
         }
@@ -64,7 +67,9 @@ object CommonValidation {
           Left(
             GenericError(
               "Attempt to pay unavailable funds: balance " +
-                s"${blockchain.balance(ptx.sender, Waves)} is less than ${ptx.amount + ptx.fee}"))
+                s"${blockchain.balance(ptx.sender, Waves)} is less than ${ptx.amount + ptx.fee}"
+            )
+          )
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
         case citx: InvokeScriptTransaction =>
@@ -112,11 +117,16 @@ object CommonValidation {
 
     }
 
+    def generic1or2Barrier(t: VersionedTransaction, name: String) = {
+      if (t.version == 1.toByte) Right(tx)
+      else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
+      else Left(GenericError(s"Unknown version of $name transaction: ${t.version}"))
+    }
+
     tx match {
       case _: BurnTransactionV1     => Right(tx)
       case _: PaymentTransaction    => Right(tx)
       case _: GenesisTransaction    => Right(tx)
-      case _: TransferTransactionV1 => Right(tx)
       case _: IssueTransactionV1    => Right(tx)
       case _: ReissueTransactionV1  => Right(tx)
       case _: ExchangeTransactionV1 => Right(tx)
@@ -131,7 +141,6 @@ object CommonValidation {
 
       case _: LeaseTransactionV1       => Right(tx)
       case _: LeaseCancelTransactionV1 => Right(tx)
-      case _: CreateAliasTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
 
@@ -141,7 +150,6 @@ object CommonValidation {
           case Some(sc) => scriptActivation(sc)
         }
 
-      case _: TransferTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case it: IssueTransactionV2 =>
         it.script match {
           case None     => Right(tx)
@@ -156,12 +164,12 @@ object CommonValidation {
           }
         }
 
-
+      case t: TransferTransaction      => generic1or2Barrier(t, "transfer")
+      case t: CreateAliasTransaction   => generic1or2Barrier(t, "create alias")
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)
       case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
@@ -177,7 +185,9 @@ object CommonValidation {
        |is more than ${settings.maxTransactionTimeForwardOffset.toMillis}ms in the future
        |relative to block timestamp $time""".stripMargin
             .replaceAll("\n", " ")
-            .replaceAll("\r", "")))
+            .replaceAll("\r", "")
+        )
+      )
     else Right(tx)
   }
 
@@ -190,7 +200,9 @@ object CommonValidation {
          |is more than ${settings.maxTransactionTimeBackOffset.toMillis}ms in the past
          |relative to previous block timestamp $prevBlockTime""".stripMargin
               .replaceAll("\n", " ")
-              .replaceAll("\r", "")))
+              .replaceAll("\r", "")
+          )
+        )
       case _ => Right(tx)
     }
 

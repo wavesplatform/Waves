@@ -190,7 +190,7 @@ object Importer extends ScorexLogging {
               if (importOptions.format == Formats.Binary) Block.parseBytes(buffer).toEither
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
-            if (blockchainUpdater.lastBlockId.contains(block.reference)) {
+            if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
               Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
                 case Left(ve) =>
                   log.error(s"Error appending block: $ve")

@@ -91,60 +91,15 @@ object PBTransactions {
         } yield tx
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
-        version match {
-          case 1 =>
             for {
               address <- recipient.toAddressOrAlias
-              tx <- vt.transfer.TransferTransactionV1.create(
-                amount.vanillaAssetId,
-                sender,
-                address,
-                amount.longAmount,
-                timestamp,
-                feeAssetId,
-                feeAmount,
-                attachment.toByteArray,
-                signature
-              )
-            } yield tx
-
-          case 2 =>
-            for {
-              address <- recipient.toAddressOrAlias
-              tx <- vt.transfer.TransferTransactionV2.create(
-                amount.vanillaAssetId,
-                sender,
-                address,
-                amount.longAmount,
-                timestamp,
-                feeAssetId,
-                feeAmount,
-                attachment.toByteArray,
-                proofs
-              )
-            } yield tx
-
-          case v =>
-            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+            } yield vt.transfer.TransferTransaction(version.toByte, sender, address, amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, timestamp, proofs)
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
-        version match {
-          case 1 =>
-            for {
-              alias <- com.wavesplatform.account.Alias.createWithChainId(alias, chainId)
-              tx    <- vt.CreateAliasTransactionV1.create(sender, alias, feeAmount, timestamp, signature)
-            } yield tx
-
-          case 2 =>
-            for {
-              alias <- com.wavesplatform.account.Alias.createWithChainId(alias, chainId)
-              tx    <- vt.CreateAliasTransactionV2.create(sender, alias, feeAmount, timestamp, proofs)
-            } yield tx
-
-          case v =>
-            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        for {
+          alias <- com.wavesplatform.account.Alias.createWithChainId(alias, chainId)
+          tx    <- vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, Proofs(Seq(signature)))
+        } yield tx
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
         version match {
@@ -344,56 +299,10 @@ object PBTransactions {
         vt.PaymentTransaction(sender, PBRecipients.toAddress(recipient).explicitGet(), amount, feeAmount, timestamp, signature)
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
-        version match {
-          case 1 =>
-            vt.transfer.TransferTransactionV1(
-              amount.vanillaAssetId,
-              sender,
-              recipient.toAddressOrAlias.explicitGet(),
-              amount.longAmount,
-              timestamp,
-              feeAssetId,
-              feeAmount,
-              attachment.toByteArray,
-              signature
-            )
-
-          case 2 =>
-            vt.transfer.TransferTransactionV2(
-              sender,
-              recipient.toAddressOrAlias.explicitGet(),
-              amount.vanillaAssetId,
-              amount.longAmount,
-              timestamp,
-              feeAssetId,
-              feeAmount,
-              attachment.toByteArray,
-              proofs
-            )
-
-          case v =>
-            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.transfer.TransferTransaction(version.toByte, sender, recipient.toAddressOrAlias.explicitGet(), amount.vanillaAssetId, amount.longAmount, feeAssetId, feeAmount, attachment.toByteArray, timestamp, proofs)
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
-        version match {
-          case 1 =>
-            vt.CreateAliasTransactionV1(sender,
-                                        com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(),
-                                        feeAmount,
-                                        timestamp,
-                                        signature)
-
-          case 2 =>
-            vt.CreateAliasTransactionV2(sender,
-                                        com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(),
-                                        feeAmount,
-                                        timestamp,
-                                        proofs)
-
-          case v =>
-            throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.CreateAliasTransaction(version.toByte, sender, com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(), feeAmount, timestamp, Proofs(signature))
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
         version match {

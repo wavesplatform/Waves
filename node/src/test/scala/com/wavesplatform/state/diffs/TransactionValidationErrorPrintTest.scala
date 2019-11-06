@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{Inside, PropSpec}
 
 class TransactionValidationErrorPrintTest extends PropSpec with Inside {
@@ -60,38 +60,31 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
     val master  = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
     val genesis = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
 
-    val issueTransaction = IssueTransactionV2.selfSigned(
-      chainId     = AddressScheme.current.chainId,
-      sender      = KeyPair(seed.bytes),
-      name        = "name".getBytes(StandardCharsets.UTF_8),
-      description = "description".getBytes(StandardCharsets.UTF_8),
-      quantity    = 100,
-      decimals    = 0,
-      reissuable  = false,
-      script      = Some(typedScript),
-      fee         = 10000000,
-      timestamp   = 0
-    ).explicitGet()
-
-    val transferTransaction = TransferTransactionV2.selfSigned(
-        assetId    = IssuedAsset(issueTransaction.id()),
-        sender     = KeyPair(master.bytes),
-        recipient  = master,
-        amount     = 1,
-        timestamp  = 0,
-        feeAssetId = Waves,
-        feeAmount  = 10000000,
-        attachment = Array[Byte]()
+    val issueTransaction = IssueTransactionV2
+      .selfSigned(
+        chainId = AddressScheme.current.chainId,
+        sender = KeyPair(seed.bytes),
+        name = "name".getBytes(StandardCharsets.UTF_8),
+        description = "description".getBytes(StandardCharsets.UTF_8),
+        quantity = 100,
+        decimals = 0,
+        reissuable = false,
+        script = Some(typedScript),
+        fee = 10000000,
+        timestamp = 0
       )
+      .explicitGet()
+
+    val transferTransaction = TransferTransaction
+      .selfSigned(version = 2.toByte, sender = KeyPair(master.bytes), recipient = master, asset = IssuedAsset(issueTransaction.id()), amount = 1, feeAsset = Waves, fee = 10000000, attachment = Array[Byte](), timestamp = 0)
       .explicitGet()
 
     assertDiffEi(
       Seq(TestBlock.create(Seq(genesis, issueTransaction))),
       TestBlock.create(Seq(transferTransaction))
-    ) {
-      error =>
-        val expected = //regex because of changeable proof
-          """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
+    ) { error =>
+      val expected = //regex because of changeable proof
+        """Left\(TransactionValidationError\(cause = ScriptExecutionError\(error = Recipient address error:3PJmMnHHVTTkzvF67HYFjrm5Vj96mM3UtLs, type = Asset, log =
             |	\$match0 = TransferTransaction\(
             |		recipient = Address\(
             |			bytes = base58'3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu'
@@ -163,7 +156,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
             |  "timestamp" : 0
             |}\)\)""".stripMargin.r
 
-        error.toString should fullyMatch regex expected
+      error.toString should fullyMatch regex expected
     }
   }
 }

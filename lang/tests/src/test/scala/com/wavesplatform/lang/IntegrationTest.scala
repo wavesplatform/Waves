@@ -5,6 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -14,26 +15,46 @@ import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
-  private val evaluator = new EvaluatorV1[Id, NoContext]()
-
   private def eval[T <: EVALUATED](code: String,
                                    pointInstance: Option[CaseObj] = None,
                                    pointType: FINAL = AorBorC,
-                                   ctxt: CTX[NoContext] = CTX.empty): Either[String, T] = {
+                                   ctxt: CTX[NoContext] = CTX.empty,
+                                   version: StdLibVersion = V3
+                                  ): Either[String, T] =
+    genericEval[NoContext, T](code, pointInstance, pointType, ctxt, version, Contextful.empty[Id])
+
+  private def genericEval[C[_[_]], T <: EVALUATED](
+    code: String,
+    pointInstance: Option[CaseObj] = None,
+    pointType: FINAL = AorBorC,
+    ctxt: CTX[C],
+    version: StdLibVersion,
+    env: C[Id]
+  ): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
-    val lazyVal = ContextfulVal.pure[NoContext](pointInstance.orNull)
+
+    val lazyVal = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX[NoContext] =
-      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX[NoContext](sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
+    val ctx: CTX[C] =
+      Monoid.combineAll(Seq(
+        PureContext.build(Global, version).withEnvironment[C],
+        addCtx.withEnvironment[C],
+        CTX[C](sampleTypes, stringToTuple, Array.empty),
+        ctxt
+      ))
+
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply(ctx.evaluationContext, v._1))
+    typed.flatMap(v => new EvaluatorV1[Id, C]().apply(ctx.evaluationContext(env), v._1))
   }
 
   property("simple let") {
@@ -1038,5 +1059,118 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval[EVALUATED](script, None) should produce("Can't find a function overload 'size'")
+  }
+
+  property("string contains") {
+    eval(""" "qwerty".contains("we") """, version = V3) should produce("Can't find a function")
+    eval(""" "qwerty".contains("we") """, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+    eval(""" "qwerty".contains("xx") """, version = V4) shouldBe Right(CONST_BOOLEAN(false))
+  }
+
+  property("valueOrElse") {
+    val script =
+      s"""
+         | let a = if (true) then 1 else unit
+         | let b = if (false) then 2 else unit
+         | let c = 3
+         |
+         | a.valueOrElse(b) == 1          &&
+         | b.valueOrElse(a) == 1          &&
+         | a.valueOrElse(c) == 1          &&
+         | b.valueOrElse(c) == c          &&
+         | c.valueOrElse(a) == c          &&
+         | b.valueOrElse(b) == unit       &&
+         | unit.valueOrElse(unit) == unit
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list append") {
+    val script =
+      """
+        | [1, 2, 3, 4] :+ 5 == [1, 2, 3, 4, 5] &&
+        | 1 :: [] :+ 2 :+ 3 == [1, 2, 3]
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list concat") {
+    val script =
+      """
+        | [1, 2, 3, 4] ++ [5, 6] == [1, 2, 3, 4, 5, 6] &&
+        | nil ++ [1, 2] :+ 3 ++ nil == [1, 2, 3]
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list result size limit") {
+    val maxLongList = "[1" + ",1" * (PureContext.MaxListLengthV4 - 1) + "]"
+    val consScript =
+      s"""
+         | let list1 = $maxLongList
+         | let list2 = 1 :: list1
+         | list2.size() == ${MaxListLengthV4 + 1}
+       """.stripMargin
+
+    eval(consScript, version = V3) shouldBe Right(CONST_BOOLEAN(true))
+    eval(consScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+
+    val appendScript = s"[1] ++ $maxLongList"
+    eval(appendScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+
+    val concatScript = s"$maxLongList :+ 1"
+    eval(concatScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+  }
+
+  property("callable V3 syntax absent at V4") {
+    val writeSetScript =
+      s"""
+         | WriteSet([DataEntry("key1", "value"), DataEntry("key2", true)])
+       """.stripMargin
+
+    val transferSetScript =
+      s"""
+         | let tsArr = [
+         |   ScriptTransfer(Address(base58'aaaa'), 100, unit),
+         |   ScriptTransfer(Address(base58'bbbb'), 2,   base58'xxx')
+         | ]
+         | let ts = TransferSet(tsArr)
+       """.stripMargin
+
+    val scriptResultScript =
+      s"""
+         | func f(sr: ScriptResult) = true
+         | true
+         |
+       """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](
+      writeSetScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("Can't find a function 'WriteSet'")
+
+    genericEval[Environment, EVALUATED](
+      transferSetScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("Can't find a function 'TransferSet'")
+
+    genericEval[Environment, EVALUATED](
+      scriptResultScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("non-existing type")
   }
 }

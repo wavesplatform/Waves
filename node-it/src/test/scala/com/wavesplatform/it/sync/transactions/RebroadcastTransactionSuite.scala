@@ -11,7 +11,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.NodeConfigs._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransactionV2
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDocker {
 
@@ -24,21 +24,15 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   private def nodeB: Node = nodes.last
 
   test("should rebroadcast a transaction if that's allowed in config") {
-    val tx = TransferTransactionV2
-      .selfSigned(Waves,
-                  nodeA.privateKey,
-                  Address.fromString(nodeB.address).right.get,
-                  transferAmount,
-                  System.currentTimeMillis(),
-                  Waves,
-                  minFee,
-                  Array.emptyByteArray)
+    val tx = TransferTransaction
+      .selfSigned(2.toByte, nodeA.privateKey, Address.fromString(nodeB.address).right.get, Waves, transferAmount, Waves, minFee, Array.emptyByteArray, System.currentTimeMillis())
       .explicitGet()
       .json()
 
     val dockerNodeBId = docker.stopContainer(dockerNodes.apply().last)
     val txId          = nodeA.signedBroadcast(tx).id
     docker.startContainer(dockerNodeBId)
+    nodeA.waitForPeers(1)
 
     nodeB.ensureTxDoesntExist(txId)
     nodeA.signedBroadcast(tx)
@@ -48,21 +42,15 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   }
   test("should not rebroadcast a transaction if that's not allowed in config") {
     dockerNodes().foreach(docker.restartNode(_, configWithRebroadcastNotAllowed))
-    val tx = TransferTransactionV2
-      .selfSigned(Waves,
-                  nodeA.privateKey,
-                  Address.fromString(nodeB.address).right.get,
-                  transferAmount,
-                  System.currentTimeMillis(),
-                  Waves,
-                  minFee,
-                  Array.emptyByteArray)
+    val tx = TransferTransaction
+      .selfSigned(2.toByte, nodeA.privateKey, Address.fromString(nodeB.address).right.get, Waves, transferAmount, Waves, minFee, Array.emptyByteArray, System.currentTimeMillis())
       .explicitGet()
       .json()
 
     val dockerNodeBId = docker.stopContainer(dockerNodes.apply().last)
     val txId          = nodeA.signedBroadcast(tx).id
     docker.startContainer(dockerNodeBId)
+    nodeA.waitForPeers(1)
 
     nodeB.ensureTxDoesntExist(txId)
     nodeA.signedBroadcast(tx)

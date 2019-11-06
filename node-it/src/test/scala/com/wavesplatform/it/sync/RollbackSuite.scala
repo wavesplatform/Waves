@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -127,14 +127,14 @@ class RollbackSuite
     assert(data2 == List(entry3, entry2))
 
     nodes.rollback(tx1height, returnToUTX = false)
-    nodes.waitForSameBlockHeadesAt(tx1height)
+    nodes.waitForSameBlockHeadersAt(tx1height)
 
     val data1 = node.getData(firstAddress)
     assert(data1 == List(entry1))
     sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore1
 
     nodes.rollback(tx1height - 1, returnToUTX = false)
-    nodes.waitForSameBlockHeadesAt(tx1height - 1)
+    nodes.waitForSameBlockHeadersAt(tx1height - 1)
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
@@ -209,7 +209,7 @@ class RollbackSuite
     sender.connect(miner.networkAddress)
     miner.connect(sender.networkAddress)
 
-    nodes.waitForSameBlockHeadesAt(height)
+    nodes.waitForSameBlockHeadersAt(height)
 
     nodes.waitForHeightArise()
 
@@ -231,7 +231,7 @@ class RollbackSuite
       val rollbackNodes = Random.shuffle(nodes).take(num)
       rollbackNodes.foreach(_.rollback(baseHeight - 1))
       nodes.waitForHeightArise()
-      nodes.waitForSameBlockHeadesAt(baseHeight)
+      nodes.waitForSameBlockHeadersAt(baseHeight)
     }
   }
 }

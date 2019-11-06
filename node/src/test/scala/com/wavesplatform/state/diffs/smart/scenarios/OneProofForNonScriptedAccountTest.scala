@@ -25,14 +25,15 @@ class OneProofForNonScriptedAccountTest extends PropSpec with PropertyChecks wit
       ts        <- positiveIntGen
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(TRUE).explicitGet())
-      transfer = TransferTransactionV2.selfSigned(Waves, master, recepient, amt, ts, Waves, fee, Array.emptyByteArray).explicitGet()
+      transfer = TransferTransaction.selfSigned(2.toByte, master, recepient, Waves, amt, Waves, fee, Array.emptyByteArray, ts).explicitGet()
     } yield (genesis, setScript, transfer)
 
     forAll(s) {
       case (genesis, script, transfer) =>
         val transferWithExtraProof = transfer.copy(proofs = Proofs(Seq(ByteStr.empty, ByteStr(Array(1: Byte)))))
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transferWithExtraProof)), smartEnabledFS)(totalDiffEi =>
-          totalDiffEi should produce("must have exactly 1 proof"))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transferWithExtraProof)), smartEnabledFS)(
+          totalDiffEi => totalDiffEi should produce("must have exactly 1 proof")
+        )
     }
   }
 

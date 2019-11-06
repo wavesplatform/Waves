@@ -33,7 +33,7 @@ object EvaluationContext {
 
     override def combine(x: EvaluationContext[C, F], y: EvaluationContext[C, F]): EvaluationContext[C, F] =
       EvaluationContext(
-        environment = x.environment,
+        environment = y.environment,
         typeDefs = x.typeDefs ++ y.typeDefs,
         letDefs = x.letDefs ++ y.letDefs,
         functions = x.functions ++ y.functions

@@ -4,12 +4,11 @@ import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParser}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParserLite}
 import com.wavesplatform.{BlockGen, NoShrink}
 import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
@@ -32,7 +31,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
 
   def mkBlock(sender: KeyPair, reference: ByteStr, transactions: Seq[Transaction]): Block =
     Block
-      .buildAndSign(3.toByte, ntpNow, reference, NxtLikeConsensusBlockData(1000, ByteStr(new Array[Byte](32))), transactions, sender, Set.empty, -1L)
+      .buildAndSign(3.toByte, ntpNow, reference, 1000, ByteStr(new Array[Byte](32)), transactions, sender, Set.empty, -1L)
       .explicitGet()
 
   val gen = for {
@@ -85,7 +84,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
   private def transactionsFromBlockchain(
       blockchain: Blockchain,
       sender: Address,
-      types: Set[TransactionParser] = Set.empty,
+      types: Set[TransactionParserLite] = Set.empty,
       fromId: Option[ByteStr] = None
   ): Seq[(Int, ByteStr)] =
     Await

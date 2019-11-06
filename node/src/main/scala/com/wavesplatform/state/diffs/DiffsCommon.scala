@@ -13,7 +13,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
-private[diffs] object DiffsCommon {
+object DiffsCommon {
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
     Script.complexityInfo(script, estimator)
       .map(calcVerifierComplexity(script, _))
@@ -35,6 +35,14 @@ private[diffs] object DiffsCommon {
     maybeCall: Option[FUNCTION_CALL]
   ): Either[String, Long] =
     Script.complexityInfo(script, estimator)
+      .map(calcFunctionComplexity(script, maybeCall, _))
+
+  def limitFreeComplexity(
+    script:    Script,
+    estimator: ScriptEstimator,
+    maybeCall: Option[FUNCTION_CALL]
+  ): Either[String, Long] =
+    Script.limitFreeComplexity(script, estimator)
       .map(calcFunctionComplexity(script, maybeCall, _))
 
   private def calcFunctionComplexity(
