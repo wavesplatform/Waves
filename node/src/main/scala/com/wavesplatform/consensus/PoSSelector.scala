@@ -37,7 +37,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
     checkBaseTargetLimit(bt, height).flatMap { _ =>
       blockchain
-        .blockProofsAtHeight(height)
+        .generationInputAtHeight(height)
         .map(parentProofs => NxtLikeConsensusBlockData(bt, blockProofs(height, parentProofs, account)))
     }
   }
@@ -49,11 +49,17 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .map(pc.calculateDelay(_, refBlockBT, balance))
   }
 
-  def validateTimestamp(height: Int, proofs: ByteStr, timestamp: Long, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] =
+  def validateTimestamp(
+      height: Int,
+      generationInput: ByteStr,
+      timestamp: Long,
+      parent: BlockHeader,
+      effectiveBalance: Long
+  ): Either[ValidationError, Unit] =
     for {
-      _ <- Either.cond(proofs.size == ProofsSize, (), GenericError("Illegal size of block generation proofs"))
-      valid = pos(height).calculateDelay(hit(proofs.arr), parent.baseTarget, effectiveBalance) + parent.timestamp
-      _ <- if (valid <= timestamp) Right(()) else Left(GenericError(s"Block timestamp $timestamp less than min valid timestamp $valid"))
+      _ <- Either.cond(generationInput.size == Block.GenerationInputLength, (), GenericError("Illegal size of block generation input"))
+      minTimestamp = pos(height).calculateDelay(hit(generationInput.arr), parent.baseTarget, effectiveBalance) + parent.timestamp
+      _ <- if (minTimestamp <= timestamp) Right(()) else Left(GenericError(s"Block timestamp $timestamp less than min valid timestamp $minTimestamp"))
     } yield ()
 
   def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
@@ -74,9 +80,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .flatMap {
         case _ if vrfActivated(height) => // todo: (NODE-1927) always last block or by height?
           for {
-            proofs <- blockchain.blockProofsAtHeight(blockchain.height)
-            // proofs <- blockchain.blockHitAtHeight(height)
-            vrf <- crypto.verifyVRF(blockGS, proofs, blockGenerator)
+            generationInput <- blockchain.generationInputAtHeight(blockchain.height)
+            vrf             <- crypto.verifyVRF(blockGS, generationInput, blockGenerator)
           } yield vrf
         case b =>
           val gs = generationSignature(b.header.generationSignature.arr, blockGenerator)
@@ -128,8 +133,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
   private def getHit(height: Int, accountPublicKey: PublicKey): Either[ValidationError, BigInt] = {
     val message =
-      if (fairPosActivated(height) && height > 100) blockchain.blockProofsAtHeight(height - 1)
-      else blockchain.blockProofsAtHeight(blockchain.height)
+      if (fairPosActivated(height) && height > 100) blockchain.generationInputAtHeight(height - 1)
+      else blockchain.generationInputAtHeight(blockchain.height)
 
     message.map(msg => if (vrfActivated(height)) msg.arr else generationSignature(msg, accountPublicKey)).map(msg => hit(msg))
   }

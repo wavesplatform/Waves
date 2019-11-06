@@ -23,7 +23,6 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
-
   import FPPoSSelectorTest._
 
   "block delay" - {
@@ -206,7 +205,24 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             .validateGeneratorSignature(
               height + 1,
               block
-            ).isRight shouldBe true
+            )
+            .isRight shouldBe true
+      }
+    }
+
+    "succeed when GS is correct (VRF)" in {
+      withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion = Block.ProtoBlockVersion), VRFActivated = true) {
+        case Env(pos, blockchain, miners) =>
+          val miner  = miners.head
+          val height = blockchain.height
+          val block  = forgeBlock(miner, blockchain, pos, Block.ProtoBlockVersion)()
+
+          pos
+            .validateGeneratorSignature(
+              height + 1,
+              block
+            )
+            .isRight shouldBe true
       }
     }
 
@@ -342,7 +358,8 @@ object FPPoSSelectorTest {
   def forgeBlock(
       miner: KeyPair,
       blockchain: Blockchain with NG,
-      pos: PoSSelector
+      pos: PoSSelector,
+      blockVersion: Byte = Block.NgBlockVersion
   )(updateDelay: Long => Long = identity, updateBT: Long => Long = identity, updateGS: ByteStr => ByteStr = identity): Block = {
     val height       = blockchain.height
     val lastBlock    = blockchain.lastBlock.get
@@ -373,7 +390,7 @@ object FPPoSSelectorTest {
 
     Block
       .buildAndSign(
-        3: Byte,
+        blockVersion,
         lastBlock.header.timestamp + delay,
         lastBlock.uniqueId,
         updateBT(cData.baseTarget),

@@ -245,6 +245,7 @@ class LevelDBWriter(
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
+      generationInput: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
@@ -419,7 +420,9 @@ class LevelDBWriter(
       val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
       val newlyApprovedFeatures = featureVotes(height)
         .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-        .collect { case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
+        .collect {
+          case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height
+        }
 
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
@@ -468,13 +471,15 @@ class LevelDBWriter(
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
     }
+
+    rw.put(Keys.generationInput(height), generationInput.arr)
   }
 
-  override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
-    readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
+  override protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)] = {
+    readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
+      val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
         val portfoliosToInvalidate  = Seq.newBuilder[Address]
         val assetInfoToInvalidate   = Seq.newBuilder[IssuedAsset]
@@ -603,7 +608,10 @@ class LevelDBWriter(
             DisableHijackedAliases.revert(rw)
           }
 
-          createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+          val generationInput = ByteStr(rw.get(Keys.generationInput(currentHeight)))
+          val block           = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+
+          (block, generationInput)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -949,6 +957,13 @@ class LevelDBWriter(
         db.get(Keys.invokeScriptResult(height, txNum))
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
+
+  override def generationInputAtHeight(height: Int): Either[ValidationError, ByteStr] = readOnly { db =>
+    Option(db.get(Keys.generationInput(height)))
+      .toRight(GenericError(s"Couldn't find generation input at height: $height"))
+      .filterOrElse(_.length == Block.GenerationInputLength, GenericError(s"Incorrect generation input at height: $height"))
+      .map(ByteStr.apply)
+  }
 
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)

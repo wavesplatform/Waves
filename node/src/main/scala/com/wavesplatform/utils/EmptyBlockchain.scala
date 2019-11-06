@@ -108,4 +108,7 @@ case object EmptyBlockchain extends Blockchain {
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
+
+  override def generationInputAtHeight(height: Int): Either[ValidationError, ByteStr] =
+    Left(GenericError(s"Couldn't find generation input at height: $height"))
 }

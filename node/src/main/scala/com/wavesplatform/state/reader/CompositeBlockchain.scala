@@ -239,6 +239,8 @@ final case class CompositeBlockchain(
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
+
+  override def generationInputAtHeight(height: Int): Either[ValidationError, BlockId] = inner.generationInputAtHeight(height)
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {

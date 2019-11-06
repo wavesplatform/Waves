@@ -36,8 +36,8 @@ package object appender extends ScorexLogging {
       miner: Miner,
       start: => String,
       success: => String,
-      errorPrefix: String)(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
-
+      errorPrefix: String
+  )(f: => Task[Either[B, Option[BigInt]]]): Task[Either[B, Option[BigInt]]] = {
     log.debug(start)
     f map {
       case Right(maybeNewScore) =>
@@ -51,22 +51,27 @@ package object appender extends ScorexLogging {
     }
   }
 
-  private[appender] def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
-                                    utxStorage: UtxPoolImpl,
-                                    pos: PoSSelector,
-                                    time: Time,
-                                    verify: Boolean)(block: Block): Either[ValidationError, Option[Int]] = {
-      if (verify)
-        validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(block)
-      else
-        blockchainUpdater.blockProofsAtHeight(blockchainUpdater.height)
-          .flatMap(proofs => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, proofs))
+  private[appender] def appendBlock(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      time: Time,
+      verify: Boolean
+  )(block: Block): Either[ValidationError, Option[Int]] = {
+    if (verify)
+      validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(block)
+    else
+      blockchainUpdater
+        .generationInputAtHeight(blockchainUpdater.height)
+        .flatMap(genInput => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, genInput))
   }
 
-  private[appender] def validateAndAppendBlock(blockchainUpdater: BlockchainUpdater with Blockchain,
-                                               utxStorage: UtxPoolImpl,
-                                               pos: PoSSelector,
-                                               time: Time)(block: Block): Either[ValidationError, Option[Int]] =
+  private[appender] def validateAndAppendBlock(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      time: Time
+  )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
         !blockchainUpdater.hasScript(block.sender),
@@ -85,8 +90,10 @@ package object appender extends ScorexLogging {
     } yield baseHeight
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
-      block: Block, proofs: ByteStr): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, proofs, verify)).map { maybeDiscardedTxs =>
+      block: Block,
+      generationInput: ByteStr
+  ): Either[ValidationError, Option[Int]] =
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, generationInput, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
         metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
@@ -95,23 +102,26 @@ package object appender extends ScorexLogging {
     }
 
   private def blockConsensusValidation(blockchain: Blockchain, pos: PoSSelector, currentTs: Long, block: Block)(
-      genBalance: (Int, BlockId) => Either[String, Long]): Either[ValidationError, ByteStr] =
+      genBalance: (Int, BlockId) => Either[String, Long]
+  ): Either[ValidationError, ByteStr] =
     metrics.blockConsensusValidation
       .measureSuccessful {
 
         val blockTime = block.header.timestamp
 
         for {
-          height <- blockchain.heightOf(block.header.reference).toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
+          height <- blockchain
+            .heightOf(block.header.reference)
+            .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
           parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
           effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
           _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          proofs           <- pos.validateGeneratorSignature(height, block)
-          _                <- pos.validateTimestamp(height, proofs, block.header.timestamp, parent, effectiveBalance).orElse(checkExceptions(height, block))
-        } yield proofs
+          generationInput  <- pos.validateGeneratorSignature(height, block)
+          _                <- pos.validateTimestamp(height, generationInput, block.header.timestamp, parent, effectiveBalance).orElse(checkExceptions(height, block))
+        } yield generationInput
       }
       .left
       .map {

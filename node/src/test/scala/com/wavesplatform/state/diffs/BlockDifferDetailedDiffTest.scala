@@ -27,7 +27,7 @@ class BlockDifferDetailedDiffTest extends FreeSpec with Matchers with PropertyCh
 
       preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
         val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
-        state.append(diff, fees, totalFee, None, curBlock)
+        state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, curBlock)
         Some(curBlock)
       }
 

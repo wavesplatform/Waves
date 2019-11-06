@@ -254,7 +254,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
         withDomain(rewardSettings) { d =>
           b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
             val BlockDiffer.Result(diff, carryFee, totalFee, _, _) = differ(d.levelDBWriter, prevBlock, curBlock)
-            d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock)
+            d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, curBlock)
             Some(curBlock)
           }
 
