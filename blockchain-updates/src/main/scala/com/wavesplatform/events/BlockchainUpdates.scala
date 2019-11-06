@@ -92,7 +92,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
       val heightToRollbackTo = Math.max(kafkaHeight - 1, 1)
       val sigToRollback = context.blockchain
         .blockHeaderAndSize(heightToRollbackTo)
-        .map(_._1.signerData.signature)
+        .map(_._1.reference)
         .get // guaranteed not to fail by previous checks on heights
 
       log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollbackTo")

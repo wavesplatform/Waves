@@ -9,12 +9,12 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.lease.LeaseTransactionV2
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
-class BigString extends BaseTransactionSuite with CancelAfterFailure {
+class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -55,13 +55,14 @@ class BigString extends BaseTransactionSuite with CancelAfterFailure {
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
     val unsignedLeasing =
-      LeaseTransactionV2
+      LeaseTransaction
         .create(
+          2.toByte,
           acc0,
+          acc2,
           transferAmount,
           minFee + 0.2.waves,
           System.currentTimeMillis(),
-          acc2,
           Proofs.empty
         )
         .explicitGet()
