@@ -705,7 +705,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce("many ScriptTransfers")
+          _ should produce("Too many script actions")
         }
     }
   }
