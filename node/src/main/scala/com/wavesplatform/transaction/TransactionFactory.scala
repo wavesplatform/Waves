@@ -606,7 +606,7 @@ object TransactionFactory {
     val pf: PartialFunction[TransactionParserLite, Either[ValidationError, Transaction]] = {
       case TransferTransaction       => jsv.as[TransferRequest].toTx
       case CreateAliasTransaction    => jsv.as[CreateAliasRequest].toTx
-      case LeaseTransaction          => jsv.as[CreateAliasRequest].toTx
+      case LeaseTransaction          => jsv.as[LeaseRequest].toTx
       case IssueTransactionV1        => jsv.as[SignedIssueV1Request].toTx
       case IssueTransactionV2        => jsv.as[SignedIssueV2Request].toTx
       case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
