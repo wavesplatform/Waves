@@ -136,7 +136,8 @@ case class Block private[block] (
 
   private val bytesToSign: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < ProtoBlockVersion) bytes().dropRight(SignatureLength)
-    else PBBlocks.protobuf(this).header.get.toByteArray
+    else PBBlocks.protobuf(this.copy(signature = ByteStr.empty)).toByteArray
+    // else PBBlocks.protobuf(this).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
   }
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {

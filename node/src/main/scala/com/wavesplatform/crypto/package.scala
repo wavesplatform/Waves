@@ -6,13 +6,14 @@ import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils.ScorexLogging
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
 import scala.util.Try
 
-package object crypto {
+package object crypto extends ScorexLogging {
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
 
@@ -43,7 +44,11 @@ package object crypto {
     Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
 
   def verifyVRF(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Either[ValidationError, ByteStr] =
-    Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))).toEither.left.map(GenericError(_))
+    Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))).toEither.left
+      .map { e =>
+        log.warn("Generation signatures does not match", e)
+        GenericError("Generation signatures does not match")
+      }
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 

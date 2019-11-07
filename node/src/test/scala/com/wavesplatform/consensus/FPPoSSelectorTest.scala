@@ -1,11 +1,14 @@
 package com.wavesplatform.consensus
 
+import java.nio.file.Files
+
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.LevelDBFactory
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -15,230 +18,223 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{TransactionGen, WithDB, crypto}
+import com.wavesplatform.{TestHelpers, TransactionGen, WithDB, crypto}
+import org.iq80.leveldb.Options
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 import scala.util.Random
 
-class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings {
+class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings with ScalaCheckPropertyChecks {
   import FPPoSSelectorTest._
 
+  val generationSignatureMethods = Table(
+    ("method", "block version", "vrf activated"),
+    ("Blake2b256", Block.NgBlockVersion, false),
+    ("VRF", Block.ProtoBlockVersion, true)
+  )
+
   "block delay" - {
-    "same on the same height in different forks" in {
-      withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110)) {
-        case Env(_, blockchain, miners) =>
-          val miner1 = miners.head
-          val miner2 = miners.tail.head
+    val generationSignatureMethods = Table(
+      ("method", "block version", "vrf activated"),
+      ("Blake2b256", Block.NgBlockVersion, false)
+      // ("VRF", Block.ProtoBlockVersion, true) // todo: (NODE-1927) is that correct for VRF?
+    )
 
-          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
+    "same on the same height in different forks" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110, blockVersion), vrfActivated) {
+          case Env(_, blockchain, miners) =>
+            val miner1 = miners.head
+            val miner2 = miners.tail.head
 
-          val fork1 = mkFork(10, miner1, blockchain)
-          val fork2 = mkFork(10, miner2, blockchain)
+            val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
 
-          val fork1Delay = {
-            val blockForHit =
-              fork1
-                .lift(100)
-                .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
-                .getOrElse(fork1.head)
+            val fork1 = mkFork(10, miner1, blockchain, blockVersion)
+            val fork2 = mkFork(10, miner2, blockchain, blockVersion)
 
-            calcDelay(blockForHit, fork1.head.header.baseTarget, miner1, miner1Balance)
-          }
+            val fork1Delay = {
+              val blockForHit =
+                fork1
+                  .lift(100)
+                  .orElse(
+                    blockchain
+                      .blockAt(blockchain.height + fork1.length - 100)
+                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork1.length - 100).explicitGet()))
+                  )
+                  .getOrElse(fork1.head)
 
-          val fork2Delay = {
-            val blockForHit =
-              fork2
-                .lift(100)
-                .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
-                .getOrElse(fork2.head)
+              val gs =
+                if (vrfActivated)
+                  blockForHit._2.arr
+                else
+                  PoSCalculator
+                    .generationSignature(
+                      blockForHit._2.arr,
+                      miner1
+                    )
+              calcDelay(gs, fork1.head._1.header.baseTarget, miner1Balance)
+            }
 
-            calcDelay(blockForHit, fork2.head.header.baseTarget, miner1, miner1Balance)
-          }
+            val fork2Delay = {
+              val blockForHit =
+                fork2
+                  .lift(100)
+                  .orElse(
+                    blockchain
+                      .blockAt(blockchain.height + fork2.length - 100)
+                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork2.length - 100).explicitGet()))
+                  )
+                  .getOrElse(fork2.head)
 
-          fork1Delay shouldEqual fork2Delay
-      }
-    }
+              val gs =
+                if (vrfActivated)
+                  blockForHit._2.arr
+                else
+                  PoSCalculator
+                    .generationSignature(
+                      blockForHit._2.arr,
+                      miner1
+                    )
+              calcDelay(gs, fork2.head._1.header.baseTarget, miner1Balance)
+            }
 
-    "same on the same height in different forks (VRF)" ignore {
-      withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110, Block.ProtoBlockVersion)) {
-        case Env(_, blockchain, miners) =>
-          val miner1 = miners.head
-          val miner2 = miners.tail.head
-
-          val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
-
-          val fork1 = mkFork(10, miner1, blockchain, Block.ProtoBlockVersion)
-          val fork2 = mkFork(10, miner2, blockchain, Block.ProtoBlockVersion)
-
-          val fork1Delay = {
-            val blockForHit =
-              fork1
-                .lift(100)
-                .orElse(blockchain.blockAt(blockchain.height + fork1.length - 100))
-                .getOrElse(fork1.head)
-
-            val refBlock = fork1.find(b => b.uniqueId == blockForHit.header.reference).get
-
-            calcVRFDelay(blockForHit, fork1.head.header.baseTarget, refBlock.header.generationSignature, miner1Balance)
-          }
-
-          val fork2Delay = {
-            val blockForHit =
-              fork2
-                .lift(100)
-                .orElse(blockchain.blockAt(blockchain.height + fork2.length - 100))
-                .getOrElse(fork2.head)
-
-            val refBlock = fork2.find(b => b.uniqueId == blockForHit.header.reference).get
-
-            calcVRFDelay(blockForHit, fork2.head.header.baseTarget, refBlock.header.generationSignature, miner1Balance)
-          }
-
-          fork1Delay shouldEqual fork2Delay
-      }
+            fork1Delay shouldEqual fork2Delay
+        }
     }
   }
 
   "block delay validation" - {
-    "succeed when delay is correct" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miners) =>
-          val miner        = miners.head
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)()
+    "succeed when delay is correct" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner        = miners.head
+            val height       = blockchain.height
+            val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
+            val lastBlock    = blockchain.lastBlock.get
+            val block        = forgeBlock(miner, blockchain, pos, blockVersion)()
 
-          pos
-            .validateBlockDelay(height + 1, block, lastBlock.header, minerBalance)
-            .explicitGet()
-      }
+            pos
+              .validateBlockDelay(height + 1, block, lastBlock.header, minerBalance)
+              .explicitGet()
+        }
     }
 
-    "failed when delay less than expected" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miners) =>
-          val miner        = miners.head
-          val height       = blockchain.height
-          val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
-          val lastBlock    = blockchain.lastBlock.get
-          val block        = forgeBlock(miner, blockchain, pos)(updateDelay = _ - 1)
+    "failed when delay less than expected" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner        = miners.head
+            val height       = blockchain.height
+            val minerBalance = blockchain.effectiveBalance(miner.toAddress, 0)
+            val lastBlock    = blockchain.lastBlock.get
+            val block        = forgeBlock(miner, blockchain, pos, blockVersion)(updateDelay = _ - 1)
 
-          pos
-            .validateBlockDelay(
-              height + 1,
-              block,
-              lastBlock.header,
-              minerBalance
-            ) should produce("less than min valid timestamp")
-      }
+            pos
+              .validateBlockDelay(
+                height + 1,
+                block,
+                lastBlock.header,
+                minerBalance
+              ) should produce("less than min valid timestamp")
+        }
     }
   }
 
   "base target validation" - {
-    "succeed when BT is correct" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miners) =>
-          val miner     = miners.head
-          val height    = blockchain.height
-          val lastBlock = blockchain.lastBlock.get
-          val block     = forgeBlock(miner, blockchain, pos)()
+    "succeed when BT is correct 1" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner     = miners.head
+            val height    = blockchain.height
+            val lastBlock = blockchain.lastBlock.get
+            val block     = forgeBlock(miner, blockchain, pos, blockVersion)()
 
-          pos
-            .validateBaseTarget(
-              height + 1,
-              block,
-              lastBlock.header,
-              blockchain.blockAt(height - 2).map(_.header)
-            ) shouldBe Right(())
-      }
+            pos
+              .validateBaseTarget(
+                height + 1,
+                block,
+                lastBlock.header,
+                blockchain.blockAt(height - 2).map(_.header)
+              ) shouldBe Right(())
+        }
     }
 
-    "failed when BT less than expected" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miners) =>
-          val miner     = miners.head
-          val height    = blockchain.height
-          val lastBlock = blockchain.lastBlock.get
-          val block     = forgeBlock(miner, blockchain, pos)(updateBT = _ - 1)
+    "failed when BT less than expected" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner     = miners.head
+            val height    = blockchain.height
+            val lastBlock = blockchain.lastBlock.get
+            val block     = forgeBlock(miner, blockchain, pos, blockVersion)(updateBT = _ - 1)
 
-          pos
-            .validateBaseTarget(
-              height + 1,
-              block,
-              lastBlock.header,
-              blockchain.blockAt(height - 2).map(_.header)
-            ) should produce("does not match calculated baseTarget")
-      }
+            pos
+              .validateBaseTarget(
+                height + 1,
+                block,
+                lastBlock.header,
+                blockchain.blockAt(height - 2).map(_.header)
+              ) should produce("does not match calculated baseTarget")
+        }
     }
 
-    "failed when BT greater than expected" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miners) =>
-          val miner     = miners.head
-          val height    = blockchain.height
-          val lastBlock = blockchain.lastBlock.get
-          val block     = forgeBlock(miner, blockchain, pos)(updateBT = _ + 1)
+    "failed when BT greater than expected" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner     = miners.head
+            val height    = blockchain.height
+            val lastBlock = blockchain.lastBlock.get
+            val block     = forgeBlock(miner, blockchain, pos, blockVersion)(updateBT = _ + 1)
 
-          pos
-            .validateBaseTarget(
-              height + 1,
-              block,
-              lastBlock.header,
-              blockchain.blockAt(height - 2).map(_.header)
-            ) should produce("does not match calculated baseTarget")
-      }
+            pos
+              .validateBaseTarget(
+                height + 1,
+                block,
+                lastBlock.header,
+                blockchain.blockAt(height - 2).map(_.header)
+              ) should produce("does not match calculated baseTarget")
+        }
     }
   }
 
   "generation signature validation" - {
-    "succeed when GS is correct" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10)) {
-        case Env(pos, blockchain, miners) =>
-          val miner  = miners.head
-          val height = blockchain.height
-          val block  = forgeBlock(miner, blockchain, pos)()
+    "succeed when GS is correct" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner  = miners.head
+            val height = blockchain.height
+            val block  = forgeBlock(miner, blockchain, pos, blockVersion)()
 
-          pos
-            .validateGeneratorSignature(
-              height + 1,
-              block
-            )
-            .isRight shouldBe true
-      }
+            pos
+              .validateGenerationSignature(
+                height + 1,
+                block
+              )
+              .isRight shouldBe true
+        }
     }
 
-    "succeed when GS is correct (VRF)" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion = Block.ProtoBlockVersion), VRFActivated = true) {
-        case Env(pos, blockchain, miners) =>
-          val miner  = miners.head
-          val height = blockchain.height
-          val block  = forgeBlock(miner, blockchain, pos, Block.ProtoBlockVersion)()
+    "failed when GS is incorrect" in forAll(generationSignatureMethods) {
+      case (_, blockVersion: Byte, vrfActivated: Boolean) =>
+        withEnv(chainGen(List(ENOUGH_AMT), 100, blockVersion), vrfActivated) {
+          case Env(pos, blockchain, miners) =>
+            val miner  = miners.head
+            val height = blockchain.height
+            val block  = forgeBlock(miner, blockchain, pos, blockVersion)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
 
-          pos
-            .validateGeneratorSignature(
-              height + 1,
-              block
-            )
-            .isRight shouldBe true
-      }
-    }
-
-    "failed when GS is incorrect" in {
-      withEnv(chainGen(List(ENOUGH_AMT), 100)) {
-        case Env(pos, blockchain, miners) =>
-          val miner  = miners.head
-          val height = blockchain.height
-          val block  = forgeBlock(miner, blockchain, pos)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
-
-          pos
-            .validateGeneratorSignature(
-              height + 1,
-              block
-            ) should produce("Generation signatures does not match")
-      }
+            pos
+              .validateGenerationSignature(
+                height + 1,
+                block
+              ) should produce("Generation signatures does not match")
+        }
     }
   }
 
@@ -258,6 +254,9 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   }
 
   def withEnv(gen: Time => Gen[(Seq[KeyPair], Seq[Block])], VRFActivated: Boolean = false)(f: Env => Unit): Unit = {
+    // we are not using the db instance from WithDB trait as it should be recreated between property checks
+    val path = Files.createTempDirectory("lvl").toAbsolutePath
+    val db   = LevelDBFactory.factory.open(path.toFile, new Options().createIfMissing(true))
     val defaultWriter = TestLevelDB.withFunctionalitySettings(
       db,
       ignoreSpendableBalanceChanged,
@@ -274,7 +273,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature.take(Block.GenerationInputLength)).explicitGet()
       }
 
       f(Env(pos, bcu, accounts))
@@ -282,6 +281,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     } finally {
       bcu.shutdown()
       db.close()
+      TestHelpers.deleteRecursively(path)
     }
   }
 }
@@ -300,48 +300,53 @@ object FPPoSSelectorTest {
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 
-  def mkFork(blockCount: Int, miner: KeyPair, blockchain: Blockchain, blockVersion: Byte = Block.RewardBlockVersion): List[Block] = {
+  def mkFork(blockCount: Int, miner: KeyPair, blockchain: Blockchain, blockVersion: Byte = Block.RewardBlockVersion): List[(Block, ByteStr)] = {
     val height = blockchain.height
 
-    val lastBlock = blockchain.lastBlock.get
+    val lastBlock                = blockchain.lastBlock.get
+    val lastBlockGenerationInput = blockchain.generationInputAtHeight(height).explicitGet()
 
-    ((1 to blockCount) foldLeft List(lastBlock)) { (forkChain, ind) =>
+    ((1 to blockCount) foldLeft List((lastBlock, lastBlockGenerationInput))) { (forkChain, ind) =>
       val blockForHit =
         forkChain
           .lift(100)
-          .orElse(blockchain.blockAt(height + ind - 100))
+          .orElse(blockchain.blockAt(height + ind - 100).map((_, blockchain.generationInputAtHeight(height + ind - 100).explicitGet())))
           .getOrElse(forkChain.head)
 
-      val gs =
-        if (blockVersion < Block.ProtoBlockVersion)
-          PoSCalculator
+      val (gs, generationInput) =
+        if (blockVersion < Block.ProtoBlockVersion) {
+          val gs = PoSCalculator
             .generationSignature(
-              blockForHit.header.generationSignature.arr,
+              blockForHit._2.arr,
               miner
             )
-        else
-          PoSCalculator
+          (gs, gs)
+        } else {
+          val gs = PoSCalculator
             .generationVRFSignature(
-              blockForHit.header.generationSignature.arr,
+              blockForHit._2.arr,
               miner
             )
+          val gi = crypto.verifyVRF(gs, blockForHit._2.arr, miner.publicKey).explicitGet().arr
+          (gs, gi)
+        }
 
       val delay: Long = 60000
 
       val bt = FairPoSCalculator.calculateBaseTarget(
         60,
         height + ind - 1,
-        forkChain.head.header.baseTarget,
-        forkChain.head.header.timestamp,
-        (forkChain.lift(2) orElse blockchain.blockAt(height + ind - 3)) map (_.header.timestamp),
-        forkChain.head.header.timestamp + delay
+        forkChain.head._1.header.baseTarget,
+        forkChain.head._1.header.timestamp,
+        (forkChain.lift(2).map(_._1) orElse blockchain.blockAt(height + ind - 3)) map (_.header.timestamp),
+        forkChain.head._1.header.timestamp + delay
       )
 
       val newBlock = Block
         .buildAndSign(
-          blockVersion: Byte,
-          forkChain.head.header.timestamp + delay,
-          forkChain.head.uniqueId,
+          blockVersion,
+          forkChain.head._1.header.timestamp + delay,
+          forkChain.head._1.uniqueId,
           bt,
           ByteStr(gs),
           Seq.empty,
@@ -351,7 +356,7 @@ object FPPoSSelectorTest {
         )
         .explicitGet()
 
-      newBlock :: forkChain
+      (newBlock, ByteStr(generationInput)) :: forkChain
     }
   }
 
@@ -439,27 +444,8 @@ object FPPoSSelectorTest {
       }
   }
 
-  def calcDelay(blockForHit: Block, prevBT: Long, minerPK: PublicKey, effBalance: Long): Long = {
-
-    val gs =
-      PoSCalculator
-        .generationSignature(
-          blockForHit.header.generationSignature.arr,
-          minerPK
-        )
-
+  def calcDelay(gs: Array[Byte], prevBT: Long, effBalance: Long): Long = {
     val hit = PoSCalculator.hit(gs)
-
     FairPoSCalculator.calculateDelay(hit, prevBT, effBalance)
   }
-
-  def calcVRFDelay(blockForHit: Block, prevBT: Long, refGS: ByteStr, effBalance: Long): Long = {
-
-    val gs = crypto.verifyVRF(blockForHit.header.generationSignature, refGS, blockForHit.header.generator).right.get.arr
-
-    val hit = PoSCalculator.hit(gs)
-
-    FairPoSCalculator.calculateDelay(hit, prevBT, effBalance)
-  }
-
 }

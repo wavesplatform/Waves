@@ -78,7 +78,7 @@ package object appender extends ScorexLogging {
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      proofs <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
+      generationInput <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
         val balance = blockchainUpdater.generatingBalance(block.sender, parent)
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
@@ -86,7 +86,7 @@ package object appender extends ScorexLogging {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
-      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, proofs)
+      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, generationInput)
     } yield baseHeight
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
@@ -119,8 +119,8 @@ package object appender extends ScorexLogging {
           _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          generationInput  <- pos.validateGeneratorSignature(height, block)
-          _                <- pos.validateTimestamp(height, generationInput, block.header.timestamp, parent, effectiveBalance).orElse(checkExceptions(height, block))
+          generationInput  <- pos.validateGenerationSignature(height, block)
+          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
         } yield generationInput
       }
       .left
