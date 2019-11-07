@@ -58,6 +58,15 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     FUNCTION_CALL(FunctionHeader.Native(FunctionIds.GT_LONG), List(GETTER(REF("tx"), "fee"), CONST_LONG(-1)))
   ).explicitGet()
 
+  val assetUsingThis = ExprScript(
+    V3,
+    FUNCTION_CALL(
+      FunctionHeader.Native(FunctionIds.EQ),
+      List(REF("this"), REF("this"))
+    ),
+    false
+  ).explicitGet()
+
   val assetBanned = ExprScript(FALSE).explicitGet()
 
   val throwingAsset = ExprScript(FUNCTION_CALL(Native(THROW), Nil)).explicitGet()
@@ -942,7 +951,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
         val t =
           TransferTransaction
-            .selfSigned(2.toByte, IssuedAsset(asset.id()), master, acc, asset.quantity / 10, ts, Waves, enoughFee, Array[Byte]())
+            .selfSigned(2.toByte, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, Array[Byte](), ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("NegativeAmount")
@@ -1055,17 +1064,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (ts, acc, amount, genesis, setScript, ci, master, sponsoredAsset, setSponsorship) =>
         val t =
           TransferTransaction
-            .selfSigned(
-              2.toByte,
-              IssuedAsset(sponsoredAsset.id()),
-              master,
-              ci.sender,
-              sponsoredAsset.quantity / 10,
-              ts,
-              Waves,
-              enoughFee,
-              Array[Byte]()
-            )
+            .selfSigned(2.toByte, master, ci.sender, IssuedAsset(sponsoredAsset.id()), sponsoredAsset.quantity / 10, Waves, enoughFee, Array[Byte](), ts)
             .explicitGet()
         assertDiffAndState(
           Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),
@@ -1217,6 +1216,94 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
           _ should produce(s"doesn't exist in the script")
+        }
+    }
+  }
+
+  property("self-payment and self-transfer V3") {
+    forAll(for {
+      acc <- accountGen
+      am <- smallFeeGen
+      contractGen = paymentContractGen(acc, am, assets = List(Waves)) _
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.const(acc),
+        masterGen  = Gen.const(acc),
+        payment = Some(Payment(1, Waves)),
+        feeGen = ciFee(1)
+      )
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), fs) {
+          _ shouldBe 'right
+        }
+    }
+  }
+
+  property("self-payment V4") {
+    forAll(for {
+      acc <- accountGen
+      am <- smallFeeGen
+      contractGen = paymentContractGen(acc, am, assets = Nil) _
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.const(acc),
+        masterGen  = Gen.const(acc),
+        payment = Some(Payment(1, Waves)),
+        feeGen = ciFee(1)
+      )
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
+          _ should produce("DApp self-payment is forbidden")
+        }
+    }
+  }
+
+  property("self-transfer V4") {
+    forAll(for {
+      acc <- accountGen
+      am <- smallFeeGen
+      contractGen = paymentContractGen(acc, am, assets = List(Waves)) _
+      r <- preconditionsAndSetContract(
+        contractGen,
+        invokerGen = Gen.const(acc),
+        masterGen  = Gen.const(acc),
+        payment = None,
+        feeGen = ciFee(1)
+      )
+    } yield (r._1, r._2, r._3)) {
+      case (genesis, setScript, ci) =>
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
+          _ should produce("DApp self-payment is forbidden")
+        }
+    }
+  }
+
+  property("transferring asset this value") {
+    forAll(for {
+      a <- accountGen
+      quantity = 1000000
+      am     <- Gen.choose[Long](1L, quantity)
+      master <- accountGen
+      ts     <- timestampGen
+      asset = IssueTransactionV2
+        .selfSigned(chainId, master, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), quantity, 8, false, Some(assetUsingThis), enoughFee, ts)
+        .explicitGet()
+      contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
+      r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
+    } yield (a, am, r._1, r._2, r._3, asset, master)) {
+      case (acc, amount, genesis, setScript, ci, asset, master) =>
+        val features = fs.copy(
+          preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+        )
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci)), features) {
+          case (blockDiff, newState) =>
+            blockDiff.scriptsRun shouldBe 3
+            newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
+            newState.balance(acc, IssuedAsset(asset.id())) shouldBe amount
         }
     }
   }

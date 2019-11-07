@@ -117,6 +117,12 @@ object CommonValidation {
 
     }
 
+    def generic1or2Barrier(t: VersionedTransaction, name: String) = {
+      if (t.version == 1.toByte) Right(tx)
+      else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
+      else Left(GenericError(s"Unknown version of $name transaction: ${t.version}"))
+    }
+
     tx match {
       case _: BurnTransactionV1     => Right(tx)
       case _: PaymentTransaction    => Right(tx)
@@ -133,9 +139,7 @@ object CommonValidation {
           }
         }
 
-      case _: LeaseTransactionV1       => Right(tx)
       case _: LeaseCancelTransactionV1 => Right(tx)
-      case _: CreateAliasTransactionV1 => Right(tx)
       case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
       case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
 
@@ -144,11 +148,6 @@ object CommonValidation {
           case None     => Right(tx)
           case Some(sc) => scriptActivation(sc)
         }
-
-      case t: TransferTransaction =>
-        if (t.version == 1.toByte) Right(tx)
-        else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
-        else Left(GenericError(s"Unknown version of transfer transaction: ${t.version}"))
 
       case it: IssueTransactionV2 =>
         it.script match {
@@ -164,11 +163,12 @@ object CommonValidation {
           }
         }
 
+      case t: TransferTransaction      => generic1or2Barrier(t, "transfer")
+      case t: CreateAliasTransaction   => generic1or2Barrier(t, "create alias")
+      case t: LeaseTransaction         => generic1or2Barrier(t, "lease")
       case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: LeaseCancelTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: CreateAliasTransactionV2 => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)
       case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))

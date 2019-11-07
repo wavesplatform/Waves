@@ -158,7 +158,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity)
       sponsor  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
-      transfer = TransferTransaction.selfSigned(1.toByte, Waves, acc, acc, 1, ts, feeAsset = IssuedAsset(issue.id()), minFee, Array()).explicitGet()
+      transfer = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee, Array(), ts).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
 
     forAll(setup) {
@@ -182,10 +182,10 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       minFee <- Gen.choose(1000000, issue.quantity)
       sponsor = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransaction
-        .selfSigned(1.toByte, Waves, acc, acc, 1, ts, feeAsset = IssuedAsset(issue.id()), minFee + 7, Array())
+        .selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 7, Array(), ts)
         .explicitGet()
       transfer2 = TransferTransaction
-        .selfSigned(1.toByte, Waves, acc, acc, 1, ts, feeAsset = IssuedAsset(issue.id()), minFee + 9, Array())
+        .selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 9, Array(), ts)
         .explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer1, transfer2)
 
@@ -210,9 +210,9 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       minFee <- Gen.choose(1, issue.quantity / 11)
 
       sponsor1  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
-      transfer1 = TransferTransaction.selfSigned(1.toByte, Waves, acc, acc, 1, ts, IssuedAsset(issue.id()), fee = minFee, Array()).explicitGet()
+      transfer1 = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, IssuedAsset(issue.id()), fee = minFee, Array(), ts).explicitGet()
       sponsor2  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee * 10), One, ts).explicitGet()
-      transfer2 = TransferTransaction.selfSigned(1.toByte, Waves, acc, acc, 1, ts, IssuedAsset(issue.id()), fee = minFee * 10, Array()).explicitGet()
+      transfer2 = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, IssuedAsset(issue.id()), fee = minFee * 10, Array(), ts).explicitGet()
     } yield (acc, genesis, issue, sponsor1, transfer1, sponsor2, transfer2)
 
     forAll(setup) {

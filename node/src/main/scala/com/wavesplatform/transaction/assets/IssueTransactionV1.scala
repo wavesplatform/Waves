@@ -28,7 +28,7 @@ case class IssueTransactionV1 private (sender: PublicKey,
     with SignedTransaction
     with FastHashId {
 
-  override val version: Byte                    = 1
+  override val version: TxVersion                    = 1
   override val builder: IssueTransactionV1.type = IssueTransactionV1
   override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
@@ -38,7 +38,7 @@ case class IssueTransactionV1 private (sender: PublicKey,
 
 object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = IssueTransaction.typeId
+  override val typeId: TxType = IssueTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

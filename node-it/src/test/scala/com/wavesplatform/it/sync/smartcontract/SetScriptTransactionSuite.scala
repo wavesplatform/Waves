@@ -69,7 +69,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         recipient = acc3.stringRepr,
         assetId = None,
         amount = transferAmount,
-        fee = minFee + 0.00001.waves + 0.00002.waves,
+        fee = minFee + 0.00001.waves + 0.00002.waves
       )
     )
   }
@@ -77,23 +77,20 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
   test("can send from acc0 using multisig of acc1 and acc2") {
     val unsigned =
       TransferTransaction(
-          version = 2.toByte,
-          asset = Waves,
-          sender = acc0,
-          recipient = acc3,
-          amount = transferAmount,
-          timestamp = System.currentTimeMillis(),
-          feeAsset = Waves,
-          fee = minFee + 0.004.waves,
-          attachment = Array.emptyByteArray,
-          proofs = Proofs.empty
-        )
-        .explicitGet()
-    val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
-    val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
-
-    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
-
+        version = 2.toByte,
+        sender = acc0,
+        recipient = acc3,
+        assetId = Waves,
+        amount = transferAmount,
+        feeAssetId = Waves,
+        fee = minFee + 0.004.waves,
+        attachment = Array.emptyByteArray,
+        timestamp = System.currentTimeMillis(),
+        proofs = Proofs.empty
+      )
+    val sig1   = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
+    val sig2   = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
+    val signed = unsigned.copy(proofs = Proofs(sig1, sig2))
     sender.signedBroadcast(signed.json(), waitForTx = true).id
 
   }
@@ -113,8 +110,9 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
     val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
 
-    val removeScriptId =  sender
-      .signedBroadcast(signed.json(), waitForTx = true).id
+    val removeScriptId = sender
+      .signedBroadcast(signed.json(), waitForTx = true)
+      .id
 
     sender.transactionInfo(removeScriptId).script shouldBe None
 

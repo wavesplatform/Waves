@@ -17,11 +17,10 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.transfer._
 
 object RealTransactionWrapper {
-
   private def header(tx: Transaction, txIdOpt: Option[ByteStr] = None): Header = {
     val v = tx match {
       case vt: VersionedTransaction => vt.version
-      case _                        => 1
+      case _                        => TxVersion.V1
     }
     Header(txIdOpt.getOrElse(ByteStr(tx.id().arr)), tx.assetFee._2, tx.timestamp, v)
   }
@@ -62,10 +61,10 @@ object RealTransactionWrapper {
   }
 
   def apply(
-    tx: Transaction,
-    blockchain: Blockchain,
-    stdLibVersion: StdLibVersion,
-    target: AttachedPaymentTarget
+      tx: Transaction,
+      blockchain: Blockchain,
+      stdLibVersion: StdLibVersion,
+      target: AttachedPaymentTarget
   ): Either[ExecutionError, Tx] =
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
@@ -79,13 +78,14 @@ object RealTransactionWrapper {
       case b: CreateAliasTransaction => Tx.CreateAlias(proven(b), b.alias.name).asRight
       case ms: MassTransferTransaction =>
         Tx.MassTransfer(
-          proven(ms),
-          assetId = ms.assetId.compatId,
-          transferCount = ms.transfers.length,
-          totalAmount = ms.transfers.map(_.amount).sum,
-          transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-          attachment = ByteStr(ms.attachment)
-        ).asRight
+            proven(ms),
+            assetId = ms.assetId.compatId,
+            transferCount = ms.transfers.length,
+            totalAmount = ms.transfers.map(_.amount).sum,
+            transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
+            attachment = ByteStr(ms.attachment)
+          )
+          .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
       case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient).asRight
@@ -93,26 +93,28 @@ object RealTransactionWrapper {
       case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee).asRight
       case d: DataTransaction =>
         Tx.Data(
-          proven(d),
-          d.data.map {
-            case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
-            case StringDataEntry(key, value)  => DataItem.Str(key, value)
-            case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
-            case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
-          }.toIndexedSeq
-        ).asRight
+            proven(d),
+            d.data.map {
+              case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
+              case StringDataEntry(key, value)  => DataItem.Str(key, value)
+              case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
+              case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
+            }.toIndexedSeq
+          )
+          .asRight
       case ci: InvokeScriptTransaction =>
-        AttachedPaymentExtractor.extractPayments(ci, stdLibVersion, blockchain, target)
-            .map { payments =>
-              Tx.CI(
-                proven(ci),
-                ci.dAppAddressOrAlias,
-                payments,
-                ci.feeAssetId.compatId,
-                ci.funcCallOpt.map(_.function.funcName),
-                ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
-              )
-            }
+        AttachedPaymentExtractor
+          .extractPayments(ci, stdLibVersion, blockchain, target)
+          .map { payments =>
+            Tx.CI(
+              proven(ci),
+              ci.dAppAddressOrAlias,
+              payments,
+              ci.feeAssetId.compatId,
+              ci.funcCallOpt.map(_.function.funcName),
+              ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
+            )
+          }
     }
 
   def mapTransferTx(t: TransferTransaction): Tx.Transfer =

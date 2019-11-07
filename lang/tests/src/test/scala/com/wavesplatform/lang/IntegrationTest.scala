@@ -1128,32 +1128,49 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(concatScript, version = V4) should produce(s"exceed $MaxListLengthV4")
   }
 
-  property("dApp backward compatibility") {
-    val script =
+  property("callable V3 syntax absent at V4") {
+    val writeSetScript =
       s"""
-         | let wsArr = [DataEntry("key1", "value"), DataEntry("key2", true)]
-         | let ws = WriteSet(wsArr)
-         |
+         | WriteSet([DataEntry("key1", "value"), DataEntry("key2", true)])
+       """.stripMargin
+
+    val transferSetScript =
+      s"""
          | let tsArr = [
          |   ScriptTransfer(Address(base58'aaaa'), 100, unit),
          |   ScriptTransfer(Address(base58'bbbb'), 2,   base58'xxx')
          | ]
          | let ts = TransferSet(tsArr)
-         |
-         | let r = ScriptResult(ws, ts)
-         |
-         | ws == wsArr &&
-         | ts == tsArr &&
-         | r  == wsArr ++ tsArr
+       """.stripMargin
+
+    val scriptResultScript =
+      s"""
+         | func f(sr: ScriptResult) = true
+         | true
          |
        """.stripMargin
 
     val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
     genericEval[Environment, EVALUATED](
-      script,
+      writeSetScript,
       ctxt = ctx,
       version = V4,
       env = utils.environment
-    ) shouldBe Right(CONST_BOOLEAN(true))
+    ) should produce("Can't find a function 'WriteSet'")
+
+    genericEval[Environment, EVALUATED](
+      transferSetScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("Can't find a function 'TransferSet'")
+
+    genericEval[Environment, EVALUATED](
+      scriptResultScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("non-existing type")
   }
 }

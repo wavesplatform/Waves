@@ -9,7 +9,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransactionV1}
+import com.wavesplatform.transaction.lease.LeaseCancelTransactionV1
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import org.scalacheck.Gen.posNum
@@ -31,7 +31,7 @@ class LeaseBroadcastRouteSpec
 
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
-      ("lease", leaseGen.retryUntil(_.isInstanceOf[LeaseTransactionV1]), identity),
+      ("lease", leaseGen.retryUntil(_.version == 1), identity),
       ("cancel", leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransactionV1]), {
         case o: JsObject => o ++ Json.obj("txId" -> o.value("leaseId"))
         case other       => other

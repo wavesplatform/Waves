@@ -11,7 +11,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, CreateAliasTransactionV1, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.PropSpec
@@ -87,7 +87,7 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with W
     maybeFeeAsset            <- Gen.oneOf(maybeAsset, maybeAsset2)
     alias                    <- aliasGen
     fee                      <- smallFeeGen
-    aliasTx = CreateAliasTransactionV1.selfSigned(aliasedRecipient, alias, fee, ts).explicitGet()
+    aliasTx = CreateAliasTransaction.selfSigned(Transaction.V2, aliasedRecipient, alias, fee, ts).explicitGet()
     transfer <- transferGeneratorP(
       master,
       alias,

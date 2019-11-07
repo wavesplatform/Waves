@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.api.http.assets.{MassTransferRequest, SignedMassTransferRequest}
+import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -49,9 +49,11 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val transferId                 = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee).id
     nodes.waitForHeightAriseAndTxPresent(transferId)
 
-    miner.assertBalances(firstAddress,
-                         balance1 - massTransferTransactionFee - 3 * transferAmount,
-                         eff1 - massTransferTransactionFee - 3 * transferAmount)
+    miner.assertBalances(
+      firstAddress,
+      balance1 - massTransferTransactionFee - 3 * transferAmount,
+      eff1 - massTransferTransactionFee - 3 * transferAmount
+    )
     miner.assertBalances(secondAddress, balance2 + transferAmount, eff2 + transferAmount)
     miner.assertBalances(thirdAddress, balance3 + 2 * transferAmount, eff3 + 2 * transferAmount)
   }
@@ -97,10 +99,12 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
   test("invalid transfer should not be in UTX or blockchain") {
     import com.wavesplatform.transaction.transfer._
 
-    def request(transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
-                fee: Long = calcMassTransferFee(1),
-                timestamp: Long = System.currentTimeMillis,
-                attachment: Array[Byte] = Array.emptyByteArray) = {
+    def request(
+        transfers: List[Transfer] = List(Transfer(secondAddress, transferAmount)),
+        fee: Long = calcMassTransferFee(1),
+        timestamp: Long = System.currentTimeMillis,
+        attachment: Array[Byte] = Array.emptyByteArray
+    ) = {
       val txEi = for {
         parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
         tx              <- MassTransferTransaction.selfSigned(Waves, sender.privateKey, parsedTransfers, timestamp, fee, attachment)
@@ -108,13 +112,15 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
       val (signature, idOpt) = txEi.fold(_ => (List(fakeSignature), None), tx => (tx.proofs.base58().toList, Some(tx.id())))
 
-      val req = SignedMassTransferRequest(Base58.encode(sender.publicKey),
-                                          None,
-                                          transfers,
-                                          fee,
-                                          timestamp,
-                                          attachment.headOption.map(_ => Base58.encode(attachment)),
-                                          signature)
+      val req = SignedMassTransferRequest(
+        Base58.encode(sender.publicKey),
+        None,
+        transfers,
+        fee,
+        timestamp,
+        attachment.headOption.map(_ => Base58.encode(attachment)),
+        signature
+      )
 
       (req, idOpt)
     }
@@ -125,8 +131,10 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val (balance1, eff1) = miner.accountBalances(firstAddress)
     val invalidTransfers = Seq(
       (request(timestamp = System.currentTimeMillis + 1.day.toMillis), "Transaction timestamp .* is more than .*ms in the future"),
-      (request(transfers = List.fill(MaxTransferCount + 1)(Transfer(secondAddress, 1)), fee = calcMassTransferFee(MaxTransferCount + 1)),
-       s"Number of transfers ${MaxTransferCount + 1} is greater than 100"),
+      (
+        request(transfers = List.fill(MaxTransferCount + 1)(Transfer(secondAddress, 1)), fee = calcMassTransferFee(MaxTransferCount + 1)),
+        s"Number of transfers ${MaxTransferCount + 1} is greater than 100"
+      ),
       (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
       (request(fee = 0), "insufficient fee"),
       (request(fee = 99999), "Fee .* does not exceed minimal value"),
@@ -160,11 +168,13 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     val signedMassTransfer: JsObject = {
       val rs = sender.postJsonWithApiKey(
         "/transactions/sign",
-        Json.obj("type"      -> MassTransferTransaction.typeId,
-                 "version"   -> MassTransferTransaction.version,
-                 "sender"    -> firstAddress,
-                 "transfers" -> transfers,
-                 "fee"       -> fee)
+        Json.obj(
+          "type"      -> MassTransferTransaction.typeId,
+          "version"   -> MassTransferTransaction.version,
+          "sender"    -> firstAddress,
+          "transfers" -> transfers,
+          "fee"       -> fee
+        )
       )
       Json.parse(rs.getResponseBody).as[JsObject]
     }
@@ -246,7 +256,8 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       .parse(
         sender
           .get(s"/transactions/address/$secondAddress/limit/10")
-          .getResponseBody)
+          .getResponseBody
+      )
       .as[JsArray]
       .value
       .map(js => extractTransactionByType(js, 11).head)

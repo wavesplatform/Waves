@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http._
+import com.wavesplatform.api.http.requests.{LeaseCancelV1Request, LeaseRequest, SignedLeaseCancelV1Request}
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -29,11 +30,11 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
 
   private def deprecatedRoute: Route =
     (path("lease") & withAuth) {
-      broadcast[LeaseV1Request](TransactionFactory.leaseV1(_, wallet, time))
+      broadcast[LeaseRequest](TransactionFactory.lease(_, wallet, time))
     } ~ (path("cancel") & withAuth) {
       broadcast[LeaseCancelV1Request](TransactionFactory.leaseCancelV1(_, wallet, time))
     } ~ pathPrefix("broadcast") {
-      path("lease")(broadcast[SignedLeaseV1Request](_.toTx)) ~
+      path("lease")(broadcast[LeaseRequest](_.toTx)) ~
         path("cancel")(broadcast[SignedLeaseCancelV1Request](_.toTx))
     }
 

@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.api.http.leasing
 
-import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import com.wavesplatform.api.http.requests.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 

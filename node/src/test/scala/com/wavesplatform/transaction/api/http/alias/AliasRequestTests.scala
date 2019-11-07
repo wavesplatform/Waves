@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.api.http.alias
 
-import com.wavesplatform.api.http.alias.{CreateAliasV1Request, SignedCreateAliasV1Request}
+import com.wavesplatform.api.http.requests.{CreateAliasV1Request, SignedCreateAliasV1Request}
 import org.scalatest.{FunSuite, Matchers}
 import play.api.libs.json.Json
 

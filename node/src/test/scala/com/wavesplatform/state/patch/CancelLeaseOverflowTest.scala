@@ -6,7 +6,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.lease.LeaseTransactionV1
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalatest.PropSpec
@@ -24,14 +24,13 @@ class CancelLeaseOverflowTest extends PropSpec with PropertyChecks with WithStat
       amount    <- positiveLongGen
       fee       <- smallFeeGen
       ts        <- timestampGen
-    } yield
-      (
-        GenesisTransaction.create(sender1, amount + fee, ts).explicitGet(),
-        GenesisTransaction.create(sender2, amount + fee * 2, ts).explicitGet(),
-        LeaseTransactionV1.selfSigned(sender1, amount, fee, ts, sender2).explicitGet(),
-        LeaseTransactionV1.selfSigned(sender2, amount, fee, ts, recipient).explicitGet(),
-        TransferTransaction.selfSigned(1.toByte, Waves, sender2, recipient, amount, ts, Waves, fee, Array.emptyByteArray).explicitGet()
-      )
+    } yield (
+      GenesisTransaction.create(sender1, amount + fee, ts).explicitGet(),
+      GenesisTransaction.create(sender2, amount + fee * 2, ts).explicitGet(),
+      LeaseTransaction.selfSigned(1.toByte, sender1, sender2, amount, fee, ts).explicitGet(),
+      LeaseTransaction.selfSigned(1.toByte, sender2, recipient, amount, fee, ts).explicitGet(),
+      TransferTransaction.selfSigned(1.toByte, sender2, recipient, Waves, amount, Waves, fee, Array.emptyByteArray, ts).explicitGet()
+    )
 
     forAll(leaseOverflowGen) {
       case (gt1, gt2, lease1, lease2, tx) =>

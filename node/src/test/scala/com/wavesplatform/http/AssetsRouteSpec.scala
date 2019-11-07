@@ -4,7 +4,8 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
-import com.wavesplatform.api.http.assets.{AssetsApiRoute, TransferV1Request, TransferV2Request}
+import com.wavesplatform.api.http.assets.AssetsApiRoute
+import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.transfer._
@@ -17,7 +18,7 @@ import play.api.libs.json.Writes
 class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMockFactory with Eventually with RestAPISettingsHelper {
 
   private val wallet = stub[Wallet]
-  private val state = stub[Blockchain]
+  private val state  = stub[Blockchain]
 
   private val seed               = "seed".getBytes("UTF-8")
   private val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

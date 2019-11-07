@@ -6,6 +6,7 @@ import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
+import com.wavesplatform.api.http.requests.{SignedTransferV1Request, SignedTransferV2Request}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
@@ -14,6 +15,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -24,7 +26,8 @@ class AssetsBroadcastRouteSpec
     with RequestGen
     with PathMockFactory
     with PropertyChecks
-    with RestAPISettingsHelper {
+    with RestAPISettingsHelper
+    with NoShrink {
 
   private[this] val route = AssetsApiRoute(
     restAPISettings,
@@ -159,33 +162,35 @@ class AssetsBroadcastRouteSpec
     val receiverPrivateKey = Wallet.generateNewAccount(seed, 1)
 
     val transferRequest = createSignedTransferRequest(
-      TransferTransaction(
-        version = 1.toByte,
-        asset = Asset.Waves,
-        sender = senderPrivateKey,
-        recipient = receiverPrivateKey.toAddress,
-        amount = 1 * Waves,
-        timestamp = System.currentTimeMillis(),
-        feeAsset = Asset.Waves,
-        fee = Waves / 3,
-        attachment = Array.emptyByteArray,
-        signer = senderPrivateKey
-      ).right.get
+      TransferTransaction
+        .selfSigned(
+          1.toByte,
+          senderPrivateKey,
+          receiverPrivateKey.toAddress,
+          Asset.Waves,
+          1 * Waves,
+          Asset.Waves,
+          Waves / 3,
+          Array.emptyByteArray,
+          System.currentTimeMillis()
+        )
+        .right
+        .get
     )
 
     val versionedTransferRequest = createSignedVersionedTransferRequest(
       TransferTransaction(
         version = 2.toByte,
-        asset = Asset.Waves,
         sender = senderPrivateKey,
         recipient = receiverPrivateKey.toAddress,
+        assetId = Asset.Waves,
         amount = 1 * Waves,
-        timestamp = System.currentTimeMillis(),
-        feeAsset = Asset.Waves,
+        feeAssetId = Asset.Waves,
         fee = Waves / 3,
         attachment = Array.emptyByteArray,
+        timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty)
-      ).right.get
+      )
     )
 
     "/transfer" - {
@@ -233,7 +238,7 @@ class AssetsBroadcastRouteSpec
       fee,
       timestamp,
       attachment.headOption.map(_ => Base58.encode(attachment)),
-      proofs.proofs.map(_.toString)
+      proofs.proofs.map(_.toString).toList
     )
   }
 

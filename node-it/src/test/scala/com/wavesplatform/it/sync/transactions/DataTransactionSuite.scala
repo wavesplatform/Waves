@@ -8,7 +8,7 @@ import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.DataTransaction
+import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 
@@ -50,7 +50,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
         entries: List[DataEntry[_]] = List(IntegerDataEntry("int", 177)),
         fee: Long = 100000,
         timestamp: Long = System.currentTimeMillis,
-        version: Byte = DataTransaction.supportedVersions.head
+        version: TxVersion = DataTransaction.supportedVersions.head
     ): DataTransaction =
       DataTransaction.selfSigned(sender.privateKey, entries, fee, timestamp).explicitGet()
 

@@ -181,7 +181,7 @@ class MinerImpl(
     Either.cond(chanCount >= minerSettings.quorum, (), s"Quorum not available ($chanCount/${minerSettings.quorum}), not forging block.")
   }
 
-  private def blockFeatures(version: Byte): Set[Short] = {
+  private def blockFeatures(version: TxVersion): Set[Short] = {
     if (version <= 2) Set.empty[Short]
     else
       settings.featuresSettings.supported
@@ -190,7 +190,7 @@ class MinerImpl(
         .toSet
   }
 
-  private def blockRewardVote(version: Byte): Long =
+  private def blockRewardVote(version: TxVersion): Long =
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 

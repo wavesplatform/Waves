@@ -171,7 +171,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       sizes: BlockAndMicroblockSize,
       prev: ByteStr,
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       timestamp: Long
   ): (BlockAndMicroblocks, Seq[Transaction]) = {
     val ((blockTxs, microblockTxs), rest) = take(txs, sizes)
@@ -188,7 +188,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       sizes: BlockAndMicroblockSizes,
       initial: ByteStr,
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       timestamp: Long
   ): BlockAndMicroblockSequence = {
     sizes
