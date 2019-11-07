@@ -3,7 +3,7 @@ package com.wavesplatform.transaction
 import com.google.common.primitives.Shorts
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.api.http.SignedDataRequest
+import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.state.DataEntry._

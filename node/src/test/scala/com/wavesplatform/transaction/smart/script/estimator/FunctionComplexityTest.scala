@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart.script.estimator
 
-import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -33,9 +32,9 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
   private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), DirectiveSet.contractDirectiveSet)
 
   private def estimate(
-    expr: Terms.EXPR,
-    ctx: CTX[Environment],
-    funcCosts: Map[FunctionHeader, Coeval[Long]]
+      expr: Terms.EXPR,
+      ctx: CTX[Environment],
+      funcCosts: Map[FunctionHeader, Coeval[Long]]
   ): Either[String, Long] =
     estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
 
@@ -98,18 +97,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
       .right
       .get
 
-    val ttx = TransferTransaction(
-      2.toByte,
-      Waves,
-      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-      Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get,
-      100000000,
-      1526641218066L,
-      Waves,
-      100000000,
-      Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
-      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
-    ).right.get
+    val ttx = TransferTransaction(2.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get, Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get, Waves, 100000000, Waves, 100000000, Base58.tryDecodeWithLimit("4t2Xazb2SX").get, 1526641218066L, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
 
     val script = scriptWithAllV1Functions(dtx, ttx)
     val adaptedScript =

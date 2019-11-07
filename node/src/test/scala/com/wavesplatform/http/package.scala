@@ -98,17 +98,6 @@ package object http {
       (JsPath \ "proofs").readNullable[Proofs] and
       (JsPath \ "signature").readNullable[ByteStr]
   ) { (version, sender, recipient, asset, amount, timestamp, feeAsset, fee, attachment, proofs, signature) =>
-    TransferTransaction(
-      version.getOrElse(1.toByte),
-      asset,
-      sender,
-      recipient,
-      amount,
-      timestamp,
-      feeAsset,
-      fee,
-      attachment,
-      proofs.orElse(signature.map(s => Proofs(Seq(s)))).get
-    ).explicitGet()
+    TransferTransaction.create(version.getOrElse(1.toByte), sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs.orElse(signature.map(s => Proofs(Seq(s)))).get).explicitGet()
   }
 }

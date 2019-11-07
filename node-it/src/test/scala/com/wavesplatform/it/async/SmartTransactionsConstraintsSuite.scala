@@ -2,7 +2,7 @@ package com.wavesplatform.it.async
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.assets.SignedSetScriptRequest
+import com.wavesplatform.api.http.requests.SignedSetScriptRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker

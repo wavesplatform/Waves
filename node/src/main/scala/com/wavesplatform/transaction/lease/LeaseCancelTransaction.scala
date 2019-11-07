@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -30,7 +30,7 @@ trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction
 
 object LeaseCancelTransaction {
 
-  val typeId: Byte = 9
+  val typeId: TxType = 9.toByte
 
   def validateLeaseCancelParams(tx: LeaseCancelTransaction): Either[ValidationError, Unit] = {
     validateLeaseCancelParams(tx.leaseId, tx.fee)

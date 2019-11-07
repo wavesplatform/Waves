@@ -23,7 +23,7 @@ import play.api.libs.json._
 import scala.util.{Failure, Try}
 
 case class BlockHeader(
-    version: Byte,
+    version: TxVersion,
     timestamp: Long,
     reference: ByteStr,
     baseTarget: Long,
@@ -146,7 +146,7 @@ case class Block private[block] (
 object Block extends ScorexLogging {
 
   def build(
-      version: Byte,
+      version: TxVersion,
       timestamp: Long,
       reference: ByteStr,
       baseTarget: Long,
@@ -162,7 +162,7 @@ object Block extends ScorexLogging {
     )
 
   def buildAndSign(
-      version: Byte,
+      version: TxVersion,
       timestamp: Long,
       reference: ByteStr,
       baseTarget: Long,

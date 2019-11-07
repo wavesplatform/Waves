@@ -40,13 +40,13 @@ case class SetScriptTransaction private (chainId: Byte, sender: PublicKey, scrip
   override val json                    = Coeval.evalOnce(jsonBase() ++ Json.obj("chainId" -> chainId, "version" -> version, "script" -> script.map(_.bytes().base64)))
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-  override def version: Byte              = 1
+  override def version: TxVersion              = 1
 }
 
 object SetScriptTransaction extends TransactionParserFor[SetScriptTransaction] with TransactionParser.MultipleVersions {
 
-  override val typeId: Byte                 = 13
-  override val supportedVersions: Set[Byte] = Set(1)
+  override val typeId: TxType                 = 13
+  override val supportedVersions: Set[TxVersion] = Set(1)
 
   private def chainId: Byte = AddressScheme.current.chainId
 
