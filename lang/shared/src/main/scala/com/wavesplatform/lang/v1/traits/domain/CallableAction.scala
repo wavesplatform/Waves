@@ -17,18 +17,18 @@ case class Issue(
     description: String,
     isReissuable: Boolean,
     name: String,
-    quantity: Int
+    quantity: Long
 ) extends CallableAction
 
 case class Reissue(
     assetId: ByteStr,
     isReissuable: Boolean,
-    quantity: Int
+    quantity: Long
 ) extends CallableAction
 
 case class Burn(
     assetId: ByteStr,
-    quantity: Int
+    quantity: Long
 ) extends CallableAction
 
 sealed trait DataItem[T] extends CallableAction {

@@ -4,10 +4,12 @@ import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.lang._
@@ -31,6 +33,7 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
@@ -39,14 +42,14 @@ import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Right, Success, Try}
 
 object InvokeScriptTransactionDiff {
 
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
@@ -195,7 +198,7 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          compositeDiff <- foldActions(blockchain, tx, dAppAddress)(actions, dataAndPaymentDiff)
+          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress)(actions, dataAndPaymentDiff)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -290,66 +293,71 @@ object InvokeScriptTransactionDiff {
         Right(())
     }
 
-  private def foldActions(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
+  private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address)(
     ps: List[CallableAction],
     paymentsAndData: Diff
   ): TracedResult[ValidationError, Diff] =
     ps.foldLeft(TracedResult(paymentsAndData.asRight[ValidationError])) { (diffAcc, action) =>
 
-    def applyTransfer(transfer: AssetTransfer): TracedResult[ValidationError, Diff] = {
-      val AssetTransfer(addressRepr, amount, asset) = transfer
-      val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-      Asset.fromCompatId(asset) match {
-        case Waves =>
-          val r = Diff.stateOps(
-            portfolios =
-              Map(address     -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
-              Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
-          )
-          TracedResult.wrapValue(r)
-        case a@IssuedAsset(id) =>
-          val nextDiff = Diff.stateOps(
-            portfolios =
-              Map(address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
-              Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
-              )
-          )
-          blockchain.assetScript(a) match {
-            case None => nextDiff.asRight[ValidationError]
-            case Some(script) =>
-              val assetVerifierDiff =
-                if (blockchain.disallowSelfPayment) nextDiff
-                else nextDiff.copy(
-                  portfolios = Map(
-                    address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-                    dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+      def applyTransfer(transfer: AssetTransfer): TracedResult[ValidationError, Diff] = {
+        val AssetTransfer(addressRepr, amount, asset) = transfer
+        val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+        Asset.fromCompatId(asset) match {
+          case Waves =>
+            val r = Diff.stateOps(
+              portfolios =
+                Map(address     -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
+                Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
+            )
+            TracedResult.wrapValue(r)
+          case a@IssuedAsset(id) =>
+            val nextDiff = Diff.stateOps(
+              portfolios =
+                Map(address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
+                Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
+            )
+            blockchain.assetScript(a) match {
+              case None => nextDiff.asRight[ValidationError]
+              case Some(script) =>
+                val assetVerifierDiff =
+                  if (blockchain.disallowSelfPayment) nextDiff
+                  else nextDiff.copy(
+                    portfolios = Map(
+                      address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
+                      dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                    )
                   )
+                val assetValidationDiff = diffAcc.resultE.flatMap(
+                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, a.id, assetVerifierDiff, script)
                 )
-              val assetValidationDiff = diffAcc.resultE.flatMap(
-                d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, a.id, assetVerifierDiff, script)
-              )
-              val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
-              TracedResult(
-                assetValidationDiff.map(_ => nextDiff),
-                List(AssetVerifierTrace(id, errorOpt))
-              )
-          }
+                val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+                TracedResult(
+                  assetValidationDiff.map(_ => nextDiff),
+                  List(AssetVerifierTrace(id, errorOpt))
+                )
+            }
+        }
       }
-    }
 
-    def applyDataItem(item: DataItem[_]): TracedResult[ValidationError, Diff] =
-      TracedResult.wrapValue(
-        Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
-      )
+      def applyDataItem(item: DataItem[_]): TracedResult[ValidationError, Diff] =
+        TracedResult.wrapValue(
+          Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
+        )
 
-    val diff = action match {
-      case t: AssetTransfer => applyTransfer(t)
-      case d: DataItem[_]   => applyDataItem(d)
-      case i: Issue         => ???
-      case r: Reissue       => ???
-      case b: Burn          => ???
-    }
-    diffAcc |+| diff
+      def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] =
+        DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
+
+      def applyBurn(burn: Burn): TracedResult[ValidationError, Diff] =
+        DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
+
+      val diff = action match {
+        case t: AssetTransfer => applyTransfer(t)
+        case d: DataItem[_]   => applyDataItem(d)
+        case i: Issue         => ???
+        case r: Reissue       => applyReissue(r)
+        case b: Burn          => applyBurn(b)
+      }
+      diffAcc |+| diff
   }
 
   private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
