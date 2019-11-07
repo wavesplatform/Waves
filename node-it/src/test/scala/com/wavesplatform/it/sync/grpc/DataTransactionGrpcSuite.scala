@@ -58,7 +58,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       "Fee .* does not exceed minimal value",
       Code.INVALID_ARGUMENT)
 
-    nodes.foreach(n => n.grpc.waitForHeight(n.height + 1))
+    sender.grpc.waitForHeight(sender.height + 1)
     sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance
     sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance
   }
