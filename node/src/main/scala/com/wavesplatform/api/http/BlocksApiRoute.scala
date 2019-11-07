@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction._
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
@@ -103,7 +102,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     )
   )
   def heightEncoded: Route = (path("height" / Segment) & get) { encodedSignature =>
-    if (encodedSignature.length > TransactionParsers.SignatureStringLength)
+    if (encodedSignature.length > requests.SignatureStringLength)
       complete(InvalidSignature)
     else {
       val result: Either[ApiError, JsObject] = for {
@@ -188,8 +187,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       } else {
         commonApi
           .blockHeadersRange(start, end)
-          .map { case (bh, size, transactionCount, signature, height) =>
-            BlockHeader.json(bh, size, transactionCount, signature).addBlockFields(height)
+          .map {
+            case (bh, size, transactionCount, signature, height) =>
+              BlockHeader.json(bh, size, transactionCount, signature).addBlockFields(height)
           }
       }
 
@@ -232,7 +232,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     )
   )
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
-    if (encodedSignature.length > TransactionParsers.SignatureStringLength) {
+    if (encodedSignature.length > requests.SignatureStringLength) {
       complete(InvalidSignature)
     } else {
       val result = for {

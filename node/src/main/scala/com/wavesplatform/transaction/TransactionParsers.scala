@@ -1,23 +1,15 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.crypto._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.base58Length
 
 import scala.util.{Failure, Try}
 
 object TransactionParsers {
-
-  val TimestampLength            = 8
-  val AmountLength               = 8
-  val TypeLength                 = 1
-  val SignatureStringLength: Int = base58Length(SignatureLength)
-
-  private val old: Map[Byte, TransactionParserLite] = Seq[TransactionParserLite](
+  private[this] val old: Map[Byte, TransactionParserLite] = Seq[TransactionParserLite](
     GenesisTransaction,
     PaymentTransaction,
     IssueTransactionV1,
@@ -33,7 +25,7 @@ object TransactionParsers {
     x.typeId -> x
   }(collection.breakOut)
 
-  private val modern: Map[(Byte, Byte), TransactionParserLite] = Seq[TransactionParserLite](
+  private[this] val modern: Map[(Byte, Byte), TransactionParserLite] = Seq[TransactionParserLite](
     DataTransaction,
     SetScriptTransaction,
     IssueTransactionV2,
@@ -60,7 +52,7 @@ object TransactionParsers {
       }
   } ++ modern
 
-  val byName: Map[String, TransactionParserLite] = (old ++ modern).map {
+  private[this] val byName: Map[String, TransactionParserLite] = (old ++ modern).map {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 

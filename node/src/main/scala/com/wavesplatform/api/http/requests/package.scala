@@ -2,19 +2,23 @@ package com.wavesplatform.api.http
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto.{DigestLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
-import com.wavesplatform.transaction.{Asset, AssetIdStringLength, Proofs, TxValidationError}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, Validation}
-import play.api.libs.json.{JsError, JsNull, JsPath, JsResult, JsString, JsSuccess, JsValue, JsonValidationError, Reads}
+import com.wavesplatform.transaction.{Asset, AssetIdStringLength, Proofs, TxValidationError}
+import com.wavesplatform.utils.base58Length
+import play.api.libs.json._
 import supertagged.TaggedType
 
 package object requests {
-  import cats.instances.list._
   import cats.instances.either._
+  import cats.instances.list._
   import cats.syntax.either._
   import cats.syntax.traverse._
+
+  val SignatureStringLength: Int = base58Length(SignatureLength)
+  val DigestStringLength: Int    = base58Length(DigestLength)
 
   def parseBase58(v: String, error: String, maxLength: Int): Validation[ByteStr] =
     if (v.length > maxLength) Left(TxValidationError.GenericError(error))
@@ -75,9 +79,9 @@ package object requests {
 
   implicit object ProofStrReads extends Reads[ProofStr] {
     override def reads(json: JsValue): JsResult[ProofStr] = json match {
-      case JsNull => JsSuccess(ProofStr(""))
+      case JsNull      => JsSuccess(ProofStr(""))
       case JsString(s) => JsSuccess(ProofStr(s))
-      case _ => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsstring"))))
+      case _           => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
   }
 }

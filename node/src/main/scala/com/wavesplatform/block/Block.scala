@@ -218,7 +218,7 @@ object Block extends ScorexLogging {
       GenesisTransaction.create(acc, ts.amount, genesisSettings.timestamp).explicitGet()
     }
 
-    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte)))
+    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(crypto.DigestLength)(0: Byte)))
     val txBytes              = writeTransactionData(GenesisBlockVersion, transactionGenesisData)
     val cBytes               = writeConsensusBytes(consensusGenesisData.baseTarget, consensusGenesisData.generationSignature)
 

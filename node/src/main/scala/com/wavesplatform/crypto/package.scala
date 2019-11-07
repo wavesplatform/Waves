@@ -6,19 +6,18 @@ import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
 package object crypto {
+  // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
+  val DigestLength: Int    = 32
 
-  val DigestSize: Int = 32
-
-  def fastHash(m: Array[Byte]): Array[Byte] = Blake2b256.hash(m)
-
-  def fastHash(s: String): Array[Byte] = fastHash(s.getBytes("UTF-8"))
-
+  // Digests
+  def fastHash(m: Array[Byte]): Array[Byte]   = Blake2b256.hash(m)
+  def fastHash(s: String): Array[Byte]        = fastHash(s.getBytes("UTF-8"))
   def secureHash(m: Array[Byte]): Array[Byte] = Keccak256.hash(Blake2b256.hash(m))
+  def secureHash(s: String): Array[Byte]      = secureHash(s.getBytes("UTF-8"))
 
-  def secureHash(s: String): Array[Byte] = secureHash(s.getBytes("UTF-8"))
-
+  // Signatures
   def sign(account: PrivateKey, message: ByteStr): ByteStr =
     Curve25519.sign(SPrivateKey(account.arr), message)
 
@@ -30,7 +29,7 @@ package object crypto {
   // see
   // https://github.com/jedisct1/libsodium/blob/ab4ab23d5744a8e060864a7cec1a7f9b059f9ddd/src/libsodium/crypto_scalarmult/curve25519/ref10/x25519_ref10.c#L17
   // https://boringssl.googlesource.com/boringssl/+/master/third_party/wycheproof_testvectors/x25519_test.json
-  private val blacklist: Array[Array[Byte]] = Array(
+  private[this] val BlacklistedKeys: Array[Array[Byte]] = Array(
     // 0 (order 4)
     Array(0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00),
@@ -55,7 +54,7 @@ package object crypto {
   ).map(_.map(_.toByte))
 
   def isWeakPublicKey(publicKey: Array[Byte]): Boolean =
-    blacklist.exists { wk =>
+    BlacklistedKeys.exists { wk =>
       publicKey.view.init == wk.view.init &&
       (publicKey.last == wk.last || (publicKey.last & 0xff) == wk.last + 0x80)
     }

@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.crypto
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -14,8 +15,8 @@ object LeaseCancelTxSerializer {
   def toJson(tx: LeaseCancelTransaction): JsObject = {
     import tx._
     ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version"   -> version,
-      "leaseId"    -> leaseId.toString,
+      "version" -> version,
+      "leaseId" -> leaseId.toString,
       "chainId" -> chainByte
     )
   }
@@ -26,7 +27,7 @@ object LeaseCancelTxSerializer {
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte.getOrElse(AddressScheme.current.chainId)), baseBytes)
     }
   }
 
@@ -43,7 +44,7 @@ object LeaseCancelTxSerializer {
       val sender    = buf.getPublicKey
       val fee       = buf.getLong
       val timestamp = buf.getLong
-      val leaseId = buf.getByteArray(crypto.DigestSize)
+      val leaseId   = buf.getByteArray(crypto.DigestLength)
       LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil)
     }
 
@@ -57,10 +58,10 @@ object LeaseCancelTxSerializer {
       tx.copy(proofs = proofs)
     } else {
       require(bytes(0) == LeaseCancelTransaction.typeId, "transaction type mismatch")
-      val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
+      val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
       require(buf.get == LeaseCancelTransaction.typeId, "transaction type mismatch")
       val transaction = parseCommonPart(TxVersion.V1, buf)
-      val signature = buf.getSignature
+      val signature   = buf.getSignature
       transaction.copy(proofs = Proofs(signature))
     }
   }

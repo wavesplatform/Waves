@@ -4,25 +4,25 @@ import cats.implicits._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class SignedLeaseCancelV2Request(@ApiModelProperty(required = true)
-                                      chainId: Byte,
-                                      @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                      senderPublicKey: String,
-                                      @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
-                                      leaseId: String,
-                                      @ApiModelProperty(required = true)
-                                      timestamp: Long,
-                                      @ApiModelProperty(required = true)
-                                      proofs: List[String],
-                                      @ApiModelProperty(required = true)
-                                      fee: Long)
-    {
+case class SignedLeaseCancelV2Request(
+    @ApiModelProperty(required = true)
+    chainId: Byte,
+    @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+    senderPublicKey: String,
+    @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
+    leaseId: String,
+    @ApiModelProperty(required = true)
+    timestamp: Long,
+    @ApiModelProperty(required = true)
+    proofs: List[String],
+    @ApiModelProperty(required = true)
+    fee: Long
+) {
   def toTx: Either[ValidationError, LeaseCancelTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)

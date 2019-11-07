@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import play.api.libs.json.Json
@@ -18,11 +17,12 @@ case class LeaseCancelRequest(
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, LeaseCancelTransaction] =
     for {
-      validProofs <- toProofs(version, signature, proofs)
+      validProofs  <- toProofs(version, signature, proofs)
+      validLeaseId <- parseBase58(leaseId, "invalid.leaseTx", DigestStringLength)
       tx <- LeaseCancelTransaction.create(
         version.getOrElse(1.toByte),
         sender,
-        Base58.decode(leaseId),
+        validLeaseId,
         fee,
         timestamp.getOrElse(0L),
         validProofs

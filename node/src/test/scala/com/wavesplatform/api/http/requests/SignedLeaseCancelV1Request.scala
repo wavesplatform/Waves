@@ -3,7 +3,6 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
@@ -13,7 +12,7 @@ case class SignedLeaseCancelV1Request(
     @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
     senderPublicKey: String,
     @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
-    txId: String,
+    leaseId: String,
     @ApiModelProperty(required = true)
     timestamp: Long,
     @ApiModelProperty(required = true)
@@ -25,7 +24,7 @@ case class SignedLeaseCancelV1Request(
     for {
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _leaseTx   <- parseBase58(txId, "invalid.leaseTx", SignatureStringLength)
+      _leaseTx   <- parseBase58(leaseId, "invalid.leaseTx", SignatureStringLength)
       _t         <- LeaseCancelTransaction.create(1.toByte, _sender, _leaseTx, fee, timestamp, Proofs(_signature))
     } yield _t
 }
