@@ -1,10 +1,9 @@
 package com.wavesplatform.http
 
-import java.net.{URLDecoder, URLEncoder}
-
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressOrAlias}
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.common.CommonAccountApi
+import com.wavesplatform.api.common.CommonAccountApi.AddressScriptInfo
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -14,9 +13,8 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.{Blockchain, Diff, StringDataEntry}
+import com.wavesplatform.state.Blockchain
 
-import scala.util.Random
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -39,12 +37,12 @@ class AddressRouteSpec
 
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.stringRepr)
-  private val blockchain   = stub[Blockchain]
+  private val blockchain   = stub[Blockchain]("globalBlockchain")
   (blockchain.activatedFeatures _).when().returning(Map())
 
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
 
-  private val commonAccountApi = new CommonAccountApi(Diff.empty, db, blockchain)
+  private val commonAccountApi = mock[CommonAccountApi]("globalAccountApi")
 
   private val route =
     AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, commonAccountApi).route
@@ -157,9 +155,10 @@ class AddressRouteSpec
   }
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
-    (blockchain.accountScript _)
-      .when(allAccounts(1).toAddress)
-      .onCall((_: AddressOrAlias) => Some((ExprScript(TRUE).explicitGet(), 1L)))
+    val script = ExprScript(TRUE).explicitGet()
+    val si = AddressScriptInfo(Some(script.bytes()), Some(script.expr.toString), 1L, FeeValidation.ScriptExtraFee)
+
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(si).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -170,9 +169,7 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    (blockchain.accountScript _)
-      .when(allAccounts(2).toAddress)
-      .onCall((_: AddressOrAlias) => None)
+    (commonAccountApi.script _).expects(allAccounts(2).toAddress).returning(AddressScriptInfo(None, None, 0, 0)).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -210,9 +207,9 @@ class AddressRouteSpec
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
 
-    (blockchain.accountScript _)
-      .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
+    val contractScript = ContractScript(V3, contractWithMeta).explicitGet()
+    val contractScriptInfo = AddressScriptInfo(Some(contractScript.bytes()), Some(contractScript.expr.toString), 11L, FeeValidation.ScriptExtraFee)
+    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(contractScriptInfo).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -226,6 +223,7 @@ class AddressRouteSpec
       (response \ "complexity").as[Long] shouldBe 11
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
+
     Get(routePath(s"/scriptInfo/${allAddresses(3)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
@@ -250,96 +248,6 @@ class AddressRouteSpec
   }
 
   routePath(s"/data/${allAddresses(1)}?matches=regex") in {
-    val dataKeys = Set(
-      "abc",
-      "aBcD",
-      "ABD",
-      "ac",
-      "ab1c",
-      "1aB1cD",
-      "A1BD0",
-      "a110b",
-      "123",
-      "reeee",
-      " ab",
-      "ab ",
-      "a b\n",
-      "ab1 \n\t",
-      "\n\raB1\t",
-      "\n  \r  \t\t",
-      "!#$%&'()*+,",
-      "!#$%&'()<*=>+,",
-      "!",
-      "<!@#qwe>",
-      "\\",
-      "\"\\",
-      "qwe!",
-      "\b",
-      "\u0000",
-      "\b\b",
-      "\bqweasd\u0000",
-      "\u0000qweqwe"
-    )
-
-    val testData: Map[String, String] =
-      dataKeys.map { k =>
-        k -> Random.nextString(16)
-      }.toMap
-
-    val regexps = List(
-      /*"abc", "bca",*/
-      "[a-zA-Z]{1,}",
-      "[a-z0-9]{0,4}",
-      "[a-zA-Z0-9]{1,4}",
-      "[a-z!-/]{2,}",
-      "[!-/:-@]{0,}",
-      "re*",
-      "re.ee",
-      "\\w{0,}",
-      "\\d{0,}",
-      "[\\w\\d]{0,}",
-      "\\s{0,}",
-      "^1aB1cD$",
-      "(a|b)c"
-    )
-
-    testData.foreach {
-      case (k, v) =>
-        (blockchain
-          .accountData(_: Address, _: String))
-          .when(allAccounts(1).toAddress, k)
-          .returning(Some(StringDataEntry(k, v)))
-          .anyNumberOfTimes()
-    }
-
-    for (regex <- regexps) {
-      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-        val kvs = responseAs[JsArray].value
-          .map { json =>
-            ((json \ "key").as[String], (json \ "value").as[String])
-          }
-          .toList
-          .sortBy(_._1)
-
-        val regexPattern = regex.r.pattern
-        kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
-      }
-    }
-
-    for (regex <- regexps.map(rgx => URLEncoder.encode(rgx, "UTF-8"))) {
-      Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {
-        val kvs = responseAs[JsArray].value
-          .map { json =>
-            ((json \ "key").as[String], (json \ "value").as[String])
-          }
-          .toList
-          .sortBy(_._1)
-
-        val regexPattern = URLDecoder.decode(regex, "UTF-8").r.pattern
-        kvs shouldEqual testData.filter(k => regexPattern.matcher(k._1).matches()).toSeq.sortBy(_._1)
-      }
-    }
-
     val invalidRegexps = List("[a-z", "([a-z]{0}", "[a-z]{0", "[a-z]{,5}")
     for (regex <- invalidRegexps) {
       Get(routePath(s"""/data/${allAddresses(1)}?matches=$regex""")) ~> route ~> check {

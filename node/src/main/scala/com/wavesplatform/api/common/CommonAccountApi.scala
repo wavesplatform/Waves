@@ -60,7 +60,7 @@ class CommonAccountApi(diff: => Diff, db: DB, blockchain: Blockchain) {
     blockchain.accountData(address, key)
   }
 
-  def dataStream(address: Address, keyFilter: String => Boolean = _ => true): Observable[DataEntry[_]] = {
+  def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = {
     val entriesFromDiff = diff.accountData.get(address).fold[Map[String, DataEntry[_]]](Map.empty)(_.data)
     val entries = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
@@ -68,7 +68,7 @@ class CommonAccountApi(diff: => Diff, db: DB, blockchain: Blockchain) {
       val addressId = db.get(Keys.addressId(address)).get
       db.iterateOver(Keys.DataHistoryPrefix) { e =>
         val key = new String(e.getKey.drop(2), Charsets.UTF_8)
-        if (keyFilter(key) && !entriesFromDiff.contains(key)) {
+        if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
           ro.get(Keys.data(addressId, key)(ro.get(Keys.dataHistory(addressId, key)).head)).foreach(entries += _)
         }
       }

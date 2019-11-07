@@ -1,29 +1,24 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.directives.values.V1
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.settings.WalletSettings
+import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
-import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
@@ -42,12 +37,12 @@ class TransactionsRouteSpec
 
   private val wallet              = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain          = mock[Blockchain]
-  private val utx                 = mock[UtxPool]
   private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
   private val addressTransactions = mock[CommonTransactionsApi]
+  private val utxPoolSize         = mockFunction[Int]
 
-  private val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
-
+  private val route =
+    new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, utxPoolSize.apply(), utxPoolSynchronizer, new TestTime).route
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -63,16 +58,7 @@ class TransactionsRouteSpec
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
-        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
-          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
-        )
-        val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
-        (blockchain.hasAccountScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
-        (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
-
-        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
+        (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -99,16 +85,7 @@ class TransactionsRouteSpec
           )
         )
 
-        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
-          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
-        )
-        val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
-        (blockchain.hasAccountScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
-        (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
-
-        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
+        (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 200000L, 0L))).once()
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -131,16 +108,7 @@ class TransactionsRouteSpec
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
-        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
-          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 100)
-        )
-        val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
-        (blockchain.hasAccountScript _).expects(sender.toAddress).returning(false).anyNumberOfTimes()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
-        (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
-
-        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
+        (addressTransactions.calculateFee _).expects(*).returning(Right((Asset.Waves, 100000L, 0L))).once()
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -161,33 +129,7 @@ class TransactionsRouteSpec
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
-        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
-          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 0)
-        )
-        val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
-        (blockchain.hasAccountScript _).expects(sender.toAddress).returning(false).once()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
-        (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
-        (blockchain.assetDescription _)
-          .expects(assetId)
-          .returning(
-            Some(
-              AssetDescription(
-                issuer = accountGen.sample.get,
-                name = "foo".getBytes("UTF-8"),
-                description = "bar".getBytes("UTF-8"),
-                decimals = 8,
-                reissuable = false,
-                totalVolume = Long.MaxValue,
-                script = None,
-                sponsorship = 5
-              )
-            )
-          )
-          .anyNumberOfTimes()
-
-        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
+        (addressTransactions.calculateFee _).expects(*).returning(Right((assetId, 5L, 0L))).once()
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -208,34 +150,7 @@ class TransactionsRouteSpec
           "recipient"       -> accountGen.sample.get.toAddress
         )
 
-        val featuresSettings = TestFunctionalitySettings.Enabled.copy(
-          preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.FeeSponsorship.id -> 0)
-        )
-
-        val blockchain = mock[Blockchain]
-        (blockchain.height _).expects().returning(featuresSettings.featureCheckBlocksPeriod).once()
-        (blockchain.hasAccountScript _).expects(sender.toAddress).returning(true).once()
-        (blockchain.activatedFeatures _).expects().returning(featuresSettings.preActivatedFeatures)
-        (blockchain.settings _).expects().returning(BlockchainSettings('T', featuresSettings, GenesisSettings.TESTNET, RewardsSettings.TESTNET))
-        (blockchain.assetDescription _)
-          .expects(assetId)
-          .returning(
-            Some(
-              AssetDescription(
-                issuer = accountGen.sample.get,
-                name = "foo".getBytes("UTF-8"),
-                description = "bar".getBytes("UTF-8"),
-                decimals = 8,
-                reissuable = false,
-                totalVolume = Long.MaxValue,
-                script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
-                sponsorship = 5
-              )
-            )
-          )
-          .anyNumberOfTimes()
-
-        val route = new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, 0, utxPoolSynchronizer, new TestTime).route
+        (addressTransactions.calculateFee _).expects(*).returning(Right((assetId, 45L, 0L))).once()
 
         Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
           status shouldEqual StatusCodes.OK
@@ -278,25 +193,21 @@ class TransactionsRouteSpec
     }
 
     "returns 200 if correct params provided" - {
-      def routeGen: Gen[Route] =
-        Gen.const({
-          val b = mock[Blockchain]
-          new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, b, 0, utxPoolSynchronizer, new TestTime).route
-        })
-
       "address and limit" in {
-        forAll(routeGen, addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
-          case (r, address, limit) =>
-            Get(routePath(s"/address/$address/limit/$limit")) ~> r ~> check {
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
+          case (address, limit) =>
+            (addressTransactions.transactionsByAddress _).expects(*, *, limit, None).returning(Seq.empty).once()
+            Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
             }
         }
       }
 
       "address, limit and after" in {
-        forAll(routeGen, addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
-          case (r, address, limit, txId) =>
-            Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> r ~> check {
+        forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
+          case (address, limit, txId) =>
+            (addressTransactions.transactionsByAddress _).expects(*, *, limit, *).returning(Seq.empty).once()
+            Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
             }
         }
@@ -322,7 +233,8 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height) =>
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).once()
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(height -> tx)).once()
+
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
@@ -339,12 +251,12 @@ class TransactionsRouteSpec
       } yield t
 
       forAll(g) { txs =>
-        (utx.all _).expects().returns(txs).once()
+        (addressTransactions.unconfirmedTransactions _).expects().returning(txs).once()
         Get(routePath("/unconfirmed")) ~> route ~> check {
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
             if ((r \ "version").as[Int] == 1) {
-              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).toString
+              (r \ "signature").as[String] shouldEqual t.proofs.proofs.head.toString
             } else {
               (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.toString)
             }
@@ -362,7 +274,7 @@ class TransactionsRouteSpec
       } yield t
 
       forAll(g) { txs =>
-        (utx.size _).expects().returns(txs.size).once()
+        utxPoolSize.expects().returning(txs.size).once()
         Get(routePath("/unconfirmed/size")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual Json.obj("size" -> JsNumber(txs.size))
@@ -383,7 +295,7 @@ class TransactionsRouteSpec
 
     "working properly otherwise" in {
       forAll(randomTransactionGen) { tx =>
-        (utx.transactionById _).expects(tx.id()).returns(Some(tx)).once()
+        (addressTransactions.unconfirmedTransactionById _).expects(tx.id()).returns(Some(tx)).once()
         Get(routePath(s"/unconfirmed/info/${tx.id().toString}")) ~> route ~> check {
           status shouldEqual StatusCodes.OK
           responseAs[JsValue] shouldEqual tx.json()
@@ -394,8 +306,8 @@ class TransactionsRouteSpec
 
   routePath("/sign") - {
     "function call without args" in {
-      val acc1       = wallet.generateNewAccount().get
-      val acc2       = wallet.generateNewAccount().get
+      val acc1 = wallet.generateNewAccount().get
+      val acc2 = wallet.generateNewAccount().get
 
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)

@@ -27,6 +27,7 @@ import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
+import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
@@ -324,7 +325,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
                       log.error(s"Error compiling regex ${request.matches}", e)
                       ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
                     },
-                    r => accountData(address, r.pattern)
+                    r => accountData(address, request.matches)
                   )
               )
             else complete(accountDataList(address, request.keys: _*))
@@ -344,7 +345,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   )
   def getDataItem: Route = (path("data" / Segment / Segment) & get) {
     case (address, key) =>
-      complete(accountData(address, key))
+      complete(accountDataEntry(address, key))
   }
 
   @Path("/")
@@ -441,17 +442,17 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .map { acc =>
-        ToResponseMarshallable(commonAccountApi.dataStream(acc).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
+        ToResponseMarshallable(commonAccountApi.dataStream(acc, None).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
       }
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String, regex: Pattern)(implicit sc: Scheduler): ToResponseMarshallable = {
+  private def accountData(address: String, regex: String)(implicit sc: Scheduler): ToResponseMarshallable = {
     Address
       .fromString(address)
       .map { addr =>
         val result: ToResponseMarshallable = commonAccountApi
-          .dataStream(addr, k => regex.matcher(k).matches())
+          .dataStream(addr, Some(regex))
           .toListL
           .runAsyncLogErr
           .map(_.sortBy(_.key))
@@ -461,7 +462,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String, key: String): ToResponseMarshallable = {
+  private def accountDataEntry(address: String, key: String): ToResponseMarshallable = {
     val result = for {
       addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
       value <- commonAccountApi.data(addr, key).toRight(DataKeyDoesNotExist)
