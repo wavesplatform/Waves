@@ -10,9 +10,9 @@ import com.wavesplatform.transaction.validation.TxValidator
 object LeaseCancelTxValidator extends TxValidator[LeaseCancelTransaction] {
   override def validate(tx: LeaseCancelTransaction): ValidatedNel[ValidationError, LeaseCancelTransaction] = {
     import tx._
-    Validations.seq(tx)(
-      Validations.fee(fee),
-      Validations.cond(leaseId.length == crypto.DigestLength, GenericError("Lease transaction id is invalid"))
+    V.seq(tx)(
+      V.fee(fee),
+      V.cond(leaseId.length == crypto.DigestLength, GenericError("Lease transaction id is invalid"))
     )
   }
 }
