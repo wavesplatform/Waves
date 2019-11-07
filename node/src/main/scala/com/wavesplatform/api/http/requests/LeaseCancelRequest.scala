@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import play.api.libs.json.Json
+import play.api.libs.json.{Format, Json}
 
 case class LeaseCancelRequest(
     version: Option[Byte],
@@ -31,5 +31,19 @@ case class LeaseCancelRequest(
 }
 
 object LeaseCancelRequest {
-  implicit val jsonFormat = Json.format[LeaseCancelRequest]
+  implicit val jsonFormat = Format(
+    {
+      import play.api.libs.functional.syntax._
+      import play.api.libs.json._
+      ((JsPath \ "version").readNullable[Byte] and
+        (JsPath \ "sender").readNullable[String] and
+        (JsPath \ "senderPublicKey").readNullable[String] and
+        (JsPath \ "leaseId").read[String].orElse((JsPath \ "txId").read[String]) and
+        (JsPath \ "fee").read[Long] and
+        (JsPath \ "timestamp").readNullable[Long] and
+        (JsPath \ "signature").readNullable[String] and
+        (JsPath \ "proofs").readNullable[List[String]])(LeaseCancelRequest.apply _)
+    },
+    Json.writes[LeaseCancelRequest]
+  )
 }
