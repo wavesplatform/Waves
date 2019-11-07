@@ -32,7 +32,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
     first.bytes() shouldEqual second.bytes()
   }
 
-  property("JSON format validation for LeaseCancelTransaction") {
+  property("JSON format validation for LeaseCancelTransactionV1") {
     val js = Json.parse("""{
                        "type": 9,
                        "id": "7hmabbFS8a2z79a29pzZH1s8LHxrsEAnnLjJxNdZ1gGw",
@@ -64,7 +64,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
     js shouldEqual tx.json()
   }
 
-  property("JSON format validation for LeaseCancelTransaction") {
+  property("JSON format validation for LeaseCancelTransactionV2") {
     val js = Json.parse("""{
                         "type": 9,
                         "id": "4nvUUiQjTH7D2LFyzaxs8JwaZYZHDggJgq1iP99TvVDM",
