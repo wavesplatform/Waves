@@ -10,7 +10,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
-import com.wavesplatform.serialization.Deser.ByteBufferOps
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._

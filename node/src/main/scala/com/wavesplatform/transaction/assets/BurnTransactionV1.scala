@@ -19,7 +19,7 @@ case class BurnTransactionV1 private (sender: PublicKey, asset: IssuedAsset, qua
     with SignedTransaction
     with FastHashId {
 
-  override def version: Byte           = 1
+  override def version: TxVersion           = 1
   override def chainByte: Option[Byte] = None
 
   override val builder: BurnTransactionV1.type = BurnTransactionV1
@@ -29,7 +29,7 @@ case class BurnTransactionV1 private (sender: PublicKey, asset: IssuedAsset, qua
 
 object BurnTransactionV1 extends TransactionParserFor[BurnTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = BurnTransaction.typeId
+  override val typeId: TxType = BurnTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>

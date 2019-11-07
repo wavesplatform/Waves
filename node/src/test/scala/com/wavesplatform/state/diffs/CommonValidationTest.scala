@@ -117,25 +117,15 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
 
       val transferWavesTx = TransferTransaction
-        .selfSigned(1.toByte, Waves, richAcc, recipientAcc, 10 * Constants.UnitsInWave, ts, Waves, 1 * Constants.UnitsInWave, Array.emptyByteArray)
+        .selfSigned(1.toByte, richAcc, recipientAcc, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, Array.emptyByteArray, ts)
         .explicitGet()
 
       val transferAssetTx = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          IssuedAsset(issueTx.id()),
-          richAcc,
-          recipientAcc,
-          100,
-          ts,
-          Waves,
-          if (smartToken) {
+        .selfSigned(1.toByte, richAcc, recipientAcc, IssuedAsset(issueTx.id()), 100, Waves, if (smartToken) {
             1 * Constants.UnitsInWave + ScriptExtraFee
           } else {
             1 * Constants.UnitsInWave
-          },
-          Array.emptyByteArray
-        )
+          }, Array.emptyByteArray, ts)
         .explicitGet()
 
       val sponsorTx =
@@ -166,17 +156,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         else Seq.empty
 
       val transferBackTx = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          IssuedAsset(issueTx.id()),
-          recipientAcc,
-          richAcc,
-          1,
-          ts,
-          if (feeInAssets) IssuedAsset(issueTx.id()) else Waves,
-          feeAmount,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, recipientAcc, richAcc, IssuedAsset(issueTx.id()), 1, if (feeInAssets) IssuedAsset(issueTx.id()) else Waves, feeAmount, Array.emptyByteArray, ts)
         .explicitGet()
 
       (TestBlock.create(Vector[Transaction](genesisTx, issueTx, transferWavesTx, transferAssetTx) ++ sponsorTx ++ setScriptTx), transferBackTx)

@@ -5,13 +5,13 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.block.Block.{GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, RewardBlockVersion}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.serialization.Deser.ByteBufferOps
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.serialization.ByteBufferOps
+import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxVersion}
 
 import scala.util.Try
 
 package object block {
-  private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
+  private[block] def writeTransactionData(version: TxVersion, txs: Seq[Transaction]): Array[Byte] = {
     val txsCount = version match {
       case GenesisBlockVersion | PlainBlockVersion => Array(txs.size.toByte)
       case NgBlockVersion | RewardBlockVersion     => Ints.toByteArray(txs.size)

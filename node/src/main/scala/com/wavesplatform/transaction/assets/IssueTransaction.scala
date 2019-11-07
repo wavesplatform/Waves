@@ -11,7 +11,7 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -52,8 +52,7 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   )
 }
 object IssueTransaction {
-
-  val typeId: Byte = 3
+  val typeId: TxType = 3.toByte
 
   val MaxDescriptionLength = 1000
   val MaxAssetNameLength   = 16

@@ -20,7 +20,7 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
   def sellMatcherFee: Long
   def fee: Long
   def timestamp: Long
-  def version: Byte
+  def version: TxVersion
 
   override val assetFee: (Asset, Long) = (Waves, fee)
 
@@ -49,7 +49,7 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
 
 object ExchangeTransaction {
 
-  val typeId: Byte = 7
+  val typeId: TxType = 7
 
   def parse(bytes: Array[Byte]): Try[ExchangeTransaction] =
     bytes.headOption

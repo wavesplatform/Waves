@@ -169,7 +169,7 @@ package object state {
       import monix.execution.Scheduler.Implicits.global
 
       blockchain
-        .addressTransactionsObservable(address, Set(CreateAliasTransactionV1, CreateAliasTransactionV2), None)
+        .addressTransactionsObservable(address, Set(CreateAliasTransaction), None)
         .collect {
           case (_, a: CreateAliasTransaction) => a.alias
         }

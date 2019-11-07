@@ -48,7 +48,7 @@ trait BurnTransaction extends ProvenTransaction with VersionedTransaction {
 
 object BurnTransaction {
 
-  val typeId: Byte = 6
+  val typeId: TxType = 6
 
   def validateBurnParams(tx: BurnTransaction): Either[ValidationError, Unit] = {
     validateBurnParams(tx.quantity, tx.fee)

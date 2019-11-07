@@ -28,18 +28,9 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     alice                                                    <- accountGen
     (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    masterToAlice: TransferTransaction = TransferTransaction(
-      1.toByte,
-      Asset.Waves,
-      master,
-      alice,
-      3 * Waves,
-      ts + 1,
-      Asset.Waves,
-      transferAssetWavesFee,
-      Array.emptyByteArray,
-      master
-    ).explicitGet()
+    masterToAlice: TransferTransaction = TransferTransaction
+      .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
+      .explicitGet()
     issue: IssueTransactionV1 = IssueTransactionV1.selfSigned(alice, assetName, description, quantity, decimals, false, Waves, ts + 100).explicitGet()
     burn: BurnTransactionV1   = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
     reissue: ReissueTransactionV1 = ReissueTransactionV1

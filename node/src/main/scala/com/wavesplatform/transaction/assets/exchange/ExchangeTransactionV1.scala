@@ -28,7 +28,7 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
     extends ExchangeTransaction
     with SignedTransaction {
 
-  override def version: Byte           = 1
+  override def version: TxVersion           = 1
   override val builder                 = ExchangeTransactionV1
   override val assetFee: (Asset, Long) = (Waves, fee)
 
@@ -51,7 +51,7 @@ case class ExchangeTransactionV1(buyOrder: OrderV1,
 
 object ExchangeTransactionV1 extends TransactionParserFor[ExchangeTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = ExchangeTransaction.typeId
+  override val typeId: TxType = ExchangeTransaction.typeId
 
   def create(matcher: PrivateKey,
              buyOrder: OrderV1,

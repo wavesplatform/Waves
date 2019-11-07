@@ -7,7 +7,7 @@ import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV1, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 
 class CommonAccountApi(blockchain: Blockchain) {
@@ -70,7 +70,7 @@ class CommonAccountApi(blockchain: Blockchain) {
 
   def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
     blockchain
-      .addressTransactionsObservable(address, Set(LeaseTransactionV1, LeaseTransactionV2))
+      .addressTransactionsObservable(address, Set(LeaseTransaction))
       .collect {
         case (height, leaseTransaction: LeaseTransaction) if blockchain.leaseDetails(leaseTransaction.id()).exists(_.isActive) =>
           (height, leaseTransaction)

@@ -21,14 +21,6 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      getIntegerFromArrayF,
-      getBooleanFromArrayF,
-      getBinaryFromArrayF,
-      getStringFromArrayF,
-      getIntegerByIndexF,
-      getBooleanByIndexF,
-      getBinaryByIndexF,
-      getStringByIndexF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
@@ -67,20 +59,29 @@ object WavesContext {
     )
   }
 
-  private lazy val fromV3Funcs =
-    extractedFuncs ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
-
-  private lazy val dAppBackwardCompatibilityFuncs =
-    Array(writeSetIdentityF, transferSetIdentityF, scriptResultConcatF)
+  private def fromV3Funcs(v: StdLibVersion) =
+    extractedFuncs(v) ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
-    lazy val v4Funcs = fromV3Funcs :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
-    version match {
-      case V1 | V2 =>         Array(txByIdF(proofsEnabled, version))
-      case V3 =>              fromV3Funcs :+ transferTxByIdF(proofsEnabled, version)
-      case V4 if c == DApp => v4Funcs ++ dAppBackwardCompatibilityFuncs
-      case V4 =>              v4Funcs
-    }
+    val commonFuncs =
+      Array(
+        getIntegerFromArrayF(version),
+        getBooleanFromArrayF(version),
+        getBinaryFromArrayF(version),
+        getStringFromArrayF(version),
+        getIntegerByIndexF(version),
+        getBooleanByIndexF(version),
+        getBinaryByIndexF(version),
+        getStringByIndexF(version),
+      )
+    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
+    val versionSpecificFuncs =
+      version match {
+        case V1 | V2 => Array(txByIdF(proofsEnabled, version))
+        case V3      => fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version)
+        case V4      => v4Funcs
+     }
+    commonFuncs ++ versionSpecificFuncs
   }
 
   private def variableVars(

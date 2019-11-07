@@ -1,9 +1,18 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.api.http.DataRequest
-import com.wavesplatform.api.http.alias.CreateAliasV1Request
-import com.wavesplatform.api.http.assets.{BurnV1Request, IssueV1Request, MassTransferRequest, ReissueV1Request, SponsorFeeRequest, TransferRequest}
-import com.wavesplatform.api.http.leasing.{LeaseCancelV1Request, LeaseV1Request, SignedLeaseCancelV1Request, SignedLeaseV1Request}
+import com.wavesplatform.api.http.requests.{
+  BurnV1Request,
+  CreateAliasRequest,
+  DataRequest,
+  IssueV1Request,
+  LeaseCancelV1Request,
+  LeaseRequest,
+  MassTransferRequest,
+  ReissueV1Request,
+  SignedLeaseCancelV1Request,
+  SponsorFeeRequest,
+  TransferRequest
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
@@ -18,8 +27,9 @@ import play.api.libs.json.{Json, Writes}
 class ObsoleteHandlersSuite extends BaseTransactionSuite {
 
   test("alias create") {
-    val json = sender.postJsonWithApiKey("/alias/create", CreateAliasV1Request(firstAddress, "testalias", minFee))
-    val tx   = Json.parse(json.getResponseBody).as[Transaction].id
+    val json =
+      sender.postJsonWithApiKey("/alias/create", CreateAliasRequest("testalias", Some(1.toByte), sender = Some(firstAddress), fee = Some(minFee)))
+    val tx = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }
 
@@ -35,7 +45,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
   test("assets transfer") {
     val json = sender.postJson(
       "/assets/transfer",
-      TransferRequest(Some(1.toByte), None, None, transferAmount, minFee, secondAddress, None, Some(firstAddress), None, None, None, None)
+      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, None, None, None, None)
     )
     val tx = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
@@ -64,8 +74,9 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val (balance1, eff1) = miner.accountBalances(firstAddress)
     val (balance2, eff2) = miner.accountBalances(secondAddress)
 
-    val leaseJson = sender.postJson("/leasing/lease", LeaseV1Request(firstAddress, leasingAmount, minFee, secondAddress))
-    val leaseId   = Json.parse(leaseJson.getResponseBody).as[Transaction].id
+    val leaseJson =
+      sender.postJson("/leasing/lease", LeaseRequest(None, Some(firstAddress), None, secondAddress, leasingAmount, minFee, None, None, None))
+    val leaseId = Json.parse(leaseJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(leaseId)
 
     miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
@@ -120,7 +131,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     )
 
     val r1    = sender.postJsonWithApiKey(s"/transactions/sign/$firstAddress", jsonL)
-    val lease = Json.parse(r1.getResponseBody).as[SignedLeaseV1Request]
+    val lease = Json.parse(r1.getResponseBody).as[LeaseRequest]
 
     val leaseIdJson = sender.postJson("/leasing/broadcast/lease", lease)
     val leaseId     = Json.parse(leaseIdJson.getResponseBody).as[Transaction].id

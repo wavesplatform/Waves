@@ -81,7 +81,7 @@ object TestBlock {
       defaultSigner,
       Block(
         BlockHeader(
-          1,
+          1.toByte,
           0,
           ref,
           2L,
@@ -100,7 +100,7 @@ object TestBlock {
       defaultSigner,
       Block(
         BlockHeader(
-          3,
+          3.toByte,
           0,
           ref,
           2L,

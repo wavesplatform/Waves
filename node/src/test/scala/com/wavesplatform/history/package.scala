@@ -9,7 +9,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
@@ -54,7 +54,7 @@ package object history {
       refTo: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       timestamp: Long,
       bTarget: Long = DefaultBaseTarget
   ): Block =
@@ -77,7 +77,7 @@ package object history {
       prevTotal: Block,
       txs: Seq[Transaction],
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       ts: Long
   ): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
@@ -126,7 +126,7 @@ package object history {
       base: Seq[Transaction],
       micros: Seq[Seq[Transaction]],
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       timestamp: Long
   ): (Block, Seq[MicroBlock]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)

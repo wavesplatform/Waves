@@ -41,59 +41,19 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(
-        1.toByte,
-        Waves,
-        master,
-        alice,
-        feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
-        ts + 1,
-        Waves,
-        transferAssetWavesFee,
-        Array.emptyByteArray
-      )
+      .selfSigned(1.toByte, master, alice, Waves, feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
       .right
       .get
     aliceToBob: TransferTransaction = TransferTransaction
-      .selfSigned(
-        1.toByte,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        alice,
-        bob,
-        feeAsset.quantity / 2,
-        ts + 2,
-        Waves,
-        transferAssetWavesFee,
-        Array.emptyByteArray
-      )
+      .selfSigned(1.toByte, alice, bob, Asset.fromCompatId(Some(feeAsset.id())), feeAsset.quantity / 2, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 2)
       .right
       .get
     bobToMaster: TransferTransaction = TransferTransaction
-      .selfSigned(
-        1.toByte,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        bob,
-        master,
-        amtTx,
-        ts + 3,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
-        Array.emptyByteArray
-      )
+      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 3)
       .right
       .get
     bobToMaster2: TransferTransaction = TransferTransaction
-      .selfSigned(
-        1.toByte,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        bob,
-        master,
-        amtTx,
-        ts + 4,
-        Asset.fromCompatId(Some(feeAsset.id())),
-        sponsorTx.minSponsoredAssetFee.get,
-        Array.emptyByteArray
-      )
+      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 4)
       .right
       .get
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToBob, bobToMaster, bobToMaster2)
