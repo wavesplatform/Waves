@@ -197,10 +197,11 @@ object InvokeScriptTransactionDiff {
 
           compositeDiff <- foldActions(blockchain, tx, dAppAddress)(actions, dataAndPaymentDiff)
         } yield {
-          val transfers = compositeDiff.portfolios
+          val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
-          val dataAndPaymentDiffTx              = dataAndPaymentDiff.transactions(tx.id())
-          val dataAndPaymentDiffTxWithTransfers = dataAndPaymentDiffTx.copy(_2 = dataAndPaymentDiffTx._2 ++ transfers.keys)
+          val currentTxDiff         = compositeDiff.transactions(tx.id())
+          val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys)
+          val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
           val isr = InvokeScriptResult(
             data = dataEntries,
@@ -213,7 +214,7 @@ object InvokeScriptTransactionDiff {
           )
 
           compositeDiff.copy(
-            transactions = dataAndPaymentDiff.transactions.updated(tx.id(), dataAndPaymentDiffTxWithTransfers),
+            transactions = updatedTxDiff,
             scriptsRun = scriptsInvoked + 1,
             scriptResults = Map(tx.id() -> isr),
             scriptsComplexity = invocationComplexity + verifierComplexity.getOrElse(0L) + assetsComplexity.sum
