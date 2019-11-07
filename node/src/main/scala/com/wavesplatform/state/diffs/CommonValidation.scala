@@ -139,9 +139,8 @@ object CommonValidation {
           }
         }
 
-      case _: LeaseCancelTransaction => Right(tx)
-      case _: MassTransferTransaction  => activationBarrier(BlockchainFeatures.MassTransfer)
-      case _: DataTransaction          => activationBarrier(BlockchainFeatures.DataTransaction)
+      case _: MassTransferTransaction => activationBarrier(BlockchainFeatures.MassTransfer)
+      case _: DataTransaction         => activationBarrier(BlockchainFeatures.DataTransaction)
 
       case sst: SetScriptTransaction =>
         sst.script match {
@@ -163,15 +162,15 @@ object CommonValidation {
           }
         }
 
-      case t: TransferTransaction      => generic1or2Barrier(t, "transfer")
-      case t: CreateAliasTransaction   => generic1or2Barrier(t, "create alias")
-      case t: LeaseTransaction         => generic1or2Barrier(t, "lease")
-      case _: ReissueTransactionV2     => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: BurnTransactionV2        => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: LeaseCancelTransaction => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: SponsorFeeTransaction    => activationBarrier(BlockchainFeatures.FeeSponsorship)
-      case _: InvokeScriptTransaction  => activationBarrier(BlockchainFeatures.Ride4DApps)
-      case _                           => Left(GenericError("Unknown transaction must be explicitly activated"))
+      case t: TransferTransaction     => generic1or2Barrier(t, "transfer")
+      case t: CreateAliasTransaction  => generic1or2Barrier(t, "create alias")
+      case t: LeaseTransaction        => generic1or2Barrier(t, "lease")
+      case t: LeaseCancelTransaction  => generic1or2Barrier(t, "lease cancel")
+      case _: ReissueTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: BurnTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
+      case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
+      case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 

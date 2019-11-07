@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -74,7 +73,7 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val unsignedCancelLeasing =
       LeaseCancelTransaction
         .create(
-          chainId = AddressScheme.current.chainId,
+          version = 2.toByte,
           sender = acc0,
           leaseId = ByteStr.decodeBase58(leasingId).get,
           fee = minFee + 0.2.waves,

@@ -437,7 +437,7 @@ object SyncHttpApi extends Assertions {
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long, waitForTx: Boolean = false): Transaction = {
       val tx = LeaseCancelTransaction
         .selfSigned(
-          chainId = AddressScheme.current.chainId,
+          version = TxVersion.V2,
           sender = source,
           leaseId = ByteStr.decodeBase58(leaseId).get,
           fee = fee,

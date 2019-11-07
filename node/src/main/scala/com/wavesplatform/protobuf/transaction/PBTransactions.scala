@@ -190,11 +190,7 @@ object PBTransactions {
         } yield tx
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
-        version match {
-          case 1 => vt.lease.LeaseCancelTransaction.create(1.toByte, leaseId.byteStr, feeAmount, timestamp, signature)
-          case 2 => vt.lease.LeaseCancelTransaction.create(2.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
         version match {
