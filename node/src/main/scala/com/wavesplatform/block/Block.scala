@@ -1,17 +1,13 @@
 package com.wavesplatform.block
 
-import java.nio.ByteBuffer
-
 import cats.Monoid
-import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -33,36 +29,7 @@ case class BlockHeader(
     featureVotes: Set[Short],
     rewardVote: Long
 ) {
-  private[block] val json: Coeval[JsObject] = Coeval.evalOnce {
-
-    val consensusJson =
-      Json.obj(
-        "nxt-consensus" -> Json.obj(
-          "base-target"          -> baseTarget,
-          "generation-signature" -> generationSignature.toString
-        )
-      )
-
-    val featuresJson =
-      if (version < Block.NgBlockVersion) JsObject.empty else Json.obj("features" -> JsArray(featureVotes.map(id => JsNumber(id.toInt)).toSeq))
-
-    val rewardJson =
-      if (version < Block.RewardBlockVersion) JsObject.empty else Json.obj("desiredReward" -> JsNumber(rewardVote))
-
-    val generatorJson =
-      Json.obj("generator" -> generator.stringRepr, "generatorPublicKey" -> generator.toString)
-
-    Json.obj(
-      "version"   -> version,
-      "timestamp" -> timestamp,
-      "reference" -> reference.toString
-    ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson
-  }
-}
-
-object BlockHeader {
-  def json(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
-    header.json() ++ Json.obj("signature" -> signature.toString, "blocksize" -> blockSize, "transactionCount" -> transactionCount)
+  private[block] val json: Coeval[JsObject] = Coeval.evalOnce(BlockHeaderSerializer.toJson(this))
 }
 
 case class Block private[block] (
@@ -75,45 +42,8 @@ case class Block private[block] (
   val uniqueId: ByteStr = signature
   val sender: PublicKey = header.generator
 
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    if (header.version < ProtoBlockVersion) {
-      val consensusBytes        = writeConsensusBytes(header.baseTarget, header.generationSignature)
-      val transactionsDataBytes = writeTransactionData(header.version, transactionData)
-
-      val featureVotesBytes = header.version match {
-        case v if v < NgBlockVersion => Array.empty[Byte]
-        case _ =>
-          val featuresBuf = ByteBuffer.allocate(Ints.BYTES + header.featureVotes.size * Shorts.BYTES)
-          featuresBuf.putInt(header.featureVotes.size).asShortBuffer().put(header.featureVotes.toArray)
-          featuresBuf.array
-      }
-
-      val rewardVoteBytes = header.version match {
-        case v if v < RewardBlockVersion => Array.empty[Byte]
-        case _                           => Longs.toByteArray(header.rewardVote)
-      }
-
-      Bytes.concat(
-        Array(header.version),
-        Longs.toByteArray(header.timestamp),
-        Bytes.ensureCapacity(header.reference.arr, SignatureLength, 0),
-        Ints.toByteArray(consensusBytes.length),
-        consensusBytes,
-        Ints.toByteArray(transactionsDataBytes.length),
-        transactionsDataBytes,
-        featureVotesBytes,
-        rewardVoteBytes,
-        header.generator.arr,
-        Bytes.ensureCapacity(signature.arr, SignatureLength, 0)
-      )
-    } else PBBlocks.protobuf(this).toByteArray
-  }
-
-  val json: Coeval[JsObject] = Coeval.evalOnce {
-    BlockHeader.json(header, bytes().length, transactionData.length, signature) ++
-      Json.obj("fee"          -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
-      Json.obj("transactions" -> JsArray(transactionData.map(_.json())))
-  }
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(BlockSerializer.toBytes(this))
+  val json: Coeval[JsObject]     = Coeval.evalOnce(BlockSerializer.toJson(this))
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
 
@@ -185,31 +115,9 @@ object Block extends ScorexLogging {
       .map(unsigned => unsigned.copy(signature = crypto.sign(signer, unsigned.bytesToSign())))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
-    Try {
-      val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
-
-      val version   = buf.get
-      val timestamp = buf.getLong
-      val reference = ByteStr(buf.getByteArray(SignatureLength))
-
-      val consensusBytesLength = buf.getInt
-      val baseTarget           = Longs.fromByteArray(buf.getByteArray(Block.BaseTargetLength))
-      val generationSignature  = ByteStr(buf.getByteArray(consensusBytesLength - Longs.BYTES))
-
-      buf.getInt
-
-      val transactionData = readTransactionData(version, buf)
-
-      val featureVotes = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSet else Set.empty[Short]
-      val rewardVote   = if (version > Block.NgBlockVersion) buf.getLong else -1L
-
-      val generator = buf.getPublicKey
-      val signature = ByteStr(buf.getByteArray(SignatureLength))
-
-      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote)
-
-      Block(header, signature, transactionData)
-    }.flatMap(validate(_).asTry)
+    BlockSerializer
+      .parseBytes(bytes)
+      .flatMap(validate(_).asTry)
       .recoverWith {
         case t: Throwable =>
           log.error("Error when parsing block", t)
@@ -217,57 +125,42 @@ object Block extends ScorexLogging {
       }
 
   def genesis(genesisSettings: GenesisSettings): Either[ValidationError, Block] = {
-    import com.wavesplatform.common.utils.EitherExt2
-    import genesisSettings.initialBalance
+    import cats.instances.either._
+    import cats.instances.list._
+    import cats.syntax.traverse._
 
-    val genesisSigner = KeyPair(ByteStr.empty)
-
-    val transactionGenesisData = genesisSettings.transactions.map { ts =>
-      val acc = Address.fromString(ts.recipient).explicitGet()
-      GenesisTransaction.create(acc, ts.amount, genesisSettings.timestamp).explicitGet()
-    }
-
-    val consensusGenesisData = NxtLikeConsensusBlockData(genesisSettings.initialBaseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte)))
-    val txBytes              = writeTransactionData(GenesisBlockVersion, transactionGenesisData)
-    val cBytes               = writeConsensusBytes(consensusGenesisData.baseTarget, consensusGenesisData.generationSignature)
-
-    val reference = Array.fill(SignatureLength)(-1: Byte)
-
-    val timestamp = genesisSettings.blockTimestamp
-    val toSign: Array[Byte] =
-      Bytes.concat(
-        Array(GenesisBlockVersion),
-        Longs.toByteArray(timestamp),
-        reference,
-        Ints.toByteArray(cBytes.length),
-        cBytes,
-        Ints.toByteArray(txBytes.length),
-        txBytes,
-        genesisSigner.publicKey.arr
-      )
-
-    val signature = genesisSettings.signature.fold(crypto.sign(genesisSigner, ByteStr(toSign)))(_.arr)
+    // format: off
+    def validateGenesis(block: Block): Either[ValidationError, Block] =
+      for {
+        // Common validation
+        _ <- validate(block)
+        // Verify signature
+        _ <- Either.cond(crypto.verify(block.signature, block.bytesToSign(), block.header.generator), (), GenericError("Passed genesis signature is not valid"))
+        // Verify initial balance
+        txsSum = block.transactionData.collect { case tx: GenesisTransaction => tx.amount }.reduce(Math.addExact(_: Long, _: Long))
+        _ <- Either.cond(txsSum == genesisSettings.initialBalance, (), GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $txsSum"))
+      } yield block
+    // format: on
 
     for {
-      // Verify signature
-      _ <- Either.cond(crypto.verify(signature, ByteStr(toSign), genesisSigner.publicKey), (), GenericError("Passed genesis signature is not valid"))
-      // Verify initial balance
-      txsSum = transactionGenesisData.map(_.amount).reduce(Math.addExact(_: Long, _: Long))
-      _ <- Either.cond(txsSum == initialBalance, (), GenericError(s"Initial balance $initialBalance did not match the distributions sum $txsSum"))
-    } yield Block(
-      BlockHeader(
-        GenesisBlockVersion,
-        timestamp,
-        reference,
-        consensusGenesisData.baseTarget,
-        consensusGenesisData.generationSignature,
-        genesisSigner,
-        Set.empty,
-        -1L
-      ),
-      signature,
-      transactionGenesisData
-    )
+      txs <- genesisSettings.transactions.toList.map { gts =>
+        for {
+          address <- Address.fromString(gts.recipient)
+          tx      <- GenesisTransaction.create(address, gts.amount, genesisSettings.timestamp)
+        } yield tx
+      }.sequence
+      generator  = KeyPair(ByteStr.empty)
+      baseTarget = genesisSettings.initialBaseTarget
+      genSig     = ByteStr(Array.fill(crypto.DigestSize)(0: Byte))
+      reference  = Array.fill(SignatureLength)(-1: Byte)
+      timestamp  = genesisSettings.blockTimestamp
+      block <- build(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, txs, generator, ByteStr.empty, Set(), -1L)
+      signedBlock = genesisSettings.signature match {
+        case None             => block.copy(signature = crypto.sign(generator, ByteStr(block.bytesToSign())))
+        case Some(predefined) => block.copy(signature = predefined)
+      }
+      validBlock <- validateGenesis(signedBlock)
+    } yield validBlock
   }
 
   // format: off
@@ -281,12 +174,6 @@ object Block extends ScorexLogging {
       _ <- Either.cond(b.header.featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
     } yield b).left.map(GenericError(_))
   // format: on
-
-  private def writeConsensusBytes(baseTarget: Long, generationSignature: ByteStr): Array[Byte] =
-    Bytes.concat(
-      Longs.toByteArray(baseTarget),
-      generationSignature.arr
-    )
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend

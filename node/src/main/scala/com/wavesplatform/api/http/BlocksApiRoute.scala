@@ -4,7 +4,7 @@ import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
@@ -148,7 +148,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     (if (includeTransactions) {
        commonApi.blockAtHeight(height).map(_.json())
      } else {
-       commonApi.blockHeaderAtHeight(height).map { case (bh, s, tc, sig) => BlockHeader.json(bh, s, tc, sig) }
+       commonApi.blockHeaderAtHeight(height).map { case (bh, s, tc, sig) => BlockHeaderSerializer.toJson(bh, s, tc, sig) }
      }) match {
       case Some(json) => complete(json.addBlockFields(height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -189,7 +189,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
         commonApi
           .blockHeadersRange(start, end)
           .map { case (bh, size, transactionCount, signature, height) =>
-            BlockHeader.json(bh, size, transactionCount, signature).addBlockFields(height)
+            BlockHeaderSerializer.toJson(bh, size, transactionCount, signature).addBlockFields(height)
           }
       }
 
@@ -213,7 +213,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       (if (includeTransactions) {
          commonApi.lastBlock().map(_.json())
        } else {
-         commonApi.lastBlock().map(block => BlockHeader.json(block.header, block.bytes().length, block.transactionData.size, block.signature))
+         commonApi.lastBlock().map(block => BlockHeaderSerializer.toJson(block.header, block.bytes().length, block.transactionData.size, block.signature))
        }).map(_.addBlockFields(height))
     }
   }

@@ -73,7 +73,7 @@ object TransferTxSerializer {
     if (bytes(0) == 0) {
       require(bytes(1) == TransferTransaction.typeId, "transaction type mismatch")
       val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
-      val tx     = parseCommonPart(2, buf)
+      val tx     = parseCommonPart(2.toByte, buf)
       val proofs = buf.getProofs
       tx.copy(proofs = proofs)
     } else {
@@ -81,7 +81,7 @@ object TransferTxSerializer {
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
       val signature = buf.getSignature
       require(buf.get == TransferTransaction.typeId, "transaction type mismatch")
-      parseCommonPart(1, buf).copy(proofs = Proofs(signature))
+      parseCommonPart(1.toByte, buf).copy(proofs = Proofs(signature))
     }
   }
 }

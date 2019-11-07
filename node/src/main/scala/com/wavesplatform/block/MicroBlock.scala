@@ -1,16 +1,13 @@
 package com.wavesplatform.block
 
-import java.nio.ByteBuffer
-
-import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.serialization.MicroBlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
-import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
@@ -28,22 +25,11 @@ case class MicroBlock(
     signature: ByteStr
 ) extends Signed {
 
-  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
-    val transactionDataBytes = writeTransactionData(version, transactionData)
-    Bytes.concat(
-      Array(version),
-      prevResBlockSig.arr,
-      totalResBlockSig.arr,
-      Ints.toByteArray(transactionDataBytes.length),
-      transactionDataBytes,
-      sender.arr,
-      signature.arr
-    )
-  }
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
 
-  private val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
+  private val bytesToSign: Coeval[Array[Byte]] = Coeval.evalOnce(bytes().dropRight(SignatureLength))
 
-  override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature.arr, bytesWithoutSignature(), sender))
+  override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature.arr, bytesToSign(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String = s"MicroBlock(${totalResBlockSig.trim} -> ${prevResBlockSig.trim}, txs=${transactionData.size})"
@@ -62,7 +48,7 @@ object MicroBlock extends ScorexLogging {
       _         <- Either.cond(prevResBlockSig.arr.length == SignatureLength, (), GenericError(s"Incorrect prevResBlockSig: ${prevResBlockSig.arr.length}"))
       _         <- Either.cond(totalResBlockSig.arr.length == SignatureLength, (), GenericError(s"Incorrect totalResBlockSig: ${totalResBlockSig.arr.length}"))
       _         <- Either.cond(generator.publicKey.length == KeyLength, (), GenericError(s"Incorrect generator.publicKey: ${generator.publicKey.length}"))
-      nonSigned <- validate(MicroBlock(version = 3: Byte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty))
+      nonSigned <- validate(MicroBlock(version = 3.toByte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty))
     } yield {
       val toSign    = nonSigned.bytes
       val signature = crypto.sign(generator, toSign())
@@ -71,23 +57,9 @@ object MicroBlock extends ScorexLogging {
     // format: on
 
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =
-    Try {
-      val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
-
-      val version = buf.get
-
-      val prevResBlockSig  = ByteStr(buf.getByteArray(SignatureLength))
-      val totalResBlockSig = ByteStr(buf.getByteArray(SignatureLength))
-
-      buf.getInt
-
-      val transactionData = readTransactionData(version, buf)
-
-      val generator = buf.getPublicKey
-      val signature = ByteStr(buf.getByteArray(SignatureLength))
-
-      MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature)
-    }.flatMap(validate(_).asTry)
+    MicroBlockSerializer
+      .parseBytes(bytes)
+      .flatMap(validate(_).asTry)
       .recoverWith {
         case t: Throwable =>
           log.error("Error when parsing microblock", t)
