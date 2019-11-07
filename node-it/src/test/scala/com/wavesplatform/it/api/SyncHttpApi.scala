@@ -10,7 +10,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, TransactionsApiGrpc}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, DataRequest, TransactionsApiGrpc}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -19,9 +19,10 @@ import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
+import com.wavesplatform.it.api.SyncHttpApi.sync
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.{DataTransactionData, PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
@@ -681,6 +682,15 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).grpc.broadcastReissue(source, fee, assetId, amount, reissuable, version)), waitForTx)
     }
 
+    def putData(source: KeyPair,
+                data: Seq[DataTransactionData.DataEntry],
+                fee: Long,
+                version: Int = 1,
+                timestamp: Long = System.currentTimeMillis(),
+                waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.putData(source, data, fee, version, timestamp)), waitForTx)
+    }
+
     def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
       val pbAssetIds = assetIds.map(a => ByteString.copyFrom(Base58.decode(a)))
       val balances = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
@@ -706,6 +716,14 @@ object SyncHttpApi extends Assertions {
     def height: Int = sync(async(n).grpc.height)
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
+
+    def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
+    }
+
+    def getData(address: ByteString): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest(address)).toList.map(res => res.getEntry)
+    }
   }
 
 }
