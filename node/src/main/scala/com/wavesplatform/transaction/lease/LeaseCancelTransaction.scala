@@ -39,7 +39,7 @@ final case class LeaseCancelTransaction(
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTransaction.serializer.toJson(this))
-  override def chainByte: Option[TxType]           = Some(AddressScheme.current.chainId)
+  override def chainByte: Option[TxType]           = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
 object LeaseCancelTransaction extends TransactionParserLite {

@@ -52,7 +52,9 @@ object LeaseCancelTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseCancelTransaction.typeId, "transaction type mismatch")
-      val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      require(bytes(2) == TxVersion.V2, "transaction version mismatch")
+      require(bytes(3) == AddressScheme.current.chainId, "transaction chainId mismatch")
+      val buf    = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
       val tx     = parseCommonPart(TxVersion.V2, buf)
       val proofs = buf.getProofs
       tx.copy(proofs = proofs)
