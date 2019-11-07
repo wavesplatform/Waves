@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -49,21 +49,19 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 }
 
 object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with TransactionParser.HardcodedVersion1 {
-  private val BaseLength = Longs.BYTES + Address.AddressLength + Longs.BYTES
+  private val BaseLength = Address.AddressLength + Longs.BYTES * 2
 
   override val typeId: TxType = 1
 
   def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
-
-    val typeBytes      = Array(typeId)
+    val typeBytes      = Ints.toByteArray(typeId) // ???
     val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes    = Longs.toByteArray(amount)
     val amountFill     = new Array[Byte](Longs.BYTES - amountBytes.length)
 
-    val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
-
-    val h = crypto.fastHash(data)
-    Bytes.concat(h, h)
+    val payload = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
+    val hash    = crypto.fastHash(payload)
+    Bytes.concat(hash, hash)
   }
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {

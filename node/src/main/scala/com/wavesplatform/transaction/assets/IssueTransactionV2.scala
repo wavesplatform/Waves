@@ -131,8 +131,8 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyBytes(tailIndex(2), "Sender's public key"),
-      BytesArrayUndefinedLength(tailIndex(3), "Name", TxConstraints.MaxAssetNameLength, TxConstraints.MinAssetNameLength),
-      BytesArrayUndefinedLength(tailIndex(4), "Description", TxConstraints.MaxAssetDescriptionLength),
+      BytesArrayUndefinedLength(tailIndex(3), "Name", IssueTransaction.MaxAssetNameLength, IssueTransaction.MinAssetNameLength),
+      BytesArrayUndefinedLength(tailIndex(4), "Description", IssueTransaction.MaxAssetDescriptionLength),
       LongBytes(tailIndex(5), "Quantity"),
       OneByte(tailIndex(6), "Decimals"),
       BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)"),
