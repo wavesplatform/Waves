@@ -736,6 +736,14 @@ object SyncHttpApi extends Assertions {
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
 
+    def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
+    }
+
+    def getData(address: ByteString): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest(address)).toList.map(res => res.getEntry)
+    }
+
     def setScript(sender: KeyPair,
                   script: Option[String],
                   fee: Long,
@@ -759,14 +767,6 @@ object SyncHttpApi extends Assertions {
                             version: Int = 1,
                             waitForTx: Boolean = false): PBSignedTransaction = {
       maybeWaitForTransaction(sync(async(n).grpc.broadcastSponsorFee(sender, minFee, fee, version)), waitForTx)
-    }
-
-    def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
-      accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
-    }
-
-    def getData(address: ByteString): List[DataTransactionData.DataEntry] = {
-      accounts.getDataEntries(DataRequest(address)).toList.map(res => res.getEntry)
     }
   }
 }
