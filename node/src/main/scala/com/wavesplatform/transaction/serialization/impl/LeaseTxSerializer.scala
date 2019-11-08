@@ -16,9 +16,7 @@ object LeaseTxSerializer {
     ProvenTxJson.toJson(tx) ++ Json.obj(
       "version"   -> version,
       "amount"    -> amount,
-      "recipient" -> recipient.stringRepr,
-      "fee"       -> fee,
-      "timestamp" -> timestamp
+      "recipient" -> recipient.stringRepr
     )
   }
 

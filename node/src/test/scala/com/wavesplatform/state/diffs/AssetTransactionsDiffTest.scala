@@ -129,7 +129,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
       assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
@@ -158,7 +158,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
       assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
@@ -185,7 +185,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
       assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)

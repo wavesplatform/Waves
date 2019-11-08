@@ -8,7 +8,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TransactionParsers._
 import com.wavesplatform.transaction.description.{AddressBytes, ByteEntity, LongBytes}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -37,12 +36,12 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
     val typeBytes      = Array(builder.typeId)
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
-    val amountBytes    = Bytes.ensureCapacity(Longs.toByteArray(amount), AmountLength, 0)
+    val timestampBytes = Longs.toByteArray(timestamp)
+    val amountBytes    = Longs.toByteArray(amount)
     val rcpBytes       = recipient.bytes.arr
     require(rcpBytes.length == Address.AddressLength)
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
-    require(res.length == TypeLength + BASE_LENGTH)
+    require(res.length == BaseLength + 1)
     res
   }
 
@@ -50,29 +49,25 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 }
 
 object GenesisTransaction extends TransactionParserFor[GenesisTransaction] with TransactionParser.HardcodedVersion1 {
+  private val BaseLength = Address.AddressLength + Longs.BYTES * 2
 
   override val typeId: TxType = 1
 
-  private val RECIPIENT_LENGTH = Address.AddressLength
-  private val BASE_LENGTH      = TimestampLength + RECIPIENT_LENGTH + AmountLength
-
   def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
-
-    val typeBytes      = Bytes.ensureCapacity(Ints.toByteArray(typeId), TypeLength, 0)
-    val timestampBytes = Bytes.ensureCapacity(Longs.toByteArray(timestamp), TimestampLength, 0)
+    val typeBytes      = Ints.toByteArray(typeId) // ???
+    val timestampBytes = Longs.toByteArray(timestamp)
     val amountBytes    = Longs.toByteArray(amount)
-    val amountFill     = new Array[Byte](AmountLength - amountBytes.length)
+    val amountFill     = new Array[Byte](Longs.BYTES - amountBytes.length)
 
-    val data = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
-
-    val h = crypto.fastHash(data)
-    Bytes.concat(h, h)
+    val payload = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
+    val hash    = crypto.fastHash(payload)
+    Bytes.concat(hash, hash)
   }
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     Try {
 
-      require(bytes.length >= BASE_LENGTH, "Data does not match base length")
+      require(bytes.length >= BaseLength, "Data does not match base length")
 
       byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
         Either
