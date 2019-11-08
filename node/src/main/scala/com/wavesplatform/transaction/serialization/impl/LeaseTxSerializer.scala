@@ -13,8 +13,7 @@ import scala.util.Try
 object LeaseTxSerializer {
   def toJson(tx: LeaseTransaction): JsObject = {
     import tx._
-    ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version"   -> version,
+    BaseTxJson.toJson(tx) ++ Json.obj(
       "amount"    -> amount,
       "recipient" -> recipient.stringRepr
     )
@@ -33,7 +32,7 @@ object LeaseTxSerializer {
   def toBytes(tx: LeaseTransaction): Array[Byte] = {
     import tx._
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx))
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
@@ -52,17 +51,13 @@ object LeaseTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseTransaction.typeId, "transaction type mismatch")
-      val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
       require(buf.getAsset == Waves, "Leasing assets is not supported yet")
-      val tx     = parseCommonPart(TxVersion.V2, buf)
-      val proofs = buf.getProofs
-      tx.copy(proofs = proofs)
+      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {
       require(bytes(0) == LeaseTransaction.typeId, "transaction type mismatch")
-      val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-      val signature = buf.getSignature
-      require(buf.get == LeaseTransaction.typeId, "transaction type mismatch")
-      parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(signature))
+      val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
+      parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(buf.getSignature))
     }
   }
 }
