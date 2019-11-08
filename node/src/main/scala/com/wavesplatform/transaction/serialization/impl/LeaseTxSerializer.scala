@@ -54,17 +54,13 @@ object LeaseTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseTransaction.typeId, "transaction type mismatch")
-      val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
       require(buf.getAsset == Waves, "Leasing assets is not supported yet")
-      val tx     = parseCommonPart(TxVersion.V2, buf)
-      val proofs = buf.getProofs
-      tx.copy(proofs = proofs)
+      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {
       require(bytes(0) == LeaseTransaction.typeId, "transaction type mismatch")
-      val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-      val signature = buf.getSignature
-      require(buf.get == LeaseTransaction.typeId, "transaction type mismatch")
-      parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(signature))
+      val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
+      parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(buf.getSignature))
     }
   }
 }
