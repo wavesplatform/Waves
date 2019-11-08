@@ -40,14 +40,18 @@ package object state {
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
       blockchain.heightOf(block.reference).map(_ - (back - 1).max(0)).flatMap(h => blockchain.blockHeaderAndSize(h).map(_._1))
-    def lastBlockHeader: Option[BlockHeader] = blockchain.blockHeaderAndSize(blockchain.height).map(_._1)
-    def lastBlockHeaderAndSize: Option[(BlockHeader, Int, Int, ByteStr)] = blockchain.blockHeaderAndSize(blockchain.height)
 
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
-    def lastBlockId: Option[ByteStr]     = blockchain.blockHeaderAndSize(blockchain.height).map(_._4)
-    def lastBlockTimestamp: Option[Long] = blockchain.lastBlockHeader.map(_.timestamp)
+    def blockHeader(atHeight: Int): Option[BlockHeader] = blockchain.blockHeaderAndSize(atHeight).map(_._1)
+    def blockId(atHeight: Int): Option[ByteStr]         = blockchain.blockHeaderAndSize(atHeight).map(_._4)
+
+    def lastBlockHeaderAndSize: Option[(BlockHeader, Int, Int, ByteStr)] = blockchain.blockHeaderAndSize(blockchain.height)
+    def lastBlockId: Option[ByteStr]                                     = lastBlockHeaderAndSize.map(_._4)
+    def lastBlockHeader: Option[BlockHeader]                             = lastBlockHeaderAndSize.map(_._1)
+    def lastBlockTimestamp: Option[Long]                                 = lastBlockHeader.map(_.timestamp)
+    def lastBlockIds(howMany: Int): Seq[ByteStr]                         = (blockchain.height to blockchain.height - howMany by -1).flatMap(blockId)
 
     def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
       aoa match {
@@ -74,8 +78,6 @@ package object state {
       val balances = blockchain.balanceSnapshots(address, bottomLimit, signature)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
-
-    def blockHeader(atHeight: Int): Option[BlockHeader] = blockchain.blockHeaderAndSize(atHeight).map(_._1)
 
     def unsafeHeightOf(id: ByteStr): Int =
       blockchain

@@ -9,7 +9,7 @@ import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
-import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, InvalidSignature}
+import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
 import io.netty.channel.Channel
@@ -21,12 +21,14 @@ import monix.execution.Scheduler
 import scala.util.Right
 
 object BlockAppender extends ScorexLogging {
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
-            time: Time,
-            utxStorage: UtxPoolImpl,
-            pos: PoSSelector,
-            scheduler: Scheduler,
-            verify: Boolean = true)(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
+  def apply(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      time: Time,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      scheduler: Scheduler,
+      verify: Boolean = true
+  )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       metrics.blockProcessingTimeStats.measureSuccessful {
         if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
@@ -38,19 +40,23 @@ object BlockAppender extends ScorexLogging {
       }
     }.executeOn(scheduler)
 
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain,
-            time: Time,
-            utxStorage: UtxPoolImpl,
-            pos: PoSSelector,
-            allChannels: ChannelGroup,
-            peerDatabase: PeerDatabase,
-            miner: Miner,
-            scheduler: Scheduler)(ch: Channel, newBlock: Block): Task[Unit] = {
+  def apply(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      time: Time,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      allChannels: ChannelGroup,
+      peerDatabase: PeerDatabase,
+      miner: Miner,
+      scheduler: Scheduler
+  )(ch: Channel, newBlock: Block): Task[Unit] = {
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
     metrics.blockReceivingLag.safeRecord(System.currentTimeMillis() - newBlock.header.timestamp)
 
     (for {
-      _                <- EitherT(Task(metrics.blockSignaturesValidation.measureSuccessful(newBlock.signaturesValid())))
+      _ <- EitherT(Task(metrics.blockSignaturesValidation.measureSuccessful {
+        Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))
+      }))
       validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
     } yield validApplication).value.map {
       case Right(None) => // block already appended

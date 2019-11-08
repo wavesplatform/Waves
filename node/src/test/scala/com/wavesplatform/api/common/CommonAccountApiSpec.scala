@@ -60,5 +60,6 @@ class CommonAccountApiSpec extends FreeSpec with Matchers {
       "(a|b)c"
     )
 
+    fail("not implemented")
   }
 }

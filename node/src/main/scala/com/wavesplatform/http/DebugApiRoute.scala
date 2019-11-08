@@ -11,11 +11,8 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
@@ -48,7 +45,6 @@ case class DebugApiRoute(
     time: Time,
     blockchain: Blockchain with NG,
     wallet: Wallet,
-    lastBlocks: Int => Seq[Block],
     invokeScriptResult: TransactionId => Either[ValidationError, InvokeScriptResult],
     portfolio: Address => Portfolio,
     wavesDistribution: Int => Map[Address, Long],
@@ -76,16 +72,7 @@ case class DebugApiRoute(
   override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ withAuth {
-      blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
-    }
-  }
-
-  def blocks: Route = {
-    (path("blocks" / IntNumber) & get) { howMany =>
-      complete(JsArray(lastBlocks(howMany).map { block =>
-        val bytes = block.bytes()
-        Json.obj(bytes.length.toString -> Base58.encode(crypto.fastHash(bytes)))
-      }))
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
     }
   }
 
@@ -145,8 +132,8 @@ case class DebugApiRoute(
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val base      = portfolio(address)
-          val p = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
+          val base = portfolio(address)
+          val p    = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
           complete(Json.toJson(p))
       }
     }
@@ -377,10 +364,10 @@ case class DebugApiRoute(
   )
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-        val t0 = System.nanoTime
-        val tracedDiff = for {
-          tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-          _  <- Verifier(blockchain)(tx)
+      val t0 = System.nanoTime
+      val tracedDiff = for {
+        tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
+        _  <- Verifier(blockchain)(tx)
         ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield ei
       val timeSpent = (System.nanoTime - t0) * 1e-6

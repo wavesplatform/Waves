@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http
 
 import java.nio.charset.StandardCharsets
-import java.util.regex.Pattern
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
@@ -27,7 +26,6 @@ import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.util.matching.Regex
 import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")

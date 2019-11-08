@@ -73,6 +73,10 @@ class BlockchainUpdaterImpl(
 
   publishLastBlockInfo()
 
+  def liquidBlock(id: ByteStr): Option[Block] = readLock {
+    ngState.flatMap(_.totalDiffOf(id).map(_._1))
+  }
+
   @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
 
@@ -251,7 +255,7 @@ class BlockchainUpdaterImpl(
                 metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.header.reference)) match {
                   case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                   case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
-                    if (!verify || referencedForgedBlock.signaturesValid().isRight) {
+                    if (!verify || referencedForgedBlock.signatureValid()) {
                       val height = blockchain.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                       if (discarded.nonEmpty) {

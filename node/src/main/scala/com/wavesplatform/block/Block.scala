@@ -68,7 +68,7 @@ case class Block private[block] (
     header: BlockHeader,
     signature: ByteStr,
     transactionData: Seq[Transaction]
-) extends Signed {
+) {
   import Block._
 
   val uniqueId: ByteStr = signature
@@ -131,12 +131,10 @@ case class Block private[block] (
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
     !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytes().dropRight(SignatureLength), publicKey)
   }
-
-  protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String =
     s"Block($signature -> ${header.reference.trim}, " +

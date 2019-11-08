@@ -103,8 +103,7 @@ class LevelDBWriter(
   override protected def loadScore(): BigInt = readOnly(db => db.get(Keys.score(db.get(Keys.height))))
 
   override protected def loadLastBlock(): Option[Block] = readOnly { db =>
-    val height = Height(db.get(Keys.height))
-    loadBlock(height, db)
+    loadBlock(Height(db.get(Keys.height)), db)
   }
 
   override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
@@ -813,22 +812,6 @@ class LevelDBWriter(
           }
       case _ => Seq()
     }
-  }
-
-  private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
-    loadBlock(height, db)
-  }
-
-  private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockHeaderAndSizeAt(height)
-
-    for {
-      (header, _, transactionCount, signature) <- db.get(headerKey)
-      txs = (0 until transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-      }
-      block <- createBlock(header, signature, txs).toOption
-    } yield block
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>

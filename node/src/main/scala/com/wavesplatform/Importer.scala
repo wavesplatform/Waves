@@ -171,8 +171,7 @@ object Importer extends ScorexLogging {
     log.info(s"Skipping $blocksToSkip block(s)")
 
     sys.addShutdownHook {
-      import scala.concurrent.duration._
-      val millis = (System.nanoTime() - start).nanos.toMillis
+      val millis = System.currentTimeMillis() - start
       log.info(s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}")
     }
 

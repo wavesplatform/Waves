@@ -27,7 +27,7 @@ import com.wavesplatform.database.{DBExt, Keys, openDB}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
-import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.history.{History, StorageFactory}
 import com.wavesplatform.http.{DebugApiRoute, NodeApiRoute}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.Metrics
@@ -171,15 +171,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    def score: BigInt                                               = ???
-    def loadBlockBytes(id: ByteStr): Task[Array[Byte]]              = Task.raiseError(new NoSuchElementException)
-    def loadBlockAt(height: Int): Option[Block]                       = None
-    def loadMicroBlockBytes(id: ByteStr): Task[Array[Byte]]         = Task.raiseError(new NoSuchElementException)
-    def blockIdsAfter(candidates: Seq[ByteStr]): Task[Seq[ByteStr]] = Task.raiseError(new NoSuchElementException)
-    def lastBlockIds(i: Int): Seq[ByteStr]                          = ???
-    def lastBlocks(i: Int): Seq[Block]                              = ???
+    val history = History(blockchainUpdater, db)
+    def loadBlockAt(height: Int): Option[Block] =
+      blockchainUpdater.blockId(height).flatMap(history.loadBlockBytes).map(bytes => Block.parseBytes(bytes).get)
 
-    val historyReplier = new HistoryReplier(score, loadBlockBytes, loadMicroBlockBytes, blockIdsAfter)
+    val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
       Task(blockchainUpdater.removeAfter(blockId))
@@ -247,7 +243,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     )
     val (newBlocks, extLoaderState, sh) = RxExtensionLoader(
       settings.synchronizationSettings.synchronizationTimeout,
-      Coeval(lastBlockIds(settings.synchronizationSettings.maxRollback)),
+      Coeval(blockchainUpdater.lastBlockIds(settings.synchronizationSettings.maxRollback)),
       peerDatabase,
       knownInvalidBlocks,
       blocks,
@@ -303,9 +299,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       }
 
       val cta: CommonTransactionsApi = ???
-      val cba: CommonBlocksApi = new CommonBlocksApi(blockchainUpdater, loadBlockAt)
-      val cca: CommonAccountApi = new CommonAccountApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-      val csa: CommonAssetsApi = new CommonAssetsApi(blockchainUpdater)
+      val cba: CommonBlocksApi       = new CommonBlocksApi(blockchainUpdater, loadBlockAt)
+      val cca: CommonAccountApi      = new CommonAccountApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      val csa: CommonAssetsApi       = new CommonAssetsApi(blockchainUpdater)
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
@@ -321,7 +317,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           time,
           blockchainUpdater,
           wallet,
-          lastBlocks,
           _ => Left(GenericError("not implemented")),
           _ => Portfolio.empty,
           _ => Map.empty,

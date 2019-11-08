@@ -32,7 +32,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         ng.totalDiffOf(microBlocks.last.totalResBlockSig)
         microBlocks.foreach { m =>
           val (forged, _, _, _, _) = ng.totalDiffOf(m.totalResBlockSig).get
-          forged.signaturesValid() shouldBe 'right
+          forged.signatureValid() shouldBe true
         }
         Seq(microBlocks(4)).map(x => ng.totalDiffOf(x.totalResBlockSig))
     }

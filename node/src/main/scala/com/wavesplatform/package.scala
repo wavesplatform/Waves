@@ -13,7 +13,7 @@ package object wavesplatform extends ScorexLogging {
   private def checkOrAppend(block: Block, blockchainUpdater: Blockchain with BlockchainUpdater): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
       blockchainUpdater.processBlock(block).right.map { _ =>
-        log.info(s"Genesis block ${blockchainUpdater.blockHeaderAndSize(1).get._1} has been added to the state")
+        log.info(s"Genesis block ${blockchainUpdater.lastBlockId.get} has been added to the state")
       }
     } else {
       val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeaderAndSize(1).map(_._4)
@@ -27,8 +27,7 @@ package object wavesplatform extends ScorexLogging {
     Block
       .genesis(settings.blockchainSettings.genesisSettings)
       .flatMap { genesis =>
-        log.debug(s"Genesis block: $genesis")
-        log.debug(s"Genesis block json: ${genesis.json()}")
+        log.trace(s"Genesis block json: ${genesis.json()}")
         checkOrAppend(genesis, blockchainUpdater)
       }
       .left

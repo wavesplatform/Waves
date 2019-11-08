@@ -57,7 +57,7 @@ object BlockDiffer extends ScorexLogging {
     val initDiff = Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerRewardDistr |+| currentBlockFeeDistr |+| prevBlockFeeDistr)))
 
     for {
-      _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
+      _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       r <- apply(
         CompositeBlockchain(blockchain, newBlock = Some(block)),
         constraint,

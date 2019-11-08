@@ -20,7 +20,6 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       ntpTime,
       null,
       null,
-      _ => Seq.empty,
       _ => Left(GenericError("")),
       _ => Portfolio.empty,
       _ => Map.empty,

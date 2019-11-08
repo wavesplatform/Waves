@@ -450,4 +450,16 @@ package object database extends ScorexLogging {
       header.featureVotes,
       header.rewardVote
     )
+
+  def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
+    val headerKey = Keys.blockHeaderAndSizeAt(height)
+
+    for {
+      (header, _, transactionCount, signature) <- db.get(headerKey)
+      txs = (0 until transactionCount).toList.flatMap { n =>
+        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+      }
+      block <- createBlock(header, signature, txs).toOption
+    } yield block
+  }
 }
