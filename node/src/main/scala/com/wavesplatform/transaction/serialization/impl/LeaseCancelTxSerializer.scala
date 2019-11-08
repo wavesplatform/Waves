@@ -13,7 +13,7 @@ import scala.util.Try
 
 object LeaseCancelTxSerializer {
   def toJson(tx: LeaseCancelTransaction): JsObject =
-    BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString)
+    BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString, "chainId" -> tx.chainByte)
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
