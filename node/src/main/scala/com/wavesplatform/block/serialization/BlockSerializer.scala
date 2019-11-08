@@ -43,7 +43,7 @@ object BlockHeaderSerializer {
   }
 
   def toJson(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
-    header.json() ++ Json.obj("signature" -> signature.toString, "blocksize" -> blockSize, "transactionCount" -> transactionCount)
+    toJson(header) ++ Json.obj("signature" -> signature.toString, "blocksize" -> blockSize, "transactionCount" -> transactionCount)
 }
 
 object BlockSerializer {
@@ -70,7 +70,7 @@ object BlockSerializer {
       Bytes.concat(
         Array(header.version),
         Longs.toByteArray(header.timestamp),
-        Bytes.ensureCapacity(header.reference.arr, SignatureLength, 0),
+        header.reference.arr,
         Ints.toByteArray(consensusBytes.length),
         consensusBytes,
         Ints.toByteArray(transactionsDataBytes.length),
@@ -78,7 +78,7 @@ object BlockSerializer {
         featureVotesBytes,
         rewardVoteBytes,
         header.generator.arr,
-        Bytes.ensureCapacity(signature.arr, SignatureLength, 0)
+        signature.arr
       )
     } else PBBlocks.protobuf(block).toByteArray
   }

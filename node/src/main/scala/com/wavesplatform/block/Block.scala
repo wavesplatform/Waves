@@ -2,7 +2,7 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
+import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
@@ -28,9 +28,7 @@ case class BlockHeader(
     generator: PublicKey,
     featureVotes: Set[Short],
     rewardVote: Long
-) {
-  private[block] val json: Coeval[JsObject] = Coeval.evalOnce(BlockHeaderSerializer.toJson(this))
-}
+)
 
 case class Block private[block] (
     header: BlockHeader,
@@ -64,15 +62,15 @@ case class Block private[block] (
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  private val bytesToSign: Coeval[Array[Byte]] = Coeval.evalOnce {
-    if (header.version < ProtoBlockVersion) bytes().dropRight(SignatureLength)
-    else PBBlocks.protobuf(this.copy(signature = ByteStr.empty)).toByteArray
+  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
+    if (header.version < ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
+    else PBBlocks.protobuf(copy(signature = ByteStr.empty)).toByteArray
     // else PBBlocks.protobuf(this).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
   }
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesToSign(), publicKey)
+    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -96,9 +94,7 @@ object Block extends ScorexLogging {
       featureVotes: Set[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    validate(
-      Block(BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote), signature, txs)
-    )
+    Block(BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote), signature, txs).validate
 
   def buildAndSign(
       version: Byte,
@@ -111,13 +107,12 @@ object Block extends ScorexLogging {
       featureVotes: Set[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    build(version, timestamp, reference, baseTarget, generationSignature, txs, signer, ByteStr.empty, featureVotes, rewardVote)
-      .map(unsigned => unsigned.copy(signature = crypto.sign(signer, unsigned.bytesToSign())))
+    build(version, timestamp, reference, baseTarget, generationSignature, txs, signer, ByteStr.empty, featureVotes, rewardVote).map(_.sign(signer))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     BlockSerializer
       .parseBytes(bytes)
-      .flatMap(validate(_).asTry)
+      .flatMap(_.validateToTry)
       .recoverWith {
         case t: Throwable =>
           log.error("Error when parsing block", t)
@@ -128,19 +123,6 @@ object Block extends ScorexLogging {
     import cats.instances.either._
     import cats.instances.list._
     import cats.syntax.traverse._
-
-    // format: off
-    def validateGenesis(block: Block): Either[ValidationError, Block] =
-      for {
-        // Common validation
-        _ <- validate(block)
-        // Verify signature
-        _ <- Either.cond(crypto.verify(block.signature, block.bytesToSign(), block.header.generator), (), GenericError("Passed genesis signature is not valid"))
-        // Verify initial balance
-        txsSum = block.transactionData.collect { case tx: GenesisTransaction => tx.amount }.reduce(Math.addExact(_: Long, _: Long))
-        _ <- Either.cond(txsSum == genesisSettings.initialBalance, (), GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $txsSum"))
-      } yield block
-    // format: on
 
     for {
       txs <- genesisSettings.transactions.toList.map { gts =>
@@ -156,24 +138,12 @@ object Block extends ScorexLogging {
       timestamp  = genesisSettings.blockTimestamp
       block <- build(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, txs, generator, ByteStr.empty, Set(), -1L)
       signedBlock = genesisSettings.signature match {
-        case None             => block.copy(signature = crypto.sign(generator, ByteStr(block.bytesToSign())))
+        case None             => block.sign(generator)
         case Some(predefined) => block.copy(signature = predefined)
       }
-      validBlock <- validateGenesis(signedBlock)
+      validBlock <- signedBlock.validateGenesis(genesisSettings)
     } yield validBlock
   }
-
-  // format: off
-  private def validate(b: Block): Either[GenericError, Block] =
-    (for {
-      _ <- Either.cond(b.header.reference.arr.length == SignatureLength, (), "Incorrect reference")
-      genSigLength = if (b.header.version < ProtoBlockVersion) GenerationSignatureLength else GenerationVRFSignatureLength
-      _ <- Either.cond(b.header.generationSignature.arr.length == genSigLength, (), "Incorrect generationSignature")
-      _ <- Either.cond(b.header.generator.length == KeyLength, (), "Incorrect signer")
-      _ <- Either.cond(b.header.version > 2 || b.header.featureVotes.isEmpty,(),s"Block version ${b.header.version} could not contain feature votes")
-      _ <- Either.cond(b.header.featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
-    } yield b).left.map(GenericError(_))
-  // format: on
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend

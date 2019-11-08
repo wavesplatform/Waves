@@ -152,9 +152,9 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         transactionData = txs
       )
       val toSign =
-        if (version < Block.ProtoBlockVersion) unsigned.bytes().dropRight(crypto.SignatureLength)
-        // else PBBlocks.protobuf(unsigned).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
+        if (version < Block.ProtoBlockVersion) unsigned.bytes()
         else PBBlocks.protobuf(unsigned).toByteArray
+      // else PBBlocks.protobuf(unsigned).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
       unsigned.copy(signature = ByteStr(crypto.sign(signer, toSign)))
     }
   }
