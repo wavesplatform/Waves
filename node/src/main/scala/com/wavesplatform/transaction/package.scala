@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
 
 package object transaction {
-  val AssetIdLength: Int       = com.wavesplatform.crypto.DigestSize
+  val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
   type DiscardedTransactions = Seq[Transaction]

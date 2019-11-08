@@ -3,7 +3,6 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.transfer._
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._

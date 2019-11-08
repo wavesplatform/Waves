@@ -26,7 +26,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
   val nonPositiveLong: G[Long] = choose(Long.MinValue, 0).label("non-positive value")
   val invalidDecimals: G[Byte] = oneOf(
     choose[Byte](Byte.MinValue, -1),
-    choose((IssueTransaction.MaxDecimals + 1).toByte, Byte.MaxValue)
+    choose((IssueTransaction.MaxAssetDecimals + 1).toByte, Byte.MaxValue)
   ).label("invalid decimals")
 
   val longAttachment: G[String] =
@@ -50,7 +50,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
   ).map(_.mkString)
 
   val longDescription: G[String] =
-    genBoundedBytes(IssueTransaction.MaxDescriptionLength + 1, IssueTransaction.MaxDescriptionLength + 50)
+    genBoundedBytes(IssueTransaction.MaxAssetDescriptionLength + 1, IssueTransaction.MaxAssetDescriptionLength + 50)
       .map(Base58.encode)
 
   val addressGen: G[String] = listOfN(32, Arbitrary.arbByte.arbitrary).map(b => Base58.encode(b.toArray))
@@ -66,9 +66,9 @@ trait RequestGen extends TransactionGen { _: Suite =>
   val issueReq: G[IssueV1Request] = for {
     (account, fee) <- commonFields
     name           <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    description    <- genBoundedString(0, IssueTransaction.MaxDescriptionLength)
+    description    <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
     quantity       <- positiveLongGen
-    decimals       <- G.choose[Byte](0, IssueTransaction.MaxDecimals.toByte)
+    decimals       <- G.choose[Byte](0, IssueTransaction.MaxAssetDecimals.toByte)
     reissuable     <- G.oneOf(true, false)
   } yield IssueV1Request(account, new String(name), new String(description), quantity, decimals, reissuable, fee)
 
@@ -137,5 +137,5 @@ trait RequestGen extends TransactionGen { _: Suite =>
     _signature <- signatureGen
     _timestamp <- ntpTimestampGen
     _cancel    <- leaseCancelGen
-  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.toString, _cancel.timestamp, _signature, _cancel.fee)
+  } yield SignedLeaseCancelV1Request(_cancel.sender.toString, _cancel.leaseId.toString, _timestamp, _signature, _cancel.fee)
 }

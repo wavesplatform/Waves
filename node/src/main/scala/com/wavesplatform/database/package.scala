@@ -105,7 +105,7 @@ package object database extends ScorexLogging {
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {
-        case crypto.DigestSize      => new Array[Byte](crypto.DigestSize)
+        case crypto.DigestLength      => new Array[Byte](crypto.DigestLength)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
       b.get(buffer)
@@ -120,7 +120,7 @@ package object database extends ScorexLogging {
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
           b.put(id.arr.length match {
-              case crypto.DigestSize      => crypto.DigestSize.toByte
+              case crypto.DigestLength      => crypto.DigestLength.toByte
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
             .put(id.arr)
@@ -389,8 +389,8 @@ package object database extends ScorexLogging {
   }
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
-    import com.wavesplatform.crypto.DigestSize
-    def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
+    import com.wavesplatform.crypto.DigestLength
+    def extractId(offset: Int = 2, length: Int = DigestLength): ByteStr = {
       val id = ByteStr(new Array[Byte](length))
       Array.copy(e.getKey, offset, id.arr, 0, length)
       id

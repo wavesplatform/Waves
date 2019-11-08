@@ -4,7 +4,7 @@ import cats.implicits._
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.validation._
+import com.wavesplatform.transaction.validation.TxConstraints
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -21,10 +21,11 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
     jsonBase() ++ Json.obj(
       "version"    -> version,
       "chainId"    -> chainByte,
-      "assetId" -> asset.id.toString,
+      "assetId"    -> asset.id.toString,
       "quantity"   -> quantity,
       "reissuable" -> reissuable
-    ))
+    )
+  )
 
   protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
     Bytes.concat(
@@ -40,15 +41,13 @@ trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
 }
 
 object ReissueTransaction {
-
   val typeId: TxType = 5
 
-  def validateReissueParams(tx: ReissueTransaction): Either[ValidationError, Unit] = {
+  def validateReissueParams(tx: ReissueTransaction): Either[ValidationError, Unit] =
     validateReissueParams(tx.quantity, tx.fee)
-  }
 
   def validateReissueParams(quantity: Long, fee: Long): Either[ValidationError, Unit] =
-    (validateAmount(quantity, "assets"), validateFee(fee))
+    (TxConstraints.positiveAmount(quantity, "assets"), TxConstraints.fee(fee))
       .mapN { case _ => () }
       .leftMap(_.head)
       .toEither

@@ -16,7 +16,7 @@ import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction}
@@ -43,7 +43,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     op match {
       case 1 =>
         val lease = LeaseTransaction.selfSigned(1.toByte, sender, recipient, amount, 100000, nextTs).explicitGet()
-        List(lease, LeaseCancelTransactionV1.selfSigned(sender, lease.id(), 1, nextTs).explicitGet())
+        List(lease, LeaseCancelTransaction.selfSigned(1.toByte, sender, lease.id(), 1, nextTs).explicitGet())
       case 2 =>
         List(
           MassTransferTransaction
@@ -182,7 +182,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               blockWithLeaseId,
-              Seq(LeaseCancelTransactionV1.selfSigned(sender, lt.id(), 1, nextTs).explicitGet())
+              Seq(LeaseCancelTransaction.selfSigned(1.toByte, sender, lt.id(), 1, nextTs).explicitGet())
             )
           )
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, false))

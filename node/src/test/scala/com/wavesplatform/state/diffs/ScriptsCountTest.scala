@@ -146,7 +146,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         .selfSigned(IssuedAsset(issueScr.id()), master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array()))
         .explicitGet()
       l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
-      lc = LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, master, l.id(), fee, timestamp + 1).explicitGet()
+      lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
       o1        = Order.buy(master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
@@ -279,7 +279,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         .selfSigned(IssuedAsset(issueScr.id()), master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array()))
         .explicitGet()
       l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
-      lc = LeaseCancelTransactionV2.selfSigned(AddressScheme.current.chainId, master, l.id(), fee, timestamp + 1).explicitGet()
+      lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
       o1        = Order.buy(master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
