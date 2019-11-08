@@ -28,7 +28,7 @@ object LeaseCancelTxSerializer {
   def toBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), this.bodyBytes(tx), proofs.toSignature)
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
@@ -48,17 +48,12 @@ object LeaseCancelTxSerializer {
       require(bytes(1) == LeaseCancelTransaction.typeId, "transaction type mismatch")
       require(bytes(2) == TxVersion.V2, "transaction version mismatch")
       require(bytes(3) == AddressScheme.current.chainId, "transaction chainId mismatch")
-      val buf    = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
-      val tx     = parseCommonPart(TxVersion.V2, buf)
-      val proofs = buf.getProofs
-      tx.copy(proofs = proofs)
+      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
+      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {
       require(bytes(0) == LeaseCancelTransaction.typeId, "transaction type mismatch")
       val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-      require(buf.get == LeaseCancelTransaction.typeId, "transaction type mismatch")
-      val transaction = parseCommonPart(TxVersion.V1, buf)
-      val signature   = buf.getSignature
-      transaction.copy(proofs = Proofs(signature))
+      parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(buf.getSignature))
     }
   }
 }
