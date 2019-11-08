@@ -12,14 +12,8 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.Try
 
 object LeaseCancelTxSerializer {
-  def toJson(tx: LeaseCancelTransaction): JsObject = {
-    import tx._
-    ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version" -> version,
-      "leaseId" -> leaseId.toString,
-      "chainId" -> chainByte
-    )
-  }
+  def toJson(tx: LeaseCancelTransaction): JsObject =
+    BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString)
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
