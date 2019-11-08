@@ -35,7 +35,7 @@ object LeaseTxSerializer {
   def toBytes(tx: LeaseTransaction): Array[Byte] = {
     import tx._
     version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), this.bodyBytes(tx), proofs.toSignature)
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
