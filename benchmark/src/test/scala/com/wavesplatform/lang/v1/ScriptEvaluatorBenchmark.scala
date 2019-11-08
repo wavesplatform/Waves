@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.values.V1
+import com.wavesplatform.lang.directives.values.{V1, V4}
 import com.wavesplatform.lang.v1.FunctionHeader.Native
 import com.wavesplatform.lang.v1.ScriptEvaluatorBenchmark._
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -25,9 +25,9 @@ import scorex.crypto.signatures.Curve25519
 import scala.util.Random
 
 object ScriptEvaluatorBenchmark {
-  val version = V1
+  val version                                           = V1
   val pureEvalContext: EvaluationContext[NoContext, Id] = PureContext.build(Global, V1).evaluationContext
-  val evaluatorV1: EvaluatorV1[Id, NoContext] = new EvaluatorV1[Id, NoContext]()
+  val evaluatorV1: EvaluatorV1[Id, NoContext]           = new EvaluatorV1[Id, NoContext]()
 }
 
 @OutputTimeUnit(TimeUnit.NANOSECONDS)
@@ -57,6 +57,9 @@ class ScriptEvaluatorBenchmark {
 
   @Benchmark
   def bytesConcat(st: Concat, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.bytes))
+
+  @Benchmark
+  def listMedian(st: Median, bh: Blackhole): Unit = bh.consume(evaluatorV1.apply[EVALUATED](st.context, st.expr))
 }
 
 @State(Scope.Benchmark)
@@ -107,7 +110,10 @@ class Base58Perf {
       .map { i =>
         val b = new Array[Byte](64)
         Random.nextBytes(b)
-        LET("v" + i, FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)).explicitGet())))))
+        LET(
+          "v" + i,
+          FUNCTION_CALL(PureContext.sizeBytes, List(FUNCTION_CALL(Native(FROMBASE58), List(CONST_STRING(Base58.encode(b)).explicitGet()))))
+        )
       }
       .foldRight[EXPR](sum) { case (let, e) => BLOCK(let, e) }
   }
@@ -179,4 +185,18 @@ class Concat {
       CONST_BYTESTR(ByteStr.fromBytes(0)).explicitGet(),
       Steps
     )
+}
+
+@State(Scope.Benchmark)
+class Median {
+  val context: EvaluationContext[NoContext, Id] = PureContext.build(Global, V4).evaluationContext
+
+  val expr: EXPR = {
+    val listOfLong = (1 to 100).map(_ => CONST_LONG(Random.nextLong()))
+
+    FUNCTION_CALL(
+      PureContext.getListMedian,
+      List(ARR(listOfLong))
+    )
+  }
 }
