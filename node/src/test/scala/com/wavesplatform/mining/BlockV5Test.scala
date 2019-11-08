@@ -8,22 +8,26 @@ import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.NG
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.{NoShrink, TestTime, TransactionGen, crypto}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
+import monix.eval.Task
 import monix.execution.Scheduler
-import monix.execution.schedulers.SchedulerService
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import scala.concurrent.Await
 import scala.concurrent.duration._
 
+// todo: (NODE-1927) Two miners and microblocks
 class BlockV5Test
     extends FlatSpec
     with ScalaCheckPropertyChecks
@@ -51,7 +55,7 @@ class BlockV5Test
         blockchain.height shouldBe bs.size
         blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
         withMiner(blockchain) {
-          case (miner, time) =>
+          case (miner, time, appender, scheduler) =>
             time.advance(10.minute)
 
             val forgedAtActivationHeight = miner invokePrivate forgeBlock(minerAcc)
@@ -59,10 +63,13 @@ class BlockV5Test
             val blockAtActivationHeight = forgedAtActivationHeight.right.value._2
             blockAtActivationHeight.header.version shouldBe Block.RewardBlockVersion
 
-            blockchain.processBlock(blockAtActivationHeight, blockAtActivationHeight.header.generationSignature).explicitGet()
+            Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
             blockchain.height shouldBe bs.size + 1
             blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
             blockAtActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
+
+            val genInputAtActivationHeight = blockchain.generationInputAtHeight(bs.size + 1).explicitGet()
+            genInputAtActivationHeight shouldBe blockAtActivationHeight.header.generationSignature
 
             time.advance(10.minute)
 
@@ -71,10 +78,19 @@ class BlockV5Test
             val blockAfterActivationHeight = forgedAfterActivationHeight.right.value._2
             blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
 
-            blockchain.processBlock(blockAfterActivationHeight,  blockAfterActivationHeight.header.generationSignature).explicitGet()
+            Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
             blockchain.height shouldBe bs.size + 2
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
+
+            val genInputAfterActivationHeight = blockchain.generationInputAtHeight(bs.size + 2).explicitGet()
+            genInputAfterActivationHeight shouldBe crypto
+              .verifyVRF(
+                blockAfterActivationHeight.header.generationSignature,
+                genInputAtActivationHeight,
+                minerAcc.publicKey
+              )
+              .explicitGet()
 
             time.advance(10.minute)
 
@@ -83,10 +99,19 @@ class BlockV5Test
             val blockAfterVRFUsing = forgedAfterVRFUsing.right.value._2
             blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
 
-            blockchain.processBlock(blockAfterVRFUsing, blockAfterVRFUsing.header.generationSignature).explicitGet()
+            Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
             blockchain.height shouldBe bs.size + 3
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterVRFUsing.signature shouldBe blockchain.lastBlock.value.signature
+
+            val genInputAfterVRFUsing = blockchain.generationInputAtHeight(bs.size + 3).explicitGet()
+            genInputAfterVRFUsing shouldBe crypto
+              .verifyVRF(
+                blockAfterVRFUsing.header.generationSignature,
+                genInputAfterActivationHeight,
+                minerAcc.publicKey
+              )
+              .explicitGet()
         }
       }
   }
@@ -112,15 +137,19 @@ class BlockV5Test
       f(d.blockchainUpdater)
     }
 
-  private def withMiner(blockchain: BlockchainUpdater with NG)(f: (MinerImpl, TestTime) => Unit): Unit = {
-    val pos                         = new PoSSelector(blockchain, testSettings.blockchainSettings, testSettings.synchronizationSettings)
-    val allChannels                 = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val wallet                      = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool                     = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, testSettings.utxSettings)
-    val scheduler: SchedulerService = Scheduler.singleThread("appender")
-    val time                        = new TestTime(ntpTime.correctedTime())
-    val miner                       = new MinerImpl(allChannels, blockchain, testSettings, time, utxPool, wallet, pos, scheduler, scheduler)
-    f(miner, time)
+  type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
+
+  private def withMiner(blockchain: BlockchainUpdater with NG)(f: (MinerImpl, TestTime, Appender, Scheduler) => Unit): Unit = {
+    val pos               = new PoSSelector(blockchain, testSettings.blockchainSettings, testSettings.synchronizationSettings)
+    val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+    val wallet            = Wallet(WalletSettings(None, Some("123"), None))
+    val utxPool           = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, testSettings.utxSettings)
+    val minerScheduler    = Scheduler.singleThread("miner")
+    val appenderScheduler = Scheduler.singleThread("appender")
+    val time              = new TestTime(ntpTime.correctedTime())
+    val miner             = new MinerImpl(allChannels, blockchain, testSettings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)
+    val blockAppender     = BlockAppender(blockchain, time, utxPool, pos, appenderScheduler) _
+    f(miner, time, blockAppender, appenderScheduler)
   }
 }
 
