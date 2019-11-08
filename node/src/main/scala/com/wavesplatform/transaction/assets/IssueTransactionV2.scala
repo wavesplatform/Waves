@@ -11,25 +11,27 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.WrongChain
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.{validation, _}
+import com.wavesplatform.transaction.validation.TxConstraints
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
-case class IssueTransactionV2 private (chainId: Byte,
-                                       sender: PublicKey,
-                                       name: Array[Byte],
-                                       description: Array[Byte],
-                                       quantity: Long,
-                                       decimals: Byte,
-                                       reissuable: Boolean,
-                                       script: Option[Script],
-                                       fee: Long,
-                                       timestamp: Long,
-                                       proofs: Proofs)
-    extends IssueTransaction
+case class IssueTransactionV2 private (
+    chainId: Byte,
+    sender: PublicKey,
+    name: Array[Byte],
+    description: Array[Byte],
+    quantity: Long,
+    decimals: Byte,
+    reissuable: Boolean,
+    script: Option[Script],
+    fee: Long,
+    timestamp: Long,
+    proofs: Proofs
+) extends IssueTransaction
     with FastHashId
     with ChainSpecific {
 
@@ -52,7 +54,7 @@ case class IssueTransactionV2 private (chainId: Byte,
 
 object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with TransactionParser.MultipleVersions {
 
-  override val typeId: TxType                 = IssueTransaction.typeId
+  override val typeId: TxType                    = IssueTransaction.typeId
   override val supportedVersions: Set[TxVersion] = Set(2)
 
   private def currentChainId = AddressScheme.current.chainId
@@ -67,53 +69,61 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
     }
   }
 
-  def create(chainId: Byte,
-             sender: PublicKey,
-             name: Array[Byte],
-             description: Array[Byte],
-             quantity: Long,
-             decimals: Byte,
-             reissuable: Boolean,
-             script: Option[Script],
-             fee: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(
+      chainId: Byte,
+      sender: PublicKey,
+      name: Array[Byte],
+      description: Array[Byte],
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] = {
     for {
       _ <- Either.cond(chainId == currentChainId, (), WrongChain(currentChainId, chainId))
       _ <- IssueTransaction.validateIssueParams(name, description, quantity, decimals, reissuable, fee)
-      _ <- Either.cond(script.forall(_.isInstanceOf[ExprScript]),
-                       (),
-                       TxValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract"))
+      _ <- Either.cond(
+        script.forall(_.isInstanceOf[ExprScript]),
+        (),
+        TxValidationError.GenericError(s"Asset can only be assigned with Expression script, not Contract")
+      )
     } yield IssueTransactionV2(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs)
   }
 
-  def signed(chainId: Byte,
-             sender: PublicKey,
-             name: Array[Byte],
-             description: Array[Byte],
-             quantity: Long,
-             decimals: Byte,
-             reissuable: Boolean,
-             script: Option[Script],
-             fee: Long,
-             timestamp: Long,
-             signer: PrivateKey): Either[ValidationError, TransactionT] = {
+  def signed(
+      chainId: Byte,
+      sender: PublicKey,
+      name: Array[Byte],
+      description: Array[Byte],
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] = {
     for {
       unverified <- create(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
       proofs     <- Proofs.create(Seq(ByteStr(crypto.sign(signer, unverified.bodyBytes()))))
     } yield unverified.copy(proofs = proofs)
   }
 
-  def selfSigned(chainId: Byte,
-                 sender: KeyPair,
-                 name: Array[Byte],
-                 description: Array[Byte],
-                 quantity: Long,
-                 decimals: Byte,
-                 reissuable: Boolean,
-                 script: Option[Script],
-                 fee: Long,
-                 timestamp: Long): Either[ValidationError, TransactionT] = {
+  def selfSigned(
+      chainId: Byte,
+      sender: KeyPair,
+      name: Array[Byte],
+      description: Array[Byte],
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long
+  ): Either[ValidationError, TransactionT] = {
     signed(chainId, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
   }
 
@@ -121,8 +131,8 @@ object IssueTransactionV2 extends TransactionParserFor[IssueTransactionV2] with 
     (
       OneByte(tailIndex(1), "Chain ID"),
       PublicKeyBytes(tailIndex(2), "Sender's public key"),
-      BytesArrayUndefinedLength(tailIndex(3), "Name", validation.MaxAssetNameLength, validation.MinAssetNameLength),
-      BytesArrayUndefinedLength(tailIndex(4), "Description", validation.MaxDescriptionLength),
+      BytesArrayUndefinedLength(tailIndex(3), "Name", IssueTransaction.MaxAssetNameLength, IssueTransaction.MinAssetNameLength),
+      BytesArrayUndefinedLength(tailIndex(4), "Description", IssueTransaction.MaxAssetDescriptionLength),
       LongBytes(tailIndex(5), "Quantity"),
       OneByte(tailIndex(6), "Decimals"),
       BooleanByte(tailIndex(7), "Reissuable flag (1 - True, 0 - False)"),

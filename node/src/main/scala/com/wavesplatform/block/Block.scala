@@ -133,7 +133,7 @@ object Block extends ScorexLogging {
       }.sequence
       generator  = KeyPair(ByteStr.empty)
       baseTarget = genesisSettings.initialBaseTarget
-      genSig     = ByteStr(Array.fill(crypto.DigestSize)(0: Byte))
+      genSig     = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
       reference  = Array.fill(SignatureLength)(-1: Byte)
       timestamp  = genesisSettings.blockTimestamp
       block <- build(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, txs, generator, ByteStr.empty, Set(), -1L)

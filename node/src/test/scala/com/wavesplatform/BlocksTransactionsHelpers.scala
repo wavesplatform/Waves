@@ -11,7 +11,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV1, LeaseTransaction}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
@@ -62,10 +62,10 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         timestamp <- timestamp
       } yield LeaseTransaction.selfSigned(1.toByte, from, to, amount, FeeAmount, timestamp).explicitGet()
 
-    def leaseCancel(from: KeyPair, leaseId: ByteStr, timestamp: Gen[Long] = timestampGen): Gen[LeaseCancelTransactionV1] =
+    def leaseCancel(from: KeyPair, leaseId: ByteStr, timestamp: Gen[Long] = timestampGen): Gen[LeaseCancelTransaction] =
       for {
         timestamp <- timestamp
-      } yield LeaseCancelTransactionV1.selfSigned(from, leaseId, FeeAmount, timestamp).explicitGet()
+      } yield LeaseCancelTransaction.selfSigned(1.toByte, from, leaseId, FeeAmount, timestamp).explicitGet()
 
     def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
       for {

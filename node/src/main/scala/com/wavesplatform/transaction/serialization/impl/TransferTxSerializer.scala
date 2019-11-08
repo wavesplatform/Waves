@@ -15,8 +15,7 @@ import scala.util.Try
 object TransferTxSerializer {
   def toJson(tx: TransferTransaction): JsObject = {
     import tx._
-    ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version"    -> version,
+    BaseTxJson.toJson(tx) ++ Json.obj(
       "recipient"  -> recipient.stringRepr,
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
@@ -41,16 +40,16 @@ object TransferTxSerializer {
     }
 
     version match {
-      case 1 => Array(typeId) ++ baseBytes
-      case 2 => Array(typeId, version) ++ baseBytes
+      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
     }
   }
 
   def toBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
     version match {
-      case 1 => Bytes.concat(Array(typeId), proofs.proofs.head, this.bodyBytes(tx))
-      case 2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx))
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
     }
   }
 
@@ -73,7 +72,7 @@ object TransferTxSerializer {
     if (bytes(0) == 0) {
       require(bytes(1) == TransferTransaction.typeId, "transaction type mismatch")
       val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
-      val tx     = parseCommonPart(2.toByte, buf)
+      val tx     = parseCommonPart(TxVersion.V2, buf)
       val proofs = buf.getProofs
       tx.copy(proofs = proofs)
     } else {
@@ -81,7 +80,7 @@ object TransferTxSerializer {
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
       val signature = buf.getSignature
       require(buf.get == TransferTransaction.typeId, "transaction type mismatch")
-      parseCommonPart(1.toByte, buf).copy(proofs = Proofs(signature))
+      parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(signature))
     }
   }
 }

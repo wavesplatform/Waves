@@ -2,7 +2,6 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.assets.BurnTransactionV1
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
@@ -21,19 +20,20 @@ object SignedBurnV1Request {
   implicit val writes: Writes[SignedBurnV1Request] = Json.writes[SignedBurnV1Request]
 }
 
-case class SignedBurnV1Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                               senderPublicKey: String,
-                               @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
-                               assetId: String,
-                               @ApiModelProperty(required = true, example = "1000000")
-                               quantity: Long,
-                               @ApiModelProperty(required = true)
-                               fee: Long,
-                               @ApiModelProperty(required = true)
-                               timestamp: Long,
-                               @ApiModelProperty(required = true)
-                               signature: String)
-    {
+case class SignedBurnV1Request(
+    @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
+    senderPublicKey: String,
+    @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+    assetId: String,
+    @ApiModelProperty(required = true, example = "1000000")
+    quantity: Long,
+    @ApiModelProperty(required = true)
+    fee: Long,
+    @ApiModelProperty(required = true)
+    timestamp: Long,
+    @ApiModelProperty(required = true)
+    signature: String
+) {
 
   def toTx: Either[ValidationError, BurnTransactionV1] =
     for {
