@@ -13,12 +13,9 @@ import scala.util.Try
 object LeaseTxSerializer {
   def toJson(tx: LeaseTransaction): JsObject = {
     import tx._
-    ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version"   -> version,
+    BaseTxJson.toJson(tx) ++ Json.obj(
       "amount"    -> amount,
-      "recipient" -> recipient.stringRepr,
-      "fee"       -> fee,
-      "timestamp" -> timestamp
+      "recipient" -> recipient.stringRepr
     )
   }
 
