@@ -591,7 +591,7 @@ object PureContext {
 
   lazy val getListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')))) {
-      case ARR(arr) :: Nil if arr.isInstanceOf[IndexedSeq[CONST_LONG]] => {
+      case ARR(arr) :: Nil => {
 
         def getMedian(seq: Seq[Long]): Long = {
           val targetArr = seq.toArray
@@ -605,12 +605,16 @@ object PureContext {
           }
         }
 
-        if (arr.size == 1) {
-          Right(arr.head)
-        } else if (arr.size > 1 && arr.size <= MaxListSizeForMedianCalc) {
-          Right(CONST_LONG(getMedian(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
+        if (arr.isInstanceOf[IndexedSeq[CONST_LONG]]) {
+          if (arr.size == 1) {
+            Right(arr.head)
+          } else if (arr.size > 1 && arr.size <= MaxListSizeForMedianCalc) {
+            Right(CONST_LONG(getMedian(arr.asInstanceOf[IndexedSeq[CONST_LONG]].map(_.t))))
+          } else {
+            Left(s"Invalid list size. Size should be between 1 and $MaxListSizeForMedianCalc")
+          }
         } else {
-          Left(s"Invalid list size. Size should be between 1 and $MaxListSizeForMedianCalc")
+          notImplemented[Id](s"median(arr: List[Int])", ARR(arr) :: Nil)
         }
       }
       case xs => notImplemented[Id](s"median(arr: List[Int])", xs)
