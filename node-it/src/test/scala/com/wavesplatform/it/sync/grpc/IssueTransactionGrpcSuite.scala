@@ -11,8 +11,11 @@ import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.{InvalidName, NonPositiveAmount, TooBigArray}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
+
+import scala.util.Random
 
 class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime with TableDrivenPropertyChecks {
 
@@ -20,7 +23,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
 
   test("asset issue changes issuer's asset balance") {
     for (v <- supportedVersions) {
-      val assetName        = "myasset"
+      val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength).mkString
       val assetDescription = ByteString.copyFrom("my asset description".getBytes(StandardCharsets.UTF_8))
       val issuerBalance = sender.grpc.wavesBalance(issuerAddress).available
       val issuerEffBalance = sender.grpc.wavesBalance(issuerAddress).effective
@@ -31,22 +34,56 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
       sender.grpc.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - issueFee
       sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
+
+      val assetInfo = sender.grpc.getTransaction(issuedAssetId).getTransaction.getIssue
+
+      assetInfo.decimals shouldBe 8
+      assetInfo.amount shouldBe someAssetAmount
+      assetInfo.reissuable shouldBe true
+      assetInfo.description shouldBe assetDescription
+
+    }
+  }
+
+  test("Able to issue NFT asset") {
+    for (v <- supportedVersions) {
+      val assetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength + 1).mkString
+      val assetDescription = ByteString.copyFrom("nft asset".getBytes(StandardCharsets.UTF_8))
+      val issuerBalance = sender.grpc.wavesBalance(issuerAddress).available
+      val issuerEffBalance = sender.grpc.wavesBalance(issuerAddress).effective
+      val (nftQuantity, nftDecimals, nftReissuable) = (1, 1, false)
+
+      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx = true)
+      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
+
+      sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
+      sender.grpc.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - issueFee
+      sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe nftQuantity
+
+      val assetInfo = sender.grpc.getTransaction(issuedAssetId).getTransaction.getIssue
+
+      assetInfo.decimals shouldBe nftDecimals
+      assetInfo.amount shouldBe nftQuantity
+      assetInfo.reissuable shouldBe nftReissuable
     }
   }
 
   test("Able to create asset with the same name") {
     for (v <- supportedVersions) {
-      val assetName        = "myasset2"
+      val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength).mkString
       val assetDescription = ByteString.copyFrom("my asset description 2".getBytes(StandardCharsets.UTF_8))
 
-      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 8, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
+      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      val issuedAssetTx2 = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 8, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
+      val issuedAssetTx2 = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
       val issuedAssetId2 = PBTransactions.vanilla(issuedAssetTx2).explicitGet().id().base58
 
       sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
       sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId2)).getOrElse(issuedAssetId2, 0L) shouldBe someAssetAmount
+
+      sender.grpc.getTransaction(issuedAssetId).getTransaction.getIssue.name shouldBe ByteString.copyFrom(assetName.getBytes(StandardCharsets.UTF_8))
+      sender.grpc.getTransaction(issuedAssetId2).getTransaction.getIssue.name shouldBe ByteString.copyFrom(assetName.getBytes(StandardCharsets.UTF_8))
     }
   }
 
@@ -89,7 +126,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     Table(
       ("assetVal", "decimals", "message"),
       (0L, 2, NonPositiveAmount(0, "assets")),
-      (1L, 9, TooBigArray),
+      (1L, IssueTransaction.MaxDecimals + 1, TooBigArray),
       (-1L, 1, NonPositiveAmount(-1, "assets")),
       (1L, -1, TooBigArray)
     )
@@ -106,11 +143,12 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       )
     }
   }
-
+  val tooSmallAssetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength - 1).mkString
+  val tooBigAssetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength + 1).mkString
   val invalid_assets_names =
     Table(
-      "abc",
-      "UpperCaseAssetCoinTest",
+      tooSmallAssetName,
+      tooBigAssetName,
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
@@ -122,6 +160,15 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
         Code.INTERNAL
       )
     }
+  }
+
+  test("Not able to create asset with too big description") {
+    val tooBigDescription = ByteString.copyFrom(Random.nextString(IssueTransaction.MaxDescriptionLength + 1).getBytes)
+    assertGrpcError(
+      sender.grpc.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
+      s"$TooBigArray",
+      Code.INTERNAL
+    )
   }
 
   def scriptText(version: Int): Option[String] = version match {
