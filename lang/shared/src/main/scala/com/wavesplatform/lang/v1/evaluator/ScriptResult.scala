@@ -85,8 +85,29 @@ object ScriptResult {
   }
 
   private def processIssue(fields: Map[String, EVALUATED]): Either[String, Issue] = ???
-  private def processReissue(fields: Map[String, EVALUATED]): Either[String, Reissue] = ???
-  private def processBurn(fields: Map[String, EVALUATED]): Either[String, Burn] = ???
+
+  private def processReissue(fields: Map[String, EVALUATED]): Either[String, Reissue] =
+    (
+      fields.get(FieldNames.ReissueAssetId),
+      fields.get(FieldNames.ReissueQuantity),
+      fields.get(FieldNames.ReissueIsReissuable)
+    ) match {
+      case (
+        Some(CONST_BYTESTR(assetId)),
+        Some(CONST_LONG(quantity)),
+        Some(CONST_BOOLEAN(isReissuable))
+      ) =>
+        Right(Reissue(assetId, isReissuable, quantity))
+      case other =>
+        err(other, V4, FieldNames.Reissue)
+    }
+  private def processBurn(fields: Map[String, EVALUATED]): Either[String, Burn] =
+    (fields.get(FieldNames.BurnAssetId), fields.get(FieldNames.BurnQuantity)) match {
+      case (Some(CONST_BYTESTR(assetId)), Some(CONST_LONG(quantity))) =>
+        Right(Burn(assetId, quantity))
+      case other =>
+        err(other, V4, FieldNames.Burn)
+    }
 
   private def processScriptResultV4(actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
     actions.toList
