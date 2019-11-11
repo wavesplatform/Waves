@@ -804,10 +804,10 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def generationInputAtHeight(height: Int): Option[ByteStr] = readLock {
+  override def hitSourceAtHeight(height: Int): Option[ByteStr] = readLock {
     ngState match {
       case Some(ng) if this.height == height => ng.generationInput.some
-      case _                                 => blockchain.generationInputAtHeight(height)
+      case _                                 => blockchain.hitSourceAtHeight(height)
     }
   }
 

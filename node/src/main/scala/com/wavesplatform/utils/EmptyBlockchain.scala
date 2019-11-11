@@ -110,5 +110,5 @@ case object EmptyBlockchain extends Blockchain {
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 
-  override def generationInputAtHeight(height: Int): Option[ByteStr] = None
+  override def hitSourceAtHeight(height: Int): Option[ByteStr] = None
 }

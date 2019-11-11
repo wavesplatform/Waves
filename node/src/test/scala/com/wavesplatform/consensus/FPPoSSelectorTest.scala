@@ -56,7 +56,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                   .orElse(
                     blockchain
                       .blockAt(blockchain.height + fork1.length - 100)
-                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork1.length - 100).get))
+                      .map((_, blockchain.hitSourceAtHeight(blockchain.height + fork1.length - 100).get))
                   )
                   .getOrElse(fork1.head)
 
@@ -79,7 +79,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                   .orElse(
                     blockchain
                       .blockAt(blockchain.height + fork2.length - 100)
-                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork2.length - 100).get))
+                      .map((_, blockchain.hitSourceAtHeight(blockchain.height + fork2.length - 100).get))
                   )
                   .getOrElse(fork2.head)
 
@@ -298,13 +298,13 @@ object FPPoSSelectorTest {
     val height = blockchain.height
 
     val lastBlock                = blockchain.lastBlock.get
-    val lastBlockGenerationInput = blockchain.generationInputAtHeight(height).get
+    val lastBlockGenerationInput = blockchain.hitSourceAtHeight(height).get
 
     ((1 to blockCount) foldLeft List((lastBlock, lastBlockGenerationInput))) { (forkChain, ind) =>
       val blockForHit =
         forkChain
           .lift(100)
-          .orElse(blockchain.blockAt(height + ind - 100).map((_, blockchain.generationInputAtHeight(height + ind - 100).get)))
+          .orElse(blockchain.blockAt(height + ind - 100).map((_, blockchain.hitSourceAtHeight(height + ind - 100).get)))
           .getOrElse(forkChain.head)
 
       val (gs, generationInput) =

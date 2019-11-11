@@ -95,9 +95,9 @@ trait Blockchain {
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
 
   /**
-    * Retrieves Blake2b256 signature or VRF (after feature activation) for the block at height.
+    * Retrieves hit source for the block at height.
     */
-  def generationInputAtHeight(height: Int): Option[ByteStr]
+  def hitSourceAtHeight(height: Int): Option[ByteStr]
 }
 
 object Blockchain extends BlockchainExtensions {

@@ -958,7 +958,7 @@ class LevelDBWriter(
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
-  override def generationInputAtHeight(height: Int): Option[ByteStr] = readOnly { db =>
+  override def hitSourceAtHeight(height: Int): Option[ByteStr] = readOnly { db =>
     Option(db.get(Keys.generationInput(height)))
       .filter(_.length == Block.GenerationInputLength)
       .map(ByteStr.apply)

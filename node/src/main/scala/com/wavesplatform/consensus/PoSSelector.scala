@@ -37,8 +37,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
     checkBaseTargetLimit(bt, height).flatMap { _ =>
       blockchain
-        .generationInputAtHeight(height)
-        .toRight(GenericError(s"Couldn't find generation input at height: $height"))
+        .hitSourceAtHeight(height)
+        .toRight(GenericError(s"Couldn't find hit source at height: $height"))
         .map(parentProofs => NxtLikeConsensusBlockData(bt, headerGenerationSignature(height, parentProofs, account)))
     }
   }
@@ -63,12 +63,12 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     blockchain.lastBlock
       .toRight(GenericError("No blocks in blockchain"))
       .flatMap {
-        case _ if vrfActivated(height) => // todo: (NODE-1927) always last block or by height?
+        case _ if vrfActivated(blockchain.height) =>
           for {
-            generationInput <- blockchain
-              .generationInputAtHeight(blockchain.height)
-              .toRight(GenericError(s"Couldn't find generation input at height: $height"))
-            vrf <- crypto.verifyVRF(blockGS, generationInput, blockGenerator)
+            hitSource <- blockchain
+              .hitSourceAtHeight(blockchain.height)
+              .toRight(GenericError(s"Couldn't find hit source at height: $height"))
+            vrf <- crypto.verifyVRF(blockGS, hitSource, blockGenerator)
           } yield vrf
         case b =>
           val gs = generationSignature(b.header.generationSignature.arr, blockGenerator)
@@ -120,13 +120,13 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
   private def getHit(height: Int, accountPublicKey: PublicKey): Either[ValidationError, BigInt] = {
     val message =
-      if (fairPosActivated(height) && height > 100) blockchain.generationInputAtHeight(height - 100)
-      else blockchain.generationInputAtHeight(blockchain.height)
+      if (fairPosActivated(height) && height > 100) blockchain.hitSourceAtHeight(height - 100)
+      else blockchain.hitSourceAtHeight(blockchain.height)
 
     message
       .map(msg => if (vrfActivated(height)) msg.arr else generationSignature(msg, accountPublicKey))
       .map(msg => hit(msg))
-      .toRight(GenericError(s"Couldn't find generation input at height: $height"))
+      .toRight(GenericError(s"Couldn't find hiy source at height: $height"))
   }
 
   private def headerGenerationSignature(height: Int, parentProofs: ByteStr, account: KeyPair): ByteStr =

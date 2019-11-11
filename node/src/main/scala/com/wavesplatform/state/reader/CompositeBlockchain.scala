@@ -240,7 +240,7 @@ final case class CompositeBlockchain(
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 
-  override def generationInputAtHeight(height: Int): Option[ByteStr] = inner.generationInputAtHeight(height)
+  override def hitSourceAtHeight(height: Int): Option[ByteStr] = inner.hitSourceAtHeight(height)
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {

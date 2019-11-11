@@ -62,8 +62,8 @@ package object appender extends ScorexLogging {
       validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(block)
     else
       blockchainUpdater
-        .generationInputAtHeight(blockchainUpdater.height)
-        .toRight(GenericError(s"Couldn't find generation input"))
+        .hitSourceAtHeight(blockchainUpdater.height)
+        .toRight(GenericError(s"Couldn't find hiy source"))
         .flatMap(genInput => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, genInput))
   }
 

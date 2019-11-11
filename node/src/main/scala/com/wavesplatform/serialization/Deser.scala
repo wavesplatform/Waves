@@ -1,13 +1,6 @@
 package com.wavesplatform.serialization
 
-import java.nio.ByteBuffer
-
 import com.google.common.primitives.{Bytes, Shorts}
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto.{KeyLength, SignatureLength}
-import com.wavesplatform.transaction.{Asset, AssetIdLength}
 import scorex.crypto.hash.Digest32
 
 object Deser {
