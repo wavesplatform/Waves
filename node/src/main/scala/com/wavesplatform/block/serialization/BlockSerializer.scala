@@ -17,7 +17,7 @@ import scala.util.Try
 object BlockHeaderSerializer {
   def toJson(blockHeader: BlockHeader): JsObject = {
     val consensusJson =
-      if (blockHeader.version < Block.NgBlockVersion)
+      if (blockHeader.version < Block.ProtoBlockVersion)
         Json.obj(
           "nxt-consensus" -> Json.obj(
             "base-target"          -> blockHeader.baseTarget,
