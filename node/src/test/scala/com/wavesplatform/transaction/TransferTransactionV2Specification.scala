@@ -24,8 +24,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
       "1BQcrqKmQy9vV8TxNbQA5VWKdFswHNUhPaCuKfwGPuZ1QPMgnkD6zkyuNnGiMpx2X8AUcVFiN6hYZ4SYF8Kxf8FGw8UGSTSJfv9xepxe1HbsUxGvL2zuwJ1z29mtZTunwKkAnMhqfFL6zWmQApmy4d2RYfyyW8StFaREmmP7KfG8T7Hv89r87TMaMQ2hvcLG94tzWKmLjhM4dXqJTgvNHcW6SxChSEn9mRbwu9Xu3jpFERTM9LJCbBhVAWnoz2ySAPCfHzF5otGEQjdyenuzR3av2EVg5UFd8bwkvXDUPTgyQqFMaStChZfSjzF5Kyt1vfaYMXpPpqh3ppERMx3ivCfGoStF2M9cksANC7cGPULopjSZXQY5R78djAFA87jUfy8fCoUvc7dRw84R5o7hXZ"
     )
     val json = Json.parse(
-      """
-        |{
+      """{
         |  "senderPublicKey" : "DVCo1PdepfbhA9xkRTtPc69osp86DyM9FWEp8TwGmNb1",
         |  "amount" : 80901858834201,
         |  "fee" : 22715602,
