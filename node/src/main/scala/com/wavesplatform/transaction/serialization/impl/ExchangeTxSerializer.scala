@@ -12,7 +12,7 @@ import scala.util.Try
 object ExchangeTxSerializer {
   def toJson(tx: ExchangeTransaction): JsObject = {
     import tx._
-    ProvenTxJson.toJson(tx) ++ Json.obj(
+    BaseTxJson.toJson(tx) ++ Json.obj(
       "order1"         -> buyOrder.json(),
       "order2"         -> sellOrder.json(),
       "amount"         -> amount,

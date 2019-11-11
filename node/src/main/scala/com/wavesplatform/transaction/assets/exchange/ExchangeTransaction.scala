@@ -28,7 +28,8 @@ case class ExchangeTransaction(
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with SigProofsSwitch {
 
   override def builder: TransactionParserLite = ExchangeTransaction
 
