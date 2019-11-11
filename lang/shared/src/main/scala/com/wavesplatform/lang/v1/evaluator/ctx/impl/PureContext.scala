@@ -605,7 +605,7 @@ object PureContext {
           }
         }
 
-        if (arr.isInstanceOf[IndexedSeq[CONST_LONG]]) {
+        if (arr.headOption.map(_.isInstanceOf[CONST_LONG]).getOrElse(true)) {
           if (arr.size == 1) {
             Right(arr.head)
           } else if (arr.size > 1 && arr.size <= MaxListSizeForMedianCalc) {
