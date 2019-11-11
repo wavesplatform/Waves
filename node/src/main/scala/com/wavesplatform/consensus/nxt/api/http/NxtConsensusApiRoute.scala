@@ -50,7 +50,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   def generationSignature: Route = (path("generationsignature") & get) {
     complete(
       commonApi
-        .metaAtHeight()
+        .metaAtHeight(commonApi.currentHeight)
         .map(m => Json.obj("generationSignature" -> m.header.generationSignature.toString))
         .toRight(BlockDoesNotExist)
     )
@@ -59,7 +59,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   def basetarget: Route = (path("basetarget") & get) {
     complete(
       commonApi
-        .metaAtHeight()
+        .metaAtHeight(commonApi.currentHeight)
         .map(m => Json.obj("baseTarget" -> m.header.baseTarget))
         .toRight(BlockDoesNotExist)
     )

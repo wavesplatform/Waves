@@ -6,18 +6,16 @@ import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
-import com.wavesplatform.state.Blockchain
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
 
 import scala.concurrent.Future
 
-class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
-  private[this] val commonApi = new CommonBlocksApi(blockchain)
+class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
 
   override def getCurrentHeight(request: Empty): Future[UInt32Value] = {
-    Future.successful(UInt32Value(commonApi.currentHeight()))
+    Future.successful(UInt32Value(commonApi.currentHeight))
   }
 
   override def getBlockRange(request: BlockRangeRequest, responseObserver: StreamObserver[BlockWithHeight]): Unit = responseObserver.interceptErrors {
@@ -30,7 +28,9 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) } else
         commonApi
           .metaRange(request.fromHeight, request.toHeight)
-          .map { case (header, _, _, signature, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), signature)), height) }
+          .map { meta =>
+            BlockWithHeight(Some(PBBlock(Some(meta.header.toPBHeader), meta.signature)), meta.height)
+          }
 
     responseObserver.completeWith(request.filter.generator match {
       case Some(generator) => stream.filter(_.block.exists(_.header.exists(h => h.generator.toAddress == generator.toAddress)))
@@ -43,10 +43,10 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       case Request.BlockId(blockId) =>
         commonApi
           .block(blockId)
-          .map(block => BlockWithHeight(Some(block.toPB), blockchain.heightOf(block.uniqueId).get))
+          .map(block => BlockWithHeight(Some(block.toPB), commonApi.meta(block.uniqueId).get.height))
 
       case Request.Height(height) =>
-        val actualHeight = if (height > 0) height else blockchain.height + height
+        val actualHeight = if (height > 0) height else commonApi.currentHeight + height
         commonApi
           .blockAtHeight(actualHeight)
           .map(block => BlockWithHeight(Some(block.toPB), actualHeight))

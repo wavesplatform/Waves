@@ -123,7 +123,7 @@ object Importer extends ScorexLogging {
       utxPool: UtxPool,
       blockchainUpdatedObservable: Observable[BlockchainUpdated]
   ): Seq[Extension] = {
-    val extensionContext = {
+    val extensionContext: Context = {
       val t = time
       new Context {
         override def settings: WavesSettings = wavesSettings
@@ -134,10 +134,14 @@ object Importer extends ScorexLogging {
         override def wallet: Wallet = ???
         override def utx: UtxPool   = utxPool
 
-        override def broadcastTransaction(tx: Transaction) = ???
+        override def broadcastTransaction(tx: Transaction)                 = ???
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
+
+        override def transactionsApi = ???
+        override def blocksApi       = ???
+        override def accountsApi     = ???
       }
     }
 

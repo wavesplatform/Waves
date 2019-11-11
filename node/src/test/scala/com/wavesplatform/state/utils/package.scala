@@ -19,7 +19,7 @@ package object utils {
       count: Int,
       fromId: Option[ByteStr]
   ): Seq[(Height, Transaction)] =
-    common.addressTransactions(db, diff)(address, types, count, fromId)
+    common.addressTransactions(db, diff, address, None, types, count, fromId)
 
   object TestLevelDB {
     def withFunctionalitySettings(

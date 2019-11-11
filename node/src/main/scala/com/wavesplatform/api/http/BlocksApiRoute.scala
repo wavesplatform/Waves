@@ -109,7 +109,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
   @Path("/height")
   @ApiOperation(value = "Blockchain height", notes = "Get current blockchain height", httpMethod = "GET")
   def height: Route = (path("height") & get) {
-    complete(Json.obj("height" -> commonApi.currentHeight()))
+    complete(Json.obj("height" -> commonApi.currentHeight))
   }
 
   @Path("/at/{height}")
@@ -186,11 +186,11 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
   def lastHeaderOnly: Route = (path("headers" / "last") & get)(last(includeTransactions = false))
 
   private def last(includeTransactions: Boolean) = complete {
-    val height = commonApi.currentHeight()
+    val height = commonApi.currentHeight
     (if (includeTransactions) {
-       commonApi.blockAtHeight().map(_.json())
+       commonApi.blockAtHeight(height).map(_.json())
      } else {
-       commonApi.metaAtHeight().map(block => BlockHeader.json(block.header, block.size, block.transactionCount, block.signature))
+       commonApi.metaAtHeight(height).map(block => BlockHeader.json(block.header, block.size, block.transactionCount, block.signature))
      }).map(_.addBlockFields(height))
   }
 

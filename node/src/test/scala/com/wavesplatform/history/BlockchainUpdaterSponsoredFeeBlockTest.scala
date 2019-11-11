@@ -94,10 +94,10 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(masterToAlice, feeAsset, sponsor), Seq(aliceToBob, bobToMaster)))
 
-        val block0TotalFee = block0.transactionData
-          .filter(_.assetFee._1 == Waves)
-          .map(_.assetFee._2)
-          .sum
+//        val block0TotalFee = block0.transactionData
+//          .filter(_.assetFee._1 == Waves)
+//          .map(_.assetFee._2)
+//          .sum
 
         {
           domain.blockchainUpdater.processBlock(block0) shouldBe 'right
@@ -108,10 +108,10 @@ class BlockchainUpdaterSponsoredFeeBlockTest
           domain.blockchainUpdater.processMicroBlock(microBlocks(0)) shouldBe 'right
           domain.blockchainUpdater.processMicroBlock(microBlocks(1)) shouldBe 'right
 
-          val microBlocksWavesFee = microBlocks
-            .flatMap(_.transactionData)
-            .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
-            .sum
+//          val microBlocksWavesFee = microBlocks
+//            .flatMap(_.transactionData)
+//            .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
+//            .sum
 
 //          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee + microBlocksWavesFee)
           fail("blockFee??")

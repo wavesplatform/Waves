@@ -10,7 +10,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.validation.TxConstraints
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 

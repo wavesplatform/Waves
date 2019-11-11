@@ -13,7 +13,6 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.TxValidationError.WrongChain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
-import com.wavesplatform.transaction.validation.TxConstraints
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 

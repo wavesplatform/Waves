@@ -14,7 +14,7 @@ import cats.syntax.option._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
-import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi, CommonBlocksApi, CommonTransactionsApi}
+import com.wavesplatform.api.common._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
@@ -36,7 +36,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Diff, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
@@ -171,7 +171,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         allChannels.broadcast(LocalScoreChanged(x))
       }(scheduler)
 
-    val history = History(blockchainUpdater, db)
+    val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
     def loadBlockAt(height: Int): Option[Block] =
       blockchainUpdater.blockId(height).flatMap(history.loadBlockBytes).map(bytes => Block.parseBytes(bytes).get)
 
@@ -190,6 +190,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           case Left(error) => Left(error)
         }
 
+    val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockAt)
+    val cca: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+    val csa: CommonAssetsApi   = new CommonAssetsApi(blockchainUpdater)
+    val cta: CommonTransactionsApi = CommonTransactionsApi(
+      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+      db,
+      blockchainUpdater,
+      utxStorage,
+      wallet,
+      utxSynchronizer.publish
+    )
+
     // Extensions start
     val extensionContext = new Context {
       override def settings: WavesSettings                                                       = app.settings
@@ -202,6 +214,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def spendableBalanceChanged: Observable[(Address, Asset)]                         = app.spendableBalanceChanged
       override def actorSystem: ActorSystem                                                      = app.actorSystem
       override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
+
+      override def transactionsApi = cta
+      override def blocksApi       = cba
+      override def accountsApi     = cca
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -297,11 +313,6 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           }
         }
       }
-
-      val cta: CommonTransactionsApi = ???
-      val cba: CommonBlocksApi       = new CommonBlocksApi(blockchainUpdater, loadBlockAt)
-      val cca: CommonAccountApi      = new CommonAccountApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-      val csa: CommonAssetsApi       = new CommonAssetsApi(blockchainUpdater)
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),

@@ -81,8 +81,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case (sender, recipient, txCount) =>
         withDomain(createSettings(MassTransfer -> 0)) { d =>
           def addressTransactions(address: Address): Seq[(Height, Transaction)] =
-            common.addressTransactions(db, d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff))(
+            common.addressTransactions(db, d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff),
               address,
+              None,
               Set.empty,
               Int.MaxValue,
               None

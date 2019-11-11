@@ -2,7 +2,7 @@ package com.wavesplatform.api.http.leasing
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonAccountApi
+import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.requests.{LeaseCancelRequest, LeaseRequest}
 import com.wavesplatform.http.BroadcastRoute
@@ -19,7 +19,7 @@ import play.api.libs.json.JsNumber
 
 @Path("/leasing")
 @Api(value = "/leasing")
-case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountApi: CommonAccountApi)
+case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountApi: CommonAccountsApi)
     extends ApiRoute
     with BroadcastRoute
     with AuthRoute {

@@ -10,7 +10,7 @@ import cats.syntax.either._
 import cats.syntax.traverse._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
@@ -48,7 +48,7 @@ case class AssetsApiRoute(
     utxPoolSynchronizer: UtxPoolSynchronizer,
     blockchain: Blockchain,
     time: Time,
-    commonAccountApi: CommonAccountApi,
+    commonAccountApi: CommonAccountsApi,
     commonAssetsApi: CommonAssetsApi
 ) extends ApiRoute
     with BroadcastRoute

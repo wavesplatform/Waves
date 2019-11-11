@@ -6,7 +6,7 @@ import java.util.concurrent.ThreadLocalRandom
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{DBExt, LevelDBFactory, LevelDBWriter, loadBlock}
 import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.bench.DataTestData
@@ -54,14 +54,14 @@ object ExtractInfo extends App with ScorexLogging {
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {
-        height     <- randomInts(from, state.height)
+        height                      <- randomInts(from, state.height)
         (_, _, transactionCount, _) <- state.blockHeaderAndSize(height)
         if transactionCount > 0
       } yield height
 
     def nonEmptyBlocks(from: Int): Iterator[Block] =
       nonEmptyBlockHeights(from)
-        .flatMap(state.blockAt(_))
+        .flatMap(h => db.readOnly(ro => loadBlock(Height(h.toInt), ro)))
 
     val aliasTxs = nonEmptyBlocks(benchSettings.aliasesFromHeight)
       .flatMap(_.transactionData)

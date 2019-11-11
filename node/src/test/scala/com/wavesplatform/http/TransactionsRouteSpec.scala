@@ -196,7 +196,7 @@ class TransactionsRouteSpec
       "address and limit" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
           case (address, limit) =>
-            (addressTransactions.transactionsByAddress _).expects(*, *, limit, None).returning(Seq.empty).once()
+            (addressTransactions.transactionsByAddress _).expects(*, *, *, limit, None).returning(Seq.empty).once()
             Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
             }
@@ -206,7 +206,7 @@ class TransactionsRouteSpec
       "address, limit and after" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
           case (address, limit, txId) =>
-            (addressTransactions.transactionsByAddress _).expects(*, *, limit, *).returning(Seq.empty).once()
+            (addressTransactions.transactionsByAddress _).expects(*, *, *, limit, *).returning(Seq.empty).once()
             Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
             }

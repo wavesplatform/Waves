@@ -8,55 +8,80 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Blockchain
 import monix.reactive.Observable
 
-class CommonBlocksApi(blockchain: Blockchain, blockAt: Int => Option[Block]) {
-  private def fixHeight(h: Int)                  = if (h <= 0) blockchain.height + h else h
-  private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
+trait CommonBlocksApi {
+  def childBlock(blockId: BlockId): Option[(Block, Int)]
 
-  private def blockHeaderAt(height: Int) =
-    blockchain.blockHeaderAndSize(height).map {
-      case (header, size, txCount, uniqueId) => BlockMeta(header, size, txCount, uniqueId, height)
-    }
+  def blockDelay(blockId: BlockId, blockNum: Int): Option[Long]
 
-  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(Block, Int)] =
-    metaRange(fromHeight, toHeight).flatMap { m =>
-      Observable.fromIterable(blockAt(m.height).map(_ -> m.height))
-    }
+  def currentHeight: Int
 
-  def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(Block, Int)] =
-    metaRange(fromHeight, toHeight)
-      .collect { case m if m.header.generator.toAddress == generatorAddress => m.height }
-      .flatMap(height => Observable.fromIterable(blockAt(height).map(_ -> height)))
+  def block(blockId: BlockId): Option[Block]
 
-  def childBlock(blockId: BlockId): Option[(Block, Int)] =
-    for {
-      height <- heightOf(blockId)
-      block  <- blockAt(height + 1)
-    } yield (block, height + 1)
+  def blockAtHeight(height: Int): Option[Block]
 
-  def blockDelay(blockId: BlockId, blockNum: Int): Option[Long] =
-    heightOf(blockId)
-      .map { maxHeight =>
-        val minHeight  = maxHeight - blockNum.max(1)
-        val allHeaders = (minHeight to maxHeight).flatMap(blockHeaderAt)
-        val totalPeriod = allHeaders
-          .sliding(2)
-          .map { pair =>
-            pair(1).header.timestamp - pair(0).header.timestamp
-          }
-          .sum
-        totalPeriod / allHeaders.size
+  def blocksRange(fromHeight: Int, toHeight: Int): Observable[(Block, Int)]
+
+  def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(Block, Int)]
+
+  def meta(id: ByteStr): Option[BlockMeta]
+
+  def metaAtHeight(height: Int): Option[BlockMeta]
+
+  def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta]
+
+}
+
+object CommonBlocksApi {
+  def apply(blockchain: Blockchain, blockAt: Int => Option[Block]): CommonBlocksApi = new CommonBlocksApi {
+    private def fixHeight(h: Int)                  = if (h <= 0) blockchain.height + h else h
+    private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
+
+    private def blockHeaderAt(height: Int): Option[BlockMeta] =
+      blockchain.blockHeaderAndSize(height).map {
+        case (header, size, txCount, uniqueId) => BlockMeta(header, size, txCount, uniqueId, height)
       }
 
-  def currentHeight(): Int = blockchain.height
+    def blocksRange(fromHeight: Int, toHeight: Int): Observable[(Block, Int)] =
+      metaRange(fromHeight, toHeight).flatMap { m =>
+        Observable.fromIterable(blockAt(m.height).map(_ -> m.height))
+      }
 
-  def blockAtHeight(height: Int = blockchain.height): Option[Block] = blockAt(height)
+    def blocksRange(fromHeight: Int, toHeight: Int, generatorAddress: Address): Observable[(Block, Int)] =
+      metaRange(fromHeight, toHeight)
+        .collect { case m if m.header.generator.toAddress == generatorAddress => m.height }
+        .flatMap(height => Observable.fromIterable(blockAt(height).map(_ -> height)))
 
-  def metaAtHeight(height: Int = blockchain.height): Option[BlockMeta] = blockHeaderAt(height)
+    def childBlock(blockId: BlockId): Option[(Block, Int)] =
+      for {
+        height <- heightOf(blockId)
+        block  <- blockAt(height + 1)
+      } yield (block, height + 1)
 
-  def meta(id: ByteStr): Option[BlockMeta] = heightOf(id).flatMap(blockHeaderAt)
+    def blockDelay(blockId: BlockId, blockNum: Int): Option[Long] =
+      heightOf(blockId)
+        .map { maxHeight =>
+          val minHeight  = maxHeight - blockNum.max(1)
+          val allHeaders = (minHeight to maxHeight).flatMap(blockHeaderAt)
+          val totalPeriod = allHeaders
+            .sliding(2)
+            .map { pair =>
+              pair(1).header.timestamp - pair(0).header.timestamp
+            }
+            .sum
+          totalPeriod / allHeaders.size
+        }
 
-  def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
-    Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(blockHeaderAt))
+    def currentHeight: Int = blockchain.height
 
-  def block(blockId: BlockId): Option[Block] = heightOf(blockId).flatMap(blockAt)
+    def blockAtHeight(height: Int): Option[Block] = blockAt(height)
+
+    def metaAtHeight(height: Int): Option[BlockMeta] = blockHeaderAt(height)
+
+    def meta(id: ByteStr): Option[BlockMeta] = heightOf(id).flatMap(blockHeaderAt)
+
+    def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
+      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(blockHeaderAt))
+
+    def block(blockId: BlockId): Option[Block] = heightOf(blockId).flatMap(blockAt)
+  }
 }

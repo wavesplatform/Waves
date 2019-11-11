@@ -1,8 +1,7 @@
 package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.RequestGen
-import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets._
@@ -35,7 +34,7 @@ class AssetsBroadcastRouteSpec
     DummyUtxPoolSynchronizer.rejecting(tx => TransactionValidationError(GenericError("foo"), tx)),
     stub[Blockchain],
     stub[Time],
-    stub[CommonAccountApi],
+    stub[CommonAccountsApi],
     stub[CommonAssetsApi]
   ).route
 
@@ -155,7 +154,7 @@ class AssetsBroadcastRouteSpec
   }
 
   "compatibility" - {
-    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[Time], stub[CommonAccountApi], stub[CommonAssetsApi]).route
+    val route = AssetsApiRoute(restAPISettings, stub[Wallet], DummyUtxPoolSynchronizer.accepting, stub[Blockchain], stub[Time], stub[CommonAccountsApi], stub[CommonAssetsApi]).route
 
     val seed               = "seed".getBytes("UTF-8")
     val senderPrivateKey   = Wallet.generateNewAccount(seed, 0)

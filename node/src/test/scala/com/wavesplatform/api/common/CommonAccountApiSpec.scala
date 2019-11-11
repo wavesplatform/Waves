@@ -1,12 +1,11 @@
 package com.wavesplatform.api.common
-import com.wavesplatform.account.Address
-import com.wavesplatform.state.StringDataEntry
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.util.Random
 
 class CommonAccountApiSpec extends FreeSpec with Matchers {
   "regex tests" in pendingUntilFixed {
+    /*
     val dataKeys = Set(
       "abc",
       "aBcD",
@@ -59,6 +58,8 @@ class CommonAccountApiSpec extends FreeSpec with Matchers {
       "^1aB1cD$",
       "(a|b)c"
     )
+    */
+
 
     fail("not implemented")
   }

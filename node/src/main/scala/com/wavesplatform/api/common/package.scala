@@ -2,66 +2,17 @@ package com.wavesplatform.api
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Keys, ReadOnlyDB}
-import com.wavesplatform.state.{AddressId, Diff, Height, Portfolio, TransactionId}
+import com.wavesplatform.state.{AddressId, Diff, Height, InvokeScriptResult, Portfolio, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction}
 import org.iq80.leveldb.DB
 
 package object common {
-  def addressTransactions(db: DB, maybeDiff: => Option[(Height, Diff)])(
-      address: Address,
-      types: Set[Transaction.Type],
-      count: Int,
-      fromId: Option[ByteStr]
-  ): Seq[(Height, Transaction)] = {
-    maybeDiff.map {
-      case (height, diff) =>
-        height -> diff.transactions.dropWhile { case (tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
-    } match {
-      case Some((height, matchingFromId)) if matchingFromId.nonEmpty =>
-        val filteredFromDiff = matchingFromId
-          .collect {
-            case (tx, addresses) if addresses.contains(address) && (types.isEmpty || types.contains(tx.typeId)) =>
-              Height(height) -> tx
-          }
-
-        if (filteredFromDiff.length < count) {
-          filteredFromDiff ++ loadAddressTransactions(db, address, types, count - filteredFromDiff.length, None)
-        } else {
-          filteredFromDiff.take(count)
-        }
-      case _ =>
-        loadAddressTransactions(db, address, types, count, fromId)
-    }
-  }
-
-  private def loadAddressTransactions(
-      writableDB: DB,
-      address: Address,
-      types: Set[Transaction.Type],
-      count: Int,
-      fromId: Option[ByteStr]
-  ): Seq[(Height, Transaction)] =
-    writableDB.readOnly { db =>
-      val txIds = (for {
-        addressId <- db.get(Keys.addressId(address)).view
-        maxSeqNr = db.get(Keys.addressTransactionSeqNr(AddressId(addressId)))
-        seqNr       <- (maxSeqNr to 1 by -1).view
-        (h, txNums) <- db.get(Keys.addressTransactionHN(AddressId(addressId), seqNr)).view
-        txNum       <- txNums
-      } yield h -> txNum).dropWhile { case (_, (_, _, id)) => fromId.isDefined && !fromId.contains(id) }
-
-      (for {
-        (h, (txType, txNum, _)) <- txIds
-        if types.isEmpty || types.contains(txType)
-        tx <- db.get(Keys.transactionAt(h, txNum))
-      } yield h -> tx).take(count).toSeq
-    }
-
   def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)])(address: Address): Seq[(Height, CreateAliasTransaction)] = {
     val hijackedAliases = db.get(Keys.disabledAliases)
-    addressTransactions(db, maybeDiff)(address, Set(CreateAliasTransaction.typeId), Int.MaxValue, None)
+    addressTransactions(db, maybeDiff, address, None, Set(CreateAliasTransaction.typeId), Int.MaxValue, None)
       .collect {
         case (h, t: CreateAliasTransaction) if !hijackedAliases.contains(t.alias) => h -> t
       }
@@ -89,12 +40,116 @@ package object common {
       }
   }
 
-  private def loadTransactions(db: ReadOnlyDB, ids: Seq[ByteStr]) =
-    for {
-      id     <- ids.view
-      (h, n) <- db.get(Keys.transactionHNById(TransactionId(id)))
-      tx     <- db.get(Keys.transactionAt(h, n))
-    } yield tx
+  def addressTransactions(
+      db: DB,
+      maybeDiff: Option[(Height, Diff)],
+      subject: Address,
+      sender: Option[Address],
+      types: Set[Transaction.Type],
+      count: Int,
+      fromId: Option[ByteStr]
+  ): Seq[(Height, Transaction)] = db.readOnly(ro => addressTransactions(ro, maybeDiff, subject, sender, types, count, fromId))
+
+  def invokeScriptResults(
+      db: DB,
+      maybeDiff: Option[(Height, Diff)],
+      subject: Address,
+      sender: Option[Address],
+      types: Set[Transaction.Type],
+      count: Int,
+      fromId: Option[ByteStr]
+  ): Seq[(Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])])] = db.readOnly { ro =>
+    addressTransactions(ro, maybeDiff, subject, sender, types, count, fromId)
+      .map {
+        case (height, ist: InvokeScriptTransaction) =>
+          height -> Right(ist -> maybeDiff.flatMap(_._2.scriptResults.get(ist.id())).orElse(loadInvokeScriptResult(ro, ist.id())))
+        case (height, tx) =>
+          height -> Left(tx)
+      }
+  }
+
+  def invokeScriptResults(db: DB, maybeDiff: Option[(Height, Diff)], txId: ByteStr): Option[(Height, InvokeScriptTransaction, InvokeScriptResult)] = {
+    maybeDiff
+      .flatMap {
+        case (h, diff) =>
+          diff
+            .transactionMap()
+            .get(txId)
+            .collect {
+              case (ist: InvokeScriptTransaction, _) => diff.scriptResults.get(txId).map(r => (h, ist, r))
+            }
+            .flatten
+      }
+      .orElse(db.readOnly { ro =>
+        loadTransactions(ro, txId) match {
+          case Some((h, ist: InvokeScriptTransaction)) => loadInvokeScriptResult(ro, txId).map(isr => (h, ist, isr))
+          case _                                       => None
+        }
+      })
+  }
+
+  private def addressTransactions(
+      db: ReadOnlyDB,
+      maybeDiff: => Option[(Height, Diff)],
+      subject: Address,
+      sender: Option[Address],
+      types: Set[Transaction.Type],
+      count: Int,
+      fromId: Option[ByteStr]
+  ): Seq[(Height, Transaction)] = {
+    maybeDiff.map {
+      case (height, diff) =>
+        height -> diff.transactions.dropWhile { case (tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
+    } match {
+      case Some((height, matchingFromId)) if matchingFromId.nonEmpty =>
+        val filteredFromDiff = matchingFromId
+          .collect {
+            case (tx: Authorized, addresses) if sender.forall(_ == tx.sender.toAddress) && addresses(subject) =>
+              Height(height) -> tx
+          }
+
+        if (filteredFromDiff.length < count) {
+          filteredFromDiff ++ loadAddressTransactions(db, subject, sender, types, count - filteredFromDiff.length, None)
+        } else {
+          filteredFromDiff.take(count)
+        }
+      case _ =>
+        loadAddressTransactions(db, subject, sender, types, count, fromId)
+    }
+  }
+
+  private def loadAddressTransactions(
+      db: ReadOnlyDB,
+      subject: Address,
+      sender: Option[Address],
+      types: Set[Transaction.Type],
+      count: Int,
+      fromId: Option[ByteStr]
+  ): Seq[(Height, Transaction)] = {
+    def matchesSender(tx: Transaction): Boolean =
+      sender.forall(
+        senderAddress =>
+          tx match {
+            case a: Authorized => a.sender.toAddress == senderAddress
+            case _             => false
+          }
+      )
+
+    val txIds = (for {
+      addressId <- db.get(Keys.addressId(subject)).view
+      maxSeqNr = db.get(Keys.addressTransactionSeqNr(AddressId(addressId)))
+      seqNr       <- (maxSeqNr to 1 by -1).view
+      (h, txNums) <- db.get(Keys.addressTransactionHN(AddressId(addressId), seqNr)).view
+      txNum       <- txNums
+    } yield h -> txNum).dropWhile { case (_, (_, _, id)) => fromId.isDefined && !fromId.contains(id) }
+
+    (for {
+      (h, (txType, txNum, _)) <- txIds
+      if types.isEmpty || types.contains(txType)
+      tx <- db.get(Keys.transactionAt(h, txNum))
+      if matchesSender(tx)
+    } yield h -> tx).take(count).toSeq
+  }
 
   private def loadNftList(
       writableDB: DB,
@@ -104,22 +159,32 @@ package object common {
       inclusions: Set[IssuedAsset],
       balance: (Address, IssuedAsset) => Long
   ): Seq[IssueTransaction] = writableDB.readOnly { db =>
-    val includedTransactions = loadTransactions(db, inclusions.map(_.id).toSeq)
+    val includedTransactions = inclusions.view.flatMap(asset => loadTransactions(db, asset.id)).map(_._2)
 
     val transactions = for {
       addressId <- db.get(Keys.addressId(address)).toSeq.view
       assetList = db.get(Keys.assetList(addressId)).view.collect {
         case ia if balance(address, ia) > 0 && !inclusions(ia) => ia.id
       }
-      tx <- loadTransactions(db, assetList)
+      id      <- assetList
+      (_, tx) <- loadTransactions(db, id)
     } yield tx
 
-    val result = (includedTransactions ++ transactions)
+    (includedTransactions ++ transactions)
       .dropWhile(t => fromId.isDefined && !fromId.contains(t.id()))
       .collect { case t: IssueTransaction if t.isNFT => t }
       .take(count)
-      .force
-
-    result
+      .toSeq
   }
+
+  private def loadTransactions(db: ReadOnlyDB, id: ByteStr): Option[(Height, Transaction)] =
+    for {
+      (h, n) <- db.get(Keys.transactionHNById(TransactionId(id)))
+      tx     <- db.get(Keys.transactionAt(h, n))
+    } yield h -> tx
+
+  private def loadInvokeScriptResult(db: ReadOnlyDB, id: ByteStr): Option[InvokeScriptResult] =
+    for {
+      (h, txNum) <- db.get(Keys.transactionHNById(TransactionId(id)))
+    } yield db.get(Keys.invokeScriptResult(h, txNum))
 }

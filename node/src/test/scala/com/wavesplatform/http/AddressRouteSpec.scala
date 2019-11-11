@@ -2,8 +2,8 @@ package com.wavesplatform.http
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.api.common.CommonAccountApi
-import com.wavesplatform.api.common.CommonAccountApi.AddressScriptInfo
+import com.wavesplatform.api.common.CommonAccountsApi
+import com.wavesplatform.api.common.CommonAccountsApi.AddressScriptInfo
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -42,7 +42,7 @@ class AddressRouteSpec
 
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
 
-  private val commonAccountApi = mock[CommonAccountApi]("globalAccountApi")
+  private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
   private val route =
     AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, commonAccountApi).route

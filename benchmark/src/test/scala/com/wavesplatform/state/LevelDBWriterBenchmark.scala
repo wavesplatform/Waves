@@ -5,9 +5,12 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account._
+import com.wavesplatform.api.BlockMeta
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.history.History
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
 import com.wavesplatform.transaction.Asset
@@ -37,25 +40,18 @@ import scala.io.Codec
 class LevelDBWriterBenchmark {
   @Benchmark
   def readFullBlock_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.blockById(st.allBlocks.random).get)
+    bh.consume(st.blockById(st.allBlocks.random).get)
   }
 
   @Benchmark
   def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.blockHeaderAndSize(st.allBlocks.random).get)
+    bh.consume(st.blockHeaderAndSize(st.allBlocks.random).get)
   }
 
   @Benchmark
   def transactionById_test(st: TransactionByIdSt, bh: Blackhole): Unit = {
     bh.consume(st.db.transactionInfo(st.allTxs.random).get)
   }
-
-  @Benchmark
-  def transactionByAddress_test(st: TransactionByAddressSt, bh: Blackhole): Unit = {
-    import monix.execution.Scheduler.Implicits.global
-    bh.consume(st.db.addressTransactionsObservable(st.txsAddresses.random, Set.empty, None).firstL.runSyncUnsafe(Duration.Inf))
-  }
-
 }
 
 object LevelDBWriterBenchmark {
@@ -96,6 +92,10 @@ object LevelDBWriterBenchmark {
     private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
 
     val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
+    val history = History(db, _ => None, _ => None, rawDB)
+
+    def blockById(id: ByteStr): Option[Block] = ???
+    def blockHeaderAndSize(id: ByteStr): Option[BlockMeta] = ???
 
     @TearDown
     def close(): Unit = {

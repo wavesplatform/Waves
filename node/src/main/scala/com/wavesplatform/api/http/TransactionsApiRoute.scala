@@ -91,7 +91,7 @@ class TransactionsApiRoute(
   @ApiOperation(value = "Unconfirmed transactions", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(commonApi.unconfirmedTransactions().map(txToExtendedJson)))
+      complete(JsArray(commonApi.unconfirmedTransactions.map(txToExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 
@@ -242,7 +242,7 @@ class TransactionsApiRoute(
         }
       }
 
-      val txs = commonApi.transactionsByAddress(address, Set.empty, limit, fromId)
+      val txs = commonApi.transactionsByAddress(address, None, Set.empty, limit, fromId)
       Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }))
     }
 

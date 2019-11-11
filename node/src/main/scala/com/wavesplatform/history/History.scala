@@ -1,9 +1,10 @@
 package com.wavesplatform.history
 
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.state.{BlockchainUpdaterImpl, Height}
+import com.wavesplatform.state.{Blockchain, Height, NG}
 import org.iq80.leveldb.DB
 
 trait History {
@@ -13,10 +14,9 @@ trait History {
 }
 
 object History {
-  def apply(blockchain: BlockchainUpdaterImpl, db: DB): History = new History {
+  def apply(blockchain: Blockchain, liquidBlock: ByteStr => Option[Block], microBlock: ByteStr => Option[MicroBlock], db: DB): History = new History {
     override def loadBlockBytes(id: ByteStr): Option[Array[Byte]] = {
-      blockchain
-        .liquidBlock(id)
+      liquidBlock(id)
         .map(_.bytes())
         .orElse(blockchain.heightOf(id).flatMap { h =>
           db.readOnly { ro =>
@@ -26,7 +26,7 @@ object History {
     }
 
     override def loadMicroBlockBytes(id: ByteStr): Option[Array[Byte]] =
-      blockchain.microBlock(id).map(_.bytes())
+      microBlock(id).map(_.bytes())
 
     override def blockIdsAfter(candidates: Seq[ByteStr], count: Int): Seq[ByteStr] =
       candidates.view.flatMap(blockchain.heightOf).headOption.fold[Seq[ByteStr]](Seq.empty) { firstCommonHeight =>

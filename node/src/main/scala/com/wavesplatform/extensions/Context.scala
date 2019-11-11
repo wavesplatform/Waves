@@ -2,6 +2,7 @@ package com.wavesplatform.extensions
 
 import akka.actor.ActorSystem
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
@@ -21,6 +22,10 @@ trait Context {
   def time: Time
   def wallet: Wallet
   def utx: UtxPool
+
+  def transactionsApi: CommonTransactionsApi
+  def blocksApi: CommonBlocksApi
+  def accountsApi: CommonAccountsApi
 
   def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def spendableBalanceChanged: Observable[(Address, Asset)]

@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.requests.{TransferV1Request, TransferV2Request}
 import com.wavesplatform.http.ApiMarshallers._
@@ -27,7 +27,7 @@ class AssetsRouteSpec extends RouteSpec("/assets") with RequestGen with PathMock
   (wallet.privateKeyAccount _).when(senderPrivateKey.toAddress).onCall((_: Address) => Right(senderPrivateKey)).anyNumberOfTimes()
 
   "/transfer" - {
-    val route: Route = AssetsApiRoute(restAPISettings, wallet, DummyUtxPoolSynchronizer.accepting, state, new TestTime(), mock[CommonAccountApi], mock[CommonAssetsApi]).route
+    val route: Route = AssetsApiRoute(restAPISettings, wallet, DummyUtxPoolSynchronizer.accepting, state, new TestTime(), mock[CommonAccountsApi], mock[CommonAssetsApi]).route
 
     def posting[A: Writes](v: A): RouteTestResult = Post(routePath("/transfer"), v).addHeader(ApiKeyHeader) ~> route
 

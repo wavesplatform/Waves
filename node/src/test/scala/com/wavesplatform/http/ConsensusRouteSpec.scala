@@ -24,7 +24,7 @@ class ConsensusRouteSpec
     1 to 10 foreach { _ =>
       d.blockchainUpdater.processBlock(getNextTestBlock(d.blockchainUpdater))
     }
-    val commonApi = new CommonBlocksApi(d.blockchainUpdater, _ => None)
+    val commonApi = CommonBlocksApi(d.blockchainUpdater, _ => None)
     f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater, commonApi).route)
   }
 

@@ -5,7 +5,7 @@ import java.nio.charset.StandardCharsets
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.common.CommonAccountApi
+import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.utils.{Base58, Base64}
@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountApi: CommonAccountApi)
+case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountsApi: CommonAccountsApi)
     extends ApiRoute
     with BroadcastRoute
     with AuthRoute
@@ -394,7 +394,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
             Balance(
               acc.stringRepr,
               confirmations,
-              commonAccountApi.balance(acc, confirmations)
+              commonAccountsApi.balance(acc, confirmations)
             )
           )
       )
@@ -405,18 +405,18 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, 0, commonAccountApi.balance(acc))))
+      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, 0, commonAccountsApi.balance(acc))))
       .getOrElse(InvalidAddress)
   }
 
   private def balancesDetailsJson(account: Address): BalanceDetails = {
-    val details = commonAccountApi.balanceDetails(account)
+    val details = commonAccountsApi.balanceDetails(account)
     import details._
     BalanceDetails(account.stringRepr, regular, generating, available, effective)
   }
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountApi.script(account)
+    val CommonAccountsApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountsApi.script(account)
     AddressScriptInfo(account.stringRepr, script.map(_.base64), scriptText, complexity, extraFee)
   }
 
@@ -432,7 +432,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .right
-      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, confirmations, commonAccountApi.effectiveBalance(acc, confirmations))))
+      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))))
       .getOrElse(InvalidAddress)
   }
 
@@ -440,7 +440,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .map { acc =>
-        ToResponseMarshallable(commonAccountApi.dataStream(acc, None).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
+        ToResponseMarshallable(commonAccountsApi.dataStream(acc, None).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
       }
       .getOrElse(InvalidAddress)
   }
@@ -449,7 +449,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Address
       .fromString(address)
       .map { addr =>
-        val result: ToResponseMarshallable = commonAccountApi
+        val result: ToResponseMarshallable = commonAccountsApi
           .dataStream(addr, Some(regex))
           .toListL
           .runAsyncLogErr
@@ -463,7 +463,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   private def accountDataEntry(address: String, key: String): ToResponseMarshallable = {
     val result = for {
       addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
-      value <- commonAccountApi.data(addr, key).toRight(DataKeyDoesNotExist)
+      value <- commonAccountsApi.data(addr, key).toRight(DataKeyDoesNotExist)
     } yield value
     ToResponseMarshallable(result)
   }
@@ -471,7 +471,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   private def accountDataList(address: String, keys: String*): ToResponseMarshallable = {
     val result = for {
       addr <- Address.fromString(address).left.map(_ => InvalidAddress)
-      dataList = keys.flatMap(commonAccountApi.data(addr, _))
+      dataList = keys.flatMap(commonAccountsApi.data(addr, _))
     } yield dataList
     ToResponseMarshallable(result)
   }
