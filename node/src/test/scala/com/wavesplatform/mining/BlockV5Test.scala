@@ -27,7 +27,6 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.concurrent.Await
 import scala.concurrent.duration._
 
-// todo: (NODE-1927) Two miners and microblocks
 class BlockV5Test
     extends FlatSpec
     with ScalaCheckPropertyChecks
@@ -41,24 +40,25 @@ class BlockV5Test
   import BlockV5Test._
 
   private val activationScenario = for {
-    (miner, b1) <- genesis
-    b2 = TestBlock.create(ntpNow, b1.uniqueId, Seq.empty, miner, version = Block.PlainBlockVersion)
-    b3 = TestBlock.create(ntpNow, b2.uniqueId, Seq.empty, miner, version = Block.PlainBlockVersion)
-    b4 = TestBlock.create(ntpNow, b3.uniqueId, Seq.empty, miner, version = Block.NgBlockVersion)
-    b5 = TestBlock.create(ntpNow, b4.uniqueId, Seq.empty, miner, version = Block.RewardBlockVersion, rewardVote = 7 * Constants.UnitsInWave)
-  } yield (miner, Seq(b1, b2, b3, b4, b5))
+    (miner1, miner2, b1) <- genesis
+    b2 = TestBlock.create(ntpNow, b1.uniqueId, Seq.empty, miner1, version = Block.PlainBlockVersion)
+    b3 = TestBlock.create(ntpNow, b2.uniqueId, Seq.empty, miner1, version = Block.PlainBlockVersion)
+    b4 = TestBlock.create(ntpNow, b3.uniqueId, Seq.empty, miner1, version = Block.NgBlockVersion)
+    b5 = TestBlock.create(ntpNow, b4.uniqueId, Seq.empty, miner1, version = Block.RewardBlockVersion, rewardVote = 7 * Constants.UnitsInWave)
+  } yield (miner1, miner2, Seq(b1, b2, b3, b4, b5))
 
   "Miner" should "generate valid blocks" in forAll(activationScenario) {
-    case (minerAcc, bs) =>
+    case (minerAcc1, minerAcc2, bs) =>
       withBlockchain { blockchain =>
         bs.foreach(b => blockchain.processBlock(b, b.header.generationSignature).explicitGet())
         blockchain.height shouldBe bs.size
         blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
         withMiner(blockchain) {
           case (miner, time, appender, scheduler) =>
+            time.setTime(ntpNow)
             time.advance(10.minute)
 
-            val forgedAtActivationHeight = miner invokePrivate forgeBlock(minerAcc)
+            val forgedAtActivationHeight = miner invokePrivate forgeBlock(minerAcc2)
             forgedAtActivationHeight shouldBe 'right
             val blockAtActivationHeight = forgedAtActivationHeight.right.value._2
             blockAtActivationHeight.header.version shouldBe Block.RewardBlockVersion
@@ -73,7 +73,7 @@ class BlockV5Test
 
             time.advance(10.minute)
 
-            val forgedAfterActivationHeight = miner invokePrivate forgeBlock(minerAcc)
+            val forgedAfterActivationHeight = miner invokePrivate forgeBlock(minerAcc1)
             forgedAfterActivationHeight shouldBe 'right
             val blockAfterActivationHeight = forgedAfterActivationHeight.right.value._2
             blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
@@ -88,13 +88,13 @@ class BlockV5Test
               .verifyVRF(
                 blockAfterActivationHeight.header.generationSignature,
                 genInputAtActivationHeight,
-                minerAcc.publicKey
+                minerAcc1.publicKey
               )
               .explicitGet()
 
             time.advance(10.minute)
 
-            val forgedAfterVRFUsing = miner invokePrivate forgeBlock(minerAcc)
+            val forgedAfterVRFUsing = miner invokePrivate forgeBlock(minerAcc2)
             forgedAfterVRFUsing shouldBe 'right
             val blockAfterVRFUsing = forgedAfterVRFUsing.right.value._2
             blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
@@ -109,7 +109,7 @@ class BlockV5Test
               .verifyVRF(
                 blockAfterVRFUsing.header.generationSignature,
                 genInputAfterActivationHeight,
-                minerAcc.publicKey
+                minerAcc2.publicKey
               )
               .explicitGet()
         }
@@ -118,19 +118,21 @@ class BlockV5Test
 
   private val forgeBlock = PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)
 
-  private def genesis: Gen[(KeyPair, Block)] =
+  private def genesis: Gen[(KeyPair, KeyPair, Block)] =
     for {
-      miner <- accountGen
+      miner1 <- accountGen
+      miner2 <- accountGen
       genesisBlock = TestBlock.create(
         time = ntpNow,
         ref = TestBlock.randomSignature(),
         signer = TestBlock.defaultSigner,
         txs = Seq(
-          GenesisTransaction.create(miner, Constants.TotalWaves * Constants.UnitsInWave, ntpNow).explicitGet()
+          GenesisTransaction.create(miner1, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet(),
+          GenesisTransaction.create(miner2, Constants.TotalWaves / 2 * Constants.UnitsInWave, ntpNow).explicitGet()
         ),
         version = Block.GenesisBlockVersion
       )
-    } yield (miner, genesisBlock)
+    } yield (miner1, miner2, genesisBlock)
 
   private def withBlockchain(f: BlockchainUpdater with NG => Unit): Unit =
     withDomain(testSettings) { d =>
