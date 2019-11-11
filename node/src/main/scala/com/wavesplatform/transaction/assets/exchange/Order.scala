@@ -167,18 +167,20 @@ object Order {
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
 
-  def apply(senderPublicKey: PublicKey,
-            matcherPublicKey: PublicKey,
-            assetPair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            proofs: Proofs,
-            version: TxVersion = TxVersion.V1,
-            matcherFeeAssetId: Asset = Asset.Waves): Order = version match {
+  def apply(
+      version: TxVersion,
+      senderPublicKey: PublicKey,
+      matcherPublicKey: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: TxTimestamp,
+      price: TxTimestamp,
+      timestamp: TxTimestamp,
+      expiration: TxTimestamp,
+      matcherFee: TxTimestamp,
+      proofs: Proofs,
+      matcherFeeAssetId: Asset = Asset.Waves
+  ): Order = version match {
     case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
     case 3 =>
@@ -193,68 +195,65 @@ object Order {
 
   def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
 
-  def buy(sender: KeyPair,
-          matcher: PublicKey,
-          pair: AssetPair,
-          amount: Long,
-          price: Long,
-          timestamp: Long,
-          expiration: Long,
-          matcherFee: Long,
-          version: TxVersion = TxVersion.V1,
-          matcherFeeAssetId: Asset = Waves): Order = {
+  def buy(
+      version: TxVersion = TxVersion.V1,
+      sender: KeyPair,
+      matcher: PublicKey,
+      pair: AssetPair,
+      amount: TxTimestamp,
+      price: TxTimestamp,
+      timestamp: TxTimestamp,
+      expiration: TxTimestamp,
+      matcherFee: TxTimestamp,
+      matcherFeeAssetId: Asset = Waves
+  ): Order = {
     val unsigned = version match {
       case 3 =>
-        Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-      case _ => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+        Order(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, matcherFeeAssetId)
+      case _ => Order(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     }
     sign(unsigned, sender)
   }
 
-  def sell(sender: KeyPair,
-           matcher: PublicKey,
-           pair: AssetPair,
-           amount: Long,
-           price: Long,
-           timestamp: Long,
-           expiration: Long,
-           matcherFee: Long,
-           version: TxVersion = TxVersion.V1,
-           matcherFeeAssetId: Asset = Waves): Order = {
+  def sell(version: TxVersion = TxVersion.V1, sender: KeyPair, matcher: PublicKey, pair: AssetPair, amount: TxTimestamp, price: TxTimestamp, timestamp: TxTimestamp, expiration: TxTimestamp, matcherFee: TxTimestamp, matcherFeeAssetId: Asset = Waves): Order = {
     val unsigned = version match {
       case 3 =>
-        Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-      case _ => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+        Order(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, matcherFeeAssetId)
+      case _ => Order(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     }
     sign(unsigned, sender)
   }
 
-  def apply(sender: KeyPair,
-            matcher: PublicKey,
-            pair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            version: TxVersion): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
+  def apply(
+      sender: KeyPair,
+      matcher: PublicKey,
+      pair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      version: TxVersion
+  ): Order = {
+    val unsigned = Order(version, sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty)
     sign(unsigned, sender)
   }
 
-  def apply(sender: KeyPair,
-            matcher: PublicKey,
-            pair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            version: TxVersion,
-            matcherFeeAssetId: Asset): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
+  def apply(
+      sender: KeyPair,
+      matcher: PublicKey,
+      pair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      version: TxVersion,
+      matcherFeeAssetId: Asset
+  ): Order = {
+    val unsigned = Order(version, sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, matcherFeeAssetId)
     sign(unsigned, sender)
   }
 

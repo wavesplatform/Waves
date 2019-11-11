@@ -62,19 +62,7 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(
-      sender,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      eproofs,
-      vrsn
-    )
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, eproofs)
   }
 
   def readOrderV3(sender: PublicKey,
@@ -97,20 +85,7 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(s)))
         .getOrElse(Proofs.empty)
 
-    Order(
-      sender,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      eproofs,
-      version,
-      matcherFeeAssetId
-    )
+    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, eproofs, matcherFeeAssetId)
   }
 
   private val assetReads: Reads[Asset] = {

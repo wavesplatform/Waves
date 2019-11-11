@@ -11,6 +11,7 @@ object PBOrders {
 
   def vanilla(order: PBOrder, version: Int = 0): VanillaOrder = {
     VanillaOrder(
+      if (version == 0) order.version.toByte else version.toByte,
       PublicKey(order.senderPublicKey.toByteArray),
       PublicKey(order.matcherPublicKey.toByteArray),
       vt.assets.exchange
@@ -26,7 +27,6 @@ object PBOrders {
       order.expiration,
       order.getMatcherFee.longAmount,
       order.proofs.map(_.toByteArray: ByteStr),
-      if (version == 0) order.version.toByte else version.toByte,
       PBAmounts.toVanillaAssetId(order.getMatcherFee.assetId)
     )
   }

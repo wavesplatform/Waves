@@ -55,8 +55,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount           = 1
       val sellAmount          = 1
       pair = AssetPair.createAssetPair("WAVES", assetId).get
-      val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, o1ver)
-      val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, o2ver)
+      val buy  = Order.buy(o1ver, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee)
+      val sell = Order.sell(o2ver, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee)
 
       val amount = 1
       if (tver != 1) {
@@ -161,8 +161,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val buyAmount  = 40000000
       val sellAmount = 40000000
       val assetPair = AssetPair.createAssetPair("WAVES", assetId.toString).get
-      val buy        = Order.buy(buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, o1ver, matcherFeeOrder1)
-      val sell       = Order.sell(seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, o2ver, matcherFeeOrder2)
+      val buy        = Order.buy(o1ver, buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
+      val sell       = Order.sell(o2ver, seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
       val amount     = 40000000
 
       val tx =

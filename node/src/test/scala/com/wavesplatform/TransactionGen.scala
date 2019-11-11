@@ -670,8 +670,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       assetPair = AssetPair(amountAssetId, priceAssetId)
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
-      val o1         = Order.buy(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee, 1: Byte)
-      val o2         = Order.sell(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee, 1: Byte)
+      val o1         = Order.buy(1: Byte, buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
+      val o2         = Order.sell(1: Byte, seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =

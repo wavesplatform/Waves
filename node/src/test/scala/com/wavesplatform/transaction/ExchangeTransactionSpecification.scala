@@ -64,8 +64,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf2                  = 2
         val (o1ver, o2ver, tver) = versions
 
-        val buy  = Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, o1ver, buyerMatcherFeeAssetId)
-        val sell = Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, o2ver, sellerMatcherFeeAssetId)
+        val buy  = Order.buy(o1ver, sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, buyerMatcherFeeAssetId)
+        val sell = Order.sell(o2ver, sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, sellerMatcherFeeAssetId)
 
         def create(
             matcher: KeyPair = sender1,
@@ -196,15 +196,15 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val mf                   = 300000L
         val (o1ver, o2ver, tver) = versions
 
-        val sell = Order.sell(sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf, o1ver, sellerMatcherFeeAssetId)
-        val buy  = Order.buy(sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf, o2ver, buyerMatcherFeeAssetId)
+        val sell = Order.sell(o1ver, sender2, matcher, pair, 2, sellPrice, time, expirationTimestamp, mf, sellerMatcherFeeAssetId)
+        val buy  = Order.buy(o2ver, sender1, matcher, pair, 1, buyPrice, time, expirationTimestamp, mf, buyerMatcherFeeAssetId)
 
         createExTx(buy, sell, sellPrice, matcher, tver) shouldBe an[Right[_, _]]
 
         val sell1 =
           if (o1ver == 3) {
-            Order.sell(sender2, matcher, pair, 1, buyPrice, time, time - 1, mf, o1ver, sellerMatcherFeeAssetId)
-          } else Order.sell(sender2, matcher, pair, 1, buyPrice, time, time - 1, mf, o1ver)
+            Order.sell(o1ver, sender2, matcher, pair, 1, buyPrice, time, time - 1, mf, sellerMatcherFeeAssetId)
+          } else Order.sell(o1ver, sender2, matcher, pair, 1, buyPrice, time, time - 1, mf)
 
         createExTx(buy, sell1, buyPrice, matcher, tver) shouldBe Left(OrderValidationError(sell1, "expiration should be > currentTime"))
     }

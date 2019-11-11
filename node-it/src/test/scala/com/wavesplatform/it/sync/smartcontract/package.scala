@@ -150,8 +150,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, ord1Ver)
-    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, ord2Ver)
+    val buy  = Order.buy(ord1Ver, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
+    val sell = Order.sell(ord2Ver, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
 
     (buy, sell)
   }
