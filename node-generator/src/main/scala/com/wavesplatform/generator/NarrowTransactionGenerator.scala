@@ -185,28 +185,12 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 matcher <- randomFrom(accounts)
                 seller  <- randomFrom(accounts)
                 buyer   <- randomFrom(accounts)
-                pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
-                delta = random.nextLong(10000)
-                sellOrder = Order.sell(TxVersion.V2, seller,
-                  matcher,
-                  pair,
-                  100000000 + delta,
-                  1,
-                  timestamp,
-                  timestamp + 30.days.toMillis,
-                  300000L
-                )
-                buyOrder = Order.buy(
-                  buyer,
-                  matcher,
-                  pair,
-                  100000000 + delta,
-                  1,
-                  timestamp,
-                  timestamp + 1.day.toMillis,
-                  300000L)
+                pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
+                delta     = random.nextLong(10000)
+                sellOrder = Order.sell(Order.V2, seller, matcher, pair, 100000000 + delta, 1, timestamp, timestamp + 30.days.toMillis, 300000L)
+                buyOrder  = Order.buy(Order.V2, buyer, matcher, pair, 100000000 + delta, 1, timestamp, timestamp + 1.day.toMillis, 300000L)
                 tx <- logOption(
-                  ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 100000000 + delta, 1, 300000L, 300000L, 700000L, timestamp)
+                  ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 100000000L + delta, 1, 300000L, 300000L, 700000L, timestamp)
                 )
               } yield tx
             ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")

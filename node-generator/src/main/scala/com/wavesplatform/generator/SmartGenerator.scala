@@ -11,7 +11,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
@@ -33,10 +33,12 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 
     val script: Script = Gen.script(settings.complexity, estimator)
 
-    val setScripts = Range(0, settings.scripts) flatMap (_ =>
-      accounts.map { i =>
-        SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
-      })
+    val setScripts = Range(0, settings.scripts) flatMap (
+        _ =>
+          accounts.map { i =>
+            SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
+          }
+      )
 
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
@@ -55,7 +57,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
       val tradeAssetIssue = ByteStr.decodeBase58(asset.get).toOption
       val pair            = AssetPair(Waves, Asset.fromCompatId(tradeAssetIssue))
       val sellOrder       = Order.sell(TxVersion.V2, seller, matcher, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
-      val buyOrder        = Order.buy(buyer, matcher, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
+      val buyOrder        = Order.buy(TxVersion.V2, buyer, matcher, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
 
       ExchangeTransaction.signed(TxVersion.V2, matcher, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts).explicitGet()
     }
