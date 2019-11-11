@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.transaction
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Proofs}
 
 package object impl {
@@ -49,5 +50,20 @@ package object impl {
     def getProofs: Proofs = Proofs.fromBytes(buf.getByteArray(buf.remaining())).explicitGet()
 
     def getAlias: Alias = Alias.fromBytes(buf.getPrefixedByteArray).explicitGet()
+
+    def getVersionedOrder: Order = {
+      val length  = buf.getInt
+      val version = buf.get()
+      version match {
+        case 1 =>
+          Order.fromBytes(buf.getByteArray(length))
+
+        case _ =>
+          val outArray = new Array[Byte](length + 1)
+          outArray(0) = version
+          buf.get(outArray, 1, length)
+          Order.fromBytes(version, outArray)
+      }
+    }
   }
 }

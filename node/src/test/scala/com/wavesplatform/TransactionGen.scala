@@ -675,18 +675,14 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
-        ExchangeTransactionV1
-          .create(
-            matcher,
-            o1.asInstanceOf[OrderV1],
+        ExchangeTransaction.signed(1.toByte, matcher, o1.asInstanceOf[OrderV1],
             o2.asInstanceOf[OrderV1],
             matchedAmount,
             price,
             buyFee,
             sellFee,
             (buyFee + sellFee) / 2,
-            expiration - 100
-          )
+            expiration - 100)
           .explicitGet()
 
       trans
@@ -735,8 +731,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val o1 = mkO1(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2 = mkO2(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
 
-      ExchangeTransactionV2
-        .create(matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
+      ExchangeTransaction.signed(2.toByte, matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
         .explicitGet()
     }
   }
@@ -769,8 +764,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         buyerTimestamp,
         buyerExpiration,
         buyerMatcherFee,
-        Asset fromCompatId buyerMatcherFeeAssetId.compatId
-      )
+        Asset fromCompatId buyerMatcherFeeAssetId.compatId)
 
       val sellOrder = OrderV3(
         seller,
@@ -785,18 +779,14 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         Asset fromCompatId sellerMatcherFeeAssetId.compatId
       )
 
-      ExchangeTransactionV2
-        .create(
-          matcher,
-          buyOrder,
+      ExchangeTransaction.signed(2.toByte, matcher, buyOrder,
           sellOrder,
           amount,
           price,
           buyOrder.matcherFee,
           sellOrder.matcherFee,
           300000L,
-          System.currentTimeMillis() - 10000L
-        )
+          System.currentTimeMillis() - 10000L)
         .explicitGet()
     }
 

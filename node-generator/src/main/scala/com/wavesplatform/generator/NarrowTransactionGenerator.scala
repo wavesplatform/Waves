@@ -213,7 +213,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   300000L
                 )
                 tx <- logOption(
-                  ExchangeTransactionV1.create(
+                  ExchangeTransaction.signed(
+                    1.toByte,
                     matcher,
                     buyOrder,
                     sellOrder,
@@ -257,18 +258,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   300000L
                 )
                 tx <- logOption(
-                  ExchangeTransactionV2
-                    .create(
-                      matcher,
-                      buyOrder,
-                      sellOrder,
-                      100000000 + delta,
-                      1,
-                      300000L,
-                      300000L,
-                      700000L,
-                      ts
-                    )
+                  ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 100000000 + delta, 1, 300000L, 300000L, 700000L, ts)
                 )
               } yield tx
             ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")

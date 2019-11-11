@@ -67,17 +67,20 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         val buy  = Order.buy(sender1, matcher, pair, buyAmount, buyPrice, time, expirationTimestamp, mf1, o1ver, buyerMatcherFeeAssetId)
         val sell = Order.sell(sender2, matcher, pair, sellAmount, sellPrice, time, expirationTimestamp, mf2, o2ver, sellerMatcherFeeAssetId)
 
-        def create(matcher: KeyPair = sender1,
-                   buyOrder: Order = buy,
-                   sellOrder: Order = sell,
-                   amount: Long = buyAmount,
-                   price: Long = sellPrice,
-                   buyMatcherFee: Long = mf1,
-                   sellMatcherFee: Long = 1,
-                   fee: Long = 1,
-                   timestamp: Long = expirationTimestamp - Order.MaxLiveTime): Either[ValidationError, ExchangeTransaction] = {
+        def create(
+            matcher: KeyPair = sender1,
+            buyOrder: Order = buy,
+            sellOrder: Order = sell,
+            amount: Long = buyAmount,
+            price: Long = sellPrice,
+            buyMatcherFee: Long = mf1,
+            sellMatcherFee: Long = 1,
+            fee: Long = 1,
+            timestamp: Long = expirationTimestamp - Order.MaxLiveTime
+        ): Either[ValidationError, ExchangeTransaction] = {
           if (tver == 1) {
-            ExchangeTransactionV1.create(
+            ExchangeTransaction.signed(
+              1.toByte,
               matcher = sender1,
               buyOrder = buyOrder.asInstanceOf[OrderV1],
               sellOrder = sellOrder.asInstanceOf[OrderV1],
@@ -89,7 +92,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
               timestamp = timestamp
             )
           } else {
-            ExchangeTransactionV2.create(
+            ExchangeTransaction.signed(
+              2.toByte,
               matcher = sender1,
               buyOrder = buyOrder,
               sellOrder = sellOrder,
@@ -153,7 +157,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     val mf     = 300000L
     val amount = math.min(buy.amount, sell.amount)
     if (version == 1) {
-      ExchangeTransactionV1.create(
+      ExchangeTransaction.signed(
+        1.toByte,
         matcher = matcher,
         buyOrder = buy.asInstanceOf[OrderV1],
         sellOrder = sell.asInstanceOf[OrderV1],
@@ -165,7 +170,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         timestamp = ntpTime.correctedTime()
       )
     } else {
-      ExchangeTransactionV2.create(
+      ExchangeTransaction.signed(
+        2.toByte,
         matcher = matcher,
         buyOrder = buy,
         sellOrder = sell,

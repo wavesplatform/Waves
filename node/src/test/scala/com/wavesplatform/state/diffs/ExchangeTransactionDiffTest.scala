@@ -458,17 +458,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   def createExTx(buy: Order, sell: Order, price: Long, matcher: KeyPair, ts: Long): Either[ValidationError, ExchangeTransaction] = {
     val mf     = buy.matcherFee
     val amount = math.min(buy.amount, sell.amount)
-    ExchangeTransactionV1.create(
-      matcher = matcher,
-      buyOrder = buy.asInstanceOf[OrderV1],
+    ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[OrderV1],
       sellOrder = sell.asInstanceOf[OrderV1],
       amount = amount,
       price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
       sellMatcherFee = (BigInt(mf) * amount / sell.amount).toLong,
       fee = buy.matcherFee,
-      timestamp = ts
-    )
+      timestamp = ts)
   }
 
   property("small fee cases") {
@@ -551,9 +548,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     val buy  = Order.buy(buyer, matcher, assetPair, 3100000000L, 238, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
     val sell = Order.sell(seller, matcher, assetPair, 425532L, 235, Ts, Ts + 1, MatcherFee, version = 1: Byte).asInstanceOf[OrderV1]
-    val tx = ExchangeTransactionV1
-      .create(matcher = matcher,
-              buyOrder = buy,
+    val tx = ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy,
               sellOrder = sell,
               amount = 425532,
               price = 238,
@@ -580,8 +575,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     BlockchainFeatures.SmartAssets         -> 0,
     BlockchainFeatures.Ride4DApps          -> 0,
     BlockchainFeatures.FeeSponsorship      -> 0,
-    BlockchainFeatures.FairPoS             -> 0
-  )
+    BlockchainFeatures.FairPoS             -> 0)
 
   private def createSettings(preActivatedFeatures: (BlockchainFeature, Int)*): FunctionalitySettings =
     TestFunctionalitySettings.Enabled
@@ -602,8 +596,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (genesis, transfers, issueAndScripts, etx) =>
         val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(ExchangeTransaction.typeId) * FeeValidation.FeeUnit
         val smallFee  = enoughFee - 1
-        val exchangeWithSmallFee = ExchangeTransactionV2
-          .create(MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
+        val exchangeWithSmallFee = ExchangeTransaction.signed(2.toByte, MATCHER, etx.buyOrder, etx.sellOrder, 1000000, 1000000, 0, 0, smallFee, etx.timestamp)
           .explicitGet()
 
         val exchangeWithEnoughFee = ExchangeTransactionV2
@@ -613,8 +606,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         val preconBlocks = Seq(
           TestBlock.create(Seq(genesis)),
           TestBlock.create(transfers),
-          TestBlock.create(issueAndScripts)
-        )
+          TestBlock.create(issueAndScripts))
 
         val blockWithSmallFeeETx  = TestBlock.create(Seq(exchangeWithSmallFee))
         val blockWithEnoughFeeETx = TestBlock.create(Seq(exchangeWithEnoughFee))
@@ -787,8 +779,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         OrderV2.sell(buyer, MATCHER, assetPair, 1000000, 1000000, ts + 9, ts + 10000, enoughFee)
       )
       exchangeTx = {
-        ExchangeTransactionV2
-          .create(MATCHER, o1, o2, 1000000, 1000000, enoughFee, enoughFee, enoughFee, ts + 10)
+        ExchangeTransaction.signed(2.toByte, MATCHER, o1, o2, 1000000, 1000000, enoughFee, enoughFee, enoughFee, ts + 10)
           .explicitGet()
       }
     } yield {
@@ -986,8 +977,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
               timestamp = timestamp,
               expiration = expiration,
               matcherFee = fee,
-              matcherFeeAssetId = matcherFeeAssetId
-            )
+              matcherFeeAssetId = matcherFeeAssetId)
         }
     }
   }
@@ -1059,18 +1049,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
       val exchanges = (sellOrders zip buyMatcherFees).map {
         case (sellOrder, buyMatcherFee) =>
-          ExchangeTransactionV2
-            .create(
-              matcher = matcher,
-              buyOrder = bigBuyOrder,
+          ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = bigBuyOrder,
               sellOrder = sellOrder,
               amount = sellOrder.amount,
               price = bigBuyOrder.price,
               buyMatcherFee = buyMatcherFee,
               sellMatcherFee = sellOrder.matcherFee,
               fee = (bigBuyOrder.matcherFee + sellOrder.matcherFee) / 2,
-              timestamp = Math.min(sellOrder.expiration, bigBuyOrder.expiration) - 10000
-            )
+              timestamp = Math.min(sellOrder.expiration, bigBuyOrder.expiration) - 10000)
             .explicitGet()
       }
 

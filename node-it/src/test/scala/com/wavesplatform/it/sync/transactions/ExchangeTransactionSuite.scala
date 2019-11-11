@@ -60,18 +60,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
       val amount = 1
       if (tver != 1) {
-        val tx = ExchangeTransactionV2
-          .create(
-            matcher = matcher,
-            buyOrder = buy,
+        val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
             sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
             fee = matcherFee,
-            timestamp = ntpTime.correctedTime()
-          )
+            timestamp = ntpTime.correctedTime())
           .right
           .get
 
@@ -80,18 +76,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           "Assets should be issued before they can be traded"
         )
       } else {
-        val tx = ExchangeTransactionV1
-          .create(
-            matcher = matcher,
-            buyOrder = buy.asInstanceOf[OrderV1],
+        val tx = ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[OrderV1],
             sellOrder = sell.asInstanceOf[OrderV1],
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
             fee = matcherFee,
-            timestamp = ntpTime.correctedTime()
-          )
+            timestamp = ntpTime.correctedTime())
           .right
           .get
 
@@ -174,18 +166,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val amount     = 40000000
 
       val tx =
-        ExchangeTransactionV2
-          .create(
-            matcher = matcher,
-            buyOrder = buy,
+        ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
             sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
             fee = matcherFee,
-            timestamp = ntpTime.correctedTime()
-          )
+            timestamp = ntpTime.correctedTime())
           .right
           .get
 

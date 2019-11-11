@@ -153,18 +153,14 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
     val buy = Order.buy(buyer, matcher, pair.get, 1, 1.waves, ts, ts + Order.MaxLiveTime, matcherFee)
     val sell = Order.sell(seller, matcher, pair.get, 1, 1.waves, ts, ts + Order.MaxLiveTime, matcherFee)
 
-    val tx = ExchangeTransactionV2
-      .create(
-        matcher = matcher,
-        buyOrder = buy,
+    val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
         sellOrder = sell,
         amount = 1,
         price = 1.waves,
         buyMatcherFee = matcherFee,
         sellMatcherFee = matcherFee,
         fee = matcherFee,
-        timestamp = ts
-      ).explicitGet().json()
+        timestamp = ts).explicitGet().json()
 
     sender.signedBroadcast(tx, waitForTx = true)
     sender.nftAssetsBalance(buyer.stringRepr, 10).map(info => info.assetId) should contain oneElementOf List(nftAsset)
