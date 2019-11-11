@@ -19,6 +19,35 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
     }
   }
 
+  property("TransferV2 decode pre-encoded bytes") {
+    val bytes = Base58.decode(
+      "1BQcrqKmQy9vV8TxNbQA5VWKdFswHNUhPaCuKfwGPuZ1QPMgnkD6zkyuNnGiMpx2X8AUcVFiN6hYZ4SYF8Kxf8FGw8UGSTSJfv9xepxe1HbsUxGvL2zuwJ1z29mtZTunwKkAnMhqfFL6zWmQApmy4d2RYfyyW8StFaREmmP7KfG8T7Hv89r87TMaMQ2hvcLG94tzWKmLjhM4dXqJTgvNHcW6SxChSEn9mRbwu9Xu3jpFERTM9LJCbBhVAWnoz2ySAPCfHzF5otGEQjdyenuzR3av2EVg5UFd8bwkvXDUPTgyQqFMaStChZfSjzF5Kyt1vfaYMXpPpqh3ppERMx3ivCfGoStF2M9cksANC7cGPULopjSZXQY5R78djAFA87jUfy8fCoUvc7dRw84R5o7hXZ"
+    )
+    val json = Json.parse(
+      """
+        |{
+        |  "senderPublicKey" : "DVCo1PdepfbhA9xkRTtPc69osp86DyM9FWEp8TwGmNb1",
+        |  "amount" : 80901858834201,
+        |  "fee" : 22715602,
+        |  "type" : 4,
+        |  "version" : 2,
+        |  "attachment" : "",
+        |  "sender" : "3MzrGSzM8FhSJzgJtUzpCdxVEX4hpH5Mz3Z",
+        |  "feeAssetId" : "12xeUNhM2T9ZxXrdCsXmWHEUo3rPecRJWvqhkYzcG9MV",
+        |  "proofs" : [ "1TZU9cySE3Jsutd1tJRx3Ac", "6s2KJreWUbBc4XLhbTkkpnGEJc2oPbBVqK9pCByqwnj", "ngYbR6KbDZnxu3T9NCN4MhF4DwgT41vqGmzFBfzMfb6RiJPrWUoeLnS6LTTU", "V5dyBx3qohQsxBk7KjA7niMELR42nvowbz8NwjseqS48r7XFWaBfEuf9" ],
+        |  "assetId" : "61spwGWBiKn2eXLqVjE3i3KdhAk3Mu5GiRW14vF2sMhF",
+        |  "recipient" : "3N3dGRLoei6N6EqxBnoCWMveFrS5CtmDwXK",
+        |  "feeAsset" : "12xeUNhM2T9ZxXrdCsXmWHEUo3rPecRJWvqhkYzcG9MV",
+        |  "id" : "3ETD1ZFwiENauzF8Av4J818juEX8w7AS3ku3k3KSZR77",
+        |  "timestamp" : 4512675353884576883
+        |}
+        |""".stripMargin
+    )
+
+    val tx = TransferTransaction.serializer.parseBytes(bytes)
+    tx.get.json() shouldBe json
+  }
+
   property("VersionedTransferTransactionSpecification serialization from TypedTransaction") {
     forAll(transferV2Gen) { tx: TransferTransaction =>
       val recovered = TransactionParsers.parseBytes(tx.bytes()).get
@@ -68,7 +97,18 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
                        "attachment": "4t2Xazb2SX"}
     """)
 
-    val tx = TransferTransaction(2.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(), Waves, 100000000, Waves, 100000000, Base58.tryDecodeWithLimit("4t2Xazb2SX").get, 1526641218066L, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
+    val tx = TransferTransaction(
+      2.toByte,
+      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+      Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").explicitGet(),
+      Waves,
+      100000000,
+      Waves,
+      100000000,
+      Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
+      1526641218066L,
+      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+    )
 
     tx.json() shouldEqual js
   }
