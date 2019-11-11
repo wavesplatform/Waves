@@ -75,8 +75,8 @@ object ExchangeTxSerializer {
     def parseV1(buf: ByteBuffer): ExchangeTransaction = {
       val buyLength      = buf.getInt
       val sellLength     = buf.getInt
-      val buy            = Order.fromBytes(TxVersion.V1, buf.getByteArray(buyLength))
-      val sell           = Order.fromBytes(TxVersion.V1, buf.getByteArray(sellLength))
+      val buy            = Order.parseBytes(TxVersion.V1, buf.getByteArray(buyLength)).get
+      val sell           = Order.parseBytes(TxVersion.V1, buf.getByteArray(sellLength)).get
       val price          = buf.getLong
       val amount         = buf.getLong
       val buyMatcherFee  = buf.getLong

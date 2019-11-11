@@ -382,8 +382,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       val amount = math.min(buy.amount, sell.amount)
       val tx =
         if (tver == 1) {
-          ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[OrderV1],
-              sellOrder = sell.asInstanceOf[OrderV1],
+          ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[Order],
+              sellOrder = sell.asInstanceOf[Order],
               amount = amount,
               price = sellPrice,
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,

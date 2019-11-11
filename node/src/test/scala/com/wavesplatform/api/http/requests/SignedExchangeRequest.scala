@@ -1,9 +1,7 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange._
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
@@ -37,15 +35,8 @@ case class SignedExchangeRequest(
 ) {
   def toTx: Either[ValidationError, ExchangeTransaction] =
     for {
-      _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      o1         <- castOrder(order1)
-      o2         <- castOrder(order2)
-      _t         <- ExchangeTransaction.create(1.toByte, o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs(_signature))
+      _t         <- ExchangeTransaction.create(1.toByte, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs(_signature))
     } yield _t
 
-  def castOrder(o: Order): Either[ValidationError, OrderV1] = o match {
-    case o1 @ OrderV1(_, _, _, _, _, _, _, _, _, _) => Right(o1)
-    case _                                          => Left(GenericError("ExchangeTransaction of version 1 can only contain orders of version 1"))
-  }
 }

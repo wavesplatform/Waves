@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.OrderValidationError
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
-import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.{NTPTime, TransactionGen}
 import org.scalacheck.Gen
@@ -82,8 +81,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             ExchangeTransaction.signed(
               1.toByte,
               matcher = sender1,
-              buyOrder = buyOrder.asInstanceOf[OrderV1],
-              sellOrder = sellOrder.asInstanceOf[OrderV1],
+              buyOrder = buyOrder.asInstanceOf[Order],
+              sellOrder = sellOrder.asInstanceOf[Order],
               amount = amount,
               price = price,
               buyMatcherFee = buyMatcherFee,
@@ -160,8 +159,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       ExchangeTransaction.signed(
         1.toByte,
         matcher = matcher,
-        buyOrder = buy.asInstanceOf[OrderV1],
-        sellOrder = sell.asInstanceOf[OrderV1],
+        buyOrder = buy.asInstanceOf[Order],
+        sellOrder = sell.asInstanceOf[Order],
         amount = amount,
         price = price,
         buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
@@ -261,7 +260,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       }
       """)
 
-    val buy = OrderV1(
+    val buy = Order(
+      Order.V1,
       PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -271,10 +271,11 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       1,
-      Base58.tryDecodeWithLimit("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get
+      proofs = Proofs(Base58.tryDecodeWithLimit("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get)
     )
 
-    val sell = OrderV1(
+    val sell = Order(
+      Order.V1,
       PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -284,7 +285,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       2,
-      Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+      proofs = Proofs(Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
     val tx = ExchangeTransaction
@@ -355,7 +356,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       }
       """)
 
-    val buy = OrderV2(
+    val buy = Order(
+      Order.V2,
       PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -365,10 +367,11 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       1,
-      Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
+      proofs = Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
     )
 
-    val sell = OrderV1(
+    val sell = Order(
+      Order.V1,
       PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -378,7 +381,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       2,
-      Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+      proofs = Proofs(Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
     val tx = ExchangeTransaction
@@ -399,7 +402,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     js shouldEqual tx.json()
   }
 
-  property("JSON format validation V2 OrderV3") {
+  property("JSON format validation V2 Order") {
     val js = Json.parse("""{
          "version": 2,
          "type":7,
@@ -450,7 +453,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       }
       """)
 
-    val buy = OrderV3(
+    val buy = Order(
+      Order.V3,
       PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").explicitGet(),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -464,7 +468,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       Proofs(Seq(ByteStr.decodeBase58("2bkuGwECMFGyFqgoHV4q7GRRWBqYmBFWpYRkzgYANR4nN2twgrNaouRiZBqiK2RJzuo9NooB9iRiuZ4hypBbUQs").get))
     )
 
-    val sell = OrderV1(
+    val sell = Order(
+      Order.V3,
       PublicKey.fromBase58String("7E9Za8v8aT6EyU1sX91CVK7tWUeAetnNYDxzKZsyjyKV").explicitGet(),
       PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").explicitGet(),
       AssetPair.createAssetPair("WAVES", "9ZDWzK53XT5bixkmMwTJi2YzgxCqn5dUajXFcT2HcFDy").get,
@@ -474,7 +479,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       1526992336241L,
       1529584336241L,
       2,
-      Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
+      proofs = Proofs(Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get)
     )
 
     val tx = ExchangeTransaction

@@ -42,7 +42,7 @@ object OrderJson {
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  def readOrderV1V2(sender: PublicKey,
+  def readOrderV2(sender: PublicKey,
                     matcher: PublicKey,
                     assetPair: AssetPair,
                     orderType: OrderType,
@@ -62,10 +62,10 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, eproofs)
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs)
   }
 
-  def readOrderV3(sender: PublicKey,
+  def readOrder(sender: PublicKey,
                   matcher: PublicKey,
                   assetPair: AssetPair,
                   orderType: OrderType,
@@ -85,7 +85,7 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(s)))
         .getOrElse(Proofs.empty)
 
-    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, eproofs, matcherFeeAssetId)
+    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs)
   }
 
   private val assetReads: Reads[Asset] = {
@@ -120,7 +120,7 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").readNullable[Byte]
-    r(readOrderV1V2 _)
+    r(readOrderV2 _)
   }
 
   private val orderV3Reads: Reads[Order] = {
@@ -139,7 +139,7 @@ object OrderJson {
       (JsPath \ "matcherFeeAssetId")
         .readNullable[Array[Byte]]
         .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
-    r(readOrderV3 _)
+    r(readOrder _)
   }
 
   implicit val orderReads: Reads[Order] = {

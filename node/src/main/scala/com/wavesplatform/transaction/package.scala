@@ -27,12 +27,12 @@ package object transaction {
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
 
-  implicit class TransactionValidationOps[T <: Transaction: TxValidator](tx: T) {
+  implicit class TransactionValidationOps[T: TxValidator](tx: T) {
     def validatedNel: ValidatedNel[ValidationError, T] = implicitly[TxValidator[T]].validate(tx)
     def validatedEither: Either[ValidationError, T]    = this.validatedNel.toEither.left.map(_.head)
   }
 
-  implicit class TransactionSignOps[T <: Transaction](tx: T)(implicit sign: (T, PrivateKey) => T) {
+  implicit class TransactionSignOps[T](tx: T)(implicit sign: (T, PrivateKey) => T) {
     def signWith(privateKey: PrivateKey): T = sign(tx, privateKey)
   }
 }

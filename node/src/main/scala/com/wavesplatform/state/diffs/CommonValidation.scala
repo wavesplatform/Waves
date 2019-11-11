@@ -134,8 +134,8 @@ object CommonValidation {
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
         activationBarrier(BlockchainFeatures.SmartAccountTrading).flatMap { tx =>
           (exv2.buyOrder, exv2.sellOrder) match {
-            case (_: OrderV3, _) | (_, _: OrderV3) => activationBarrier(BlockchainFeatures.OrderV3)
-            case _                                 => Right(tx)
+            case (o1, o2) if o1.version >= 3 || o2.version >= 3 => activationBarrier(BlockchainFeatures.OrderV3)
+            case _                                              => Right(tx)
           }
         }
 

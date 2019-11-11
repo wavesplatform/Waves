@@ -76,8 +76,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           "Assets should be issued before they can be traded"
         )
       } else {
-        val tx = ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[OrderV1],
-            sellOrder = sell.asInstanceOf[OrderV1],
+        val tx = ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[Order],
+            sellOrder = sell.asInstanceOf[Order],
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,

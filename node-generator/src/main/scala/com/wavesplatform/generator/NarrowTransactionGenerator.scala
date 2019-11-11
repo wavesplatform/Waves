@@ -187,8 +187,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 buyer   <- randomFrom(accounts)
                 pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
                 delta = random.nextLong(10000)
-                sellOrder = OrderV2.sell(
-                  seller,
+                sellOrder = Order.sell(TxVersion.V2, seller,
                   matcher,
                   pair,
                   100000000 + delta,
@@ -197,7 +196,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   timestamp + 30.days.toMillis,
                   300000L
                 )
-                buyOrder = OrderV2.buy(
+                buyOrder = Order.buy(
                   buyer,
                   matcher,
                   pair,
@@ -205,8 +204,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   1,
                   timestamp,
                   timestamp + 1.day.toMillis,
-                  300000L
-                )
+                  300000L)
                 tx <- logOption(
                   ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 100000000 + delta, 1, 300000L, 300000L, 700000L, timestamp)
                 )

@@ -56,13 +56,13 @@ package object impl {
       val version = buf.get()
       version match {
         case 1 =>
-          Order.fromBytes(1.toByte, buf.getByteArray(length))
+          Order.parseBytes(1.toByte, buf.getByteArray(length)).get
 
         case 2 | 3 =>
           val outArray = new Array[Byte](length)
           outArray(0) = version
           buf.get(outArray, 1, length - 1)
-          Order.fromBytes(version, outArray)
+          Order.parseBytes(version, outArray).get
 
         case _ =>
           throw new IllegalArgumentException(s"Invalid order version: $version")

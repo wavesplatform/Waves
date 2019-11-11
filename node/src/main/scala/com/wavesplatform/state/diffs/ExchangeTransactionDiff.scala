@@ -9,7 +9,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderV3}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 
 import scala.util.Right
 
@@ -67,15 +67,13 @@ object ExchangeTransactionDiff {
           ordersScripted
       }
 
-      assetsComplexity =
-        assetIds.toList
-          .flatMap(blockchain.assetScriptWithComplexity)
-          .map(_._2)
+      assetsComplexity = assetIds.toList
+        .flatMap(blockchain.assetScriptWithComplexity)
+        .map(_._2)
 
-      accountsComplexity =
-        List(tx.sender.toAddress, buyer, seller)
-          .flatMap(blockchain.accountScriptWithComplexity)
-          .map(_._2)
+      accountsComplexity = List(tx.sender.toAddress, buyer, seller)
+        .flatMap(blockchain.accountScriptWithComplexity)
+        .map(_._2)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {
@@ -83,7 +81,7 @@ object ExchangeTransactionDiff {
       def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
         Monoid.combine(
           Map(buyer  → getAssetPortfolio(asset, buyAssetChange)),
-          Map(seller → getAssetPortfolio(asset, sellAssetChange)),
+          Map(seller → getAssetPortfolio(asset, sellAssetChange))
         )
       }
 
@@ -92,7 +90,7 @@ object ExchangeTransactionDiff {
           Seq(
             getOrderFeePortfolio(t.buyOrder, t.buyMatcherFee),
             getOrderFeePortfolio(t.sellOrder, t.sellMatcherFee),
-            wavesPortfolio(-t.fee),
+            wavesPortfolio(-t.fee)
           )
         )
 
@@ -134,8 +132,8 @@ object ExchangeTransactionDiff {
 
     def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
       feeTotal <= (order match {
-        case _: OrderV3 => BigInt(maxfee)
-        case _          => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+        case _: Order => BigInt(maxfee)
+        case _        => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
       })
     }
 
@@ -171,6 +169,6 @@ object ExchangeTransactionDiff {
     asset.fold(wavesPortfolio(amt))(assetId => Portfolio(0, LeaseBalance.empty, Map(assetId -> amt)))
   }
 
-  /*** Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves) */
+  /*** Calculates fee portfolio from the order (taking into account that in Order fee can be paid in asset != Waves) */
   def getOrderFeePortfolio(order: Order, fee: Long): Portfolio = getAssetPortfolio(order.matcherFeeAssetId, fee)
 }
