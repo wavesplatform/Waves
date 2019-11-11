@@ -3,6 +3,7 @@ package com.wavesplatform.utils
 import cats.kernel.Monoid
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -23,9 +24,9 @@ case object EmptyBlockchain extends Blockchain {
 
   override def score: BigInt = 0
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = None
+  override def blockInfo(height: Int): Option[BlockInfo] = None
 
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = None
+  override def blockInfo(blockId: ByteStr): Option[BlockInfo] = None
 
   override def lastBlock: Option[Block] = None
 
@@ -109,6 +110,5 @@ case object EmptyBlockchain extends Blockchain {
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
 
-  override def generationInputAtHeight(height: Int): Either[ValidationError, ByteStr] =
-    Left(GenericError(s"Couldn't find generation input at height: $height"))
+  override def generationInputAtHeight(height: Int): Option[ByteStr] = None
 }

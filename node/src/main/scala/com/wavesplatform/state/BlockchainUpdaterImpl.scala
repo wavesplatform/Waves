@@ -5,7 +5,7 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -493,12 +493,12 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  private def liquidBlockHeaderAndSize(): Option[(BlockHeader, Int, Int, ByteStr)] = ngState.map { s =>
-    (s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length, s.bestLiquidBlock.transactionData.size, s.bestLiquidBlock.signature)
+  private def liquidBlockHeaderAndSize(): Option[BlockInfo] = ngState.map { s =>
+    BlockInfo(s.bestLiquidBlock.header, s.bestLiquidBlock.bytes().length, s.bestLiquidBlock.transactionData.size, s.bestLiquidBlock.signature)
   }
 
-  override def blockHeaderAndSize(blockId: BlockId): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
-    liquidBlockHeaderAndSize().filter(_._4 == blockId) orElse blockchain.blockHeaderAndSize(blockId)
+  override def blockInfo(blockId: BlockId): Option[BlockInfo] = readLock {
+    liquidBlockHeaderAndSize().filter(_.signature == blockId) orElse blockchain.blockInfo(blockId)
   }
 
   override def height: Int = readLock {
@@ -606,13 +606,13 @@ class BlockchainUpdaterImpl(
       blockchain.totalFee(height)
   }
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = readLock {
+  override def blockInfo(height: Int): Option[BlockInfo] = readLock {
     if (height == blockchain.height + 1)
       ngState.map(
-        x => (x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length, x.bestLiquidBlock.transactionData.size, x.bestLiquidBlock.signature)
+        x => BlockInfo(x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length, x.bestLiquidBlock.transactionData.size, x.bestLiquidBlock.signature)
       )
     else
-      blockchain.blockHeaderAndSize(height)
+      blockchain.blockInfo(height)
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
@@ -804,9 +804,9 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def generationInputAtHeight(height: Int): Either[ValidationError, ByteStr] = readLock {
+  override def generationInputAtHeight(height: Int): Option[ByteStr] = readLock {
     ngState match {
-      case Some(ng) if this.height == height => ng.generationInput.asRight
+      case Some(ng) if this.height == height => ng.generationInput.some
       case _                                 => blockchain.generationInputAtHeight(height)
     }
   }

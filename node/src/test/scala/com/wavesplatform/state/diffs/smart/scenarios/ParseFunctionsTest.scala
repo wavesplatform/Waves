@@ -4,6 +4,7 @@ import cats.Id
 import cats.implicits._
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -65,7 +66,7 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
     val expectedSignature    = Base64.encode(signature)
     val expectedGenSignature = Base64.encode(header.generationSignature)
 
-    val headerBytes = database.writeBlockHeaderAndSize((header, 1024, transactionCount, signature)).drop(Ints.BYTES)
+    val headerBytes = database.writeBlockInfo(BlockInfo(header, 1024, transactionCount, signature)).drop(Ints.BYTES)
 
     s"""
       |{-# STDLIB_VERSION  4 #-}

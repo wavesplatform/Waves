@@ -9,6 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -264,8 +265,8 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeBlockHeaderAndSize(data: (BlockHeader, Int, Int, ByteStr)): Array[Byte] = {
-    val (bh, size, transactionCount, signature) = data
+  def writeBlockInfo(data: BlockInfo): Array[Byte] = {
+    val BlockInfo(bh, size, transactionCount, signature) = data
 
     val ndo = newDataOutput()
 
@@ -294,7 +295,7 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int, Int, ByteStr) = {
+  def readBlockInfo(bs: Array[Byte]): BlockInfo = {
     val ndi = newDataInput(bs)
 
     val size   = ndi.readInt()
@@ -335,7 +336,7 @@ package object database extends ScorexLogging {
       rewardVote
     )
 
-    (header, size, transactionCount, ByteStr(signature))
+    BlockInfo(header, size, transactionCount, ByteStr(signature))
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {

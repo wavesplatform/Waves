@@ -17,12 +17,18 @@ import scala.util.Try
 object BlockHeaderSerializer {
   def toJson(blockHeader: BlockHeader): JsObject = {
     val consensusJson =
-      Json.obj(
-        "nxt-consensus" -> Json.obj(
-          "base-target"          -> blockHeader.baseTarget,
-          "generation-signature" -> blockHeader.generationSignature.toString
+      if (blockHeader.version < Block.NgBlockVersion)
+        Json.obj(
+          "nxt-consensus" -> Json.obj(
+            "base-target"          -> blockHeader.baseTarget,
+            "generation-signature" -> blockHeader.generationSignature.toString
+          )
         )
-      )
+      else
+        Json.obj(
+          "baseTarget"          -> blockHeader.baseTarget,
+          "generationSignature" -> blockHeader.generationSignature.toString
+        )
 
     val featuresJson =
       if (blockHeader.version < Block.NgBlockVersion) JsObject.empty

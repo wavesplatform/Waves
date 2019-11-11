@@ -3,6 +3,7 @@ package com.wavesplatform.database
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -105,8 +106,8 @@ object Keys {
 
   val BlockHeaderPrefix: Short = 50
 
-  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int, Int, ByteStr)]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
+  def blockInfoAt(height: Height): Key[Option[(BlockInfo)]] =
+    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo, writeBlockInfo)
 
   def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(

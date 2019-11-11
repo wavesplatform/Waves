@@ -14,7 +14,6 @@ import scala.util.Try
 package object block {
   type Validation[A] = Either[GenericError, A]
 
-  // format: off
   private[block] def validateBlock(b: Block): Validation[Block] =
     (for {
       _ <- Either.cond(b.header.reference.arr.length == SignatureLength, (), "Incorrect reference")
@@ -44,7 +43,6 @@ package object block {
       _ <- Either.cond(mb.transactionData.nonEmpty, (), "cannot create empty MicroBlock")
       _ <- Either.cond(mb.transactionData.size <= MaxTransactionsPerMicroblock, (), s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: ${mb.transactionData.size}")
     } yield mb).leftMap(GenericError(_))
-  // format: on
 
   private[block] implicit class BlockOps(block: Block) {
     def sign(signer: PrivateKey): Block                         = block.copy(signature = crypto.sign(signer, block.bytesWithoutSignature()))

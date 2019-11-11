@@ -6,7 +6,7 @@ import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -266,7 +266,7 @@ class LevelDBWriter(
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block.header, block.bytes().length, block.transactionData.size, block.signature)))
+    rw.put(Keys.blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -494,8 +494,8 @@ class LevelDBWriter(
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          val (discardedHeader, _, _, discardedSignature) = rw
-            .get(Keys.blockHeaderAndSizeAt(h))
+          val BlockInfo(discardedHeader, _, _, discardedSignature) = rw
+            .get(Keys.blockInfoAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
@@ -597,7 +597,7 @@ class LevelDBWriter(
               }
           }
 
-          rw.delete(Keys.blockHeaderAndSizeAt(h))
+          rw.delete(Keys.blockInfoAt(h))
           rw.delete(Keys.heightOf(discardedSignature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -801,21 +801,21 @@ class LevelDBWriter(
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  override def loadBlockInfo(height: Int): Option[BlockInfo] = {
+    writableDB.get(Keys.blockInfoAt(Height(height)))
   }
 
-  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    db.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[BlockInfo] = {
+    db.get(Keys.blockInfoAt(Height(height)))
   }
 
-  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  override def loadBlockInfo(blockId: ByteStr): Option[BlockInfo] = {
     writableDB
       .get(Keys.heightOf(blockId))
-      .flatMap(loadBlockHeaderAndSize)
+      .flatMap(loadBlockInfo)
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[BlockInfo] = {
     db.get(Keys.heightOf(blockId))
       .flatMap(loadBlockHeaderAndSize(_, db))
   }
@@ -891,10 +891,10 @@ class LevelDBWriter(
     (currentHeight until (currentHeight - howMany).max(0) by -1)
       .map { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAndSizeAt(height))
+        db.get(Keys.blockInfoAt(height))
       }
       .collect {
-        case Some((_, _, _, signature)) => signature
+        case Some(BlockInfo(_, _, _, signature)) => signature
       }
   }
 
@@ -903,10 +903,10 @@ class LevelDBWriter(
       (parentHeight + 1 to (parentHeight + howMany))
         .map { h =>
           val height = Height(h)
-          db.get(Keys.blockHeaderAndSizeAt(height))
+          db.get(Keys.blockInfoAt(height))
         }
         .collect {
-          case Some((_, _, _, signature)) => signature
+          case Some(BlockInfo(_, _, _, signature)) => signature
         }
     }
   }
@@ -915,7 +915,7 @@ class LevelDBWriter(
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      (block, _, _, _) <- loadBlockHeaderAndSize(height, db)
+      BlockInfo(block, _, _, _) <- loadBlockHeaderAndSize(height, db)
     } yield block
   }
 
@@ -928,8 +928,8 @@ class LevelDBWriter(
       .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAndSizeAt(height))
-          .map(_._1.featureVotes.toSeq)
+        db.get(Keys.blockInfoAt(height))
+          .map(_.header.featureVotes.toSeq)
           .getOrElse(Seq.empty)
       }
       .groupBy(identity)
@@ -942,8 +942,8 @@ class LevelDBWriter(
         settings.rewardsSettings
           .votingWindow(activatedAt, height)
           .flatMap { h =>
-            db.get(Keys.blockHeaderAndSizeAt(Height(h)))
-              .map(_._1.rewardVote)
+            db.get(Keys.blockInfoAt(Height(h)))
+              .map(_.header.rewardVote)
           }
       case _ => Seq()
     }
@@ -958,10 +958,9 @@ class LevelDBWriter(
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
-  override def generationInputAtHeight(height: Int): Either[ValidationError, ByteStr] = readOnly { db =>
+  override def generationInputAtHeight(height: Int): Option[ByteStr] = readOnly { db =>
     Option(db.get(Keys.generationInput(height)))
-      .toRight(GenericError(s"Couldn't find generation input at height: $height"))
-      .filterOrElse(_.length == Block.GenerationInputLength, GenericError(s"Incorrect generation input at height: $height"))
+      .filter(_.length == Block.GenerationInputLength)
       .map(ByteStr.apply)
   }
 
@@ -970,10 +969,10 @@ class LevelDBWriter(
   }
 
   private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockHeaderAndSizeAt(height)
+    val headerKey = Keys.blockInfoAt(height)
 
     for {
-      (header, _, transactionCount, signature) <- db.get(headerKey)
+      BlockInfo(header, _, transactionCount, signature) <- db.get(headerKey)
       txs = (0 until transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }

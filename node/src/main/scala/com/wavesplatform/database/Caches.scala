@@ -6,7 +6,8 @@ import cats.syntax.monoid._
 import cats.syntax.option._
 import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
@@ -45,23 +46,23 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
-  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  def loadBlockInfo(height: Int): Option[BlockInfo]
+  override def blockInfo(height: Int): Option[BlockInfo] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
+      c._3.map(b => BlockInfo(b.header, b.bytes().length, b.transactionData.size, b.signature))
     } else {
-      loadBlockHeaderAndSize(height)
+      loadBlockInfo(height)
     }
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)]
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  def loadBlockInfo(blockId: ByteStr): Option[BlockInfo]
+  override def blockInfo(blockId: ByteStr): Option[BlockInfo] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
+      c._3.map(b => BlockInfo(b.header, b.bytes().length, b.transactionData.size, b.signature))
     } else {
-      loadBlockHeaderAndSize(blockId)
+      loadBlockInfo(blockId)
     }
   }
 

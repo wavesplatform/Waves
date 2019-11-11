@@ -38,6 +38,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     checkBaseTargetLimit(bt, height).flatMap { _ =>
       blockchain
         .generationInputAtHeight(height)
+        .toRight(GenericError(s"Couldn't find generation input at height: $height"))
         .map(parentProofs => NxtLikeConsensusBlockData(bt, headerGenerationSignature(height, parentProofs, account)))
     }
   }
@@ -64,8 +65,10 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .flatMap {
         case _ if vrfActivated(height) => // todo: (NODE-1927) always last block or by height?
           for {
-            generationInput <- blockchain.generationInputAtHeight(blockchain.height)
-            vrf             <- crypto.verifyVRF(blockGS, generationInput, blockGenerator)
+            generationInput <- blockchain
+              .generationInputAtHeight(blockchain.height)
+              .toRight(GenericError(s"Couldn't find generation input at height: $height"))
+            vrf <- crypto.verifyVRF(blockGS, generationInput, blockGenerator)
           } yield vrf
         case b =>
           val gs = generationSignature(b.header.generationSignature.arr, blockGenerator)
@@ -120,7 +123,10 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       if (fairPosActivated(height) && height > 100) blockchain.generationInputAtHeight(height - 100)
       else blockchain.generationInputAtHeight(blockchain.height)
 
-    message.map(msg => if (vrfActivated(height)) msg.arr else generationSignature(msg, accountPublicKey)).map(msg => hit(msg))
+    message
+      .map(msg => if (vrfActivated(height)) msg.arr else generationSignature(msg, accountPublicKey))
+      .map(msg => hit(msg))
+      .toRight(GenericError(s"Couldn't find generation input at height: $height"))
   }
 
   private def headerGenerationSignature(height: Int, parentProofs: ByteStr, account: KeyPair): ByteStr =

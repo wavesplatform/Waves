@@ -68,7 +68,7 @@ class BlockV5Test
             blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
             blockAtActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
 
-            val genInputAtActivationHeight = blockchain.generationInputAtHeight(bs.size + 1).explicitGet()
+            val genInputAtActivationHeight = blockchain.generationInputAtHeight(bs.size + 1).get
             genInputAtActivationHeight shouldBe blockAtActivationHeight.header.generationSignature
 
             time.advance(10.minute)
@@ -83,7 +83,7 @@ class BlockV5Test
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
 
-            val genInputAfterActivationHeight = blockchain.generationInputAtHeight(bs.size + 2).explicitGet()
+            val genInputAfterActivationHeight = blockchain.generationInputAtHeight(bs.size + 2).get
             genInputAfterActivationHeight shouldBe crypto
               .verifyVRF(
                 blockAfterActivationHeight.header.generationSignature,
@@ -104,7 +104,7 @@ class BlockV5Test
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterVRFUsing.signature shouldBe blockchain.lastBlock.value.signature
 
-            val genInputAfterVRFUsing = blockchain.generationInputAtHeight(bs.size + 3).explicitGet()
+            val genInputAfterVRFUsing = blockchain.generationInputAtHeight(bs.size + 3).get
             genInputAfterVRFUsing shouldBe crypto
               .verifyVRF(
                 blockAfterVRFUsing.header.generationSignature,

@@ -63,6 +63,7 @@ package object appender extends ScorexLogging {
     else
       blockchainUpdater
         .generationInputAtHeight(blockchainUpdater.height)
+        .toRight(GenericError(s"Couldn't find generation input"))
         .flatMap(genInput => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, genInput))
   }
 
@@ -149,7 +150,6 @@ package object appender extends ScorexLogging {
     )
   }
 
-  //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")
     val appendBlock              = Kamon.timer("block-appender.blockchain-append-block")

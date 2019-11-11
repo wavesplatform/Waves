@@ -37,12 +37,6 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
   )
 
   "block delay" - {
-    val generationSignatureMethods = Table(
-      ("method", "block version", "vrf activated"),
-      ("Blake2b256", Block.NgBlockVersion, false)
-      // ("VRF", Block.ProtoBlockVersion, true) // todo: (NODE-1927) is that correct for VRF?
-    )
-
     "same on the same height in different forks" in forAll(generationSignatureMethods) {
       case (_, blockVersion: Byte, vrfActivated: Boolean) =>
         withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110, blockVersion), vrfActivated) {
@@ -52,8 +46,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
             val miner1Balance = blockchain.effectiveBalance(miner1.toAddress, 0)
 
-            val fork1 = mkFork(10, miner1, blockchain, blockVersion)
-            val fork2 = mkFork(10, miner2, blockchain, blockVersion)
+            val fork1 = mkFork(100, miner1, blockchain, blockVersion)
+            val fork2 = mkFork(100, miner2, blockchain, blockVersion)
 
             val fork1Delay = {
               val blockForHit =
@@ -62,7 +56,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                   .orElse(
                     blockchain
                       .blockAt(blockchain.height + fork1.length - 100)
-                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork1.length - 100).explicitGet()))
+                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork1.length - 100).get))
                   )
                   .getOrElse(fork1.head)
 
@@ -85,7 +79,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
                   .orElse(
                     blockchain
                       .blockAt(blockchain.height + fork2.length - 100)
-                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork2.length - 100).explicitGet()))
+                      .map((_, blockchain.generationInputAtHeight(blockchain.height + fork2.length - 100).get))
                   )
                   .getOrElse(fork2.head)
 
@@ -304,13 +298,13 @@ object FPPoSSelectorTest {
     val height = blockchain.height
 
     val lastBlock                = blockchain.lastBlock.get
-    val lastBlockGenerationInput = blockchain.generationInputAtHeight(height).explicitGet()
+    val lastBlockGenerationInput = blockchain.generationInputAtHeight(height).get
 
     ((1 to blockCount) foldLeft List((lastBlock, lastBlockGenerationInput))) { (forkChain, ind) =>
       val blockForHit =
         forkChain
           .lift(100)
-          .orElse(blockchain.blockAt(height + ind - 100).map((_, blockchain.generationInputAtHeight(height + ind - 100).explicitGet())))
+          .orElse(blockchain.blockAt(height + ind - 100).map((_, blockchain.generationInputAtHeight(height + ind - 100).get)))
           .getOrElse(forkChain.head)
 
       val (gs, generationInput) =
@@ -318,16 +312,16 @@ object FPPoSSelectorTest {
           val gs = PoSCalculator
             .generationSignature(
               blockForHit._2.arr,
-              miner
+              miner.publicKey
             )
           (gs, gs)
         } else {
           val gs = PoSCalculator
             .generationVRFSignature(
               blockForHit._2.arr,
-              miner
+              miner.privateKey
             )
-          val gi = crypto.verifyVRF(gs, blockForHit._2.arr, miner.publicKey).explicitGet().arr
+          val gi = crypto.verifyVRF(ByteStr(gs), blockForHit._2, miner.publicKey).explicitGet().arr
           (gs, gi)
         }
 

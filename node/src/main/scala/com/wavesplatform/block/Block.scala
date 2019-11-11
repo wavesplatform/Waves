@@ -145,6 +145,13 @@ object Block extends ScorexLogging {
     } yield validBlock
   }
 
+  case class BlockInfo(
+      header: BlockHeader,
+      size: Int,
+      transactionCount: Int,
+      signature: ByteStr
+  )
+
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
   }

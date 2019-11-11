@@ -4,6 +4,7 @@ import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -43,9 +44,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
                 address <- Address.fromString(address)
                 jsonBlocks = commonApi
                   .blockHeadersRange(start, end)
-                  .filter(_._1.generator.toAddress == address)
+                  .filter(_._1.header.generator.toAddress == address)
                   .map {
-                    case (_, _, _, _, h) =>
+                    case (_, h) =>
                       blockchain.blockAt(h).get.json().addBlockFields(h)
                   }
                 result = jsonBlocks.toListL.map(JsArray(_))
@@ -147,7 +148,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     (if (includeTransactions) {
        commonApi.blockAtHeight(height).map(_.json())
      } else {
-       commonApi.blockHeaderAtHeight(height).map { case (bh, s, tc, sig) => BlockHeaderSerializer.toJson(bh, s, tc, sig) }
+       commonApi.blockHeaderAtHeight(height).map { case BlockInfo(bh, s, tc, sig) => BlockHeaderSerializer.toJson(bh, s, tc, sig) }
      }) match {
       case Some(json) => complete(json.addBlockFields(height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -188,7 +189,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
         commonApi
           .blockHeadersRange(start, end)
           .map {
-            case (bh, size, transactionCount, signature, height) =>
+            case (BlockInfo(bh, size, transactionCount, signature), height) =>
               BlockHeaderSerializer.toJson(bh, size, transactionCount, signature).addBlockFields(height)
           }
       }
