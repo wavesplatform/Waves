@@ -1,18 +1,16 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.account.{Address, Alias, KeyPair}
-import com.wavesplatform.api.grpc.AccountsApiGrpc
+import com.wavesplatform.account.Address
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, transferAmount}
 import com.wavesplatform.it.util._
-import com.wavesplatform.protobuf.transaction.{PBRecipients, Recipient}
+import com.wavesplatform.protobuf.transaction.Recipient
 import com.wavesplatform.common.utils.EitherExt2
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.util.{Random, Try}
+import scala.util.Random
 
 class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime with TableDrivenPropertyChecks {
 
