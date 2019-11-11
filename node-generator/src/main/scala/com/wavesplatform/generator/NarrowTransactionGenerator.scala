@@ -184,52 +184,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
-          case ExchangeTransactionV1 =>
-            (
-              for {
-                matcher <- randomFrom(accounts)
-                seller  <- randomFrom(accounts)
-                buyer   <- randomFrom(accounts)
-                pair  = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
-                delta = random.nextLong(10000)
-                sellOrder = OrderV1.sell(
-                  seller,
-                  matcher,
-                  pair,
-                  100000000 + delta,
-                  1 + random.nextLong(10),
-                  ts,
-                  ts + 30.days.toMillis,
-                  moreThanStandardFee * 3
-                )
-                buyOrder = OrderV1.buy(
-                  buyer,
-                  matcher,
-                  pair,
-                  100000000 + delta,
-                  1,
-                  ts,
-                  ts + 1.day.toMillis,
-                  300000L
-                )
-                tx <- logOption(
-                  ExchangeTransaction.signed(
-                    1.toByte,
-                    matcher,
-                    buyOrder,
-                    sellOrder,
-                    100000000 + delta,
-                    1,
-                    300000,
-                    300000,
-                    moreThanStandardFee * 3,
-                    ts
-                  )
-                )
-              } yield tx
-            ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
-
-          case ExchangeTransactionV2 =>
+          case ExchangeTransaction =>
             (
               for {
                 matcher <- randomFrom(accounts)

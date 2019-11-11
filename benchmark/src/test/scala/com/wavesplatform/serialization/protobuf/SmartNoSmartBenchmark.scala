@@ -6,8 +6,8 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, _}
 import com.wavesplatform.serialization.protobuf.SmartNoSmartBenchmark.ExchangeTransactionSt
-import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
@@ -22,32 +22,14 @@ class SmartNoSmartBenchmark {
   @Benchmark
   def smartExchangeTX_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     import st._
-    val exchangeTransaction = ExchangeTransaction.signed(TxVersion.V2, buy,
-      sell,
-      2,
-      5000000000L,
-      1,
-      1,
-      1,
-      1526992336241L,
-      proofs)
-
+    val exchangeTransaction = ExchangeTransaction.create(TxVersion.V2, buy, sell, 2, 5000000000L, 1, 1, 1, 1526992336241L, proofs)
     bh.consume(exchangeTransaction.right.get)
   }
 
   @Benchmark
   def unsafeExchangeTX_test(st: ExchangeTransactionSt, bh: Blackhole): Unit = {
     import st._
-    val exchangeTransaction = ExchangeTransaction(TxVersion.V2, buy,
-      sell,
-      2,
-      5000000000L,
-      1,
-      1,
-      1,
-      1526992336241L,
-      proofs)
-
+    val exchangeTransaction = ExchangeTransaction(TxVersion.V2, buy, sell, 2, 5000000000L, 1, 1, 1, 1526992336241L, proofs)
     bh.consume(exchangeTransaction)
   }
 }
