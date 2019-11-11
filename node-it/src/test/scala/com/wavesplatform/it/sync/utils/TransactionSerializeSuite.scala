@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import scorex.crypto.encode.Base64
 
@@ -69,8 +69,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
   )
 
-  private val exV1 = ExchangeTransactionV1
+  private val exV1 = ExchangeTransaction
     .create(
+      TxVersion.V1,
       buyV1,
       sell,
       2,
@@ -79,13 +80,14 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       1,
       1,
       tsOrderFrom,
-      ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get
+      Proofs(ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get)
     )
     .right
     .get
 
-  private val exV2 = ExchangeTransactionV2
+  private val exV2 = ExchangeTransaction
     .create(
+      TxVersion.V2,
       buyV2,
       sell,
       2,

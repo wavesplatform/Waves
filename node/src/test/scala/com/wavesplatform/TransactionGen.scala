@@ -700,7 +700,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       buyMatcherFeeAssetId: Asset = Waves,
       sellMatcherFeeAssetId: Asset = Waves,
       fixedMatcher: Option[KeyPair] = None
-  ): Gen[ExchangeTransactionV2] = {
+  ): Gen[ExchangeTransaction] = {
 
     def mkBuyOrder(version: TxVersion): OrderConstructor = version match {
       case 1 => OrderV1.buy

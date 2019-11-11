@@ -43,7 +43,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
 
   property("ExchangeTransaction transaction serialization roundtrip") {
     forAll(exchangeTransactionGen) { om =>
-      val recovered = ExchangeTransaction.parse(om.bytes()).get
+      val recovered = ExchangeTransaction.parseBytes(om.bytes()).get
       om.id() shouldBe recovered.id()
       om.buyOrder.idStr() shouldBe recovered.buyOrder.idStr()
       recovered.bytes() shouldEqual om.bytes()
@@ -287,8 +287,9 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
-    val tx = ExchangeTransactionV1
+    val tx = ExchangeTransaction
       .create(
+        TxVersion.V1,
         buy,
         sell,
         2,
@@ -297,7 +298,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         1,
         1,
         1526992336241L,
-        ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get
+        Proofs(ByteStr.decodeBase58("5NxNhjMrrH5EWjSFnVnPbanpThic6fnNL48APVAkwq19y2FpQp4tNSqoAZgboC2ykUfqQs9suwBQj6wERmsWWNqa").get)
       )
       .explicitGet()
 
@@ -380,8 +381,9 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
-    val tx = ExchangeTransactionV2
+    val tx = ExchangeTransaction
       .create(
+        TxVersion.V2,
         buy,
         sell,
         2,
@@ -475,8 +477,9 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       Base58.tryDecodeWithLimit("2R6JfmNjEnbXAA6nt8YuCzSf1effDS4Wkz8owpCD9BdCNn864SnambTuwgLRYzzeP5CAsKHEviYKAJ2157vdr5Zq").get
     )
 
-    val tx = ExchangeTransactionV2
+    val tx = ExchangeTransaction
       .create(
+        TxVersion.V2,
         buy,
         sell,
         2,

@@ -56,7 +56,7 @@ package object impl {
       val version = buf.get()
       version match {
         case 1 =>
-          Order.fromBytes(buf.getByteArray(length))
+          Order.fromBytes(1.toByte, buf.getByteArray(length))
 
         case _ =>
           val outArray = new Array[Byte](length + 1)

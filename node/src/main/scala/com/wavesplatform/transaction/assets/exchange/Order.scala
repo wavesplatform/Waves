@@ -161,6 +161,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 object Order {
   type Id = ByteStr
 
+  implicit val jsonFormat = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
+
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant

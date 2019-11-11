@@ -73,7 +73,7 @@ object ExchangeTransaction extends TransactionParserLite {
       sellMatcherFee: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs
+      proofs: Proofs = Proofs.empty
   ): Either[ValidationError, ExchangeTransaction] =
     ExchangeTransaction(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs).validatedEither
 
