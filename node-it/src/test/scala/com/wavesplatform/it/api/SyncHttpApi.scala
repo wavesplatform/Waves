@@ -647,7 +647,7 @@ object SyncHttpApi extends Assertions {
     def broadcastIssue(source: KeyPair,
                        name: String,
                        quantity: Long,
-                       decimals: Byte,
+                       decimals: Int,
                        reissuable: Boolean,
                        fee: Long,
                        description: ByteString = ByteString.EMPTY,
