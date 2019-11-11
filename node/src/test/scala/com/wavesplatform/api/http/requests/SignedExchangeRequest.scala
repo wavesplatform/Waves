@@ -2,6 +2,7 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange._
 import io.swagger.annotations.ApiModelProperty
@@ -40,7 +41,7 @@ case class SignedExchangeRequest(
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       o1         <- castOrder(order1)
       o2         <- castOrder(order2)
-      _t         <- ExchangeTransactionV1.create(o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _signature)
+      _t         <- ExchangeTransaction.create(1.toByte, o1, o2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs(_signature))
     } yield _t
 
   def castOrder(o: Order): Either[ValidationError, OrderV1] = o match {

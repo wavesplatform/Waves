@@ -19,7 +19,7 @@ import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -67,6 +67,7 @@ package object http extends ApiMarshallers with ScorexLogging {
                   case CreateAliasTransaction    => txJson.as[CreateAliasRequest].toTxFrom(senderPk)
                   case LeaseTransaction          => txJson.as[LeaseRequest].toTxFrom(senderPk)
                   case LeaseCancelTransaction    => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
+                  case ExchangeTransaction       => txJson.as[ExchangeRequest].toTxFrom(senderPk)
                   case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
                   case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
                   case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)
@@ -79,8 +80,6 @@ package object http extends ApiMarshallers with ScorexLogging {
                   case SetScriptTransaction      => TransactionFactory.setScript(txJson.as[SetScriptRequest], senderPk)
                   case SetAssetScriptTransaction => TransactionFactory.setAssetScript(txJson.as[SetAssetScriptRequest], senderPk)
                   case SponsorFeeTransaction     => TransactionFactory.sponsor(txJson.as[SponsorFeeRequest], senderPk)
-                  case ExchangeTransactionV1     => TransactionFactory.exchangeV1(txJson.as[SignedExchangeRequest], senderPk)
-                  case ExchangeTransactionV2     => TransactionFactory.exchangeV2(txJson.as[SignedExchangeRequestV2], senderPk)
                 }
             }
           }

@@ -279,6 +279,21 @@ object TransactionFactory {
       signedTx = tx.signWith(signer)
     } yield signedTx
 
+  def exchange(request: ExchangeRequest, wallet: Wallet, time: Time): Either[ValidationError, ExchangeTransaction] =
+    for {
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
+      tx <- exchange(request, wallet, request.sender.get, time)
+    } yield tx
+
+  def exchange(request: ExchangeRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, ExchangeTransaction] =
+    for {
+      _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
+      sender <- wallet.findPrivateKey(request.sender.get)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender)
+      signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      signedTx = tx.signWith(signer)
+    } yield signedTx
+
   def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =
     reissueAssetV1(request, wallet, request.sender, time)
 
@@ -504,52 +519,6 @@ object TransactionFactory {
       )
     } yield tx
 
-  def exchangeV1(request: SignedExchangeRequest, sender: PublicKey): Either[ValidationError, ExchangeTransactionV1] = {
-    def orderV1(ord: Order) = {
-      import ord._
-      OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    }
-
-    for {
-      signature <- ByteStr.decodeBase58(request.signature).toEither.left.map(_ => GenericError(s"Wrong Base58 string: ${request.signature}"))
-      tx <- ExchangeTransactionV1.create(
-        orderV1(request.order1),
-        orderV1(request.order2),
-        request.amount,
-        request.price,
-        request.buyMatcherFee,
-        request.sellMatcherFee,
-        request.fee,
-        request.timestamp,
-        signature
-      )
-    } yield tx
-  }
-
-  def exchangeV2(request: SignedExchangeRequestV2, sender: PublicKey): Either[ValidationError, ExchangeTransactionV2] = {
-    import cats.instances.either._
-    import cats.instances.list._
-    import cats.syntax.traverse._
-
-    for {
-      proofs <- request.proofs
-        .map(str => ByteStr.decodeBase58(str).toEither.left.map(e => GenericError(s"Invalid proof: $str ($e)")))
-        .sequence
-
-      tx <- ExchangeTransactionV2.create(
-        request.order1,
-        request.order2,
-        request.amount,
-        request.price,
-        request.buyMatcherFee,
-        request.sellMatcherFee,
-        request.fee,
-        request.timestamp,
-        proofs
-      )
-    } yield tx
-  }
-
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
     import InvokeScriptRequest._
     val chainId = (jsv \ "chainId").asOpt[Byte]
@@ -573,8 +542,7 @@ object TransactionFactory {
       case SetScriptTransaction      => jsv.as[SignedSetScriptRequest].toTx
       case SetAssetScriptTransaction => jsv.as[SignedSetAssetScriptRequest].toTx
       case SponsorFeeTransaction     => jsv.as[SignedSponsorFeeRequest].toTx
-      case ExchangeTransactionV1     => jsv.as[SignedExchangeRequest].toTx
-      case ExchangeTransactionV2     => jsv.as[SignedExchangeRequestV2].toTx
+      case ExchangeTransaction       => jsv.as[ExchangeRequest].toTx
     }
 
     TransactionParsers.by(typeId, version) match {
