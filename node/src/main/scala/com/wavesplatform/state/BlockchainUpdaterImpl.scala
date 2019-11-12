@@ -811,7 +811,6 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  //noinspection ScalaStyle,TypeAnnotation
   private[this] object metrics {
     val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
     val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")

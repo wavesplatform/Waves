@@ -68,8 +68,8 @@ class BlockV5Test
             blockchain.lastBlock.value.header.version shouldBe Block.RewardBlockVersion
             blockAtActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
 
-            val genInputAtActivationHeight = blockchain.hitSourceAtHeight(bs.size + 1).get
-            genInputAtActivationHeight shouldBe blockAtActivationHeight.header.generationSignature
+            val hitSourceAtActivationHeight = blockchain.hitSourceAtHeight(bs.size + 1).get
+            hitSourceAtActivationHeight shouldBe blockAtActivationHeight.header.generationSignature
 
             time.advance(10.minute)
 
@@ -83,11 +83,11 @@ class BlockV5Test
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
 
-            val genInputAfterActivationHeight = blockchain.hitSourceAtHeight(bs.size + 2).get
-            genInputAfterActivationHeight shouldBe crypto
+            val hitSourceAfterActivationHeight = blockchain.hitSourceAtHeight(bs.size + 2).get
+            hitSourceAfterActivationHeight shouldBe crypto
               .verifyVRF(
                 blockAfterActivationHeight.header.generationSignature,
-                genInputAtActivationHeight,
+                hitSourceAtActivationHeight,
                 minerAcc1.publicKey
               )
               .explicitGet()
@@ -104,11 +104,11 @@ class BlockV5Test
             blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
             blockAfterVRFUsing.signature shouldBe blockchain.lastBlock.value.signature
 
-            val genInputAfterVRFUsing = blockchain.hitSourceAtHeight(bs.size + 3).get
-            genInputAfterVRFUsing shouldBe crypto
+            val hitSourceAfterVRFUsing = blockchain.hitSourceAtHeight(bs.size + 3).get
+            hitSourceAfterVRFUsing shouldBe crypto
               .verifyVRF(
                 blockAfterVRFUsing.header.generationSignature,
-                genInputAfterActivationHeight,
+                hitSourceAfterActivationHeight,
                 minerAcc2.publicKey
               )
               .explicitGet()

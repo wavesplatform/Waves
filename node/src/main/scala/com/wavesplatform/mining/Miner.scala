@@ -290,7 +290,6 @@ class MinerImpl(
 
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
-  //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
     val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
     val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
@@ -298,8 +297,8 @@ class MinerImpl(
 }
 
 object Miner {
-  val blockMiningStarted: CounterMetric = Kamon.counter("block-mining-started")
-  val microMiningStarted: CounterMetric = Kamon.counter("micro-mining-started")
+  private[mining] val blockMiningStarted = Kamon.counter("block-mining-started")
+  private[mining] val microMiningStarted = Kamon.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 500
 

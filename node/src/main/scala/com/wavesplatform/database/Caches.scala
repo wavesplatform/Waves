@@ -217,11 +217,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
-      generationInput: ByteStr,
+      hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], generationInput: ByteStr, block: Block): Unit = {
+  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -293,7 +293,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.sponsorship,
       totalFee,
       reward,
-      generationInput,
+      htiSource,
       diff.scriptResults
     )
 

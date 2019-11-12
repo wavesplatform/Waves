@@ -245,7 +245,7 @@ class LevelDBWriter(
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
-      generationInput: ByteStr,
+      hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
@@ -472,7 +472,7 @@ class LevelDBWriter(
       DisableHijackedAliases(rw)
     }
 
-    rw.put(Keys.hitSource(height), generationInput.arr)
+    rw.put(Keys.hitSource(height), hitSource.arr)
   }
 
   override protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)] = {
@@ -608,10 +608,10 @@ class LevelDBWriter(
             DisableHijackedAliases.revert(rw)
           }
 
-          val generationInput = ByteStr(rw.get(Keys.hitSource(currentHeight)))
-          val block           = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+          val hitSource = ByteStr(rw.get(Keys.hitSource(currentHeight)))
+          val block     = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
 
-          (block, generationInput)
+          (block, hitSource)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
