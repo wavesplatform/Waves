@@ -109,4 +109,17 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - minFee
     sender.grpc.wavesBalance(secondAddress).available shouldBe secondBalance + transferAmount
   }
+
+  test("not able to broadcast tx from scripted acc if tx fee doesn't include smart fee") {
+    val firstBalance = sender.grpc.wavesBalance(firstAddress).available
+    val thirdBalance = sender.grpc.wavesBalance(thirdAddress).available
+    val script = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+
+    sender.grpc.setScript(firstAcc, Some(script), setScriptFee, waitForTx = true)
+    assertGrpcError(
+    sender.grpc.broadcastTransfer(firstAcc, recipient = Recipient().withAddress(thirdAddress), amount = transferAmount, fee = minFee + smartFee - 1),
+      "Transaction sent from smart account",
+      Code.INVALID_ARGUMENT
+    )
+  }
 }
