@@ -6,9 +6,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.ScriptResult
+import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -46,9 +46,9 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         tx.dAppAddressOrAlias,
         tx.funcCall,
         Right(
-          ScriptResult(
+          ScriptResultV3(
             List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
-            List((Recipient.Address(tx.dAppAddressOrAlias.bytes), 1, None))
+            List(AssetTransfer(Recipient.Address(tx.dAppAddressOrAlias.bytes), 1, None))
           )),
         vars
       ))

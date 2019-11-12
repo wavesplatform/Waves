@@ -65,7 +65,7 @@ object TransactionDiffer {
       tx match {
         case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx)
         case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx)
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain)(ci)
+        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTimestamp)(ci)
         case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx)
         case otherTx: ProvenTransaction =>
           unverifiedWithEstimate(currentBlockTimestamp)(blockchain, otherTx)

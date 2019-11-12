@@ -4,7 +4,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database
 import com.wavesplatform.database.DBExt
-import com.wavesplatform.state.{Blockchain, Height, NG}
+import com.wavesplatform.state.{Blockchain, Height}
 import org.iq80.leveldb.DB
 
 trait History {

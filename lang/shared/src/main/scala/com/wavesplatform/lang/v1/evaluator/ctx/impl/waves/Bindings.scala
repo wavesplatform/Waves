@@ -142,7 +142,7 @@ object Bindings {
         CaseObj(buildPaymentTransactionType(proofsEnabled),
                 Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
       case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled)
-      case Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
+      case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           buildIssueTransactionType(proofsEnabled),
           combine(
@@ -167,7 +167,7 @@ object Bindings {
                   ),
                   provenTxPart(p, proofsEnabled))
         )
-      case Burn(p, quantity, assetId) =>
+      case Tx.Burn(p, quantity, assetId) =>
         CaseObj(
           buildBurnTransactionType(proofsEnabled),
           combine(Map(
