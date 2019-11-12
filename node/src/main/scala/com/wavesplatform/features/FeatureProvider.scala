@@ -19,7 +19,7 @@ object FeatureProvider {
       else BlockchainFeatureStatus.Undefined
 
     def currentBlockVersion: Byte =
-      if (isFeatureActivated(BlockchainFeatures.BlockV5, blockchain.height)) ProtoBlockVersion
+      if (isFeatureActivated(BlockchainFeatures.BlockV5)) ProtoBlockVersion
       else if (isFeatureActivated(BlockchainFeatures.BlockReward)) RewardBlockVersion
       else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight < blockchain.height) NgBlockVersion
       else PlainBlockVersion
