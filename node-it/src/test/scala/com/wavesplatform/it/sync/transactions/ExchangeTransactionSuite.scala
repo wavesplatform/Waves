@@ -7,6 +7,7 @@ import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransactionV1
 import com.wavesplatform.transaction.assets.exchange._
 import play.api.libs.json.{JsNumber, JsString, Json}
@@ -26,8 +27,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     .right
     .get
 
-  var pair: AssetPair = _
-
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
   private val acc2 = pkByAddress(thirdAddress)
@@ -41,33 +40,41 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   val versions = transactionV1versions +: transactionV2versions
 
   test("cannot exchange non-issued assets") {
-    for ((o1ver, o2ver, tver) <- versions) {
+    for ((buyVersion, sellVersion, exchangeVersion) <- versions) {
 
       val assetId = exchAsset.id().toString
 
-      val buyer               = acc0
-      val seller              = acc1
-      val matcher             = acc2
+      val buyer   = acc0
+      val seller  = acc1
+      val matcher = acc2
+
       val ts                  = ntpTime.correctedTime()
       val expirationTimestamp = ts + Order.MaxLiveTime
-      val buyPrice            = 2 * Order.PriceConstant
-      val sellPrice           = 2 * Order.PriceConstant
-      val buyAmount           = 1
-      val sellAmount          = 1
-      pair = AssetPair.createAssetPair("WAVES", assetId).get
-      val buy  = Order.buy(o1ver, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee)
-      val sell = Order.sell(o2ver, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee)
+
+      val buyPrice   = 2 * Order.PriceConstant
+      val sellPrice  = 2 * Order.PriceConstant
+      val buyAmount  = 1
+      val sellAmount = 1
+
+      val pair = AssetPair.createAssetPair("WAVES", assetId).get
+      val buy  = Order.buy(buyVersion, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee)
+      val sell = Order.sell(sellVersion, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee)
 
       val amount = 1
-      if (tver != 1) {
-        val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
+      if (exchangeVersion != 1) {
+        val tx = ExchangeTransaction
+          .signed(
+            TxVersion.V2,
+            matcher = matcher,
+            buyOrder = buy,
             sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
             fee = matcherFee,
-            timestamp = ntpTime.correctedTime())
+            timestamp = ntpTime.correctedTime()
+          )
           .right
           .get
 
@@ -76,14 +83,19 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           "Assets should be issued before they can be traded"
         )
       } else {
-        val tx = ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[Order],
-            sellOrder = sell.asInstanceOf[Order],
+        val tx = ExchangeTransaction
+          .signed(
+            1.toByte,
+            matcher = matcher,
+            buyOrder = buy,
+            sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
             fee = matcherFee,
-            timestamp = ntpTime.correctedTime())
+            timestamp = ntpTime.correctedTime()
+          )
           .right
           .get
 
@@ -98,11 +110,11 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
   test("negative - check orders v2 and v3 with exchange tx v1") {
     if (sender.findTransactionInfo(exchAsset.id().toString).isEmpty) sender.postJson("/transactions/broadcast", exchAsset.json())
-    pair = AssetPair.createAssetPair("WAVES", exchAsset.id().toString).get
+    val pair = AssetPair.createAssetPair("WAVES", exchAsset.id().toString).get
 
     for ((o1ver, o2ver) <- Seq(
            (2: Byte, 1: Byte),
-           (2: Byte, 3: Byte),
+           (2: Byte, 3: Byte)
          )) {
       val tx        = exchangeTx(pair, matcherFee, orderFee, ntpTime, o1ver, o2ver, acc1, acc0, acc2)
       val sig       = (Json.parse(tx.toString()) \ "proofs").as[Seq[JsString]].head
@@ -149,7 +161,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val matcher                  = pkByAddress(thirdAddress)
       val ts                       = ntpTime.correctedTime()
       val expirationTimestamp      = ts + Order.MaxLiveTime
-      var assetBalanceBefore: Long = 0l
+      var assetBalanceBefore: Long = 0L
 
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
         assetBalanceBefore = sender.assetBalance(secondAddress, assetId.toString).balance
@@ -160,20 +172,25 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val sellPrice  = 500000
       val buyAmount  = 40000000
       val sellAmount = 40000000
-      val assetPair = AssetPair.createAssetPair("WAVES", assetId.toString).get
+      val assetPair  = AssetPair.createAssetPair("WAVES", assetId.toString).get
       val buy        = Order.buy(o1ver, buyer, matcher, assetPair, buyAmount, buyPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
       val sell       = Order.sell(o2ver, seller, matcher, assetPair, sellAmount, sellPrice, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
       val amount     = 40000000
 
       val tx =
-        ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
+        ExchangeTransaction
+          .signed(
+            2.toByte,
+            matcher = matcher,
+            buyOrder = buy,
             sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
             fee = matcherFee,
-            timestamp = ntpTime.correctedTime())
+            timestamp = ntpTime.correctedTime()
+          )
           .right
           .get
 
