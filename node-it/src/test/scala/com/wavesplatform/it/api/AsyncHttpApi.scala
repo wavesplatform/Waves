@@ -190,6 +190,7 @@ object AsyncHttpApi extends Assertions {
 
     def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo(txId).transform {
       case Success(tx)                                          => Success(Some(tx))
+      case Success(tx)                                          => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
       case Failure(ex)                                          => Failure(ex)
     }
@@ -832,7 +833,7 @@ object AsyncHttpApi extends Assertions {
 
       transactions.broadcast(transaction)
     }
-
+    
     def broadcastReissue(source: KeyPair,
                          fee: Long,
                          assetId: String,
