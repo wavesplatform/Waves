@@ -4,8 +4,8 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
-import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -88,7 +88,7 @@ object OrderSerializer {
   }
 
   def parseBytes(version: Order.Version, bytes: Array[Byte]): Try[Order] = Try {
-    def parseCommonPart(version: TxVersion, buf: ByteBuffer): Order = {
+    def parseCommonPart(buf: ByteBuffer): Order = {
       val sender     = buf.getPublicKey
       val matcher    = buf.getPublicKey
       val assetPair  = AssetPair(buf.getAsset, buf.getAsset)
@@ -101,22 +101,20 @@ object OrderSerializer {
       Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee)
     }
 
-    require(bytes.length > 2, "buffer underflow while parsing transfer transaction")
-
     version match {
       case Order.V1 =>
         val buf = ByteBuffer.wrap(bytes)
-        parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(buf.getSignature))
+        parseCommonPart(buf).copy(proofs = Proofs(buf.getSignature))
 
       case Order.V2 =>
         require(bytes(0) == version, "order version mismatch")
         val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-        parseCommonPart(version, buf).copy(proofs = buf.getProofs)
+        parseCommonPart(buf).copy(proofs = buf.getProofs)
 
       case Order.V3 =>
         require(bytes(0) == version, "order version mismatch")
         val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-        parseCommonPart(version, buf).copy(matcherFeeAssetId = buf.getAsset, proofs = buf.getProofs)
+        parseCommonPart(buf).copy(matcherFeeAssetId = buf.getAsset, proofs = buf.getProofs)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported order version: $version")

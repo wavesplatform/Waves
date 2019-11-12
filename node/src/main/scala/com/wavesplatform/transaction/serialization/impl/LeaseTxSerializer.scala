@@ -47,7 +47,7 @@ object LeaseTxSerializer {
       LeaseTransaction(version, sender, recipient, amount, fee, timestamp, Nil)
     }
 
-    require(bytes.length > 2, "buffer underflow while parsing transfer transaction")
+    require(bytes.length > 2, "buffer underflow while parsing transaction")
 
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseTransaction.typeId, "transaction type mismatch")
