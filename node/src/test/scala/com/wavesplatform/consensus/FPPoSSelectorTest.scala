@@ -203,14 +203,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
           case Env(pos, blockchain, miners) =>
             val miner  = miners.head
-            val height = blockchain.height
             val block  = forgeBlock(miner, blockchain, pos, blockVersion)()
 
             pos
-              .validateGenerationSignature(
-                height + 1,
-                block
-              )
+              .validateGenerationSignature(block)
               .isRight shouldBe true
         }
     }
@@ -220,12 +216,10 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         withEnv(chainGen(List(ENOUGH_AMT), 100, blockVersion), vrfActivated) {
           case Env(pos, blockchain, miners) =>
             val miner  = miners.head
-            val height = blockchain.height
             val block  = forgeBlock(miner, blockchain, pos, blockVersion)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
 
             pos
               .validateGenerationSignature(
-                height + 1,
                 block
               ) should produce("Generation signatures does not match")
         }

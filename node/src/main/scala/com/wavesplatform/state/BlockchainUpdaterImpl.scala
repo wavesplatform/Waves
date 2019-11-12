@@ -162,7 +162,7 @@ class BlockchainUpdaterImpl(
       .orElse(lastBlockReward)
   }
 
-  override def processBlock(block: Block, generationInput: ByteStr, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] =
+  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] =
     writeLock {
       val height                             = blockchain.height
       val notImplementedFeatures: Set[Short] = blockchain.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -194,7 +194,7 @@ class BlockchainUpdaterImpl(
                         miningConstraints.total,
                         verify
                       )
-                      .map(r => Option((r, Seq.empty[Transaction], reward, generationInput)))
+                      .map(r => Option((r, Seq.empty[Transaction], reward, hitSource)))
                 }
               case Some(ng) =>
                 if (ng.base.header.reference == block.header.reference) {
@@ -216,7 +216,7 @@ class BlockchainUpdaterImpl(
                         log.trace(
                           s"Better liquid block(score=${block.blockScore()}) received and applied instead of existing(score=${ng.base.blockScore()})"
                         )
-                        Some((r, ng.transactions, ng.reward, generationInput))
+                        Some((r, ng.transactions, ng.reward, hitSource))
                       }
                   } else if (areVersionsOfSameBlock(block, ng.base)) {
                     if (block.transactionData.lengthCompare(ng.transactions.size) <= 0) {
@@ -238,7 +238,7 @@ class BlockchainUpdaterImpl(
                           miningConstraints.total,
                           verify
                         )
-                        .map(r => Some((r, Seq.empty[Transaction], ng.reward, generationInput)))
+                        .map(r => Some((r, Seq.empty[Transaction], ng.reward, hitSource)))
                     }
                   } else
                     Left(
@@ -270,7 +270,7 @@ class BlockchainUpdaterImpl(
                         val prevReward = ng.reward
                         val reward     = nextReward()
 
-                        val prevGenerationInput = ng.generationInput
+                        val prevHitSource = ng.hitSource
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
@@ -284,9 +284,9 @@ class BlockchainUpdaterImpl(
                           )
 
                         diff.map { hardenedDiff =>
-                          blockchain.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevGenerationInput, referencedForgedBlock)
+                          blockchain.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)
                           TxsInBlockchainStats.record(ng.transactions.size)
-                          Some((hardenedDiff, discarded.flatMap(_.transactionData), reward, generationInput))
+                          Some((hardenedDiff, discarded.flatMap(_.transactionData), reward, hitSource))
                         }
                       } else {
                         val errorText = s"Forged block has invalid signature: base: ${ng.base}, requested reference: ${block.header.reference}"
@@ -296,7 +296,7 @@ class BlockchainUpdaterImpl(
                   }
             }).map {
               _ map {
-                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded, reward, generationInput) =>
+                case (BlockDiffer.Result(newBlockDiff, carry, totalFee, updatedTotalConstraint, detailedDiff), discarded, reward, hitSource) =>
                   val newHeight   = blockchain.height + 1
                   val prevNgState = ngState
 
@@ -309,7 +309,7 @@ class BlockchainUpdaterImpl(
                       totalFee,
                       featuresApprovedWithBlock(block),
                       reward,
-                      generationInput,
+                      hitSource,
                       cancelLeases(collectLeasesToCancel(newHeight))
                     )
                   )
@@ -361,7 +361,7 @@ class BlockchainUpdaterImpl(
       BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, blockId, blockchain.height)
       Right(Seq.empty)
     } else {
-      val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.generationInput)).toSeq
+      val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
       ngState = None
       blockchain
         .rollbackTo(blockId)
@@ -806,7 +806,7 @@ class BlockchainUpdaterImpl(
 
   override def hitSourceAtHeight(height: Int): Option[ByteStr] = readLock {
     ngState match {
-      case Some(ng) if this.height == height => ng.generationInput.some
+      case Some(ng) if this.height == height => ng.hitSource.some
       case _                                 => blockchain.hitSourceAtHeight(height)
     }
   }

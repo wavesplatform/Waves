@@ -56,7 +56,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .map(_ => ())
   }
 
-  def validateGenerationSignature(height: Int, block: Block): Either[ValidationError, ByteStr] = {
+  def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
     val blockGS        = block.header.generationSignature.arr
     val blockGenerator = block.header.generator
 
@@ -67,7 +67,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           for {
             hitSource <- blockchain
               .hitSourceAtHeight(blockchain.height)
-              .toRight(GenericError(s"Couldn't find hit source at height: $height"))
+              .toRight(GenericError(s"Couldn't find hit source"))
             vrf <- crypto.verifyVRF(blockGS, hitSource, blockGenerator)
           } yield vrf
         case b =>

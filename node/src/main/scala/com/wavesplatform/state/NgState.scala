@@ -21,7 +21,7 @@ class NgState(
     baseBlockTotalFee: Long,
     val approvedFeatures: Set[Short],
     val reward: Option[Long],
-    val generationInput: ByteStr,
+    val hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, Diff]
 ) {
 

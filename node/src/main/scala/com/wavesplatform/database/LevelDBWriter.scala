@@ -472,7 +472,7 @@ class LevelDBWriter(
       DisableHijackedAliases(rw)
     }
 
-    rw.put(Keys.generationInput(height), generationInput.arr)
+    rw.put(Keys.hitSource(height), generationInput.arr)
   }
 
   override protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)] = {
@@ -608,7 +608,7 @@ class LevelDBWriter(
             DisableHijackedAliases.revert(rw)
           }
 
-          val generationInput = ByteStr(rw.get(Keys.generationInput(currentHeight)))
+          val generationInput = ByteStr(rw.get(Keys.hitSource(currentHeight)))
           val block           = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
 
           (block, generationInput)
@@ -959,7 +959,7 @@ class LevelDBWriter(
     } yield result
 
   override def hitSourceAtHeight(height: Int): Option[ByteStr] = readOnly { db =>
-    Option(db.get(Keys.generationInput(height)))
+    Option(db.get(Keys.hitSource(height)))
       .filter(_.length == Block.GenerationInputLength)
       .map(ByteStr.apply)
   }

@@ -64,7 +64,7 @@ package object appender extends ScorexLogging {
       blockchainUpdater
         .hitSourceAtHeight(blockchainUpdater.height)
         .toRight(GenericError(s"Couldn't find hiy source"))
-        .flatMap(genInput => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, genInput))
+        .flatMap(hitSource => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, hitSource))
   }
 
   private[appender] def validateAndAppendBlock(
@@ -79,7 +79,7 @@ package object appender extends ScorexLogging {
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      generationInput <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
+      hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
         val balance = blockchainUpdater.generatingBalance(block.sender, parent)
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
@@ -87,14 +87,14 @@ package object appender extends ScorexLogging {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
-      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, generationInput)
+      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
     } yield baseHeight
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
       block: Block,
-      generationInput: ByteStr
+      hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, generationInput, verify)).map { maybeDiscardedTxs =>
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
         metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
@@ -120,9 +120,9 @@ package object appender extends ScorexLogging {
           _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
-          generationInput  <- pos.validateGenerationSignature(height, block)
+          hitSource        <- pos.validateGenerationSignature(block)
           _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
-        } yield generationInput
+        } yield hitSource
       }
       .left
       .map {
