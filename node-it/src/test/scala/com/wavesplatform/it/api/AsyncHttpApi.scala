@@ -14,7 +14,7 @@ import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesReq
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.ActivationStatus
 import com.wavesplatform.http.DebugMessage._
@@ -22,12 +22,13 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
+import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, ReissueTransactionData, Script, SignedTransaction, TransferTransactionData}
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, ReissueTransactionData, Script, SetScriptTransactionData, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
@@ -764,7 +765,7 @@ object AsyncHttpApi extends Assertions {
   class NodeExtGrpc(n: Node) {
 
     import monix.execution.Scheduler.Implicits.global
-    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction}
+    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction, Script => PBScript}
 
 
     private[this] lazy val accounts = AccountsApiGrpc.stub(n.grpcChannel)
@@ -885,7 +886,23 @@ object AsyncHttpApi extends Assertions {
       transactions.broadcast(transaction)
     }
 
+    def setScript(sender: KeyPair, script: Option[String], fee: Long, timestamp: Long = System.currentTimeMillis(), version: Int = 1): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(sender.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        timestamp,
+        version,
+        PBTransaction.Data.SetScript(SetScriptTransactionData.of(
+          script.map(s => PBScript.of(ByteString.copyFrom(Base64.decode(s)))))))
 
+      script match {
+        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.EMPTY)))
+        case _ =>
+          val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      }
+    }
 
     def getTransaction(id: String): Future[PBSignedTransaction] = {
       def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
