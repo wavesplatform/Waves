@@ -125,17 +125,16 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   val invalidAssetValue =
     Table(
       ("assetVal", "decimals", "message"),
-      (0L, 2, NonPositiveAmount(0, "assets")),
-      (1L, IssueTransaction.MaxDecimals + 1, TooBigArray),
-      (-1L, 1, NonPositiveAmount(-1, "assets")),
-      (1L, -1, TooBigArray)
+      (0L, 2, "NonPositiveAmount"),
+      (1L, IssueTransaction.MaxDecimals + 1, "TooBigArray"),
+      (-1L, 1, "NonPositiveAmount"),
+      (1L, -1, "TooBigArray")
     )
 
-  forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: ValidationError) =>
+  forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: String) =>
     test(s"Not able to create asset total token='$assetVal', decimals='$decimals' ") {
       val assetName          = "myasset2"
       val decimalBytes: Byte = decimals.toByte
-
       assertGrpcError(
       sender.grpc.broadcastIssue(issuer, assetName, assetVal, decimalBytes, reissuable = false, issueFee),
         s"$error",
