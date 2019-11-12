@@ -41,7 +41,7 @@ object CreateAliasTxSerializer {
   }
 
   def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {
-    require(bytes.length > 3, "Invalid tx bytes")
+    require(bytes.length > 3, "buffer underflow while parsing transaction")
     bytes.take(3) match {
       case Array(CreateAliasTransaction.typeId, _, _) =>
         val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV1, ExchangeTransactionV2}
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -15,7 +15,7 @@ object TransactionParsers {
     IssueTransactionV1,
     ReissueTransactionV1,
     BurnTransactionV1,
-    ExchangeTransactionV1,
+    ExchangeTransaction,
     LeaseTransaction,
     LeaseCancelTransaction,
     CreateAliasTransaction,
@@ -32,7 +32,7 @@ object TransactionParsers {
     CreateAliasTransaction,
     ReissueTransactionV2,
     BurnTransactionV2,
-    ExchangeTransactionV2,
+    ExchangeTransaction,
     LeaseTransaction,
     LeaseCancelTransaction,
     SponsorFeeTransaction,

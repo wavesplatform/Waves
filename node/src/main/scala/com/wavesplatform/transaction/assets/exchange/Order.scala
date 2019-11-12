@@ -1,48 +1,42 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.OrderOps._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
-import com.wavesplatform.utils.byteStrWrites
+import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{Format, JsObject}
 
-import scala.math.BigDecimal.RoundingMode
 import scala.util.Try
 
 /**
   * Order to matcher service for asset exchange
   */
-trait Order extends BytesSerializable with JsonSerializable with Proven {
-  def senderPublicKey: PublicKey
-  def matcherPublicKey: PublicKey
-  def assetPair: AssetPair
-  def orderType: OrderType
-  def amount: Long
-  def price: Long
-  def timestamp: Long
-  def expiration: Long
-  def matcherFee: Long
-  def proofs: Proofs
-  def version: TxVersion
-  def signature: Array[Byte]   = proofs.toSignature
-  def matcherFeeAssetId: Asset = Waves
-
+case class Order(
+    version: Order.Version,
+    senderPublicKey: PublicKey,
+    matcherPublicKey: PublicKey,
+    assetPair: AssetPair,
+    orderType: OrderType,
+    amount: TxAmount,
+    price: TxAmount,
+    timestamp: TxTimestamp,
+    expiration: TxTimestamp,
+    matcherFee: TxAmount,
+    matcherFeeAssetId: Asset = Waves,
+    proofs: Proofs = Proofs.empty
+) extends Proven {
   import Order._
 
   @ApiModelProperty(hidden = true)
-  val sender = senderPublicKey
+  val sender: PublicKey = senderPublicKey
 
-  @ApiModelProperty(hidden = true)
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
     assetPair.isValid &&
@@ -50,7 +44,8 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     (matcherFee < MaxAmount) :| "matcherFee too large" &&
     (timestamp > 0) :| "timestamp should be > 0" &&
     (expiration - atTime <= MaxLiveTime) :| "expiration should be earlier than 30 days" &&
-    (expiration >= atTime) :| "expiration should be > currentTime"
+    (expiration >= atTime) :| "expiration should be > currentTime" &&
+    (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
   }
 
   //  @ApiModelProperty(hidden = true)
@@ -64,14 +59,15 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
+  // TODO: Check if we can remove ApiModelProperty annotations
   @ApiModelProperty(hidden = true)
-  val bodyBytes: Coeval[Array[Byte]]
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
   @ApiModelProperty(hidden = true)
   val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
   @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
   @ApiModelProperty(hidden = true)
-  val bytes: Coeval[Array[Byte]]
+  val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
   @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Asset = orderType match {
@@ -108,48 +104,7 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
     }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
-  override val json: Coeval[JsObject] = Coeval.evalOnce({
-    val sig = Base58.encode(signature)
-    Json.obj(
-      "version"          -> version,
-      "id"               -> idStr(),
-      "sender"           -> senderPublicKey.stringRepr,
-      "senderPublicKey"  -> Base58.encode(senderPublicKey),
-      "matcherPublicKey" -> Base58.encode(matcherPublicKey),
-      "assetPair"        -> assetPair.json,
-      "orderType"        -> orderType.toString,
-      "amount"           -> amount,
-      "price"            -> price,
-      "timestamp"        -> timestamp,
-      "expiration"       -> expiration,
-      "matcherFee"       -> matcherFee,
-      "signature"        -> sig,
-      "proofs"           -> proofs.proofs
-    )
-  })
-
-  @ApiModelProperty(hidden = true)
-  def jsonStr: String = Json.stringify(json())
-
-  @ApiModelProperty(hidden = true)
-  override def equals(obj: Any): Boolean = {
-    obj match {
-      case o: Order =>
-        senderPublicKey == o.senderPublicKey &&
-          matcherPublicKey == o.matcherPublicKey &&
-          assetPair == o.assetPair &&
-          orderType == o.orderType &&
-          price == o.price &&
-          amount == o.amount &&
-          expiration == o.expiration &&
-          matcherFee == o.matcherFee &&
-          (signature sameElements o.signature)
-      case _ => false
-    }
-  }
-
-  @ApiModelProperty(hidden = true)
-  override def hashCode(): Int = idStr.hashCode()
+  val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))
 
   @ApiModelProperty(hidden = true)
   override def toString: String = {
@@ -159,124 +114,67 @@ trait Order extends BytesSerializable with JsonSerializable with Proven {
 }
 
 object Order {
-  type Id = ByteStr
+  type Id      = ByteStr
+  type Version = Byte
+
+  implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
 
-  def apply(senderPublicKey: PublicKey,
-            matcherPublicKey: PublicKey,
-            assetPair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            proofs: Proofs,
-            version: TxVersion = TxVersion.V1,
-            matcherFeeAssetId: Asset = Asset.Waves): Order = version match {
-    case 1 => OrderV1(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    case 2 => OrderV2(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs)
-    case 3 =>
-      OrderV3(senderPublicKey, matcherPublicKey, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, proofs)
-    case _ => throw new IllegalArgumentException(s"Invalid order version: $version")
+  val V1: Version = 1
+  val V2: Version = 2
+  val V3: Version = 3
+
+  implicit def sign(order: Order, privateKey: PrivateKey): Order =
+    order.copy(proofs = Proofs(crypto.sign(privateKey, order.bodyBytes())))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: TxAmount,
+      price: TxAmount,
+      timestamp: TxTimestamp,
+      expiration: TxTimestamp,
+      matcherFee: TxAmount,
+      matcherFeeAssetId: Asset = Asset.Waves
+  ): Order =
+    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender)
+
+  def buy(
+      version: TxVersion,
+      sender: KeyPair,
+      matcher: PublicKey,
+      pair: AssetPair,
+      amount: TxAmount,
+      price: TxAmount,
+      timestamp: TxTimestamp,
+      expiration: TxTimestamp,
+      matcherFee: TxAmount,
+      matcherFeeAssetId: Asset = Waves
+  ): Order = {
+    Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
   }
 
-  def correctAmount(a: Long, price: Long): Long = {
-    val settledTotal = (BigDecimal(price) * a / Order.PriceConstant).setScale(0, RoundingMode.FLOOR).toLong
-    (BigDecimal(settledTotal) / price * Order.PriceConstant).setScale(0, RoundingMode.CEILING).toLong
+  def sell(
+      version: TxVersion,
+      sender: KeyPair,
+      matcher: PublicKey,
+      pair: AssetPair,
+      amount: TxAmount,
+      price: TxAmount,
+      timestamp: TxTimestamp,
+      expiration: TxTimestamp,
+      matcherFee: TxAmount,
+      matcherFeeAssetId: Asset = Waves
+  ): Order = {
+    Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
   }
 
-  def correctAmount(o: Order): Long = correctAmount(o.amount, o.price)
-
-  def buy(sender: KeyPair,
-          matcher: PublicKey,
-          pair: AssetPair,
-          amount: Long,
-          price: Long,
-          timestamp: Long,
-          expiration: Long,
-          matcherFee: Long,
-          version: TxVersion = TxVersion.V1,
-          matcherFeeAssetId: Asset = Waves): Order = {
-    val unsigned = version match {
-      case 3 =>
-        Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-      case _ => Order(sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
-    }
-    sign(unsigned, sender)
-  }
-
-  def sell(sender: KeyPair,
-           matcher: PublicKey,
-           pair: AssetPair,
-           amount: Long,
-           price: Long,
-           timestamp: Long,
-           expiration: Long,
-           matcherFee: Long,
-           version: TxVersion = TxVersion.V1,
-           matcherFeeAssetId: Asset = Waves): Order = {
-    val unsigned = version match {
-      case 3 =>
-        Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-      case _ => Order(sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
-    }
-    sign(unsigned, sender)
-  }
-
-  def apply(sender: KeyPair,
-            matcher: PublicKey,
-            pair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            version: TxVersion): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version)
-    sign(unsigned, sender)
-  }
-
-  def apply(sender: KeyPair,
-            matcher: PublicKey,
-            pair: AssetPair,
-            orderType: OrderType,
-            amount: Long,
-            price: Long,
-            timestamp: Long,
-            expiration: Long,
-            matcherFee: Long,
-            version: TxVersion,
-            matcherFeeAssetId: Asset): Order = {
-    val unsigned = Order(sender, matcher, pair, orderType, amount, price, timestamp, expiration, matcherFee, Proofs.empty, version, matcherFeeAssetId)
-    sign(unsigned, sender)
-  }
-
-  def sign(unsigned: Order, sender: KeyPair): Order = {
-    require(unsigned.senderPublicKey == sender.publicKey)
-    val sig = crypto.sign(sender, unsigned.bodyBytes())
-    unsigned.updateProofs(Proofs(sig))
-  }
-
-  def splitByType(o1: Order, o2: Order): (Order, Order) = {
-    require(o1.orderType != o2.orderType)
-    if (o1.orderType == OrderType.BUY) (o1, o2)
-    else (o2, o1)
-  }
-
-  def assetIdBytes(assetId: Asset): Array[Byte] = {
-    assetId.byteRepr
-  }
-
-  def fromBytes(version: TxVersion, xs: Array[Byte]): Order = version match {
-    case 1     => OrderV1.parseBytes(xs).get
-    case 2     => OrderV2.parseBytes(xs).get
-    case 3     => OrderV3.parseBytes(xs).get
-    case other => throw new IllegalArgumentException(s"Unexpected order version: $other")
-  }
-
+  def parseBytes(version: Version, bytes: Array[Byte]): Try[Order] =
+    OrderSerializer.parseBytes(version, bytes)
 }

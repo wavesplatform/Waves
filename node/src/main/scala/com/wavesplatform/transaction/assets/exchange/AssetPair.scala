@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.assets.exchange
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.Order.assetIdBytes
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import net.ceedubs.ficus.readers.ValueReader
@@ -14,16 +14,18 @@ import scala.annotation.meta.field
 import scala.util.{Failure, Success, Try}
 
 @ApiModel
-case class AssetPair(@(ApiModelProperty @field)(
-                       value = "Base58 encoded amount asset id",
-                       dataType = "string",
-                       example = "WAVES"
-                     ) amountAsset: Asset,
-                     @(ApiModelProperty @field)(
-                       value = "Base58 encoded amount price id",
-                       dataType = "string",
-                       example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
-                     ) priceAsset: Asset) {
+case class AssetPair(
+    @(ApiModelProperty @field)(
+      value = "Base58 encoded amount asset id",
+      dataType = "string",
+      example = "WAVES"
+    ) amountAsset: Asset,
+    @(ApiModelProperty @field)(
+      value = "Base58 encoded amount price id",
+      dataType = "string",
+      example = "8LQW8f7P5d5PZM7GtZEBgaqRPGSzS3DfPuiXrURJ4AJS"
+    ) priceAsset: Asset
+) {
   import AssetPair._
 
   @ApiModelProperty(hidden = true)
@@ -33,7 +35,7 @@ case class AssetPair(@(ApiModelProperty @field)(
   override def toString: String   = key
   def key: String                 = amountAssetStr + "-" + priceAssetStr
   def isValid: Validation         = (amountAsset != priceAsset) :| "Invalid AssetPair"
-  def bytes: Array[Byte]          = assetIdBytes(amountAsset) ++ assetIdBytes(priceAsset)
+  def bytes: Array[Byte]          = Bytes.concat(amountAsset.byteRepr, priceAsset.byteRepr)
   def json: JsObject = Json.obj(
     "amountAsset" -> amountAsset.maybeBase58Repr,
     "priceAsset"  -> priceAsset.maybeBase58Repr

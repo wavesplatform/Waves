@@ -42,18 +42,20 @@ object OrderJson {
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  def readOrderV1V2(sender: PublicKey,
-                    matcher: PublicKey,
-                    assetPair: AssetPair,
-                    orderType: OrderType,
-                    amount: Long,
-                    price: Long,
-                    timestamp: Long,
-                    expiration: Long,
-                    matcherFee: Long,
-                    signature: Option[Array[Byte]],
-                    proofs: Option[Array[Array[Byte]]],
-                    version: Option[Byte]): Order = {
+  def readOrderV1V2(
+      sender: PublicKey,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      signature: Option[Array[Byte]],
+      proofs: Option[Array[Array[Byte]]],
+      version: Option[Byte]
+  ): Order = {
 
     val eproofs =
       proofs
@@ -62,34 +64,24 @@ object OrderJson {
         .getOrElse(Proofs.empty)
 
     val vrsn: Byte = version.getOrElse(if (eproofs.proofs.size == 1 && eproofs.proofs.head.arr.length == SignatureLength) 1 else 2)
-    Order(
-      sender,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      eproofs,
-      vrsn
-    )
+    Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs)
   }
 
-  def readOrderV3(sender: PublicKey,
-                  matcher: PublicKey,
-                  assetPair: AssetPair,
-                  orderType: OrderType,
-                  amount: Long,
-                  price: Long,
-                  timestamp: Long,
-                  expiration: Long,
-                  matcherFee: Long,
-                  signature: Option[Array[Byte]],
-                  proofs: Option[Array[Array[Byte]]],
-                  version: TxVersion,
-                  matcherFeeAssetId: Asset): Order = {
+  def readOrderV3(
+      sender: PublicKey,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      signature: Option[Array[Byte]],
+      proofs: Option[Array[Array[Byte]]],
+      version: TxVersion,
+      matcherFeeAssetId: Asset
+  ): Order = {
 
     val eproofs =
       proofs
@@ -97,20 +89,7 @@ object OrderJson {
         .orElse(signature.map(s => Proofs(s)))
         .getOrElse(Proofs.empty)
 
-    Order(
-      sender,
-      matcher,
-      assetPair,
-      orderType,
-      amount,
-      price,
-      timestamp,
-      expiration,
-      matcherFee,
-      eproofs,
-      version,
-      matcherFeeAssetId
-    )
+    Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId, eproofs)
   }
 
   private val assetReads: Reads[Asset] = {

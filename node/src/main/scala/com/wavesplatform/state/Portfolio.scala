@@ -26,6 +26,8 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset
 }
 
 object Portfolio {
+  def waves(amount: Long): Portfolio =
+    build(Waves, amount)
 
   def build(a: Asset, amount: Long): Portfolio = a match {
     case Waves              => Portfolio(amount, LeaseBalance.empty, Map.empty)
@@ -40,9 +42,11 @@ object Portfolio {
     override val empty: Portfolio = Portfolio.empty
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio =
-      Portfolio(balance = safeSum(older.balance, newer.balance),
-                lease = Monoid.combine(older.lease, newer.lease),
-                assets = Monoid.combine(older.assets, newer.assets))
+      Portfolio(
+        balance = safeSum(older.balance, newer.balance),
+        lease = Monoid.combine(older.lease, newer.lease),
+        assets = Monoid.combine(older.assets, newer.assets)
+      )
   }
 
   implicit class PortfolioExt(self: Portfolio) {
@@ -88,7 +92,7 @@ object Portfolio {
           .fold(
             _ => JsError("Expected base58-encoded string"),
             arr => JsSuccess(IssuedAsset(ByteStr(arr)))
-        )
+          )
 
       type Errors = Seq[(JsPath, Seq[JsonValidationError])]
       def locate(e: Errors, key: String) = e.map {

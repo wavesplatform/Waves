@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.requests
 import cats.implicits._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, ExchangeTransactionV2, Order}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{Format, JsPath, Reads}
@@ -54,6 +54,6 @@ case class SignedExchangeRequestV2(
     for {
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      _t          <- ExchangeTransactionV2.create(order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _proofs)
+      _t          <- ExchangeTransaction.create(2.toByte, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, _proofs)
     } yield _t
 }

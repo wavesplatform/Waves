@@ -107,12 +107,19 @@ object InvokeScriptTransactionDiff {
             List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
           )
           invocationComplexity = scriptResult._2
-          (v3DataItems, actions) = scriptResult._1._1 match {
-            case ScriptResultV3(dataItems, transfers) => (dataItems, transfers)
-            case ScriptResultV4(actions)              => (Nil, actions)
+          actions = scriptResult._1._1 match {
+            case ScriptResultV3(dataItems, transfers) => dataItems ::: transfers
+            case ScriptResultV4(actions)              => actions
           }
+
+          dataEntries = actions
+            .filter(_.isInstanceOf[DataItem[_]])
+            .map(_.asInstanceOf[DataItem[_]])
+            .map(dataItemToEntry)
+
+          _ <- TracedResult(checkDataEntries(dataEntries)).leftMap(GenericError(_))
           _ <- TracedResult(Either.cond(
-            actions.length <= ContractLimits.MaxCallableActionsAmount,
+            actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
             (),
             GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
           ))
@@ -134,16 +141,6 @@ object InvokeScriptTransactionDiff {
               GenericError(s"Unissued assets are not allowed")
             )
           )
-
-          v4DataItems = actions
-            .filter(_.isInstanceOf[DataItem[_]])
-            .map(_.asInstanceOf[DataItem[_]])
-
-          v3DataEntries = v3DataItems.map(dataItemToEntry)
-          v4DataEntries = v4DataItems.map(dataItemToEntry)
-          dataEntries = v3DataEntries ::: v4DataEntries
-
-          _ <- TracedResult(checkDataEntries(dataEntries)).leftMap(GenericError(_))
 
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
           assetsComplexity = (tx.checkedAssets().map(_.id) ++ transfers.flatMap(_.assetId))
@@ -173,7 +170,7 @@ object InvokeScriptTransactionDiff {
               }
           })
           wavesFee = feeInfo._1
-          dataAndPaymentDiff <- TracedResult.wrapValue(payableAndV3DataPart(blockchain.height, tx, dAppAddress, v3DataEntries, feeInfo._2))
+          paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
             val totalScriptsInvoked =
               tx.checkedAssets()
@@ -198,12 +195,12 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress)(actions, dataAndPaymentDiff)
+          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress)(actions, paymentsDiff)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
           val currentTxDiff         = compositeDiff.transactions(tx.id())
-          val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys)
+          val currentTxDiffWithKeys = currentTxDiff.copy(_2 = currentTxDiff._2 ++ transfers.keys ++ compositeDiff.accountData.keys)
           val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
           val isr = InvokeScriptResult(
@@ -252,11 +249,10 @@ object InvokeScriptTransactionDiff {
     )
   }
 
-  private def payableAndV3DataPart(
+  private def paymentsPart(
     height: Int,
     tx: InvokeScriptTransaction,
     dAppAddress: Address,
-    dataEntries: List[DataEntry[_]],
     feePart: Map[Address, Portfolio]
   ): Diff = {
     val payablePart = tx.payments
@@ -273,11 +269,7 @@ object InvokeScriptTransactionDiff {
       }
       .foldLeft(Map[Address, Portfolio]())(_ |+| _)
 
-    Diff(
-      tx = tx,
-      portfolios = feePart |+| payablePart,
-      accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap))
-    )
+    Diff(tx = tx, portfolios = feePart |+| payablePart)
   }
 
   private def checkDataEntries(dataEntries: List[DataEntry[_]]): Either[String, Unit] =
