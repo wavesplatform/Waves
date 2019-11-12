@@ -7,6 +7,8 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
+import com.wavesplatform.transaction
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Proofs}
 
 package object serialization {
@@ -56,5 +58,23 @@ package object serialization {
     def getProofs: Proofs = Proofs.fromBytes(buf.getByteArray(buf.remaining())).explicitGet()
 
     def getAlias: Alias = Alias.fromBytes(buf.getPrefixedByteArray).explicitGet()
+
+    def getVersionedOrder: Order = {
+      val length  = buf.getInt
+      val version = buf.get()
+      version match {
+        case 1 =>
+          Order.parseBytes(1.toByte, buf.getByteArray(length)).get
+
+        case 2 | 3 =>
+          val outArray = new Array[Byte](length)
+          outArray(0) = version
+          buf.get(outArray, 1, length - 1)
+          Order.parseBytes(version, outArray).get
+
+        case _ =>
+          throw new IllegalArgumentException(s"Invalid order version: $version")
+      }
+    }
   }
 }

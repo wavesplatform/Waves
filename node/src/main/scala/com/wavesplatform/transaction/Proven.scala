@@ -9,6 +9,6 @@ trait Proven extends Authorized {
 
 object Proven {
   implicit class ProvenExt(private val p: Proven) extends AnyVal {
-    def signature: ByteStr = p.proofs.headOption.getOrElse(ByteStr.empty)
+    def signature: ByteStr = p.proofs.toSignature
   }
 }

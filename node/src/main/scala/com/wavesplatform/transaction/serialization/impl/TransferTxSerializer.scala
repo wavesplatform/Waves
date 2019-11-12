@@ -67,7 +67,7 @@ object TransferTxSerializer {
       TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, attachment, ts, Proofs.empty)
     }
 
-    require(bytes.length > 2, "buffer underflow while parsing transfer transaction")
+    require(bytes.length > 2, "buffer underflow while parsing transaction")
 
     if (bytes(0) == 0) {
       require(bytes(1) == TransferTransaction.typeId, "transaction type mismatch")

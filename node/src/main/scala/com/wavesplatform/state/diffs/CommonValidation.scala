@@ -15,7 +15,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
-import com.wavesplatform.transaction.assets.exchange.{Order, _}
+import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
@@ -124,18 +124,18 @@ object CommonValidation {
     }
 
     tx match {
-      case _: BurnTransactionV1     => Right(tx)
-      case _: PaymentTransaction    => Right(tx)
-      case _: GenesisTransaction    => Right(tx)
-      case _: IssueTransactionV1    => Right(tx)
-      case _: ReissueTransactionV1  => Right(tx)
-      case _: ExchangeTransactionV1 => Right(tx)
+      case _: BurnTransactionV1    => Right(tx)
+      case _: PaymentTransaction   => Right(tx)
+      case _: GenesisTransaction   => Right(tx)
+      case _: IssueTransactionV1   => Right(tx)
+      case _: ReissueTransactionV1 => Right(tx)
 
-      case exv2: ExchangeTransactionV2 =>
+      case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
+      case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
         activationBarrier(BlockchainFeatures.SmartAccountTrading).flatMap { tx =>
           (exv2.buyOrder, exv2.sellOrder) match {
-            case (_: OrderV3, _: Order) | (_: Order, _: OrderV3) => activationBarrier(BlockchainFeatures.OrderV3)
-            case _                                               => Right(tx)
+            case (o1, o2) if o1.version >= 3 || o2.version >= 3 => activationBarrier(BlockchainFeatures.OrderV3)
+            case _                                              => Right(tx)
           }
         }
 

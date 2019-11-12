@@ -172,18 +172,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
         val amount = math.min(buy.amount, sell.amount)
-        val tx = ExchangeTransactionV2
-          .create(
-            matcher = matcher,
-            buyOrder = buy,
+        val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
             sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
             fee = smartMatcherFee,
-            timestamp = ntpTime.correctedTime()
-          )
+            timestamp = ntpTime.correctedTime())
           .explicitGet()
           .json()
 
@@ -213,18 +209,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
       val amount = math.min(buy.amount, sell.amount)
-      val tx = ExchangeTransactionV2
-        .create(
-          matcher = matcher,
-          buyOrder = buy,
+      val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
           sellOrder = sell,
           amount = amount,
           price = sellPrice,
           buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
           sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
           fee = smartMatcherFee,
-          timestamp = ntpTime.correctedTime()
-        )
+          timestamp = ntpTime.correctedTime())
         .explicitGet()
         .json()
 
