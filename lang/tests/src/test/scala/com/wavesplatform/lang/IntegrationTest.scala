@@ -928,6 +928,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED]("HalfDown() != DOWN", None) should produce("Can't match inferred types")
     eval[EVALUATED]("CEILING != HALFUP", None) should produce("Can't match inferred types")
     eval[EVALUATED]("Ceiling() != Down()", None) should produce("Can't match inferred types")
+
+    eval[EVALUATED]("UP == if true then UP else DOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("UP == if true then DOWN else UP", None) shouldBe Right(CONST_BOOLEAN(false))
   }
 
   property("math functions") {
