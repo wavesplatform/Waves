@@ -12,30 +12,6 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.util.Random
 
 class OrderSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen with ValidationMatcher with NTPTime {
-
-  private def checkFieldsEquality(left: Order, right: Order): Assertion = {
-
-    def defaultChecks: Assertion = {
-      left.bytes() shouldEqual right.bytes()
-      left.idStr() shouldBe right.idStr()
-      left.senderPublicKey shouldBe right.senderPublicKey
-      left.matcherPublicKey shouldBe right.matcherPublicKey
-      left.assetPair shouldBe right.assetPair
-      left.orderType shouldBe right.orderType
-      left.price shouldBe right.price
-      left.amount shouldBe right.amount
-      left.timestamp shouldBe right.timestamp
-      left.expiration shouldBe right.expiration
-      left.matcherFee shouldBe right.matcherFee
-      left.signature shouldBe right.signature
-    }
-
-    (left, right) match {
-      case (l: Order, r: Order) => defaultChecks; l.matcherFeeAssetId shouldBe r.matcherFeeAssetId
-      case _                    => defaultChecks
-    }
-  }
-
   property("Order serialization roundtrip") {
     forAll(orderV1Gen) { order =>
       val recovered = Order.parseBytes(Order.V1, order.bytes()).get
@@ -174,4 +150,19 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
+  private[this] def checkFieldsEquality(left: Order, right: Order): Assertion = {
+    left.bytes() shouldEqual right.bytes()
+    left.idStr() shouldBe right.idStr()
+    left.senderPublicKey shouldBe right.senderPublicKey
+    left.matcherPublicKey shouldBe right.matcherPublicKey
+    left.assetPair shouldBe right.assetPair
+    left.orderType shouldBe right.orderType
+    left.price shouldBe right.price
+    left.amount shouldBe right.amount
+    left.timestamp shouldBe right.timestamp
+    left.expiration shouldBe right.expiration
+    left.matcherFee shouldBe right.matcherFee
+    left.proofs shouldBe right.proofs
+    left.matcherFeeAssetId shouldBe right.matcherFeeAssetId
+  }
 }

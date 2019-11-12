@@ -30,6 +30,8 @@ import scala.util.Random
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
+  def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
+
   val MATCHER: KeyPair = KeyPair(Base58.decode("matcher"))
 
   val fs = TestFunctionalitySettings.Enabled.copy(
@@ -153,7 +155,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                 Seq(
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
-                  ExchangeTransactionDiff.wavesPortfolio(-exchange.fee)
+                  wavesPortfolio(-exchange.fee)
                 )
               )
 
@@ -258,7 +260,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
                 Seq(
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.buyOrder, exchange.buyMatcherFee),
                   ExchangeTransactionDiff.getOrderFeePortfolio(exchange.sellOrder, exchange.sellMatcherFee),
-                  ExchangeTransactionDiff.wavesPortfolio(-exchange.fee)
+                  wavesPortfolio(-exchange.fee)
                 )
               )
 
