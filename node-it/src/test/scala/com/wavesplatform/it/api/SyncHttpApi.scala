@@ -90,7 +90,7 @@ object SyncHttpApi extends Assertions {
 
   def assertGrpcError[R](f: => R, errorRegex: String, expectedCode: Code): Assertion = Try(f) match {
     case Failure(GrpcStatusRuntimeException(status, _)) => Assertions.assert(status.getCode == expectedCode
-      && status.getDescription.matches(s".*$errorRegex.*"))
+      && status.getDescription.matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '${status.getDescription}'")
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
