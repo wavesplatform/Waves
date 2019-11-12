@@ -111,12 +111,12 @@ object OrderSerializer {
       case Order.V2 =>
         require(bytes(0) == version, "order version mismatch")
         val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-        parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
+        parseCommonPart(version, buf).copy(proofs = buf.getProofs)
 
       case Order.V3 =>
         require(bytes(0) == version, "order version mismatch")
         val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-        parseCommonPart(TxVersion.V2, buf).copy(matcherFeeAssetId = buf.getAsset, proofs = buf.getProofs)
+        parseCommonPart(version, buf).copy(matcherFeeAssetId = buf.getAsset, proofs = buf.getProofs)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported order version: $version")
