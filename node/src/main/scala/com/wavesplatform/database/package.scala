@@ -307,17 +307,18 @@ package object database extends ScorexLogging {
 
     val baseTarget = ndi.readLong()
 
-    val genSig = new Array[Byte](Block.GenerationSignatureLength)
+    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+    val genSig = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
-      if (version == 1 || version == 2) ndi.readByte()
+      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
       else ndi.readInt()
     }
+
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
@@ -325,7 +326,7 @@ package object database extends ScorexLogging {
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header =  new BlockHeader(
+    val header =  BlockHeader(
       version,
       timestamp,
       ByteStr(referenceArr),

@@ -261,7 +261,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block, block.header.generationSignature.take(Block.GenerationInputLength)).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength)).explicitGet()
       }
 
       f(Env(pos, bcu, accounts))

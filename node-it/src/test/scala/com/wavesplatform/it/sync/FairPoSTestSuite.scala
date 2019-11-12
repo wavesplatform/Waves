@@ -27,13 +27,14 @@ object FairPoSTestSuite {
   import com.wavesplatform.it.NodeConfigs._
   private val microblockActivationHeight = 0
   private val fairPoSActivationHeight    = 10
+  private val vrfActivationHeight        = 14
 
   private val config =
     ConfigFactory.parseString(s"""
     |waves {
     |   blockchain.custom {
     |      functionality {
-    |        pre-activated-features {1 = $microblockActivationHeight, 8 = $fairPoSActivationHeight}
+    |        pre-activated-features {1 = $microblockActivationHeight, 8 = $fairPoSActivationHeight, 17 = $vrfActivationHeight}
     |        generation-balance-depth-from-50-to-1000-after-height = 1000
     |      }
     |   }

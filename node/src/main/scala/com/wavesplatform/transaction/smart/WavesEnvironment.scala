@@ -165,7 +165,8 @@ class WavesEnvironment(
 
     val baseTarget = ndi.readLong()
 
-    val genSig = new Array[Byte](Block.GenerationSignatureLength)
+    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+    val genSig = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {

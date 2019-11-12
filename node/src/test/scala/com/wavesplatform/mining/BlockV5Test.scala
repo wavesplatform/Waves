@@ -112,6 +112,13 @@ class BlockV5Test
                 minerAcc2.publicKey
               )
               .explicitGet()
+
+            blockchain.blockAt(bs.size + 1).value shouldBe blockAtActivationHeight
+            blockchain.blockAt(bs.size + 2).value shouldBe blockAfterActivationHeight
+            blockchain.blockAt(bs.size + 3).value shouldBe blockAfterVRFUsing
+
+            blockchain.parentHeader(blockAfterVRFUsing.header).value shouldBe blockAfterActivationHeight.header
+            blockchain.parentHeader(blockAfterVRFUsing.header, 2).value shouldBe blockAtActivationHeight.header
         }
       }
   }

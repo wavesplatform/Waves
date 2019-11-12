@@ -168,7 +168,7 @@ object Block extends ScorexLogging {
   val GenerationVRFSignatureLength: Int    = 96
   val BlockIdLength: Int                   = SignatureLength
   val TransactionSizeLength                = 4
-  val GenerationInputLength                = 32
+  val HitSourceLength                      = 32
 
   val GenesisBlockVersion: Byte = 1
   val PlainBlockVersion: Byte   = 2

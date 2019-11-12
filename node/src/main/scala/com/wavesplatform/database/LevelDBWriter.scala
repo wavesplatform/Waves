@@ -805,7 +805,7 @@ class LevelDBWriter(
     writableDB.get(Keys.blockInfoAt(Height(height)))
   }
 
-  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[BlockInfo] = {
+  def loadBlockInfo(height: Int, db: ReadOnlyDB): Option[BlockInfo] = {
     db.get(Keys.blockInfoAt(Height(height)))
   }
 
@@ -815,20 +815,12 @@ class LevelDBWriter(
       .flatMap(loadBlockInfo)
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[BlockInfo] = {
-    db.get(Keys.heightOf(blockId))
-      .flatMap(loadBlockHeaderAndSize(_, db))
-  }
-
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
     import com.wavesplatform.crypto._
 
     val height = Height(h)
 
-    val consensuDataOffset = 1 + 8 + SignatureLength
-
-    // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = consensuDataOffset + 8 + Block.GenerationSignatureLength
+    val consensusDataOffset = 1 + 8 + SignatureLength
 
     val headerKey = Keys.blockHeaderBytesAt(height)
 
@@ -844,10 +836,14 @@ class LevelDBWriter(
 
     db.get(headerKey)
       .map { headerBytes =>
-        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
-        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
-        val version            = headerBytes.head
-        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
+        val version      = headerBytes.head
+        val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+        // version + timestamp + reference + baseTarget + genSig
+        val txCountOffset      = consensusDataOffset + 8 + genSigLength
+        val bytesBeforeCData   = headerBytes.take(consensusDataOffset)
+        val consensusDataBytes = headerBytes.slice(consensusDataOffset, consensusDataOffset + 40)
+
+        val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
           val byte = headerBytes(txCountOffset)
           (byte.toInt, Array[Byte](byte))
         } else {
@@ -856,7 +852,7 @@ class LevelDBWriter(
         }
 
         val bytesAfterTxs =
-          if (version > 2) {
+          if (version > Block.PlainBlockVersion) {
             headerBytes.drop(txCountOffset + txCountBytes.length)
           } else {
             headerBytes.takeRight(SignatureLength + KeyLength)
@@ -915,7 +911,7 @@ class LevelDBWriter(
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      BlockInfo(block, _, _, _) <- loadBlockHeaderAndSize(height, db)
+      BlockInfo(block, _, _, _) <- loadBlockInfo(height, db)
     } yield block
   }
 
@@ -960,7 +956,7 @@ class LevelDBWriter(
 
   override def hitSourceAtHeight(height: Int): Option[ByteStr] = readOnly { db =>
     Option(db.get(Keys.hitSource(height)))
-      .filter(_.length == Block.GenerationInputLength)
+      .filter(_.length == Block.HitSourceLength)
       .map(ByteStr.apply)
   }
 
