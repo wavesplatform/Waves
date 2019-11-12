@@ -967,5 +967,8 @@ object AsyncHttpApi extends Assertions {
       accounts.getBalances(req,obs)
       result.map(_.headOption.getOrElse(throw new NoSuchElementException("Balances not found for address")).getWaves).runToFuture
     }
+
+    def broadcast(unsignedTx: PBTransaction, proofs: Seq[ByteString]): Future[PBSignedTransaction] = transactions.broadcast(SignedTransaction(Some(unsignedTx), proofs))
+
   }
 }
