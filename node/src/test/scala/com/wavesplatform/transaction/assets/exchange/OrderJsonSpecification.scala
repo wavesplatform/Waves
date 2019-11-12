@@ -47,7 +47,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.matcherFee shouldBe 0
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
-        o.signature shouldBe Base58.tryDecodeWithLimit("signature").get
+        o.signature shouldBe ByteStr(Base58.decode("signature"))
     }
 
     val jsonOV3 = Json.parse(s"""
@@ -82,7 +82,7 @@ class OrderJsonSpecification extends PropSpec with PropertyChecks with Matchers 
         o.matcherFee shouldBe 0
         o.timestamp shouldBe 0
         o.expiration shouldBe 0
-        o.signature shouldBe Base58.tryDecodeWithLimit("signature").get
+        o.signature shouldBe ByteStr(Base58.decode("signature"))
         o.matcherFeeAssetId shouldBe IssuedAsset(ByteStr.decodeBase58("29ot86P3HoUZXH1FCoyvff7aeZ3Kt7GqPwBWXncjRF2b").get)
     }
   }
