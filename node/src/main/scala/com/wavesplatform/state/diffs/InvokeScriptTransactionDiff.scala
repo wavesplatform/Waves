@@ -170,7 +170,7 @@ object InvokeScriptTransactionDiff {
               }
           })
           wavesFee = feeInfo._1
-          paymentDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
+          paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
             val totalScriptsInvoked =
               tx.checkedAssets()
@@ -195,7 +195,7 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress)(actions, paymentDiff)
+          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress)(actions, paymentsDiff)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
