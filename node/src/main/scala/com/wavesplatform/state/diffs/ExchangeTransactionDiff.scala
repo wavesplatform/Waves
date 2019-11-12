@@ -135,8 +135,8 @@ object ExchangeTransactionDiff {
 
     def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
       feeTotal <= (order match {
-        case _: Order => BigInt(maxfee)
-        case _        => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
+        case o: Order if o.version == Order.V3 => BigInt(maxfee)
+        case _                                 => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
       })
     }
 
