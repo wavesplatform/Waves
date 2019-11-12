@@ -42,18 +42,20 @@ object OrderJson {
     case _ => JsError(Seq(JsPath() -> Seq(JsonValidationError("error.expected.jsstring"))))
   }
 
-  def readOrderV2(sender: PublicKey,
-                    matcher: PublicKey,
-                    assetPair: AssetPair,
-                    orderType: OrderType,
-                    amount: Long,
-                    price: Long,
-                    timestamp: Long,
-                    expiration: Long,
-                    matcherFee: Long,
-                    signature: Option[Array[Byte]],
-                    proofs: Option[Array[Array[Byte]]],
-                    version: Option[Byte]): Order = {
+  def readOrderV1V2(
+      sender: PublicKey,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      signature: Option[Array[Byte]],
+      proofs: Option[Array[Array[Byte]]],
+      version: Option[Byte]
+  ): Order = {
 
     val eproofs =
       proofs
@@ -65,19 +67,21 @@ object OrderJson {
     Order(vrsn, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, proofs = eproofs)
   }
 
-  def readOrder(sender: PublicKey,
-                  matcher: PublicKey,
-                  assetPair: AssetPair,
-                  orderType: OrderType,
-                  amount: Long,
-                  price: Long,
-                  timestamp: Long,
-                  expiration: Long,
-                  matcherFee: Long,
-                  signature: Option[Array[Byte]],
-                  proofs: Option[Array[Array[Byte]]],
-                  version: TxVersion,
-                  matcherFeeAssetId: Asset): Order = {
+  def readOrderV3(
+      sender: PublicKey,
+      matcher: PublicKey,
+      assetPair: AssetPair,
+      orderType: OrderType,
+      amount: Long,
+      price: Long,
+      timestamp: Long,
+      expiration: Long,
+      matcherFee: Long,
+      signature: Option[Array[Byte]],
+      proofs: Option[Array[Array[Byte]]],
+      version: TxVersion,
+      matcherFeeAssetId: Asset
+  ): Order = {
 
     val eproofs =
       proofs
@@ -120,7 +124,7 @@ object OrderJson {
       (JsPath \ "signature").readNullable[Array[Byte]] and
       (JsPath \ "proofs").readNullable[Array[Array[Byte]]] and
       (JsPath \ "version").readNullable[Byte]
-    r(readOrderV2 _)
+    r(readOrderV1V2 _)
   }
 
   private val orderV3Reads: Reads[Order] = {
@@ -139,7 +143,7 @@ object OrderJson {
       (JsPath \ "matcherFeeAssetId")
         .readNullable[Array[Byte]]
         .map(arrOpt => Asset.fromCompatId(arrOpt.map(ByteStr(_))))
-    r(readOrder _)
+    r(readOrderV3 _)
   }
 
   implicit val orderReads: Reads[Order] = {
