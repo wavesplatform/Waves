@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
 import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.{Format, JsObject}
 
 import scala.util.Try
 
@@ -24,18 +24,18 @@ case class Order(
     matcherPublicKey: PublicKey,
     assetPair: AssetPair,
     orderType: OrderType,
-    amount: Long,
-    price: Long,
-    timestamp: Long,
-    expiration: Long,
-    matcherFee: Long,
+    amount: TxAmount,
+    price: TxAmount,
+    timestamp: TxTimestamp,
+    expiration: TxTimestamp,
+    matcherFee: TxAmount,
     matcherFeeAssetId: Asset = Waves,
     proofs: Proofs = Proofs.empty
 ) extends Proven {
   import Order._
 
   @ApiModelProperty(hidden = true)
-  val sender = senderPublicKey
+  val sender: PublicKey = senderPublicKey
 
   def isValid(atTime: Long): Validation = {
     isValidAmount(amount, price) &&
@@ -59,6 +59,7 @@ case class Order(
     (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
   }
 
+  // TODO: Check if we can remove ApiModelProperty annotations
   @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
   @ApiModelProperty(hidden = true)
@@ -106,9 +107,6 @@ case class Order(
   val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))
 
   @ApiModelProperty(hidden = true)
-  def jsonStr: String = Json.stringify(json())
-
-  @ApiModelProperty(hidden = true)
   override def toString: String = {
     val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${matcherFeeAssetId.fold("Waves")(_.toString)}," else ""
     s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$matcherFeeAssetIdStr proofs=$proofs)"
@@ -119,7 +117,7 @@ object Order {
   type Id      = ByteStr
   type Version = Byte
 
-  implicit val jsonFormat = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
+  implicit lazy val jsonFormat: Format[Order] = com.wavesplatform.transaction.assets.exchange.OrderJson.orderFormat
 
   val MaxLiveTime: Long = 30L * 24L * 60L * 60L * 1000L
   val PriceConstant     = 100000000L
@@ -138,11 +136,11 @@ object Order {
       matcher: PublicKey,
       assetPair: AssetPair,
       orderType: OrderType,
-      amount: TxTimestamp,
-      price: TxTimestamp,
+      amount: TxAmount,
+      price: TxAmount,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxTimestamp,
+      matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Asset.Waves
   ): Order =
     Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender)
@@ -152,11 +150,11 @@ object Order {
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
-      amount: TxTimestamp,
-      price: TxTimestamp,
+      amount: TxAmount,
+      price: TxAmount,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxTimestamp,
+      matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Waves
   ): Order = {
     Order.selfSigned(version, sender, matcher, pair, OrderType.BUY, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)
@@ -167,11 +165,11 @@ object Order {
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
-      amount: TxTimestamp,
-      price: TxTimestamp,
+      amount: TxAmount,
+      price: TxAmount,
       timestamp: TxTimestamp,
       expiration: TxTimestamp,
-      matcherFee: TxTimestamp,
+      matcherFee: TxAmount,
       matcherFeeAssetId: Asset = Waves
   ): Order = {
     Order.selfSigned(version, sender, matcher, pair, OrderType.SELL, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId)

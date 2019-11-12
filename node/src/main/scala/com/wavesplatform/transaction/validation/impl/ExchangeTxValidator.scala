@@ -24,7 +24,8 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
       V.cond(buyOrder.assetPair == sellOrder.assetPair, GenericError("Both orders should have same AssetPair")),
       V.cond(buyOrder.isValid(timestamp), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages())),
       V.cond(sellOrder.isValid(timestamp), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).messages())),
-      V.cond(price <= buyOrder.price && price >= sellOrder.price, GenericError("priceIsValid"))
+      V.cond(price <= buyOrder.price && price >= sellOrder.price, GenericError("priceIsValid")),
+      V.cond(version > 1 || (buyOrder.version == 1 && sellOrder.version == 1), GenericError("can only contain orders of version 1"))
     )
   }
 }
