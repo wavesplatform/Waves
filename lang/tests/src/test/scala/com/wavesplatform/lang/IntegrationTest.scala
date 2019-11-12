@@ -918,6 +918,19 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 
+  property("rounding modes") {
+    eval[EVALUATED]("Down() == DOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Up() == UP", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Ceiling() == CEILING", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("HalfUp() == HALFUP", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("HalfDown() == HALFDOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+
+    eval[EVALUATED]("HalfDown() != DOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Up() != UP", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("CEILING != HALFUP", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Ceiling() != Down()", None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
   property("math functions") {
     eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
     eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
