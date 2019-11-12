@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.RequestGen
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
@@ -8,9 +7,10 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.lease.LeaseCancelTransactionV1
+import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
+import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.Gen.posNum
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
@@ -23,7 +23,8 @@ class LeaseBroadcastRouteSpec
     with RequestGen
     with PathMockFactory
     with PropertyChecks
-    with RestAPISettingsHelper {
+    with RestAPISettingsHelper
+    with NoShrink {
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.rejecting(t => TransactionValidationError(GenericError("foo"), t))
   private[this] val route               = LeaseApiRoute(restAPISettings, stub[Wallet], stub[Blockchain], utxPoolSynchronizer, stub[Time]).route
   "returns StateCheckFailed" - {
@@ -31,7 +32,7 @@ class LeaseBroadcastRouteSpec
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
       ("lease", leaseGen.retryUntil(_.version == 1), identity),
-      ("cancel", leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransactionV1]), {
+      ("cancel", leaseCancelGen.retryUntil(_.isInstanceOf[LeaseCancelTransaction]), {
         case o: JsObject => o ++ Json.obj("txId" -> o.value("leaseId"))
         case other       => other
       })
@@ -74,7 +75,7 @@ class LeaseBroadcastRouteSpec
       def posting[A: Writes](v: A): RouteTestResult = Post(routePath("cancel"), v) ~> route
 
       forAll(invalidBase58) { pk =>
-        posting(cancel.copy(txId = pk)) should produce(CustomValidationError("invalid.leaseTx"))
+        posting(cancel.copy(leaseId = pk)) should produce(CustomValidationError("invalid.leaseTx"))
       }
       forAll(invalidBase58) { pk =>
         posting(cancel.copy(senderPublicKey = pk)) should produce(InvalidAddress)

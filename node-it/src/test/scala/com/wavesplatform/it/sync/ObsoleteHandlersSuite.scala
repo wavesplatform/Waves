@@ -5,11 +5,10 @@ import com.wavesplatform.api.http.requests.{
   CreateAliasRequest,
   DataRequest,
   IssueV1Request,
-  LeaseCancelV1Request,
+  LeaseCancelRequest,
   LeaseRequest,
   MassTransferRequest,
   ReissueV1Request,
-  SignedLeaseCancelV1Request,
   SponsorFeeRequest,
   TransferRequest
 }
@@ -82,8 +81,15 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
     miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
 
-    val leaseCancelJson = sender.postJson("/leasing/cancel", LeaseCancelV1Request(firstAddress, leaseId, minFee))
-    val leaseCancel     = Json.parse(leaseCancelJson.getResponseBody).as[Transaction].id
+    val leaseCancelJson = sender.postJson(
+      "/leasing/cancel",
+      Json.obj(
+        "sender"  -> firstAddress,
+        "leaseId" -> leaseId,
+        "fee"     -> minFee
+      )
+    )
+    val leaseCancel = Json.parse(leaseCancelJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(leaseCancel)
 
     miner.assertBalances(firstAddress, balance1 - 2 * minFee, eff1 - 2 * minFee)
@@ -145,7 +151,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     )
 
     val r2     = sender.postJsonWithApiKey(s"/transactions/sign/$firstAddress", jsonLC)
-    val leaseC = Json.parse(r2.getResponseBody).as[SignedLeaseCancelV1Request]
+    val leaseC = Json.parse(r2.getResponseBody).as[LeaseCancelRequest]
 
     val leaseCIdJson = sender.postJson("/leasing/broadcast/cancel", leaseC)
     val leaseCId     = Json.parse(leaseCIdJson.getResponseBody).as[Transaction].id

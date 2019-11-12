@@ -1,45 +1,88 @@
 package com.wavesplatform.transaction.lease
 
-import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, VersionedTransaction}
+import com.wavesplatform.transaction.serialization.impl.LeaseCancelTxSerializer
+import com.wavesplatform.transaction.validation.impl.LeaseCancelTxValidator
+import com.wavesplatform.transaction.{
+  FastHashId,
+  Proofs,
+  SigProofsSwitch,
+  TransactionParserLite,
+  TxAmount,
+  TxTimestamp,
+  TxType,
+  TxVersion,
+  TxWithFee,
+  VersionedTransaction
+}
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
-trait LeaseCancelTransaction extends ProvenTransaction with VersionedTransaction {
-  def chainByte: Option[Byte]
-  def leaseId: ByteStr
-  def fee: Long
-  override val assetFee: (Asset, Long) = (Waves, fee)
+import scala.reflect.ClassTag
+import scala.util.Try
 
-  override val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "chainId"   -> chainByte,
-      "version"   -> version,
-      "fee"       -> fee,
-      "timestamp" -> timestamp,
-      "leaseId" -> leaseId.toString
-    ))
-  protected val bytesBase = Coeval.evalOnce(Bytes.concat(sender, Longs.toByteArray(fee), Longs.toByteArray(timestamp), leaseId.arr))
-
+final case class LeaseCancelTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    leaseId: ByteStr,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs
+) extends SigProofsSwitch
+    with VersionedTransaction
+    with TxWithFee.InWaves
+    with FastHashId {
+  override def builder: TransactionParserLite      = LeaseCancelTransaction
+  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTransaction.serializer.bodyBytes(this))
+  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTransaction.serializer.toBytes(this))
+  override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTransaction.serializer.toJson(this))
+  override def chainByte: Option[TxType]           = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
-object LeaseCancelTransaction {
+object LeaseCancelTransaction extends TransactionParserLite {
+  type TransactionT = LeaseCancelTransaction
+  val classTag: ClassTag[LeaseCancelTransaction] = ClassTag(classOf[LeaseCancelTransaction])
+  val supportedVersions: Set[TxVersion]          = Set(1, 2)
+  val typeId: TxType                             = 9
 
-  val typeId: TxType = 9.toByte
+  implicit val validator = LeaseCancelTxValidator
+  val serializer         = LeaseCancelTxSerializer
 
-  def validateLeaseCancelParams(tx: LeaseCancelTransaction): Either[ValidationError, Unit] = {
-    validateLeaseCancelParams(tx.leaseId, tx.fee)
-  }
+  implicit def sign(tx: LeaseCancelTransaction, privateKey: PrivateKey): LeaseCancelTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  def validateLeaseCancelParams(leaseId: ByteStr, fee: Long): Either[ValidationError, Unit] =
-    if (leaseId.arr.length != crypto.DigestSize) {
-      Left(GenericError("Lease transaction id is invalid"))
-    } else if (fee <= 0) {
-      Left(InsufficientFee())
-    } else Right(())
+  override def parseBytes(bytes: Array[TxVersion]): Try[LeaseCancelTransaction] =
+    serializer.parseBytes(bytes)
+
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
+      leaseId: ByteStr,
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] =
+    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs).validatedEither
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      leaseId: ByteStr,
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
+    create(version, sender, leaseId, fee, timestamp, Nil).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      leaseId: ByteStr,
+      fee: TxAmount,
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, leaseId, fee, timestamp, sender)
 }

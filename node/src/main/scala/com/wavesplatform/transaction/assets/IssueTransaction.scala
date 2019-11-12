@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.validation._
+import com.wavesplatform.transaction.validation.TxConstraints
 import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -54,10 +54,10 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
 object IssueTransaction {
   val typeId: TxType = 3.toByte
 
-  val MaxDescriptionLength = 1000
-  val MaxAssetNameLength   = 16
-  val MinAssetNameLength   = 4
-  val MaxDecimals          = 8
+  val MinAssetNameLength        = 4
+  val MaxAssetNameLength        = 16
+  val MaxAssetDescriptionLength = 1000
+  val MaxAssetDecimals          = 8
 
   def validateIssueParams(tx: IssueTransaction): Either[ValidationError, Unit] = {
     validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
@@ -73,11 +73,11 @@ object IssueTransaction {
   ): Either[ValidationError, Unit] = {
     //noinspection UnnecessaryPartialFunction
     (
-      validateAmount(quantity, "assets"),
-      validateName(name),
-      validateDescription(description),
-      validateDecimals(decimals),
-      validateFee(fee)
+      TxConstraints.positiveAmount(quantity, "assets"),
+      TxConstraints.assetName(name),
+      TxConstraints.assetDescription(description),
+      TxConstraints.assetDecimals(decimals),
+      TxConstraints.fee(fee)
     ).mapN { case _ => () }
       .leftMap(_.head)
       .toEither

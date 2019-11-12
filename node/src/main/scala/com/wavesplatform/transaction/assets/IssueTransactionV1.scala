@@ -10,6 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.validation.TxConstraints
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -93,8 +94,8 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
       SignatureBytes(tailIndex(1), "Signature"),
       ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
       PublicKeyBytes(tailIndex(3), "Sender's public key"),
-      BytesArrayUndefinedLength(tailIndex(4), "Asset name", validation.MaxAssetNameLength, validation.MinAssetNameLength),
-      BytesArrayUndefinedLength(tailIndex(5), "Description", validation.MaxDescriptionLength),
+      BytesArrayUndefinedLength(tailIndex(4), "Asset name", IssueTransaction.MaxAssetNameLength, IssueTransaction.MinAssetNameLength),
+      BytesArrayUndefinedLength(tailIndex(5), "Description", IssueTransaction.MaxAssetDescriptionLength),
       LongBytes(tailIndex(6), "Quantity"),
       OneByte(tailIndex(7), "Decimals"),
       BooleanByte(tailIndex(8), "Reissuable flag (1 - True, 0 - False)"),
