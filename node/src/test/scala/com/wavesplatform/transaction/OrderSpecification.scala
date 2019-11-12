@@ -134,6 +134,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
       case (sender, matcher, pair, _, amount, price, timestamp, _, _) =>
         val expiration = timestamp + Order.MaxLiveTime - 1000
         val buy = Order.buy(
+          Order.V1,
           sender = sender,
           matcher = matcher,
           pair = pair,
@@ -146,6 +147,7 @@ class OrderSpecification extends PropSpec with PropertyChecks with Matchers with
         buy.orderType shouldBe OrderType.BUY
 
         val sell = Order.sell(
+          Order.V1,
           sender = sender,
           matcher = matcher,
           pair = pair,

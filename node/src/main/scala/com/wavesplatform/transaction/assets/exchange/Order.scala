@@ -148,7 +148,7 @@ object Order {
     Order(version, sender, matcher, assetPair, orderType, amount, price, timestamp, expiration, matcherFee, matcherFeeAssetId).signWith(sender)
 
   def buy(
-      version: TxVersion = TxVersion.V1,
+      version: TxVersion,
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,
@@ -163,7 +163,7 @@ object Order {
   }
 
   def sell(
-      version: TxVersion = TxVersion.V1,
+      version: TxVersion,
       sender: KeyPair,
       matcher: PublicKey,
       pair: AssetPair,

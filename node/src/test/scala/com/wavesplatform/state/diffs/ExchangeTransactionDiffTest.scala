@@ -502,6 +502,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
         val assetPair = AssetPair(IssuedAsset(issue1.id()), Waves)
         val buy = Order.buy(
+          Order.V1,
           sender = buyer,
           matcher = matcher,
           pair = assetPair,
@@ -512,6 +513,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           matcherFee = MatcherFee
         )
         val sell = Order.sell(
+          Order.V1,
           sender = seller,
           matcher = matcher,
           pair = assetPair,
@@ -549,6 +551,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case ((buyer, seller, matcher, gen1, gen2, issue1), price) =>
         val assetPair = AssetPair(IssuedAsset(issue1.id()), Waves)
         val buy = Order.buy(
+          Order.V1,
           sender = buyer,
           matcher = matcher,
           pair = assetPair,
@@ -559,6 +562,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           matcherFee = MatcherFee
         )
         val sell = Order.sell(
+          Order.V1,
           sender = seller,
           matcher = matcher,
           pair = assetPair,

@@ -688,18 +688,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
         ExchangeTransaction
-          .signed(
-            1.toByte,
-            matcher,
-            o1.asInstanceOf[Order],
-            o2.asInstanceOf[Order],
-            matchedAmount,
-            price,
-            buyFee,
-            sellFee,
-            (buyFee + sellFee) / 2,
-            expiration - 100
-          )
+          .signed(1.toByte, matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
           .explicitGet()
 
       trans
@@ -719,15 +708,15 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fixedMatcher: Option[KeyPair] = None
   ): Gen[ExchangeTransaction] = {
     def mkBuyOrder(version: TxVersion): OrderConstructor = version match {
-      case 1 => Order.buy(Order.V1, _, _, _, _, _, _, _, _)
-      case 2 => Order.buy(Order.V2, _, _, _, _, _, _, _, _)
-      case 3 => Order.buy(Order.V3, _, _, _, _, _, _, _, _, buyMatcherFeeAssetId)
+      case Order.V1 => Order.buy(Order.V1, _, _, _, _, _, _, _, _)
+      case Order.V2 => Order.buy(Order.V2, _, _, _, _, _, _, _, _)
+      case Order.V3 => Order.buy(Order.V3, _, _, _, _, _, _, _, _, buyMatcherFeeAssetId)
     }
 
     def mkSellOrder(version: TxVersion): OrderConstructor = version match {
-      case 1 => Order.sell(Order.V1, _, _, _, _, _, _, _, _)
-      case 2 => Order.sell(Order.V2, _, _, _, _, _, _, _, _)
-      case 3 => Order.sell(Order.V3, _, _, _, _, _, _, _, _, sellMatcherFeeAssetId)
+      case Order.V1 => Order.sell(Order.V1, _, _, _, _, _, _, _, _)
+      case Order.V2 => Order.sell(Order.V2, _, _, _, _, _, _, _, _)
+      case Order.V3 => Order.sell(Order.V3, _, _, _, _, _, _, _, _, sellMatcherFeeAssetId)
     }
 
     for {

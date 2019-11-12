@@ -28,7 +28,7 @@ object OrderSerializer {
       "matcherFee"       -> matcherFee,
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
-    )
+    ) ++ (if (version == Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty)
   }
 
   def bodyBytes(tx: Order): Array[Byte] = {
