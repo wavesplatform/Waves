@@ -184,14 +184,21 @@ class LevelDBWriter(
     Map.empty
   )
 
+  private def assetIssueInfo(asset: IssuedAsset, db : ReadOnlyDB) : Option[(Int, IssueTransaction)] = {
+    db.get(Keys.generatedAssetInfo(asset)) orElse
+    (transactionInfo(asset.id, db).flatMap {
+      case (h, i: IssueTransaction) => Some(h -> i)
+      case _ => None
+    })
+  }
+
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(asset.id, db) match {
-      case Some((_, i: IssueTransaction)) =>
+    assetIssueInfo(asset, db) map {
+      case (_, i) =>
         val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
         val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
-      case _ => None
+        AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship)
     }
   }
 
@@ -247,6 +254,13 @@ class LevelDBWriter(
       reward: Option[Long],
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
+
+    val generatedIssues: List[IssueTransaction] = scriptResults.toList.flatMap { case (id, r) => r.issues }
+
+    for (i <- generatedIssues) {
+      rw.put(Keys.generatedAssetInfo(IssuedAsset(i.id())), Some(height -> i))
+    }
+
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -578,7 +592,12 @@ class LevelDBWriter(
                 case _: DataTransaction => // see changed data keys removal
 
                 case _: InvokeScriptTransaction =>
-                  rw.delete(Keys.invokeScriptResult(h, num))
+                  val k = Keys.invokeScriptResult(h, num)
+                  val r = rw.get(k)
+                  for (i <- r.issues) {
+                    rw.delete(Keys.generatedAssetInfo(IssuedAsset(i.id())))
+                  }
+                  rw.delete(k)
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>

@@ -4,16 +4,20 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
+//import com.wavesplatform.protobuf.transaction.assets.IssueTransaction
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.Asset.Waves
-import play.api.libs.json.Json
+import play.api.libs.json._
 
-final case class InvokeScriptResult(data: Seq[DataEntry[_]] = Nil, transfers: Seq[InvokeScriptResult.Payment] = Nil)
+final case class InvokeScriptResult(data: Seq[DataEntry[_]] = Nil, transfers: Seq[InvokeScriptResult.Payment] = Nil, issues: Seq[IssueTransaction] = Nil /*, reissues: Seq[Reissue] = Nil, burns: Seq[Burn] = Nil */)
 
 //noinspection TypeAnnotation
 object InvokeScriptResult {
   val empty = InvokeScriptResult()
+
+  implicit val jsonIssueWrites = Writes[IssueTransaction] { t => t.json() } // XXX
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
@@ -26,7 +30,7 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
-  implicit val jsonFormat = Json.format[InvokeScriptResult]
+  implicit val jsonFormat = Json.writes[InvokeScriptResult]
 
   implicit val monoid = new Monoid[InvokeScriptResult] {
     override val empty: InvokeScriptResult =

@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 object Keys {
@@ -174,4 +175,9 @@ object Keys {
 
   val wavesAmountPrefix: Short = 58
   def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(wavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+
+  val generatedAssetInfoPrefix: Short = 59
+  def generatedAssetInfo(asset: IssuedAsset): Key[Option[(Int, IssueTransaction)]] = Key.opt("generated-assetinfo", bytes(generatedAssetInfoPrefix, asset.id.arr), (readTransactionInfo(_) match {
+    case (h, t) => (h -> t.asInstanceOf[IssueTransaction])
+    }), writeTransactionInfo)
 }
