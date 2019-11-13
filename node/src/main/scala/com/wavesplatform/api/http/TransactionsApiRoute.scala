@@ -15,6 +15,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -22,13 +23,13 @@ import scala.util.Success
 
 @Path("/transactions")
 @Api(value = "/transactions")
-class TransactionsApiRoute(
-    val settings: RestAPISettings,
+case class TransactionsApiRoute(
+    settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
-    utxPoolSize: => Int,
-    val utxPoolSynchronizer: UtxPoolSynchronizer,
+    utxPoolSize: Coeval[Int],
+    utxPoolSynchronizer: UtxPoolSynchronizer,
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
@@ -102,7 +103,7 @@ class TransactionsApiRoute(
     httpMethod = "GET"
   )
   def utxSize: Route = (pathPrefix("size") & get) {
-    complete(Json.obj("size" -> JsNumber(utxPoolSize)))
+    complete(Json.obj("size" -> JsNumber(utxPoolSize())))
   }
 
   @Path("/unconfirmed/info/{id}")

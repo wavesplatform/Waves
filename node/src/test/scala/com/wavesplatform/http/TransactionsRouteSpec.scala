@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
+import monix.eval.Coeval
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
@@ -42,7 +43,7 @@ class TransactionsRouteSpec
   private val utxPoolSize         = mockFunction[Int]
 
   private val route =
-    new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, utxPoolSize.apply(), utxPoolSynchronizer, new TestTime).route
+    new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, Coeval(utxPoolSize.apply()), utxPoolSynchronizer, new TestTime).route
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 

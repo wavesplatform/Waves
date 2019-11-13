@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -359,7 +359,7 @@ class LevelDBWriter(
             _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
             if isNew
           } yield key
-          ).toSeq
+        ).toSeq
 
         if (newKeys.nonEmpty) {
           val chunkCountKey = Keys.dataKeyChunkCount(addressId)
@@ -395,7 +395,9 @@ class LevelDBWriter(
         val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
         val newlyApprovedFeatures = featureVotes(height)
           .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-          .collect { case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
+          .collect {
+            case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height
+          }
 
         if (newlyApprovedFeatures.nonEmpty) {
           approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
@@ -421,7 +423,7 @@ class LevelDBWriter(
       rw.put(Keys.carryFee(height), carry)
       expiredKeys += Keys.carryFee(threshold - 1).keyBytes
 
-    rw.put(Keys.blockTransactionsFee(height), totalFee)
+      rw.put(Keys.blockTransactionsFee(height), totalFee)
 
       if (dbSettings.storeInvokeScriptResults) scriptResults.foreach {
         case (txId, result) =>
@@ -590,10 +592,7 @@ class LevelDBWriter(
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
-        accountDataToInvalidate.result().foreach {
-          case ak @ (addr, _) =>
-            discardAccountData(ak)
-        }
+        accountDataToInvalidate.result().foreach(discardAccountData)
         discardedBlock
       }
 
@@ -727,35 +726,25 @@ class LevelDBWriter(
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  @inline
-  private def heightMatches(key: Array[Byte], maxHeight: Int): Boolean =
-    key.startsWith(Shorts.toByteArray(Keys.LeaseStatusPrefix)) && Ints.fromByteArray(key.slice(2, 6)) <= maxHeight
-
   override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
-    val iterator = db.iterator
-    iterator.seek(Shorts.toByteArray(Keys.LeaseStatusPrefix) ++ Ints.toByteArray(from))
-    val probablyActiveLeases = mutable.Set.empty[ByteStr]
-
-    try while (iterator.hasNext && heightMatches(iterator.peekNext().getKey, to)) {
-      val entry   = iterator.next()
-      val leaseId = ByteStr(entry.getKey.drop(6))
-      if (entry.getValue.headOption.contains(1.toByte)) {
-        probablyActiveLeases += leaseId
+    val activeLeaseIds = mutable.Set.empty[ByteStr]
+    db.iterateOver(Keys.LeaseStatusPrefix) { e =>
+      val leaseId = e.getKey.slice(2, e.getKey.length - 4)
+      if (e.getValue.headOption.contains(1.toByte)) {
+        activeLeaseIds += leaseId
       } else {
-        probablyActiveLeases -= leaseId
+        activeLeaseIds -= leaseId
       }
-    } finally iterator.close()
+    }
 
     val activeLeaseTransactions = for {
-      leaseId <- probablyActiveLeases
+      leaseId <- activeLeaseIds
       if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
       (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx     <- db.get(Keys.transactionAt(h, n))
+      tx     <- db.get(Keys.transactionAt(h, n)).collect { case lt: LeaseTransaction if filter(lt) => lt }
     } yield tx
 
-    activeLeaseTransactions.collect {
-      case lt: LeaseTransaction if filter(lt) => lt
-    }.toSeq
+    activeLeaseTransactions.toSeq
   }
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = readOnly { db =>

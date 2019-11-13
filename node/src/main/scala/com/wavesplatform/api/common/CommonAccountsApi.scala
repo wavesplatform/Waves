@@ -1,19 +1,24 @@
 package com.wavesplatform.api.common
 
+import cats.instances.map._
+import cats.syntax.monoid._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Keys}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.Portfolio.longSemigroup
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Diff, Height}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
+import com.wavesplatform.api.common
 
 import scala.collection.mutable
 
@@ -28,9 +33,9 @@ trait CommonAccountsApi {
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
-  def portfolio(address: Address): Map[Asset, Long]
+  def portfolio(address: Address): Map[IssuedAsset, Long]
 
-  def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction]
+  def nftPortfolio(address: Address, limit: Int, from: Option[IssuedAsset]): Observable[IssueTransaction]
 
   def script(address: Address): AddressScriptInfo
 
@@ -71,9 +76,15 @@ object CommonAccountsApi {
 
     override def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
-    override def portfolio(address: Address): Map[Asset, Long] = ???
+    override def portfolio(address: Address): Map[IssuedAsset, Long] =
+      (diff.portfolios.getOrElse(address, Portfolio.empty).assets |+| common.portfolio(
+        db,
+        address,
+        blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
+      )).filter(_._2 > 0)
 
-    override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = ???
+    override def nftPortfolio(address: Address, count: Int, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+      Observable.fromIterable(nftList(db, diff, blockchain.balance, address, count, from.map(_.id)))
 
     override def script(address: Address): AddressScriptInfo = {
       val script: Option[(Script, Long)] = blockchain.accountScript(address)
@@ -108,6 +119,7 @@ object CommonAccountsApi {
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
-    override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = ???
+    override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] =
+      Observable.fromIterable(Seq.empty)
   }
 }

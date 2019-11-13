@@ -4,7 +4,6 @@ import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.Portfolio
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{NTPTime, TestWallet}
 import monix.eval.Task
 
@@ -20,7 +19,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       ntpTime,
       null,
       null,
-      _ => Left(GenericError("")),
+      null,
       _ => Portfolio.empty,
       _ => Map.empty,
       PeerDatabase.NoOp,

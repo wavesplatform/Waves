@@ -1,5 +1,6 @@
 package com.wavesplatform.database
 
+import com.google.common.primitives.Shorts
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.metrics.LevelDBStats.DbHistogramExt
 import org.iq80.leveldb.{DB, DBIterator, ReadOptions}
@@ -21,9 +22,15 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterator: DBIterator = db.iterator(readOptions)
 
-  def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
+  def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = iterateOver(Shorts.toByteArray(prefix))(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
+  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
+    val iterator = db.iterator(readOptions)
+    try {
+      iterator.seek(prefix)
+      while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
+    } finally iterator.close()
+  }
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator

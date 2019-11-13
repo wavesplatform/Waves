@@ -1,13 +1,18 @@
 package com.wavesplatform.api
+import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.database.{DBExt, Keys, ReadOnlyDB}
 import com.wavesplatform.state.{AddressId, Diff, Height, InvokeScriptResult, Portfolio, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction}
 import org.iq80.leveldb.DB
+
+import scala.collection.mutable
 
 package object common {
   def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)])(address: Address): Seq[(Height, CreateAliasTransaction)] = {
@@ -18,26 +23,27 @@ package object common {
       }
   }
 
-  def nftList(db: DB, maybeDiff: => Option[(Height, Diff)], balance: (Address, IssuedAsset) => Long)(
+  def nftList(
+      db: DB,
+      diff: Diff,
+      balance: (Address, IssuedAsset) => Long,
       address: Address,
       count: Int,
       fromId: Option[ByteStr]
-  ): Seq[IssueTransaction] = maybeDiff match {
-    case None => loadNftList(db, address, count, fromId, Set.empty, balance)
-    case Some((_, diff)) =>
-      val received = diff.portfolios.getOrElse(address, Portfolio.empty).assets.collect { case (aid, v) if v > 0 => aid }.toSet
-      val issuedInDiff = diff.transactions
-        .collect {
-          case (tx: IssueTransaction, _) if tx.isNFT && received(IssuedAsset(tx.id())) => tx
-        }
-        .dropWhile(it => fromId.isDefined && !fromId.contains(it.id()))
-
-      if (issuedInDiff.length >= count) issuedInDiff.take(count)
-      else if (issuedInDiff.nonEmpty) {
-        issuedInDiff ++ loadNftList(db, address, count - issuedInDiff.length, None, received, balance)
-      } else {
-        loadNftList(db, address, count, fromId, received, balance)
+  ): Seq[IssueTransaction] = {
+    val received = diff.portfolios.getOrElse(address, Portfolio.empty).assets.collect { case (aid, v) if v > 0 => aid }.toSet
+    val issuedInDiff = diff.transactions
+      .collect {
+        case (tx: IssueTransaction, _) if tx.isNFT && received(IssuedAsset(tx.id())) => tx
       }
+      .dropWhile(it => fromId.isDefined && !fromId.contains(it.id()))
+
+    if (issuedInDiff.length >= count) issuedInDiff.take(count)
+    else if (issuedInDiff.nonEmpty) {
+      issuedInDiff ++ loadNftList(db, address, count - issuedInDiff.length, None, received, balance)
+    } else {
+      loadNftList(db, address, count, fromId, received, balance)
+    }
   }
 
   def addressTransactions(
@@ -81,16 +87,46 @@ package object common {
             .flatten
       }
       .orElse(db.readOnly { ro =>
-        loadTransactions(ro, txId) match {
+        loadTransaction(ro, txId) match {
           case Some((h, ist: InvokeScriptTransaction)) => loadInvokeScriptResult(ro, txId).map(isr => (h, ist, isr))
           case _                                       => None
         }
       })
   }
 
+  def portfolio(db: DB, address: Address, includeNFT: Boolean): Map[IssuedAsset, Long] = db.readOnly { ro =>
+    ro.get(Keys.addressId(address)).fold(Map.empty[IssuedAsset, Long]) { addressId =>
+      val addressIdBytes = addressId.toByteArray
+      val offset         = 2 + addressIdBytes.length
+
+      val balances = mutable.AnyRefMap.empty[IssuedAsset, Long]
+      ro.iterateOver(Shorts.toByteArray(Keys.AssetBalancePrefix) ++ addressIdBytes) { e =>
+        val asset = IssuedAsset(ByteStr(e.getKey.slice(offset, offset + crypto.DigestLength)))
+        balances += asset -> Longs.fromByteArray(e.getValue)
+      }
+
+      if (includeNFT) {
+        balances.filter(_._2 > 0).toMap
+      } else {
+        (for {
+          (asset, balance) <- balances
+          if balance > 0
+          _ <- loadTransaction(ro, asset.id).collect { case (_, it: IssueTransaction) if !it.isNFT => it.id() }
+        } yield asset -> balance).toMap
+      }
+    }
+  }
+
+  def activeLeases(db: DB, maybeDiff: Option[(Height, Diff)], address: Address): Seq[(Height, LeaseTransaction)] = db.readOnly { ro =>
+    def isCancelled(id: ByteStr): Boolean = maybeDiff.exists(_._2.leaseState.get(id).contains(true))
+
+    addressTransactions(db, maybeDiff, address, None, Set(LeaseTransaction.typeId), Int.MaxValue, None)
+      .collect { case (h, lt: LeaseTransaction) if !isCancelled(lt.id()) => h -> lt }
+  }
+
   private def addressTransactions(
       db: ReadOnlyDB,
-      maybeDiff: => Option[(Height, Diff)],
+      maybeDiff: Option[(Height, Diff)],
       subject: Address,
       sender: Option[Address],
       types: Set[Transaction.Type],
@@ -159,7 +195,7 @@ package object common {
       inclusions: Set[IssuedAsset],
       balance: (Address, IssuedAsset) => Long
   ): Seq[IssueTransaction] = writableDB.readOnly { db =>
-    val includedTransactions = inclusions.view.flatMap(asset => loadTransactions(db, asset.id)).map(_._2)
+    val includedTransactions = inclusions.view.flatMap(asset => loadTransaction(db, asset.id)).map(_._2)
 
     val transactions = for {
       addressId <- db.get(Keys.addressId(address)).toSeq.view
@@ -167,7 +203,7 @@ package object common {
         case ia if balance(address, ia) > 0 && !inclusions(ia) => ia.id
       }
       id      <- assetList
-      (_, tx) <- loadTransactions(db, id)
+      (_, tx) <- loadTransaction(db, id)
     } yield tx
 
     (includedTransactions ++ transactions)
@@ -177,7 +213,7 @@ package object common {
       .toSeq
   }
 
-  private def loadTransactions(db: ReadOnlyDB, id: ByteStr): Option[(Height, Transaction)] =
+  private def loadTransaction(db: ReadOnlyDB, id: ByteStr): Option[(Height, Transaction)] =
     for {
       (h, n) <- db.get(Keys.transactionHNById(TransactionId(id)))
       tx     <- db.get(Keys.transactionAt(h, n))

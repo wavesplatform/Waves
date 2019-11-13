@@ -9,6 +9,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block.BlockId
@@ -18,11 +19,11 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult, LeaseBalance, NG, Portfolio, TransactionId}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -45,7 +46,7 @@ case class DebugApiRoute(
     time: Time,
     blockchain: Blockchain with NG,
     wallet: Wallet,
-    invokeScriptResult: TransactionId => Either[ValidationError, InvokeScriptResult],
+    transactionsApi: CommonTransactionsApi,
     portfolio: Address => Portfolio,
     wavesDistribution: Int => Map[Address, Long],
     peerDatabase: PeerDatabase,
@@ -392,18 +393,9 @@ case class DebugApiRoute(
     )
   )
   def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment)) { id =>
-    blockchain.transactionInfo(id) match {
-      case Some((h, tx: InvokeScriptTransaction)) =>
-        val resultE = invokeScriptResult(TransactionId(tx.id()))
-          .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
-        complete(resultE)
-
-      case Some((_, tx)) =>
-        complete(ApiError.UnsupportedTransactionType)
-
-      case None =>
-        complete(ApiError.TransactionDoesNotExist)
-
+    transactionsApi.invokeScriptResultById(id) match {
+      case Some((height, ist, isr)) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
+      case None                     => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -427,10 +419,16 @@ case class DebugApiRoute(
     )
   )
   def stateChangesByAddress: Route =
-    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, afterOpt) =>
-      (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) {
-        implicit sc =>
-          ???
+    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.as[ByteStr].?)) { (address, limit, afterOpt) =>
+      validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
+        complete {
+          transactionsApi
+            .invokeScriptResults(address, None, Set.empty, limit, afterOpt)
+            .map {
+              case (height, Right((ist, isr))) => ist.json() ++ Json.obj("height" -> height, "stateChanges" -> isr)
+              case (height, Left(tx)) => tx.json() ++ Json.obj("height" -> height)
+            }
+        }
       }
     }
 }

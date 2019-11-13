@@ -14,7 +14,18 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
-import com.wavesplatform.api.http.requests.{BurnV1Request, ExchangeRequest, IssueV1Request, MassTransferRequest, ReissueV1Request, SignedBurnV1Request, SignedIssueV1Request, SignedReissueV1Request, SponsorFeeRequest, TransferRequest}
+import com.wavesplatform.api.http.requests.{
+  BurnV1Request,
+  ExchangeRequest,
+  IssueV1Request,
+  MassTransferRequest,
+  ReissueV1Request,
+  SignedBurnV1Request,
+  SignedIssueV1Request,
+  SignedReissueV1Request,
+  SponsorFeeRequest,
+  TransferRequest
+}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
@@ -38,7 +49,6 @@ import monix.execution.Scheduler
 import play.api.libs.json._
 
 import scala.concurrent.Future
-import scala.util.Success
 
 @Path("/assets")
 @Api(value = "assets")
@@ -73,7 +83,7 @@ case class AssetsApiRoute(
     )
   )
   def balance: Route =
-    (get & path("balance" / Segment / Segment)) { (address, assetId) =>
+    (get & path("balance" / AddrSegment / B58Segment)) { (address, assetId) =>
       complete(balanceJson(address, assetId))
     }
 
@@ -185,31 +195,15 @@ case class AssetsApiRoute(
   def nft: Route =
     extractScheduler(
       implicit sc =>
-        (path("nft" / Segment / "limit" / IntNumber) & parameter('after.?) & get) { (addressParam, limitParam, maybeAfterParam) =>
-          val response: Either[ApiError, Future[JsArray]] = for {
-            addr  <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-            limit <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
-            maybeAfter <- maybeAfterParam match {
-              case Some(v) =>
-                ByteStr
-                  .decodeBase58(v)
-                  .fold(
-                    _ => Left(CustomValidationError(s"Unable to decode asset id $v")),
-                    id => Right(Some(IssuedAsset(id)))
-                  )
-              case None => Right(None)
-            }
-          } yield {
+        (path("nft" / AddrSegment / "limit" / IntNumber) & parameter('after.as[ByteStr].?) & get) { (address, limit, maybeAfter) =>
+          complete {
             commonAccountApi
-              .nftPortfolio(addr, maybeAfter)
-              .take(limit)
+              .nftPortfolio(address, limit, maybeAfter.map(IssuedAsset))
               .map(_.json())
               .toListL
               .map(lst => JsArray(lst))
               .runAsyncLogErr
           }
-
-          complete(response)
         }
     )
 
@@ -236,20 +230,12 @@ case class AssetsApiRoute(
         path("transfer")(broadcast[TransferRequest](_.toTx))
     )
 
-  private def balanceJson(address: String, assetIdStr: String): Either[ApiError, JsObject] = {
-    ByteStr.decodeBase58(assetIdStr) match {
-      case Success(assetId) =>
-        (for {
-          acc <- Address.fromString(address)
-        } yield Json.obj(
-          "address" -> acc.stringRepr,
-          "assetId" -> assetIdStr,
-          "balance" -> JsNumber(BigDecimal(blockchain.balance(acc, IssuedAsset(assetId))))
-        )).left
-          .map(ApiError.fromValidationError)
-      case _ => Left(InvalidAddress)
-    }
-  }
+  private def balanceJson(address: Address, assetId: ByteStr): JsObject =
+    Json.obj(
+      "address" -> address,
+      "assetId" -> assetId,
+      "balance" -> JsNumber(BigDecimal(blockchain.balance(address, IssuedAsset(assetId))))
+    )
 
   private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] =
     (for {
@@ -259,7 +245,7 @@ case class AssetsApiRoute(
         "address" -> acc.stringRepr,
         "balances" -> JsArray(
           (for {
-            (asset @ IssuedAsset(assetId), balance)                                <- commonAccountApi.portfolio(acc) if balance > 0
+            (asset @ IssuedAsset(assetId), balance)                                <- commonAccountApi.portfolio(acc)
             CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) <- commonAssetsApi.fullInfo(asset)
           } yield Json.obj(
             "assetId"    -> assetId,

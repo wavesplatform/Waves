@@ -1,5 +1,6 @@
 package com.wavesplatform.history
 
+import cats.syntax.option._
 import com.wavesplatform._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common
@@ -10,7 +11,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.state.{Height, diffs}
+import com.wavesplatform.state.diffs
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -36,9 +37,12 @@ class BlockchainUpdaterNFTTest
           def nftList(address: Address): Seq[IssueTransaction] =
             common.nftList(
               db,
-              d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff),
-              d.blockchainUpdater.balance
-            )(address, Int.MaxValue, None)
+              d.blockchainUpdater.bestLiquidDiff.orEmpty,
+              d.blockchainUpdater.balance,
+              address,
+              Int.MaxValue,
+              None
+            )
 
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
@@ -72,9 +76,12 @@ class BlockchainUpdaterNFTTest
           def nftList(address: Address): Seq[IssueTransaction] =
             common.nftList(
               db,
-              d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff),
-              d.blockchainUpdater.balance
-            )(address, Int.MaxValue, None)
+              d.blockchainUpdater.bestLiquidDiff.orEmpty,
+              d.blockchainUpdater.balance,
+              address,
+              Int.MaxValue,
+              None
+            )
 
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right

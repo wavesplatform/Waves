@@ -45,7 +45,7 @@ class AddressRouteSpec
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
   private val route =
-    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, commonAccountApi).route
+    seal(AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, commonAccountApi).route)
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -72,7 +72,7 @@ class AddressRouteSpec
   }
 
   routePath("/validate/{address}") in {
-    val t = Table(("address", "valid"), allAddresses.map(_ -> true) :+ "invalid-address" -> false: _*)
+    val t = Table(("address", "valid"), allAddresses.map(_ -> true) :+ "ABCDEFGHJKLMNPQRSTUVWXYZ" -> false: _*)
 
     forAll(t) { (a, v) =>
       Get(routePath(s"/validate/$a")) ~> route ~> check {

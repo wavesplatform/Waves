@@ -6,6 +6,7 @@ import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.{TraceStep, TracedResult}
@@ -71,6 +72,10 @@ trait ApiMarshallers {
       }
     }
 
+  implicit val byteStrUnmarshaller: Unmarshaller[String, ByteStr] = Unmarshaller.strict[String, ByteStr] { s =>
+    ByteStr.decodeBase58(s).get
+  }
+
   // preserve support for extracting plain strings from requests
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
   implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
@@ -82,7 +87,7 @@ trait ApiMarshallers {
   }
 
   // preserve support for using plain strings as request entities
-  implicit val stringMarshaller = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
+  implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
 }
 
 object ApiMarshallers extends ApiMarshallers

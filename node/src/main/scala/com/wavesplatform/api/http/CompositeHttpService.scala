@@ -25,7 +25,7 @@ case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], 
     }
 
   val compositeRoute: Route        = extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)
-  val loggingCompositeRoute: Route = DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute)
+  val loggingCompositeRoute: Route = Route.seal(DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute))
 
   private def logRequestResponse(req: HttpRequest)(res: RouteResult): Unit = res match {
     case Complete(resp) =>
@@ -51,5 +51,11 @@ case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], 
 
       extendedRoute(ctx)
     } else base
+  }
+}
+
+object CompositeHttpService {
+  implicit val exceptionHandler: ExceptionHandler = ExceptionHandler {
+    case ApiException(apiError) => complete(apiError)
   }
 }

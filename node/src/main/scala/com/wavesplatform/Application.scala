@@ -37,7 +37,6 @@ import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Diff, Height, Portfolio}
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -317,7 +316,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater, cba),
-        new TransactionsApiRoute(settings.restAPISettings, cta, wallet, blockchainUpdater, utxStorage.size, utxSynchronizer, time),
+        TransactionsApiRoute(settings.restAPISettings, cta, wallet, blockchainUpdater, Coeval(utxStorage.size), utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, cba),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator),
@@ -328,7 +327,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           time,
           blockchainUpdater,
           wallet,
-          _ => Left(GenericError("not implemented")),
+          cta,
           _ => Portfolio.empty,
           _ => Map.empty,
           peerDatabase,

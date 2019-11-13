@@ -30,15 +30,21 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, commonAccountsApi: CommonAccountsApi)
-    extends ApiRoute
+case class AddressApiRoute(
+    settings: RestAPISettings,
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    time: Time,
+    commonAccountsApi: CommonAccountsApi
+) extends ApiRoute
     with BroadcastRoute
     with AuthRoute
     with AutoParamsDirective {
 
   import AddressApiRoute._
 
-  val MaxAddressesPerRequest         = 1000
+  val MaxAddressesPerRequest = 1000
 
   override lazy val route =
     pathPrefix("addresses") {
@@ -53,13 +59,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def scriptInfo: Route = (path("scriptInfo" / Segment) & get) { address =>
-    complete(
-      Address
-        .fromString(address)
-        .map(addressScriptInfoJson)
-        .map(ToResponseMarshallable(_))
-    )
+  def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
+    complete(addressScriptInfoJson(address))
   }
 
   @Path("/scriptInfo/{address}/meta")
@@ -69,13 +70,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
-    complete(
-      Address
-        .fromString(address)
-        .flatMap(scriptMetaJson)
-        .map(ToResponseMarshallable(_))
-    )
+  def scriptMeta: Route = (path("scriptInfo" / AddrSegment / "meta") & get) { address =>
+    complete(scriptMetaJson(address))
   }
 
   @Path("/{address}")
@@ -85,14 +81,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def deleteAddress: Route = path(Segment) { address =>
+  def deleteAddress: Route = path(AddrSegment) { address =>
     (delete & withAuth) {
-      if (Address.fromString(address).isLeft) {
-        complete(InvalidAddress)
-      } else {
-        val deleted = wallet.findPrivateKey(address).exists(account => wallet.deleteAccount(account))
-        complete(Json.obj("deleted" -> deleted))
-      }
+      val deleted = wallet.privateKeyAccount(address).exists(account => wallet.deleteAccount(account))
+      complete(Json.obj("deleted" -> deleted))
     }
   }
 
@@ -114,7 +106,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     )
   )
   def sign: Route = {
-    path("sign" / Segment) { address =>
+    path("sign" / AddrSegment) { address =>
       signPath(address, encode = true)
     }
   }
@@ -136,7 +128,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     )
   )
   def signText: Route = {
-    path("signText" / Segment) { address =>
+    path("signText" / AddrSegment) { address =>
       signPath(address, encode = false)
     }
   }
@@ -157,7 +149,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       )
     )
   )
-  def verify: Route = path("verify" / Segment) { address =>
+  def verify: Route = path("verify" / AddrSegment) { address =>
     verifyPath(address, decode = true)
   }
 
@@ -177,7 +169,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       )
     )
   )
-  def verifyText: Route = path("verifyText" / Segment) { address =>
+  def verifyText: Route = path("verifyText" / AddrSegment) { address =>
     verifyPath(address, decode = false)
   }
 
@@ -279,8 +271,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Validity(address, Address.fromString(address).isRight))
+  def validate: Route = (path("validate" / B58Segment) & get) { addressBytes =>
+    complete(Validity(addressBytes.toString, Address.fromBytes(addressBytes).isRight))
   }
 
   // TODO: Remove from API
@@ -313,7 +305,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   def getData: Route =
     extractScheduler(
       implicit sc =>
-        path("data" / Segment) { address =>
+        path("data" / AddrSegment) { address =>
           protobufEntity(api.DataRequest) { request =>
             if (request.matches.nonEmpty)
               complete(
@@ -323,7 +315,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
                       log.error(s"Error compiling regex ${request.matches}", e)
                       ApiError.fromValidationError(GenericError(s"Cannot compile regex"))
                     },
-                    r => accountData(address, request.matches)
+                    _ => accountData(address, request.matches)
                   )
               )
             else complete(accountDataList(address, request.keys: _*))
@@ -341,7 +333,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")
     )
   )
-  def getDataItem: Route = (path("data" / Segment / Segment) & get) {
+  def getDataItem: Route = (path("data" / AddrSegment / Segment) & get) {
     case (address, key) =>
       complete(accountDataEntry(address, key))
   }
@@ -423,7 +415,8 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
     import cats.implicits._
     blockchain
-      .accountScript(account).map(_._1)
+      .accountScript(account)
+      .map(_._1)
       .traverse(Global.dAppFuncTypes)
       .map(AccountScriptMeta(account.stringRepr, _))
   }
@@ -436,50 +429,26 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       .getOrElse(InvalidAddress)
   }
 
-  private def accountData(address: String)(implicit sc: Scheduler): ToResponseMarshallable = {
-    Address
-      .fromString(address)
-      .map { acc =>
-        ToResponseMarshallable(commonAccountsApi.dataStream(acc, None).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
-      }
-      .getOrElse(InvalidAddress)
-  }
+  private def accountData(address: Address)(implicit sc: Scheduler): ToResponseMarshallable =
+    ToResponseMarshallable(commonAccountsApi.dataStream(address, None).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
 
-  private def accountData(address: String, regex: String)(implicit sc: Scheduler): ToResponseMarshallable = {
-    Address
-      .fromString(address)
-      .map { addr =>
-        val result: ToResponseMarshallable = commonAccountsApi
-          .dataStream(addr, Some(regex))
-          .toListL
-          .runAsyncLogErr
-          .map(_.sortBy(_.key))
+  private def accountData(addr: Address, regex: String)(implicit sc: Scheduler): ToResponseMarshallable =
+    commonAccountsApi
+      .dataStream(addr, Some(regex))
+      .toListL
+      .runAsyncLogErr
+      .map(_.sortBy(_.key))
 
-        result
-      }
-      .getOrElse(InvalidAddress)
-  }
+  private def accountDataEntry(address: Address, key: String): ToResponseMarshallable =
+    commonAccountsApi.data(address, key).toRight(DataKeyDoesNotExist)
 
-  private def accountDataEntry(address: String, key: String): ToResponseMarshallable = {
-    val result = for {
-      addr  <- Address.fromString(address).left.map(_ => InvalidAddress)
-      value <- commonAccountsApi.data(addr, key).toRight(DataKeyDoesNotExist)
-    } yield value
-    ToResponseMarshallable(result)
-  }
+  private def accountDataList(address: Address, keys: String*): ToResponseMarshallable =
+    keys.flatMap(commonAccountsApi.data(address, _))
 
-  private def accountDataList(address: String, keys: String*): ToResponseMarshallable = {
-    val result = for {
-      addr <- Address.fromString(address).left.map(_ => InvalidAddress)
-      dataList = keys.flatMap(commonAccountsApi.data(addr, _))
-    } yield dataList
-    ToResponseMarshallable(result)
-  }
-
-  private def signPath(address: String, encode: Boolean) = (post & entity(as[String])) { message =>
+  private def signPath(address: Address, encode: Boolean): Route = (post & entity(as[String])) { message =>
     withAuth {
       val res = wallet
-        .findPrivateKey(address)
+        .privateKeyAccount(address)
         .map(pk => {
           val messageBytes = message.getBytes(StandardCharsets.UTF_8)
           val signature    = crypto.sign(pk, messageBytes)
@@ -490,25 +459,20 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     }
   }
 
-  private def verifyPath(address: String, decode: Boolean): Route = withAuth {
+  private def verifyPath(address: Address, decode: Boolean): Route = withAuth {
     jsonPost[SignedMessage] { m =>
-      if (Address.fromString(address).isLeft) {
-        InvalidAddress
-      } else {
-        //DECODE SIGNATURE
-        val msg: Try[Array[Byte]] =
-          if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
-          else Success(m.message.getBytes("UTF-8"))
-        verifySigned(msg, m.signature, m.publickey, address)
-      }
+      val msg: Try[Array[Byte]] =
+        if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
+        else Success(m.message.getBytes("UTF-8"))
+      verifySigned(msg, m.signature, m.publickey, address)
     }
   }
 
-  private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: String) = {
+  private def verifySigned(msg: Try[Array[Byte]], signature: String, publicKey: String, address: Address) = {
     (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
-        val isValid = account.stringRepr == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
+        val isValid = account == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }

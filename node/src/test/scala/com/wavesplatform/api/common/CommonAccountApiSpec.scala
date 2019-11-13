@@ -1,7 +1,6 @@
 package com.wavesplatform.api.common
-import org.scalatest.{FreeSpec, Matchers}
 
-import scala.util.Random
+import org.scalatest.{FreeSpec, Matchers}
 
 class CommonAccountApiSpec extends FreeSpec with Matchers {
   "regex tests" in pendingUntilFixed {

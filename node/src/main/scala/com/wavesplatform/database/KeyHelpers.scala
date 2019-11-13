@@ -11,7 +11,7 @@ object KeyHelpers {
     ByteBuffer.allocate(6).putShort(prefix).putInt(height).array()
 
   def hBytes(prefix: Short, height: Int, bytes: Array[Byte]): Array[Byte] =
-    ByteBuffer.allocate(6 + bytes.length).putShort(prefix).putInt(height).put(bytes).array()
+    ByteBuffer.allocate(6 + bytes.length).putShort(prefix).put(bytes).putInt(height).array()
 
   def bytes(prefix: Short, bytes: Array[Byte]): Array[Byte] =
     ByteBuffer.allocate(2 + bytes.length).putShort(prefix).put(bytes).array()
@@ -22,7 +22,7 @@ object KeyHelpers {
 
   def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, height, addressId.toByteArray)
 
-  def hNum(prefix: Short, height: Int, num: TxNum): Array[Byte] = hBytes(prefix, height, Shorts.toByteArray(num))
+  def hNum(prefix: Short, height: Int, num: TxNum): Array[Byte] = bytes(prefix, Ints.toByteArray(height) ++ Shorts.toByteArray(num))
 
   def historyKey(name: String, prefix: Short, b: Array[Byte]): Key[Seq[Int]] = Key(name, bytes(prefix, b), readIntSeq, writeIntSeq)
 

@@ -459,4 +459,10 @@ object ApiError {
         "transaction" -> tx.json()
       )
   }
+
+  case object InvalidBase58 extends ApiError {
+    override val id = 406
+    override val message = "Invalid Base58 string"
+    override val code = StatusCodes.BadRequest
+  }
 }

@@ -28,8 +28,9 @@ object Keys {
     Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
   def assetBalanceHistory(addressId: BigInt, asset: IssuedAsset): Key[Seq[Int]] =
     historyKey("asset-balance-history", 8, addressId.toByteArray ++ asset.id.arr)
+  val AssetBalancePrefix: Short = 9
   def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key("asset-balance", hBytes(9, height, addressId.toByteArray ++ asset.id.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+    Key("asset-balance", hBytes(AssetBalancePrefix, height, addressId.toByteArray ++ asset.id.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetInfoHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-info-history", 10, asset.id.arr)
   def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
