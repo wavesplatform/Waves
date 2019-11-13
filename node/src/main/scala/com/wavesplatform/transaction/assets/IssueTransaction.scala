@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import cats.implicits._
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -8,7 +7,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
-import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator}
+import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.impl.IssueTxValidator
 import com.wavesplatform.transaction.{
   FastHashId,
   Proofs,
@@ -44,7 +44,7 @@ case class IssueTransaction(
     with SigProofsSwitch
     with TxWithFee.InWaves {
 
-  override def builder: IssueTransaction.type = IssueTransaction
+  override def builder = IssueTransaction
 
   override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
@@ -65,11 +65,12 @@ object IssueTransaction extends TransactionParserLite {
   override val supportedVersions: Set[TxVersion]    = Set(1, 2)
   override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
 
-  val serializer                                        = IssueTxSerializer
+  val serializer = IssueTxSerializer
 
-  implicit val validator: TxValidator[IssueTransaction] = ???
+  implicit val validator: TxValidator[IssueTransaction] = IssueTxValidator
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
   def create(
       version: TxVersion,
       sender: PublicKey,
@@ -115,30 +116,6 @@ object IssueTransaction extends TransactionParserLite {
     signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
 
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
-
-  def validateIssueParams(tx: IssueTransaction): Either[ValidationError, Unit] = {
-    validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
-  }
-
-  def validateIssueParams(
-      name: Array[Byte],
-      description: Array[Byte],
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      fee: Long
-  ): Either[ValidationError, Unit] = {
-    //noinspection UnnecessaryPartialFunction
-    (
-      TxConstraints.positiveAmount(quantity, "assets"),
-      TxConstraints.assetName(name),
-      TxConstraints.assetDescription(description),
-      TxConstraints.assetDecimals(decimals),
-      TxConstraints.fee(fee)
-    ).mapN { case _ => () }
-      .leftMap(_.head)
-      .toEither
-  }
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()
