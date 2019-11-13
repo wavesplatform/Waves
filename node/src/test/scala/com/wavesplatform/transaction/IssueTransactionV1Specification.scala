@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
@@ -46,15 +46,19 @@ class IssueTransactionV1Specification extends PropSpec with PropertyChecks with 
                        }
     """)
 
-    val tx = IssueTransaction.create(TxVersion.V1, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+    val tx = IssueTransaction
+      .create(
+        TxVersion.V1,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes("UTF-8"),
         "Gigacoin".getBytes("UTF-8"),
         10000000000L,
         8,
-        true, script = None,
+        true,
+        script = None,
         100000000,
         1526287561757L,
-        ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get
+        Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
       )
       .right
       .get

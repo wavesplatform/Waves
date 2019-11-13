@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -101,14 +101,19 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .create(recipient, ENOUGH_AMT, timestamp)
         .explicitGet()
       (script, _) = ScriptCompiler(s"false", isAssetScript = false, estimator).explicitGet()
-      issueTx = IssueTransaction.selfSigned(TxVersion.V1, sender = contract,
+      issueTx = IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          sender = contract,
           name = "Asset#1".getBytes("UTF-8"),
           description = "description".getBytes("UTF-8"),
           quantity = Long.MaxValue,
           decimals = 8,
-          reissuable = false, script = None,
+          reissuable = false,
+          script = None,
           fee = ENOUGH_FEE,
-          timestamp = timestamp + 2)
+          timestamp = timestamp + 2
+        )
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
@@ -120,7 +125,17 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferToRecipient = TransferTransaction
-        .selfSigned(2.toByte, contract, recipient, IssuedAsset(issueTx.id()), ENOUGH_FEE * 3, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 4)
+        .selfSigned(
+          2.toByte,
+          contract,
+          recipient,
+          IssuedAsset(issueTx.id()),
+          ENOUGH_FEE * 3,
+          Waves,
+          ENOUGH_FEE,
+          Array.emptyByteArray,
+          System.currentTimeMillis() + 4
+        )
         .explicitGet()
       setScript = SetScriptTransaction
         .selfSigned(
@@ -131,7 +146,17 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferTx = TransferTransaction
-        .selfSigned(2.toByte, recipient, accountGen.sample.get, Waves, 1, IssuedAsset(issueTx.id()), ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 8)
+        .selfSigned(
+          2.toByte,
+          recipient,
+          accountGen.sample.get,
+          Waves,
+          1,
+          IssuedAsset(issueTx.id()),
+          ENOUGH_FEE,
+          Array.emptyByteArray,
+          System.currentTimeMillis() + 8
+        )
         .explicitGet()
     } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToRecipient, setScript)), transferTx)
   }
@@ -148,14 +173,19 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .create(sponsor, ENOUGH_AMT, timestamp)
         .explicitGet()
       (script, _) = ScriptCompiler(s"true", isAssetScript = false, estimator).explicitGet()
-      issueTx = IssueTransaction.selfSigned(TxVersion.V1, sender = sponsor,
+      issueTx = IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          sender = sponsor,
           name = "Asset#1".getBytes("UTF-8"),
           description = "description".getBytes("UTF-8"),
           quantity = Long.MaxValue,
           decimals = 8,
-          reissuable = false, script = None,
+          reissuable = false,
+          script = None,
           fee = ENOUGH_FEE,
-          timestamp = timestamp + 2)
+          timestamp = timestamp + 2
+        )
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
@@ -167,7 +197,17 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferToContract = TransferTransaction
-        .selfSigned(2.toByte, sponsor, contract, IssuedAsset(issueTx.id()), ENOUGH_FEE * 3, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 4)
+        .selfSigned(
+          2.toByte,
+          sponsor,
+          contract,
+          IssuedAsset(issueTx.id()),
+          ENOUGH_FEE * 3,
+          Waves,
+          ENOUGH_FEE,
+          Array.emptyByteArray,
+          System.currentTimeMillis() + 4
+        )
         .explicitGet()
       setScript = SetScriptTransaction
         .selfSigned(
@@ -178,7 +218,17 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       transferTx = TransferTransaction
-        .selfSigned(2.toByte, contract, sponsor, Waves, 1, IssuedAsset(issueTx.id()), ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis() + 8)
+        .selfSigned(
+          2.toByte,
+          contract,
+          sponsor,
+          Waves,
+          1,
+          IssuedAsset(issueTx.id()),
+          ENOUGH_FEE,
+          Array.emptyByteArray,
+          System.currentTimeMillis() + 8
+        )
         .explicitGet()
     } yield (Seq(Seq(gen1, gen2), Seq(issueTx, sponsorTx), Seq(transferToContract, setScript)), transferTx)
   }

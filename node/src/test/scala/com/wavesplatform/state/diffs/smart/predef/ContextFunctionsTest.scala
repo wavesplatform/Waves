@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -13,12 +13,12 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -27,7 +27,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -286,7 +286,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val reissuable  = true
           val assetScript = None
           val sponsored   = false
-          val issueTx = IssueTransaction.selfSigned(TxVersion.V2, masterAcc,
+          val issueTx = IssueTransaction
+            .selfSigned(
+              TxVersion.V2,
+              masterAcc,
               "testAsset".getBytes("UTF-8"),
               "Test asset".getBytes("UTF-8"),
               quantity,
@@ -294,7 +297,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               reissuable,
               assetScript,
               MinIssueFee * 2,
-              dataTransaction.timestamp + 5)
+              dataTransaction.timestamp + 5
+            )
             .right
             .get
 
@@ -360,7 +364,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |
                  | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                   Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                   Array.fill(Block.GeneratorSignatureLength)(0: Byte)
+                 )}'
                  | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
@@ -463,7 +468,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                   WavesContext.build(
                     DirectiveSet(V3, Account, Expression).explicitGet()
                   )
-                ))
+                )
+              )
           }
 
           val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()

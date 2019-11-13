@@ -11,9 +11,9 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -38,12 +38,13 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
 
       parsedEmptyScript = Parser.parseExpr(emptyScript).get.value
 
-      emptyExprScript = ExprScript(
-        V3,
-        ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
+      emptyExprScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransaction.selfSigned(TxVersion.V2, firstAcc,
+      issueTransaction = IssueTransaction
+        .selfSigned(
+          TxVersion.V2,
+          firstAcc,
           "name".getBytes(StandardCharsets.UTF_8),
           "description".getBytes(StandardCharsets.UTF_8),
           100,
@@ -51,7 +52,8 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
           false,
           Some(emptyExprScript),
           1000000,
-          ts)
+          ts
+        )
         .explicitGet()
 
       asset = IssuedAsset(issueTransaction.id())
@@ -72,8 +74,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
 
       untypedScript = Parser.parseExpr(assetScript).get.value
 
-      typedScript = ExprScript(V3,
-                               ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), untypedScript).explicitGet()._1)
+      typedScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), untypedScript).explicitGet()._1)
         .explicitGet()
 
       setAssetScriptTransaction = SetAssetScriptTransaction

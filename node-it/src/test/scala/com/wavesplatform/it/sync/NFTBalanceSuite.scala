@@ -9,7 +9,8 @@ import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction}
+import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.FreeSpec
 import play.api.libs.json._
@@ -159,12 +160,16 @@ object NFTBalanceSuite {
   def fillPortfolio(issuer: KeyPair, nft: Int, simple: Int): (List[IssueTransaction], List[IssueTransaction]) = {
 
     val simpleAssets = List.fill[IssueTransaction](simple) {
-      IssueTransaction.selfSigned(TxVersion.V1, issuer,
+      IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          issuer,
           s"SimpleAsset".getBytes("UTF-8"),
           s"Simple Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
           1000,
           8,
-          reissuable = true, script = None,
+          reissuable = true,
+          script = None,
           1.waves,
           System.currentTimeMillis()
         )
@@ -172,12 +177,16 @@ object NFTBalanceSuite {
     }
 
     val nonFungibleAssets = List.fill[IssueTransaction](nft) {
-      IssueTransaction.selfSigned(TxVersion.V1, issuer,
+      IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          issuer,
           "NonFungibleAsset".getBytes("UTF-8"),
           s"NFT Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
           1,
           0,
-          reissuable = false, script = None,
+          reissuable = false,
+          script = None,
           1.waves,
           System.currentTimeMillis()
         )

@@ -23,6 +23,9 @@ import com.wavesplatform.transaction.{
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
+import scala.reflect.ClassTag
+import scala.util.Try
+
 case class IssueTransaction(
     version: TxVersion,
     sender: PublicKey,
@@ -57,14 +60,16 @@ object IssueTransaction extends TransactionParserLite {
   val MaxAssetDecimals          = 8
 
   override type TransactionT = IssueTransaction
-  override val typeId: TxType                    = 3
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+
+  override val typeId: TxType                       = 3
+  override val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
 
   val serializer                                        = IssueTxSerializer
+
   implicit val validator: TxValidator[IssueTransaction] = ???
   implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-
   def create(
       version: TxVersion,
       sender: PublicKey,
@@ -108,6 +113,8 @@ object IssueTransaction extends TransactionParserLite {
       timestamp: Long
   ): Either[ValidationError, TransactionT] =
     signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+
+  override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
 
   def validateIssueParams(tx: IssueTransaction): Either[ValidationError, Unit] = {
     validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)

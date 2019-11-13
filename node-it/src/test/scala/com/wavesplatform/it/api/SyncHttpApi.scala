@@ -8,11 +8,11 @@ import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -454,10 +454,7 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).signedBroadcast(tx)), waitForTx)
     }
 
-    def signedIssue(tx: SignedIssueV1Request): Transaction =
-      sync(async(n).signedIssue(tx))
-
-    def signedIssue(tx: SignedIssueV2Request): Transaction =
+    def signedIssue(tx: IssueRequest): Transaction =
       sync(async(n).signedIssue(tx))
 
     def ensureTxDoesntExist(txId: String): Unit =

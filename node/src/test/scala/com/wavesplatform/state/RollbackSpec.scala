@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransactio
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
@@ -198,7 +198,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransaction.selfSigned(TxVersion.V1, sender, "test".getBytes("UTF-8"), Array.empty[Byte], assetAmount, 8, true, script = None, 1, nextTs).explicitGet()
+            IssueTransaction
+              .selfSigned(TxVersion.V1, sender, "test".getBytes("UTF-8"), Array.empty[Byte], assetAmount, 8, true, script = None, 1, nextTs)
+              .explicitGet()
 
           d.appendBlock(
             TestBlock.create(
@@ -241,7 +243,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
-          val issueTransaction = IssueTransaction.selfSigned(TxVersion.V1, sender, name, description, 2000, 8, true, script = None, 1, nextTs).explicitGet()
+          val issueTransaction =
+            IssueTransaction.selfSigned(TxVersion.V1, sender, name, description, 2000, 8, true, script = None, 1, nextTs).explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
           d.appendBlock(

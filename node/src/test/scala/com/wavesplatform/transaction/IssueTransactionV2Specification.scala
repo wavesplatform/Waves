@@ -34,7 +34,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       tx.reissuable shouldEqual recovered.reissuable
       tx.fee shouldEqual recovered.fee
       tx.name shouldEqual recovered.name
-      tx.chainId shouldEqual recovered.chainId
+      tx.chainByte shouldEqual recovered.chainByte
       tx.bytes() shouldEqual recovered.bytes()
     }
   }

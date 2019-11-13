@@ -8,7 +8,7 @@ import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransaction, ReissueTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -30,8 +30,10 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     masterToAlice: TransferTransaction = TransferTransaction
       .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
       .explicitGet()
-    issue: IssueTransaction = IssueTransaction.selfSigned(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100).explicitGet()
-    burn: BurnTransactionV1   = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
+    issue: IssueTransaction = IssueTransaction
+      .selfSigned(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
+      .explicitGet()
+    burn: BurnTransactionV1 = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
     reissue: ReissueTransactionV1 = ReissueTransactionV1
       .selfSigned(alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
       .explicitGet()

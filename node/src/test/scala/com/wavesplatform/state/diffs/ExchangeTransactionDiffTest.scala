@@ -15,8 +15,8 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction, IssueTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -815,9 +815,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       genesis = GenesisTransaction.create(MATCHER, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransaction.selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
+      asset1 = IssueTransaction
+        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
-      asset2 = IssueTransaction.selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
+      asset2 = IssueTransaction
+        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
@@ -906,9 +908,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       genesis = GenesisTransaction.create(MATCHER, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransaction.selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
+      asset1 = IssueTransaction
+        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
-      asset2 = IssueTransaction.selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
+      asset2 = IssueTransaction
+        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
