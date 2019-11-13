@@ -3,17 +3,17 @@ package com.wavesplatform.generator
 import java.nio.file.{Files, Paths}
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
@@ -60,7 +60,10 @@ object Preconditions {
                 .flatMap(_.toOption)
                 .map(_._1)
 
-              val tx = IssueTransaction.selfSigned(TxVersion.V2, issuer,
+              val tx = IssueTransaction
+                .selfSigned(
+                  TxVersion.V2,
+                  issuer,
                   assetName.getBytes("UTF-8"),
                   assetDescription.getBytes("UTF-8"),
                   amount,
