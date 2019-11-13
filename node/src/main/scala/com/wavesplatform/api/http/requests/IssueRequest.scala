@@ -1,7 +1,6 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -25,6 +24,10 @@ case class IssueRequest(
   def toTxFrom(sender: PublicKey): Either[ValidationError, IssueTransaction] =
     for {
       validProofs <- toProofs(version, signature, proofs)
+      validScript <- script match {
+        case None         => Right(None)
+        case Some(script) => Script.fromBase64String(script).map(Some(_))
+      }
       tx <- IssueTransaction.create(
         version.getOrElse(defaultVersion),
         sender,
@@ -33,7 +36,7 @@ case class IssueRequest(
         quantity,
         decimals,
         reissuable,
-        script.map(str => Script.fromBase64String(str).explicitGet()),
+        validScript,
         fee,
         timestamp.getOrElse(defaultTimestamp),
         validProofs
