@@ -191,7 +191,6 @@ object AsyncHttpApi extends Assertions {
 
     def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo(txId).transform {
       case Success(tx)                                          => Success(Some(tx))
-      case Success(tx)                                          => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
       case Failure(ex)                                          => Failure(ex)
     }
