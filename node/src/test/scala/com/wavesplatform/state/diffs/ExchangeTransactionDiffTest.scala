@@ -806,8 +806,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val sellerScript = Some(ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1)
     val buyerScript  = Some(ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1)
 
-    val chainId = AddressScheme.current.chainId
-
     forAll(for {
       buyer  <- accountGen
       seller <- accountGen
@@ -891,8 +889,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       txScript: Gen[String]
   ): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 100000000
-
-    val chainId = AddressScheme.current.chainId
 
     for {
       txScript <- txScript
