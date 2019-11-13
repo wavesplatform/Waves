@@ -1,23 +1,14 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import io.grpc.Status.Code
 
-import scala.util.Random
 import scala.concurrent.duration._
 
 class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
@@ -46,7 +37,6 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
         decimals = 0,
         reissuable = false,
         fee = issueFee,
-        version = 2,
         waitForTx = true)).explicitGet().id().base58
 
     assetWScript = PBTransactions.vanilla(
@@ -58,7 +48,6 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
         reissuable = false,
         fee = issueFee,
         script = Some(scriptBase64),
-        version = 2,
         waitForTx = true)).explicitGet().id().base58
   }
 
