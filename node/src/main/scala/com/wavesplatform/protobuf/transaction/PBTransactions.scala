@@ -193,33 +193,18 @@ object PBTransactions {
         vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
-        version match {
-          case 1 =>
-            vt.assets.exchange.ExchangeTransactionV1.create(
-              PBOrders.vanillaV1(buyOrder),
-              PBOrders.vanillaV1(sellOrder),
-              amount,
-              price,
-              buyMatcherFee,
-              sellMatcherFee,
-              feeAmount,
-              timestamp,
-              signature
-            )
-          case 2 =>
-            vt.assets.exchange.ExchangeTransactionV2.create(
-              PBOrders.vanilla(buyOrder),
-              PBOrders.vanilla(sellOrder),
-              amount,
-              price,
-              buyMatcherFee,
-              sellMatcherFee,
-              feeAmount,
-              timestamp,
-              proofs
-            )
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.assets.exchange.ExchangeTransaction.create(
+          2.toByte,
+          PBOrders.vanilla(buyOrder),
+          PBOrders.vanilla(sellOrder),
+          amount,
+          price,
+          buyMatcherFee,
+          sellMatcherFee,
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.DataTransaction(dt) =>
         vt.DataTransaction.create(
@@ -402,33 +387,18 @@ object PBTransactions {
         vt.lease.LeaseCancelTransaction(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
-        version match {
-          case 1 =>
-            vt.assets.exchange.ExchangeTransactionV1(
-              PBOrders.vanillaV1(buyOrder),
-              PBOrders.vanillaV1(sellOrder),
-              amount,
-              price,
-              buyMatcherFee,
-              sellMatcherFee,
-              feeAmount,
-              timestamp,
-              signature
-            )
-          case 2 =>
-            vt.assets.exchange.ExchangeTransactionV2(
-              PBOrders.vanilla(buyOrder),
-              PBOrders.vanilla(sellOrder),
-              amount,
-              price,
-              buyMatcherFee,
-              sellMatcherFee,
-              feeAmount,
-              timestamp,
-              proofs
-            )
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.assets.exchange.ExchangeTransaction(
+          version.toByte,
+          PBOrders.vanilla(buyOrder),
+          PBOrders.vanilla(sellOrder),
+          amount,
+          price,
+          buyMatcherFee,
+          sellMatcherFee,
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.DataTransaction(dt) =>
         vt.DataTransaction(

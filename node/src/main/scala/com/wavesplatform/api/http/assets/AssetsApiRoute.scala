@@ -14,7 +14,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
-import com.wavesplatform.api.http.requests.{BurnV1Request, IssueV1Request, MassTransferRequest, ReissueV1Request, SignedBurnV1Request, SignedExchangeRequest, SignedIssueV1Request, SignedReissueV1Request, SponsorFeeRequest, TransferRequest}
+import com.wavesplatform.api.http.requests.{BurnV1Request, ExchangeRequest, IssueV1Request, MassTransferRequest, ReissueV1Request, SignedBurnV1Request, SignedIssueV1Request, SignedReissueV1Request, SponsorFeeRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
@@ -232,7 +232,7 @@ case class AssetsApiRoute(
       path("issue")(broadcast[SignedIssueV1Request](_.toTx)) ~
         path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
         path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
-        path("exchange")(broadcast[SignedExchangeRequest](_.toTx)) ~
+        path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
         path("transfer")(broadcast[TransferRequest](_.toTx))
     )
 

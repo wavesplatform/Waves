@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import cats.Monoid
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto
@@ -32,7 +33,7 @@ case class BlockHeader(
     featureVotes: Set[Short],
     rewardVote: Long
 ) {
-  private[block] val json: Coeval[JsObject] = Coeval.evalOnce {
+  val json: Coeval[JsObject] = Coeval.evalOnce {
 
     val consensusJson =
       Json.obj(
@@ -57,11 +58,6 @@ case class BlockHeader(
       "reference" -> reference.toString
     ) ++ consensusJson ++ featuresJson ++ rewardJson ++ generatorJson
   }
-}
-
-object BlockHeader {
-  def json(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
-    header.json() ++ Json.obj("signature" -> signature.toString, "blocksize" -> blockSize, "transactionCount" -> transactionCount)
 }
 
 case class Block private[block] (
@@ -106,11 +102,12 @@ case class Block private[block] (
     )
   }
 
-  val json: Coeval[JsObject] = Coeval.evalOnce {
-    BlockHeader.json(header, bytes().length, transactionData.length, signature) ++
-      Json.obj("fee"          -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
-      Json.obj("transactions" -> JsArray(transactionData.map(_.json())))
-  }
+  val json = header.json.map(
+    _ ++ BlockMeta.json(bytes().length, transactionData.length, signature) ++ Json.obj(
+      "fee"          -> transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum,
+      "transactions" -> JsArray(transactionData.map(_.json()))
+    )
+  )
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
 

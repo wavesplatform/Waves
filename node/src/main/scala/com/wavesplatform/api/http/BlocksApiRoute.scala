@@ -4,7 +4,6 @@ import akka.http.scaladsl.server.{Route, StandardRoute}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationError, InvalidSignature, TooBigArrayAllocation}
-import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
@@ -130,7 +129,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
   )
   def atHeaderOnly: Route = (path("headers" / "at" / IntNumber) & get)(at(_, includeTransactions = false))
 
-  private def at(height: Int, includeTransactions: Boolean): StandardRoute = ???
+  private def at(height: Int, includeTransactions: Boolean): StandardRoute = complete {
+    if (includeTransactions) commonApi.blockAtHeight(height).map(_.json().addBlockFields(height))
+    else commonApi.metaAtHeight(height).map(_.json())
+    }
 
   @Path("/seq/{from}/{to}")
   @ApiOperation(value = "Block range", notes = "Get blocks at specified heights", httpMethod = "GET")
@@ -165,10 +167,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
       } else {
         commonApi
           .metaRange(start, end)
-          .map {
-            meta =>
-              BlockHeader.json(meta.header, meta.size, meta.transactionCount, meta.signature).addBlockFields(meta.height)
-          }
+          .map(_.json())
       }
 
       extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
@@ -187,11 +186,11 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
 
   private def last(includeTransactions: Boolean) = complete {
     val height = commonApi.currentHeight
-    (if (includeTransactions) {
-       commonApi.blockAtHeight(height).map(_.json())
+    if (includeTransactions) {
+       commonApi.blockAtHeight(height).map(_.json().addBlockFields(height))
      } else {
-       commonApi.metaAtHeight(height).map(block => BlockHeader.json(block.header, block.size, block.transactionCount, block.signature))
-     }).map(_.addBlockFields(height))
+       commonApi.metaAtHeight(height).map(_.json())
+     }
   }
 
   @Path("/first")
@@ -211,7 +210,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
     if (encodedSignature.length > requests.SignatureStringLength) {
       complete(InvalidSignature)
     } else
-      complete(???)
+      complete(commonApi.block(ByteStr.decodeBase58(encodedSignature).get).map { case (block, height) => block.json().addBlockFields(height) })
   }
 
   private[this] implicit class JsonObjectOps(json: JsObject) {

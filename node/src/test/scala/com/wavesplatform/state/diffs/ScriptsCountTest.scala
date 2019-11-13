@@ -149,16 +149,16 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
-      o1        = Order.buy(master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      o2        = Order.sell(acc, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      exchange = ExchangeTransactionV2
-        .create(master, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+      o1        = Order.buy(2: Byte, master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2        = Order.sell(2: Byte, acc, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      exchange = ExchangeTransaction
+        .signed(TxVersion.V2, master, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
-      o1a = Order.buy(master, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      o2a = Order.sell(acc, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      exchangea = ExchangeTransactionV2
-        .create(acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+      o1a = Order.buy(2: Byte, master, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2a = Order.sell(2: Byte, acc, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      exchangea = ExchangeTransaction
+        .signed(TxVersion.V2, acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
       setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
@@ -177,10 +177,10 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         )
         .explicitGet()
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
-      o1b        = Order.buy(master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1, 2: Byte)
-      o2b        = Order.sell(acc, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1, 2: Byte)
-      exchangeB = ExchangeTransactionV2
-        .create(master, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
+      o1b        = Order.buy(2: Byte, master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o2b        = Order.sell(2: Byte, acc, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      exchangeB = ExchangeTransaction
+        .signed(TxVersion.V2, master, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
     } yield {
       val txs = Seq[Transaction](
@@ -282,16 +282,16 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
 
       assetPair = AssetPair(IssuedAsset(issueScr.id()), IssuedAsset(issueSp.id()))
-      o1        = Order.buy(master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      o2        = Order.sell(acc, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      exchange = ExchangeTransactionV2
-        .create(master, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+      o1        = Order.buy(2: Byte, master, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2        = Order.sell(2: Byte, acc, master, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      exchange = ExchangeTransaction
+        .signed(TxVersion.V2, master, o1, o2, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
-      o1a = Order.buy(master, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      o2a = Order.sell(acc, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1, 2: Byte)
-      exchangea = ExchangeTransactionV2
-        .create(acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
+      o1a = Order.buy(2: Byte, master, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      o2a = Order.sell(2: Byte, acc, acc, assetPair, 100000000L, 100000000L, timestamp, 10000L, 1)
+      exchangea = ExchangeTransaction
+        .signed(TxVersion.V2, acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
       setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
@@ -310,10 +310,10 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         )
         .explicitGet()
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
-      o1b        = Order.buy(master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1, 2: Byte)
-      o2b        = Order.sell(acc, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1, 2: Byte)
-      exchangeB = ExchangeTransactionV2
-        .create(master, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
+      o1b        = Order.buy(2: Byte, master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      o2b        = Order.sell(2: Byte, acc, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
+      exchangeB = ExchangeTransaction
+        .signed(TxVersion.V2, master, o1b, o2b, 100000001L, 100000001L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
     } yield {
       assertDiffAndState(

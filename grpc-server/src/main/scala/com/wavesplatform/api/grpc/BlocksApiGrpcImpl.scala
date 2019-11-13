@@ -43,7 +43,7 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
       case Request.BlockId(blockId) =>
         commonApi
           .block(blockId)
-          .map(block => BlockWithHeight(Some(block.toPB), commonApi.meta(block.uniqueId).get.height))
+          .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
 
       case Request.Height(height) =>
         val actualHeight = if (height > 0) height else commonApi.currentHeight + height

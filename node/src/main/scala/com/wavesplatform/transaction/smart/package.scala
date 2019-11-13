@@ -13,14 +13,15 @@ import shapeless._
 
 package object smart {
   def buildThisValue(
-    in: TxOrd,
-    blockchain: Blockchain,
-    ds: DirectiveSet,
-    scriptContainerAddress: Option[ByteStr]
+      in: TxOrd,
+      blockchain: Blockchain,
+      ds: DirectiveSet,
+      scriptContainerAddress: Option[ByteStr]
   ): Either[ExecutionError, InputEntity] =
     in.eliminate(
-      tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, scriptContainerAddress))
-        .map(Coproduct[InputEntity](_)),
+      tx =>
+        RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, scriptContainerAddress))
+          .map(Coproduct[InputEntity](_)),
       _.eliminate(
         order => Coproduct[InputEntity](RealTransactionWrapper.ord(order)).asRight[ExecutionError],
         _.eliminate(
@@ -31,13 +32,13 @@ package object smart {
     )
 
   def paymentTarget(
-    ds: DirectiveSet,
-    scriptContainerAddress: Option[ByteStr]
+      ds: DirectiveSet,
+      scriptContainerAddress: Option[ByteStr]
   ): AttachedPaymentTarget =
     (ds.scriptType, ds.contentType, scriptContainerAddress) match {
       case (Account, DAppType, _)                 => DAppTarget
       case (Account, Expression, _)               => InvokerScript
       case (AssetType, Expression, Some(assetId)) => AssetScript(assetId)
-      case _  => ???
+      case _                                      => ???
     }
 }

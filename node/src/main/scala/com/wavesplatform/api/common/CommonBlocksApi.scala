@@ -15,7 +15,7 @@ trait CommonBlocksApi {
 
   def currentHeight: Int
 
-  def block(blockId: BlockId): Option[Block]
+  def block(blockId: BlockId): Option[(Block, Int)]
 
   def blockAtHeight(height: Int): Option[Block]
 
@@ -82,6 +82,6 @@ object CommonBlocksApi {
     def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
       Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(blockHeaderAt))
 
-    def block(blockId: BlockId): Option[Block] = heightOf(blockId).flatMap(blockAt)
+    def block(blockId: BlockId): Option[(Block, Int)] = heightOf(blockId).flatMap(h => blockAt(h).map(_ -> h))
   }
 }

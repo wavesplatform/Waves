@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.transaction.DataTransaction
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, Order}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
@@ -119,8 +119,9 @@ package object smartcontract {
     val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount).toLong
     val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong
 
-    val tx = ExchangeTransactionV2
-      .create(
+    val tx = ExchangeTransaction
+      .signed(
+        2.toByte,
         matcher = matcher,
         buyOrder = buy,
         sellOrder = sell,
@@ -149,8 +150,8 @@ package object smartcontract {
     val buyAmount           = 2
     val sellAmount          = 3
 
-    val buy  = Order.buy(buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee, ord1Ver)
-    val sell = Order.sell(seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee, ord2Ver)
+    val buy  = Order.buy(ord1Ver, buyer, matcher, pair, buyAmount, buyPrice, ts, expirationTimestamp, fee)
+    val sell = Order.sell(ord2Ver, seller, matcher, pair, sellAmount, sellPrice, ts, expirationTimestamp, fee)
 
     (buy, sell)
   }
