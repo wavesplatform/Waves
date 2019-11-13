@@ -1,6 +1,7 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -32,7 +33,7 @@ case class IssueRequest(
         quantity,
         decimals,
         reissuable,
-        script.flatMap(str => Script.fromBase64String(str).toOption),
+        script.map(str => Script.fromBase64String(str).explicitGet()),
         fee,
         timestamp.getOrElse(defaultTimestamp),
         validProofs

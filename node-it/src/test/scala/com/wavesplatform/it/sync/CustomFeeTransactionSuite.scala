@@ -88,8 +88,7 @@ object CustomFeeTransactionSuite {
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .right
-    .get
+    .explicitGet()
 
   val assetId = assetTx.id()
 
