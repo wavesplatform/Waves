@@ -11,6 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings.{buildAssetIn
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.OrdType
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
 
 object Vals {
   def tx(
@@ -36,7 +37,11 @@ object Vals {
               _.eliminate(
                 o => orderObject(o, proofsEnabled, version).asRight[ExecutionError],
                 _.eliminate(
-                  o => Bindings.scriptTransfer(o).asRight[ExecutionError],
+                  {
+                    case b: BurnPseudoTx    => Bindings.mapBurnPseudoTx(b).asRight[ExecutionError]
+                    case r: ReissuePseudoTx => Bindings.maReissuePseudoTx(r).asRight[ExecutionError]
+                    case st: ScriptTransfer => Bindings.scriptTransfer(st).asRight[ExecutionError]
+                  },
                   _ => "Expected Transaction or Order".asLeft[EVALUATED]
                 )
               )
