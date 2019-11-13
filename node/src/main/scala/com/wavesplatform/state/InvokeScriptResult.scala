@@ -3,6 +3,8 @@ import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
+import com.wavesplatform.utils._
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 //import com.wavesplatform.protobuf.transaction.assets.IssueTransaction
 import com.wavesplatform.protobuf.utils.PBUtils
@@ -11,7 +13,13 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.Asset.Waves
 import play.api.libs.json._
 
-final case class InvokeScriptResult(data: Seq[DataEntry[_]] = Nil, transfers: Seq[InvokeScriptResult.Payment] = Nil, issues: Seq[IssueTransaction] = Nil /*, reissues: Seq[Reissue] = Nil, burns: Seq[Burn] = Nil */)
+final case class InvokeScriptResult(
+   data: Seq[DataEntry[_]] = Nil,
+   transfers: Seq[InvokeScriptResult.Payment] = Nil,
+   issues: Seq[IssueTransaction] = Nil,
+   reissues: Seq[Reissue] = Nil,
+   burns: Seq[Burn] = Nil
+)
 
 //noinspection TypeAnnotation
 object InvokeScriptResult {
@@ -30,6 +38,9 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
+  implicit val jsonFormat = Json.writes[InvokeScriptResult]
+  implicit val reissueFormat = Json.writes[Reissue]
+  implicit val burnFormat = Json.writes[Burn]
   implicit val jsonFormat = Json.writes[InvokeScriptResult]
 
   implicit val monoid = new Monoid[InvokeScriptResult] {
@@ -58,9 +69,24 @@ object InvokeScriptResult {
           PBInvokeScriptResult.Payment(
             ByteString.copyFrom(payment.address.bytes),
             Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
-          ))
+          )
+      ),
+      isr.reissues.map(toPbReissue),
+      isr.burns.map(toPbBurn)
     )
   }
+
+  private def toPbReissue(r: Reissue) =
+    PBInvokeScriptResult.Reissue(ByteString.copyFrom(r.assetId.arr), r.quantity, r.isReissuable)
+
+  private def toPbBurn(b: Burn) =
+    PBInvokeScriptResult.Burn(ByteString.copyFrom(b.assetId.arr), b.quantity)
+
+  private def toVanillaReissue(r: PBInvokeScriptResult.Reissue) =
+    Reissue(r.assetId.toByteArray, r.isReissuable, r.amount)
+
+  private def toVanillaBurn(b: PBInvokeScriptResult.Burn) =
+    Burn(b.assetId.toByteArray, b.amount)
 
   def fromPB(pbValue: PBInvokeScriptResult): InvokeScriptResult = {
     InvokeScriptResult(
@@ -68,7 +94,9 @@ object InvokeScriptResult {
       pbValue.transfers.map { p =>
         val (asset, amount) = PBAmounts.toAssetAndAmount(p.getAmount)
         InvokeScriptResult.Payment(Address.fromBytes(p.address.toByteArray).explicitGet(), asset, amount)
-      }
+      },
+      pbValue.reissues.map(toVanillaReissue),
+      pbValue.burns.map(toVanillaBurn)
     )
   }
 }

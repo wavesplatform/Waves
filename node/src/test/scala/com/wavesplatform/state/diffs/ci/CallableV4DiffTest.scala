@@ -5,11 +5,12 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.V4
+import com.wavesplatform.lang.directives.values.{Asset, ScriptType, StdLibVersion, V4}
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, assertDiffEi, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransactionV2
@@ -21,7 +22,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
   property("reissue and burn actions results state") {
-    forAll(paymentPreconditions) {
+    forAll(paymentPreconditions()) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
         assertDiffAndState(
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
@@ -37,13 +38,46 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  private def paymentPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransactionV2, KeyPair, Long, Long)] =
+  property("asset script can disallow reissue") {
+    forAll(paymentPreconditions(Some(disallowReissueAsset))) {
+      case (genesis, setScript, invoke, issue, _, _, _) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis :+ setScript :+ issue)),
+          TestBlock.create(Seq(invoke)),
+          features
+        )(_ should produce("TransactionNotAllowedByScript"))
+    }
+  }
+
+  property("asset script can disallow burn") {
+    forAll(paymentPreconditions(Some(disallowBurnAsset))) {
+      case (genesis, setScript, invoke, issue, _, _, _) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis :+ setScript :+ issue)),
+          TestBlock.create(Seq(invoke)),
+          features
+        )(_ should produce("TransactionNotAllowedByScript"))
+    }
+  }
+
+  property("asset script can allow burn and reissue") {
+    forAll(paymentPreconditions(Some(allowBurnAndReissueAsset))) {
+      case (genesis, setScript, invoke, issue, _, _, _) =>
+        assertDiffEi(
+          Seq(TestBlock.create(genesis :+ setScript :+ issue)),
+          TestBlock.create(Seq(invoke)),
+          features
+        )(_ shouldBe 'right)
+    }
+  }
+
+  private def paymentPreconditions(assetScript: Option[Script] = None): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransactionV2, KeyPair, Long, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
       fee     <- ciFee(1)
-      issue   <- smartIssueTransactionGen(master, Gen.const(None), forceReissuable = true)
+      issue   <- smartIssueTransactionGen(master, Gen.const(assetScript), forceReissuable = true)
       reissueAmount <- positiveLongGen
       burnAmount    <- Gen.choose(0, reissueAmount)
     } yield {
@@ -54,6 +88,52 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         ci <- InvokeScriptTransaction.selfSigned(invoker, master, None, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
+
+  private val disallowReissueAsset: Script =
+    assetVerifier(
+      """
+        | match tx {
+        |   case r: ReissueTransaction => false
+        |   case _ => true
+        | }
+      """.stripMargin
+    )
+
+  private val disallowBurnAsset: Script =
+    assetVerifier(
+      """
+        | match tx {
+        |   case r: BurnTransaction => false
+        |   case _ => true
+        | }
+      """.stripMargin
+    )
+
+  private val allowBurnAndReissueAsset: Script =
+    assetVerifier(
+      """
+        | match tx {
+        |   case t: ReissueTransaction | BurnTransaction => true
+        |   case _ => false
+        | }
+      """.stripMargin
+    )
+
+  private def assetVerifier(result: String): Script = {
+    val script =
+      s"""
+         | {-# STDLIB_VERSION 4          #-}
+         | {-# CONTENT_TYPE   EXPRESSION #-}
+         | {-# SCRIPT_TYPE    ASSET      #-}
+         |
+         | $result
+         |
+       """.stripMargin
+
+    val expr = Parser.parseExpr(script).get.value
+    val compiled = compileExpr(expr, V4, Asset)
+    ExprScript(V4, compiled).explicitGet()
+  }
 
   private def dApp(assetId: ByteStr, reissueAmount: Long, burnAmount: Long): Script = {
     val script =
