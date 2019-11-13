@@ -28,7 +28,7 @@ import org.slf4j.LoggerFactory
 import scala.concurrent.duration._
 import scala.util.Random
 
-//noinspection ScalaStyle
+//noinspection ScalaStyle, TypeAnnotation
 class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
   private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
@@ -36,7 +36,6 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
   override def next(): Iterator[Transaction] =
     generate(settings.transactions).toIterator
 
-  //noinspection ScalaStyle,TypeAnnotation
   private[this] object preconditions {
     val issueTransactionSender = randomFrom(accounts).get
 
@@ -193,10 +192,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
                 pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAssetIssue.id()))
                 delta     = random.nextLong(10000)
-                sellOrder = Order.sell(Order.V2, seller, matcher, pair, 100000000 + delta, 1, timestamp, timestamp + 30.days.toMillis, 300000L)
-                buyOrder  = Order.buy(Order.V2, buyer, matcher, pair, 100000000 + delta, 1, timestamp, timestamp + 1.day.toMillis, 300000L)
+                sellOrder = Order.sell(Order.V2, seller, matcher, pair, 10000000 + delta, 10 + random.nextLong(10), timestamp, timestamp + 30.days.toMillis, 300000L)
+                buyOrder  = Order.buy(Order.V2, buyer, matcher, pair, 10000000 + delta, 10 + random.nextLong(10), timestamp, timestamp + 1.day.toMillis, 300000L)
                 tx <- logOption(
-                  ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 100000000L + delta, 1, 300000L, 300000L, 700000L, timestamp)
+                  ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 10000000L + delta, 10, 300000L, 300000L, 700000L, timestamp)
                 )
               } yield tx
             ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
