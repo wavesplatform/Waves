@@ -39,7 +39,7 @@ object Vals {
                 _.eliminate(
                   {
                     case b: BurnPseudoTx    => Bindings.mapBurnPseudoTx(b).asRight[ExecutionError]
-                    case r: ReissuePseudoTx => Bindings.maReissuePseudoTx(r).asRight[ExecutionError]
+                    case r: ReissuePseudoTx => Bindings.mapReissuePseudoTx(r).asRight[ExecutionError]
                     case st: ScriptTransfer => Bindings.scriptTransfer(st).asRight[ExecutionError]
                   },
                   _ => "Expected Transaction or Order".asLeft[EVALUATED]

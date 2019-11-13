@@ -134,7 +134,7 @@ object Bindings {
       proofsEnabled = false
     )
 
-  def maReissuePseudoTx(r: ReissuePseudoTx): CaseObj =
+  def mapReissuePseudoTx(r: ReissuePseudoTx): CaseObj =
     reissueTransactionObject(
       proofsEnabled = false,
       Proven(

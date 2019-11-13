@@ -373,8 +373,8 @@ object InvokeScriptTransactionDiff {
           case Some(script) =>
             val assetValidationDiff =
               for {
-                acc <- diffAcc.resultE
-                result <- actionDiff
+                acc             <- diffAcc.resultE
+                result          <- actionDiff
                 validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(acc, pseudoTx, assetId, result, script)
               } yield validatedResult
             val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
