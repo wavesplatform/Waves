@@ -33,7 +33,7 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.{IssueTransaction, InvokeScriptIssueTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
@@ -336,6 +336,9 @@ object InvokeScriptTransactionDiff {
           Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
         )
 
+      def applyIssue(issue: Issue): TracedResult[ValidationError, Diff] =
+        AssetTransactionsDiff.issue(blockchain)(InvokeScriptIssueTransaction.create(tx.chainId, dAppAddress, issue.name, issue.description, issue.quantity, issue.decimals, issue.reissuable, issue.script, tx.timestamp))
+
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] =
         DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
 
@@ -345,7 +348,7 @@ object InvokeScriptTransactionDiff {
       val diff = action match {
         case t: AssetTransfer => applyTransfer(t)
         case d: DataItem[_]   => applyDataItem(d)
-        case i: Issue         => ???
+        case i: Issue         => applyIssue(i)
         case r: Reissue       => applyReissue(r)
         case b: Burn          => applyBurn(b)
       }
