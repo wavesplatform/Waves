@@ -103,11 +103,11 @@ object Preconditions {
             acc.keyPair,
             IssuedAsset(issuedAsset.assetId),
             balance,
-            time.correctedTime(),
             Waves,
             Fee,
-            "Generator".getBytes("UTF-8")
-          )
+            "Generator".getBytes("UTF-8"),
+            time.correctedTime(),
+        )
           .explicitGet()
       }
     }
