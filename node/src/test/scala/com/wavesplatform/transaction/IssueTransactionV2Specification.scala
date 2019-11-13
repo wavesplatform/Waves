@@ -14,7 +14,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.HistoryTest
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.{TransactionGen, WithDB}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -23,8 +23,8 @@ import play.api.libs.json.Json
 class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {
 
   property("SmartIssueTransaction serialization roundtrip") {
-    forAll(smartIssueTransactionGen()) { tx: IssueTransactionV2 =>
-      val recovered = IssueTransactionV2.parseBytes(tx.bytes()).get
+    forAll(smartIssueTransactionGen()) { tx: IssueTransaction =>
+      val recovered = IssueTransaction.parseBytes(tx.bytes()).get
 
       tx.sender.stringRepr shouldEqual recovered.sender.stringRepr
       tx.timestamp shouldEqual recovered.timestamp
@@ -63,10 +63,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
                        }
     """)
 
-    val tx = IssueTransactionV2
-      .create(
-        'T',
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+    val tx = IssueTransaction.create(TxVersion.V2, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes("UTF-8"),
         "Gigacoin".getBytes("UTF-8"),
         10000000000L,
@@ -113,10 +110,7 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
 
     val script = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, contract, V3).explicitGet())
 
-    val tx = IssueTransactionV2
-      .create(
-        'T',
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+    val tx = IssueTransaction.create(TxVersion.V2, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         "Gigacoin".getBytes("UTF-8"),
         "Gigacoin".getBytes("UTF-8"),
         10000000000L,

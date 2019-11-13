@@ -12,7 +12,7 @@ import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{Inside, PropSpec}
 
@@ -60,10 +60,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
     val master  = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
     val genesis = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
 
-    val issueTransaction = IssueTransactionV2
-      .selfSigned(
-        chainId = AddressScheme.current.chainId,
-        sender = KeyPair(seed.bytes),
+    val issueTransaction = IssueTransaction.selfSigned(TxVersion.V2, sender = KeyPair(seed.bytes),
         name = "name".getBytes(StandardCharsets.UTF_8),
         description = "description".getBytes(StandardCharsets.UTF_8),
         quantity = 100,
@@ -71,8 +68,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
         reissuable = false,
         script = Some(typedScript),
         fee = 10000000,
-        timestamp = 0
-      )
+        timestamp = 0)
       .explicitGet()
 
     val transferTransaction = TransferTransaction

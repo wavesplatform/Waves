@@ -6,7 +6,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -101,17 +101,14 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .create(recipient, ENOUGH_AMT, timestamp)
         .explicitGet()
       (script, _) = ScriptCompiler(s"false", isAssetScript = false, estimator).explicitGet()
-      issueTx = IssueTransactionV1
-        .selfSigned(
-          sender = contract,
+      issueTx = IssueTransaction.selfSigned(TxVersion.V1, sender = contract,
           name = "Asset#1".getBytes("UTF-8"),
           description = "description".getBytes("UTF-8"),
           quantity = Long.MaxValue,
           decimals = 8,
-          reissuable = false,
+          reissuable = false, script = None,
           fee = ENOUGH_FEE,
-          timestamp = timestamp + 2
-        )
+          timestamp = timestamp + 2)
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(
@@ -151,17 +148,14 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .create(sponsor, ENOUGH_AMT, timestamp)
         .explicitGet()
       (script, _) = ScriptCompiler(s"true", isAssetScript = false, estimator).explicitGet()
-      issueTx = IssueTransactionV1
-        .selfSigned(
-          sender = sponsor,
+      issueTx = IssueTransaction.selfSigned(TxVersion.V1, sender = sponsor,
           name = "Asset#1".getBytes("UTF-8"),
           description = "description".getBytes("UTF-8"),
           quantity = Long.MaxValue,
           decimals = 8,
-          reissuable = false,
+          reissuable = false, script = None,
           fee = ENOUGH_FEE,
-          timestamp = timestamp + 2
-        )
+          timestamp = timestamp + 2)
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
         .selfSigned(

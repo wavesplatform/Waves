@@ -128,14 +128,12 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val issueV1 = IssueTransactionV1
-    .create(
-      publicKey,
+  private val issueV1 = IssueTransaction.create(TxVersion.V1, publicKey,
       "Gigacoin".getBytes("UTF-8"),
       "Gigacoin".getBytes("UTF-8"),
       someAssetAmount,
       8,
-      true,
+      true, script = None,
       issueFee,
       ts,
       ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get
@@ -143,10 +141,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val issueV2 = IssueTransactionV2
-    .create(
-      chainId,
-      publicKey,
+  private val issueV2 = IssueTransaction.create(TxVersion.V2, publicKey,
       "Gigacoin".getBytes("UTF-8"),
       "Gigacoin".getBytes("UTF-8"),
       someAssetAmount,

@@ -224,9 +224,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransaction, ReissueTransactionV1)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransactionV1)] =
     for {
-      version            <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
+      version            <- Gen.oneOf(IssueTransaction.supportedVersions.toSeq)
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
@@ -236,10 +236,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      issue = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          accountA,
+      issue = IssueTransaction.selfSigned(TxVersion.V2, accountA,
           assetName,
           description,
           quantity,
@@ -247,8 +244,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
           reissuable,
           Some(createScript(code)),
           smallFee,
-          timestamp + 1
-        )
+          timestamp + 1)
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction

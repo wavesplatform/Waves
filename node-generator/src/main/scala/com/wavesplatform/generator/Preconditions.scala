@@ -9,7 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -60,10 +60,7 @@ object Preconditions {
                 .flatMap(_.toOption)
                 .map(_._1)
 
-              val tx = IssueTransactionV2
-                .selfSigned(
-                  AddressScheme.current.chainId,
-                  issuer,
+              val tx = IssueTransaction.selfSigned(TxVersion.V2, issuer,
                   assetName.getBytes("UTF-8"),
                   assetDescription.getBytes("UTF-8"),
                   amount,

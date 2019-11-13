@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
@@ -97,10 +97,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       val issueTx =
         if (smartToken)
-          IssueTransactionV2
-            .selfSigned(
-              AddressScheme.current.chainId,
-              richAcc,
+          IssueTransaction.selfSigned(TxVersion.V2, richAcc,
               "test".getBytes("UTF-8"),
               "desc".getBytes("UTF-8"),
               Long.MaxValue,
@@ -108,12 +105,10 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
               reissuable = false,
               Some(script),
               Constants.UnitsInWave,
-              ts
-            )
+              ts)
             .explicitGet()
         else
-          IssueTransactionV1
-            .selfSigned(richAcc, "test".getBytes("UTF-8"), "desc".getBytes("UTF-8"), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
+          IssueTransaction.selfSigned(TxVersion.V1, richAcc, "test".getBytes("UTF-8"), "desc".getBytes("UTF-8"), Long.MaxValue, 2, reissuable = false, script = None, Constants.UnitsInWave, ts)
             .explicitGet()
 
       val transferWavesTx = TransferTransaction

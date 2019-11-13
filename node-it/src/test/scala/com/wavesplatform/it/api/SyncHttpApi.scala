@@ -23,7 +23,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -243,10 +243,7 @@ object SyncHttpApi extends Assertions {
         script: Option[String],
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = IssueTransactionV2
-        .selfSigned(
-          chainId = AddressScheme.current.chainId,
-          sender = source,
+      val tx = IssueTransaction.selfSigned(TxVersion.V2, sender = source,
           name = name.getBytes(StandardCharsets.UTF_8),
           description = description.getBytes(StandardCharsets.UTF_8),
           quantity = quantity,

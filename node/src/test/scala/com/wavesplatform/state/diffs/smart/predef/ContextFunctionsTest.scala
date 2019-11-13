@@ -24,7 +24,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
@@ -286,10 +286,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val reissuable  = true
           val assetScript = None
           val sponsored   = false
-          val issueTx = IssueTransactionV2
-            .selfSigned(
-              AddressScheme.current.chainId,
-              masterAcc,
+          val issueTx = IssueTransaction.selfSigned(TxVersion.V2, masterAcc,
               "testAsset".getBytes("UTF-8"),
               "Test asset".getBytes("UTF-8"),
               quantity,
@@ -297,8 +294,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               reissuable,
               assetScript,
               MinIssueFee * 2,
-              dataTransaction.timestamp + 5
-            )
+              dataTransaction.timestamp + 5)
             .right
             .get
 

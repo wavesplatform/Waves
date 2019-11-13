@@ -22,7 +22,7 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state.diffs.smart.predef.chainId
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
@@ -35,7 +35,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
   val preconditions: Gen[
-    (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
+    (Seq[GenesisTransaction], IssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
     for {
       company  <- accountGen
       king     <- accountGen
@@ -75,10 +75,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          company,
+      issueTransaction = IssueTransaction.selfSigned(TxVersion.V2, company,
           "name".getBytes(StandardCharsets.UTF_8),
           "description".getBytes(StandardCharsets.UTF_8),
           100,
@@ -86,8 +83,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
           false,
           Some(typedScript),
           1000000,
-          ts
-        )
+          ts)
         .explicitGet()
 
       assetId = IssuedAsset(issueTransaction.id())

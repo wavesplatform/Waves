@@ -119,21 +119,17 @@ object PBTransactions {
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
         version match {
           case 1 =>
-            vt.assets.IssueTransactionV1.create(
-              sender,
+            vt.assets.IssueTransaction.create(TxVersion.V1, sender,
               name.toByteArray,
               description.toByteArray,
               quantity,
               decimals.toByte,
-              reissuable,
+              reissuable, script = None,
               feeAmount,
               timestamp,
-              signature
-            )
+              signature)
           case 2 =>
-            vt.assets.IssueTransactionV2.create(
-              chainId,
-              sender,
+            vt.assets.IssueTransaction.create(TxVersion.V2, sender,
               name.toByteArray,
               description.toByteArray,
               quantity,
@@ -142,8 +138,7 @@ object PBTransactions {
               script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
               feeAmount,
               timestamp,
-              proofs
-            )
+              proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -315,21 +310,17 @@ object PBTransactions {
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
         version match {
           case 1 =>
-            vt.assets.IssueTransactionV1(
-              sender,
+            vt.assets.IssueTransaction(TxVersion.V1, sender,
               name.toByteArray,
               description.toByteArray,
               quantity,
               decimals.toByte,
-              reissuable,
+              reissuable, script = None,
               feeAmount,
               timestamp,
-              signature
-            )
+              signature)
           case 2 =>
-            vt.assets.IssueTransactionV2(
-              chainId,
-              sender,
+            vt.assets.IssueTransaction(TxVersion.V2, sender,
               name.toByteArray,
               description.toByteArray,
               quantity,
@@ -338,8 +329,7 @@ object PBTransactions {
               script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
               feeAmount,
               timestamp,
-              proofs
-            )
+              proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 

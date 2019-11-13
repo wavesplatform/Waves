@@ -8,7 +8,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.DataEntry
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 package object sync {
@@ -54,7 +54,7 @@ package object sync {
       TransactionNotAllowedByAssetScript.Code
     )
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+  def createSignedIssueRequest(tx: IssueTransaction): SignedIssueV1Request = {
     import tx._
     SignedIssueV1Request(
       Base58.encode(tx.sender),
@@ -69,7 +69,7 @@ package object sync {
     )
   }
 
-  def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
+  def createSignedIssueRequest(tx: IssueTransaction): SignedIssueV2Request = {
     import tx._
     SignedIssueV2Request(
       Base58.encode(tx.sender),

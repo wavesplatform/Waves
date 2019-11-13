@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.{IssueTransactionV2, SetAssetScriptTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -20,7 +20,7 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
-  val preconditions: Gen[(GenesisTransaction, IssueTransactionV2, SetAssetScriptTransaction, TransferTransaction)] =
+  val preconditions: Gen[(GenesisTransaction, IssueTransaction, SetAssetScriptTransaction, TransferTransaction)] =
     for {
       firstAcc  <- accountGen
       secondAcc <- accountGen
@@ -43,10 +43,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
         ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          firstAcc,
+      issueTransaction = IssueTransaction.selfSigned(TxVersion.V2, firstAcc,
           "name".getBytes(StandardCharsets.UTF_8),
           "description".getBytes(StandardCharsets.UTF_8),
           100,
@@ -54,8 +51,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
           false,
           Some(emptyExprScript),
           1000000,
-          ts
-        )
+          ts)
         .explicitGet()
 
       asset = IssuedAsset(issueTransaction.id())
