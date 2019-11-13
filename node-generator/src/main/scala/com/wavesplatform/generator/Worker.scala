@@ -95,7 +95,7 @@ class Worker(
         _            <- logInfo(s"Sending initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
-        r <- if (cntToSend >= txs.size) afterInitial *> writeTailInitial(validChannel)
+        r <- if (cntToSend >= txs.size) afterInitial *> writeTailInitial(validChannel, state)
         else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
       } yield r
 
@@ -107,16 +107,17 @@ class Worker(
         _ <- nodeUTXTransactionsToSendCount >>= (cnt => if (cnt == settings.utxLimit) Task.unit else Task.defer(afterInitial))
       } yield ()
 
-  // todo: Partial send
-  private[this] def writeTailInitial(channel: Channel, txs: Seq[Transaction] = tailInitial): Task[Channel] =
+  private[this] def writeTailInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = tailInitial): Task[Channel] =
     if (!canContinue())
       Task.now(channel)
     else
       for {
         validChannel <- validateChannel(channel)
         _            <- logInfo(s"Sending tail initial transactions to $validChannel")
-        _            <- Task.deferFuture(networkSender.send(validChannel, txs.toStream: _*))
-      } yield validChannel
+        cntToSend    <- calcAndSaveCntToSend(state)
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
+        r            <- if (cntToSend >= txs.size) Task.now(validChannel) else Task.defer(writeTailInitial(validChannel, state, txs.drop(cntToSend)))
+      } yield r
 
   private[this] def pullAndWrite(channel: Channel, state: Ref[Task, State], cnt: Int = 0): Task[Channel] =
     if (!canContinue())
@@ -201,7 +202,7 @@ object Worker {
               case _ =>
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
-                val nextRaised   = if (nextCnt == warmUp.end && warmUp.once) true else false
+                val nextRaised   = nextCnt == warmUp.end && warmUp.once
                 WorkState(nextCnt, nextRaised, endAfter, warmUp)
             }
           }

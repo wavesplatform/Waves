@@ -99,9 +99,9 @@ object Preconditions {
         TransferTransaction
           .selfSigned(
             2.toByte,
-            IssuedAsset(issuedAsset.assetId),
             settings.faucet,
             acc.keyPair,
+            IssuedAsset(issuedAsset.assetId),
             balance,
             time.correctedTime(),
             Waves,
