@@ -21,59 +21,98 @@ class ScriptUtilsTestSuite extends BaseTransactionSuite with CancelAfterFailure 
   val scriptWithAllFunctions =
     s"""
        |{-# STDLIB_VERSION 4 #-}
-       |{-# CONTENT_TYPE DAPP #-}
        |{-# SCRIPT_TYPE ACCOUNT #-}
-       |
+       |{-# CONTENT_TYPE DAPP #-}
        |let b16 = base16'abcd'
+       |
        |let b58 = base58'abcd'
+       |
        |let b64 = base64'abcd'
+       |
        |let unt = unit
+       |
        |let h = height
+       |
        |let lstBlock = lastBlock
+       |
        |let self = this
-       |let from = fromBase16String("abcd") + fromBase58String("abcd") + fromBase64String("abcd")
-       |let to = toBase16String(b16) + toBase58String(b58) + toBase64String(b64)
-       |let toBin = toBytes(true) + toBytes(1) + toBytes("str")
-       |let toInteger = toInt(b58) + toInt(b58, 1)
+       |
+       |let from = ((fromBase16String("abcd") + fromBase58String("abcd")) + fromBase64String("abcd"))
+       |
+       |let to = ((toBase16String(b16) + toBase58String(b58)) + toBase64String(b64))
+       |
+       |let toBin = ((toBytes(true) + toBytes(1)) + toBytes("str"))
+       |
+       |let toInteger = (toInt(b58) + toInt(b58, 1))
+       |
        |let toStr = toString(true)
+       |
        |let str = toUtf8String(b58)
-       |let index = indexOf(str, "s") == indexOf(str, "s", 3) && lastIndexOf(str, "s") == lastIndexOf(str, "s", 3)
+       |
+       |let index = (indexOf(str, "s") == indexOf(str, "s", 3))
+       |
+       |let lastIndex = (lastIndexOf(str, "s") == lastIndexOf(str, "s", 3))
+       |
        |let fract = fraction(3, 4, 2)
-       |let math = pow(1, 2, 3, 4, 5, CEILING) + log(1, 2, 3, 4, 5, FLOOR) - -1 * +2 / 3 % 4
+       |
+       |let math = ((pow(1, 2, 3, 4, 5, CEILING) + log(1, 2, 3, 4, 5, FLOOR)) - (((-1 * +2) / 3) % 4))
+       |
        |let avg = median([1, 2, 3])
-       |let comparing = !((1 == 2) && (3 != 4) || (5 > 6) && (7 < 8) || (9 >= 10) && (11 <= 12))
+       |
+       |let comparing = [!((1 == 2)), (3 != 4), (5 > 6), (7 < 8), (9 >= 10), (11 <= 12)]
+       |
        |let parInt = parseInt("10")
+       |
        |let parIntV = parseIntValue("10")
+       |
        |let isDef = isDefined(parInt)
-       |let val = extract(parInt) + value(parInt) + valueOrErrorMessage(parInt, "error!")
-       |let binDropTake = drop(b58, 1) + take(b58, 2) + dropRight(b58, 3) + takeRight(b58, 4)
-       |let strDropTake = drop(str, 1) + take(str, 2) + dropRight(str, 3) + takeRight(str, 4)
-       |let sizes = size(b58) + size(str)
+       |
+       |let val = ((extract(parInt) + value(parInt)) + valueOrErrorMessage(parInt, "error!"))
+       |
+       |let binDropTake = [drop(b58, 1), take(b58, 2), dropRight(b58, 3), takeRight(b58, 4)]
+       |
+       |let strDropTake = [drop(str, 1), take(str, 2), dropRight(str, 3), takeRight(str, 4)]
+       |
+       |let sizes = (size(b58) + size(str))
+       |
        |let splitted = split(str, ";")
-       |let hashes = sha256(b58) + blake2b256(b58) + keccak256(b58)
-       |let verify = sigVerify(b16, b58, b64) && rsaVerify(SHA256, b16, b58, b64) && checkMerkleProof(b16, b58, b64)
+       |
+       |let hashes = ((sha256(b58) + blake2b256(b58)) + keccak256(b58))
+       |
+       |let sig = sigVerify(b16, b58, b64)
+       |
+       |let rsa = rsaVerify(SHA256, b16, b58, b64)
+       |
+       |let merkle = checkMerkleProof(b16, b58, b64)
+       |
        |let orderBuy = Buy
+       |
        |let orderSell = Sell
+       |
        |let address = Address(b58)
-       |let balances = wavesBalance(address) + assetBalance(address, b58)
+       |
+       |let balances = (wavesBalance(address) + assetBalance(address, b58))
+       |
        |let assetInf = value(assetInfo(b58)).issuer
+       |
        |let blockInf = value(blockInfoByHeight(1)).timestamp
+       |
        |let txHeight = transactionHeightById(b58)
+       |
        |let txTransfer = value(transferTransactionById(b58)).recipient
+       |
        |let list = 1::[]:+2
+       |
        |let concatenation = [1, 2] ++ [3, 4]
-       |let bytesConcat = b16 + b58
        |
-       |func thr() = {
-       |  if true then
-       |    true
-       |  else
-       |    throw("error")
-       |}
+       |func thr() = if (true)
+       |  then true
+       |  else throw("error")
        |
-       |func addresses(rec: Address, str: String, pubKey: ByteVector) = {
+       |
+       |func addresses(rec: Address, pubKey: ByteVector, str: String) = {
        |  let addressToString = toString(rec)
-       |  addressFromRecipient(rec) == addressFromString(str) && addressFromStringValue(str) == addressFromPublicKey(pubKey)
+       |  [addressFromRecipient(rec), addressFromPublicKey(pubKey), addressFromString(str), addressFromStringValue(str)]
        |}
        |""".stripMargin
 
