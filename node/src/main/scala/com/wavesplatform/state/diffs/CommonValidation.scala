@@ -127,7 +127,6 @@ object CommonValidation {
       case _: BurnTransactionV1    => Right(tx)
       case _: PaymentTransaction   => Right(tx)
       case _: GenesisTransaction   => Right(tx)
-      case _: IssueTransaction   => Right(tx)
       case _: ReissueTransactionV1 => Right(tx)
 
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)

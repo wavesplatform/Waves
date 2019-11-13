@@ -257,7 +257,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     forAll(for {
       acc        <- accountGen
       genesis    <- genesisGeneratorP(acc)
-      smartIssue <- smartIssueTransactionGen(acc)
+      smartIssue <- issueV2TransactionGen(acc)
     } yield (genesis, smartIssue)) {
       case (gen, issue) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {

@@ -76,13 +76,13 @@ object IssueTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == IssueTransaction.typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
       parseCommonPart(TxVersion.V2, buf).copy(script = buf.getScript, proofs = buf.getProofs)
     } else {
       require(bytes(0) == IssueTransaction.typeId, "transaction type mismatch")
       val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
-      require(buf.getByte == IssueTransaction.typeId, "transaction type mismatch")
       val signature = buf.getSignature
+      require(buf.getByte == IssueTransaction.typeId, "transaction type mismatch")
       parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(signature))
     }
   }

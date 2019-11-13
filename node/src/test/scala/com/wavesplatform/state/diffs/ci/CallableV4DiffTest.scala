@@ -43,7 +43,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       invoker <- accountGen
       ts      <- timestampGen
       fee     <- ciFee(1)
-      issue   <- smartIssueTransactionGen(master, Gen.const(None), forceReissuable = true)
+      issue   <- issueV2TransactionGen(master, Gen.const(None), forceReissuable = true)
       reissueAmount <- positiveLongGen
       burnAmount    <- Gen.choose(0, reissueAmount)
     } yield {
