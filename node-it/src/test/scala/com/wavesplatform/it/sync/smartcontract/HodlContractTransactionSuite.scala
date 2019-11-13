@@ -6,7 +6,7 @@ import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_LONG
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -109,7 +109,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         fee = 1.waves,
         waitForTx = true
       )
-      .id
+      ._1.id
 
     sender.waitForTransaction(invokeScriptId)
 
@@ -145,7 +145,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         fee = 1.waves,
         waitForTx = true
       )
-      .id
+      ._1.id
 
     val balanceAfter = sender.accountBalances(contract.stringRepr)._1
 

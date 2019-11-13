@@ -4,11 +4,13 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
-import com.wavesplatform.lang.v1.traits.domain.DataItem
+import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, DataItem}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.FieldNames
+import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -57,22 +59,22 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
   val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))
 
   val writeResult    = List(DataItem.Lng("xxx", 42))
-  val transferResult = List((Address(address1), 41L, Some(asset)), (Address(address2), 42L, None))
+  val transferResult = List(AssetTransfer(Address(address1), 41L, Some(asset)), AssetTransfer(Address(address2), 42L, None))
 
   property("ScriptResult from WriteSet") {
-    ScriptResult.fromObj(writeSetObj) shouldBe Right(ScriptResult(writeResult, List.empty))
+    ScriptResult.fromObj(writeSetObj, V3) shouldBe Right(ScriptResultV3(writeResult, List.empty))
   }
 
   property("ScriptResult from TransferSet") {
-    ScriptResult.fromObj(transferSetObj) shouldBe Right(ScriptResult(List.empty, transferResult))
+    ScriptResult.fromObj(transferSetObj, V3) shouldBe Right(ScriptResultV3(List.empty, transferResult))
   }
 
   property("ScriptResult from ScriptResult") {
-    ScriptResult.fromObj(scriptResultObj) shouldBe
-      Right(ScriptResult(writeResult, transferResult))
+    ScriptResult.fromObj(scriptResultObj, V3) shouldBe
+      Right(ScriptResultV3(writeResult, transferResult))
   }
 
   property("ScriptResult from bad object") {
-    ScriptResult.fromObj(CaseObj(CASETYPEREF("Foo", el), Map.empty)) should produce("CallableFunction needs to return")
+    ScriptResult.fromObj(CaseObj(CASETYPEREF("Foo", el), Map.empty), V3) should produce("CallableFunction needs to return")
   }
 }

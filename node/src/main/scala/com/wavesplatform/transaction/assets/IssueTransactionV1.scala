@@ -10,6 +10,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.validation.TxConstraints
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -28,7 +29,7 @@ case class IssueTransactionV1 private (sender: PublicKey,
     with SignedTransaction
     with FastHashId {
 
-  override val version: Byte                    = 1
+  override val version: TxVersion                    = 1
   override val builder: IssueTransactionV1.type = IssueTransactionV1
   override val bodyBytes: Coeval[Array[Byte]]   = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), bytesBase()))
   override val bytes: Coeval[Array[Byte]]       = Coeval.evalOnce(Bytes.concat(Array(builder.typeId), signature.arr, bodyBytes()))
@@ -38,7 +39,7 @@ case class IssueTransactionV1 private (sender: PublicKey,
 
 object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with TransactionParser.HardcodedVersion1 {
 
-  override val typeId: Byte = IssueTransaction.typeId
+  override val typeId: TxType = IssueTransaction.typeId
 
   override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
     byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
@@ -93,8 +94,8 @@ object IssueTransactionV1 extends TransactionParserFor[IssueTransactionV1] with 
       SignatureBytes(tailIndex(1), "Signature"),
       ConstantByte(tailIndex(2), value = typeId, name = "Transaction type"),
       PublicKeyBytes(tailIndex(3), "Sender's public key"),
-      BytesArrayUndefinedLength(tailIndex(4), "Asset name", validation.MaxAssetNameLength, validation.MinAssetNameLength),
-      BytesArrayUndefinedLength(tailIndex(5), "Description", validation.MaxDescriptionLength),
+      BytesArrayUndefinedLength(tailIndex(4), "Asset name", IssueTransaction.MaxAssetNameLength, IssueTransaction.MinAssetNameLength),
+      BytesArrayUndefinedLength(tailIndex(5), "Description", IssueTransaction.MaxAssetDescriptionLength),
       LongBytes(tailIndex(6), "Quantity"),
       OneByte(tailIndex(7), "Decimals"),
       BooleanByte(tailIndex(8), "Reissuable flag (1 - True, 0 - False)"),

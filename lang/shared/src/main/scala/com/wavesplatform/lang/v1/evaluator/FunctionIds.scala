@@ -30,6 +30,7 @@ object FunctionIds {
 
   val SIZE_LIST: Short         = 400
   val GET_LIST: Short          = 401
+  val MEDIAN_LIST: Short       = 405
   val LONG_TO_BYTES: Short     = 410
   val STRING_TO_BYTES: Short   = 411
   val BOOLEAN_TO_BYTES: Short  = 412
@@ -37,6 +38,8 @@ object FunctionIds {
   val BOOLEAN_TO_STRING: Short = 421
 
   val CREATE_LIST: Short = 1100
+  val APPEND_LIST: Short = 1101
+  val CONCAT_LIST: Short = 1102
 
   val UTF8STRING: Short   = 1200
   val BININT: Short       = 1201

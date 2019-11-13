@@ -2,9 +2,9 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, PrivateKey, PublicKey}
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Proofs
@@ -42,13 +42,13 @@ trait PBImplicitConversions {
 
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
     def toVanilla(signature: ByteStr): vb.BlockHeader = {
-      new vb.BlockHeader(
-        header.timestamp,
+      BlockHeader(
         header.version.toByte,
+        header.timestamp,
         header.reference.toByteStr,
-        vb.SignerData(header.generator.toPublicKey, signature),
-        NxtLikeConsensusBlockData(header.baseTarget, header.generationSignature.toByteStr),
-        0,
+        header.baseTarget,
+        header.generationSignature.toByteStr,
+        header.generator.toPublicKey,
         header.featureVotes.map(intToShort).toSet,
         header.rewardVote
       )
@@ -59,12 +59,12 @@ trait PBImplicitConversions {
     def toPBHeader: PBBlock.Header = PBBlock.Header(
       0: Byte,
       header.reference.toPBByteString,
-      header.consensusData.baseTarget,
-      header.consensusData.generationSignature.toPBByteString,
+      header.baseTarget,
+      header.generationSignature.toPBByteString,
       header.featureVotes.map(shortToInt).toSeq,
       header.timestamp,
       header.version,
-      ByteString.copyFrom(header.signerData.generator)
+      ByteString.copyFrom(header.generator)
     )
   }
 
@@ -82,7 +82,7 @@ trait PBImplicitConversions {
   implicit class PBByteStringConversions(bytes: ByteString) {
     def toByteStr          = ByteStr(bytes.toByteArray)
     def toPublicKey        = PublicKey(bytes.toByteArray)
-    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).explicitGet()
+    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

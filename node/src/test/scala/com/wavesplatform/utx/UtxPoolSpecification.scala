@@ -106,7 +106,7 @@ class UtxPoolSpecification
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
-      .selfSigned(1.toByte, Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte])
+      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, Array.empty[Byte], time.getTimestamp())
       .explicitGet())
       .label("transferTransaction")
 
@@ -115,7 +115,7 @@ class UtxPoolSpecification
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
-      .selfSigned(1.toByte, Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte])
+      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, Array.empty[Byte], time.getTimestamp())
       .explicitGet())
       .label("transferWithRecipient")
 
@@ -328,15 +328,15 @@ class UtxPoolSpecification
         UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false)
       )
 
-      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
+      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.header.timestamp))
     }
 
   private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(1.toByte, Waves, sender, recipient, waves(1), ts, Waves, feeAmount, Array.emptyByteArray).explicitGet()
+    TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, Array.emptyByteArray, ts).explicitGet()
   }
 
   private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(2.toByte, Waves, sender, recipient, waves(1), ts, Waves, feeAmount, Array.emptyByteArray).explicitGet()
+    TransferTransaction.selfSigned(2.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, Array.emptyByteArray, ts).explicitGet()
   }
 
   "UTX Pool" - {

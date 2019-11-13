@@ -9,7 +9,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction._
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
@@ -44,9 +43,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
                 address <- Address.fromString(address)
                 jsonBlocks = commonApi
                   .blockHeadersRange(start, end)
-                  .filter(_._1.signerData.generator.toAddress == address)
+                  .filter(_._1.generator.toAddress == address)
                   .map {
-                    case (_, _, h) =>
+                    case (_, _, _, _, h) =>
                       blockchain.blockAt(h).get.json().addBlockFields(h)
                   }
                 result = jsonBlocks.toListL.map(JsArray(_))
@@ -103,7 +102,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     )
   )
   def heightEncoded: Route = (path("height" / Segment) & get) { encodedSignature =>
-    if (encodedSignature.length > TransactionParsers.SignatureStringLength)
+    if (encodedSignature.length > requests.SignatureStringLength)
       complete(InvalidSignature)
     else {
       val result: Either[ApiError, JsObject] = for {
@@ -148,7 +147,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     (if (includeTransactions) {
        commonApi.blockAtHeight(height).map(_.json())
      } else {
-       commonApi.blockHeaderAtHeight(height).map { case (bh, s) => BlockHeader.json(bh, s) }
+       commonApi.blockHeaderAtHeight(height).map { case (bh, s, tc, sig) => BlockHeader.json(bh, s, tc, sig) }
      }) match {
       case Some(json) => complete(json.addBlockFields(height))
       case None       => complete(Json.obj("status" -> "error", "details" -> "No block for this height"))
@@ -188,7 +187,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       } else {
         commonApi
           .blockHeadersRange(start, end)
-          .map { case (bh, size, height) => BlockHeader.json(bh, size).addBlockFields(height) }
+          .map {
+            case (bh, size, transactionCount, signature, height) =>
+              BlockHeader.json(bh, size, transactionCount, signature).addBlockFields(height)
+          }
       }
 
       extractScheduler(implicit sc => complete(blocks.toListL.map(JsArray(_)).runToFuture))
@@ -211,7 +213,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       (if (includeTransactions) {
          commonApi.lastBlock().map(_.json())
        } else {
-         commonApi.lastBlock().map(block => BlockHeader.json(block, block.bytes().length))
+         commonApi.lastBlock().map(block => BlockHeader.json(block.header, block.bytes().length, block.transactionData.size, block.signature))
        }).map(_.addBlockFields(height))
     }
   }
@@ -230,7 +232,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     )
   )
   def signature: Route = (path("signature" / Segment) & get) { encodedSignature =>
-    if (encodedSignature.length > TransactionParsers.SignatureStringLength) {
+    if (encodedSignature.length > requests.SignatureStringLength) {
       complete(InvalidSignature)
     } else {
       val result = for {

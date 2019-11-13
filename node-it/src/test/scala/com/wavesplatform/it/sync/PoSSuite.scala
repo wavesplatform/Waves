@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.consensus.FairPoSCalculator
@@ -42,7 +42,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
       val newTimestamp = blockTimestamp(h + 1)
 
-      block.timestamp shouldBe (newTimestamp +- 1100)
+      block.header.timestamp shouldBe (newTimestamp +- 1100)
     }
   }
 
@@ -120,9 +120,10 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
+    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
     val resignedBlock =
       block
-        .copy(signerData = SignerData(signerPK, ByteStr(crypto.sign(otherNodePK, block.bytes()))))
+        .copy(signature = signature)
 
     waitForBlockTime(resignedBlock)
 
@@ -136,7 +137,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
   }
 
   def waitForBlockTime(block: Block): Unit = {
-    val timeout = block.timestamp - System.currentTimeMillis()
+    val timeout = block.header.timestamp - System.currentTimeMillis()
 
     if (timeout > 0) Thread.sleep(timeout)
   }
@@ -200,9 +201,9 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
       .buildNonConflicting()
 
   private def generatorSignature(signature: Array[Byte], publicKey: PublicKey): Array[Byte] = {
-    val s = new Array[Byte](crypto.DigestSize * 2)
-    System.arraycopy(signature, 0, s, 0, crypto.DigestSize)
-    System.arraycopy(publicKey.arr, 0, s, crypto.DigestSize, crypto.DigestSize)
+    val s = new Array[Byte](crypto.DigestLength * 2)
+    System.arraycopy(signature, 0, s, 0, crypto.DigestLength)
+    System.arraycopy(publicKey.arr, 0, s, crypto.DigestLength, crypto.DigestLength)
     crypto.fastHash(s)
   }
 
@@ -245,15 +246,14 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         )
     )
 
-    val cData: NxtLikeConsensusBlockData = NxtLikeConsensusBlockData(bastTarget, genSig)
-
     Block
       .buildAndSign(
         version = 3: Byte,
         timestamp = lastBlockTS + validBlockDelay,
         reference = ByteStr(lastBlockId),
-        consensusData = cData,
-        transactionData = Nil,
+        baseTarget = bastTarget,
+        generationSignature = genSig,
+        txs = Nil,
         signer = signerPK,
         featureVotes = Set.empty,
         rewardVote = -1L

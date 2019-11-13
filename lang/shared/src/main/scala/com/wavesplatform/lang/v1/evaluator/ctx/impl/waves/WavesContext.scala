@@ -21,14 +21,6 @@ object WavesContext {
       getBooleanFromStateF,
       getBinaryFromStateF,
       getStringFromStateF,
-      getIntegerFromArrayF,
-      getBooleanFromArrayF,
-      getBinaryFromArrayF,
-      getStringFromArrayF,
-      getIntegerByIndexF,
-      getBooleanByIndexF,
-      getBinaryByIndexF,
-      getStringByIndexF,
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
@@ -63,19 +55,34 @@ object WavesContext {
     CTX(
       variableTypes(version, proofsEnabled),
       variableVars(isTokenContext, version, ds.contentType, proofsEnabled),
-      variableFuncs(version, proofsEnabled)
+      variableFuncs(version, ds.contentType, proofsEnabled)
     )
   }
 
-  private lazy val fromV3Funcs =
-    extractedFuncs ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
+  private def fromV3Funcs(v: StdLibVersion) =
+    extractedFuncs(v) ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
 
-  private def variableFuncs(version: StdLibVersion, proofsEnabled: Boolean) =
-    version match {
-      case V1 | V2 => Array(txByIdF(proofsEnabled, version))
-      case V3 => fromV3Funcs :+ transferTxByIdF(proofsEnabled, version)
-      case V4 => fromV3Funcs :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
-    }
+  private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
+    val commonFuncs =
+      Array(
+        getIntegerFromArrayF(version),
+        getBooleanFromArrayF(version),
+        getBinaryFromArrayF(version),
+        getStringFromArrayF(version),
+        getIntegerByIndexF(version),
+        getBooleanByIndexF(version),
+        getBinaryByIndexF(version),
+        getStringByIndexF(version),
+      )
+    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
+    val versionSpecificFuncs =
+      version match {
+        case V1 | V2 => Array(txByIdF(proofsEnabled, version))
+        case V3      => fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version)
+        case V4      => v4Funcs
+     }
+    commonFuncs ++ versionSpecificFuncs
+  }
 
   private def variableVars(
     isTokenContext: Boolean,

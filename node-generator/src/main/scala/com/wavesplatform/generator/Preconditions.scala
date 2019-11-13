@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
-import com.wavesplatform.transaction.lease.{LeaseTransaction, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -47,8 +47,8 @@ object Preconditions {
           action match {
             case LeaseP(from, to, amount, repeat) =>
               val newTxs = (1 to repeat.getOrElse(1)).map { _ =>
-                LeaseTransactionV2
-                  .selfSigned(from, amount, Fee, time.correctedTime(), to)
+                LeaseTransaction
+                  .selfSigned(2.toByte, from, to, amount, Fee, time.correctedTime())
                   .explicitGet()
               }.toList
               (uni.copy(leases = newTxs ::: uni.leases), newTxs ::: txs)
@@ -79,7 +79,7 @@ object Preconditions {
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, Waves, settings.faucet, acc, balance, time.correctedTime(), Waves, Fee, "Generator".getBytes("UTF-8"))
+                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, "Generator".getBytes("UTF-8"), time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))

@@ -8,9 +8,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, VersionedTransaction}
+import com.wavesplatform.transaction.validation.TxConstraints
+import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -24,8 +25,6 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   def script: Option[Script]
 
   override final val assetFee: (Asset, Long) = (Waves, fee)
-
-  val isNFT: Boolean = quantity == 1 && decimals == 0 && !reissuable
 
   val issueJson: Coeval[JsObject] = Coeval.evalOnce(
     jsonBase() ++ Json.obj(
@@ -53,13 +52,12 @@ trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
   )
 }
 object IssueTransaction {
+  val typeId: TxType = 3.toByte
 
-  val typeId: Byte = 3
-
-  val MaxDescriptionLength = 1000
-  val MaxAssetNameLength   = 16
-  val MinAssetNameLength   = 4
-  val MaxDecimals          = 8
+  val MinAssetNameLength        = 4
+  val MaxAssetNameLength        = 16
+  val MaxAssetDescriptionLength = 1000
+  val MaxAssetDecimals          = 8
 
   def validateIssueParams(tx: IssueTransaction): Either[ValidationError, Unit] = {
     validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
@@ -73,12 +71,13 @@ object IssueTransaction {
       reissuable: Boolean,
       fee: Long
   ): Either[ValidationError, Unit] = {
+    //noinspection UnnecessaryPartialFunction
     (
-      validateAmount(quantity, "assets"),
-      validateName(name),
-      validateDescription(description),
-      validateDecimals(decimals),
-      validateFee(fee)
+      TxConstraints.positiveAmount(quantity, "assets"),
+      TxConstraints.assetName(name),
+      TxConstraints.assetDescription(description),
+      TxConstraints.assetDecimals(decimals),
+      TxConstraints.fee(fee)
     ).mapN { case _ => () }
       .leftMap(_.head)
       .toEither
@@ -86,5 +85,11 @@ object IssueTransaction {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()
+    def isNFT: Boolean   = tx.quantity == 1 && tx.decimals == 0 && !tx.reissuable
+    def isNFT(blockchain: Blockchain): Boolean = {
+      import com.wavesplatform.features.BlockchainFeatures
+      import com.wavesplatform.features.FeatureProvider._
+      blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
+    }
   }
 }

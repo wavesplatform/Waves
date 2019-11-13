@@ -2,7 +2,8 @@ package com.wavesplatform.http
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.api.http.{ScriptWithImportsRequest, UtilsApiRoute}
+import com.wavesplatform.api.http.UtilsApiRoute
+import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.ApiMarshallers._
@@ -13,7 +14,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.diffs.FeeValidation
@@ -91,6 +92,18 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
         "{-# STDLIB_VERSION 3 #-}\n" +
         "{-# CONTENT_TYPE EXPRESSION #-}\n" +
         "true"
+    }
+
+    val compiled = "AAIDAAAAAAAAAAIIAQAAAAEAAAAAAWEJAQAAABFAZXh0ck5hdGl2ZSgxMDQwKQAAAAIFAAAAA25pbAIAAAAAAAAAAAAAAACl8TPJ"
+    Post(routePath("/script/decompile"), compiled) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "script").as[String].trim shouldBe
+        """
+          |{-# STDLIB_VERSION 3 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |let a = getIntegerValue(nil, "")
+        """.stripMargin.trim
     }
 
     val dappVerBytesStr = ContractScript(V3, dappVer).explicitGet().bytes().base64

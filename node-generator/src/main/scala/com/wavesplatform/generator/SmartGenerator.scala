@@ -11,10 +11,10 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransactionV2, OrderV2}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
 
 import scala.concurrent.duration._
 
@@ -33,15 +33,17 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 
     val script: Script = Gen.script(settings.complexity, estimator)
 
-    val setScripts = Range(0, settings.scripts) flatMap (_ =>
-      accounts.map { i =>
-        SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
-      })
+    val setScripts = Range(0, settings.scripts) flatMap (
+        _ =>
+          accounts.map { i =>
+            SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
+          }
+      )
 
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, Waves, bank, bank, 1.waves - 2 * fee, now + i, Waves, fee, Array.emptyByteArray)
+        .selfSigned(2.toByte, bank, bank, Waves, 1.waves - 2 * fee, Waves, fee, Array.emptyByteArray, now + i)
         .explicitGet()
     }
 
@@ -54,10 +56,10 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
       val asset           = randomFrom(settings.assets.toSeq)
       val tradeAssetIssue = ByteStr.decodeBase58(asset.get).toOption
       val pair            = AssetPair(Waves, Asset.fromCompatId(tradeAssetIssue))
-      val sellOrder       = OrderV2.sell(seller, matcher, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
-      val buyOrder        = OrderV2.buy(buyer, matcher, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
+      val sellOrder       = Order.sell(TxVersion.V2, seller, matcher, pair, 100000000L, 1, ts, ts + 30.days.toMillis, 0.003.waves)
+      val buyOrder        = Order.buy(TxVersion.V2, buyer, matcher, pair, 100000000L, 1, ts, ts + 1.day.toMillis, 0.003.waves)
 
-      ExchangeTransactionV2.create(matcher, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts).explicitGet()
+      ExchangeTransaction.signed(TxVersion.V2, matcher, buyOrder, sellOrder, 100000000, 1, 0.003.waves, 0.003.waves, 0.011.waves, ts).explicitGet()
     }
 
     setScripts ++ txs ++ extxs

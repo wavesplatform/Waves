@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.TxValidationError.UsupportedProofVersion
 import com.wavesplatform.transaction.TxValidationError.TooManyProofs
 import com.wavesplatform.transaction.TxValidationError.ToBigProof
 
-case class Proofs(proofs: List[ByteStr]) {
+case class Proofs(proofs: Seq[ByteStr]) {
   val bytes: Coeval[Array[Byte]]  = Coeval.evalOnce(Bytes.concat(Array(Proofs.Version), Deser.serializeArrays(proofs.map(_.arr))))
   val base58: Coeval[Seq[String]] = Coeval.evalOnce(proofs.map(p => Base58.encode(p.arr)))
   def toSignature: ByteStr        = proofs.headOption.getOrElse(ByteStr.empty)
@@ -39,7 +39,7 @@ object Proofs {
 
   def createWithBytes(proofs: Seq[ByteStr], parsedBytes: Array[Byte]): Either[ValidationError, Proofs] =
     validate(proofs) map { _ =>
-      new Proofs(proofs.toList) {
+      new Proofs(proofs) {
         override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce {
           val proofsLength = 3 + proofs.map(_.length + 2).sum
           if (parsedBytes.length == proofsLength) parsedBytes else parsedBytes.take(proofsLength)
@@ -48,7 +48,7 @@ object Proofs {
     }
 
   def create(proofs: Seq[ByteStr]): Either[ValidationError, Proofs] =
-    validate(proofs).map(_ => Proofs(proofs.toList))
+    validate(proofs).map(_ => Proofs(proofs))
 
   def fromBytes(ab: Array[Byte]): Either[ValidationError, Proofs] =
     for {
@@ -58,6 +58,7 @@ object Proofs {
       r    <- createWithBytes(arrs.map(ByteStr(_)), ab)
     } yield r
 
-  implicit def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs.toList)
+  def apply(proof1: ByteStr, proofs: ByteStr*): Proofs = new Proofs(proof1 +: proofs)
+  implicit def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs)
   implicit def toSeq(proofs: Proofs): Seq[ByteStr] = proofs.proofs
 }

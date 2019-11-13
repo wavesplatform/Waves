@@ -21,7 +21,8 @@ object BinaryOperation {
     Left(List(EQ_OP, NE_OP)),
     Right(List(CONS_OP)),
     Left(List(SUM_OP, SUB_OP)),
-    Left(List(MUL_OP, DIV_OP, MOD_OP))
+    Left(List(MUL_OP, DIV_OP, MOD_OP)),
+    Left(List(LIST_APPEND_OP, LIST_CONCAT_OP))
   )
 
   def opsToFunctions(op: BinaryOperation): String = op.func
@@ -82,4 +83,11 @@ object BinaryOperation {
     }
   }
 
+  case object LIST_APPEND_OP extends BinaryOperation {
+    override val func: String = ":+"
+  }
+
+  case object LIST_CONCAT_OP extends BinaryOperation {
+    override val func: String = "++"
+  }
 }

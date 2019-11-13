@@ -16,7 +16,6 @@ import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.Validation
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 
@@ -43,8 +42,6 @@ sealed trait ByteEntity[T] { self =>
   private[description] val AddressType        = "Address"
   private[description] val AliasType          = "Alias"
   private[description] val AddressOrAliasType = "Address or Alias"
-  private[description] val OrderType          = "Order"
-  private[description] val OrderV1Type        = "OrderV1"
   private[description] val ProofsType         = "Proofs"
   private[description] val UnimportantType    = ""
 
@@ -314,42 +311,6 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
     }
   }
 
-}
-
-case class OrderBytes(index: Int, name: String) extends ByteEntity[Order] {
-
-  def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(
-      ByteEntityDescription(index, s"$name size (N)", UnimportantType, "4", subIndex = 1),
-      ByteEntityDescription(index, s"$name version mark", UnimportantType, "1 (version 1) / 0 (version 2)", subIndex = 2),
-      ByteEntityDescription(index, name, OrderType, "N, see the appropriate Order version structure", subIndex = 3)
-    )
-  }
-
-  def deserialize(buf: Array[Byte], offset: Int): Try[(Order, Int)] = {
-    Try {
-
-      val orderSize = Ints.fromByteArray(buf.slice(offset, offset + 4))
-      val orderMark = buf(offset + 4)
-
-      orderMark match {
-        case 1 => OrderV1.parseBytes(buf.drop(offset + 5)).map(order => order -> (offset + 5 + orderSize))
-        case 2 => OrderV2.parseBytes(buf.drop(offset + 4)).map(order => order -> (offset + 4 + orderSize))
-        case 3 => OrderV3.parseBytes(buf.drop(offset + 4)).map(order => order -> (offset + 4 + orderSize))
-      }
-    }.flatten
-  }
-}
-
-case class OrderV1Bytes(index: Int, name: String, length: String) extends ByteEntity[OrderV1] {
-
-  def generateDoc: Seq[ByteEntityDescription] = Seq(ByteEntityDescription(index, name, OrderV1Type, length))
-
-  def deserialize(buf: Array[Byte], offset: Int): Try[(OrderV1, Int)] = {
-    OrderV1.parseBytes(buf.drop(offset)).map { order =>
-      order -> (offset + order.bytes.value.length)
-    }
-  }
 }
 
 case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]] {

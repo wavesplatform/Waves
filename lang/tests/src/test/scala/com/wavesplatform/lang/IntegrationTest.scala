@@ -5,6 +5,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -13,29 +14,52 @@ import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
 import com.wavesplatform.lang.v1.evaluator.ctx._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{PureContext, _}
-import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
+import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
-  private val evaluator = new EvaluatorV1[Id, NoContext]()
+import scala.util.Random
 
-  private def eval[T <: EVALUATED](code: String,
-                                   pointInstance: Option[CaseObj] = None,
-                                   pointType: FINAL = AorBorC,
-                                   ctxt: CTX[NoContext] = CTX.empty,
-                                   version: StdLibVersion = V3
-                                  ): Either[String, T] = {
+class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink {
+  private def eval[T <: EVALUATED](
+      code: String,
+      pointInstance: Option[CaseObj] = None,
+      pointType: FINAL = AorBorC,
+      ctxt: CTX[NoContext] = CTX.empty,
+      version: StdLibVersion = V3
+  ): Either[String, T] =
+    genericEval[NoContext, T](code, pointInstance, pointType, ctxt, version, Contextful.empty[Id])
+
+  private def genericEval[C[_[_]], T <: EVALUATED](
+      code: String,
+      pointInstance: Option[CaseObj] = None,
+      pointType: FINAL = AorBorC,
+      ctxt: CTX[C],
+      version: StdLibVersion,
+      env: C[Id]
+  ): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
-    val lazyVal = ContextfulVal.pure[NoContext](pointInstance.orNull)
+
+    val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
-    val ctx: CTX[NoContext] =
-      Monoid.combineAll(Seq(PureContext.build(Global, version), CTX[NoContext](sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
+    val ctx: CTX[C] =
+      Monoid.combineAll(
+        Seq(
+          PureContext.build(Global, version).withEnvironment[C],
+          addCtx.withEnvironment[C],
+          CTX[C](sampleTypes, stringToTuple, Array.empty),
+          ctxt
+        )
+      )
+
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
-    typed.flatMap(v => evaluator.apply(ctx.evaluationContext, v._1))
+    typed.flatMap(v => new EvaluatorV1[Id, C]().apply(ctx.evaluationContext(env), v._1))
   }
 
   property("simple let") {
@@ -152,11 +176,14 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(s"$longMax / $longMin + 1") shouldBe evaluated(0)
     eval(s"($longMax / 2) * 2") shouldBe evaluated(longMax - 1)
     eval[EVALUATED]("fraction(9223372036854775807, 3, 2)") shouldBe Left(
-      s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1")
+      s"Long overflow: value `${BigInt(Long.MaxValue) * 3 / 2}` greater than 2^63-1"
+    )
     eval[EVALUATED]("fraction(-9223372036854775807, 3, 2)") shouldBe Left(
-      s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+      s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1"
+    )
     eval[EVALUATED](s"$longMax + fraction(-9223372036854775807, 3, 2)") shouldBe Left(
-      s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1")
+      s"Long overflow: value `${-BigInt(Long.MaxValue) * 3 / 2}` less than -2^63-1"
+    )
     eval[EVALUATED](s"2 + 2 * 2") shouldBe evaluated(6)
     eval("2 * 3 == 2 + 4") shouldBe evaluated(true)
   }
@@ -203,16 +230,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("equals works on elements from Gens") {
-    List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(gen =>
-      forAll(for {
-        (expr, res) <- gen
-        str         <- toString(expr)
-      } yield (str, res)) {
-        case (str, res) =>
-          withClue(str) {
-            eval[EVALUATED](str) shouldBe evaluated(res)
-          }
-    })
+    List(CONST_LONGgen, SUMgen(50), INTGen(50)).foreach(
+      gen =>
+        forAll(for {
+          (expr, res) <- gen
+          str         <- toString(expr)
+        } yield (str, res)) {
+          case (str, res) =>
+            withClue(str) {
+              eval[EVALUATED](str) shouldBe evaluated(res)
+            }
+        }
+    )
 
     forAll(for {
       (expr, res) <- BOOLgen(50)
@@ -336,13 +365,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       PureContext.build(Global, V1).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
+        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
         functions = Seq(doubleFst)
       )
     )
 
-    val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000l))), REF("x")))
-    ev[CONST_LONG](context, expr) shouldBe evaluated(2003l)
+    val expr = FUNCTION_CALL(PureContext.sumLong.header, List(FUNCTION_CALL(doubleFst.header, List(CONST_LONG(1000L))), REF("x")))
+    ev[CONST_LONG](context, expr) shouldBe evaluated(2003L)
   }
 
   property("context won't change after execution of an inner block") {
@@ -350,7 +379,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       PureContext.build(Global, V1).evaluationContext[Id],
       EvaluationContext.build(
         typeDefs = Map.empty,
-        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3l))),
+        letDefs = Map("x" -> LazyVal.fromEvaluated[Id](CONST_LONG(3L))),
         functions = Seq()
       )
     )
@@ -359,7 +388,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       function = PureContext.sumLong.header,
       args = List(
         BLOCK(
-          dec = LET("x", CONST_LONG(5l)),
+          dec = LET("x", CONST_LONG(5L)),
           body = REF("x")
         ),
         REF("x")
@@ -422,29 +451,32 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |[x,y,z]
       """.stripMargin
     eval[EVALUATED](src) shouldBe Right(
-      ARR(Vector(
-        CaseObj(
-          dataEntryType,
-          Map(
-            "key"   -> CONST_STRING("foo").explicitGet(),
-            "value" -> CONST_LONG(1)
-          )
-        ),
-        CaseObj(
-          dataEntryType,
-          Map(
-            "key"   -> CONST_STRING("bar").explicitGet(),
-            "value" -> CONST_STRING("2").explicitGet()
-          )
-        ),
-        CaseObj(
-          dataEntryType,
-          Map(
-            "key"   -> CONST_STRING("baz").explicitGet(),
-            "value" -> CONST_STRING("2").explicitGet()
+      ARR(
+        Vector(
+          CaseObj(
+            dataEntryType,
+            Map(
+              "key"   -> CONST_STRING("foo").explicitGet(),
+              "value" -> CONST_LONG(1)
+            )
+          ),
+          CaseObj(
+            dataEntryType,
+            Map(
+              "key"   -> CONST_STRING("bar").explicitGet(),
+              "value" -> CONST_STRING("2").explicitGet()
+            )
+          ),
+          CaseObj(
+            dataEntryType,
+            Map(
+              "key"   -> CONST_STRING("baz").explicitGet(),
+              "value" -> CONST_STRING("2").explicitGet()
+            )
           )
         )
-      )))
+      )
+    )
   }
 
   property("allow 'throw' in '==' arguments") {
@@ -692,9 +724,9 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val str = "a" * 32766 + "z"
     val src =
       """ str.lastIndexOf("z", 32766) """
-    eval(src, ctxt = CTX[NoContext](Seq(),
-      Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))), Array())
-    ) shouldBe Right(CONST_LONG(32766L))
+    eval(src, ctxt = CTX[NoContext](Seq(), Map("str" -> (STRING -> ContextfulVal.pure[NoContext](CONST_STRING(str).explicitGet()))), Array())) shouldBe Right(
+      CONST_LONG(32766L)
+    )
   }
 
   property("lastIndexOf (not present)") {
@@ -755,42 +787,58 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("split") {
     val src =
       """ "q:we:.;q;we:x;q.we".split(":.;") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
-      CONST_STRING("q:we").explicitGet(),
-      CONST_STRING("q;we:x;q.we").explicitGet()
-    )))
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("q:we").explicitGet(),
+          CONST_STRING("q;we:x;q.we").explicitGet()
+        )
+      )
+    )
   }
 
   property("split separate correctly") {
     val src =
       """ "str1;str2;str3;str4".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
-      CONST_STRING("str1").explicitGet(),
-      CONST_STRING("str2").explicitGet(),
-      CONST_STRING("str3").explicitGet(),
-      CONST_STRING("str4").explicitGet()
-    )))
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("str1").explicitGet(),
+          CONST_STRING("str2").explicitGet(),
+          CONST_STRING("str3").explicitGet(),
+          CONST_STRING("str4").explicitGet()
+        )
+      )
+    )
   }
 
   property("split separator at the end") {
     val src =
       """ "str1;str2;".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
-      CONST_STRING("str1").explicitGet(),
-      CONST_STRING("str2").explicitGet(),
-      CONST_STRING("").explicitGet()
-    )))
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("str1").explicitGet(),
+          CONST_STRING("str2").explicitGet(),
+          CONST_STRING("").explicitGet()
+        )
+      )
+    )
   }
 
   property("split double separator") {
     val src =
       """ "str1;;str2;str3".split(";") """
-    eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
-      CONST_STRING("str1").explicitGet(),
-      CONST_STRING("").explicitGet(),
-      CONST_STRING("str2").explicitGet(),
-      CONST_STRING("str3").explicitGet()
-    )))
+    eval[EVALUATED](src) shouldBe Right(
+      ARR(
+        IndexedSeq(
+          CONST_STRING("str1").explicitGet(),
+          CONST_STRING("").explicitGet(),
+          CONST_STRING("str2").explicitGet(),
+          CONST_STRING("str3").explicitGet()
+        )
+      )
+    )
   }
 
   property("parseInt") {
@@ -1007,7 +1055,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
        """.stripMargin
 
     eval(script(error = false)) shouldBe Right(CONST_LONG(1))
-    eval(script(error = true))  shouldBe Left(message)
+    eval(script(error = true)) shouldBe Left(message)
   }
 
   property("list as argument") {
@@ -1066,5 +1114,141 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     eval(script, version = V3) should produce("Can't find a function")
     eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list append") {
+    val script =
+      """
+        | [1, 2, 3, 4] :+ 5 == [1, 2, 3, 4, 5] &&
+        | 1 :: [] :+ 2 :+ 3 == [1, 2, 3]
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list concat") {
+    val script =
+      """
+        | [1, 2, 3, 4] ++ [5, 6] == [1, 2, 3, 4, 5, 6] &&
+        | nil ++ [1, 2] :+ 3 ++ nil == [1, 2, 3]
+      """.stripMargin
+
+    eval(script, version = V3) should produce("Can't find a function")
+    eval(script, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("list result size limit") {
+    val maxLongList = "[1" + ",1" * (PureContext.MaxListLengthV4 - 1) + "]"
+    val consScript =
+      s"""
+         | let list1 = $maxLongList
+         | let list2 = 1 :: list1
+         | list2.size() == ${MaxListLengthV4 + 1}
+       """.stripMargin
+
+    eval(consScript, version = V3) shouldBe Right(CONST_BOOLEAN(true))
+    eval(consScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+
+    val appendScript = s"[1] ++ $maxLongList"
+    eval(appendScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+
+    val concatScript = s"$maxLongList :+ 1"
+    eval(concatScript, version = V4) should produce(s"exceed $MaxListLengthV4")
+  }
+
+  property("callable V3 syntax absent at V4") {
+    val writeSetScript =
+      s"""
+         | WriteSet([DataEntry("key1", "value"), DataEntry("key2", true)])
+       """.stripMargin
+
+    val transferSetScript =
+      s"""
+         | let tsArr = [
+         |   ScriptTransfer(Address(base58'aaaa'), 100, unit),
+         |   ScriptTransfer(Address(base58'bbbb'), 2,   base58'xxx')
+         | ]
+         | let ts = TransferSet(tsArr)
+       """.stripMargin
+
+    val scriptResultScript =
+      s"""
+         | func f(sr: ScriptResult) = true
+         | true
+         |
+       """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](
+      writeSetScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("Can't find a function 'WriteSet'")
+
+    genericEval[Environment, EVALUATED](
+      transferSetScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("Can't find a function 'TransferSet'")
+
+    genericEval[Environment, EVALUATED](
+      scriptResultScript,
+      ctxt = ctx,
+      version = V4,
+      env = utils.environment
+    ) should produce("non-existing type")
+  }
+
+  property("List[Int] median - 100 elements") {
+    val arr       = (1 to 100).map(_ => Random.nextLong())
+    val arrSorted = arr.sorted
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(((BigInt(arrSorted(49)) + BigInt(arrSorted(50))) / 2).toLong))
+  }
+
+  property("List[Int] median - 99 elements") {
+    val arr       = (1 to 99).map(_ => Random.nextLong())
+    val arrSorted = arr.sorted
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(arrSorted(49)))
+  }
+
+  property("List[Int] median - 1 elements") {
+    val arr = Seq(Random.nextLong())
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(arr.head))
+  }
+
+  property("List[Int] median - 101 elements - error") {
+    val arr = (1 to 101).map(_ => Long.MaxValue)
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+  }
+
+  property("List[Int] median - 500 elements - error") {
+    val arr = (1 to 500).map(_ => Long.MaxValue)
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+  }
+
+  property("List[Int] median - empty list - error") {
+    val src =
+      s"[].median()"
+    eval(src, version = V4) should produce("Invalid list size. Size should be between 1 and")
+  }
+
+  property("List[Int] median - list with non int elements - error") {
+    val src =
+      s"""["foo", "bar"].median()"""
+    eval(src, version = V4) should produce("Can't apply")
   }
 }

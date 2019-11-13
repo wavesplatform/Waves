@@ -1,11 +1,13 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
-import com.wavesplatform.it.sync._
 
 class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFailure {
   private val errorMessage = "Reason: Cannot lease more than own"
@@ -59,8 +61,6 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("lease cancellation reverts eff.b. changes; lessor pays fee for both lease and cancellation") {
-    import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
-
     def getStatus(txId: String): String = {
       val r = sender.get(s"/transactions/info/$txId")
       (Json.parse(r.getResponseBody) \ "status").as[String]
@@ -77,7 +77,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
 
       val status1 = getStatus(createdLeaseTxId)
-      status1 shouldBe Active
+      status1 shouldBe LeaseStatus.Active
 
       val activeLeases = sender.activeLeases(secondAddress)
       assert(activeLeases.forall(!_.sender.contains(secondAddress)))
@@ -92,7 +92,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(secondAddress, balance2, eff2)
 
       val status2 = getStatus(createdLeaseTxId)
-      status2 shouldBe Canceled
+      status2 shouldBe TransactionsApiRoute.LeaseStatus.Canceled
 
       val leases2 = sender.activeLeases(firstAddress)
       assert(leases2.forall(_.id != createdLeaseTxId))

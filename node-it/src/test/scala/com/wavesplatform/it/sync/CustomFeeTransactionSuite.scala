@@ -50,7 +50,7 @@ class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFai
     notMiner.assertAssetBalance(minerAddress, issuedAssetId, transferFee)
 
     // after `feature-check-blocks-period` asset fees should be sponsored
-    nodes.waitForSameBlockHeadesAt(featureCheckBlocksPeriod)
+    nodes.waitForSameBlockHeadersAt(featureCheckBlocksPeriod)
     val sponsoredId = notMiner.transfer(senderAddress, secondAddress, 1, transferFee, Some(issuedAssetId), Some(issuedAssetId)).id
     nodes.waitForHeightAriseAndTxPresent(sponsoredId)
 

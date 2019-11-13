@@ -1,10 +1,9 @@
 package com.wavesplatform.lagonaki.unit
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.{Block, SignerData}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.metrics.Instrumented
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -49,7 +48,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         3,
         time,
         reference,
-        NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
+        baseTarget,
+        ByteStr(generationSignature),
         Seq.fill(amt)(paymentTransaction),
         recipient,
         Set.empty,
@@ -66,7 +66,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
               version,
               time,
               reference,
-              NxtLikeConsensusBlockData(baseTarget, generationSignature),
+              baseTarget,
+              generationSignature,
               transactionData,
               recipient,
               Set.empty,
@@ -76,9 +77,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           val parsedBlock = Block.parseBytes(block.bytes()).get
           assert(block.signaturesValid().isRight)
           assert(parsedBlock.signaturesValid().isRight)
-          assert(parsedBlock.consensusData.generationSignature == generationSignature)
-          assert(parsedBlock.version.toInt == version)
-          assert(parsedBlock.signerData.generator == recipient.publicKey)
+          assert(parsedBlock.header.generationSignature == generationSignature)
+          assert(parsedBlock.header.version.toInt == version)
+          assert(parsedBlock.header.generator == recipient.publicKey)
       }
     }
   }
@@ -91,7 +92,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             version,
             time,
             reference,
-            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            baseTarget,
+            generationSignature,
             transactionData,
             recipient,
             Set(1),
@@ -111,7 +113,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           version,
           time,
           reference,
-          NxtLikeConsensusBlockData(baseTarget, generationSignature),
+          baseTarget,
+          generationSignature,
           transactionData,
           recipient,
           supportedFeatures,
@@ -131,7 +134,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             version,
             time,
             reference,
-            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            baseTarget,
+            generationSignature,
             transactionData,
             recipient,
             featureVotes,
@@ -141,10 +145,10 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         val parsedBlock = Block.parseBytes(block.bytes()).get
         assert(block.signaturesValid().isRight)
         assert(parsedBlock.signaturesValid().isRight)
-        assert(parsedBlock.consensusData.generationSignature == generationSignature)
-        assert(parsedBlock.version.toInt == version)
-        assert(parsedBlock.signerData.generator == recipient.publicKey)
-        assert(parsedBlock.featureVotes == featureVotes)
+        assert(parsedBlock.header.generationSignature == generationSignature)
+        assert(parsedBlock.header.version.toInt == version)
+        assert(parsedBlock.header.generator == recipient.publicKey)
+        assert(parsedBlock.header.featureVotes == featureVotes)
     }
   }
 
@@ -157,9 +161,11 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             3,
             time,
             reference,
-            NxtLikeConsensusBlockData(baseTarget, generationSignature),
+            baseTarget,
+            generationSignature,
             transactionData,
-            SignerData(weakAccount, ByteStr(Array.fill(64)(0: Byte))),
+            weakAccount,
+            ByteStr(Array.fill(64)(0: Byte)),
             Set.empty,
             -1L
           )
@@ -173,9 +179,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3, 1, ByteStr(ref), NxtLikeConsensusBlockData(1, ByteStr(gs)), txs, acc, Set.empty, -1L).explicitGet()
+            Block.buildAndSign(3, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Set.empty, -1L).explicitGet()
           )
-        val (bytes, t1) = Instrumented.withTimeMillis(block.bytesWithoutSignature())
+        val (bytes, t1) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
         val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))
         println((t0, t1, t2, t3))

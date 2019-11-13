@@ -16,11 +16,21 @@ object FieldNames {
   val Key            = "key"
   val Value          = "value"
 
-  lazy val ExpectedScriptResult = s"$WriteSet($Data: List[DataEntry($Key: String, $Value: Int|String|Boolean|ByteVector)]" +
-    s" or " +
-    s"$TransferSet($Transfers: List[$ScriptTransfer($Recipient: Address, $Amount: Int, $Asset: ByteBector|Unit)]" +
-    s" or " +
-    s"$ScriptResult($ScriptWriteSet: $WriteSet, $ScriptTransferSet: $TransferSet)"
-  lazy val Error = s"CallableFunction needs to return $ExpectedScriptResult or it super type"
+  val IssueScript = "Script"
+  val Issue = "Issue"
+  val IssueName         = "name"
+  val IssueQuantity     = "quantity"
+  val IssueDecimals     = "decimals"
+  val IssueDescription  = "description"
+  val IssueScriptField  = "compiledScript"
+  val IssueIsReissuable = "isReissuable"
 
+  val Reissue = "Reissue"
+  val ReissueAssetId      = "assetId"
+  val ReissueQuantity     = "quantity"
+  val ReissueIsReissuable = "isReissuable"
+
+  val Burn = "Burn"
+  val BurnAssetId  = "assetId"
+  val BurnQuantity = "quantity"
 }

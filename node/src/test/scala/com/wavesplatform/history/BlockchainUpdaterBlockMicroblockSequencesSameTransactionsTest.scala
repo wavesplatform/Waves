@@ -37,7 +37,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
                   mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
               }
               d.blockchainUpdater.processBlock(last)
-              d.portfolio(last.signerData.generator.toAddress).balance
+              d.portfolio(last.header.generator.toAddress).balance
             }
         }
         finalMinerBalances.toSet.size shouldBe 1
@@ -171,7 +171,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       sizes: BlockAndMicroblockSize,
       prev: ByteStr,
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       timestamp: Long
   ): (BlockAndMicroblocks, Seq[Transaction]) = {
     val ((blockTxs, microblockTxs), rest) = take(txs, sizes)
@@ -188,7 +188,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
       sizes: BlockAndMicroblockSizes,
       initial: ByteStr,
       signer: KeyPair,
-      version: Byte,
+      version: TxVersion,
       timestamp: Long
   ): BlockAndMicroblockSequence = {
     sizes

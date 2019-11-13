@@ -16,7 +16,7 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, Version}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -126,7 +126,7 @@ object JsAPI {
       "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"           -> ContractLimits.MaxTransferPaymentAmount,
+      "MaxPaymentAmount"           -> ContractLimits.MaxCallableActionsAmount,
       "MaxAttachedPaymentAmount"   -> ContractLimits.MaxAttachedPaymentAmount
     )
   }
@@ -237,10 +237,11 @@ object JsAPI {
 
   private def asJs(repl: Repl): js.Dynamic =
     jObj(
-      "evaluate"  -> (repl.execute _ andThen mapResult),
-      "info"      -> repl.info _,
-      "totalInfo" -> repl.totalInfo _,
-      "clear"     -> repl.clear _
+      "evaluate"    -> (repl.execute _ andThen mapResult),
+      "info"        -> repl.info _,
+      "totalInfo"   -> repl.totalInfo _,
+      "clear"       -> repl.clear _,
+      "reconfigure" -> (repl.reconfigure _ andThen asJs)
     )
 
   private def mapResult(eval: Future[Either[String, String]]): Promise[js.Object with js.Dynamic] =

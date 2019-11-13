@@ -4,7 +4,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
 import org.scalacheck.Gen
 import org.scalatest.Suite
@@ -33,7 +32,8 @@ trait BlockGen extends TransactionGen { _: Suite =>
           version,
           if (txs.isEmpty) timestamp else txs.map(_.timestamp).max,
           reference,
-          NxtLikeConsensusBlockData(baseTarget, ByteStr(generationSignature)),
+          baseTarget,
+          ByteStr(generationSignature),
           txs,
           signer,
           Set.empty,

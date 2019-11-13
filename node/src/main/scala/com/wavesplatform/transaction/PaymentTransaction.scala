@@ -9,7 +9,6 @@ import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TransactionParsers._
 import com.wavesplatform.transaction.description._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
@@ -25,15 +24,19 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
   override val json: Coeval[JsObject]     = Coeval.evalOnce(jsonBase() ++ Json.obj("recipient" -> recipient.stringRepr, "amount" -> amount))
 
   private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(Array(builder.typeId), Longs.toByteArray(timestamp), sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee)))
+    Bytes.concat(Array(builder.typeId), Longs.toByteArray(timestamp), sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee))
+  )
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(Ints.toByteArray(builder.typeId),
-                 Longs.toByteArray(timestamp),
-                 sender,
-                 recipient.bytes.arr,
-                 Longs.toByteArray(amount),
-                 Longs.toByteArray(fee)))
+    Bytes.concat(
+      Ints.toByteArray(builder.typeId),
+      Longs.toByteArray(timestamp),
+      sender,
+      recipient.bytes.arr,
+      Longs.toByteArray(amount),
+      Longs.toByteArray(fee)
+    )
+  )
 
   val hash: Coeval[Array[Byte]] = Coeval.evalOnce(crypto.fastHash(hashBytes()))
 
@@ -41,14 +44,16 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
 }
 
 object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with TransactionParser.HardcodedVersion1 {
+  override val typeId: TxType = 2
 
-  override val typeId: Byte = 2
-
-  val RecipientLength: Int = Address.AddressLength
-
-  private val SenderLength = 32
-  private val FeeLength    = 8
-  private val BaseLength   = TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
+  private[this] val BaseLength = {
+    val AmountLength         = Longs.BYTES
+    val FeeLength            = AmountLength
+    val TimestampLength      = Longs.BYTES
+    val SenderLength         = 32
+    val RecipientLength: Int = Address.AddressLength
+    TimestampLength + SenderLength + RecipientLength + AmountLength + FeeLength + SignatureLength
+  }
 
   def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
@@ -56,12 +61,14 @@ object PaymentTransaction extends TransactionParserFor[PaymentTransaction] with 
     })
   }
 
-  def create(sender: PublicKey,
-             recipient: Address,
-             amount: Long,
-             fee: Long,
-             timestamp: Long,
-             signature: ByteStr): Either[ValidationError, TransactionT] = {
+  def create(
+      sender: PublicKey,
+      recipient: Address,
+      amount: Long,
+      fee: Long,
+      timestamp: Long,
+      signature: ByteStr
+  ): Either[ValidationError, TransactionT] = {
     if (amount <= 0) {
       Left(TxValidationError.NonPositiveAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
     } else if (fee <= 0) {

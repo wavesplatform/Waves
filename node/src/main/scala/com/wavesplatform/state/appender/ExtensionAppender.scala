@@ -34,7 +34,7 @@ object ExtensionAppender extends ScorexLogging {
         {
           val extension = newBlocks.dropWhile(blockchainUpdater.contains)
 
-          extension.headOption.map(_.reference) match {
+          extension.headOption.map(_.header.reference) match {
             case Some(lastCommonBlockId) =>
               val forkApplicationResultEi = Coeval {
                 extension.view

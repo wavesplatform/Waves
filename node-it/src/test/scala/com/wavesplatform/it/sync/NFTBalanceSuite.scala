@@ -19,11 +19,8 @@ import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Random
 
-class NFTBalanceSuite
-    extends FreeSpec with BaseTransactionSuiteLike {
-
+class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
   import NFTBalanceSuite._
-
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -88,22 +85,13 @@ class NFTBalanceSuite
       val other = KeyPair("other".getBytes)
 
       val transfer = TransferTransaction
-        .selfSigned(
-          1.toByte,
-          randomTokenToTransfer,
-          issuer,
-          other,
-          1,
-          System.currentTimeMillis(),
-          Waves,
-          0.001.waves,
-          Array.emptyByteArray
-        )
+        .selfSigned(1.toByte, issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, Array.emptyByteArray, System.currentTimeMillis())
         .explicitGet()
 
       val assertion = for {
         tx         <- node.signedBroadcast(transfer.json())
         _          <- node.waitForTransaction(tx.id)
+        _          <- node.waitForHeightArise
         issuerNFTs <- getNFTPage(node, issuer.stringRepr, 1000, None)
         otherNFTs  <- getNFTPage(node, other.stringRepr, 1000, None)
       } yield {
@@ -111,7 +99,7 @@ class NFTBalanceSuite
         otherNFTs should contain(randomTokenToTransfer.id.toString)
       }
 
-      Await.result(assertion, 10.seconds)
+      Await.result(assertion, 50.seconds)
     }
   }
 
@@ -131,7 +119,8 @@ class NFTBalanceSuite
       }
 
       Await.result(
-        assertion, 1.minute
+        assertion,
+        1.minute
       )
     }
 

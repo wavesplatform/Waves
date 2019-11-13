@@ -4,7 +4,7 @@ import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.Config
 import com.wavesplatform.account._
-import com.wavesplatform.api.http.assets.TransferRequest
+import com.wavesplatform.api.http.requests.TransferRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.TransferSending.Req
 import com.wavesplatform.it.api.AsyncHttpApi._
@@ -116,16 +116,16 @@ trait TransferSending extends ScorexLogging {
             TransferTransaction
               .selfSigned(
                 version = 2.toByte,
-                asset = Waves,
                 sender = KeyPair(Base58.decode(x.senderSeed)),
                 recipient = AddressOrAlias.fromString(x.targetAddress).explicitGet(),
+                asset = Waves,
                 amount = x.amount,
-                timestamp = start + i,
                 feeAsset = Waves,
                 fee = x.fee,
                 attachment = if (includeAttachment) {
                   Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray
+                } else Array.emptyByteArray,
+                timestamp = start + i
               )
               .right
               .get
@@ -149,15 +149,15 @@ trait TransferSending extends ScorexLogging {
     import tx._
     TransferRequest(
       Some(2.toByte),
-      assetId.maybeBase58Repr,
-      feeAssetId.maybeBase58Repr,
-      amount,
-      fee,
-      recipient.stringRepr,
-      Some(timestamp),
       None,
       Some(Base58.encode(tx.sender)),
+      recipient.stringRepr,
+      assetId.maybeBase58Repr,
+      amount,
+      feeAssetId.maybeBase58Repr,
+      fee,
       attachment.headOption.map(_ => Base58.encode(attachment)),
+      Some(timestamp),
       None,
       Some(proofs.base58().toList)
     )

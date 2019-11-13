@@ -10,7 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 
 class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
   test("big let assignment chain") {
@@ -45,17 +45,7 @@ class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(
-      2.toByte,
-      Waves,
-      pkNewAddress,
-      pkNewAddress,
-      1.waves,
-      System.currentTimeMillis(),
-      Waves,
-      smartMinFee,
-      Array()
-    )
+    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress, Waves, 1.waves, Waves, smartMinFee, Array(), System.currentTimeMillis())
     val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }

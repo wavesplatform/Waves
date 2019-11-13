@@ -9,7 +9,6 @@ import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.GenesisTransaction
@@ -104,8 +103,9 @@ object GenesisBlockGenerator extends App {
         version = 1,
         timestamp = timestamp,
         reference = reference,
-        consensusData = NxtLikeConsensusBlockData(settings.baseTarget, ByteStr(Array.fill(crypto.DigestSize)(0: Byte))),
-        transactionData = genesisTxs,
+        settings.baseTarget,
+        ByteStr(Array.fill(crypto.DigestLength)(0: Byte)),
+        txs = genesisTxs,
         signer = genesisSigner,
         featureVotes = Set.empty,
         rewardVote = -1L
@@ -113,12 +113,12 @@ object GenesisBlockGenerator extends App {
       .explicitGet()
   }
 
-  val signature = genesisBlock.signerData.signature
+  val signature = genesisBlock.signature
 
   report(
     addrInfos = shares.map(x => (x._1, x._2)),
     settings = GenesisSettings(
-      genesisBlock.timestamp,
+      genesisBlock.header.timestamp,
       timestamp,
       settings.initialBalance,
       Some(signature),

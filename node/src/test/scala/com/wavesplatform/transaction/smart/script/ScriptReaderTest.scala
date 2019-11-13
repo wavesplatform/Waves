@@ -6,7 +6,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.{ContractScript, ScriptReader}
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
-import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.{NoShrink, crypto}
 import org.scalacheck.{Arbitrary, Gen}
