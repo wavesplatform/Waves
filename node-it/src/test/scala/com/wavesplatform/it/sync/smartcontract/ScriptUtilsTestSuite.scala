@@ -1,10 +1,97 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.typesafe.config.Config
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class ScriptUtilsTestSuite extends BaseTransactionSuite with CancelAfterFailure {
+  private val estimator = ScriptEstimatorV1
+
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(entitiesNumber = 1)
+      .buildNonConflicting()
+
+  val scriptWithAllFunctions =
+    s"""
+       |{-# STDLIB_VERSION 4 #-}
+       |{-# CONTENT_TYPE DAPP #-}
+       |{-# SCRIPT_TYPE ACCOUNT #-}
+       |
+       |let b16 = base16'abcd'
+       |let b58 = base58'abcd'
+       |let b64 = base64'abcd'
+       |let unt = unit
+       |let h = height
+       |let lstBlock = lastBlock
+       |let self = this
+       |let from = fromBase16String("abcd") + fromBase58String("abcd") + fromBase64String("abcd")
+       |let to = toBase16String(b16) + toBase58String(b58) + toBase64String(b64)
+       |let toBin = toBytes(true) + toBytes(1) + toBytes("str")
+       |let toInteger = toInt(b58) + toInt(b58, 1)
+       |let toStr = toString(true)
+       |let str = toUtf8String(b58)
+       |let index = indexOf(str, "s") == indexOf(str, "s", 3) && lastIndexOf(str, "s") == lastIndexOf(str, "s", 3)
+       |let fract = fraction(3, 4, 2)
+       |let math = pow(1, 2, 3, 4, 5, CEILING) + log(1, 2, 3, 4, 5, FLOOR) - -1 * +2 / 3 % 4
+       |let avg = median([1, 2, 3])
+       |let comparing = !((1 == 2) && (3 != 4) || (5 > 6) && (7 < 8) || (9 >= 10) && (11 <= 12))
+       |let parInt = parseInt("10")
+       |let parIntV = parseIntValue("10")
+       |let isDef = isDefined(parInt)
+       |let val = extract(parInt) + value(parInt) + valueOrErrorMessage(parInt, "error!")
+       |let binDropTake = drop(b58, 1) + take(b58, 2) + dropRight(b58, 3) + takeRight(b58, 4)
+       |let strDropTake = drop(str, 1) + take(str, 2) + dropRight(str, 3) + takeRight(str, 4)
+       |let sizes = size(b58) + size(str)
+       |let splitted = split(str, ";")
+       |let hashes = sha256(b58) + blake2b256(b58) + keccak256(b58)
+       |let verify = sigVerify(b16, b58, b64) && rsaVerify(SHA256, b16, b58, b64) && checkMerkleProof(b16, b58, b64)
+       |let orderBuy = Buy
+       |let orderSell = Sell
+       |let address = Address(b58)
+       |let balances = wavesBalance(address) + assetBalance(address, b58)
+       |let assetInf = value(assetInfo(b58)).issuer
+       |let blockInf = value(blockInfoByHeight(1)).timestamp
+       |let txHeight = transactionHeightById(b58)
+       |let txTransfer = value(transferTransactionById(b58)).recipient
+       |let list = 1::[]:+2
+       |let concatenation = [1, 2] ++ [3, 4]
+       |let bytesConcat = b16 + b58
+       |
+       |func thr() = {
+       |  if true then
+       |    true
+       |  else
+       |    throw("error")
+       |}
+       |
+       |func addresses(rec: Address, str: String, pubKey: ByteVector) = {
+       |  let addressToString = toString(rec)
+       |  addressFromRecipient(rec) == addressFromString(str) && addressFromStringValue(str) == addressFromPublicKey(pubKey)
+       |}
+       |""".stripMargin
+
+  //TODO expression. asset. defaults
+  //TODO Ceiling(), Floor(), Up(), Down(), HalfUp(), HalfDown(), CEILING, FLOOR, UP, DOWN, HALFUP, HALFDOWN
+  //TODO NoAlg(), Md5(), Sha1(), Sha224(), Sha256(), Sha384(), Sha512(), Sha3224(), Sha3256(), Sha3384(), Sha3512()
+  //TODO NOALG, MD5, SHA1, SHA224, SHA256, SHA384, SHA512, SHA3224, SHA3256, SHA3384, SHA3512
+  //TODO types: creation, argument definition
+  // Alias, Address, AssetPair, List, AttachedPayment, TransferSet, WriteSet, ScriptResult, Asset,
+  // Invocation, Transfer, BlockInfo, DataEntry, Unit, Order, Transaction, all txs
+  //TODO FOLD, match-case, if-then-else, let-func-@C-@V
+
+  test("compile and decompile script with all functions") {
+    val script = ScriptCompiler.compile(scriptWithAllFunctions, estimator).explicitGet()._1
+
+    sender.scriptDecompile(script.bytes().base64).script shouldBe scriptWithAllFunctions
+  }
+
   test("decompile script containing deep block structure should not blow stack") {
     val node = nodes.head
 
