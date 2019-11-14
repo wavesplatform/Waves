@@ -10,7 +10,7 @@ case class ReissueRequest(
     version: Option[Byte],
     sender: Option[String],
     senderPublicKey: Option[String],
-    asset: String,
+    assetId: String,
     quantity: Long,
     reissuable: Boolean,
     fee: Long,
@@ -21,7 +21,7 @@ case class ReissueRequest(
   def toTxFrom(sender: PublicKey): Either[ValidationError, ReissueTransaction] =
     for {
       validProofs <- toProofs(version, signature, proofs)
-      validAsset  <- toAsset(Some(asset))
+      validAsset  <- toAsset(Some(assetId))
       tx <- ReissueTransaction.create(
         version.getOrElse(defaultVersion),
         sender,

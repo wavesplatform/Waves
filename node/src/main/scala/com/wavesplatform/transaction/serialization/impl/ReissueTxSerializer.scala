@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
