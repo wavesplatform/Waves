@@ -6,7 +6,8 @@ import cats.syntax.monoid._
 import cats.syntax.option._
 import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
@@ -45,23 +46,23 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
-  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  def loadBlockInfo(height: Int): Option[BlockInfo]
+  override def blockInfo(height: Int): Option[BlockInfo] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
+      c._3.map(b => BlockInfo(b.header, b.bytes().length, b.transactionData.size, b.signature))
     } else {
-      loadBlockHeaderAndSize(height)
+      loadBlockInfo(height)
     }
   }
 
-  def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)]
-  override def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  def loadBlockInfo(blockId: ByteStr): Option[BlockInfo]
+  override def blockInfo(blockId: ByteStr): Option[BlockInfo] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
+      c._3.map(b => BlockInfo(b.header, b.bytes().length, b.transactionData.size, b.signature))
     } else {
-      loadBlockHeaderAndSize(blockId)
+      loadBlockInfo(blockId)
     }
   }
 
@@ -156,7 +157,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] =
+    cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
   protected def loadAssetScript(asset: IssuedAsset): Option[Script]
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
@@ -214,10 +216,12 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
-      reward: Option[Long],scriptResults: Map[ByteStr, InvokeScriptResult]
+      reward: Option[Long],
+      hitSource: ByteStr,
+      scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], block: Block): Unit = {
+  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -289,6 +293,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.sponsorship,
       totalFee,
       reward,
+      htiSource,
       diff.scriptResults
     )
 
@@ -320,9 +325,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     forgetBlocks()
   }
 
-  protected def doRollback(targetBlockId: ByteStr): Seq[Block]
+  protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)]
 
-  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = {
+  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
     for {
       height <- heightOf(targetBlockId)
         .toRight(s"No block with signature: $targetBlockId found in blockchain")

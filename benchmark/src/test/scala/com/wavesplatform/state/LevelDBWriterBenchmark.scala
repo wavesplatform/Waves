@@ -42,7 +42,7 @@ class LevelDBWriterBenchmark {
 
   @Benchmark
   def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
-    bh.consume(st.db.blockHeaderAndSize(st.allBlocks.random).get)
+    bh.consume(st.db.blockInfo(st.allBlocks.random).get)
   }
 
   @Benchmark

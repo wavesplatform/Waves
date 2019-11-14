@@ -4,8 +4,8 @@ import java.nio.ByteBuffer
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}

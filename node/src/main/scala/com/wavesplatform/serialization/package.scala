@@ -1,19 +1,18 @@
-package com.wavesplatform.transaction.serialization
+package com.wavesplatform
 
 import java.nio.ByteBuffer
 
+import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Proofs}
 
-package object impl {
-  private[serialization] implicit class ByteBufferOps(private val buf: ByteBuffer) extends AnyVal {
+package object serialization {
+  implicit class ByteBufferOps(private val buf: ByteBuffer) extends AnyVal {
     def getPrefixedByteArray: Array[Byte] = {
       val prefix = buf.getShort
       require(prefix >= 0, "negative array length")
@@ -46,6 +45,13 @@ package object impl {
     def getByteArray(size: Int): Array[Byte] = {
       val result = new Array[Byte](size)
       buf.get(result)
+      result
+    }
+
+    def getShortArray(size: Int): Array[Short] = {
+      val result = new Array[Short](size)
+      buf.asShortBuffer().get(result)
+      buf.position(buf.position() + Shorts.BYTES * size)
       result
     }
 
