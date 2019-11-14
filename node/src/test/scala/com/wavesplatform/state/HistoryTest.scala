@@ -9,8 +9,8 @@ trait HistoryTest {
   val genesisBlock: Block = TestBlock.withReference(ByteStr(Array.fill(SignatureLength)(0: Byte)))
 
   def getNextTestBlock(blockchain: Blockchain): Block =
-    TestBlock.withReference(blockchain.lastBlockHeaderAndSize.get._4)
+    TestBlock.withReference(blockchain.lastBlockId.get)
 
   def getNextTestBlockWithVotes(blockchain: Blockchain, votes: Set[Short]): Block =
-    TestBlock.withReferenceAndFeatures(blockchain.lastBlockHeaderAndSize.get._4, votes)
+    TestBlock.withReferenceAndFeatures(blockchain.lastBlockId.get, votes)
 }

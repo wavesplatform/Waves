@@ -53,7 +53,7 @@ trait WithState extends Matchers with DBCacheSettings { _: Suite =>
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.diff))
@@ -66,7 +66,7 @@ trait WithState extends Matchers with DBCacheSettings { _: Suite =>
 
     preconditions.foreach { precondition =>
       val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) = differ(state, precondition).resultE.explicitGet()
-      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition)
+      state.append(preconditionDiff, preconditionFees, totalFee, None, precondition.header.generationSignature, precondition)
     }
     val totalDiff1 = differ(state, block)
     assertion(totalDiff1.map(_.diff))
@@ -80,7 +80,7 @@ trait WithState extends Matchers with DBCacheSettings { _: Suite =>
 
     preconditions.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
       val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, prevBlock, curBlock).explicitGet()
-      state.append(diff, fees, totalFee, None, curBlock)
+      state.append(diff, fees, totalFee, None, curBlock.header.generationSignature, curBlock)
       Some(curBlock)
     }
 
@@ -88,7 +88,7 @@ trait WithState extends Matchers with DBCacheSettings { _: Suite =>
     val cb                                             = CompositeBlockchain(state, Some(diff))
     assertion(diff, cb)
 
-    state.append(diff, fees, totalFee, None, block)
+    state.append(diff, fees, totalFee, None, block.header.generationSignature, block)
     assertion(diff, state)
   }
 
@@ -108,7 +108,7 @@ trait WithState extends Matchers with DBCacheSettings { _: Suite =>
 
       test(txs => {
         val block = TestBlock.create(txs)
-        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block))
+        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature, block))
       })
     }
 

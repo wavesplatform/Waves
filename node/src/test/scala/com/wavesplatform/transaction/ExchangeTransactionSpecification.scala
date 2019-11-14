@@ -46,11 +46,6 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       om.id() shouldBe recovered.id()
       om.buyOrder.idStr() shouldBe recovered.buyOrder.idStr()
       recovered.bytes() shouldEqual om.bytes()
-
-      if (Set(om.buyOrder.version, om.sellOrder.version) == Set(2.toByte, 3.toByte)) {
-        println(Base64.encode(om.bytes()))
-        println(om.toPrettyString)
-      }
     }
   }
 
@@ -595,7 +590,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     js shouldEqual tx.json()
   }
 
-  property("JSON format validation V2 Order") {
+  property("JSON format validation V2 OrderV3") {
     val js = Json.parse("""{
          "version": 2,
          "type":7,

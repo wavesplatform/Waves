@@ -14,6 +14,7 @@ import cats.syntax.option._
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
@@ -174,6 +175,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     def loadBlockAt(height: Int): Option[Block] =
       blockchainUpdater.blockId(height).flatMap(history.loadBlockBytes).map(bytes => Block.parseBytes(bytes).get)
 
+    def loadBlockMetaAt(height: Int): Option[BlockMeta] = None
+
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
     def rollbackTask(blockId: ByteStr, returnTxsToUtx: Boolean) =
@@ -183,13 +186,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
-            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
+            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
             miner.scheduleMining()
             Right(discardedBlocks)
           case Left(error) => Left(error)
         }
 
-    val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockAt)
+    val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockAt, loadBlockMetaAt)
     val cca: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     val csa: CommonAssetsApi   = new CommonAssetsApi(blockchainUpdater)
     val cta: CommonTransactionsApi = CommonTransactionsApi(

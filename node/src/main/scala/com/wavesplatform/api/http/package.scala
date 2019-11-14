@@ -8,12 +8,12 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidBase58, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidBase58, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base58Alphabet, EitherExt2}
+import com.wavesplatform.common.utils.Base58Alphabet
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -68,8 +68,7 @@ package object http extends ApiMarshallers with ScorexLogging {
                   case LeaseTransaction          => txJson.as[LeaseRequest].toTxFrom(senderPk)
                   case LeaseCancelTransaction    => txJson.as[LeaseCancelRequest].toTxFrom(senderPk)
                   case ExchangeTransaction       => txJson.as[ExchangeRequest].toTxFrom(senderPk)
-                  case IssueTransactionV1        => TransactionFactory.issueAssetV1(txJson.as[IssueV1Request], senderPk)
-                  case IssueTransactionV2        => TransactionFactory.issueAssetV2(txJson.as[IssueV2Request], senderPk)
+                  case IssueTransaction          => txJson.as[IssueRequest].toTxFrom(senderPk)
                   case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], senderPk)
                   case ReissueTransactionV2      => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], senderPk)
                   case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], senderPk)

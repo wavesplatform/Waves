@@ -6,7 +6,7 @@ import cats.syntax.monoid._
 import cats.syntax.option._
 import com.google.common.cache._
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
@@ -45,13 +45,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
-  def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  def loadBlockInfo(height: Int): Option[SignedBlockHeader]
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = {
     val c = current
     if (height == c._1) {
-      c._3.map(b => (b.header, b.bytes().length, b.transactionData.size, b.signature))
+      c._3.map(b => SignedBlockHeader(b.header, b.signature))
     } else {
-      loadBlockHeaderAndSize(height)
+      loadBlockInfo(height)
     }
   }
 
@@ -96,9 +96,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardLeaseBalance(address: Address): Unit = leaseBalanceCache.invalidate(address)
   override def leaseBalance(address: Address): LeaseBalance = leaseBalanceCache.get(address)
 
-  private[database] val portfolioCache: LoadingCache[Address, Portfolio] = cache(dbSettings.maxCacheSize / 4, _ => ???)
-  protected def discardPortfolio(address: Address): Unit                 = portfolioCache.invalidate(address)
-
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
@@ -126,17 +123,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def hasAccountScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] =
+    cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
   protected def loadAssetScript(asset: IssuedAsset): Option[Script]
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
 
   override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = assetScriptCache.get(asset)
-  override def hasAssetScript(asset: IssuedAsset): Boolean =
-    assetScriptCache.getIfPresent(asset) match {
-      case null => hasAssetScriptBytes(asset)
-      case x    => x.nonEmpty
-    }
 
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
@@ -179,10 +172,12 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
-      reward: Option[Long],scriptResults: Map[ByteStr, InvokeScriptResult]
+      reward: Option[Long],
+      hitSource: ByteStr,
+      scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], block: Block): Unit = {
+  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -202,8 +197,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
     val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
-
-    val newPortfolios = diff.portfolios.keys.toSet
 
     val newFills = for {
       (orderId, fillInfo) <- diff.orderFills
@@ -251,6 +244,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.sponsorship,
       totalFee,
       reward,
+      htiSource,
       diff.scriptResults
     )
 
@@ -270,7 +264,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
-    for (address                 <- newPortfolios) discardPortfolio(address)
     for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
@@ -282,9 +275,9 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     forgetBlocks()
   }
 
-  protected def doRollback(targetBlockId: ByteStr): Seq[Block]
+  protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)]
 
-  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[Block]] = {
+  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
     for {
       height <- heightOf(targetBlockId)
         .toRight(s"No block with signature: $targetBlockId found in blockchain")

@@ -12,7 +12,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.Portfolio.longSemigroup
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Diff, Height, Portfolio}
+import com.wavesplatform.state.{Blockchain, DataEntry, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction

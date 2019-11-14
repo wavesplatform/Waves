@@ -6,8 +6,9 @@ import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
@@ -221,6 +222,7 @@ class LevelDBWriter(
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
+      hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = {
     log.trace(s"Persisting block ${block.uniqueId} at height $height")
@@ -243,7 +245,7 @@ class LevelDBWriter(
           k -> v
         }.toMap
 
-      rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block.header, block.bytes().length, block.transactionData.size, block.signature)))
+      rw.put(Keys.blockMetaAt(Height(height)), Some(BlockMeta(block.header, block.bytes().length, block.transactionData.size, block.signature, height)))
       rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
       val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -445,17 +447,19 @@ class LevelDBWriter(
       if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
         disabledAliases = DisableHijackedAliases(rw)
       }
+
+      rw.put(Keys.hitSource(height), Some(hitSource))
     }
+
     log.trace(s"Finished persisting block ${block.uniqueId} at height $height")
   }
 
-  override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
-    readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
+  override protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)] = {
+    readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
+      val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
-        val portfoliosToInvalidate  = Seq.newBuilder[Address]
         val assetInfoToInvalidate   = Seq.newBuilder[IssuedAsset]
         val ordersToInvalidate      = Seq.newBuilder[ByteStr]
         val scriptsToDiscard        = Seq.newBuilder[Address]
@@ -468,8 +472,8 @@ class LevelDBWriter(
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          val (discardedHeader, _, _, discardedSignature) = rw
-            .get(Keys.blockHeaderAndSizeAt(h))
+          val BlockMeta(discardedHeader, _, _, discardedSignature, _) = rw
+            .get(Keys.blockMetaAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
@@ -498,7 +502,6 @@ class LevelDBWriter(
 
             log.trace(s"Discarding portfolio for $address")
 
-            portfoliosToInvalidate += address
             balanceAtHeightCache.invalidate((currentHeight, addressId))
             leaseBalanceAtHeightCache.invalidate((currentHeight, addressId))
             discardLeaseBalance(address)
@@ -571,7 +574,7 @@ class LevelDBWriter(
               }
           }
 
-          rw.delete(Keys.blockHeaderAndSizeAt(h))
+          rw.delete(Keys.blockMetaAt(h))
           rw.delete(Keys.heightOf(discardedSignature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -583,11 +586,13 @@ class LevelDBWriter(
             disabledAliases = Set.empty
           }
 
-          createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+          val hitSource = rw.get(Keys.hitSource(currentHeight)).get
+          val block     = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+
+          (block, hitSource)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
-        portfoliosToInvalidate.result().foreach(discardPortfolio)
         assetInfoToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
@@ -726,7 +731,7 @@ class LevelDBWriter(
     recMergeFixed(wbh.head, wbh.tail, lbh.head, lbh.tail, ArrayBuffer.empty)
   }
 
-  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
+  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
     val activeLeaseIds = mutable.Set.empty[ByteStr]
     db.iterateOver(Keys.LeaseStatusPrefix) { e =>
       val leaseId = e.getKey.slice(2, e.getKey.length - 4)
@@ -739,7 +744,6 @@ class LevelDBWriter(
 
     val activeLeaseTransactions = for {
       leaseId <- activeLeaseIds
-      if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
       (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
       tx     <- db.get(Keys.transactionAt(h, n)).collect { case lt: LeaseTransaction if filter(lt) => lt }
     } yield tx
@@ -760,17 +764,12 @@ class LevelDBWriter(
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  override def loadBlockInfo(height: Int): Option[SignedBlockHeader] = {
+    writableDB.get(Keys.blockMetaAt(Height(height))).map(_.toSignedHeader)
   }
 
-  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    db.get(Keys.blockHeaderAndSizeAt(Height(height)))
-  }
-
-  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    db.get(Keys.heightOf(blockId))
-      .flatMap(loadBlockHeaderAndSize(_, db))
+  def loadBlockInfo(height: Int, db: ReadOnlyDB): Option[SignedBlockHeader] = {
+    db.get(Keys.blockMetaAt(Height(height))).map(_.toSignedHeader)
   }
 
   override def loadHeightOf(blockId: ByteStr): Option[Int] = {
@@ -782,8 +781,8 @@ class LevelDBWriter(
       .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAndSizeAt(height))
-          .map(_._1.featureVotes.toSeq)
+        db.get(Keys.blockMetaAt(height))
+          .map(_.header.featureVotes.toSeq)
           .getOrElse(Seq.empty)
       }
       .groupBy(identity)
@@ -796,11 +795,16 @@ class LevelDBWriter(
         settings.rewardsSettings
           .votingWindow(activatedAt, height)
           .flatMap { h =>
-            db.get(Keys.blockHeaderAndSizeAt(Height(h)))
-              .map(_._1.rewardVote)
+            db.get(Keys.blockMetaAt(Height(h)))
+              .map(_.header.rewardVote)
           }
       case _ => Seq()
     }
+  }
+
+  override def hitSource(height: Int): Option[ByteStr] = readOnly { db =>
+    db.get(Keys.hitSource(height))
+      .filter(_.arr.length == Block.HitSourceLength)
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>

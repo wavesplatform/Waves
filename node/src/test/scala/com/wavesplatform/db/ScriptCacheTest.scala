@@ -2,7 +2,7 @@ package com.wavesplatform.db
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
@@ -105,7 +105,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         case (List(account), bcu) =>
           bcu.accountScript(account.toAddress) shouldEqual Some(script)
 
-          val (lastBlock, _, _, uniqueId) = bcu.lastBlockHeaderAndSize.get
+          val SignedBlockHeader(lastBlock, uniqueId) = bcu.lastBlockHeader.get
 
           val newScriptTx = SetScriptTransaction
             .selfSigned(account, None, FEE, lastBlock.timestamp + 1)
@@ -119,7 +119,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             )
 
           bcu
-            .processBlock(blockWithEmptyScriptTx)
+            .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature)
             .explicitGet()
 
           bcu.accountScript(account.toAddress) shouldEqual None
@@ -144,7 +144,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       f(accounts, bcu)

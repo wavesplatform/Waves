@@ -20,7 +20,6 @@ import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
-import scala.concurrent.duration.Duration
 import scala.io.Codec
 
 /**
@@ -45,7 +44,7 @@ class LevelDBWriterBenchmark {
 
   @Benchmark
   def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
-    bh.consume(st.blockHeaderAndSize(st.allBlocks.random).get)
+    bh.consume(st.db.blockHeader(st.allBlocks.random).get)
   }
 
   @Benchmark

@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
@@ -15,9 +14,9 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
@@ -225,9 +224,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransaction, ReissueTransactionV1)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransactionV1)] =
     for {
-      version            <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
+      version            <- Gen.oneOf(IssueTransaction.supportedVersions.toSeq)
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
@@ -237,10 +236,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      issue = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          accountA,
+      issue = IssueTransaction.selfSigned(TxVersion.V2, accountA,
           assetName,
           description,
           quantity,
@@ -248,8 +244,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
           reissuable,
           Some(createScript(code)),
           smallFee,
-          timestamp + 1
-        )
+          timestamp + 1)
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
@@ -262,7 +257,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
     forAll(for {
       acc        <- accountGen
       genesis    <- genesisGeneratorP(acc)
-      smartIssue <- smartIssueTransactionGen(acc)
+      smartIssue <- issueV2TransactionGen(acc)
     } yield (genesis, smartIssue)) {
       case (gen, issue) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {

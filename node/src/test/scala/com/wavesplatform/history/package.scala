@@ -42,7 +42,7 @@ package object history {
   )
 
   val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
-  val generationSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
+  val generationSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block =
     buildBlockOfTxs(refTo, txs, txs.headOption.fold(0L)(_.timestamp))

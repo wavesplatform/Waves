@@ -12,11 +12,11 @@ import com.wavesplatform.utils.ScorexLogging
 package object wavesplatform extends ScorexLogging {
   private def checkOrAppend(block: Block, blockchainUpdater: Blockchain with BlockchainUpdater): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
-      blockchainUpdater.processBlock(block).right.map { _ =>
-        log.info(s"Genesis block ${blockchainUpdater.lastBlockId.get} has been added to the state")
+      blockchainUpdater.processBlock(block, block.header.generationSignature).right.map { _ =>
+        log.info(s"Genesis block ${blockchainUpdater.blockHeader(1).get.header} has been added to the state")
       }
     } else {
-      val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeaderAndSize(1).map(_._4)
+      val existingGenesisBlockId: Option[ByteStr] = blockchainUpdater.blockHeader(1).map(_.signature)
       Either.cond(existingGenesisBlockId.fold(false)(_ == block.uniqueId),
                   (),
                   GenericError("Mismatched genesis blocks in configuration and blockchain"))

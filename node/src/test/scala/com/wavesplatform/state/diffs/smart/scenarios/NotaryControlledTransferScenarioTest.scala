@@ -3,7 +3,6 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import java.nio.charset.StandardCharsets
 
 import cats.Id
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -23,10 +22,10 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.state.diffs.smart.predef.chainId
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
 import monix.eval.Coeval
@@ -35,8 +34,7 @@ import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
-  val preconditions: Gen[
-    (Seq[GenesisTransaction], IssueTransactionV2, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
+  val preconditions: Gen[(Seq[GenesisTransaction], IssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
     for {
       company  <- accountGen
       king     <- accountGen
@@ -76,9 +74,9 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransactionV2
+      issueTransaction = IssueTransaction
         .selfSigned(
-          AddressScheme.current.chainId,
+          TxVersion.V2,
           company,
           "name".getBytes(StandardCharsets.UTF_8),
           "description".getBytes(StandardCharsets.UTF_8),
@@ -112,18 +110,18 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       accountBDataTransaction = DataTransaction
         .selfSigned(accountB, List(BooleanDataEntry(transferFromAToB.id().toString, true)), 1000, ts + 5)
         .explicitGet()
-    } yield
-      (Seq(genesis1, genesis2, genesis3, genesis4, genesis5),
-       issueTransaction,
-       kingDataTransaction,
-       transferFromCompanyToA,
-       notaryDataTransaction,
-       accountBDataTransaction,
-       transferFromAToB)
-
+    } yield (
+      Seq(genesis1, genesis2, genesis3, genesis4, genesis5),
+      issueTransaction,
+      kingDataTransaction,
+      transferFromCompanyToA,
+      notaryDataTransaction,
+      accountBDataTransaction,
+      transferFromAToB
+    )
 
   def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] = {
-    val ds = DirectiveSet(V1, Asset, Expression).explicitGet()
+    val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
     val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ds)
     lazyContexts(ds)().evaluationContext(environment)
   }

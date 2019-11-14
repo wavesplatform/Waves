@@ -159,7 +159,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
           .sample
           .get
 
-      bcu.processBlock(firstBlock).explicitGet()
+      bcu.processBlock(firstBlock, firstBlock.header.generationSignature).explicitGet()
 
       f(Env(settings, pos, bcu, utxPoolStub, schedulerService, account, secondBlock))
 

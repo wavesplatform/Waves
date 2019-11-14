@@ -190,10 +190,10 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         if (multiPayment)
           Gen.listOfN(
             ContractLimits.MaxAttachedPaymentAmount - 1,
-            smartIssueTransactionGen(invoker, Gen.const(Some(commonAssetScript)))
+            issueV2TransactionGen(invoker, Gen.const(Some(commonAssetScript)))
           )
         else Gen.const(List())
-      specialIssue <- smartIssueTransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
+      specialIssue <- issueV2TransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
     } yield {
       for {
         genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)

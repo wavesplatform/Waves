@@ -2,7 +2,7 @@ package com.wavesplatform.utils
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -22,7 +22,9 @@ case object EmptyBlockchain extends Blockchain {
 
   override def score: BigInt = 0
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = None
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = None
+
+  override def hitSource(height: Int): Option[ByteStr] = None
 
   override def carryFee: Long = 0
 
@@ -67,15 +69,13 @@ case object EmptyBlockchain extends Blockchain {
 
   override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = None
 
-  override def hasAssetScript(asset: IssuedAsset): Boolean = false
-
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = 0
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
+  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *

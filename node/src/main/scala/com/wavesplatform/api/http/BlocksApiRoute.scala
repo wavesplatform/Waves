@@ -18,7 +18,7 @@ import play.api.libs.json._
 case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, commonApi: CommonBlocksApi) extends ApiRoute {
   private[this] val MaxBlocksPerRequest = 100 // todo: make this configurable and fix integration tests
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("blocks") {
       signature ~ first ~ last ~ lastHeaderOnly ~ at ~ atHeaderOnly ~ seq ~ seqHeaderOnly ~ height ~ heightEncoded ~ address ~ delay
     }
@@ -132,7 +132,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = complete {
     if (includeTransactions) commonApi.blockAtHeight(height).map(_.json().addBlockFields(height))
     else commonApi.metaAtHeight(height).map(_.json())
-    }
+  }
 
   @Path("/seq/{from}/{to}")
   @ApiOperation(value = "Block range", notes = "Get blocks at specified heights", httpMethod = "GET")
@@ -187,10 +187,10 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain, com
   private def last(includeTransactions: Boolean) = complete {
     val height = commonApi.currentHeight
     if (includeTransactions) {
-       commonApi.blockAtHeight(height).map(_.json().addBlockFields(height))
-     } else {
-       commonApi.metaAtHeight(height).map(_.json())
-     }
+      commonApi.blockAtHeight(height).map(_.json().addBlockFields(height))
+    } else {
+      commonApi.metaAtHeight(height).map(_.json())
+    }
   }
 
   @Path("/first")

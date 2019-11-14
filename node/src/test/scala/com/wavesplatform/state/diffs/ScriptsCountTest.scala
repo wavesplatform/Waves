@@ -105,18 +105,14 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       setContract                 = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts).explicitGet()
       resetContract               = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
-      issueSp = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
+      issueSp = IssueTransaction.selfSigned(TxVersion.V2, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
         .explicitGet()
       sponsorTx = SponsorFeeTransaction.selfSigned(master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
       burnSp    = BurnTransactionV2.selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueSp.id()), 1, fee, timestamp).explicitGet()
       reissueSp = ReissueTransactionV2
         .selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
         .explicitGet()
-      issueScr = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          master,
+      issueScr = IssueTransaction.selfSigned(TxVersion.V2, master,
           assetName,
           description,
           quantity + 1000000000L,
@@ -124,8 +120,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
           true,
           Some(allAllowed),
           iFee,
-          timestamp
-        )
+          timestamp)
         .explicitGet()
       burnScr = BurnTransactionV2.selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransactionV2
@@ -162,10 +157,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         .explicitGet()
 
       setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
-      issueScrB = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          acc,
+      issueScrB = IssueTransaction.selfSigned(TxVersion.V2, acc,
           assetName,
           description,
           quantity + 1000000000L,
@@ -173,8 +165,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
           true,
           Some(allAllowed),
           iFee,
-          timestamp
-        )
+          timestamp)
         .explicitGet()
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
       o1b        = Order.buy(2: Byte, master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)
@@ -238,18 +229,14 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       setContract                 = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts).explicitGet()
       resetContract               = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
-      issueSp = IssueTransactionV2
-        .selfSigned(AddressScheme.current.chainId, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
+      issueSp = IssueTransaction.selfSigned(TxVersion.V2, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
         .explicitGet()
       sponsorTx = SponsorFeeTransaction.selfSigned(master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
       burnSp    = BurnTransactionV2.selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueSp.id()), 1, fee, timestamp).explicitGet()
       reissueSp = ReissueTransactionV2
         .selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
         .explicitGet()
-      issueScr = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          master,
+      issueScr = IssueTransaction.selfSigned(TxVersion.V2, master,
           assetName,
           description,
           quantity + 1000000000L,
@@ -257,8 +244,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
           true,
           Some(allAllowed),
           iFee,
-          timestamp
-        )
+          timestamp)
         .explicitGet()
       burnScr = BurnTransactionV2.selfSigned(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), 1, fee, timestamp).explicitGet()
       reissueScr = ReissueTransactionV2
@@ -295,10 +281,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
         .explicitGet()
 
       setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
-      issueScrB = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          acc,
+      issueScrB = IssueTransaction.selfSigned(TxVersion.V2, acc,
           assetName,
           description,
           quantity + 1000000000L,
@@ -306,8 +289,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
           true,
           Some(allAllowed),
           iFee,
-          timestamp
-        )
+          timestamp)
         .explicitGet()
       assetPairB = AssetPair(IssuedAsset(issueScrB.id()), IssuedAsset(issueScr.id()))
       o1b        = Order.buy(2: Byte, master, master, assetPairB, 100000001L, 100000001L, timestamp, 10000L, 1)

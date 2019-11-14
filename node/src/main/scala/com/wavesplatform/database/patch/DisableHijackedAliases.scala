@@ -4,7 +4,6 @@ import java.util
 
 import com.wavesplatform.account.Alias
 import com.wavesplatform.database.{Keys, RW}
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 
@@ -14,32 +13,19 @@ object DisableHijackedAliases extends ScorexLogging {
   def apply(rw: RW): Set[Alias] = {
     log.info("Collecting hijacked aliases")
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
-    val height  = Height(rw.get(Keys.height))
 
-    for (h <- 1 until height) {
-      val (header, _, transactionCount, _) = rw
-        .get(Keys.blockHeaderAndSizeAt(Height(h)))
-        .get
-
-      for (n <- 0 until transactionCount) {
-        val txNum = TxNum(n.toShort)
-
-        val transactionBytes = rw
-          .get(Keys.transactionBytesAt(Height(h), txNum))
-          .get
-
-        val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
-          transactionBytes(0) == 0 &&
-            transactionBytes(1) == CreateAliasTransaction.typeId
-
-        if (isCreateAlias) {
-          TransactionParsers
-            .parseBytes(transactionBytes)
-            .foreach {
-              case cat: CreateAliasTransaction => aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
-              case _                           =>
-            }
-        }
+    rw.iterateOver(Keys.TransactionInfoPrefix) { e =>
+      val transactionBytes = e.getValue
+      val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
+        transactionBytes(0) == 0 &&
+          transactionBytes(1) == CreateAliasTransaction.typeId
+      if (isCreateAlias) {
+        TransactionParsers
+          .parseBytes(transactionBytes)
+          .foreach {
+            case cat: CreateAliasTransaction => aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
+            case _                           =>
+          }
       }
     }
 

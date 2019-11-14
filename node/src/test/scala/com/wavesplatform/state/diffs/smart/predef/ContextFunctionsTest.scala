@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -25,10 +25,10 @@ import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.PropSpec
@@ -287,9 +287,9 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           val reissuable  = true
           val assetScript = None
           val sponsored   = false
-          val issueTx = IssueTransactionV2
+          val issueTx = IssueTransaction
             .selfSigned(
-              AddressScheme.current.chainId,
+              TxVersion.V2,
               masterAcc,
               "testAsset".getBytes("UTF-8"),
               "Test asset".getBytes("UTF-8"),
@@ -365,7 +365,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  |
                  | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                   Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                   Array.fill(Block.GenerationSignatureLength)(0: Byte)
+                 )}'
                  | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
@@ -387,7 +388,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   }
 
   property("block info by height") {
-    val generatorSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
+    val generatorSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
 
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
@@ -468,7 +469,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                   WavesContext.build(
                     DirectiveSet(V3, Account, Expression).explicitGet()
                   )
-                ))
+                )
+              )
           }
 
           val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()

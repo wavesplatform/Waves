@@ -65,7 +65,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
       case (sender, r1, r2, blocks) =>
         withDomain() { d =>
           for (b <- blocks) {
-            d.blockchainUpdater.processBlock(b, verify = false)
+            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
           }
 
           Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))

@@ -210,9 +210,9 @@ case class DebugApiRoute(
   )
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
     jsonPost[RollbackParams] { params =>
-      blockchain.blockHeaderAndSize(params.rollbackTo) match {
-        case Some((_, _, _, uniqueId)) =>
-          rollbackToBlock(uniqueId, params.returnTransactionsToUtx)
+      blockchain.blockHeader(params.rollbackTo) match {
+        case Some(sh) =>
+          rollbackToBlock(sh.signature, params.returnTransactionsToUtx)
         case None =>
           (StatusCodes.BadRequest, "Block at height not found")
       }

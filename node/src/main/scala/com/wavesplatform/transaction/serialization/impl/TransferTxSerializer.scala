@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}

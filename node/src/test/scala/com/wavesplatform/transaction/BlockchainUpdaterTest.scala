@@ -9,6 +9,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.history
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state._
 import org.scalatest.words.ShouldVerb
 import org.scalatest.{FreeSpec, Matchers}
@@ -95,7 +96,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
     b.featureStatus(2, ApprovalPeriod) shouldBe BlockchainFeatureStatus.Undefined
 
-    b.removeAfter(b.blockHeaderAndSize(ApprovalPeriod - 1).get._4).explicitGet()
+    b.removeAfter(b.blockHeader(ApprovalPeriod - 1).get.signature).explicitGet()
 
     b.height shouldBe ApprovalPeriod - 1
     b.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
@@ -109,7 +110,7 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
     b.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
-    b.removeAfter(b.blockHeaderAndSize(b.height - 1).get._4).explicitGet()
+    b.removeAfter(b.blockHeader(b.height - 1).get.signature).explicitGet()
 
     b.height shouldBe 2 * ApprovalPeriod - 1
     b.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
@@ -121,13 +122,13 @@ class BlockchainUpdaterTest extends FreeSpec with Matchers with HistoryTest with
     b.featureStatus(1, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Activated
     b.featureStatus(2, 2 * ApprovalPeriod) shouldBe BlockchainFeatureStatus.Approved
 
-    b.removeAfter(b.blockHeaderAndSize(b.height - 1).get._4).explicitGet()
+    b.removeAfter(b.blockHeader(b.height - 1).get.signature).explicitGet()
 
     b.height shouldBe 2 * ApprovalPeriod - 1
     b.featureStatus(1, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Approved
     b.featureStatus(2, 2 * ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined
 
-    b.removeAfter(b.blockHeaderAndSize(ApprovalPeriod - 1).get._4).explicitGet()
+    b.removeAfter(b.blockHeader(ApprovalPeriod - 1).get.signature).explicitGet()
 
     b.height shouldBe ApprovalPeriod - 1
     b.featureStatus(1, ApprovalPeriod - 1) shouldBe BlockchainFeatureStatus.Undefined

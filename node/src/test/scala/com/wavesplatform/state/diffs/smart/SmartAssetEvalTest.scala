@@ -12,16 +12,16 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.{IssueTransactionV2, SetAssetScriptTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
-  val preconditions: Gen[(GenesisTransaction, IssueTransactionV2, SetAssetScriptTransaction, TransferTransaction)] =
+  val preconditions: Gen[(GenesisTransaction, IssueTransaction, SetAssetScriptTransaction, TransferTransaction)] =
     for {
       firstAcc  <- accountGen
       secondAcc <- accountGen
@@ -39,14 +39,12 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
 
       parsedEmptyScript = Parser.parseExpr(emptyScript).get.value
 
-      emptyExprScript = ExprScript(
-        V3,
-        ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
+      emptyExprScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransactionV2
+      issueTransaction = IssueTransaction
         .selfSigned(
-          AddressScheme.current.chainId,
+          TxVersion.V2,
           firstAcc,
           "name".getBytes(StandardCharsets.UTF_8),
           "description".getBytes(StandardCharsets.UTF_8),
@@ -77,8 +75,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
 
       untypedScript = Parser.parseExpr(assetScript).get.value
 
-      typedScript = ExprScript(V3,
-                               ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), untypedScript).explicitGet()._1)
+      typedScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), untypedScript).explicitGet()._1)
         .explicitGet()
 
       setAssetScriptTransaction = SetAssetScriptTransaction

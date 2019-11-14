@@ -4,7 +4,7 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -39,11 +39,6 @@ final case class CompositeBlockchain(
     maybeDiff
       .flatMap(_.assetScripts.get(asset))
       .getOrElse(inner.assetScript(asset))
-
-  override def hasAssetScript(asset: IssuedAsset): Boolean = maybeDiff.flatMap(_.assetScripts.get(asset)) match {
-    case Some(s) => s.nonEmpty
-    case None    => inner.hasAssetScript(asset)
-  }
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
     val script: Option[Script] = assetScript(asset).map(_._1)
@@ -117,8 +112,8 @@ final case class CompositeBlockchain(
     case Left(_)                      => diff.aliases.get(alias).toRight(AliasDoesNotExist(alias))
   }
 
-  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
-    CompositeBlockchain.collectActiveLeases(inner, maybeDiff, height, from, to)(filter)
+  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
+    CompositeBlockchain.collectActiveLeases(inner, maybeDiff)(filter)
 
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = {
     val b = Map.newBuilder[Address, A]
@@ -170,10 +165,10 @@ final case class CompositeBlockchain(
 
   override def score: BigInt = newBlock.fold(BigInt(0))(_.blockScore()) + inner.score
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] =
+  override def blockHeader(height: Int): Option[SignedBlockHeader] =
     newBlock match {
-      case Some(b) if this.height == height => Some((b.header, b.bytes().length, b.transactionData.length, b.signature))
-      case _ => inner.blockHeaderAndSize(height)
+      case Some(b) if this.height == height => Some(SignedBlockHeader(b.header, b.signature))
+      case _ => inner.blockHeader(height)
     }
 
   override def heightOf(blockId: ByteStr): Option[Int] = newBlock.filter(_.uniqueId == blockId).map(_ => height) orElse inner.heightOf(blockId)
@@ -191,15 +186,15 @@ final case class CompositeBlockchain(
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
+
+  override def hitSource(height: Int): Option[ByteStr] = inner.hitSource(height)
 }
 
 object CompositeBlockchain {
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
-      filter: LeaseTransaction => Boolean
-  ): Seq[LeaseTransaction] = {
-    val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff])(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+    val innerActiveLeases = inner.collectActiveLeases(filter)
     maybeDiff match {
-      case Some(ng) if to == height =>
+      case Some(ng) =>
         val cancelledInLiquidBlock = ng.leaseState.collect {
           case (id, false) => id
         }.toSet

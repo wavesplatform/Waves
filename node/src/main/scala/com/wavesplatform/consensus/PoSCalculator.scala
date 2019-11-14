@@ -1,15 +1,18 @@
 package com.wavesplatform.consensus
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 
 trait PoSCalculator {
-  def calculateBaseTarget(targetBlockDelaySeconds: Long,
-                          prevHeight: Int,
-                          prevBaseTarget: Long,
-                          parentTimestamp: Long,
-                          maybeGreatGrandParentTimestamp: Option[Long],
-                          timestamp: Long): Long
+  def calculateBaseTarget(
+      targetBlockDelaySeconds: Long,
+      prevHeight: Int,
+      prevBaseTarget: Long,
+      parentTimestamp: Long,
+      maybeGreatGrandParentTimestamp: Option[Long],
+      timestamp: Long
+  ): Long
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long
 }
@@ -18,12 +21,15 @@ object PoSCalculator {
   private[consensus] val HitSize: Int        = 8
   private[consensus] val MinBaseTarget: Long = 9
 
-  private[consensus] def generatorSignature(signature: Array[Byte], publicKey: PublicKey): Array[Byte] = {
+  private[consensus] def generationSignature(signature: Array[Byte], publicKey: PublicKey): ByteStr = {
     val s = new Array[Byte](crypto.DigestLength * 2)
     System.arraycopy(signature, 0, s, 0, crypto.DigestLength)
     System.arraycopy(publicKey.arr, 0, s, crypto.DigestLength, crypto.DigestLength)
-    crypto.fastHash(s)
+    ByteStr(crypto.fastHash(s))
   }
+
+  private[consensus] def generationVRFSignature(signature: Array[Byte], privateKey: PrivateKey): ByteStr =
+    ByteStr(crypto.signVRF(privateKey, signature))
 
   private[consensus] def hit(generatorSignature: Array[Byte]): BigInt = BigInt(1, generatorSignature.take(HitSize).reverse)
 
@@ -45,12 +51,14 @@ object NxtPoSCalculator extends PoSCalculator {
 
   import PoSCalculator._
 
-  def calculateBaseTarget(targetBlockDelaySeconds: Long,
-                          prevHeight: Int,
-                          prevBaseTarget: Long,
-                          parentTimestamp: Long,
-                          maybeGreatGrandParentTimestamp: Option[Long],
-                          timestamp: Long): Long = {
+  def calculateBaseTarget(
+      targetBlockDelaySeconds: Long,
+      prevHeight: Int,
+      prevBaseTarget: Long,
+      parentTimestamp: Long,
+      maybeGreatGrandParentTimestamp: Option[Long],
+      timestamp: Long
+  ): Long = {
 
     if (prevHeight % 2 == 0) {
       val meanBlockDelay  = maybeGreatGrandParentTimestamp.fold(timestamp - parentTimestamp)(ts => (timestamp - ts) / MeanCalculationDepth) / 1000
@@ -82,7 +90,7 @@ object FairPoSCalculator extends PoSCalculator {
   private val MaxSignature: Array[Byte] = Array.fill[Byte](HitSize)(-1)
   private val MaxHit: BigDecimal        = BigDecimal(BigInt(1, MaxSignature))
   private val C1                        = 70000
-  private val C2                        = 5E17
+  private val C2                        = 5e17
   private val TMin                      = 5000
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = {
@@ -91,12 +99,14 @@ object FairPoSCalculator extends PoSCalculator {
     a.toLong
   }
 
-  def calculateBaseTarget(targetBlockDelaySeconds: Long,
-                          prevHeight: Int,
-                          prevBaseTarget: Long,
-                          parentTimestamp: Long,
-                          maybeGreatGrandParentTimestamp: Option[Long],
-                          timestamp: Long): Long = {
+  def calculateBaseTarget(
+      targetBlockDelaySeconds: Long,
+      prevHeight: Int,
+      prevBaseTarget: Long,
+      parentTimestamp: Long,
+      maybeGreatGrandParentTimestamp: Option[Long],
+      timestamp: Long
+  ): Long = {
     val maxDelay = normalize(90, targetBlockDelaySeconds)
     val minDelay = normalize(30, targetBlockDelaySeconds)
 

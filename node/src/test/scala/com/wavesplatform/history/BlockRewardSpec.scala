@@ -18,6 +18,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.{NoShrink, TransactionGen}
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -222,7 +223,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner1)
       b3        = mkEmptyBlock(b2.uniqueId, miner1)
       b4        = TestBlock.create(ntpNow, b3.uniqueId, Seq(tx1), miner1)
-      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx2)), miner2, 3, ntpNow)
+      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx2)), miner2, 3.toByte, ntpNow)
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result =
@@ -233,7 +234,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
         withDomain(rewardSettings) { d =>
           b2s.foldLeft[Option[Block]](None) { (prevBlock, curBlock) =>
             val BlockDiffer.Result(diff, carryFee, totalFee, _, _) = differ(d.levelDBWriter, prevBlock, curBlock)
-            d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock)
+            d.levelDBWriter.append(diff, carryFee, totalFee, None, curBlock.header.generationSignature, curBlock)
             Some(curBlock)
           }
 
@@ -267,7 +268,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)
       b4        = mkEmptyBlock(b3.uniqueId, miner)
-      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx)), miner, 3, ntpNow)
+      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx)), miner, 3.toByte, ntpNow)
       b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
       b6b = TestBlock.sign(
         miner,
@@ -308,7 +309,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)
       b4        = mkEmptyBlock(b3.uniqueId, miner)
-      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx1)), miner, 3, ntpNow)
+      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx1)), miner, 3.toByte, ntpNow)
       b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
       b6b       = TestBlock.sign(miner, b6a.copy(transactionData = Seq(tx2)))
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)

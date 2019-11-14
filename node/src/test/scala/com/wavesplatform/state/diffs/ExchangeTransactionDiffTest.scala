@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.db.WithState
@@ -16,8 +16,8 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AccountBalanceError
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1, IssueTransactionV2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -438,13 +438,13 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
   }
 
   property("buy waves without enough money for fee") {
-    val preconditions: Gen[(GenesisTransaction, GenesisTransaction, IssueTransactionV1, ExchangeTransaction)] = for {
+    val preconditions: Gen[(GenesisTransaction, GenesisTransaction, IssueTransaction, ExchangeTransaction)] = for {
       buyer  <- accountGen
       seller <- accountGen
       ts     <- timestampGen
       gen1: GenesisTransaction = GenesisTransaction.create(buyer, 1 * Constants.UnitsInWave, ts).explicitGet()
       gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
-      issue1: IssueTransactionV1 <- issueGen(buyer)
+      issue1: IssueTransaction <- issueGen(buyer)
       exchange <- Gen.oneOf(
         exchangeV1GeneratorP(buyer, seller, Waves, IssuedAsset(issue1.id()), fixedMatcherFee = Some(300000)),
         exchangeV2GeneratorP(buyer, seller, Waves, IssuedAsset(issue1.id()), fixedMatcherFee = Some(300000))
@@ -490,7 +490,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, IssueTransaction)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -498,7 +498,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         ts      <- timestampGen
         gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
         gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
-        issue1: IssueTransactionV1 <- issueGen(seller)
+        issue1: IssueTransaction <- issueGen(seller)
       } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) {
@@ -539,7 +539,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, IssueTransaction)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -547,7 +547,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         ts      <- timestampGen
         gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
         gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
-        issue1: IssueTransactionV1 <- issueGen(seller, fixedQuantity = Some(1000L))
+        issue1: IssueTransaction <- issueGen(seller, fixedQuantity = Some(1000L))
       } yield (buyer, seller, matcher, gen1, gen2, issue1)
 
     forAll(preconditions, priceGen) {
@@ -589,7 +589,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     val MatcherFee = 300000L
     val Ts         = 1000L
 
-    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransactionV1)] =
+    val preconditions: Gen[(KeyPair, KeyPair, KeyPair, GenesisTransaction, GenesisTransaction, GenesisTransaction, IssueTransaction)] =
       for {
         buyer   <- accountGen
         seller  <- accountGen
@@ -598,7 +598,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         gen1: GenesisTransaction = GenesisTransaction.create(buyer, ENOUGH_AMT, ts).explicitGet()
         gen2: GenesisTransaction = GenesisTransaction.create(seller, ENOUGH_AMT, ts).explicitGet()
         gen3: GenesisTransaction = GenesisTransaction.create(matcher, ENOUGH_AMT, ts).explicitGet()
-        issue1: IssueTransactionV1 <- issueGen(buyer, fixedQuantity = Some(Long.MaxValue))
+        issue1: IssueTransaction <- issueGen(buyer, fixedQuantity = Some(Long.MaxValue))
       } yield (buyer, seller, matcher, gen1, gen2, gen3, issue1)
 
     val (buyer, seller, matcher, gen1, gen2, gen3, issue1) = preconditions.sample.get
@@ -807,8 +807,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     val sellerScript = Some(ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1)
     val buyerScript  = Some(ScriptCompiler(script, isAssetScript = false, estimator).explicitGet()._1)
 
-    val chainId = AddressScheme.current.chainId
-
     forAll(for {
       buyer  <- accountGen
       seller <- accountGen
@@ -816,11 +814,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       genesis = GenesisTransaction.create(MATCHER, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransactionV2
-        .selfSigned(chainId, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
+      asset1 = IssueTransaction
+        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
-      asset2 = IssueTransactionV2
-        .selfSigned(chainId, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
+      asset2 = IssueTransaction
+        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
@@ -893,8 +891,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
   ): Gen[(GenesisTransaction, List[TransferTransaction], List[Transaction], ExchangeTransaction)] = {
     val enoughFee = 100000000
 
-    val chainId = AddressScheme.current.chainId
-
     for {
       txScript <- txScript
       txScriptCompiled = ScriptCompiler(txScript, isAssetScript = false, estimator).explicitGet()._1
@@ -909,11 +905,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       genesis = GenesisTransaction.create(MATCHER, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransactionV2
-        .selfSigned(chainId, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
+      asset1 = IssueTransaction
+        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
-      asset2 = IssueTransactionV2
-        .selfSigned(chainId, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
+      asset2 = IssueTransaction
+        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)

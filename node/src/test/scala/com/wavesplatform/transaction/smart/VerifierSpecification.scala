@@ -54,9 +54,9 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   property("ExchangeTransaction - matcherFeeAssetId's in custom exchange transaction should be verified") {
     forAll(exchangeTransactionV2WithArbitraryFeeAssetsInOrdersGen) { tx =>
       val (invalidScript, comp) = ScriptCompiler.compile("(5 / 0) == 2", estimator).explicitGet()
-      val falseScript        = ExprScript(Terms.FALSE).explicitGet()
+      val falseScript           = ExprScript(Terms.FALSE).explicitGet()
 
-      setFeeAssetScriptsAndVerify(Some(invalidScript -> comp), None)(tx) should produce("ScriptExecutionError")        // buy order:  matcherFeeAsset has invalid script
+      setFeeAssetScriptsAndVerify(Some(invalidScript -> comp), None)(tx) should produce("ScriptExecutionError") // buy order:  matcherFeeAsset has invalid script
       setFeeAssetScriptsAndVerify(None, Some((falseScript, 1)))(tx) should produce("TransactionNotAllowedByScript") // sell order: matcherFeeAsset script gives false as a result
       setFeeAssetScriptsAndVerify(None, None)(tx) shouldBe 'right
     }
@@ -68,12 +68,13 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
     sender2: KeyPair <- accountGen
-    assetPair                  <- assetPairGen
-    r                          <- exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset, orderVersions = Set(2, 3))
+    assetPair        <- assetPairGen
+    r                <- exchangeV2GeneratorP(sender1, sender2, assetPair.amountAsset, assetPair.priceAsset, orderVersions = Set(2, 3))
   } yield r
 
   private def setFeeAssetScriptsAndVerify(buyFeeAssetScript: Option[(Script, Long)], sellFeeAssetScript: Option[(Script, Long)])(
-      tx: ExchangeTransaction): ValidationResult[Transaction] = {
+      tx: ExchangeTransaction
+  ): ValidationResult[Transaction] = {
 
     val blockchain = stub[Blockchain]
 
@@ -87,7 +88,6 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       case (asset: IssuedAsset, scriptOption) =>
         (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(tx.sender, 8))
         (blockchain.assetScript _).when(asset).returns(scriptOption)
-        (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)
       case _ =>
     }
 

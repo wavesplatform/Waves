@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -30,7 +30,12 @@ object Keys {
     historyKey("asset-balance-history", 8, addressId.toByteArray ++ asset.id.arr)
   val AssetBalancePrefix: Short = 9
   def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =
-    Key("asset-balance", hBytes(AssetBalancePrefix, height, addressId.toByteArray ++ asset.id.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
+    Key(
+      "asset-balance",
+      hBytes(AssetBalancePrefix, height, addressId.toByteArray ++ asset.id.arr),
+      Option(_).fold(0L)(Longs.fromByteArray),
+      Longs.toByteArray
+    )
 
   def assetInfoHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-info-history", 10, asset.id.arr)
   def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
@@ -71,7 +76,7 @@ object Keys {
   def dataKeyChunk(addressId: BigInt, chunkNo: Int): Key[Seq[String]] =
     Key("data-key-chunk", addr(32, addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
 
-  val DataHistoryPrefix: Short = 33
+  val DataHistoryPrefix: Short                                   = 33
   def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey("data-history", 33, addressId.toByteArray ++ key.getBytes(UTF_8))
   def data(addressId: BigInt, key: String)(height: Int): Key[Option[DataEntry[_]]] =
     Key.opt("data", hBytes(34, height, addressId.toByteArray ++ key.getBytes(UTF_8)), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
@@ -96,7 +101,7 @@ object Keys {
   def assetScript(asset: IssuedAsset)(height: Int): Key[Option[Script]] =
     Key.opt("asset-script", hBytes(47, height, asset.id.arr), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
-    Key.opt("asset-script", hBytes(47, height, asset.id.arr), (_ => ()), (_ => Array[Byte]()))
+    Key.opt("asset-script", hBytes(47, height, asset.id.arr), _ => (), _ => Array[Byte]())
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 
@@ -105,8 +110,8 @@ object Keys {
 
   val BlockHeaderPrefix: Short = 50
 
-  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int, Int, ByteStr)]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
+  def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
+    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo(height), writeBlockInfo)
 
   def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
@@ -175,9 +180,12 @@ object Keys {
   val wavesAmountPrefix: Short              = 58
   def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(wavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 
+  val HitSourcePrefix: Short                       = 59
+  def hitSource(height: Int): Key[Option[ByteStr]] = Key.opt("hit-source", h(HitSourcePrefix, height), ByteStr(_), _.arr)
+
   val disabledAliases: Key[Set[Alias]] = Key(
     "disabled-aliases",
-    Shorts.toByteArray(59.toShort),
+    Shorts.toByteArray(60.toShort),
     b => readStrings(b).map(s => Alias.create(s).explicitGet()).toSet,
     as => writeStrings(as.map(_.name).toSeq)
   )

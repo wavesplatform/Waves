@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -12,9 +12,9 @@ import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalatest.{Inside, PropSpec}
 
 class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
@@ -61,9 +61,9 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
     val master  = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
     val genesis = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
 
-    val issueTransaction = IssueTransactionV2
+    val issueTransaction = IssueTransaction
       .selfSigned(
-        chainId = AddressScheme.current.chainId,
+        TxVersion.V2,
         sender = KeyPair(seed.bytes),
         name = "name".getBytes(StandardCharsets.UTF_8),
         description = "description".getBytes(StandardCharsets.UTF_8),
@@ -77,7 +77,17 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
       .explicitGet()
 
     val transferTransaction = TransferTransaction
-      .selfSigned(version = 2.toByte, sender = KeyPair(master.bytes), recipient = master, asset = IssuedAsset(issueTransaction.id()), amount = 1, feeAsset = Waves, fee = 10000000, attachment = Array[Byte](), timestamp = 0)
+      .selfSigned(
+        version = 2.toByte,
+        sender = KeyPair(master.bytes),
+        recipient = master,
+        asset = IssuedAsset(issueTransaction.id()),
+        amount = 1,
+        feeAsset = Waves,
+        fee = 10000000,
+        attachment = Array[Byte](),
+        timestamp = 0
+      )
       .explicitGet()
 
     assertDiffEi(

@@ -14,6 +14,7 @@ import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
@@ -22,7 +23,6 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves

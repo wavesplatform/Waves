@@ -1,12 +1,16 @@
 package com.wavesplatform.api
 
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.serialization.BlockHeaderSerializer
+import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 case class BlockMeta(header: BlockHeader, size: Int, transactionCount: Int, signature: ByteStr, height: Int) {
-  val json = header.json.map {
-    _ ++ BlockMeta.json(size, transactionCount, signature) ++ Json.obj("height" -> height)
+  def toSignedHeader: SignedBlockHeader = SignedBlockHeader(header, signature)
+
+  val json = Coeval.evalOnce {
+    BlockHeaderSerializer.toJson(header, size, transactionCount, signature) ++ Json.obj("height" -> height)
   }
 }
 

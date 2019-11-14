@@ -14,18 +14,7 @@ import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
-import com.wavesplatform.api.http.requests.{
-  BurnV1Request,
-  ExchangeRequest,
-  IssueV1Request,
-  MassTransferRequest,
-  ReissueV1Request,
-  SignedBurnV1Request,
-  SignedIssueV1Request,
-  SignedReissueV1Request,
-  SponsorFeeRequest,
-  TransferRequest
-}
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
@@ -213,7 +202,7 @@ case class AssetsApiRoute(
     } ~ (path("masstransfer") & withAuth) {
       broadcast[MassTransferRequest](TransactionFactory.massTransferAsset(_, wallet, time))
     } ~ (path("issue") & withAuth) {
-      broadcast[IssueV1Request](TransactionFactory.issueAssetV1(_, wallet, time))
+      broadcast[IssueRequest](TransactionFactory.issue(_, wallet, time))
     } ~ (path("reissue") & withAuth) {
       broadcast[ReissueV1Request](TransactionFactory.reissueAssetV1(_, wallet, time))
     } ~ (path("burn") & withAuth) {
@@ -223,7 +212,7 @@ case class AssetsApiRoute(
     } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
       wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
     }) ~ pathPrefix("broadcast")(
-      path("issue")(broadcast[SignedIssueV1Request](_.toTx)) ~
+      path("issue")(broadcast[IssueRequest](_.toTx)) ~
         path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
         path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
         path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~

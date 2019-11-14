@@ -15,11 +15,11 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV1}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransactionV1}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
@@ -70,7 +70,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             }
           }
           val blocks        = newBlocks(0)
-          val droppedBlocks = d.removeAfter(genesisSignature)
+          val droppedBlocks = d.removeAfter(genesisSignature).map(_._1)
           droppedBlocks(0).header.reference shouldBe genesisSignature
           droppedBlocks.map(_.uniqueId).toList shouldBe blocks
           droppedBlocks foreach d.appendBlock
@@ -208,7 +208,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransactionV1.selfSigned(sender, "test".getBytes("UTF-8"), Array.empty[Byte], assetAmount, 8, true, 1, nextTs).explicitGet()
+            IssueTransaction
+              .selfSigned(TxVersion.V1, sender, "test".getBytes("UTF-8"), Array.empty[Byte], assetAmount, 8, true, script = None, 1, nextTs)
+              .explicitGet()
 
           d.appendBlock(
             TestBlock.create(
@@ -251,7 +253,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
-          val issueTransaction = IssueTransactionV1.selfSigned(sender, name, description, 2000, 8, true, 1, nextTs).explicitGet()
+          val issueTransaction =
+            IssueTransaction.selfSigned(TxVersion.V1, sender, name, description, 2000, 8, true, script = None, 1, nextTs).explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
           d.appendBlock(

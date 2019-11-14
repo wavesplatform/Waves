@@ -6,6 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}

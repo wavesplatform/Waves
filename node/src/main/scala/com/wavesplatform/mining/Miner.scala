@@ -4,7 +4,7 @@ import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.Block._
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
@@ -119,7 +119,7 @@ class MinerImpl(
   ): Either[String, NxtLikeConsensusBlockData] = {
     pos
       .consensusData(
-        account.publicKey,
+        account,
         height,
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,
@@ -136,23 +136,23 @@ class MinerImpl(
     val version             = blockchainUpdater.currentBlockVersion
     val lastBlock           = blockchainUpdater.lastBlockHeader.get
     val referencedBlockInfo = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
-    val refBlockBT          = referencedBlockInfo.consensus.baseTarget
+    val refBlockBT          = referencedBlockInfo.baseTarget
     val refBlockTS          = referencedBlockInfo.timestamp
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
-    lazy val blockDelay     = currentTime - lastBlock.timestamp
+    lazy val blockDelay     = currentTime - lastBlock.header.timestamp
     lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
       validBlockDelay <- pos
-        .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
+        .getValidBlockDelay(height, account, refBlockBT, balance)
         .leftMap(_.toString)
         .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
       _ = log.debug(
         s"Forging with ${account.toAddress}, Time $blockDelay > Estimated Time $validBlockDelay, balance $balance, prev block $refBlockID at $height with target $refBlockBT"
       )
-      consensusData <- consensusData(height, account, lastBlock, refBlockBT, refBlockTS, balance, currentTime)
+      consensusData <- consensusData(height, account, lastBlock.header, refBlockBT, refBlockTS, balance, currentTime)
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
       (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
@@ -162,7 +162,7 @@ class MinerImpl(
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(
-          version.toByte,
+          version,
           currentTime,
           refBlockID,
           consensusData.baseTarget,
@@ -182,7 +182,7 @@ class MinerImpl(
   }
 
   private def blockFeatures(version: TxVersion): Set[Short] = {
-    if (version <= 2) Set.empty[Short]
+    if (version <= PlainBlockVersion) Set.empty[Short]
     else
       settings.featuresSettings.supported
         .filterNot(blockchainUpdater.approvedFeatures.keySet)
@@ -214,7 +214,7 @@ class MinerImpl(
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
     val height    = blockchainUpdater.height
-    val (lastBlock, _, _, uniqueId) = blockchainUpdater.blockHeaderAndSize(height).get
+    val SignedBlockHeader(lastBlock, uniqueId) = blockchainUpdater.blockHeader(height).get
     for {
       _  <- checkAge(height, lastBlock.timestamp)
       _  <- checkScript(account)
@@ -297,14 +297,14 @@ class MinerImpl(
 }
 
 object Miner {
-  val blockMiningStarted = Kamon.counter("block-mining-started")
-  val microMiningStarted = Kamon.counter("micro-mining-started")
+  private[mining] val blockMiningStarted = Kamon.counter("block-mining-started")
+  private[mining] val microMiningStarted = Kamon.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 500
 
   case object Disabled extends Miner with MinerDebugInfo {
     override def scheduleMining(): Unit                                                         = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
-    override val state                                                                          = MinerDebugInfo.Disabled
+    override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 }

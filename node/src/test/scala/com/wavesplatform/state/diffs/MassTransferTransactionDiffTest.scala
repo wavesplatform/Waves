@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
@@ -34,7 +34,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
           amount    <- Gen.choose(100000L, 1000000000L)
         } yield ParsedTransfer(recipient, amount)
         transfers                              <- Gen.listOfN(transferCount, transferGen)
-        (assetIssue: IssueTransactionV1, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, master)
+        (assetIssue: IssueTransaction, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, master)
         maybeAsset                             <- Gen.option(assetIssue.id()).map(Asset.fromCompatId)
         transfer                               <- massTransferGeneratorP(master, transfers, maybeAsset)
       } yield (genesis, assetIssue, transfer)
@@ -110,7 +110,7 @@ class MassTransferTransactionDiffTest extends PropSpec with PropertyChecks with 
     val setup = for {
       (genesis, master)                      <- baseSetup
       recipients                             <- Gen.listOfN(2, accountGen.map(acc => ParsedTransfer(acc.toAddress, ENOUGH_AMT / 2 + 1)))
-      (assetIssue: IssueTransactionV1, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, master)
+      (assetIssue: IssueTransaction, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, master)
       maybeAsset                             <- Gen.option(assetIssue.id()).map(Asset.fromCompatId)
       transfer                               <- massTransferGeneratorP(master, recipients, maybeAsset)
     } yield (genesis, transfer)

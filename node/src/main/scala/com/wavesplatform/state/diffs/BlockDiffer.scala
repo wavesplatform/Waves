@@ -117,7 +117,7 @@ object BlockDiffer extends ScorexLogging {
 
     val currentBlockHeight = blockchain.height
     val timestamp          = blockchain.lastBlockTimestamp.get
-    val blockGenerator     = blockchain.lastBlockHeader.get.generator.toAddress
+    val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
 
     val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)

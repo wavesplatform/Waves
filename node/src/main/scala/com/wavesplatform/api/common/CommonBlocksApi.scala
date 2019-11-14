@@ -32,14 +32,9 @@ trait CommonBlocksApi {
 }
 
 object CommonBlocksApi {
-  def apply(blockchain: Blockchain, blockAt: Int => Option[Block]): CommonBlocksApi = new CommonBlocksApi {
+  def apply(blockchain: Blockchain, blockAt: Int => Option[Block], blockMetaAt: Int => Option[BlockMeta]): CommonBlocksApi = new CommonBlocksApi {
     private def fixHeight(h: Int)                  = if (h <= 0) blockchain.height + h else h
     private def heightOf(id: ByteStr): Option[Int] = blockchain.heightOf(id)
-
-    private def blockHeaderAt(height: Int): Option[BlockMeta] =
-      blockchain.blockHeaderAndSize(height).map {
-        case (header, size, txCount, uniqueId) => BlockMeta(header, size, txCount, uniqueId, height)
-      }
 
     def blocksRange(fromHeight: Int, toHeight: Int): Observable[(Block, Int)] =
       metaRange(fromHeight, toHeight).flatMap { m =>
@@ -61,7 +56,7 @@ object CommonBlocksApi {
       heightOf(blockId)
         .map { maxHeight =>
           val minHeight  = maxHeight - blockNum.max(1)
-          val allHeaders = (minHeight to maxHeight).flatMap(blockHeaderAt)
+          val allHeaders = (minHeight to maxHeight).flatMap(h => blockMetaAt(h))
           val totalPeriod = allHeaders
             .sliding(2)
             .map { pair =>
@@ -75,12 +70,12 @@ object CommonBlocksApi {
 
     def blockAtHeight(height: Int): Option[Block] = blockAt(height)
 
-    def metaAtHeight(height: Int): Option[BlockMeta] = blockHeaderAt(height)
+    def metaAtHeight(height: Int): Option[BlockMeta] = blockMetaAt(height)
 
-    def meta(id: ByteStr): Option[BlockMeta] = heightOf(id).flatMap(blockHeaderAt)
+    def meta(id: ByteStr): Option[BlockMeta] = heightOf(id).flatMap(blockMetaAt)
 
     def metaRange(fromHeight: Int, toHeight: Int): Observable[BlockMeta] =
-      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(blockHeaderAt))
+      Observable.fromIterable((fixHeight(fromHeight) to fixHeight(toHeight)).flatMap(h => blockMetaAt(h)))
 
     def block(blockId: BlockId): Option[(Block, Int)] = heightOf(blockId).flatMap(h => blockAt(h).map(_ -> h))
   }

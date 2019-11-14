@@ -10,7 +10,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalacheck.Gen
 import org.scalatest._
@@ -126,8 +126,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransactionV1
-          .selfSigned(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
+        issue = IssueTransaction.selfSigned(TxVersion.V1, sender, assetName, description, quantity, decimals, reissuable = reissuable, script = None, iFee, timestamp)
           .right
           .get
         minFee <- smallFeeGen
@@ -141,8 +140,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       for {
         sender                                                                       <- accountGen
         (_, assetName, description, quantity, decimals, reissuable, iFee, timestamp) <- issueParamGen
-        issue = IssueTransactionV1
-          .selfSigned(sender, assetName, description, quantity, decimals, reissuable = reissuable, iFee, timestamp)
+        issue = IssueTransaction.selfSigned(TxVersion.V1, sender, assetName, description, quantity, decimals, reissuable = reissuable, script = None, iFee, timestamp)
           .right
           .get
         minFee  = None
@@ -155,7 +153,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
-      issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
+      issue   = IssueTransaction.selfSigned(TxVersion.V1, acc, name, desc, quantity, decimals, reissuable, script = None, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity)
       sponsor  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee, Array(), ts).explicitGet()
@@ -178,7 +176,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
-      issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
+      issue   = IssueTransaction.selfSigned(TxVersion.V1, acc, name, desc, quantity, decimals, reissuable, script = None, fee, ts).explicitGet()
       minFee <- Gen.choose(1000000, issue.quantity)
       sponsor = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransaction
@@ -206,7 +204,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
     val setup = for {
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
-      issue   = IssueTransactionV1.selfSigned(acc, name, desc, quantity, decimals, reissuable, fee, ts).explicitGet()
+      issue   = IssueTransaction.selfSigned(TxVersion.V1, acc, name, desc, quantity, decimals, reissuable, script = None, fee, ts).explicitGet()
       minFee <- Gen.choose(1, issue.quantity / 11)
 
       sponsor1  = SponsorFeeTransaction.selfSigned(acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()

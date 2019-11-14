@@ -13,7 +13,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -38,13 +38,13 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  private def paymentPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransactionV2, KeyPair, Long, Long)] =
+  private def paymentPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Long, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
       fee     <- ciFee(1)
-      issue   <- smartIssueTransactionGen(master, Gen.const(None), forceReissuable = true)
+      issue   <- issueV2TransactionGen(master, Gen.const(None), forceReissuable = true)
       reissueAmount <- positiveLongGen
       burnAmount    <- Gen.choose(0, reissueAmount)
     } yield {

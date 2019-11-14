@@ -9,6 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -264,8 +265,8 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeBlockHeaderAndSize(data: (BlockHeader, Int, Int, ByteStr)): Array[Byte] = {
-    val (bh, size, transactionCount, signature) = data
+  def writeBlockInfo(data: BlockMeta): Array[Byte] = {
+    val BlockMeta(bh, size, transactionCount, signature, _) = data
 
     val ndo = newDataOutput()
 
@@ -294,7 +295,7 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int, Int, ByteStr) = {
+  def readBlockInfo(height: Int)(bs: Array[Byte]): BlockMeta = {
     val ndi = newDataInput(bs)
 
     val size   = ndi.readInt()
@@ -306,17 +307,18 @@ package object database extends ScorexLogging {
 
     val baseTarget = ndi.readLong()
 
-    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+    val genSig = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
-      if (version == 1 || version == 2) ndi.readByte()
+      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
       else ndi.readInt()
     }
+
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
@@ -324,7 +326,7 @@ package object database extends ScorexLogging {
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header =  new BlockHeader(
+    val header =  BlockHeader(
       version,
       timestamp,
       ByteStr(referenceArr),
@@ -335,7 +337,7 @@ package object database extends ScorexLogging {
       rewardVote
     )
 
-    (header, size, transactionCount, ByteStr(signature))
+    BlockMeta(header, size, transactionCount, ByteStr(signature), height)
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum, ByteStr)]) = {
@@ -452,10 +454,10 @@ package object database extends ScorexLogging {
     )
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockHeaderAndSizeAt(height)
+    val headerKey = Keys.blockMetaAt(height)
 
     for {
-      (header, _, transactionCount, signature) <- db.get(headerKey)
+      BlockMeta(header, _, transactionCount, signature, _) <- db.get(headerKey)
       txs = (0 until transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }
