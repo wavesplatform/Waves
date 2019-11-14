@@ -1,12 +1,14 @@
 package com.wavesplatform.api.http
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, Validation}
-import com.wavesplatform.transaction.{Asset, AssetIdStringLength, Proofs, TxValidationError}
+import com.wavesplatform.transaction.{Asset, AssetIdStringLength, Proofs, TxValidationError, TxVersion}
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json._
 import supertagged.TaggedType
@@ -84,4 +86,11 @@ package object requests {
       case _           => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
   }
+
+  private[requests] implicit class RequestStrExt(private val str: String) extends AnyVal {
+    def utf8Bytes: Array[Byte] = str.getBytes(StandardCharsets.UTF_8)
+  }
+
+  private[requests] def defaultVersion = TxVersion.V1
+  private[requests] def defaultTimestamp = 0L
 }

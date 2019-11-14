@@ -4,7 +4,7 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, ReissueTransactionV2}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransactionV2}
 import org.scalacheck.Gen
 import play.api.libs.json._
 
@@ -34,7 +34,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
       fee                                                                      <- smallFeeGen
       reissuable                                                               <- Gen.oneOf(true, false)
     } yield {
-      val issue = IssueTransactionV1.selfSigned(sender, assetName, description, quantity, decimals, reissuable = true, iFee, timestamp).explicitGet()
+      val issue = IssueTransaction.selfSigned(TxVersion.V1, sender, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp).explicitGet()
       val reissue1 = ReissueTransactionV2
         .selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(issue.assetId), quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()

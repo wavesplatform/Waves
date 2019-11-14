@@ -117,35 +117,19 @@ object PBTransactions {
         } yield tx
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
-        version match {
-          case 1 =>
-            vt.assets.IssueTransactionV1.create(
-              sender,
-              name.toByteArray,
-              description.toByteArray,
-              quantity,
-              decimals.toByte,
-              reissuable,
-              feeAmount,
-              timestamp,
-              signature
-            )
-          case 2 =>
-            vt.assets.IssueTransactionV2.create(
-              chainId,
-              sender,
-              name.toByteArray,
-              description.toByteArray,
-              quantity,
-              decimals.toByte,
-              reissuable,
-              script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
-              feeAmount,
-              timestamp,
-              proofs
-            )
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.assets.IssueTransaction.create(
+          version.toByte,
+          sender,
+          name.toByteArray,
+          description.toByteArray,
+          quantity,
+          decimals.toByte,
+          reissuable,
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
         version match {
@@ -313,35 +297,19 @@ object PBTransactions {
         )
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
-        version match {
-          case 1 =>
-            vt.assets.IssueTransactionV1(
-              sender,
-              name.toByteArray,
-              description.toByteArray,
-              quantity,
-              decimals.toByte,
-              reissuable,
-              feeAmount,
-              timestamp,
-              signature
-            )
-          case 2 =>
-            vt.assets.IssueTransactionV2(
-              chainId,
-              sender,
-              name.toByteArray,
-              description.toByteArray,
-              quantity,
-              decimals.toByte,
-              reissuable,
-              script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
-              feeAmount,
-              timestamp,
-              proofs
-            )
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.assets.IssueTransaction(
+          version.toByte,
+          sender,
+          name.toByteArray,
+          description.toByteArray,
+          quantity,
+          decimals.toByte,
+          reissuable,
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
         version match {

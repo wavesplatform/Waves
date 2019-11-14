@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -73,7 +73,9 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransactionV1.selfSigned(from, "test".getBytes(), "".getBytes(), 1, 0, reissuable = false, 100000000L, timestamp).explicitGet()
+      } yield IssueTransaction
+        .selfSigned(TxVersion.V1, from, "test".getBytes(), "".getBytes(), 1, 0, reissuable = false, script = None, 100000000L, timestamp)
+        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {

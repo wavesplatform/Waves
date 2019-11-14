@@ -27,7 +27,7 @@ class AssetsApiRouteSpec
   private val route =
     AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime).route
 
-  private val smartAssetTx = smartIssueTransactionGen().retryUntil(_.script.nonEmpty).sample.get
+  private val smartAssetTx = issueV2TransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
     issuer = smartAssetTx.sender,
     name = smartAssetTx.name,
