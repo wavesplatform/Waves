@@ -6,7 +6,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransaction, ReissueTransactionV1}
+import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
@@ -19,7 +19,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   val Waves: Long = 100000000
 
   type Setup =
-    (Long, GenesisTransaction, TransferTransaction, IssueTransaction, BurnTransactionV1, ReissueTransactionV1)
+    (Long, GenesisTransaction, TransferTransaction, IssueTransaction, BurnTransactionV1, ReissueTransaction)
 
   val preconditions: Gen[Setup] = for {
     master                                                   <- accountGen
@@ -35,8 +35,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
       .selfSigned(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
       .explicitGet()
     burn: BurnTransactionV1 = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
-    reissue: ReissueTransactionV1 = ReissueTransactionV1
-      .selfSigned(alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
+    reissue: ReissueTransaction = ReissueTransaction.selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
       .explicitGet()
   } yield (ts, genesis, masterToAlice, issue, burn, reissue)
 

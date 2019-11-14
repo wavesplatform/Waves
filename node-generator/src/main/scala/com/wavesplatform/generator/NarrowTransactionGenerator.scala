@@ -133,22 +133,18 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
 
-          case ReissueTransactionV2 =>
+          case ReissueTransaction =>
             (
               for {
                 assetTx <- randomFrom(reissuableIssueTxs) orElse randomFrom(Universe.IssuedAssets.filter(_.reissuable))
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx <- logOption(
-                  ReissueTransactionV2
-                    .selfSigned(
-                      AddressScheme.current.chainId,
-                      sender,
+                  ReissueTransaction.selfSigned(2.toByte, sender,
                       IssuedAsset(assetTx.id()),
                       Random.nextInt(Int.MaxValue),
                       true,
                       100400000L,
-                      timestamp
-                    )
+                      timestamp)
                 )
               } yield tx
             ).logNone("There is no reissuable assets, may be you need to increase issue transaction's probability or pre-configure them")

@@ -143,7 +143,7 @@ object InvokeScriptTransactionDiff {
           )
 
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
-          assetsComplexity = (tx.checkedAssets().map(_.id) ++ transfers.flatMap(_.assetId))
+          assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
             .map(_._2)
 
@@ -173,7 +173,7 @@ object InvokeScriptTransactionDiff {
           paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
             val totalScriptsInvoked =
-              tx.checkedAssets()
+              tx.checkedAssets
                 .collect { case asset @ IssuedAsset(_) => asset }
                 .count(blockchain.hasAssetScript) +
                 transfers.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
