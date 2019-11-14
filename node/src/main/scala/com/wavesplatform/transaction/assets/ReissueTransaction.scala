@@ -37,6 +37,8 @@ case class ReissueTransaction(
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override def chainByte: Option[Byte] = if (version >= TxVersion.V2) Some(AddressScheme.current.chainId) else None
+
+  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
 object ReissueTransaction extends TransactionParserLite {

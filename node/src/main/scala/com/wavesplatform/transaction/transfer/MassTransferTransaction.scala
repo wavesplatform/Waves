@@ -73,7 +73,7 @@ case class MassTransferTransaction private (
   def compactJson(recipients: Set[AddressOrAlias]): JsObject =
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
-  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
+  override def checkedAssets: Seq[IssuedAsset] = assetId match {
     case Waves          => Seq()
     case a: IssuedAsset => Seq(a)
   }
