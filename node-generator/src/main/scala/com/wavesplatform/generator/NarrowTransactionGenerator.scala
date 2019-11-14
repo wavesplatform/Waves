@@ -40,10 +40,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
   private[this] object preconditions {
     val issueTransactionSender = randomFrom(accounts).get
 
-    val tradeAssetIssue = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        issueTransactionSender,
+    val tradeAssetIssue = IssueTransaction.selfSigned(TxVersion.V2, issueTransactionSender,
         "TRADE".getBytes("UTF-8"),
         "Waves DEX is the best exchange ever".getBytes("UTF-8"),
         100000000,
@@ -51,8 +48,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
         reissuable = true,
         fee = 100400000L,
         timestamp = System.currentTimeMillis(),
-        script = None
-      )
+        script = None)
       .right
       .get
 
@@ -84,8 +80,8 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val generated = (0 until (n * 1.2).toInt).foldLeft(
       (
         Seq.empty[Transaction],
-        Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
-        Seq[IssueTransactionV2](preconditions.tradeAssetIssue),
+        Seq[IssueTransaction](preconditions.tradeAssetIssue),
+        Seq[IssueTransaction](preconditions.tradeAssetIssue),
         Universe.Leases,
         Seq.empty[CreateAliasTransaction]
       )
@@ -94,7 +90,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
         val timestamp = System.currentTimeMillis() + i
 
         val tx = typeGen.getRandom match {
-          case IssueTransactionV2 =>
+          case IssueTransaction =>
             val sender      = randomFrom(accounts).get
             val name        = new Array[Byte](10)
             val description = new Array[Byte](10)
@@ -103,10 +99,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
             val reissuable = random.nextBoolean()
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
-              IssueTransactionV2
-                .selfSigned(
-                  AddressScheme.current.chainId,
-                  sender,
+              IssueTransaction.selfSigned(TxVersion.V2, sender,
                   name,
                   description,
                   amount,
@@ -114,8 +107,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                   reissuable,
                   None,
                   100400000L,
-                  timestamp
-                )
+                  timestamp)
             )
 
           case TransferTransaction =>
@@ -344,10 +336,10 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
         }
 
         (tx.map(tx => allTxsWithValid :+ tx).getOrElse(allTxsWithValid), tx match {
-          case Some(tx: IssueTransactionV2) => validIssueTxs :+ tx
+          case Some(tx: IssueTransaction) => validIssueTxs :+ tx
           case _                            => validIssueTxs
         }, tx match {
-          case Some(tx: IssueTransactionV2) if tx.reissuable  => reissuableIssueTxs :+ tx
+          case Some(tx: IssueTransaction) if tx.reissuable  => reissuableIssueTxs :+ tx
           case Some(tx: ReissueTransaction) if !tx.reissuable => reissuableIssueTxs.filter(_.id() != tx.id())
           case _                                              => reissuableIssueTxs
         }, tx match {
@@ -385,7 +377,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
       .find(_.stringRepr == address)
       .orElse(Universe.Accounts.map(_.keyPair).find(_.stringRepr == address))
 
-  private[this] def randomSenderAndAsset(issueTxs: Seq[IssueTransactionV2]): Option[(KeyPair, Option[ByteStr])] =
+  private[this] def randomSenderAndAsset(issueTxs: Seq[IssueTransaction]): Option[(KeyPair, Option[ByteStr])] =
     if (random.nextBoolean()) {
       (randomFrom(issueTxs) orElse randomFrom(Universe.IssuedAssets)).map { issue =>
         val pk = (accounts ++ Universe.Accounts.map(_.keyPair)).find(_.publicKey == issue.sender).get

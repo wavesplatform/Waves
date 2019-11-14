@@ -7,6 +7,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto.{KeyLength, SignatureLength}
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Proofs}
 
@@ -37,6 +38,10 @@ package object serialization {
       }
     }
 
+    // More explicit name
+    def getByte: Byte =
+      buf.get()
+
     def getByteArray(size: Int): Array[Byte] = {
       val result = new Array[Byte](size)
       buf.get(result)
@@ -55,6 +60,8 @@ package object serialization {
     def getPublicKey: PublicKey = PublicKey(getByteArray(KeyLength))
 
     def getProofs: Proofs = Proofs.fromBytes(buf.getByteArray(buf.remaining())).explicitGet()
+
+    def getScript: Option[Script] = Deser.parseByteArrayOptionWithLength(buf).map(ScriptReader.fromBytes(_).explicitGet())
 
     def getAlias: Alias = Alias.fromBytes(buf.getPrefixedByteArray).explicitGet()
 

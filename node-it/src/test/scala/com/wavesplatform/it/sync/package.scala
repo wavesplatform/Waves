@@ -1,14 +1,14 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
-import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.DataEntry
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 package object sync {
@@ -54,34 +54,22 @@ package object sync {
       TransactionNotAllowedByAssetScript.Code
     )
 
-  def createSignedIssueRequest(tx: IssueTransactionV1): SignedIssueV1Request = {
+  def createIssueRequest(tx: IssueTransaction): IssueRequest = {
     import tx._
-    SignedIssueV1Request(
-      Base58.encode(tx.sender),
+    IssueRequest(
+      Some(tx.version),
+      None,
+      Some(Base58.encode(tx.sender)),
       new String(name),
       new String(description),
       quantity,
       decimals,
       reissuable,
+      tx.script.map(_.bytes().base64),
       fee,
-      timestamp,
-      signature.toString
-    )
-  }
-
-  def createSignedIssueRequest(tx: IssueTransactionV2): SignedIssueV2Request = {
-    import tx._
-    SignedIssueV2Request(
-      Base58.encode(tx.sender),
-      new String(name),
-      new String(description),
-      quantity,
-      decimals,
-      reissuable,
-      fee,
-      timestamp,
-      proofs.proofs.map(_.toString).toList,
-      tx.script.map(_.bytes().base64)
+      Some(timestamp),
+      proofs.headOption.map(_.toString),
+      Some(proofs.proofs.map(_.toString).toList)
     )
   }
 

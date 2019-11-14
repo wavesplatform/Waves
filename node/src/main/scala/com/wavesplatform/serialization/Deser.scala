@@ -1,5 +1,7 @@
 package com.wavesplatform.serialization
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.{Bytes, Shorts}
 import scorex.crypto.hash.Digest32
 
@@ -13,6 +15,14 @@ object Deser {
       Bytes.concat(Shorts.toByteArray(length.toShort), b)
     else
       throw new IllegalArgumentException(s"Attempting to serialize array with size, but the size($length) exceeds MaxShort(${Short.MaxValue})")
+  }
+
+  def parseArrayWithLength(bytes: ByteBuffer): Array[Byte] = {
+    val length = bytes.getShort
+    require(length >= 0, s"Array length should be non-negative, but $length found")
+    val array = new Array[Byte](length)
+    bytes.get(array)
+    array
   }
 
   def parseArrayWithLength(bytes: Array[Byte], position: Int): (Array[Byte], Int) = {
@@ -33,6 +43,10 @@ object Deser {
       val b = bytes.slice(position + 1, position + 1 + length)
       (Some(b), position + 1 + length)
     } else (None, position + 1)
+  }
+
+  def parseByteArrayOptionWithLength(bytes: ByteBuffer): Option[Array[Byte]] = {
+    if (bytes.get() == 1) Some(parseArrayWithLength(bytes)) else None
   }
 
   def parseOption[T](bytes: Array[Byte], position: Int, length: Int = -1)(deser: Array[Byte] => T): (Option[T], Int) = {
@@ -65,7 +79,7 @@ object Deser {
   def serializeOption[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
     b.map(a => (1: Byte) +: ser(a)).getOrElse(Array(0: Byte))
 
-  def serializeOptionOfArray[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
+  def serializeOptionOfArrayWithLength[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
     b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
 
   def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {

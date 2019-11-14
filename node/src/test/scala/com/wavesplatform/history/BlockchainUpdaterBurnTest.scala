@@ -6,9 +6,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransactionV1, ReissueTransactionV1}
+import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransaction, ReissueTransactionV1}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, GenesisTransaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -19,7 +19,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   val Waves: Long = 100000000
 
   type Setup =
-    (Long, GenesisTransaction, TransferTransaction, IssueTransactionV1, BurnTransactionV1, ReissueTransactionV1)
+    (Long, GenesisTransaction, TransferTransaction, IssueTransaction, BurnTransactionV1, ReissueTransactionV1)
 
   val preconditions: Gen[Setup] = for {
     master                                                   <- accountGen
@@ -31,8 +31,10 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     masterToAlice: TransferTransaction = TransferTransaction
       .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
       .explicitGet()
-    issue: IssueTransactionV1 = IssueTransactionV1.selfSigned(alice, assetName, description, quantity, decimals, false, Waves, ts + 100).explicitGet()
-    burn: BurnTransactionV1   = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
+    issue: IssueTransaction = IssueTransaction
+      .selfSigned(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
+      .explicitGet()
+    burn: BurnTransactionV1 = BurnTransactionV1.selfSigned(alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
     reissue: ReissueTransactionV1 = ReissueTransactionV1
       .selfSigned(alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
       .explicitGet()
@@ -51,11 +53,11 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   property("issue -> burn -> reissue in sequential blocks works correctly") {
     scenario(preconditions, localWavesSettings) {
       case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
-        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1, ts)
-        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn), defaultSigner, 1, ts + 350)
-        val block4 = customBuildBlockOfTxs(block3.uniqueId, Seq(reissue), defaultSigner, 1, ts + 450)
+        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1.toByte, ts)
+        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
+        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn), defaultSigner, TxVersion.V1, ts + 350)
+        val block4 = customBuildBlockOfTxs(block3.uniqueId, Seq(reissue), defaultSigner, TxVersion.V1, ts + 450)
 
         domain.appendBlock(block0)
         domain.appendBlock(block1)
@@ -77,10 +79,10 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   property("issue -> burn -> reissue in micro blocks works correctly") {
     scenario(preconditions, localWavesSettings) {
       case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
-        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1, ts)
-        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn, reissue), defaultSigner, 1, ts + 350)
+        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, TxVersion.V1, ts)
+        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
+        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn, reissue), defaultSigner, TxVersion.V1, ts + 350)
 
         domain.appendBlock(block0)
         domain.appendBlock(block1)
