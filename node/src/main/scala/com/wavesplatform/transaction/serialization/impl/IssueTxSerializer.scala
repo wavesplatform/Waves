@@ -5,7 +5,6 @@ import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -61,14 +60,14 @@ object IssueTxSerializer {
 
   def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): IssueTransaction = {
-      val sender    = buf.getPublicKey
-      val name = Deser.parseArrayWithLength(buf)
+      val sender      = buf.getPublicKey
+      val name        = Deser.parseArrayWithLength(buf)
       val description = Deser.parseArrayWithLength(buf)
       val quantity    = buf.getLong
-      val decimals = buf.getByte
-      val reissuable = buf.getBoolean
-      val fee = buf.getLong
-      val timestamp = buf.getLong
+      val decimals    = buf.getByte
+      val reissuable  = buf.getBoolean
+      val fee         = buf.getLong
+      val timestamp   = buf.getLong
       IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, None, fee, timestamp, Nil)
     }
 
@@ -80,7 +79,7 @@ object IssueTxSerializer {
       parseCommonPart(TxVersion.V2, buf).copy(script = buf.getScript, proofs = buf.getProofs)
     } else {
       require(bytes(0) == IssueTransaction.typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
+      val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
       val signature = buf.getSignature
       require(buf.getByte == IssueTransaction.typeId, "transaction type mismatch")
       parseCommonPart(TxVersion.V1, buf).copy(proofs = Proofs(signature))

@@ -132,13 +132,7 @@ object PBTransactions {
         )
 
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
-        version match {
-          case 1 =>
-            vt.assets.ReissueTransaction.create(1.toByte, sender, IssuedAsset(assetId.toByteArray), amount, reissuable, feeAmount, timestamp, signature)
-          case 2 =>
-            vt.assets.ReissueTransaction.create(2.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs)
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.assets.ReissueTransaction.create(version.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs)
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
         version match {
@@ -312,13 +306,7 @@ object PBTransactions {
         )
 
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
-        version match {
-          case 1 =>
-            vt.assets.ReissueTransaction(1.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, signature)
-          case 2 =>
-            vt.assets.ReissueTransaction(2.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs)
-          case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
-        }
+        vt.assets.ReissueTransaction(version.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs)
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
         version match {

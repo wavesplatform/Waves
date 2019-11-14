@@ -19,9 +19,8 @@ import com.wavesplatform.api.http.requests.{
   ExchangeRequest,
   IssueRequest,
   MassTransferRequest,
-  ReissueV1Request,
+  ReissueRequest,
   SignedBurnV1Request,
-  SignedReissueV1Request,
   SponsorFeeRequest,
   TransferRequest
 }
@@ -240,7 +239,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     } ~ (path("issue") & withAuth) {
       broadcast[IssueRequest](TransactionFactory.issue(_, wallet, time))
     } ~ (path("reissue") & withAuth) {
-      broadcast[ReissueV1Request](TransactionFactory.reissueAssetV1(_, wallet, time))
+      broadcast[ReissueRequest](TransactionFactory.reissue(_, wallet, time))
     } ~ (path("burn") & withAuth) {
       broadcast[BurnV1Request](TransactionFactory.burnAssetV1(_, wallet, time))
     } ~ (path("sponsor") & withAuth) {
@@ -249,7 +248,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
     }) ~ pathPrefix("broadcast")(
       path("issue")(broadcast[IssueRequest](_.toTx)) ~
-        path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
+        path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
         path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
         path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
         path("transfer")(broadcast[TransferRequest](_.toTx))

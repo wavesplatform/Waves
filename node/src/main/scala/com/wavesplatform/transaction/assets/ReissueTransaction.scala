@@ -25,6 +25,7 @@ case class ReissueTransaction(
     proofs: Proofs
 ) extends VersionedTransaction
     with ProvenTransaction
+    with SigProofsSwitch
     with TxWithFee.InWaves
     with FastHashId {
 
@@ -51,7 +52,8 @@ object ReissueTransaction extends TransactionParserLite {
 
   val serializer = ReissueTxSerializer
 
-  override def parseBytes(bytes: Array[TxVersion]): Try[ReissueTransaction] = ???
+  override def parseBytes(bytes: Array[TxVersion]): Try[ReissueTransaction] =
+    serializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,

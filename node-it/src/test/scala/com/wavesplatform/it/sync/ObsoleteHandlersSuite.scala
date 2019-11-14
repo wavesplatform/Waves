@@ -7,7 +7,6 @@ import com.wavesplatform.api.http.requests.{
   LeaseCancelRequest,
   LeaseRequest,
   MassTransferRequest,
-  ReissueV1Request,
   SponsorFeeRequest,
   TransferRequest
 }
@@ -68,8 +67,17 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val burn     = Json.parse(burnJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(burn)
 
-    val reissueJson = sender.postJson("/assets/reissue", ReissueV1Request(firstAddress, issue, someAssetAmount, true, issueFee))
-    val reissue     = Json.parse(reissueJson.getResponseBody).as[Transaction].id
+    val reissueJson = sender.postJson(
+      "/assets/reissue",
+      Json.obj(
+        "sender"     -> firstAddress,
+        "assetId"    -> issue,
+        "quantity"   -> someAssetAmount,
+        "reissuable" -> true,
+        "fee"        -> issueFee
+      )
+    )
+    val reissue = Json.parse(reissueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(reissue)
 
     val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(firstAddress, issue, Some(100L), sponsorFee))

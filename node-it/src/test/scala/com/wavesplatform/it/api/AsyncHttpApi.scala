@@ -21,7 +21,7 @@ import com.wavesplatform.api.grpc.{
   TransactionsRequest
 }
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.{IssueRequest, ReissueV1Request, TransferRequest}
+import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
@@ -401,7 +401,16 @@ object AsyncHttpApi extends Assertions {
     def scriptDecompile(script: String): Future[DecompiledScript] = post("/utils/script/decompile", script).as[DecompiledScript]
 
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long): Future[Transaction] =
-      postJson("/assets/reissue", ReissueV1Request(sourceAddress, assetId, quantity, reissuable, fee)).as[Transaction]
+      postJson(
+        "/assets/reissue",
+        Json.obj(
+          "sender"     -> sourceAddress,
+          "assetId"    -> assetId,
+          "quantity"   -> quantity,
+          "reissuable" -> reissuable,
+          "fee"        -> fee
+        )
+      ).as[Transaction]
 
     def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: TxVersion = TxVersion.V2): Future[Transaction] = {
       signAndBroadcast(

@@ -55,7 +55,7 @@ object ReissueTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[ReissueTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): ReissueTransaction = {
       val sender     = buf.getPublicKey
-      val asset      = buf.getAsset.asInstanceOf[IssuedAsset]
+      val asset      = buf.getIssuedAsset
       val quantity   = buf.getLong
       val reissuable = buf.getBoolean
       val fee        = buf.getLong
