@@ -28,7 +28,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val issuerBalance = sender.grpc.wavesBalance(issuerAddress).available
       val issuerEffBalance = sender.grpc.wavesBalance(issuerAddress).effective
 
-      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 8, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
+      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 8, reissuable = true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
       sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
@@ -51,13 +51,13 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       val assetDescription = ByteString.copyFrom("nft asset".getBytes(StandardCharsets.UTF_8))
       val issuerBalance = sender.grpc.wavesBalance(issuerAddress).available
       val issuerEffBalance = sender.grpc.wavesBalance(issuerAddress).effective
-      val (nftQuantity, nftDecimals, nftReissuable) = (1, 1, false)
+      val (nftQuantity, nftDecimals, nftReissuable, nftIssueFee) = (1, 0, false, minFee)
 
-      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx = true)
+      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, nftIssueFee, assetDescription, version = v, script = scriptText(v), waitForTx = true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance - issueFee
-      sender.grpc.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - issueFee
+      sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance - nftIssueFee
+      sender.grpc.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - nftIssueFee
       sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe nftQuantity
 
       val assetInfo = sender.grpc.getTransaction(issuedAssetId).getTransaction.getIssue
@@ -68,15 +68,40 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     }
   }
 
+  test("not able to issue asset with fee less then issueFee (minFee for NFT)") {
+    for (v <- supportedVersions) {
+      val assetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength + 1).mkString
+      val assetDescription = ByteString.copyFrom("nft asset".getBytes(StandardCharsets.UTF_8))
+      val issuerBalance = sender.grpc.wavesBalance(issuerAddress).available
+      val issuerEffBalance = sender.grpc.wavesBalance(issuerAddress).effective
+      val (nftQuantity, nftDecimals, nftReissuable) = (1, 0, false)
+
+      assertGrpcError(
+        sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, reissuable = true, issueFee - 1, assetDescription, version = v),
+        s"does not exceed minimal value of $issueFee",
+        Code.INVALID_ARGUMENT
+      )
+
+      assertGrpcError(
+        sender.grpc.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, minFee - 1, assetDescription, version = v),
+        s"does not exceed minimal value of $minFee",
+        Code.INVALID_ARGUMENT
+      )
+
+      sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance
+      sender.grpc.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance
+    }
+  }
+
   test("Able to create asset with the same name") {
     for (v <- supportedVersions) {
       val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength).mkString
       val assetDescription = ByteString.copyFrom("my asset description 2".getBytes(StandardCharsets.UTF_8))
 
-      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
+      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, reissuable = true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      val issuedAssetTx2 = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
+      val issuedAssetTx2 = sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 7, reissuable = true, issueFee, assetDescription, version = v, script = scriptText(v), waitForTx =  true)
       val issuedAssetId2 = PBTransactions.vanilla(issuedAssetTx2).explicitGet().id().base58
 
       sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe someAssetAmount
