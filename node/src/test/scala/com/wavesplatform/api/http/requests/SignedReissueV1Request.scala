@@ -2,6 +2,7 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
@@ -31,6 +32,6 @@ case class SignedReissueV1Request(
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
       _assetId   <- parseBase58ToAsset(assetId)
-      _t         <- ReissueTransaction.create(1.toByte, _sender, _assetId, quantity, reissuable, fee, timestamp, _signature)
+      _t         <- ReissueTransaction.create(1.toByte, _sender, _assetId, quantity, reissuable, fee, timestamp, Proofs(_signature))
     } yield _t
 }
