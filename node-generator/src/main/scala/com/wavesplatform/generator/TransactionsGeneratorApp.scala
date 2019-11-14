@@ -142,8 +142,6 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       )
   }
 
-  implicit val _: ValueReader[Worker.Settings] = Worker.settingsReader
-
   val defaultConfig =
     ConfigFactory
       .load()
@@ -177,7 +175,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       Universe.Leases = universe.leases
 
       val generator: TransactionGenerator = finalConfig.mode match {
-        case Mode.NARROW   => new NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts, estimator)
+        case Mode.NARROW   => NarrowTransactionGenerator(finalConfig.narrow, finalConfig.privateKeyAccounts, time, estimator)
         case Mode.WIDE     => new WideTransactionGenerator(finalConfig.wide, finalConfig.privateKeyAccounts)
         case Mode.DYN_WIDE => new DynamicWideTransactionGenerator(finalConfig.dynWide, finalConfig.privateKeyAccounts)
         case Mode.MULTISIG => new MultisigTransactionGenerator(finalConfig.multisig, finalConfig.privateKeyAccounts, estimator)
@@ -209,7 +207,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
         }
       }
 
-      val initialGenTransactions = generator.initial
+      val initialGenTransactions     = generator.initial
       val initialGenTailTransactions = generator.tailInitial
 
       log.info(s"Universe precondition transactions size: ${initialUniTransactions.size}")

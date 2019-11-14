@@ -9,7 +9,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.IssueTransactionV2
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -23,9 +23,8 @@ import scala.collection.generic.CanBuildFrom
 object Preconditions {
   private[this] val Fee = 1500000L
 
-  final case class CreatedAccount(keyPair: KeyPair, balance: Long, script: Option[Script])
+  sealed abstract class PAction(val priority: Int) extends Product with Serializable
 
-  sealed abstract class PAction(val priority: Int)
   final case class LeaseP(from: KeyPair, to: Address, amount: Long, repeat: Option[Int]) extends PAction(3)
   final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissuable: Boolean, scriptFile: String)
       extends PAction(2)
@@ -33,9 +32,11 @@ object Preconditions {
 
   final case class PGenSettings(faucet: KeyPair, actions: List[PAction])
 
+  final case class CreatedAccount(keyPair: KeyPair, balance: Long, script: Option[Script])
+
   final case class UniverseHolder(
       accounts: List[CreatedAccount] = Nil,
-      issuedAssets: List[IssueTransaction] = Nil,
+      issuedAssets: List[IssueTransactionV2] = Nil,
       leases: List[LeaseTransaction] = Nil
   )
 
@@ -106,8 +107,8 @@ object Preconditions {
             Waves,
             Fee,
             "Generator".getBytes("UTF-8"),
-            time.correctedTime(),
-        )
+            time.correctedTime()
+          )
           .explicitGet()
       }
     }

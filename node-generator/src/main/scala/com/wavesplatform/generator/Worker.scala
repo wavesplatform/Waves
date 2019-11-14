@@ -8,7 +8,6 @@ import cats.Show
 import cats.effect.concurrent.Ref
 import cats.syntax.apply._
 import cats.syntax.flatMap._
-import com.typesafe.config.Config
 import com.wavesplatform.generator.Worker.{EmptyState, Settings, SkipState, State}
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
@@ -16,12 +15,11 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import monix.eval.Task
 import monix.execution.Scheduler
-import net.ceedubs.ficus.readers.ValueReader
 import org.asynchttpclient.AsyncHttpClient
 import play.api.libs.json.Json
 
 import scala.compat.java8.FutureConverters
-import scala.concurrent.duration.{Duration, FiniteDuration}
+import scala.concurrent.duration.FiniteDuration
 import scala.concurrent.{ExecutionContext, Future}
 
 class Worker(
@@ -131,7 +129,9 @@ class Worker(
         validChannel <- validateChannel(channel)
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
-        _            <- Task.deferFuture(networkSender.send(validChannel, transactionSource.take(cntToSend).toStream: _*))
+        txs          <- Task(transactionSource.take(cntToSend).toStream)
+        _            <- logInfo(s"Head transaction id: ${txs.head.id()}")
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs: _*))
         _            <- sleep(settings.delay)
         r            <- Task.defer(pullAndWrite(validChannel, state, (cnt + 1) % 10))
       } yield r
@@ -168,8 +168,6 @@ class Worker(
 }
 
 object Worker {
-  import net.ceedubs.ficus.Ficus._
-
   case class Settings(
       utxLimit: Int,
       delay: FiniteDuration,
@@ -224,40 +222,6 @@ object Worker {
 
   final case class SkipState(cnt: Int) extends State {
     override def toString: String = "SkipState"
-  }
-
-  implicit val settingsReader: ValueReader[Settings] = (config: Config, path: String) => {
-    def readWaitUtxOrDelay(path: String, default: FiniteDuration): Either[FiniteDuration, FiniteDuration] =
-      if (config.hasPath(path)) {
-        val value = config.as[String](path)
-        if (value == "empty-utx") Right(default)
-        else {
-          val duration: Duration = Duration(value)
-          Left(FiniteDuration(duration.length, duration.unit))
-        }
-      } else Right(default)
-
-    val utxLimit         = config.as[Int](s"$path.utx-limit")
-    val delay            = config.as[FiniteDuration](s"$path.delay")
-    val tailInitialDelay = readWaitUtxOrDelay(s"$path.tail-initial-delay", delay)
-    val initialDelay     = readWaitUtxOrDelay(s"$path.initial-delay", delay)
-    val workingTime      = config.as[FiniteDuration](s"$path.working-time")
-    val autoReconnect    = config.as[Boolean](s"$path.auto-reconnect")
-    val reconnectDelay   = config.as[FiniteDuration](s"$path.reconnect-delay")
-
-    def readWarmUp(warmUpConfig: Config): WarmUp = {
-      val warmUpStart    = warmUpConfig.as[Int](s"start")
-      val warmUpEnd      = warmUpConfig.as[Option[Int]](s"end").getOrElse(utxLimit)
-      val warmUpStep     = warmUpConfig.as[Int](s"step")
-      val warmUpDuration = warmUpConfig.as[Option[FiniteDuration]](s"duration")
-      val warmUpOnce     = warmUpConfig.as[Option[Boolean]](s"once").getOrElse(true)
-      WarmUp(warmUpStart, warmUpEnd, warmUpStep, warmUpDuration, warmUpOnce)
-    }
-
-    val warmUp     = readWarmUp(config.getConfig(s"$path.warm-up"))
-    val initWarmUp = if (config.hasPath(s"$path.initial-warm-up")) Some(readWarmUp(config.getConfig(s"$path.init-warm-up"))) else None
-
-    Settings(utxLimit, delay, tailInitialDelay, initialDelay, workingTime, autoReconnect, reconnectDelay, warmUp, initWarmUp)
   }
 
   implicit val toPrintable: Show[Settings] = { x =>
