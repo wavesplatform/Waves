@@ -5,12 +5,12 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.{ReissueTransaction, ReissueTransactionV1}
+import com.wavesplatform.transaction.assets.{ReissueTransaction, ReissueTransaction}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class ReissueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ReissueTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Reissue serialization roundtrip") {
     forAll(reissueGen) { issue: ReissueTransaction =>
@@ -45,9 +45,7 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
                     }
     """)
 
-    val tx = ReissueTransactionV1
-      .create(
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+    val tx = ReissueTransaction.create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
         IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
         100000000L,
         true,

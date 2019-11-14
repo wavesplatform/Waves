@@ -229,15 +229,14 @@ object TransactionFactory {
       signedTx = tx.signWith(signer)
     } yield signedTx
 
-  def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV1] =
+  def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransaction] =
     reissueAssetV1(request, wallet, request.sender, time)
 
-  def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, ReissueTransactionV1] =
+  def reissueAssetV1(request: ReissueV1Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, ReissueTransaction] =
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- ReissueTransactionV1.signed(
-        sender,
+      tx <- ReissueTransaction.signed(1.toByte, sender,
         IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         request.quantity,
         request.reissuable,
@@ -247,9 +246,8 @@ object TransactionFactory {
       )
     } yield tx
 
-  def reissueAssetV1(request: ReissueV1Request, sender: PublicKey): Either[ValidationError, ReissueTransactionV1] =
-    ReissueTransactionV1.create(
-      sender,
+  def reissueAssetV1(request: ReissueV1Request, sender: PublicKey): Either[ValidationError, ReissueTransaction] =
+    ReissueTransaction.create(1.toByte, sender,
       IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
       request.quantity,
       request.reissuable,
@@ -258,16 +256,14 @@ object TransactionFactory {
       EmptySignature
     )
 
-  def reissueAssetV2(request: ReissueV2Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransactionV2] =
+  def reissueAssetV2(request: ReissueV2Request, wallet: Wallet, time: Time): Either[ValidationError, ReissueTransaction] =
     reissueAssetV2(request, wallet, request.sender, time)
 
-  def reissueAssetV2(request: ReissueV2Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, ReissueTransactionV2] =
+  def reissueAssetV2(request: ReissueV2Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, ReissueTransaction] =
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- ReissueTransactionV2.signed(
-        AddressScheme.current.chainId,
-        sender,
+      tx <- ReissueTransaction.signed(2.toByte, sender,
         IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         request.quantity,
         request.reissuable,
@@ -277,10 +273,8 @@ object TransactionFactory {
       )
     } yield tx
 
-  def reissueAssetV2(request: ReissueV2Request, sender: PublicKey): Either[ValidationError, ReissueTransactionV2] =
-    ReissueTransactionV2.create(
-      AddressScheme.current.chainId,
-      sender,
+  def reissueAssetV2(request: ReissueV2Request, sender: PublicKey): Either[ValidationError, ReissueTransaction] =
+    ReissueTransaction.create(2.toByte, sender,
       IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
       request.quantity,
       request.reissuable,
@@ -467,8 +461,8 @@ object TransactionFactory {
       case LeaseCancelTransaction    => jsv.as[LeaseCancelRequest].toTx
       case IssueTransaction          => jsv.as[IssueRequest].toTx
       case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
-      case ReissueTransactionV1      => jsv.as[SignedReissueV1Request].toTx
-      case ReissueTransactionV2      => jsv.as[SignedReissueV2Request].toTx
+      case ReissueTransaction      => jsv.as[SignedReissueV1Request].toTx
+      case ReissueTransaction      => jsv.as[SignedReissueV2Request].toTx
       case BurnTransactionV1         => jsv.as[SignedBurnV1Request].toTx
       case BurnTransactionV2         => jsv.as[SignedBurnV2Request].toTx
       case DataTransaction           => jsv.as[SignedDataRequest].toTx
@@ -508,8 +502,8 @@ object TransactionFactory {
               case LeaseTransaction          => TransactionFactory.lease(txJson.as[LeaseRequest], wallet, signerAddress, time)
               case LeaseCancelTransaction    => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
               case IssueTransaction          => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
-              case ReissueTransactionV1      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
-              case ReissueTransactionV2      => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
+              case ReissueTransaction      => TransactionFactory.reissueAssetV1(txJson.as[ReissueV1Request], wallet, signerAddress, time)
+              case ReissueTransaction      => TransactionFactory.reissueAssetV2(txJson.as[ReissueV2Request], wallet, signerAddress, time)
               case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
               case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
               case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)

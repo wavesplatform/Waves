@@ -1,54 +1,76 @@
 package com.wavesplatform.transaction.assets
 
-import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.validation.TxConstraints
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, _}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction._
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
-trait ReissueTransaction extends ProvenTransaction with VersionedTransaction {
-  def asset: IssuedAsset
-  def quantity: Long
-  def reissuable: Boolean
-  def fee: Long
+import scala.reflect.ClassTag
+import scala.util._
 
-  override val assetFee: (Asset, Long) = (Waves, fee)
+case class ReissueTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    asset: IssuedAsset,
+    quantity: Long,
+    reissuable: Boolean,
+    fee: Long,
+    timestamp: Long,
+    proofs: Proofs
+) extends VersionedTransaction
+    with ProvenTransaction
+    with TxWithFee.InWaves
+    with FastHashId {
 
-  override final val json: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "version"    -> version,
-      "chainId"    -> chainByte,
-      "assetId"    -> asset.id.toString,
-      "quantity"   -> quantity,
-      "reissuable" -> reissuable
-    )
-  )
+  override val builder = ReissueTransaction
 
-  protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce {
-    Bytes.concat(
-      sender,
-      asset.id.arr,
-      Longs.toByteArray(quantity),
-      if (reissuable) Array(1: Byte) else Array(0: Byte),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
-  }
-  override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
+  override val bodyBytes: Coeval[Array[Byte]] = ???
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(???)
+  override val json: Coeval[JsObject]         = ???
+
+  override def chainByte: Option[Byte] = if (version >= TxVersion.V2) Some(AddressScheme.current.chainId) else None
 }
 
-object ReissueTransaction {
-  val typeId: TxType = 5
+object ReissueTransaction extends TransactionParserLite {
+  override type TransactionT = ReissueTransaction
 
-  def validateReissueParams(tx: ReissueTransaction): Either[ValidationError, Unit] =
-    validateReissueParams(tx.quantity, tx.fee)
+  override val typeId: TxType                         = ReissueTransaction.typeId
+  override def supportedVersions: Set[TxVersion]      = Set(1, 2)
+  override def classTag: ClassTag[ReissueTransaction] = ClassTag(classOf[ReissueTransaction])
 
-  def validateReissueParams(quantity: Long, fee: Long): Either[ValidationError, Unit] =
-    (TxConstraints.positiveAmount(quantity, "assets"), TxConstraints.fee(fee))
-      .mapN { case _ => () }
-      .leftMap(_.head)
-      .toEither
+  override def parseBytes(bytes: Array[TxVersion]): Try[ReissueTransaction] = ???
+
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
+      asset: IssuedAsset,
+      quantity: Long,
+      reissuable: Boolean,
+      fee: Long,
+      timestamp: Long,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] = ???
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      asset: IssuedAsset,
+      quantity: Long,
+      reissuable: Boolean,
+      fee: Long,
+      timestamp: Long,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] = ???
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      asset: IssuedAsset,
+      quantity: Long,
+      reissuable: Boolean,
+      fee: Long,
+      timestamp: Long
+  ): Either[ValidationError, TransactionT] = ???
 }

@@ -4,19 +4,19 @@ import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransactionV2}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction, ReissueTransaction}
 import org.scalacheck.Gen
 import play.api.libs.json._
 
-class ReissueTransactionV2Specification extends GenericTransactionSpecification[ReissueTransactionV2] {
+class ReissueTransactionSpecification extends GenericTransactionSpecification[ReissueTransaction] {
 
-  def transactionParser: com.wavesplatform.transaction.TransactionParserFor[ReissueTransactionV2] = ReissueTransactionV2
+  def transactionParser: com.wavesplatform.transaction.TransactionParserFor[ReissueTransaction] = ReissueTransaction
 
-  def updateProofs(tx: ReissueTransactionV2, p: Proofs): ReissueTransactionV2 = {
+  def updateProofs(tx: ReissueTransaction, p: Proofs): ReissueTransaction = {
     tx.copy(proofs = p)
   }
 
-  def assertTxs(first: ReissueTransactionV2, second: ReissueTransactionV2): Unit = {
+  def assertTxs(first: ReissueTransaction, second: ReissueTransaction): Unit = {
     first.sender.stringRepr shouldEqual second.sender.stringRepr
     first.timestamp shouldEqual second.timestamp
     first.fee shouldEqual second.fee
@@ -28,20 +28,19 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
     first.bytes() shouldEqual second.bytes()
   }
 
-  def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], ReissueTransactionV2))] =
+  def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], ReissueTransaction))] =
     for {
       (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       fee                                                                      <- smallFeeGen
       reissuable                                                               <- Gen.oneOf(true, false)
     } yield {
       val issue = IssueTransaction.selfSigned(TxVersion.V1, sender, assetName, description, quantity, decimals, reissuable = true, script = None, iFee, timestamp).explicitGet()
-      val reissue1 = ReissueTransactionV2
-        .selfSigned(AddressScheme.current.chainId, sender, IssuedAsset(issue.assetId), quantity, reissuable = reissuable, fee, timestamp)
+      val reissue1 = ReissueTransaction.selfSigned(2.toByte, sender, IssuedAsset(issue.assetId), quantity, reissuable = reissuable, fee, timestamp)
         .explicitGet()
       (Seq(issue), reissue1)
     }
 
-  def jsonRepr: Seq[(JsValue, ReissueTransactionV2)] =
+  def jsonRepr: Seq[(JsValue, ReissueTransaction)] =
     Seq(
       (Json.parse("""{
                        "type": 5,
@@ -61,10 +60,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
                        "reissuable": true
                     }
     """),
-       ReissueTransactionV2
-         .create(
-           'T',
-           PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+       ReissueTransaction.create(2.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
            IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
            100000000L,
            true,
