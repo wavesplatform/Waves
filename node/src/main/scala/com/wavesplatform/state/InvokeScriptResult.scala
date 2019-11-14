@@ -65,6 +65,7 @@ object InvokeScriptResult {
             Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
           )
       ),
+      issues = Nil,
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn)
     )

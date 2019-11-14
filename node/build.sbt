@@ -9,7 +9,8 @@ enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlu
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
   Resolver.bintrayRepo("dnvriend", "maven"),
-  Resolver.sbtPluginRepo("releases")
+  Resolver.sbtPluginRepo("releases"),
+  Resolver.sonatypeRepo("snapshots")
 )
 
 libraryDependencies ++= Dependencies.node.value
