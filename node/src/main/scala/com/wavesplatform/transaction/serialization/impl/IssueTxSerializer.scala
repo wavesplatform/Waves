@@ -66,7 +66,7 @@ object IssueTxSerializer {
       val description = Deser.parseArrayWithLength(buf)
       val quantity    = buf.getLong
       val decimals = buf.getByte
-      val reissuable = buf.getByte != 0
+      val reissuable = buf.getBoolean
       val fee = buf.getLong
       val timestamp = buf.getLong
       IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, None, fee, timestamp, Nil)

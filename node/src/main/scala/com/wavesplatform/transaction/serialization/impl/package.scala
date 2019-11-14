@@ -9,6 +9,7 @@ import com.wavesplatform.crypto.{KeyLength, SignatureLength}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Proofs}
 
@@ -20,11 +21,13 @@ package object impl {
       if (prefix > 0) getByteArray(prefix) else Array.emptyByteArray
     }
 
-    def getAsset: Asset = {
-      val prefix = buf.get
-      if (prefix == 0) Asset.Waves
-      else if (prefix == 1) Asset.IssuedAsset(ByteStr(getByteArray(transaction.AssetIdLength)))
-      else throw new IllegalArgumentException(s"Invalid asset id prefix: $prefix")
+    def getIssuedAsset: IssuedAsset =
+      Asset.IssuedAsset(ByteStr(getByteArray(transaction.AssetIdLength)))
+
+    def getAsset: Asset = buf.getByte match {
+      case 0 => Asset.Waves
+      case 1 => this.getIssuedAsset
+      case b => throw new IllegalArgumentException(s"Invalid asset id prefix: $b")
     }
 
     def getAddressOrAlias: AddressOrAlias = {
@@ -42,6 +45,12 @@ package object impl {
     // More explicit name
     def getByte: Byte =
       buf.get()
+
+    def getBoolean: Boolean = getByte match {
+      case 0 => false
+      case 1 => true
+      case b => throw new IllegalArgumentException(s"Invalid boolean value: $b")
+    }
 
     def getByteArray(size: Int): Array[Byte] = {
       val result = new Array[Byte](size)
