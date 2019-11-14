@@ -4,6 +4,7 @@ import cats.Id
 import cats.implicits._
 import com.google.common.primitives.Ints
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -32,30 +33,33 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
 
   val blockheaderGen: Gen[(BlockHeader, ByteStr, Int)] = {
     for {
-      timestamp        <- Gen.posNum[Long]
-      version          <- Gen.posNum[Byte]
-      reference        <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
-      generator        <- Gen.containerOfN[Array, Byte](KeyLength, Arbitrary.arbByte.arbitrary)
-      signature        <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
-      baseTarget       <- Gen.posNum[Long]
-      genSignature     <- Gen.containerOfN[Array, Byte](Block.GeneratorSignatureLength, Arbitrary.arbByte.arbitrary)
+      timestamp  <- Gen.posNum[Long]
+      version    <- Gen.posNum[Byte]
+      reference  <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
+      generator  <- Gen.containerOfN[Array, Byte](KeyLength, Arbitrary.arbByte.arbitrary)
+      signature  <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
+      baseTarget <- Gen.posNum[Long]
+      genSignature <- Gen.containerOfN[Array, Byte](
+        if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength,
+        Arbitrary.arbByte.arbitrary
+      )
       transactionCount <- Gen.posNum[Int]
       featureVotes     <- Gen.listOf(Gen.posNum[Short])
       reward           <- Gen.posNum[Long]
     } yield (
-        new BlockHeader(
-          version,
-          timestamp,
-          reference,
-          baseTarget,
-          genSignature,
-          PublicKey(ByteStr(generator)),
-          featureVotes.toSet,
-          reward
-        ),
-        signature,
-        transactionCount
-      )
+      BlockHeader(
+        version,
+        timestamp,
+        reference,
+        baseTarget,
+        genSignature,
+        PublicKey(ByteStr(generator)),
+        featureVotes.toSet,
+        reward
+      ),
+      signature,
+      transactionCount
+    )
   }
 
   def scriptSrc(header: BlockHeader, signature: ByteStr, transactionCount: Int): String = {
@@ -65,7 +69,7 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
     val expectedSignature    = Base64.encode(signature)
     val expectedGenSignature = Base64.encode(header.generationSignature)
 
-    val headerBytes = database.writeBlockHeaderAndSize((header, 1024, transactionCount, signature)).drop(Ints.BYTES)
+    val headerBytes = database.writeBlockInfo(BlockInfo(header, 1024, transactionCount, signature)).drop(Ints.BYTES)
 
     s"""
       |{-# STDLIB_VERSION  4 #-}
@@ -108,13 +112,13 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       ds
     )
 
-    val untyped  = Parser.parseExpr(code).get.value
+    val untyped = Parser.parseExpr(code).get.value
     val ctx: CTX[Environment] =
-      PureContext.build(Global, V4).withEnvironment[Environment]    |+|
-      CryptoContext.build(Global, V4) .withEnvironment[Environment] |+|
-      WavesContext.build(ds)
+      PureContext.build(Global, V4).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, V4).withEnvironment[Environment] |+|
+        WavesContext.build(ds)
 
-    val typed    = ExpressionCompiler(ctx.compilerContext, untyped)
+    val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => new EvaluatorV1[Id, Environment].apply(ctx.evaluationContext(env), v._1))
   }
 

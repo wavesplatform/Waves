@@ -22,7 +22,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   val blockGen = for {
     baseTarget          <- arbitrary[Long]
     reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
-    generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
+    generationSignature <- byteArrayGen(Block.GenerationSignatureLength)
     assetBytes          <- byteArrayGen(AssetIdLength)
     assetId = IssuedAsset(ByteStr(assetBytes))
     sender                    <- accountGen
@@ -37,7 +37,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     for {
       baseTarget          <- arbitrary[Long]
       reference           <- byteArrayGen(Block.BlockIdLength).map(r => ByteStr(r))
-      generationSignature <- byteArrayGen(Block.GeneratorSignatureLength)
+      generationSignature <- byteArrayGen(Block.GenerationSignatureLength)
       assetBytes          <- byteArrayGen(AssetIdLength)
       assetId = Some(ByteStr(assetBytes))
       sender                                  <- accountGen
@@ -175,7 +175,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   }
 
   ignore("sign time for 60k txs") {
-    forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GeneratorSignatureLength)) {
+    forAll(randomTransactionsGen(60000), accountGen, byteArrayGen(Block.BlockIdLength), byteArrayGen(Block.GenerationSignatureLength)) {
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
           Instrumented.withTimeMillis(

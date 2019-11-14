@@ -223,7 +223,8 @@ case class Block(
     fee: Long,
     features: Option[Seq[Short]],
     reward: Option[Long],
-    desiredReward: Option[Long]
+    desiredReward: Option[Long],
+    version: Option[Byte] = None
 )
 object Block {
   implicit val blockFormat: Format[Block] = Json.format
@@ -239,7 +240,8 @@ case class BlockHeaders(
     features: Option[Set[Short]],
     reward: Option[Long],
     desiredReward: Option[Long],
-    totalFee: Long
+    totalFee: Long,
+    version: Option[Byte] = None
 )
 object BlockHeaders {
   implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format

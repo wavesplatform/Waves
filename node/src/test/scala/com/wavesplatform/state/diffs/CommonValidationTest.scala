@@ -50,7 +50,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }
@@ -73,7 +73,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }
@@ -208,7 +208,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }

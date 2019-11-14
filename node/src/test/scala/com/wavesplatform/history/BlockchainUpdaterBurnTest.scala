@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransactionV1, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -51,11 +52,11 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   property("issue -> burn -> reissue in sequential blocks works correctly") {
     scenario(preconditions, localWavesSettings) {
       case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
-        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1, ts)
-        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn), defaultSigner, 1, ts + 350)
-        val block4 = customBuildBlockOfTxs(block3.uniqueId, Seq(reissue), defaultSigner, 1, ts + 450)
+        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1.toByte, ts)
+        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
+        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn), defaultSigner, TxVersion.V1, ts + 350)
+        val block4 = customBuildBlockOfTxs(block3.uniqueId, Seq(reissue), defaultSigner, TxVersion.V1, ts + 450)
 
         domain.appendBlock(block0)
         domain.appendBlock(block1)
@@ -77,10 +78,10 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
   property("issue -> burn -> reissue in micro blocks works correctly") {
     scenario(preconditions, localWavesSettings) {
       case (domain, (ts, genesis, masterToAlice, issue, burn, reissue)) =>
-        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, 1, ts)
-        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, 1, ts + 150)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, 1, ts + 250)
-        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn, reissue), defaultSigner, 1, ts + 350)
+        val block0 = customBuildBlockOfTxs(randomSig, Seq(genesis), defaultSigner, TxVersion.V1, ts)
+        val block1 = customBuildBlockOfTxs(block0.uniqueId, Seq(masterToAlice), defaultSigner, TxVersion.V1, ts + 150)
+        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq(issue), defaultSigner, TxVersion.V1, ts + 250)
+        val block3 = customBuildBlockOfTxs(block2.uniqueId, Seq(burn, reissue), defaultSigner, TxVersion.V1, ts + 350)
 
         domain.appendBlock(block0)
         domain.appendBlock(block1)

@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.crypto
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}

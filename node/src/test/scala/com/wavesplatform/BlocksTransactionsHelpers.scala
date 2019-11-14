@@ -1,4 +1,5 @@
 package com.wavesplatform
+
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -6,6 +7,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -151,7 +153,11 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         signature = ByteStr.empty,
         transactionData = txs
       )
-      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bytes())))
+      val toSign =
+        if (version < Block.ProtoBlockVersion) unsigned.bytes()
+        else PBBlocks.protobuf(unsigned).toByteArray
+      // else PBBlocks.protobuf(unsigned).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, toSign)))
     }
   }
 }
