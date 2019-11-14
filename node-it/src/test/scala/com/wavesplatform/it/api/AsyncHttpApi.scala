@@ -881,23 +881,6 @@ object AsyncHttpApi extends Assertions {
       }
     }
 
-    def broadcastLease(source: KeyPair,
-                       recipient: Recipient,
-                       amount: Long,
-                       fee: Long,
-                       version: Int = 2): Future[PBSignedTransaction] = {
-      val unsigned = PBTransaction(
-        chainId,
-        ByteString.copyFrom(source.publicKey),
-        Some(Amount.of(ByteString.EMPTY, fee)),
-        System.currentTimeMillis,
-        version,
-        PBTransaction.Data.Lease(LeaseTransactionData.of(Some(recipient), amount))
-      )
-      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
-    }
-
     def putData(source: KeyPair,
                 data: Seq[DataTransactionData.DataEntry],
                 fee: Long,
@@ -1047,5 +1030,37 @@ object AsyncHttpApi extends Assertions {
       transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
     }
 
+    def broadcastLease(source: KeyPair,
+                       recipient: Recipient,
+                       amount: Long,
+                       fee: Long,
+                       version: Int = 2): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(source.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.Lease(LeaseTransactionData.of(Some(recipient), amount))
+      )
+      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+    }
+
+    def broadcastLeaseCancel(source: KeyPair,
+                             leaseId: String,
+                             fee: Long,
+                             version: Int = 2): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(source.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.LeaseCancel(LeaseCancelTransactionData.of(ByteString.copyFrom(Base58.decode(leaseId))))
+      )
+      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+    }
   }
 }

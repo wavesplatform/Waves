@@ -692,15 +692,6 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).grpc.broadcastCreateAlias(source, alias, fee, version)), waitForTx)
     }
 
-    def broadcastLease(source: KeyPair,
-                       recipient: Recipient,
-                       amount: Long,
-                       fee: Long,
-                       version: Int = 2,
-                       waitForTx: Boolean = false): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.broadcastLease(source, recipient, amount, fee, version)), waitForTx)
-    }
-
     def putData(source: KeyPair,
                 data: Seq[DataTransactionData.DataEntry],
                 fee: Long,
@@ -767,6 +758,28 @@ object SyncHttpApi extends Assertions {
                             version: Int = 1,
                             waitForTx: Boolean = false): PBSignedTransaction = {
       maybeWaitForTransaction(sync(async(n).grpc.broadcastSponsorFee(sender, minFee, fee, version)), waitForTx)
+    }
+
+    def broadcastLease(source: KeyPair,
+                       recipient: Recipient,
+                       amount: Long,
+                       fee: Long,
+                       version: Int = 2,
+                       waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastLease(source, recipient, amount, fee, version)), waitForTx)
+    }
+
+    def broadcastLeaseCancel(source: KeyPair,
+                             leaseId: String,
+                             fee: Long,
+                             version: Int = 2,
+                             waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastLeaseCancel(source, leaseId, fee, version)), waitForTx)
+    }
+
+    def getActiveLeases(address: ByteString): List[PBSignedTransaction] = {
+      val leases = accounts.getActiveLeases(AccountRequest.of(address))
+      leases.toList.map(resp => resp.getTransaction)
     }
   }
 }
