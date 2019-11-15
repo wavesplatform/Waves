@@ -1,14 +1,13 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.{TransactionGen, crypto}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.api.http.requests.SignedMassTransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.{TransactionGen, crypto}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
@@ -68,7 +67,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
                        ]
                        }
   """)
-    
+
     val tx = MassTransferTransaction.serializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
@@ -152,7 +151,16 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
       .get
 
     val tx = MassTransferTransaction
-      .create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), Waves, transfers, 200000, 1518091313964L, Base58.tryDecodeWithLimit("59QuUcqP6p").get, Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get)))
+      .create(
+        1.toByte,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        Waves,
+        transfers,
+        200000,
+        1518091313964L,
+        Base58.tryDecodeWithLimit("59QuUcqP6p").get,
+        Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
+      )
       .right
       .get
 
