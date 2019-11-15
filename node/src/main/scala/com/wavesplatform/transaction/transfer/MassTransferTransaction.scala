@@ -21,11 +21,11 @@ import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
     version: TxVersion,
-    assetId: Asset,
     sender: PublicKey,
+    assetId: Asset,
     transfers: Seq[ParsedTransfer],
-    timestamp: TxTimestamp,
     fee: TxAmount,
+    timestamp: TxTimestamp,
     attachment: Array[Byte],
     proofs: Proofs
 ) extends ProvenTransaction
@@ -83,38 +83,38 @@ object MassTransferTransaction extends TransactionParserLite {
 
   def create(
       version: TxVersion,
-      assetId: Asset,
       sender: PublicKey,
+      assetId: Asset,
       transfers: Seq[ParsedTransfer],
-      timestamp: TxTimestamp,
       fee: TxAmount,
+      timestamp: TxTimestamp,
       attachment: Array[Byte],
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
-    MassTransferTransaction(version, assetId, sender, transfers, timestamp, fee, attachment, proofs).validatedEither
+    MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs).validatedEither
 
   def signed(
       version: TxVersion,
-      assetId: Asset,
       sender: PublicKey,
+      assetId: Asset,
       transfers: Seq[ParsedTransfer],
-      timestamp: TxTimestamp,
       fee: TxAmount,
+      timestamp: TxTimestamp,
       attachment: Array[Byte],
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
-    create(version, assetId, sender, transfers, timestamp, fee, attachment, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
-      assetId: Asset,
       sender: KeyPair,
+      assetId: Asset,
       transfers: Seq[ParsedTransfer],
-      timestamp: TxTimestamp,
       fee: TxAmount,
+      timestamp: TxTimestamp,
       attachment: Array[Byte]
   ): Either[ValidationError, TransactionT] =
-    signed(version, assetId, sender, transfers, timestamp, fee, attachment, sender)
+    signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {

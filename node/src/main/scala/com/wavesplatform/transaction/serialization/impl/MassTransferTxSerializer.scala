@@ -72,6 +72,6 @@ object MassTransferTxSerializer {
     val fee        = buf.getLong
     val attachment = Deser.parseArrayWithLength(buf)
     val proofs     = buf.getProofs
-    MassTransferTransaction(TxVersion.V1, assetId, sender, transfers, timestamp, fee, attachment, proofs)
+    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, attachment, proofs)
   }
 }

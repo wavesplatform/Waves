@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -1081,7 +1081,15 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
       val massTransfer =
         MassTransferTransaction
-          .selfSigned(1.toByte, assetId = IssuedAsset(issueTx2.id()), sender = buyer, transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)), genesisTimestamp + 1000L, fee = 1000L, Array.empty[Byte])
+          .selfSigned(
+            1.toByte,
+            sender = buyer,
+            assetId = IssuedAsset(issueTx2.id()),
+            transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)),
+            fee = 1000L,
+            genesisTimestamp + 1000L,
+            Array.empty[Byte]
+          )
           .explicitGet()
 
       val buyMatcherFees = getSeqWithPredefinedSum(totalBuyMatcherFeeForExchangeTransactions, sellOrdersCount)
