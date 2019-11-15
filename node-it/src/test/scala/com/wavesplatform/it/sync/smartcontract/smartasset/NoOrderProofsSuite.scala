@@ -9,7 +9,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.BurnTransactionV2
+import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
@@ -83,10 +83,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       errProofMsg
     )
 
-    val incorrectBrTx = BurnTransactionV2
-      .create(
-        AddressScheme.current.chainId,
-        pkByAddress(firstAddress),
+    val incorrectBrTx = BurnTransaction.create(2.toByte, pkByAddress(firstAddress),
         IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
         1,
         smartMinFee,

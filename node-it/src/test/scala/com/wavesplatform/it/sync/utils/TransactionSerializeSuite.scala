@@ -104,8 +104,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val burnV1 = BurnTransactionV1
+  private val burnV1 = BurnTransaction
     .create(
+      1.toByte,
       publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
@@ -116,9 +117,9 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val burnV2 = BurnTransactionV2
+  private val burnV2 = BurnTransaction
     .create(
-      chainId,
+      2.toByte,
       publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
@@ -266,18 +267,24 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val reissueV1 = ReissueTransaction.create(1.toByte, publicKey,
+  private val reissueV1 = ReissueTransaction
+    .create(
+      1.toByte,
+      publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,
       1.waves,
       ts,
-    Proofs(ByteStr.decodeBase58("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get)
+      Proofs(ByteStr.decodeBase58("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get)
     )
     .right
     .get
 
-  private val reissueV2 = ReissueTransaction.create(2.toByte, publicKey,
+  private val reissueV2 = ReissueTransaction
+    .create(
+      2.toByte,
+      publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,

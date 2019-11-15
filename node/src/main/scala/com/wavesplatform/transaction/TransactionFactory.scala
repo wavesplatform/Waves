@@ -244,59 +244,20 @@ object TransactionFactory {
       signedTx = tx.signWith(signer)
     } yield signedTx
 
-  def burnAssetV1(request: BurnV1Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV1] =
-    burnAssetV1(request, wallet, request.sender, time)
-
-  def burnAssetV1(request: BurnV1Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, BurnTransactionV1] =
+  def burn(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =
     for {
-      sender <- wallet.findPrivateKey(request.sender)
-      signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- BurnTransactionV1.signed(
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        request.quantity,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
+      tx <- burn(request, wallet, request.sender.get, time)
     } yield tx
 
-  def burnAssetV1(request: BurnV1Request, sender: PublicKey): Either[ValidationError, BurnTransactionV1] = BurnTransactionV1.create(
-    sender,
-    IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-    request.quantity,
-    request.fee,
-    request.timestamp.getOrElse(0),
-    EmptySignature
-  )
-
-  def burnAssetV2(request: BurnV2Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV2] =
-    burnAssetV2(request, wallet, request.sender, time)
-
-  def burnAssetV2(request: BurnV2Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, BurnTransactionV2] =
+  def burn(request: BurnRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, BurnTransaction] =
     for {
-      sender <- wallet.findPrivateKey(request.sender)
-      signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- BurnTransactionV2.signed(
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        request.quantity,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
-    } yield tx
-
-  def burnAssetV2(request: BurnV2Request, sender: PublicKey): Either[ValidationError, BurnTransactionV2] = BurnTransactionV2.create(
-    AddressScheme.current.chainId,
-    sender,
-    IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-    request.quantity,
-    request.fee,
-    request.timestamp.getOrElse(0),
-    Proofs.empty
-  )
+      _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
+      sender <- wallet.findPrivateKey(request.sender.get)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender)
+      signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      signedTx = tx.signWith(signer)
+    } yield signedTx
 
   def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] =
     data(request, wallet, request.sender, time)
@@ -422,9 +383,8 @@ object TransactionFactory {
       case LeaseCancelTransaction    => jsv.as[LeaseCancelRequest].toTx
       case IssueTransaction          => jsv.as[IssueRequest].toTx
       case ReissueTransaction        => jsv.as[ReissueRequest].toTx
+      case BurnTransaction           => jsv.as[BurnRequest].toTx
       case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
-      case BurnTransactionV1         => jsv.as[SignedBurnV1Request].toTx
-      case BurnTransactionV2         => jsv.as[SignedBurnV2Request].toTx
       case DataTransaction           => jsv.as[SignedDataRequest].toTx
       case InvokeScriptTransaction   => jsv.as[SignedInvokeScriptRequest].toTx
       case SetScriptTransaction      => jsv.as[SignedSetScriptRequest].toTx
@@ -463,8 +423,7 @@ object TransactionFactory {
               case LeaseCancelTransaction    => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
               case IssueTransaction          => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
               case ReissueTransaction        => TransactionFactory.reissue(txJson.as[ReissueRequest], wallet, signerAddress, time)
-              case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
-              case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
+              case BurnTransaction           => TransactionFactory.burn(txJson.as[BurnRequest], wallet, signerAddress, time)
               case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
               case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
               case InvokeScriptTransaction   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)

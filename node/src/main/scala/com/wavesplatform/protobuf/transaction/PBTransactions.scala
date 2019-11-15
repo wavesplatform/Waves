@@ -136,8 +136,8 @@ object PBTransactions {
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
         version match {
-          case 1 => vt.assets.BurnTransactionV1.create(sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
-          case 2 => vt.assets.BurnTransactionV2.create(chainId, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
+          case 1 => vt.assets.BurnTransaction.create(1.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
+          case 2 => vt.assets.BurnTransaction.create(2.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 
@@ -310,8 +310,8 @@ object PBTransactions {
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
         version match {
-          case 1 => vt.assets.BurnTransactionV1(sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
-          case 2 => vt.assets.BurnTransactionV2(chainId, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
+          case 1 => vt.assets.BurnTransaction(1.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, signature)
+          case 2 => vt.assets.BurnTransaction(2.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
           case v => throw new IllegalArgumentException(s"Unsupported transaction version: $v")
         }
 

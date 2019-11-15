@@ -15,12 +15,11 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests.{
-  BurnV1Request,
+  BurnRequest,
   ExchangeRequest,
   IssueRequest,
   MassTransferRequest,
   ReissueRequest,
-  SignedBurnV1Request,
   SponsorFeeRequest,
   TransferRequest
 }
@@ -241,7 +240,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     } ~ (path("reissue") & withAuth) {
       broadcast[ReissueRequest](TransactionFactory.reissue(_, wallet, time))
     } ~ (path("burn") & withAuth) {
-      broadcast[BurnV1Request](TransactionFactory.burnAssetV1(_, wallet, time))
+      broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
     } ~ (path("sponsor") & withAuth) {
       broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
     } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
@@ -249,7 +248,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     }) ~ pathPrefix("broadcast")(
       path("issue")(broadcast[IssueRequest](_.toTx)) ~
         path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
-        path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
+        path("burn")(broadcast[BurnRequest](_.toTx)) ~
         path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
         path("transfer")(broadcast[TransferRequest](_.toTx))
     )
