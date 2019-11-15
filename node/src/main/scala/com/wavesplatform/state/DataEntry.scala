@@ -52,7 +52,7 @@ object DataEntry {
   }
 
   def parse(buf: ByteBuffer): DataEntry[_] = {
-    val keyLength = buf.getShort.ensuring(len => len > 0 && len <= MaxKeySize)
+    val keyLength = buf.getShort
     val bytes     = new Array[Byte](keyLength)
     buf.get(bytes)
     val key = new String(bytes, UTF_8)

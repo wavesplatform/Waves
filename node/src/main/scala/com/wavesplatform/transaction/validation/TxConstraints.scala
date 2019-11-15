@@ -24,9 +24,6 @@ object TxConstraints {
   def cond(cond: => Boolean, err: => ValidationError): ValidatedNV =
     if (cond) Valid(()) else Invalid(err).toValidatedNel
 
-  def tryDo(cond: => Unit, err: => ValidationError): ValidatedNV =
-    if (Try(cond).isSuccess) Valid(()) else Invalid(err).toValidatedNel
-
   def fee(fee: Long): ValidatedV[Long] = {
     Validated
       .condNel(

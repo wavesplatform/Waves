@@ -1,18 +1,17 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Shorts
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.{TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{Format, Json}
-import scorex.crypto.encode.Base64
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -34,6 +33,46 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
 
   property("serialization roundtrip") {
     forAll(dataTransactionGen)(checkSerialization)
+  }
+
+  property("decode pre-encoded bytes") {
+    val bytes = Base64.decode(
+      "AAwB1SiqvsNcoQDYfHt6EoYy+vGc1EUxgZRXRFEToyoh7yIAAwADaW50AAAAAAAAAAAYAARib29sAQEABGJsb2ICAAVhbGljZQAAAWODBPoKAAAAAAABhqABAAEAQGWOW7SpwumpOCG4fGjUQXv5VRNt1PRVH8+C5J1OyNjxNwJpmm06hc7D143OEcxpzQakHhC5lb09xQ7wtesPa4s="
+    )
+    val json = Json.parse("""{
+        |  "type": 12,
+        |  "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
+        |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+        |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+        |  "fee": 100000,
+        |  "feeAssetId": null,
+        |  "timestamp": 1526911531530,
+        |  "proofs": [
+        |    "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
+        |  ],
+        |  "version": 1,
+        |  "data": [
+        |    {
+        |      "key": "int",
+        |      "type": "integer",
+        |      "value": 24
+        |    },
+        |    {
+        |      "key": "bool",
+        |      "type": "boolean",
+        |      "value": true
+        |    },
+        |    {
+        |      "key": "blob",
+        |      "type": "binary",
+        |      "value": "base64:YWxpY2U="
+        |    }
+        |  ]
+        |}""".stripMargin)
+
+    val tx = DataTransaction.serializer.parseBytes(bytes).get
+    tx.json() shouldBe json
+    assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }
 
   property("serialization from TypedTransaction") {

@@ -37,7 +37,7 @@ object DataTxSerializer {
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {
     def parseDataEntries(buf: ByteBuffer): Seq[DataEntry[_]] = {
       val entryCount = buf.getShort
-      require(entryCount < 0 || entryCount > buf.remaining(), s"Broken array size ($entryCount entries while ${buf.remaining()} bytes available)")
+      require(entryCount >= 0 && buf.remaining() > entryCount, s"Broken array size ($entryCount entries while ${buf.remaining()} bytes available)")
       Vector.fill(entryCount)(DataEntry.parse(buf))
     }
 
