@@ -9,7 +9,7 @@ object Deser {
 
   def serializeBoolean(b: Boolean): Array[Byte] = if (b) Array(1: Byte) else Array(0: Byte)
 
-  def serializeArray(b: Array[Byte]): Array[Byte] = {
+  def serializeArrayWithLength(b: Array[Byte]): Array[Byte] = {
     val length = b.length
     if (length.isValidShort)
       Bytes.concat(Shorts.toByteArray(length.toShort), b)
@@ -80,12 +80,12 @@ object Deser {
     b.map(a => (1: Byte) +: ser(a)).getOrElse(Array(0: Byte))
 
   def serializeOptionOfArrayWithLength[T](b: Option[T])(ser: T => Array[Byte]): Array[Byte] =
-    b.map(a => (1: Byte) +: serializeArray(ser(a))).getOrElse(Array(0: Byte))
+    b.map(a => (1: Byte) +: serializeArrayWithLength(ser(a))).getOrElse(Array(0: Byte))
 
   def serializeArrays(bs: Seq[Array[Byte]]): Array[Byte] = {
     require(bs.length.isValidShort, s"Attempting to serialize array with size, but the size(${bs.length}) exceeds MaxShort(${Short.MaxValue})")
     val countBytes = Shorts.toByteArray(bs.length.toShort)
-    Bytes.concat(Seq(countBytes) ++ bs.map(serializeArray): _*)
+    Bytes.concat(Seq(countBytes) ++ bs.map(serializeArrayWithLength): _*)
   }
 
   def serializeMerkleRootHash(d: Digest32): Array[Byte] = {

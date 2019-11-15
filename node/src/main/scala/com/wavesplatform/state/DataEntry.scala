@@ -151,7 +151,7 @@ case class BooleanDataEntry(override val key: String, override val value: Boolea
 
 case class BinaryDataEntry(override val key: String, override val value: ByteStr)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[ByteStr]("binary", key, value) {
-  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArray(value.arr)
+  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArrayWithLength(value.arr)
 
   override def toJson: JsObject = super.toJson + ("value" -> JsString(value.base64))
 
@@ -160,7 +160,7 @@ case class BinaryDataEntry(override val key: String, override val value: ByteStr
 
 case class StringDataEntry(override val key: String, override val value: String)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[String]("string", key, value) {
-  override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArray(value.getBytes(UTF_8))
+  override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArrayWithLength(value.getBytes(UTF_8))
 
   override def toJson: JsObject = super.toJson + ("value" -> JsString(value))
 

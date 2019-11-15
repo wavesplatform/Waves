@@ -1,4 +1,7 @@
 package com.wavesplatform.account
+import java.nio.ByteBuffer
+
+import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
@@ -29,6 +32,23 @@ object AddressOrAlias {
         val (_, aliasEnd) = Deser.parseArrayWithLength(bytes, position + 2)
         Alias.fromBytes(bytes.slice(position, aliasEnd)).map((_, aliasEnd))
       case _ => Left(InvalidAddress("Unknown address/alias version"))
+    }
+  }
+
+  def fromBytes(buf: ByteBuffer): Either[ValidationError, AddressOrAlias] = {
+    buf.get match {
+      case Address.AddressVersion =>
+        val addressBytes = new Array[Byte](Address.AddressLength - 1)
+        buf.get(addressBytes)
+        Address.fromBytes(Bytes.concat(Array(Address.AddressVersion), addressBytes))
+
+      case Alias.AddressVersion =>
+        val chainId = buf.get
+        val aliasBytes = Deser.parseArrayWithLength(buf)
+        Alias.fromBytes(Bytes.concat(Array(Address.AddressVersion, chainId), aliasBytes))
+
+      case _ =>
+        Left(InvalidAddress("Unknown address/alias version"))
     }
   }
 

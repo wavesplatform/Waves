@@ -47,6 +47,6 @@ case class SignedMassTransferRequest(
       _proofs     <- Proofs.create(_proofBytes)
       _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
-      t           <- MassTransferTransaction.create(_assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
+      t           <- MassTransferTransaction.create(1.toByte, _assetId, _sender, _transfers, timestamp, fee, _attachment.arr, _proofs)
     } yield t
 }

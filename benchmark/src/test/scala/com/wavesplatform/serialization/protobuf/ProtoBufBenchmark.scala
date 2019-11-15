@@ -31,15 +31,7 @@ class ProtoBufBenchmark {
         .get
 
       MassTransferTransaction
-        .create(
-          Waves,
-          PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-          transfers,
-          1518091313964L,
-          200000,
-          Base58.tryDecodeWithLimit("59QuUcqP6p").get,
-          Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
-        )
+        .create(1.toByte, Waves, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get, transfers, 1518091313964L, 200000, Base58.tryDecodeWithLimit("59QuUcqP6p").get, Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get)))
         .right
         .get
     }
@@ -58,15 +50,7 @@ class ProtoBufBenchmark {
         .get
 
       MassTransferTransaction
-        .create(
-          Waves,
-          PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-          transfers,
-          1518091313964L,
-          200000,
-          Base58.tryDecodeWithLimit("59QuUcqP6p").get,
-          Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
-        )
+        .create(1.toByte, Waves, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get, transfers, 1518091313964L, 200000, Base58.tryDecodeWithLimit("59QuUcqP6p").get, Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get)))
         .right
         .get
     }

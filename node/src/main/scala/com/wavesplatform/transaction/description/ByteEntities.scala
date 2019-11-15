@@ -267,52 +267,6 @@ case class ProofsBytes(index: Int, concise: Boolean = true) extends ByteEntity[P
   }
 }
 
-case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
-
-  import cats.implicits._
-
-  private def readTransfer(buf: Array[Byte], offset: Int): (Validation[ParsedTransfer], Int) = {
-    AddressOrAlias.fromBytes(buf, offset) match {
-      case Right((addressOrAlias, ofs)) =>
-        val amount = Longs.fromByteArray(buf.slice(ofs, ofs + 8))
-        Right[ValidationError, ParsedTransfer](ParsedTransfer(addressOrAlias, amount)) -> (ofs + 8)
-      case Left(validationError) => Left(validationError) -> offset
-    }
-  }
-
-  def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(
-      ByteEntityDescription(index, "Number of transfers", UnimportantType, "2", 1),
-      ByteEntityDescription(index, "Address or alias for transfer 1", AddressOrAliasType, "Depends on the first byte (1 - Address, 2 - Alias)", 2),
-      ByteEntityDescription(index, "Amount for transfer 1", LongType, "8", 3),
-      ByteEntityDescription(index, "Address or alias for transfer 2", AddressOrAliasType, "Depends on the first byte (1 - Address, 2 - Alias)", 4),
-      ByteEntityDescription(index, "Amount for transfer 2", LongType, "8", 5, additionalInfo = "\n...")
-    )
-  }
-
-  def deserialize(buf: Array[Byte], offset: Int): Try[(List[ParsedTransfer], Int)] = {
-    Try {
-
-      val transferCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
-
-      val transfersList: List[(Validation[ParsedTransfer], Int)] =
-        if (transferCount == 0) {
-          Nil
-        } else if (transferCount < 0 || transferCount > buf.length - offset - 2) {
-          throw new IllegalArgumentException(s"Invalid array size ($transferCount entries while ${buf.length - offset - 2} bytes available)")
-        } else {
-          List.iterate(readTransfer(buf, offset + 2), transferCount) { case (_, offset) => readTransfer(buf, offset) }
-        }
-
-      val resultOffset = transfersList.lastOption.map(_._2).getOrElse(offset + 2)
-      val resultList   = transfersList.map { case (ei, _) => ei }.sequence.explicitGet()
-
-      resultList -> resultOffset
-    }
-  }
-
-}
-
 case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.FUNCTION_CALL] {
 
   def generateDoc: Seq[ByteEntityDescription] = {
