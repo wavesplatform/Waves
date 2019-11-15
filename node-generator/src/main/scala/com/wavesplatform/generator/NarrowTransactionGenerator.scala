@@ -53,8 +53,8 @@ class NarrowTransactionGenerator(
     val generated = (0 until (n * 1.2).toInt).foldLeft(
       (
         Seq.empty[Transaction],
-        Seq[IssueTransactionV2](preconditions.tradeAsset),
-        Seq[IssueTransactionV2](preconditions.tradeAsset),
+        preconditions.tradeAsset.fold(Seq.empty[IssueTransactionV2])(Seq(_)),
+        preconditions.tradeAsset.fold(Seq.empty[IssueTransactionV2])(Seq(_)),
         Universe.Leases,
         Seq.empty[CreateAliasTransaction]
       )
@@ -154,7 +154,7 @@ class NarrowTransactionGenerator(
                 matcher <- randomFrom(Universe.Accounts).map(_.keyPair)
                 seller  <- randomFrom(Universe.Accounts).map(_.keyPair)
                 buyer   <- randomFrom(Universe.Accounts).map(_.keyPair)
-                pair      = AssetPair(Waves, IssuedAsset(preconditions.tradeAsset.id()))
+                pair    <- preconditions.tradeAsset.map(a => AssetPair(Waves, IssuedAsset(a.id())))
                 delta     = random.nextLong(10000)
                 sellOrder = Order.sell(Order.V2, seller, matcher, pair, 10000000 + delta, 10, timestamp, timestamp + 30.days.toMillis, 300000L)
                 buyOrder = Order.buy(
@@ -418,7 +418,7 @@ object NarrowTransactionGenerator {
 
   final case class Preconditions(
       leaseRecipient: KeyPair,
-      tradeAsset: IssueTransactionV2,
+      tradeAsset: Option[IssueTransactionV2],
       setScriptAccounts: Seq[KeyPair],
       setScriptAssets: Seq[IssueTransactionV2]
   )
@@ -482,7 +482,7 @@ object NarrowTransactionGenerator {
                   .selfSigned(
                     AddressScheme.current.chainId,
                     issuer,
-                    s"$name#$i".getBytes("UTF-8").take(16),
+                    s"$i#$name".getBytes("UTF-8").take(16),
                     s"$description #$i".getBytes("UTF-8"),
                     amount,
                     decimals.toByte,
@@ -498,47 +498,52 @@ object NarrowTransactionGenerator {
         (accountInitTxs, accountTailInitTxs ++ assetTailInitTxs, accounts, assetTailInitTxs)
       } else (Seq(), Seq(), Seq(), Seq())
 
-    val trader = randomFrom(accounts).get
+    val (tradeAsset, tradeTailInitTxs) = if (settings.probabilities.keySet.contains(ExchangeTransaction)) {
 
-    val tradeAsset = IssueTransactionV2
-      .selfSigned(
-        AddressScheme.current.chainId,
-        trader,
-        "TRADE".getBytes("UTF-8"),
-        "Waves DEX is the best exchange ever".getBytes("UTF-8"),
-        100000000,
-        2,
-        reissuable = true,
-        fee = 100400000L,
-        timestamp = System.currentTimeMillis(),
-        script = None
-      )
-      .right
-      .get
+      val trader = randomFrom(accounts).get
 
-    val tradeAssetDistribution = {
-      (Universe.Accounts.map(_.keyPair).toSet - trader).toSeq.map(acc => {
-        TransferTransaction
-          .selfSigned(
-            2.toByte,
-            trader,
-            acc,
-            IssuedAsset(tradeAsset.id()),
-            tradeAsset.quantity / Universe.Accounts.size,
-            Waves,
-            900000,
-            Array.fill(random.nextInt(100))(random.nextInt().toByte),
-            System.currentTimeMillis()
-          )
-          .right
-          .get
-      })
-    }
+      val tradeAsset = IssueTransactionV2
+        .selfSigned(
+          AddressScheme.current.chainId,
+          trader,
+          "TRADE".getBytes("UTF-8"),
+          "Waves DEX is the best exchange ever".getBytes("UTF-8"),
+          100000000,
+          2,
+          reissuable = true,
+          fee = 100400000L,
+          timestamp = System.currentTimeMillis(),
+          script = None
+        )
+        .right
+        .get
+
+      val tradeAssetDistribution: Seq[Transaction] = {
+        (Universe.Accounts.map(_.keyPair).toSet - trader).toSeq.map(acc => {
+          TransferTransaction
+            .selfSigned(
+              2.toByte,
+              trader,
+              acc,
+              IssuedAsset(tradeAsset.id()),
+              tradeAsset.quantity / Universe.Accounts.size,
+              Waves,
+              900000,
+              Array.fill(random.nextInt(100))(random.nextInt().toByte),
+              System.currentTimeMillis()
+            )
+            .right
+            .get
+        })
+      }
+
+      (Some(tradeAsset), tradeAssetDistribution)
+    } else (None, Seq())
 
     val leaseRecipient = GeneratorSettings.toKeyPair("lease recipient")
 
-    val initialTxs     = tradeAsset +: setScriptInitTxs
-    val tailInitialTxs = tradeAssetDistribution ++ setScriptTailInitTxs
+    val initialTxs     = tradeAsset.fold(Seq.empty[Transaction])(Seq(_)) ++ setScriptInitTxs
+    val tailInitialTxs = tradeTailInitTxs ++ setScriptTailInitTxs
     val preconditions  = Preconditions(leaseRecipient, tradeAsset, setScriptAccounts, setScriptAssets)
 
     new NarrowTransactionGenerator(settings, preconditions, accounts, estimator, initialTxs, tailInitialTxs)

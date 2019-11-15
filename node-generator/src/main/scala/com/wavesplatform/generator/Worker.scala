@@ -130,7 +130,7 @@ class Worker(
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
         txs          <- Task(transactionSource.take(cntToSend).toStream)
-        _            <- logInfo(s"Head transaction id: ${txs.head.id()}")
+        _            <- txs.headOption.fold(Task.unit)(tx => logInfo(s"Head transaction id: ${tx.id()}"))
         _            <- Task.deferFuture(networkSender.send(validChannel, txs: _*))
         _            <- sleep(settings.delay)
         r            <- Task.defer(pullAndWrite(validChannel, state, (cnt + 1) % 10))
