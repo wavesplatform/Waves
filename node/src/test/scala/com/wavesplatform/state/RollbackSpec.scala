@@ -317,7 +317,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(DataTransaction.selfSigned(sender, List(dataEntry), 1, nextTs).explicitGet())
+              Seq(DataTransaction.selfSigned(1.toByte, sender, List(dataEntry), 1, nextTs).explicitGet())
             )
           )
 

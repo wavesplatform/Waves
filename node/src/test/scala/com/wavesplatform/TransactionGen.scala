@@ -882,13 +882,13 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       uniq = data.foldRight(List.empty[DataEntry[_]]) { (e, es) =>
         if (es.exists(_.key == e.key)) es else e :: es
       }
-    } yield DataTransaction.selfSigned(sender, uniq, 15000000, timestamp).explicitGet())
+    } yield DataTransaction.selfSigned(1.toByte, sender, uniq, 15000000, timestamp).explicitGet())
       .label("DataTransaction")
 
   def dataTransactionGenP(sender: KeyPair, data: List[DataEntry[_]]): Gen[DataTransaction] =
     (for {
       timestamp <- timestampGen
-    } yield DataTransaction.selfSigned(sender, data, 15000000, timestamp).explicitGet())
+    } yield DataTransaction.selfSigned(1.toByte, sender, data, 15000000, timestamp).explicitGet())
       .label("DataTransactionP")
 
   def preconditionsTransferAndLease(typed: EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =

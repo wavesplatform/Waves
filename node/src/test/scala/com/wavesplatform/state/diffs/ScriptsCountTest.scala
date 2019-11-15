@@ -126,7 +126,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       assetScript = SetAssetScriptTransaction
         .create(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
-      data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
+      data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
         .selfSigned(2.toByte, master, acc, Waves, 10000000000L, Waves, fee, ByteStr(Array()), timestamp)
         .explicitGet()
@@ -248,7 +248,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       assetScript = SetAssetScriptTransaction
         .create(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
-      data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
+      data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
         .selfSigned(2.toByte, master, acc, Waves, 10000000000L, Waves, fee, ByteStr(Array()), timestamp)
         .explicitGet()

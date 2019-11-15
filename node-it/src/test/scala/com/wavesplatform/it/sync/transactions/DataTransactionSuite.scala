@@ -52,7 +52,7 @@ class DataTransactionSuite extends BaseTransactionSuite {
         timestamp: Long = System.currentTimeMillis,
         version: TxVersion = DataTransaction.supportedVersions.head
     ): DataTransaction =
-      DataTransaction.selfSigned(sender.privateKey, entries, fee, timestamp).explicitGet()
+      DataTransaction.selfSigned(1.toByte, sender.privateKey, entries, fee, timestamp).explicitGet()
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)
     val invalidTxs = Seq(

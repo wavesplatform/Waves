@@ -313,47 +313,6 @@ case class TransfersBytes(index: Int) extends ByteEntity[List[ParsedTransfer]] {
 
 }
 
-case class ListDataEntryBytes(index: Int) extends ByteEntity[List[DataEntry[_]]] {
-
-  def generateDoc: Seq[ByteEntityDescription] = {
-    Seq(
-      ByteEntityDescription(index, "Data entries count", UnimportantType, "2", subIndex = 1),
-      ByteEntityDescription(index, "Key 1 length (K1)", UnimportantType, "2", subIndex = 2),
-      ByteEntityDescription(
-        index,
-        "Key 1 bytes",
-        "UTF-8 encoded",
-        s"K1 <= ${DataEntry.MaxKeySize} * 4 (max number of bytes per char) = ${DataEntry.MaxKeySize * 4}",
-        subIndex = 3
-      ),
-      ByteEntityDescription(index, "Value 1 type (0 = integer, 1 = boolean, 2 = binary array, 3 = string)", UnimportantType, "1", subIndex = 4),
-      ByteEntityDescription(
-        index,
-        "Value 1 bytes",
-        "Value 1 type",
-        s"Depends on the value type, max ${DataEntry.MaxValueSize}",
-        subIndex = 5,
-        additionalInfo = "\n..."
-      )
-    )
-  }
-
-  def deserialize(buf: Array[Byte], offset: Int): Try[(List[DataEntry[_]], Int)] = {
-    Try {
-
-      val entryCount = Shorts.fromByteArray(buf.slice(offset, offset + 2))
-
-      if (entryCount < 0 || entryCount > buf.size - offset - 2) {
-        throw new Exception(s"Brocken array size ($entryCount entries while ${buf.size - offset - 2} bytes avaliable)")
-      } else if (entryCount > 0) {
-        val parsed = List.iterate(DataEntry.parse(buf, offset + 2), entryCount) { case (_, p) => DataEntry.parse(buf, p) }
-        parsed.map(_._1) -> parsed.last._2
-      } else
-        List.empty -> (offset + 2)
-    }
-  }
-}
-
 case class FunctionCallBytes(index: Int, name: String) extends ByteEntity[Terms.FUNCTION_CALL] {
 
   def generateDoc: Seq[ByteEntityDescription] = {

@@ -181,13 +181,7 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction.create(
-          sender,
-          dt.data.toList.map(toVanillaDataEntry),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.DataTransaction.create(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
@@ -349,13 +343,7 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction(
-          sender,
-          dt.data.toList.map(toVanillaDataEntry),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.DataTransaction(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
@@ -476,9 +464,9 @@ object PBTransactions {
         )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.MassTransfer(data))
 
-      case tx @ vt.DataTransaction(sender, data, fee, timestamp, proofs) =>
+      case tx @ vt.DataTransaction(version, sender, data, fee, timestamp, proofs) =>
         val txData = DataTransactionData(data.map(toPBDataEntry))
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.DataTransaction(txData))
+        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.DataTransaction(txData))
 
       case tx @ vt.assets.SponsorFeeTransaction(sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs) =>
         val data = SponsorFeeTransactionData(Some(Amount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
