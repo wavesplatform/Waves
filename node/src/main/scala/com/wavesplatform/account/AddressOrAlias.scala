@@ -38,14 +38,15 @@ object AddressOrAlias {
   def fromBytes(buf: ByteBuffer): Either[ValidationError, AddressOrAlias] = {
     buf.get match {
       case Address.AddressVersion =>
-        val addressBytes = new Array[Byte](Address.AddressLength - 1)
+        buf.position(buf.position() - 1)
+        val addressBytes = new Array[Byte](Address.AddressLength)
         buf.get(addressBytes)
-        Address.fromBytes(Bytes.concat(Array(Address.AddressVersion), addressBytes))
+        Address.fromBytes(addressBytes)
 
       case Alias.AddressVersion =>
         val chainId = buf.get
         val aliasBytes = Deser.parseArrayWithLength(buf)
-        Alias.fromBytes(Bytes.concat(Array(Address.AddressVersion, chainId), aliasBytes))
+        Alias.createWithChainId(new String(aliasBytes, "UTF-8"), chainId)
 
       case _ =>
         Left(InvalidAddress("Unknown address/alias version"))

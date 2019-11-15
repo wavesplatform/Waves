@@ -31,7 +31,7 @@ object MassTransferTxSerializer {
   def bodyBytes(tx: MassTransferTransaction): Array[Byte] = {
     import tx._
     val transferBytes = transfers
-      .map { case ParsedTransfer(recipient, amount) => recipient.bytes.arr ++ Longs.toByteArray(amount) }
+      .map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
 
     Bytes.concat(
       Array(builder.typeId, version),
@@ -63,7 +63,7 @@ object MassTransferTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == MassTransferTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
+    require(buf.getByte == MassTransferTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
 
     val sender     = buf.getPublicKey
     val assetId    = buf.getAsset

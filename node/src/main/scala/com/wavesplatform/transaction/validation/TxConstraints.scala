@@ -52,7 +52,7 @@ object TxConstraints {
   }
 
   def noOverflow(amounts: Long*): ValidatedV[Long] = {
-    Try(amounts.tail.fold(amounts.head)(Math.addExact))
+    Try(amounts.fold(0L)(Math.addExact))
       .fold[ValidatedV[Long]](
         _ => TxValidationError.OverflowError.invalidNel,
         _.validNel
