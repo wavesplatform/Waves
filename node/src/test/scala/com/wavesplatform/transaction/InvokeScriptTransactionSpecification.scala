@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
@@ -13,6 +12,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
+import com.wavesplatform.{TransactionGen, crypto}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
@@ -36,6 +36,45 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Verifier.verifyAsEllipticCurveSignature(transaction) shouldBe 'right
       Verifier.verifyAsEllipticCurveSignature(deser) shouldBe 'right // !!!!!!!!!!!!!!!
     }
+  }
+
+  property("decode pre-encoded bytes") {
+    val bytes = Base64.decode(
+      "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
+    )
+    AddressScheme.current = new AddressScheme {
+      override val chainId: TxVersion = 'D'.toByte
+    }
+    val json = Json.parse(s"""{
+                         "type": 16,
+                         "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
+                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "senderPublicKey": "$publicKey",
+                         "fee": 100000,
+                         "feeAssetId": null,
+                         "timestamp": 1526910778245,
+                         "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
+                         "version": 1,
+                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "call": {
+                            "function" : "foo",
+                             "args" : [
+                             { "type" : "binary",
+                               "value" : "base64:YWxpY2U="
+                             }
+                            ]
+                          },
+                         "payment" : [{
+                            "amount" : 7,
+                            "assetId" : "$publicKey"
+                            }]
+                        }
+    """)
+
+    val tx = InvokeScriptTransaction.serializer.parseBytes(bytes).get
+    tx.json() shouldBe json
+    ByteStr(tx.bytes()) shouldBe ByteStr(bytes)
+    AddressScheme.current = DefaultAddressScheme
   }
 
   property("JSON format validation for InvokeScriptTransaction") {
@@ -67,12 +106,21 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     """)
 
     val tx = InvokeScriptTransaction
-      .selfSigned(1.toByte, KeyPair("test3".getBytes("UTF-8")), KeyPair("test4".getBytes("UTF-8")), Some(
+      .selfSigned(
+        1.toByte,
+        KeyPair("test3".getBytes("UTF-8")),
+        KeyPair("test4".getBytes("UTF-8")),
+        Some(
           Terms.FUNCTION_CALL(
             FunctionHeader.User("foo"),
             List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
           )
-        ), Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))), 100000, Waves, 1526910778245L)
+        ),
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        100000,
+        Waves,
+        1526910778245L
+      )
       .right
       .get
 
@@ -103,7 +151,16 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     """)
 
     val tx = InvokeScriptTransaction
-      .selfSigned(1.toByte, KeyPair("test3".getBytes("UTF-8")), KeyPair("test4".getBytes("UTF-8")), None, Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))), 100000, Waves, 1526910778245L)
+      .selfSigned(
+        1.toByte,
+        KeyPair("test3".getBytes("UTF-8")),
+        KeyPair("test4".getBytes("UTF-8")),
+        None,
+        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
+        100000,
+        Waves,
+        1526910778245L
+      )
       .right
       .get
 
@@ -137,36 +194,76 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)), Seq(), 1, Waves, 1, Proofs.empty) should produce("more than 22 arguments")
+    InvokeScriptTransaction.create(
+      1.toByte,
+      pk,
+      pk.toAddress,
+      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("more than 22 arguments")
   }
 
   property(s"can't call a func with non native(simple) args - ARR") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(
+    InvokeScriptTransaction.create(
+      1.toByte,
+      pk,
+      pk.toAddress,
+      Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
         )
-      ), Seq(), 1, Waves, 1, Proofs.empty) should produce("All arguments of invokeScript must be one of the types")
+      ),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
   }
 
   property(s"can't call a func with non native(simple) args - CaseObj") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(
+    InvokeScriptTransaction.create(
+      1.toByte,
+      pk,
+      pk.toAddress,
+      Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
         )
-      ), Seq(), 1, Waves, 1, Proofs.empty) should produce("All arguments of invokeScript must be one of the types")
+      ),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("All arguments of invokeScript must be one of the types")
   }
 
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))), Seq(), 1, Waves, 1, Proofs.empty) should produce("TooBigArray")
+    InvokeScriptTransaction.create(
+      1.toByte,
+      pk,
+      pk.toAddress,
+      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))),
+      Seq(),
+      1,
+      Waves,
+      1,
+      Proofs.empty
+    ) should produce("TooBigArray")
   }
 
   property("can't have zero amount") {
