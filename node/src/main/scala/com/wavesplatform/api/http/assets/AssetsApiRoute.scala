@@ -204,17 +204,17 @@ case class AssetsApiRoute(
     } ~ (path("issue") & withAuth) {
       broadcast[IssueRequest](TransactionFactory.issue(_, wallet, time))
     } ~ (path("reissue") & withAuth) {
-      broadcast[ReissueV1Request](TransactionFactory.reissueAssetV1(_, wallet, time))
+      broadcast[ReissueRequest](TransactionFactory.reissue(_, wallet, time))
     } ~ (path("burn") & withAuth) {
-      broadcast[BurnV1Request](TransactionFactory.burnAssetV1(_, wallet, time))
+      broadcast[BurnRequest](TransactionFactory.burn(_, wallet, time))
     } ~ (path("sponsor") & withAuth) {
       broadcast[SponsorFeeRequest](TransactionFactory.sponsor(_, wallet, time))
     } ~ (path("order") & withAuth)(jsonPost[Order] { order =>
       wallet.privateKeyAccount(order.senderPublicKey).map(pk => Order.sign(order, pk))
     }) ~ pathPrefix("broadcast")(
       path("issue")(broadcast[IssueRequest](_.toTx)) ~
-        path("reissue")(broadcast[SignedReissueV1Request](_.toTx)) ~
-        path("burn")(broadcast[SignedBurnV1Request](_.toTx)) ~
+        path("reissue")(broadcast[ReissueRequest](_.toTx)) ~
+        path("burn")(broadcast[BurnRequest](_.toTx)) ~
         path("exchange")(broadcast[ExchangeRequest](_.toTx)) ~
         path("transfer")(broadcast[TransferRequest](_.toTx))
     )

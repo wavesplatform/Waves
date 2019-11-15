@@ -72,7 +72,7 @@ case class InvokeScriptTransaction private (
         })
     )
 
-  override def checkedAssets(): Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
+  override def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 

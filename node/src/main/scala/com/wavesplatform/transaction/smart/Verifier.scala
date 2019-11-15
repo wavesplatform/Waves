@@ -57,7 +57,7 @@ object Verifier extends ScorexLogging {
         }
     }
     validatedTx.flatMap { tx =>
-      tx.checkedAssets()
+      tx.checkedAssets
         .flatMap {
           case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
           case _                  => None

@@ -9,7 +9,7 @@ import play.api.libs.json._
 
 class SetScriptTransactionSpecification extends GenericTransactionSpecification[SetScriptTransaction] {
 
-  def transactionParser: com.wavesplatform.transaction.TransactionParserFor[SetScriptTransaction] = SetScriptTransaction
+  def transactionParser = SetScriptTransaction
 
   def updateProofs(tx: SetScriptTransaction, p: Proofs): SetScriptTransaction = {
     tx.copy(proofs = p)
@@ -29,7 +29,8 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
 
   def jsonRepr: Seq[(JsValue, SetScriptTransaction)] =
     Seq(
-      (Json.parse("""{
+      (
+        Json.parse("""{
                        "type": 13,
                        "id": "Cst37pKJ19WnUZSD6mjqywosMJDbqatuYm2sFAbXrysE",
                        "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
@@ -45,16 +46,18 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
                        "script": null
                        }
     """),
-       SetScriptTransaction
-         .create(
-           PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-           None,
-           100000,
-           1526983936610L,
-           Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
-         )
-         .right
-         .get))
+        SetScriptTransaction
+          .create(
+            PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+            None,
+            100000,
+            1526983936610L,
+            Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
+          )
+          .right
+          .get
+      )
+    )
 
   def transactionName: String = "SetScriptTransaction"
 

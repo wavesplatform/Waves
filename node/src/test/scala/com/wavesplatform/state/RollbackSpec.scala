@@ -15,7 +15,7 @@ import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
-import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransactionV1}
+import com.wavesplatform.transaction.assets.{IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
@@ -276,7 +276,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               nextTs,
               blockIdWithIssue,
               Seq(
-                ReissueTransactionV1.selfSigned(sender, IssuedAsset(issueTransaction.id()), 2000, false, 1, nextTs).explicitGet()
+                ReissueTransaction.selfSigned(1.toByte, sender, IssuedAsset(issueTransaction.id()), 2000, false, 1, nextTs).explicitGet()
               )
             )
           )
