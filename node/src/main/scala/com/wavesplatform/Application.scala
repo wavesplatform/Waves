@@ -176,7 +176,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         .map {
           case Right(discardedBlocks) =>
             allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
-            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
+            if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_._1.transactionData))
             miner.scheduleMining()
             Right(discardedBlocks)
           case Left(error) => Left(error)

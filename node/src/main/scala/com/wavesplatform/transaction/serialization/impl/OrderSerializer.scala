@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
 import play.api.libs.json.{JsObject, Json}

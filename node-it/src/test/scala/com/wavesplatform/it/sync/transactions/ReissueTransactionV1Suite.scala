@@ -5,7 +5,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.sync._
 
-class ReissueTransactionV1Suite extends BaseTransactionSuite {
+class ReissueTransactionSuite extends BaseTransactionSuite {
 
   test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
 

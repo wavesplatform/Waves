@@ -12,8 +12,8 @@ object TransactionParsers {
   private[this] val old: Map[Byte, TransactionParserLite] = Seq[TransactionParserLite](
     GenesisTransaction,
     PaymentTransaction,
-    IssueTransactionV1,
-    ReissueTransactionV1,
+    IssueTransaction,
+    ReissueTransaction,
     BurnTransactionV1,
     ExchangeTransaction,
     LeaseTransaction,
@@ -28,9 +28,9 @@ object TransactionParsers {
   private[this] val modern: Map[(Byte, Byte), TransactionParserLite] = Seq[TransactionParserLite](
     DataTransaction,
     SetScriptTransaction,
-    IssueTransactionV2,
+    IssueTransaction,
     CreateAliasTransaction,
-    ReissueTransactionV2,
+    ReissueTransaction,
     BurnTransactionV2,
     ExchangeTransaction,
     LeaseTransaction,

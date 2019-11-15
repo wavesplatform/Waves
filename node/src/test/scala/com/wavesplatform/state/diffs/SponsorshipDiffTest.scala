@@ -7,10 +7,10 @@ import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -277,8 +277,19 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).explicitGet()
-      issue = IssueTransactionV1
-        .selfSigned(master, Base58.tryDecodeWithLimit("Asset").get, Array.emptyByteArray, 100, 2, reissuable = false, 100000000, ts + 1)
+      issue = IssueTransaction
+        .selfSigned(
+          TxVersion.V1,
+          master,
+          Base58.decode("Asset"),
+          Array.emptyByteArray,
+          100,
+          2,
+          reissuable = false,
+          script = None,
+          100000000,
+          ts + 1
+        )
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       sponsor = SponsorFeeTransaction.selfSigned(master, assetId, Some(100), 100000000, ts + 2).explicitGet()

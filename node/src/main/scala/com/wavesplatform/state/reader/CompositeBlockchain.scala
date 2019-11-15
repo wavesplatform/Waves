@@ -3,7 +3,7 @@ package com.wavesplatform.state.reader
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -196,13 +196,13 @@ final case class CompositeBlockchain(
   private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.uniqueId == blockId)
   private def filterByHeight(height: Int): Option[Block]  = newBlock.filter(_ => this.height == height)
 
-  private def headerAndSize(block: Block): (BlockHeader, Int, Int, ByteStr) =
-    (block.header, block.bytes().length, block.transactionData.size, block.signature)
+  private def blockInfo(block: Block): BlockInfo =
+    BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)
 
-  override def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] =
-    filterByHeight(height).map(headerAndSize) orElse inner.blockHeaderAndSize(height)
-  override def blockHeaderAndSize(blockId: ByteStr): Option[((BlockHeader, Int, Int, ByteStr))] =
-    filterById(blockId).map(headerAndSize) orElse inner.blockHeaderAndSize(blockId)
+  override def blockInfo(height: Int): Option[BlockInfo] =
+    filterByHeight(height).map(blockInfo) orElse inner.blockInfo(height)
+  override def blockInfo(blockId: ByteStr): Option[BlockInfo] =
+    filterById(blockId).map(blockInfo) orElse inner.blockInfo(blockId)
 
   override def blockBytes(height: Int): Option[Array[Byte]]      = filterByHeight(height).map(_.bytes()) orElse inner.blockBytes(height)
   override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = filterById(blockId).map(_.bytes()) orElse inner.blockBytes(blockId)
@@ -239,6 +239,8 @@ final case class CompositeBlockchain(
   override def blockRewardVotes(height: Int): Seq[Long] = inner.blockRewardVotes(height)
 
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
+
+  override def hitSourceAtHeight(height: Int): Option[ByteStr] = inner.hitSourceAtHeight(height)
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {

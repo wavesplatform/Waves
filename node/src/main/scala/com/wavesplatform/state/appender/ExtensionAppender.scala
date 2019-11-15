@@ -81,7 +81,7 @@ object ExtensionAppender extends ScorexLogging {
                   forkApplicationResultEi() match {
                     case Left(e) =>
                       blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
-                      droppedBlocks.foreach(blockchainUpdater.processBlock(_).explicitGet())
+                      droppedBlocks.foreach { case (b, gp) => blockchainUpdater.processBlock(b, gp).explicitGet() }
                       Left(e)
 
                     case Right(_) =>
@@ -94,7 +94,7 @@ object ExtensionAppender extends ScorexLogging {
                             .addField("txs", droppedBlocks.size)
                         )
                       }
-                      utxStorage.addAndCleanup(droppedBlocks.flatMap(_.transactionData))
+                      utxStorage.addAndCleanup(droppedBlocks.flatMap { case (b, _) => b.transactionData })
                       Right(Some(blockchainUpdater.score))
                   }
               }

@@ -30,8 +30,12 @@ case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
 object RawBytes {
-  def from(tx: Transaction): RawBytes = RawBytes(TransactionSpec.messageCode, tx.bytes())
-  def from(b: Block): RawBytes        = RawBytes(BlockSpec.messageCode, b.bytes())
+  def from(tx: Transaction): RawBytes = // todo: (NODE-1935) Protobuf spec
+    RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
+
+  def from(b: Block): RawBytes =
+    if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))
+    else RawBytes(PBBlockSpec.messageCode, PBBlockSpec.serializeData(b))
 }
 
 case class BlockForged(block: Block) extends Message

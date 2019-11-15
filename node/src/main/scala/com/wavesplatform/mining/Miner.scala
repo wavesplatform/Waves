@@ -118,7 +118,7 @@ class MinerImpl(
   ): Either[String, NxtLikeConsensusBlockData] = {
     pos
       .consensusData(
-        account.publicKey,
+        account,
         height,
         blockchainSettings.genesisSettings.averageBlockDelay,
         refBlockBT,
@@ -145,7 +145,7 @@ class MinerImpl(
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
       validBlockDelay <- pos
-        .getValidBlockDelay(height, account.publicKey, refBlockBT, balance)
+        .getValidBlockDelay(height, account, refBlockBT, balance)
         .leftMap(_.toString)
         .ensure(s"$currentTime: Block delay $blockDelay was NOT less than estimated delay")(_ < blockDelay)
       _ = log.debug(
@@ -161,7 +161,7 @@ class MinerImpl(
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
       block <- Block
         .buildAndSign(
-          version.toByte,
+          version,
           currentTime,
           refBlockID,
           consensusData.baseTarget,
@@ -181,7 +181,7 @@ class MinerImpl(
   }
 
   private def blockFeatures(version: TxVersion): Set[Short] = {
-    if (version <= 2) Set.empty[Short]
+    if (version <= PlainBlockVersion) Set.empty[Short]
     else
       settings.featuresSettings.supported
         .filterNot(blockchainUpdater.approvedFeatures.keySet)
@@ -296,14 +296,14 @@ class MinerImpl(
 }
 
 object Miner {
-  val blockMiningStarted = Kamon.counter("block-mining-started")
-  val microMiningStarted = Kamon.counter("micro-mining-started")
+  private[mining] val blockMiningStarted = Kamon.counter("block-mining-started")
+  private[mining] val microMiningStarted = Kamon.counter("micro-mining-started")
 
   val MaxTransactionsPerMicroblock: Int = 500
 
   case object Disabled extends Miner with MinerDebugInfo {
     override def scheduleMining(): Unit                                                         = ()
     override def getNextBlockGenerationOffset(account: KeyPair): Either[String, FiniteDuration] = Left("Disabled")
-    override val state                                                                          = MinerDebugInfo.Disabled
+    override val state: MinerDebugInfo.State                                                    = MinerDebugInfo.Disabled
   }
 }

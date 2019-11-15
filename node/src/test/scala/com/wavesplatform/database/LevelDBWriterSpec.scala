@@ -129,7 +129,7 @@ class LevelDBWriterSpec
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       bcu.shutdown()
@@ -149,7 +149,7 @@ class LevelDBWriterSpec
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       bcu.shutdown()
@@ -218,10 +218,10 @@ class LevelDBWriterSpec
           )
         )
 
-      bcu.processBlock(genesisBlock) shouldBe 'right
-      bcu.processBlock(block1) shouldBe 'right
-      bcu.processBlock(block2) shouldBe 'right
-      bcu.processBlock(block3) shouldBe 'right
+      bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block1, block1.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block2, block2.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block3, block3.header.generationSignature) shouldBe 'right
 
       bcu.blockAt(1).get shouldBe genesisBlock
       bcu.blockAt(2).get shouldBe block1
@@ -229,7 +229,7 @@ class LevelDBWriterSpec
       bcu.blockAt(4).get shouldBe block3
 
       for (i <- 1 to db.get(Keys.height)) {
-        db.get(Keys.blockHeaderAndSizeAt(Height(i))).isDefined shouldBe true
+        db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
       }
 
       bcu.blockBytes(1).get shouldBe genesisBlock.bytes()

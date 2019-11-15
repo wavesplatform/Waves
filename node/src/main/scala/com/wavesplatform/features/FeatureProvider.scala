@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.block.Block.{NgBlockVersion, PlainBlockVersion, RewardBlockVersion}
+import com.wavesplatform.block.Block.{NgBlockVersion, PlainBlockVersion, RewardBlockVersion, ProtoBlockVersion}
 import com.wavesplatform.state.Blockchain
 
 object FeatureProvider {
@@ -19,7 +19,8 @@ object FeatureProvider {
       else BlockchainFeatureStatus.Undefined
 
     def currentBlockVersion: Byte =
-      if (isFeatureActivated(BlockchainFeatures.BlockReward)) RewardBlockVersion
+      if (isFeatureActivated(BlockchainFeatures.BlockV5)) ProtoBlockVersion
+      else if (isFeatureActivated(BlockchainFeatures.BlockReward)) RewardBlockVersion
       else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight < blockchain.height) NgBlockVersion
       else PlainBlockVersion
 

@@ -38,7 +38,7 @@ case class TransferTransaction(
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
 
-  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
+  override def checkedAssets: Seq[IssuedAsset] = assetId match {
     case a: IssuedAsset => Seq(a)
     case Waves          => Nil
   }

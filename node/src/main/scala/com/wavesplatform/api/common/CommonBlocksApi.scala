@@ -2,8 +2,7 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.block.VanillaBlock
 import com.wavesplatform.state.Blockchain
@@ -47,15 +46,15 @@ private[api] class CommonBlocksApi(blockchain: Blockchain) {
     blockchain.blockAt(height)
   }
 
-  def blockHeaderAtHeight(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    blockchain.blockHeaderAndSize(height)
+  def blockHeaderAtHeight(height: Int): Option[BlockInfo] = {
+    blockchain.blockInfo(height)
   }
 
-  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockHeader, Int, Int, ByteStr, Int)] = {
+  def blockHeadersRange(fromHeight: Int, toHeight: Int): Observable[(BlockInfo, Int)] = {
     Observable
       .fromIterable(fixHeight(fromHeight) to fixHeight(toHeight))
-      .map(height => (height, blockchain.blockHeaderAndSize(height)))
-      .collect { case (height, Some((header, size, transactionCount, signature))) => (header, size, transactionCount, signature, height) }
+      .map(height => (height, blockchain.blockInfo(height)))
+      .collect { case (height, Some(BlockInfo(header, size, transactionCount, signature))) => (BlockInfo(header, size, transactionCount, signature), height) }
   }
 
   def lastBlock(): Option[VanillaBlock] = {

@@ -3,17 +3,17 @@ package com.wavesplatform.generator
 import java.nio.file.{Files, Paths}
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.{Address, AddressScheme, KeyPair}
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Transaction, TxVersion}
 import com.wavesplatform.utils.Time
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ValueReader
@@ -36,7 +36,7 @@ object Preconditions {
 
   final case class UniverseHolder(
       accounts: List[CreatedAccount] = Nil,
-      issuedAssets: List[IssueTransactionV2] = Nil,
+      issuedAssets: List[IssueTransaction] = Nil,
       leases: List[LeaseTransaction] = Nil
   )
 
@@ -61,9 +61,9 @@ object Preconditions {
                 .flatMap(_.toOption)
                 .map(_._1)
 
-              val tx = IssueTransactionV2
+              val tx = IssueTransaction
                 .selfSigned(
-                  AddressScheme.current.chainId,
+                  TxVersion.V2,
                   issuer,
                   assetName.getBytes("UTF-8"),
                   assetDescription.getBytes("UTF-8"),

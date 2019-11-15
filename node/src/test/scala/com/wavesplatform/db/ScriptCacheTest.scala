@@ -120,7 +120,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             )
 
           bcu
-            .processBlock(blockWithEmptyScriptTx)
+            .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature)
             .explicitGet()
 
           bcu.accountScript(account.toAddress) shouldEqual None
@@ -140,7 +140,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       f(accounts, bcu)
