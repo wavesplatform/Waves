@@ -19,6 +19,7 @@ import play.api.libs.json._
 
 import scala.util.{Failure, Try}
 
+// todo: (NODE-1972) Add merkle proof
 case class BlockHeader(
     version: Byte,
     timestamp: Long,
@@ -65,7 +66,7 @@ case class Block private[block] (
   private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
     else PBBlocks.protobuf(copy(signature = ByteStr.empty)).toByteArray
-    // else PBBlocks.protobuf(this).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
+    // else PBBlocks.protobuf(this).header.get.toByteArray // todo: (NODE-1972) header with merkle proof
   }
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
