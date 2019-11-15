@@ -31,7 +31,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val lazyVal = ContextfulVal.pure[NoContext](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
     val ctx: CTX[NoContext] =
-      Monoid.combineAll(Seq(PureContext.build(Global, V3), CTX[NoContext](sampleTypes, stringToTuple, Array.empty), addCtx, ctxt))
+      Monoid.combineAll(Seq(
+        PureContext.build(Global, V3),
+        CryptoContext.build(Global, V3),
+        CTX[NoContext](sampleTypes, stringToTuple, Array.empty),
+        addCtx,
+        ctxt
+      ))
     val typed = ExpressionCompiler(ctx.compilerContext, untyped)
     typed.flatMap(v => evaluator.apply(ctx.evaluationContext, v._1))
   }
@@ -916,6 +922,43 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("rounding modes") {
+    eval[EVALUATED]("Down() == DOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Up() == UP", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Ceiling() == CEILING", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("HalfUp() == HALFUP", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("HalfDown() == HALFDOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("HalfEven() == HALFEVEN", None) shouldBe Right(CONST_BOOLEAN(true))
+
+    eval[EVALUATED]("HalfDown() != DOWN", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("CEILING != HALFUP", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("Ceiling() != Down()", None) should produce("Can't match inferred types")
+
+    eval[EVALUATED]("UP == if true then UP else DOWN", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("UP == if true then DOWN else UP", None) shouldBe Right(CONST_BOOLEAN(false))
+  }
+
+  property("RSA hash algorithms") {
+    eval[EVALUATED]("NoAlg() == NOALG", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Md5() == MD5", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha1() == SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha224() == SHA224", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha256() == SHA256", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha384() == SHA384", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha512() == SHA512", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3224() == SHA3224", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3256() == SHA3256", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3384() == SHA3384", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3512() == SHA3512", None) shouldBe Right(CONST_BOOLEAN(true))
+
+    eval[EVALUATED]("NoAlg() != SHA224", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("MD5 != SHA3224", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("Sha512() != Sha3512()", None) should produce("Can't match inferred types")
+
+    eval[EVALUATED]("MD5 == if true then MD5 else SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("MD5 == if true then SHA1 else MD5", None) shouldBe Right(CONST_BOOLEAN(false))
   }
 
   property("math functions") {

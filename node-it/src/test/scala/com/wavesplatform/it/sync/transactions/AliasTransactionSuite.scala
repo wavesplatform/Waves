@@ -114,14 +114,6 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
     assertBadRequestAndMessage(sender.createAlias(firstAddress, alias, balance + minFee), "State check failed. Reason: negative waves balance")
   }
 
-  test("Able to resolve alias via gRPC method") {
-    val alias            = randomAlias()
-    createAlias(firstAddress, alias)
-
-    val addr = miner.grpc.resolveAlias(alias)
-    addr.stringRepr shouldBe firstAddress
-  }
-
   private def createAlias(address: String, alias: String): Long = {
     if (!sender.aliasByAddress(address).exists(_.endsWith(alias))) {
       val aliasId = sender.createAlias(address, alias, minFee).id
