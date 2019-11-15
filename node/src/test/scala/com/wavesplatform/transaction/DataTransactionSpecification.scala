@@ -90,10 +90,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     import DataTransaction.MaxEntryCount
     import com.wavesplatform.state._
     forAll(dataTransactionGen, dataEntryGen(500)) {
-      case (DataTransaction(sender, data, fee, timestamp, proofs), entry) =>
+      case (DataTransaction(version, sender, _, fee, timestamp, proofs), _) =>
         def check(data: List[DataEntry[_]]): Assertion = {
-          val txEi = DataTransaction.create(1.toByte, sender, data, fee, timestamp, proofs)
-          txEi shouldBe Right(DataTransaction(1.toByte, sender, data, fee, timestamp, proofs))
+          val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
+          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
           checkSerialization(txEi.explicitGet())
         }
 
@@ -104,32 +104,32 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         check(List(BinaryDataEntry("bin", ByteStr.empty)))                              // empty binary
         check(List(BinaryDataEntry("bin", ByteStr(Array.fill(MaxValueSize)(1: Byte))))) // max binary value size
         check(List(StringDataEntry("str", "")))                                         // empty string
-        check(List(StringDataEntry("str", "A" * MaxValueSize))) // max string size
+        check(List(StringDataEntry("str", "A" * MaxValueSize)))                         // max string size
     }
   }
 
   property("negative validation cases") {
     forAll(dataTransactionGen) {
-      case DataTransaction(sender, data, fee, timestamp, proofs) =>
+      case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
         val dataTooBig   = List.tabulate(100)(n => StringDataEntry((100 + n).toString, "a" * 1527))
-        val dataTooBigEi = DataTransaction.create(1.toByte, sender, dataTooBig, fee, timestamp, proofs)
+        val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
 
         val emptyKey   = List(IntegerDataEntry("", 2))
-        val emptyKeyEi = DataTransaction.create(1.toByte, sender, emptyKey, fee, timestamp, proofs)
+        val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
         val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
-        val keyTooLongEi = DataTransaction.create()
+        val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
-        val valueTooLongEi = DataTransaction.create()
+        val valueTooLongEi = DataTransaction.create(version, sender, valueTooLong, fee, timestamp, proofs)
         valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
-        val e               = BooleanDataEntry("dupe", true)
+        val e               = BooleanDataEntry("dupe", value = true)
         val duplicateKeys   = e +: data.drop(3) :+ e
-        val duplicateKeysEi = DataTransaction.create()
+        val duplicateKeysEi = DataTransaction.create(version, sender, duplicateKeys, fee, timestamp, proofs)
         duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
 
         val noFeeEi = DataTransaction.create(1.toByte, sender, data, 0, timestamp, proofs)
@@ -174,10 +174,17 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   """)
 
     val entry1 = IntegerDataEntry("int", 24)
-    val entry2 = BooleanDataEntry("bool", true)
+    val entry2 = BooleanDataEntry("bool", value = true)
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val tx = DataTransaction
-      .create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), List(entry1, entry2, entry3), 100000, 1526911531530L, Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get)))
+      .create(
+        1.toByte,
+        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+        List(entry1, entry2, entry3),
+        100000,
+        1526911531530L,
+        Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get))
+      )
       .right
       .get
 

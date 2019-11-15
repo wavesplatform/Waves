@@ -60,7 +60,7 @@ object DataTransaction extends TransactionParserLite {
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      data: List[DataEntry[_]],
+      data: Seq[DataEntry[_]],
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
