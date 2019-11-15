@@ -112,7 +112,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       10000000000L,
       burnFee,
       ts,
-      ByteStr.decodeBase58("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get
+      Proofs(ByteStr.decodeBase58("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get)
     )
     .right
     .get

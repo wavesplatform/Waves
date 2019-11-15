@@ -14,10 +14,9 @@ object BurnTxSerializer {
   def toJson(tx: BurnTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "assetId"  -> asset.id.toString,
-      "quantity" -> quantity,
-      "chainId"  -> chainByte
-    )
+      "assetId" -> asset.id.toString,
+      "amount"  -> quantity
+    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
   }
 
   def bodyBytes(tx: BurnTransaction): Array[Byte] = {

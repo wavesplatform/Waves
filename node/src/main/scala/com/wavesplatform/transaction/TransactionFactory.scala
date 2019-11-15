@@ -7,7 +7,6 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -22,9 +21,6 @@ import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
 object TransactionFactory {
-
-  private val EmptySignature = ByteStr(Array.fill(SignatureLength)(0: Byte))
-
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
