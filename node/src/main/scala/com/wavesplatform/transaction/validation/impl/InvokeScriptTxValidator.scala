@@ -9,6 +9,8 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
 
+import scala.util.Try
+
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
     def checkAmounts(payments: Seq[Payment]): ValidatedNV = {
@@ -38,7 +40,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
-      V.cond(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes, TooBigArray)
+      V.cond(Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false), TooBigArray)
     )
   }
 }
