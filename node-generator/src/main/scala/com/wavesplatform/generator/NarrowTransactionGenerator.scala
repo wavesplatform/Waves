@@ -249,7 +249,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
             }
             val size = 128 + data.map(_.toBytes.length).sum
             val fee  = 500000L * (size / 1024 + 1)
-            logOption(DataTransaction.selfSigned(sender, data.toList, fee, timestamp))
+            logOption(DataTransaction.selfSigned(1.toByte, sender, data.toList, fee, timestamp))
 
           case SponsorFeeTransaction =>
             (

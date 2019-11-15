@@ -67,12 +67,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
       }).toList
 
     val initialData = DataTransaction
-      .selfSigned(
-        smart,
-        data,
-        ENOUGH_FEE,
-        System.currentTimeMillis()
-      )
+      .selfSigned(1.toByte, smart, data, ENOUGH_FEE, System.currentTimeMillis())
       .explicitGet()
 
     val dtx1_id = sender.signedBroadcast(initialData.json()).id
@@ -94,15 +89,10 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     def mkInvData() =
       DataTransaction
-        .selfSigned(
-          smart,
-          List(
+        .selfSigned(1.toByte, smart, List(
             BinaryDataEntry("pk", ByteStr(smart.publicKey)),
             BinaryDataEntry("sig", ByteStr(signature)),
-          ),
-          ENOUGH_FEE,
-          System.currentTimeMillis()
-        )
+          ), ENOUGH_FEE, System.currentTimeMillis())
         .explicitGet()
 
     assertApiErrorRaised(sender.signedBroadcast(mkInvData().json()))

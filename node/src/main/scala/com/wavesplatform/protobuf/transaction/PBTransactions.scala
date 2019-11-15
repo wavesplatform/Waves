@@ -181,13 +181,7 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction.create(
-          sender,
-          dt.data.toList.map(toVanillaDataEntry),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.DataTransaction.create(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
@@ -349,13 +343,7 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction(
-          sender,
-          dt.data.toList.map(toVanillaDataEntry),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.DataTransaction(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(

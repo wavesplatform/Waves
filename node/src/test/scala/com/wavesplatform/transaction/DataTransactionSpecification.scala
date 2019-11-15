@@ -92,8 +92,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     forAll(dataTransactionGen, dataEntryGen(500)) {
       case (DataTransaction(sender, data, fee, timestamp, proofs), entry) =>
         def check(data: List[DataEntry[_]]): Assertion = {
-          val txEi = DataTransaction.create(sender, data, fee, timestamp, proofs)
-          txEi shouldBe Right(DataTransaction(sender, data, fee, timestamp, proofs))
+          val txEi = DataTransaction.create(1.toByte, sender, data, fee, timestamp, proofs)
+          txEi shouldBe Right(DataTransaction(1.toByte, sender, data, fee, timestamp, proofs))
           checkSerialization(txEi.explicitGet())
         }
 
@@ -112,30 +112,30 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     forAll(dataTransactionGen) {
       case DataTransaction(sender, data, fee, timestamp, proofs) =>
         val dataTooBig   = List.tabulate(100)(n => StringDataEntry((100 + n).toString, "a" * 1527))
-        val dataTooBigEi = DataTransaction.create(sender, dataTooBig, fee, timestamp, proofs)
+        val dataTooBigEi = DataTransaction.create(1.toByte, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
 
         val emptyKey   = List(IntegerDataEntry("", 2))
-        val emptyKeyEi = DataTransaction.create(sender, emptyKey, fee, timestamp, proofs)
+        val emptyKeyEi = DataTransaction.create(1.toByte, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
         val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
-        val keyTooLongEi = DataTransaction.create(sender, keyTooLong, fee, timestamp, proofs)
+        val keyTooLongEi = DataTransaction.create()
         keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val valueTooLong   = data :+ BinaryDataEntry("key", ByteStr(Array.fill(MaxValueSize + 1)(1: Byte)))
-        val valueTooLongEi = DataTransaction.create(sender, valueTooLong, fee, timestamp, proofs)
+        val valueTooLongEi = DataTransaction.create()
         valueTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
         val e               = BooleanDataEntry("dupe", true)
         val duplicateKeys   = e +: data.drop(3) :+ e
-        val duplicateKeysEi = DataTransaction.create(sender, duplicateKeys, fee, timestamp, proofs)
+        val duplicateKeysEi = DataTransaction.create()
         duplicateKeysEi shouldBe Left(TxValidationError.DuplicatedDataKeys)
 
-        val noFeeEi = DataTransaction.create(sender, data, 0, timestamp, proofs)
+        val noFeeEi = DataTransaction.create(1.toByte, sender, data, 0, timestamp, proofs)
         noFeeEi shouldBe Left(TxValidationError.InsufficientFee())
 
-        val negativeFeeEi = DataTransaction.create(sender, data, -100, timestamp, proofs)
+        val negativeFeeEi = DataTransaction.create(1.toByte, sender, data, -100, timestamp, proofs)
         negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
     }
   }
@@ -177,13 +177,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     val entry2 = BooleanDataEntry("bool", true)
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val tx = DataTransaction
-      .create(
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        List(entry1, entry2, entry3),
-        100000,
-        1526911531530L,
-        Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get))
-      )
+      .create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), List(entry1, entry2, entry3), 100000, 1526911531530L, Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get)))
       .right
       .get
 
