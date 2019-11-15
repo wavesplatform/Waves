@@ -45,6 +45,15 @@ object TxConstraints {
       )
   }
 
+  def positiveOrZeroAmount(amount: Long, of: => String): ValidatedV[Long] = {
+    Validated
+      .condNel(
+        amount >= 0,
+        amount,
+        TxValidationError.NegativeAmount(amount, of)
+      )
+  }
+
   def noOverflow(amounts: Long*): ValidatedV[Long] = {
     Try(amounts.tail.fold(amounts.head)(Math.addExact))
       .fold[ValidatedV[Long]](
