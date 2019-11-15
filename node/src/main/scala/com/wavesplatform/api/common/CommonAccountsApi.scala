@@ -4,21 +4,19 @@ import cats.instances.map._
 import cats.syntax.monoid._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.api.common
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.Portfolio.longSemigroup
-import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{Blockchain, DataEntry, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
-import com.wavesplatform.api.common
 
 import scala.collection.mutable
 
@@ -37,7 +35,7 @@ trait CommonAccountsApi {
 
   def nftPortfolio(address: Address, limit: Int, from: Option[IssuedAsset]): Observable[IssueTransaction]
 
-  def script(address: Address): AddressScriptInfo
+  def script(address: Address): Option[(Script, Long)]
 
   def data(address: Address, key: String): Option[DataEntry[_]]
 
@@ -50,7 +48,6 @@ trait CommonAccountsApi {
 
 object CommonAccountsApi {
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
-  final case class AddressScriptInfo(script: Option[ByteStr], scriptText: Option[String], complexity: Long, extraFee: Long)
 
   def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
 
@@ -86,16 +83,7 @@ object CommonAccountsApi {
     override def nftPortfolio(address: Address, count: Int, from: Option[IssuedAsset]): Observable[IssueTransaction] =
       Observable.fromIterable(nftList(db, diff, blockchain.balance, address, count, from.map(_.id)))
 
-    override def script(address: Address): AddressScriptInfo = {
-      val script: Option[(Script, Long)] = blockchain.accountScript(address)
-
-      AddressScriptInfo(
-        script = script.map(_._1.bytes()),
-        scriptText = script.map(_._1.expr.toString),
-        complexity = script.map(_._2).getOrElse(0),
-        extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
-      )
-    }
+    override def script(address: Address): Option[(Script, Long)] = blockchain.accountScript(address)
 
     override def data(address: Address, key: String): Option[DataEntry[_]] = {
       blockchain.accountData(address, key)

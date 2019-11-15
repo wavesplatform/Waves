@@ -8,12 +8,13 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidBase58, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidBase58, InvalidSignature, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58Alphabet
+import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -30,7 +31,7 @@ import play.api.libs.json._
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 package object http extends ApiMarshallers with ScorexLogging {
   val versionReads: Reads[Byte] = {
@@ -95,19 +96,21 @@ package object http extends ApiMarshallers with ScorexLogging {
     }
   }
 
-  val Digest: PathMatcher1[ByteStr] = Segment.map(str => ByteStr.decodeBase58(str) match {
-    case Success(value) => value
-    case Failure(_) => throw ApiException(InvalidBase58)
-  })
-
   val B58Segment: PathMatcher1[ByteStr] = PathMatcher(s"[$Base58Alphabet]+".r)
     .flatMap(str => ByteStr.decodeBase58(str).toOption)
 
+  def base58Segment(requiredLength: Int, error: String => ApiError): PathMatcher1[ByteStr] = Segment.map(str => ByteStr.decodeBase58(str) match {
+    case Success(value) if value.length == requiredLength => value
+    case _ => throw ApiException(error(str))
+  })
+
+  val Signature: PathMatcher1[ByteStr] = base58Segment(crypto.SignatureLength, _ => InvalidSignature)
+
   val AddrSegment: PathMatcher1[Address] = Segment.map { str =>
     (for {
-      bytes <- ByteStr.decodeBase58(str).toEither.left.map(_ => InvalidBase58)
-      addr <- Address.fromBytes(bytes).left.map(ApiError.fromValidationError)
-    } yield addr).fold(ae => throw ApiException(ae), identity)
+      bytes <- ByteStr.decodeBase58(str).toEither.left.map(t => GenericError(t))
+      addr <- Address.fromBytes(bytes)
+    } yield addr).fold({ ae => println(ae); throw ApiException(ApiError.fromValidationError(ae))}, identity)
   }
 
   private val jsonRejectionHandler = RejectionHandler

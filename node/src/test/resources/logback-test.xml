@@ -6,6 +6,8 @@
         </encoder>
     </appender>
 
+    <logger name="scorex.crypto.signatures.Curve25519" level="OFF"/>
+
     <root level="TRACE">
         <appender-ref ref="STDOUT" />
     </root>

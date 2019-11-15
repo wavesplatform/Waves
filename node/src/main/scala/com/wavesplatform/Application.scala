@@ -173,7 +173,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
     def loadBlockAt(height: Int): Option[Block] =
-      blockchainUpdater.blockId(height).flatMap(history.loadBlockBytes).map(bytes => Block.parseBytes(bytes).get)
+      for {
+        id <- blockchainUpdater.blockId(height)
+        block <- blockchainUpdater.liquidBlock(id).orElse(history.loadBlockBytes(id).flatMap(bytes => Block.parseBytes(bytes).toOption))
+      } yield block
 
     def loadBlockMetaAt(height: Int): Option[BlockMeta] = None
 
@@ -320,7 +323,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater, cba),
         TransactionsApiRoute(settings.restAPISettings, cta, wallet, blockchainUpdater, Coeval(utxStorage.size), utxSynchronizer, time),
-        NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater, cba),
+        NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),

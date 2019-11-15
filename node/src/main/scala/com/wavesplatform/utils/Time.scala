@@ -16,6 +16,8 @@ trait Time {
 
 class NTP(ntpServer: String) extends Time with ScorexLogging with AutoCloseable {
 
+  log.info("Initializing time")
+
   private val offsetPanicThreshold = 1000000L
   private val ExpirationTimeout    = 60.seconds
   private val RetryDelay           = 10.seconds

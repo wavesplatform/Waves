@@ -3,22 +3,19 @@ package com.wavesplatform.http
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.api.common.CommonAccountsApi.AddressScriptInfo
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.http.ApiMarshallers._
-import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
+import com.wavesplatform.lang.contract.DApp
+import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction, VerifierAnnotation, VerifierFunction}
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
 import com.wavesplatform.state.Blockchain
-
-import com.wavesplatform.lang.contract.DApp
-import com.wavesplatform.lang.contract.DApp.{VerifierAnnotation, VerifierFunction}
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, WithDB, crypto}
 import org.scalacheck.Gen
@@ -72,7 +69,7 @@ class AddressRouteSpec
   }
 
   routePath("/validate/{address}") in {
-    val t = Table(("address", "valid"), allAddresses.map(_ -> true) :+ "ABCDEFGHJKLMNPQRSTUVWXYZ" -> false: _*)
+    val t = Table(("address", "valid"), allAddresses.map(_ -> true) :+ "3P2HNUd5VUPLMQkJmctTPEeeHumiPN2GkTb" -> false: _*)
 
     forAll(t) { (a, v) =>
       Get(routePath(s"/validate/$a")) ~> route ~> check {
@@ -156,9 +153,9 @@ class AddressRouteSpec
 
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     val script = ExprScript(TRUE).explicitGet()
-    val si = AddressScriptInfo(Some(script.bytes()), Some(script.expr.toString), 1L, FeeValidation.ScriptExtraFee)
 
-    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(si).once()
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(script -> 1L)).once()
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(script -> 1L)).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -169,7 +166,8 @@ class AddressRouteSpec
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    (commonAccountApi.script _).expects(allAccounts(2).toAddress).returning(AddressScriptInfo(None, None, 0, 0)).once()
+    (commonAccountApi.script _).expects(allAccounts(2).toAddress).returning(None).once()
+    (blockchain.accountScript _).when(allAccounts(2).toAddress).returns(None).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(2)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -186,7 +184,7 @@ class AddressRouteSpec
         List(
           CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 3))),
           CallableFuncSignature(ByteString.copyFrom(Array[Byte](8))),
-          CallableFuncSignature(ByteString.EMPTY),
+          CallableFuncSignature(ByteString.EMPTY)
         )
       ),
       decs = List(),
@@ -207,9 +205,9 @@ class AddressRouteSpec
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
 
-    val contractScript = ContractScript(V3, contractWithMeta).explicitGet()
-    val contractScriptInfo = AddressScriptInfo(Some(contractScript.bytes()), Some(contractScript.expr.toString), 11L, FeeValidation.ScriptExtraFee)
-    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(contractScriptInfo).once()
+    val contractScript     = ContractScript(V3, contractWithMeta).explicitGet()
+    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(contractScript -> 11L)).once()
+    (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(contractScript -> 11L))
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]

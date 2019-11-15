@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.BlockGen
-import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -26,8 +25,7 @@ class ConsensusRouteSpec
       val block = getNextTestBlock(d.blockchainUpdater)
       d.blockchainUpdater.processBlock(block, block.header.generationSignature)
     }
-    val commonApi = CommonBlocksApi(d.blockchainUpdater, _ => None)
-    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater, commonApi).route)
+    f(d.blockchainUpdater, NxtConsensusApiRoute(restAPISettings, d.blockchainUpdater).route)
   }
 
   routePath("/generationsignature") - {
@@ -45,7 +43,7 @@ class ConsensusRouteSpec
     }
 
     "for non-existent block" in routeTest { (h, route) =>
-      Get(routePath(s"/generationsignature/brggwg4wg4g")) ~> route should produce(BlockDoesNotExist)
+      Get(routePath(s"/generationsignature/24aTK4mg6DMFKw4SuQCfSRG52MXg8DSjDWQopahs38Cm3tPMFM1m6fGqCoPY69kstM7TE4mpJAMYmG7LWTTjndCH")) ~> route should produce(BlockDoesNotExist)
     }
   }
 
@@ -58,7 +56,7 @@ class ConsensusRouteSpec
     }
 
     "for non-existent block" in routeTest { (h, route) =>
-      Get(routePath(s"/basetarget/brggwg4wg4g")) ~> route should produce(BlockDoesNotExist)
+      Get(routePath(s"/basetarget/24aTK4mg6DMFKw4SuQCfSRG52MXg8DSjDWQopahs38Cm3tPMFM1m6fGqCoPY69kstM7TE4mpJAMYmG7LWTTjndCH")) ~> route should produce(BlockDoesNotExist)
     }
   }
 }

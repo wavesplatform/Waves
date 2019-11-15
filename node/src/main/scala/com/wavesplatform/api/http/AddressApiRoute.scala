@@ -17,6 +17,7 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
@@ -60,7 +61,16 @@ case class AddressApiRoute(
     )
   )
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
-    complete(addressScriptInfoJson(address))
+    val script = blockchain.accountScript(address)
+    complete(
+      Json.obj(
+        "address"    -> address.stringRepr,
+        "script"     -> script.map(_._1.bytes().base64),
+        "scriptText" -> script.map(_._1.expr.toString),
+        "complexity" -> script.fold(0L)(_._2),
+        "extraFee"   -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
+      )
+    )
   }
 
   @Path("/scriptInfo/{address}/meta")
@@ -81,11 +91,9 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def deleteAddress: Route = path(AddrSegment) { address =>
-    (delete & withAuth) {
-      val deleted = wallet.privateKeyAccount(address).exists(account => wallet.deleteAccount(account))
-      complete(Json.obj("deleted" -> deleted))
-    }
+  def deleteAddress: Route = (delete & withAuth & path(AddrSegment)) { address =>
+    val deleted = wallet.privateKeyAccount(address).exists(account => wallet.deleteAccount(account))
+    complete(Json.obj("deleted" -> deleted))
   }
 
   @Path("/sign/{address}")
@@ -180,7 +188,7 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def balance: Route = (path("balance" / Segment) & get) { address =>
+  def balance: Route = (path("balance" / AddrSegment) & get) { address =>
     complete(balanceJson(address))
   }
 
@@ -191,15 +199,11 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
+  def balanceDetails: Route = (path("balance" / "details" / AddrSegment) & get) { address =>
+    val details = commonAccountsApi.balanceDetails(address)
+    import details._
     complete(
-      Address
-        .fromString(address)
-        .right
-        .map(acc => {
-          ToResponseMarshallable(balancesDetailsJson(acc))
-        })
-        .getOrElse(InvalidAddress)
+      Json.obj("address" -> address.stringRepr, "regular" -> regular, "generating" -> generating, "available" -> available, "effective" -> effective)
     )
   }
 
@@ -212,7 +216,7 @@ case class AddressApiRoute(
     )
   )
   def balanceWithConfirmations: Route = {
-    (path("balance" / Segment / IntNumber) & get) {
+    (path("balance" / AddrSegment / IntNumber) & get) {
       case (address, confirmations) =>
         complete(balanceJson(address, confirmations))
     }
@@ -226,7 +230,7 @@ case class AddressApiRoute(
     )
   )
   def effectiveBalance: Route = {
-    path("effectiveBalance" / Segment) { address =>
+    path("effectiveBalance" / AddrSegment) { address =>
       complete(effectiveBalanceJson(address, 0))
     }
   }
@@ -240,11 +244,10 @@ case class AddressApiRoute(
     )
   )
   def effectiveBalanceWithConfirmations: Route = {
-    path("effectiveBalance" / Segment / IntNumber) {
-      case (address, confirmations) =>
-        complete(
-          effectiveBalanceJson(address, confirmations)
-        )
+    path("effectiveBalance" / AddrSegment / IntNumber) { (address, confirmations) =>
+      complete(
+        effectiveBalanceJson(address, confirmations)
+      )
     }
   }
 
@@ -376,61 +379,27 @@ case class AddressApiRoute(
     }
   }
 
-  private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Address
-      .fromString(address)
-      .right
-      .map(
-        acc =>
-          ToResponseMarshallable(
-            Balance(
-              acc.stringRepr,
-              confirmations,
-              commonAccountsApi.balance(acc, confirmations)
-            )
-          )
-      )
-      .getOrElse(InvalidAddress)
-  }
+  private def balanceJson(acc: Address, confirmations: Int) =
+    Balance(acc.stringRepr, confirmations, commonAccountsApi.balance(acc, confirmations))
 
-  private def balanceJson(address: String): ToResponseMarshallable = {
-    Address
-      .fromString(address)
-      .right
-      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, 0, commonAccountsApi.balance(acc))))
-      .getOrElse(InvalidAddress)
-  }
-
-  private def balancesDetailsJson(account: Address): BalanceDetails = {
-    val details = commonAccountsApi.balanceDetails(account)
-    import details._
-    BalanceDetails(account.stringRepr, regular, generating, available, effective)
-  }
-
-  private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
-    val CommonAccountsApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountsApi.script(account)
-    AddressScriptInfo(account.stringRepr, script.map(_.base64), scriptText, complexity, extraFee)
-  }
+  private def balanceJson(acc: Address) = Balance(acc.stringRepr, 0, commonAccountsApi.balance(acc))
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
     import cats.implicits._
-    blockchain
-      .accountScript(account)
+    val accountScript = blockchain.accountScript(account)
+
+    accountScript
       .map(_._1)
       .traverse(Global.dAppFuncTypes)
       .map(AccountScriptMeta(account.stringRepr, _))
   }
 
-  private def effectiveBalanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
-    Address
-      .fromString(address)
-      .right
-      .map(acc => ToResponseMarshallable(Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))))
-      .getOrElse(InvalidAddress)
+  private def effectiveBalanceJson(acc: Address, confirmations: Int) = {
+    Balance(acc.stringRepr, confirmations, commonAccountsApi.effectiveBalance(acc, confirmations))
   }
 
-  private def accountData(address: Address)(implicit sc: Scheduler): ToResponseMarshallable =
-    ToResponseMarshallable(commonAccountsApi.dataStream(address, None).toListL.runAsyncLogErr.map(_.sortBy(_.key)))
+  private def accountData(address: Address)(implicit sc: Scheduler) =
+    commonAccountsApi.dataStream(address, None).toListL.runAsyncLogErr.map(_.sortBy(_.key))
 
   private def accountData(addr: Address, regex: String)(implicit sc: Scheduler): ToResponseMarshallable =
     commonAccountsApi
@@ -472,7 +441,7 @@ case class AddressApiRoute(
     (msg, Base58.tryDecodeWithLimit(signature), Base58.tryDecodeWithLimit(publicKey)) match {
       case (Success(msgBytes), Success(signatureBytes), Success(pubKeyBytes)) =>
         val account = PublicKey(pubKeyBytes)
-        val isValid = account == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
+        val isValid = account.toAddress == address && crypto.verify(signatureBytes, msgBytes, PublicKey(pubKeyBytes))
         Right(Json.obj("valid" -> isValid))
       case _ => Left(InvalidMessage)
     }
@@ -496,7 +465,6 @@ case class AddressApiRoute(
 }
 
 object AddressApiRoute {
-
   case class Signed(message: String, publicKey: String, signature: String)
 
   implicit val signedFormat: Format[Signed] = Json.format
@@ -505,17 +473,9 @@ object AddressApiRoute {
 
   implicit val balanceFormat: Format[Balance] = Json.format
 
-  case class BalanceDetails(address: String, regular: Long, generating: Long, available: Long, effective: Long)
-
-  implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
-
   case class Validity(address: String, valid: Boolean)
 
   implicit val validityFormat: Format[Validity] = Json.format
-
-  case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String], complexity: Long, extraFee: Long)
-
-  implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
 
   case class AccountScriptMeta(address: String, meta: Option[Dic])
   implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
