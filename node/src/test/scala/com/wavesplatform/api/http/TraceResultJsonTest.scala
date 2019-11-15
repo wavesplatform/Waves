@@ -23,16 +23,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       publicKey <- PublicKey.fromBase58String("9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT")
       address   <- Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU")
       proof     <- ByteStr.decodeBase58("4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ").toEither
-      tx <- InvokeScriptTransaction.create(
-        sender = publicKey,
-        dappAddress = address,
-        fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
-        p = List(Payment(1, Waves)),
-        fee = 10000000,
-        feeAssetId = Waves,
-        timestamp = 1111,
-        proofs = Proofs(List(proof))
-      )
+      tx <- InvokeScriptTransaction.create(1.toByte, sender = publicKey, dappAddress = address, fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))), p = List(Payment(1, Waves)), fee = 10000000, feeAssetId = Waves, timestamp = 1111, proofs = Proofs(List(proof)))
     } yield tx
   ).explicitGet()
 

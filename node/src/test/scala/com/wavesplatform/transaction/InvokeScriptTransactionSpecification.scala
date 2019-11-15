@@ -67,20 +67,12 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     """)
 
     val tx = InvokeScriptTransaction
-      .selfSigned(
-        KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")),
-        Some(
+      .selfSigned(1.toByte, KeyPair("test3".getBytes("UTF-8")), KeyPair("test4".getBytes("UTF-8")), Some(
           Terms.FUNCTION_CALL(
             FunctionHeader.User("foo"),
             List(Terms.CONST_BYTESTR(ByteStr(Base64.tryDecode("YWxpY2U=").get)).explicitGet())
           )
-        ),
-        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
-        100000,
-        Waves,
-        1526910778245L
-      )
+        ), Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))), 100000, Waves, 1526910778245L)
       .right
       .get
 
@@ -111,15 +103,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     """)
 
     val tx = InvokeScriptTransaction
-      .selfSigned(
-        KeyPair("test3".getBytes("UTF-8")),
-        KeyPair("test4".getBytes("UTF-8")),
-        None,
-        Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))),
-        100000,
-        Waves,
-        1526910778245L
-      )
+      .selfSigned(1.toByte, KeyPair("test3".getBytes("UTF-8")), KeyPair("test4".getBytes("UTF-8")), None, Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58(publicKey).get))), 100000, Waves, 1526910778245L)
       .right
       .get
 
@@ -153,72 +137,36 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property(s"can't have more than ${ContractLimits.MaxInvokeScriptArgs} args") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      pk,
-      pk.toAddress,
-      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ) should produce("more than 22 arguments")
+    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)), Seq(), 1, Waves, 1, Proofs.empty) should produce("more than 22 arguments")
   }
 
   property(s"can't call a func with non native(simple) args - ARR") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      pk,
-      pk.toAddress,
-      Some(
+    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
         )
-      ),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ) should produce("All arguments of invokeScript must be one of the types")
+      ), Seq(), 1, Waves, 1, Proofs.empty) should produce("All arguments of invokeScript must be one of the types")
   }
 
   property(s"can't call a func with non native(simple) args - CaseObj") {
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      pk,
-      pk.toAddress,
-      Some(
+    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
           List(CaseObj(CASETYPEREF("SHA256", List.empty), Map("tmpKey" -> CONST_LONG(42))))
         )
-      ),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ) should produce("All arguments of invokeScript must be one of the types")
+      ), Seq(), 1, Waves, 1, Proofs.empty) should produce("All arguments of invokeScript must be one of the types")
   }
 
   property("can't be more 5kb") {
     val largeString = "abcde" * 1024
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
-    InvokeScriptTransaction.create(
-      pk,
-      pk.toAddress,
-      Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))),
-      Seq(),
-      1,
-      Waves,
-      1,
-      Proofs.empty
-    ) should produce("TooBigArray")
+    InvokeScriptTransaction.create(1.toByte, pk, pk.toAddress, Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))), Seq(), 1, Waves, 1, Proofs.empty) should produce("TooBigArray")
   }
 
   property("can't have zero amount") {

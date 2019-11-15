@@ -477,15 +477,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = InvokeScriptTransaction
-            .selfSigned(
-              masterAcc,
-              masterAcc,
-              Some(fc),
-              Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
+            .selfSigned(1.toByte, masterAcc, masterAcc, Some(fc), Seq.empty, FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee), Waves, System.currentTimeMillis())
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
