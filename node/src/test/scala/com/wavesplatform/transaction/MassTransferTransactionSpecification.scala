@@ -68,10 +68,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
                        ]
                        }
   """)
-
-    val asdfsdf =json.as[SignedMassTransferRequest].toTx.explicitGet()
-    println(Base64.encode(asdfsdf.bytes()))
-
+    
     val tx = MassTransferTransaction.serializer.parseBytes(bytes).get
     tx.json() shouldBe json
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
