@@ -10,7 +10,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, TransactionsApiGrpc}
+import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, ScriptData, TransactionsApiGrpc}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets.{SignedIssueV1Request, SignedIssueV2Request}
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -21,7 +21,7 @@ import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.assets.IssueTransactionV2
@@ -723,6 +723,23 @@ object SyncHttpApi extends Assertions {
     def height: Int = sync(async(n).grpc.height)
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
+
+    def setScript(sender: KeyPair,
+                  script: Option[String],
+                  fee: Long,
+                  timestamp: Long = System.currentTimeMillis(),
+                  version: Int = 1,
+                  waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.setScript(sender, script, fee, timestamp, version)), waitForTx)
+    }
+
+    def scriptInfo(address: ByteString): ScriptData = {
+      accounts.getScript(AccountRequest.of(address))
+    }
+
+    def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcast(tx,proofs)), waitForTx)
+    }
   }
 
 }
