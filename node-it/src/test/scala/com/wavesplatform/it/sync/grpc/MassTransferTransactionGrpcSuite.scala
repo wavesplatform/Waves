@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount}
@@ -11,10 +10,7 @@ import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.common.utils.EitherExt2
 import io.grpc.Status.Code
 
-import scala.util.Random
-
 class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
-  private def fakeSignature = Base58.encode(Array.fill(64)(Random.nextInt.toByte))
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
     val firstBalance = sender.grpc.wavesBalance(firstAddress)
