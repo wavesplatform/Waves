@@ -219,6 +219,7 @@ object PBTransactions {
           _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
 
           tx <- vt.smart.InvokeScriptTransaction.create(
+            1.toByte,
             sender,
             dApp,
             fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
@@ -366,7 +367,7 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
-          chainId,
+          1.toByte,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser

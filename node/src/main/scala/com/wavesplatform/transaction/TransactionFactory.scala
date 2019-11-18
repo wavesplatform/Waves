@@ -266,32 +266,14 @@ object TransactionFactory {
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       contract <- AddressOrAlias.fromString(request.dApp)
 
-      tx <- InvokeScriptTransaction.signed(
-        sender,
-        contract,
-        request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
-        request.payment,
-        request.fee,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- InvokeScriptTransaction.signed(1.toByte, sender, contract, request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)), request.payment, request.fee, Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)), request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
       addressOrAlias <- AddressOrAlias.fromString(request.dApp)
       fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
-      tx <- InvokeScriptTransaction.create(
-        sender,
-        addressOrAlias,
-        fcOpt,
-        request.payment,
-        request.fee,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.timestamp.getOrElse(0),
-        Proofs.empty
-      )
+      tx <- InvokeScriptTransaction.create(1.toByte, sender, addressOrAlias, fcOpt, request.payment, request.fee, Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)), request.timestamp.getOrElse(0), Proofs.empty)
 
     } yield tx
 

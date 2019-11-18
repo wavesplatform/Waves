@@ -38,6 +38,45 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     }
   }
 
+  property("decode pre-encoded bytes") {
+    val bytes = Base64.decode(
+      "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
+    )
+    AddressScheme.current = new AddressScheme {
+      override val chainId: TxVersion = 'D'.toByte
+    }
+    val json = Json.parse(s"""{
+                         "type": 16,
+                         "id": "F4Kf5GZqAEnfTgaK9Zj9CypXApE6M4yYGR2DQ3yMhjwF",
+                         "sender": "3FX9SibfqAWcdnhrmFzqM1mGqya6DkVVnps",
+                         "senderPublicKey": "$publicKey",
+                         "fee": 100000,
+                         "feeAssetId": null,
+                         "timestamp": 1526910778245,
+                         "proofs": ["x7T161SxvUxpubEAKv4UL5ucB5pquAhTryZ8Qrd347TPuQ4yqqpVMQ2B5FpeFXGnpyLvb7wGeoNsyyjh5R61u7F"],
+                         "version": 1,
+                         "dApp" : "3Fb641A9hWy63K18KsBJwns64McmdEATgJd",
+                         "call": {
+                            "function" : "foo",
+                             "args" : [
+                             { "type" : "binary",
+                               "value" : "base64:YWxpY2U="
+                             }
+                            ]
+                          },
+                         "payment" : [{
+                            "amount" : 7,
+                            "assetId" : "$publicKey"
+                            }]
+                        }
+    """)
+
+    val tx = InvokeScriptTransaction.serializer.parseBytes(bytes).get
+    tx.json() shouldBe json
+    ByteStr(tx.bytes()) shouldBe ByteStr(bytes)
+    AddressScheme.current = DefaultAddressScheme
+  }
+
   property("JSON format validation for InvokeScriptTransaction") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val js = Json.parse(s"""{
@@ -68,6 +107,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
     val tx = InvokeScriptTransaction
       .selfSigned(
+        1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
         KeyPair("test4".getBytes("UTF-8")),
         Some(
@@ -112,6 +152,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
 
     val tx = InvokeScriptTransaction
       .selfSigned(
+        1.toByte,
         KeyPair("test3".getBytes("UTF-8")),
         KeyPair("test4".getBytes("UTF-8")),
         None,
@@ -154,6 +195,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
+      1.toByte,
       pk,
       pk.toAddress,
       Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), Range(0, 23).map(_ => Terms.CONST_LONG(0)).toList)),
@@ -169,6 +211,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
+      1.toByte,
       pk,
       pk.toAddress,
       Some(
@@ -189,6 +232,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
+      1.toByte,
       pk,
       pk.toAddress,
       Some(
@@ -210,6 +254,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     import com.wavesplatform.common.state.diffs.ProduceError._
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
+      1.toByte,
       pk,
       pk.toAddress,
       Some(Terms.FUNCTION_CALL(FunctionHeader.User("foo"), List(Terms.CONST_STRING(largeString).explicitGet()))),
