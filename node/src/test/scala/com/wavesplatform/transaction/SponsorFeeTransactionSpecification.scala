@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.TransactionGen
+import com.wavesplatform.{TransactionGen, crypto}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
@@ -25,10 +25,36 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
   )
 
   property("SponsorFee serialization roundtrip") {
-    forAll(sponsorFeeGen) { transaction: SponsorFeeTransaction =>
-      val recovered = SponsorFeeTransaction.parseBytes(transaction.bytes()).get
-      recovered.bytes() shouldEqual transaction.bytes()
+    forAll(sponsorFeeGen) { tx: SponsorFeeTransaction =>
+      val recovered = SponsorFeeTransaction.parseBytes(tx.bytes()).get
+      recovered.bytes() shouldEqual tx.bytes()
     }
+  }
+
+  property("decode pre-encoded bytes") {
+    val bytes = Base64.decode(
+      "AA4BDgG2DPWVCbVaxm9js3LYdZnhlWTRzVqNW4nurEvoDdnFLfweiKVqJfyZOK39MkvNISLB/ylUNT0ycoPSLGCPR6oaAAAAAAJIpUEAAAAABfXhAAAADF1swIRMAQABAEAlGGbLsMhr+34lYt3/Tx7XT76Al4D/V5xOhHwntdW2jR+/1XA6ku20SU6tPHphxo2+wFOxyJcPWEOBptAuw1oL"
+    )
+    val json = Json.parse(
+      """
+        |{
+        |  "senderPublicKey" : "DFefQsRMtXtTKtpVBwsrD3mPAzerWxLXWHPEe9ANc548",
+        |  "sender" : "3N3dKf1VfhfF6QuxeyBcKL73czXE6nys27u",
+        |  "feeAssetId" : null,
+        |  "proofs" : [ "k1ve9smBuVvEiRHGjVSpBwtUfPG4yETrxpXWPGEu83ddo5DdycGcEY4qfav8A1Ej9reCEdEivwRpWZ72zZ12X54" ],
+        |  "assetId" : "HyAkA27DbuhLcFmimoSXoD9H5FP99JX5PcSXvMni4UWM",
+        |  "fee" : 100000000,
+        |  "minSponsoredAssetFee" : 38315329,
+        |  "id" : "QhCGqFtJncL8y6eAgyGFP4xQBoXbBH4uaB3iKaRZLy8",
+        |  "type" : 14,
+        |  "version" : 1,
+        |  "timestamp" : 13595396047948
+        |}
+        |""".stripMargin)
+
+    val tx = SponsorFeeTransaction.serializer.parseBytes(bytes).get
+    tx.json() shouldBe json
+    assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }
 
   property("SponsorFee serialization from TypedTransaction") {

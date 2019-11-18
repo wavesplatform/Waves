@@ -33,7 +33,7 @@ object SponsorFeeTxSerializer {
 
   def toBytes(tx: SponsorFeeTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(Array(0: Byte, builder.typeId, version), bodyBytes(), proofs.bytes()) // [0, typeId, version] appears twice
+    Bytes.concat(Array(0: Byte, builder.typeId, version), this.bodyBytes(tx), proofs.bytes()) // [typeId, version] appears twice
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SponsorFeeTransaction] = Try {
@@ -41,7 +41,7 @@ object SponsorFeeTxSerializer {
 
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == SponsorFeeTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
-    require(buf.getByte == 0 && buf.getByte == SponsorFeeTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
+    require(buf.getByte == SponsorFeeTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
 
     val sender               = buf.getPublicKey
     val asset                = buf.getIssuedAsset

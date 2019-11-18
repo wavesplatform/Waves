@@ -8,7 +8,7 @@ object SponsorFeeTxValidator extends TxValidator[SponsorFeeTransaction] {
   override def validate(tx: SponsorFeeTransaction): ValidatedV[SponsorFeeTransaction] = {
     import tx._
     V.seq(tx)(
-      V.cond(minSponsoredAssetFee.exists(_ <= 0), NegativeMinFee(minSponsoredAssetFee.get, "asset")),
+      V.cond(minSponsoredAssetFee.forall(_ > 0), NegativeMinFee(minSponsoredAssetFee.get, "asset")),
       V.fee(fee)
     )
   }
