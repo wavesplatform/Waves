@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state._
 import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
