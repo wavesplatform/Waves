@@ -101,8 +101,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       fee                         = 1000000000L
-      setContract                 = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts).explicitGet()
-      resetContract               = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts + 1).explicitGet()
+      setContract                 = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts).explicitGet()
+      resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       issueSp = IssueTransaction.selfSigned(TxVersion.V2, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
         .explicitGet()
@@ -153,7 +153,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .signed(TxVersion.V2, acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
-      setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
+      setContractB = SetScriptTransaction.selfSigned(1.toByte, acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransaction.selfSigned(TxVersion.V2, acc,
           assetName,
           description,
@@ -223,8 +223,8 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       ts     <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       fee                         = 1000000000L
-      setContract                 = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts).explicitGet()
-      resetContract               = SetScriptTransaction.selfSigned(master, Some(allAllowed), fee, ts + 1).explicitGet()
+      setContract                 = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts).explicitGet()
+      resetContract               = SetScriptTransaction.selfSigned(1.toByte, master, Some(allAllowed), fee, ts + 1).explicitGet()
       (_, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen
       issueSp = IssueTransaction.selfSigned(TxVersion.V2, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
         .explicitGet()
@@ -275,7 +275,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
         .signed(TxVersion.V2, acc, o1a, o2a, 100000000L, 100000000L, 1, 1, (1 + 1) / 2, 10000L - 100)
         .explicitGet()
 
-      setContractB = SetScriptTransaction.selfSigned(acc, Some(allAllowed), fee, ts).explicitGet()
+      setContractB = SetScriptTransaction.selfSigned(1.toByte, acc, Some(allAllowed), fee, ts).explicitGet()
       issueScrB = IssueTransaction.selfSigned(TxVersion.V2, acc,
           assetName,
           description,

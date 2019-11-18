@@ -340,7 +340,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               genesisBlockId,
-              Seq(SetScriptTransaction.selfSigned(sender, Some(script), 400000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(1.toByte, sender, Some(script), 400000, nextTs).explicitGet())
             )
           )
 
@@ -352,7 +352,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               blockWithScriptId,
-              Seq(SetScriptTransaction.selfSigned(sender, None, 800000, nextTs).explicitGet())
+              Seq(SetScriptTransaction.selfSigned(1.toByte, sender, None, 800000, nextTs).explicitGet())
             )
           )
 

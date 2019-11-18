@@ -50,7 +50,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       for {
         genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-        setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp(issue.id.value, reissueAmount, burnAmount)), fee, ts + 2)
+        setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(issue.id.value, reissueAmount, burnAmount)), fee, ts + 2)
         ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()

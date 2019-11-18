@@ -197,8 +197,8 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       for {
         genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-        setVerifier <- SetScriptTransaction.selfSigned(invoker, Some(accountScript), fee, ts + 2)
-        setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp(invoker)), fee, ts + 2)
+        setVerifier <- SetScriptTransaction.selfSigned(1.toByte, invoker, Some(accountScript), fee, ts + 2)
+        setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(invoker)), fee, ts + 2)
         (issues, payments) =
           if (repeatAdditionalAsset) {
             val issues = specialIssue :: commonIssues.drop(1)

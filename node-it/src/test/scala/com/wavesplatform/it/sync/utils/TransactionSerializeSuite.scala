@@ -304,13 +304,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val setscript = SetScriptTransaction
-    .create(
-      publicKey,
-      None,
-      setScriptFee,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
-    )
+    .create(1.toByte, publicKey, None, setScriptFee, ts, Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get)))
     .right
     .get
 

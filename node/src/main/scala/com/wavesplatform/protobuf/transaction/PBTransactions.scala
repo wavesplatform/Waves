@@ -149,13 +149,7 @@ object PBTransactions {
         )
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction.create(
-          sender,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.smart.SetScriptTransaction.create(1.toByte, sender, script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
 
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         for {
@@ -315,14 +309,7 @@ object PBTransactions {
         )
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction(
-          chainId,
-          sender,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.smart.SetScriptTransaction(1.toByte, sender, script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
 
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         vt.lease.LeaseTransaction(version.toByte, sender, recipient.toAddressOrAlias.explicitGet(), amount, feeAmount, timestamp, proofs)
