@@ -93,7 +93,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), i) =>
         val timestamp = System.currentTimeMillis() + i
 
-        val tx = typeGen.getRandom match {
+        val tx: Option[Transaction] = typeGen.getRandom match {
           case IssueTransaction =>
             val sender      = randomFrom(accounts).get
             val name        = new Array[Byte](10)
@@ -141,7 +141,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                     sender,
                     IssuedAsset(assetTx.id()),
                     Random.nextInt(Int.MaxValue),
-                    true,
+                    reissuable = true,
                     100400000L,
                     timestamp
                   )
@@ -280,7 +280,16 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
 
             logOption(
-              InvokeScriptTransaction.selfSigned(1.toByte, sender, GeneratorSettings.toKeyPair(script.dappAccount).toAddress, maybeFunctionCall, Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)), 5300000L, Waves, timestamp)
+              InvokeScriptTransaction.selfSigned(
+                1.toByte,
+                sender,
+                GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
+                maybeFunctionCall,
+                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
+                5300000L,
+                Waves,
+                timestamp
+              )
             )
 
           case SetScriptTransaction =>
