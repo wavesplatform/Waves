@@ -32,7 +32,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     fee    <- smallFeeGen
     script <- Gen.option(scriptGen)
-  } yield (genesis, SetScriptTransaction.selfSigned(master, script, fee, ts).explicitGet())
+  } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, script, fee, ts).explicitGet())
 
   property("setting script results in account state") {
     forAll(preconditionsAndSetContract) {
@@ -59,7 +59,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         None
       )
     )
-  } yield (genesis, SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet())
+  } yield (genesis, SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts).explicitGet())
 
   property("setting contract results in account state") {
     forAll(preconditionsAndSetContract) {
@@ -88,7 +88,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       expr    = BLOCK(LET("x", CONST_LONG(3)), CONST_BOOLEAN(true))
       script  = ExprScript(V1, expr, checkSize = false).explicitGet()
-      tx      = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
+      tx      = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
     } yield (genesis, tx)
 
     forAll(setup) {

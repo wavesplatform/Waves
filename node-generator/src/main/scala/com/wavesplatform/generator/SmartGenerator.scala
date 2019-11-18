@@ -36,7 +36,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
     val setScripts = Range(0, settings.scripts) flatMap (
         _ =>
           accounts.map { i =>
-            SetScriptTransaction.selfSigned(i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
+            SetScriptTransaction.selfSigned(1.toByte, i, Some(script), 1.waves, System.currentTimeMillis()).explicitGet()
           }
       )
 

@@ -333,30 +333,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       funcBinding <- Gen.const("funcForTesting")
       contract    = simpleContract(funcBinding).explicitGet()
       script      = ContractScript(V3, contract)
-      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts).explicitGet()
+      setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = Terms.FUNCTION_CALL(
         FunctionHeader.User(funcBinding),
         List.fill(invocationParamsCount)(FALSE)
       )
       ci = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          master,
-          Some(fc),
-          payment.toSeq,
-          if (sponsored) {
+        .selfSigned(1.toByte, invoker, master, Some(fc), payment.toSeq, if (sponsored) {
             sponsorTx.minSponsoredAssetFee.get * 5
           } else {
             fee
-          },
-          if (sponsored) {
+          }, if (sponsored) {
             IssuedAsset(issueTx.id())
           } else {
             Waves
-          },
-          ts
-        )
+          }, ts)
         .explicitGet()
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
   }
@@ -399,30 +391,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       funcBinding <- funcNameGen
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(V3, contract)
-      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
+      setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
       ci = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          master,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
+        .selfSigned(1.toByte, invoker, master, fc, payment.toSeq, if (sponsored) {
             sponsorTx.minSponsoredAssetFee.get * 5
           } else {
             fee
-          },
-          if (sponsored) {
+          }, if (sponsored) {
             IssuedAsset(issueTx.id())
           } else {
             Waves
-          },
-          ts + 3
-        )
+          }, ts + 3)
         .explicitGet()
     } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
@@ -449,31 +433,23 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       funcBinding <- funcNameGen
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(V3, contract)
-      setVerifier = SetScriptTransaction.selfSigned(invoker, ContractScript(V3, verifier).toOption, fee, ts + 2).explicitGet()
-      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
+      setVerifier = SetScriptTransaction.selfSigned(1.toByte, invoker, ContractScript(V3, verifier).toOption, fee, ts + 2).explicitGet()
+      setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
       ci = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          master,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
+        .selfSigned(1.toByte, invoker, master, fc, payment.toSeq, if (sponsored) {
             sponsorTx.minSponsoredAssetFee.get * 5
           } else {
             fee
-          },
-          if (sponsored) {
+          }, if (sponsored) {
             IssuedAsset(issueTx.id())
           } else {
             Waves
-          },
-          ts + 3
-        )
+          }, ts + 3)
         .explicitGet()
     } yield (List(genesis, genesis2), setVerifier, setContract, ci, master, issueTx, sponsorTx)
 
@@ -500,49 +476,33 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       fakeAlias   = Alias.create("fakealias").explicitGet()
       aliasTx <- createAliasGen(master, masterAlias, fee, ts + 1)
       script      = ContractScript(V3, contract)
-      setContract = SetScriptTransaction.selfSigned(master, script.toOption, fee, ts + 2).explicitGet()
+      setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
         None
       ciWithAlias = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          masterAlias,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
+        .selfSigned(1.toByte, invoker, masterAlias, fc, payment.toSeq, if (sponsored) {
             sponsorTx.minSponsoredAssetFee.get * 5
           } else {
             fee
-          },
-          if (sponsored) {
+          }, if (sponsored) {
             IssuedAsset(issueTx.id())
           } else {
             Waves
-          },
-          ts + 3
-        )
+          }, ts + 3)
         .explicitGet()
       ciWithFakeAlias = InvokeScriptTransaction
-        .selfSigned(
-          invoker,
-          fakeAlias,
-          fc,
-          payment.toSeq,
-          if (sponsored) {
+        .selfSigned(1.toByte, invoker, fakeAlias, fc, payment.toSeq, if (sponsored) {
             sponsorTx.minSponsoredAssetFee.get * 5
           } else {
             fee
-          },
-          if (sponsored) {
+          }, if (sponsored) {
             IssuedAsset(issueTx.id())
           } else {
             Waves
-          },
-          ts + 3
-        )
+          }, ts + 3)
         .explicitGet()
     } yield (List(genesis, genesis2), master, setContract, ciWithAlias, ciWithFakeAlias, aliasTx)
 
@@ -635,7 +595,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
         assertDiffEi(
           Seq(TestBlock.create(genesis ++ Seq(setScript))),
-          TestBlock.create(Seq(ci.copy(proofs = proofs))),
+          TestBlock.create(Seq(ci.copy(1.toByte, proofs = proofs))),
           fs
         ) {
           _ should produce("Transactions from non-scripted accounts must have exactly 1 proof")
@@ -655,7 +615,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
 
         assertDiffEi(
           Seq(TestBlock.create(genesis ++ Seq(setScript))),
-          TestBlock.create(Seq(ci.copy(proofs = proofs))),
+          TestBlock.create(Seq(ci.copy(1.toByte, proofs = proofs))),
           fs
         ) {
           _ should produce("Proof doesn't validate as signature")
@@ -969,7 +929,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       funcBinding <- validAliasStringGen
       fee         <- ciFee(1)
       fc = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet()))
-      ci = InvokeScriptTransaction.selfSigned(invoker, master, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
+      ci = InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, Some(fc), Seq(Payment(-1, Waves)), fee, Waves, ts)
     } yield ci) { _ should produce("NonPositiveAmount") }
   }
 
@@ -1187,7 +1147,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setVerifier, setContract, ci, proofsCount) =>
         val proof         = ci.proofs
         val multiSigProof = ci.proofs.copy(proofs = List.fill(proofsCount)(proof.proofs.head))
-        val multiSigCi    = ci.copy(proofs = multiSigProof)
+        val multiSigCi    = ci.copy(1.toByte, proofs = multiSigProof)
 
         assertDiffEi(
           Seq(TestBlock.create(genesis ++ Seq(setVerifier, setContract))),

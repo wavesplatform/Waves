@@ -309,7 +309,7 @@ class UtxPoolSpecification
     for {
       ts <- timestampGen
     } yield {
-      val setScript = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
+      val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
       Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
     }
 
@@ -433,13 +433,7 @@ class UtxPoolSpecification
                 GenesisTransaction.create(richAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 GenesisTransaction.create(randomAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 SetScriptTransaction
-                  .signed(
-                    richAccount,
-                    Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
-                    QuickTX.FeeAmount * 4,
-                    ntpNow,
-                    richAccount
-                  )
+                  .signed(1.toByte, richAccount, Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()), QuickTX.FeeAmount * 4, ntpNow, richAccount)
                   .explicitGet()
               ),
               signer = TestBlock.defaultSigner,

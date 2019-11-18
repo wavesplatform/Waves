@@ -313,7 +313,7 @@ class TransactionsRouteSpec
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)
       val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
-      val funcWithArgs = InvokeScriptTransaction.functionCallToJson(
+      val funcWithArgs = InvokeScriptTransaction.serializer.functionCallToJson(
         FUNCTION_CALL(
           FunctionHeader.User(funcName),
           List(CONST_LONG(1), CONST_BOOLEAN(true))

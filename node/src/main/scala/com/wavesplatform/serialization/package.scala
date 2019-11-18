@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.{Asset, Proofs}
 
 package object serialization {
   implicit class ByteBufferOps(private val buf: ByteBuffer) extends AnyVal {
-    def getPrefixedByteArray: Array[Byte] = {
+    def getByteArrayWithLength: Array[Byte] = {
       val prefix = buf.getShort
       require(prefix >= 0, "negative array length")
       if (prefix > 0) getByteArray(prefix) else Array.emptyByteArray
@@ -72,7 +72,7 @@ package object serialization {
 
     def getScript: Option[Script] = Deser.parseByteArrayOptionWithLength(buf).map(ScriptReader.fromBytes(_).explicitGet())
 
-    def getAlias: Alias = Alias.fromBytes(buf.getPrefixedByteArray).explicitGet()
+    def getAlias: Alias = Alias.fromBytes(buf.getByteArrayWithLength).explicitGet()
 
     def getVersionedOrder: Order = {
       val length  = buf.getInt

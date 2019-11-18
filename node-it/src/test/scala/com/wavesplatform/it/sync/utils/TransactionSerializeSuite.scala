@@ -304,13 +304,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val setscript = SetScriptTransaction
-    .create(
-      publicKey,
-      None,
-      setScriptFee,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
-    )
+    .create(1.toByte, publicKey, None, setScriptFee, ts, Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get)))
     .right
     .get
 
@@ -353,21 +347,12 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   )
 
   private val invokeScript = InvokeScriptTransaction
-    .create(
-      PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
-      PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
-      Some(
+    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get, PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get, Some(
         Terms.FUNCTION_CALL(
           function = FunctionHeader.User("testfunc"),
           args = List(TRUE)
         )
-      ),
-      Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
-      smartMinFee,
-      Waves,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
-    )
+      ), Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))), smartMinFee, Waves, ts, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
     .right
     .get
 

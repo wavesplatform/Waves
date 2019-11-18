@@ -24,21 +24,21 @@ package object ci {
 
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment]   |+|
-      CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-      WavesContext.build(
-        DirectiveSet(version, Account, DAppType).explicitGet()
-      )
+      PureContext.build(Global, version).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+        WavesContext.build(
+          DirectiveSet(version, Account, DAppType).explicitGet()
+        )
     ContractCompiler(ctx.compilerContext, expr, version).explicitGet()
   }
 
   def compileExpr(expr: EXPR, version: StdLibVersion, scriptType: ScriptType): Terms.EXPR = {
     val ctx =
-      PureContext.build(Global, version).withEnvironment[Environment]   |+|
-      CryptoContext.build(Global, version).withEnvironment[Environment] |+|
-      WavesContext.build(
-        DirectiveSet(version, scriptType, Expression).explicitGet()
-      )
+      PureContext.build(Global, version).withEnvironment[Environment] |+|
+        CryptoContext.build(Global, version).withEnvironment[Environment] |+|
+        WavesContext.build(
+          DirectiveSet(version, scriptType, Expression).explicitGet()
+        )
     ExpressionCompiler(ctx.compilerContext, expr).explicitGet()._1
   }
 }

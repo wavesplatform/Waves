@@ -139,12 +139,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
         )
         .explicitGet()
       setScript = SetScriptTransaction
-        .selfSigned(
-          contract,
-          Some(script),
-          ENOUGH_FEE,
-          System.currentTimeMillis() + 6
-        )
+        .selfSigned(1.toByte, contract, Some(script), ENOUGH_FEE, System.currentTimeMillis() + 6)
         .explicitGet()
       transferTx = TransferTransaction
         .selfSigned(
@@ -211,12 +206,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with WithState wi
         )
         .explicitGet()
       setScript = SetScriptTransaction
-        .selfSigned(
-          contract,
-          Some(script),
-          ENOUGH_FEE,
-          System.currentTimeMillis() + 6
-        )
+        .selfSigned(1.toByte, contract, Some(script), ENOUGH_FEE, System.currentTimeMillis() + 6)
         .explicitGet()
       transferTx = TransferTransaction
         .selfSigned(

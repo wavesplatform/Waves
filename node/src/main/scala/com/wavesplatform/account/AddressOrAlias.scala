@@ -44,7 +44,7 @@ object AddressOrAlias {
         Address.fromBytes(addressBytes)
 
       case Alias.AddressVersion =>
-        val chainId = buf.get
+        val chainId    = buf.get
         val aliasBytes = Deser.parseArrayWithLength(buf)
         Alias.createWithChainId(new String(aliasBytes, "UTF-8"), chainId)
 
