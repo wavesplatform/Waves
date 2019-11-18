@@ -153,9 +153,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     sender    <- accountGen
     fee       <- smallFeeGen
     timestamp <- timestampGen
-    proofs    <- proofsGen
     script    <- Gen.option(contractOrExpr)
-  } yield SetScriptTransaction.create(1.toByte, sender, script, fee, timestamp, proofs).explicitGet()
+  } yield SetScriptTransaction.selfSigned(1.toByte, sender, script, fee, timestamp).explicitGet()
 
   def selfSignedSetScriptTransactionGenP(sender: KeyPair, s: Script): Gen[SetScriptTransaction] =
     for {

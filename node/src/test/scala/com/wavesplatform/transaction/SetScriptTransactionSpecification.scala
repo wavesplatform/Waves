@@ -2,7 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalacheck.Gen
 import play.api.libs.json._
@@ -64,4 +64,26 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
     }
   }
 
+  override def preserBytesJson: Option[(Array[TxVersion], JsValue)] =
+    Some(
+      Base64.decode(
+        "AA0BVM0TkdpiFV5gEBKCPA/ywRDiYs057r7FRwiXfwlf5tB1AQAfAQkAAGQAAAACAAAAAAAAAAABAAAAAAAAAAAB/cLTbwAAAAACODUuPMqjnZaOKXYBAAEAQIluaI2QJaNachtUD0FI1RzgcY0NmElIyp/0V06TAljDP4NlAt2XUHme3asul95ah/3/5E7JE9a/NXjvxDx4iA8="
+      ) -> Json.parse(
+        """
+          |{
+          |  "senderPublicKey" : "EoXtNDWGV5XsjiEAZXufddF57a1FdWhypJnps92CAdp8",
+          |  "sender" : "3NBy87bQasxRkFTfMM8sq6MDbVUiPGS95g8",
+          |  "feeAssetId" : null,
+          |  "chainId" : 84,
+          |  "proofs" : [ "3kNEbDaUaCZudgk5V5iJtTEY5Tm6NPLjbE2Jh8cF3ruSRtyRcSdnKqCtUWC8qQnwfpVttio3CftsTC7mbNsBsLo8" ],
+          |  "fee" : 37238062,
+          |  "id" : "HkZwtM5u9H5FAV8ihaKJo5nBj3rj9yYL9mJoLcuecK29",
+          |  "type" : 13,
+          |  "version" : 1,
+          |  "script" : "base64:AQkAAGQAAAACAAAAAAAAAAABAAAAAAAAAAAB/cLTbw==",
+          |  "timestamp" : 4380493484802320758
+          |}
+          |""".stripMargin
+      )
+    )
 }
