@@ -516,9 +516,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       assetId = IssuedAsset(issue.assetId)
     } yield (
       issue,
-      SponsorFeeTransaction.selfSigned(sender, assetId, Some(minFee), 1 * Constants.UnitsInWave, timestamp).explicitGet(),
-      SponsorFeeTransaction.selfSigned(sender, assetId, Some(minFee1), 1 * Constants.UnitsInWave, timestamp).explicitGet(),
-      SponsorFeeTransaction.selfSigned(sender, assetId, None, 1 * Constants.UnitsInWave, timestamp).explicitGet()
+      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee), 1 * Constants.UnitsInWave, timestamp).explicitGet(),
+      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, Some(minFee1), 1 * Constants.UnitsInWave, timestamp).explicitGet(),
+      SponsorFeeTransaction.selfSigned(1.toByte, sender, assetId, None, 1 * Constants.UnitsInWave, timestamp).explicitGet()
     )
 
   val sponsorFeeGen: Gen[SponsorFeeTransaction] = for {

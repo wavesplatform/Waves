@@ -44,6 +44,6 @@ case class SignedSponsorFeeRequest(@ApiModelProperty(value = "Base58 encoded sen
       _asset      <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength).map(IssuedAsset)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- SponsorFeeTransaction.create(_sender, _asset, minSponsoredAssetFee, fee, timestamp, _proofs)
+      t           <- SponsorFeeTransaction.create(1.toByte, _sender, _asset, minSponsoredAssetFee, fee, timestamp, _proofs)
     } yield t
 }

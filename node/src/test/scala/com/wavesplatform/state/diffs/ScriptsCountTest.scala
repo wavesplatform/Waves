@@ -106,7 +106,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       issueSp = IssueTransaction
         .selfSigned(TxVersion.V2, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
         .explicitGet()
-      sponsorTx = SponsorFeeTransaction.selfSigned(master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
+      sponsorTx = SponsorFeeTransaction.selfSigned(1.toByte, master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
       burnSp    = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, fee, timestamp).explicitGet()
       reissueSp = ReissueTransaction
         .selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
@@ -217,7 +217,7 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with T
       issueSp = IssueTransaction
         .selfSigned(TxVersion.V2, master, assetName, description, quantity + 1000000000L, decimals, true, None, iFee, timestamp)
         .explicitGet()
-      sponsorTx = SponsorFeeTransaction.selfSigned(master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
+      sponsorTx = SponsorFeeTransaction.selfSigned(1.toByte, master, IssuedAsset(issueSp.id()), Some(1), fee, timestamp).explicitGet()
       burnSp    = BurnTransaction.selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, fee, timestamp).explicitGet()
       reissueSp = ReissueTransaction
         .selfSigned(2.toByte, master, IssuedAsset(issueSp.id()), 1, true, fee, timestamp)
