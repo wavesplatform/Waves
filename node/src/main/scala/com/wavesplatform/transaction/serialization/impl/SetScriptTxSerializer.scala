@@ -31,10 +31,8 @@ object SetScriptTxSerializer {
     )
   }
 
-  def toBytes(tx: SetScriptTransaction): Array[Byte] = {
-    import tx._
-    Bytes.concat(Array(0: Byte), bodyBytes(tx), proofs.bytes())
-  }
+  def toBytes(tx: SetScriptTransaction): Array[Byte] =
+    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")
