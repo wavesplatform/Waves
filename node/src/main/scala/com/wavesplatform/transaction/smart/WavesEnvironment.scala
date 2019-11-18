@@ -123,7 +123,7 @@ class WavesEnvironment(
     blockchain.lastBlock.map(block => toBlockInfo(block.header, height.toInt))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockHeaderAndSize(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize._1, blockHeight))
+    blockchain.blockInfo(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
     BlockInfo(
@@ -165,7 +165,8 @@ class WavesEnvironment(
 
     val baseTarget = ndi.readLong()
 
-    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+    val genSig = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {

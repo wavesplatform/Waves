@@ -232,7 +232,7 @@ class CommonFunctionsTest extends PropSpec with PropertyChecks with Matchers wit
       )
       transferResult shouldBe evaluated(true)
 
-      val dataTx = DataTransaction.create(t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
+      val dataTx = DataTransaction.create(1.toByte, t.sender, List(entry), 100000L, t.timestamp, Proofs(Seq.empty)).explicitGet()
       val dataResult = runScript(
         s"""
            |match tx {

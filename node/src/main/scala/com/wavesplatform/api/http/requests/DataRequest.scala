@@ -37,6 +37,6 @@ case class SignedDataRequest(@(ApiModelProperty @field)(value = "Base58 encoded 
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- DataTransaction.create(_sender, data, fee, timestamp, _proofs)
+      t           <- DataTransaction.create(1.toByte, _sender, data, fee, timestamp, _proofs)
     } yield t
 }

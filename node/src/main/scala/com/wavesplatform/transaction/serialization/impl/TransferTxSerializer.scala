@@ -4,6 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -34,7 +35,7 @@ object TransferTxSerializer {
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
         recipient.bytes.arr,
-        Deser.serializeArray(attachment)
+        Deser.serializeArrayWithLength(attachment)
       )
     }
 
@@ -61,7 +62,7 @@ object TransferTxSerializer {
       val amount     = buf.getLong
       val fee        = buf.getLong
       val recipient  = buf.getAddressOrAlias
-      val attachment = buf.getPrefixedByteArray
+      val attachment = buf.getByteArrayWithLength
 
       TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, attachment, ts, Proofs.empty)
     }

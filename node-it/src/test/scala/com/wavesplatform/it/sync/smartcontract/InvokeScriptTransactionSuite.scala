@@ -116,13 +116,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     val tx =
       DataTransaction
-        .create(
-          sender = contract,
-          data = List(StringDataEntry("a", "OOO")),
-          feeAmount = 1.waves,
-          timestamp = System.currentTimeMillis(),
-          proofs = Proofs.empty
-        )
+        .create(1.toByte, sender = contract, data = List(StringDataEntry("a", "OOO")), fee = 1.waves, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
         .explicitGet()
 
     val dataTxId = sender

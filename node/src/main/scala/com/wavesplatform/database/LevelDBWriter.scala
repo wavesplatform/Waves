@@ -6,7 +6,7 @@ import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -245,6 +245,7 @@ class LevelDBWriter(
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
+      hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
@@ -265,7 +266,7 @@ class LevelDBWriter(
         k -> v
       }.toMap
 
-    rw.put(Keys.blockHeaderAndSizeAt(Height(height)), Some((block.header, block.bytes().length, block.transactionData.size, block.signature)))
+    rw.put(Keys.blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -419,7 +420,9 @@ class LevelDBWriter(
       val minVotes = settings.functionalitySettings.blocksForFeatureActivation(height)
       val newlyApprovedFeatures = featureVotes(height)
         .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
-        .collect { case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height }
+        .collect {
+          case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height
+        }
 
       if (newlyApprovedFeatures.nonEmpty) {
         approvedFeaturesCache = newlyApprovedFeatures ++ rw.get(Keys.approvedFeatures)
@@ -468,13 +471,15 @@ class LevelDBWriter(
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
     }
+
+    rw.put(Keys.hitSource(height), hitSource.arr)
   }
 
-  override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
-    readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[Block]) { targetHeight =>
+  override protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)] = {
+    readOnly(_.get(Keys.heightOf(targetBlockId))).fold(Seq.empty[(Block, ByteStr)]) { targetHeight =>
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
-      val discardedBlocks: Seq[Block] = for (currentHeight <- height until targetHeight by -1) yield {
+      val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
         val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
         val portfoliosToInvalidate  = Seq.newBuilder[Address]
         val assetInfoToInvalidate   = Seq.newBuilder[IssuedAsset]
@@ -489,8 +494,8 @@ class LevelDBWriter(
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          val (discardedHeader, _, _, discardedSignature) = rw
-            .get(Keys.blockHeaderAndSizeAt(h))
+          val BlockInfo(discardedHeader, _, _, discardedSignature) = rw
+            .get(Keys.blockInfoAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
@@ -592,7 +597,7 @@ class LevelDBWriter(
               }
           }
 
-          rw.delete(Keys.blockHeaderAndSizeAt(h))
+          rw.delete(Keys.blockInfoAt(h))
           rw.delete(Keys.heightOf(discardedSignature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -603,7 +608,10 @@ class LevelDBWriter(
             DisableHijackedAliases.revert(rw)
           }
 
-          createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+          val hitSource = ByteStr(rw.get(Keys.hitSource(currentHeight)))
+          val block     = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+
+          (block, hitSource)
         }
 
         balancesToInvalidate.result().foreach(discardBalance)
@@ -793,23 +801,18 @@ class LevelDBWriter(
     readOnly(db => db.get(Keys.heightOf(blockId)).map(h => db.get(Keys.score(h))))
   }
 
-  override def loadBlockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    writableDB.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  override def loadBlockInfo(height: Int): Option[BlockInfo] = {
+    writableDB.get(Keys.blockInfoAt(Height(height)))
   }
 
-  def loadBlockHeaderAndSize(height: Int, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    db.get(Keys.blockHeaderAndSizeAt(Height(height)))
+  def loadBlockInfo(height: Int, db: ReadOnlyDB): Option[BlockInfo] = {
+    db.get(Keys.blockInfoAt(Height(height)))
   }
 
-  override def loadBlockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)] = {
+  override def loadBlockInfo(blockId: ByteStr): Option[BlockInfo] = {
     writableDB
       .get(Keys.heightOf(blockId))
-      .flatMap(loadBlockHeaderAndSize)
-  }
-
-  def loadBlockHeaderAndSize(blockId: ByteStr, db: ReadOnlyDB): Option[(BlockHeader, Int, Int, ByteStr)] = {
-    db.get(Keys.heightOf(blockId))
-      .flatMap(loadBlockHeaderAndSize(_, db))
+      .flatMap(loadBlockInfo)
   }
 
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
@@ -817,10 +820,7 @@ class LevelDBWriter(
 
     val height = Height(h)
 
-    val consensuDataOffset = 1 + 8 + SignatureLength
-
-    // version + timestamp + reference + baseTarget + genSig
-    val txCountOffset = consensuDataOffset + 8 + Block.GeneratorSignatureLength
+    val consensusDataOffset = 1 + 8 + SignatureLength
 
     val headerKey = Keys.blockHeaderBytesAt(height)
 
@@ -836,10 +836,14 @@ class LevelDBWriter(
 
     db.get(headerKey)
       .map { headerBytes =>
-        val bytesBeforeCData   = headerBytes.take(consensuDataOffset)
-        val consensusDataBytes = headerBytes.slice(consensuDataOffset, consensuDataOffset + 40)
-        val version            = headerBytes.head
-        val (txCount, txCountBytes) = if (version == 1 || version == 2) {
+        val version      = headerBytes.head
+        val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+        // version + timestamp + reference + baseTarget + genSig
+        val txCountOffset      = consensusDataOffset + 8 + genSigLength
+        val bytesBeforeCData   = headerBytes.take(consensusDataOffset)
+        val consensusDataBytes = headerBytes.slice(consensusDataOffset, consensusDataOffset + 40)
+
+        val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
           val byte = headerBytes(txCountOffset)
           (byte.toInt, Array[Byte](byte))
         } else {
@@ -848,7 +852,7 @@ class LevelDBWriter(
         }
 
         val bytesAfterTxs =
-          if (version > 2) {
+          if (version > Block.PlainBlockVersion) {
             headerBytes.drop(txCountOffset + txCountBytes.length)
           } else {
             headerBytes.takeRight(SignatureLength + KeyLength)
@@ -883,10 +887,10 @@ class LevelDBWriter(
     (currentHeight until (currentHeight - howMany).max(0) by -1)
       .map { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAndSizeAt(height))
+        db.get(Keys.blockInfoAt(height))
       }
       .collect {
-        case Some((_, _, _, signature)) => signature
+        case Some(BlockInfo(_, _, _, signature)) => signature
       }
   }
 
@@ -895,10 +899,10 @@ class LevelDBWriter(
       (parentHeight + 1 to (parentHeight + howMany))
         .map { h =>
           val height = Height(h)
-          db.get(Keys.blockHeaderAndSizeAt(height))
+          db.get(Keys.blockInfoAt(height))
         }
         .collect {
-          case Some((_, _, _, signature)) => signature
+          case Some(BlockInfo(_, _, _, signature)) => signature
         }
     }
   }
@@ -907,7 +911,7 @@ class LevelDBWriter(
     for {
       h <- db.get(Keys.heightOf(block.reference))
       height = Height(h - back + 1)
-      (block, _, _, _) <- loadBlockHeaderAndSize(height, db)
+      BlockInfo(block, _, _, _) <- loadBlockInfo(height, db)
     } yield block
   }
 
@@ -920,8 +924,8 @@ class LevelDBWriter(
       .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
-        db.get(Keys.blockHeaderAndSizeAt(height))
-          .map(_._1.featureVotes.toSeq)
+        db.get(Keys.blockInfoAt(height))
+          .map(_.header.featureVotes.toSeq)
           .getOrElse(Seq.empty)
       }
       .groupBy(identity)
@@ -934,8 +938,8 @@ class LevelDBWriter(
         settings.rewardsSettings
           .votingWindow(activatedAt, height)
           .flatMap { h =>
-            db.get(Keys.blockHeaderAndSizeAt(Height(h)))
-              .map(_._1.rewardVote)
+            db.get(Keys.blockInfoAt(Height(h)))
+              .map(_.header.rewardVote)
           }
       case _ => Seq()
     }
@@ -950,15 +954,21 @@ class LevelDBWriter(
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
+  override def hitSourceAtHeight(height: Int): Option[ByteStr] = readOnly { db =>
+    Option(db.get(Keys.hitSource(height)))
+      .filter(_.length == Block.HitSourceLength)
+      .map(ByteStr.apply)
+  }
+
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)
   }
 
   private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockHeaderAndSizeAt(height)
+    val headerKey = Keys.blockInfoAt(height)
 
     for {
-      (header, _, transactionCount, signature) <- db.get(headerKey)
+      BlockInfo(header, _, transactionCount, signature) <- db.get(headerKey)
       txs = (0 until transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }

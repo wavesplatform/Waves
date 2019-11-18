@@ -1,222 +1,108 @@
 package com.wavesplatform.transaction.smart
 
-import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account._
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
-import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset._
-import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.serialization.impl.InvokeScriptTxSerializer
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
+import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
+import scala.reflect.ClassTag
 import scala.util.Try
 
-case class InvokeScriptTransaction private (
-    chainId: Byte,
+case class InvokeScriptTransaction(
+    version: TxVersion,
     sender: PublicKey,
     dAppAddressOrAlias: AddressOrAlias,
-    funcCallOpt: Option[Terms.FUNCTION_CALL],
+    funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
-    fee: Long,
+    fee: TxAmount,
     feeAssetId: Asset,
-    timestamp: Long,
+    timestamp: TxTimestamp,
     proofs: Proofs
 ) extends ProvenTransaction
     with VersionedTransaction
+    with TxWithFee.InCustomAsset
     with FastHashId {
-
-  import InvokeScriptTransaction.paymentPartFormat
-  import play.api.libs.json.Json
 
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
-  override val builder: TransactionParser = InvokeScriptTransaction
+  override val builder = InvokeScriptTransaction
 
-  val bodyBytes: Coeval[Array[Byte]] =
-    Coeval.evalOnce(
-      Bytes.concat(
-        Array(builder.typeId, version, chainId),
-        sender,
-        dAppAddressOrAlias.bytes.arr,
-        Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
-        Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
-        Longs.toByteArray(fee),
-        feeAssetId.byteRepr,
-        Longs.toByteArray(timestamp)
-      )
-    )
+  val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
+  val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
+  val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override val assetFee: (Asset, Long) = (feeAssetId, fee)
-  override val json: Coeval[JsObject] =
-    Coeval.evalOnce(
-      jsonBase()
-        ++ Json.obj(
-          "version" -> version,
-          "dApp"    -> dAppAddressOrAlias.stringRepr,
-          "payment" -> payments
-        )
-        ++ (funcCallOpt match {
-          case Some(fc) => Json.obj("call" -> InvokeScriptTransaction.functionCallToJson(fc))
-          case None     => JsObject.empty
-        })
-    )
-
-  override def checkedAssets(): Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
-
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-
-  override def version: TxVersion = TxVersion.V1
+  override def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
+  override def chainByte: Option[TxVersion]    = Some(AddressScheme.current.chainId)
 }
 
-object InvokeScriptTransaction extends TransactionParserFor[InvokeScriptTransaction] with TransactionParser.MultipleVersions {
-
-  import play.api.libs.json.{Json, _}
-
-  case class Payment(amount: Long, assetId: Asset)
-
-  implicit val paymentPartFormat: Format[InvokeScriptTransaction.Payment] = Json.format
-
-  def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
-    Json.obj(
-      "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
-      "args" -> JsArray(
-        fc.args.map {
-          case Terms.CONST_LONG(l)    => Json.obj("type" -> "integer", "value" -> l)
-          case Terms.CONST_BOOLEAN(l) => Json.obj("type" -> "boolean", "value" -> l)
-          case Terms.CONST_BYTESTR(l) => Json.obj("type" -> "binary", "value" -> l.base64)
-          case Terms.CONST_STRING(l)  => Json.obj("type" -> "string", "value" -> l)
-          case _                      => ???
-        }
-      )
-    )
-  }
+object InvokeScriptTransaction extends TransactionParserLite {
+  override type TransactionT = InvokeScriptTransaction
 
   override val typeId: TxType                    = 16
   override val supportedVersions: Set[TxVersion] = Set(1)
+  override val classTag                          = ClassTag(classOf[DataTransaction])
 
-  private def currentChainId: Byte = AddressScheme.current.chainId
+  implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
 
-  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    byteTailDescription.deserializeFromByteArray(bytes).flatMap { tx =>
-      validate(tx)
-        .map(_ => tx)
-        .foldToTry
-    }
+  implicit def sign(tx: InvokeScriptTransaction, privateKey: PrivateKey): InvokeScriptTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
+  val serializer = InvokeScriptTxSerializer
+
+  override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
+    serializer.parseBytes(bytes)
+
+  case class Payment(amount: TxAmount, assetId: Asset)
+  object Payment {
+    import play.api.libs.json.{Json, _}
+    implicit val jsonFormat: Format[Payment] = Json.format
   }
 
   def create(
+      version: TxVersion,
       sender: PublicKey,
       dappAddress: AddressOrAlias,
-      fc: Option[Terms.FUNCTION_CALL],
+      fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: Long,
+      fee: TxAmount,
       feeAssetId: Asset,
-      timestamp: Long,
+      timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] = {
-    for {
-      _ <- validate(fc, p, fee)
-      tx   = new InvokeScriptTransaction(currentChainId, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs)
-      size = tx.bytes().length
-      _ <- Either.cond(size <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
-    } yield tx
-  }
-
-  private def checkAmounts(payments: Seq[Payment]): Either[NonPositiveAmount, Unit] =
-    payments
-      .find(_.amount <= 0)
-      .fold(().asRight[NonPositiveAmount])(
-        p =>
-          NonPositiveAmount(
-            p.amount,
-            p.assetId.fold("Waves")(_.toString)
-          ).asLeft[Unit]
-      )
+  ): Either[ValidationError, TransactionT] =
+    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs).validatedEither
 
   def signed(
+      version: TxVersion,
       sender: PublicKey,
       dappAddress: AddressOrAlias,
-      fc: Option[Terms.FUNCTION_CALL],
+      fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: Long,
+      fee: TxAmount,
       feeAssetId: Asset,
-      timestamp: Long,
+      timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
-    for {
-      tx     <- create(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty)
-      proofs <- Proofs.create(Seq(ByteStr(crypto.sign(signer, tx.bodyBytes()))))
-    } yield tx.copy(proofs = proofs)
+    create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
+      version: TxVersion,
       sender: KeyPair,
       dappAddress: AddressOrAlias,
-      fc: Option[Terms.FUNCTION_CALL],
+      fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: Long,
+      fee: TxAmount,
       feeAssetId: Asset,
-      timestamp: Long
-  ): Either[ValidationError, TransactionT] = {
-    signed(sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
-  }
-
-  def validate(tx: InvokeScriptTransaction): Either[ValidationError, Unit] = {
-    for {
-      _ <- Either.cond(tx.chainId == currentChainId, (), WrongChain(currentChainId, tx.chainId))
-      _ <- validate(tx.funcCallOpt, tx.payments, tx.fee)
-      _ <- Either.cond(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes, (), TooBigArray)
-    } yield ()
-  }
-
-  def validate(fc: Option[Terms.FUNCTION_CALL], p: Seq[Payment], fee: Long): Either[ValidationError, Unit] = {
-    for {
-      _ <- Either.cond(fee > 0, (), InsufficientFee(s"insufficient fee: $fee"))
-      _ <- Either.cond(
-        fc.isEmpty || fc.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
-        (),
-        GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")
-      )
-      _ <- Either.cond(
-        fc.isEmpty || (fc.get.function match {
-          case FunctionHeader.User(internalName, _) =>
-            internalName.getBytes("UTF-8").length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
-          case _ => true
-        }),
-        (),
-        GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
-      )
-      _ <- checkAmounts(p)
-      _ <- Either.cond(
-        fc.isEmpty || fc.get.args.forall(x => x.isInstanceOf[EVALUATED] && !x.isInstanceOf[CaseObj] && !x.isInstanceOf[ARR]),
-        (),
-        GenericError("All arguments of invokeScript must be one of the types: Int, ByteVector, String, Boolean")
-      )
-    } yield ()
-  }
-
-  val byteTailDescription: ByteEntity[InvokeScriptTransaction] = {
-    (
-      OneByte(tailIndex(1), "Chain ID"),
-      PublicKeyBytes(tailIndex(2), "Sender's public key"),
-      AddressOrAliasBytes(tailIndex(3), "Contract address or alias"),
-      OptionBytes(tailIndex(4), "Function call", FunctionCallBytes(tailIndex(4), "Function call")),
-      SeqBytes(tailIndex(5), "Payments", PaymentBytes(tailIndex(5), "Payment")),
-      LongBytes(tailIndex(6), "Fee"),
-      OptionBytes(tailIndex(7), "Fee's asset ID", AssetIdBytes(tailIndex(7), "Fee's asset ID"), "flag (1 - asset, 0 - Waves)")
-        .map(_.getOrElse(Waves)),
-      LongBytes(tailIndex(8), "Timestamp"),
-      ProofsBytes(tailIndex(9))
-    ) mapN InvokeScriptTransaction.apply
-  }
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
 }

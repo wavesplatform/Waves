@@ -15,7 +15,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   case class Block(height: Int, baseTarget: Long, miner: KeyPair, timestamp: Long, delay: Long)
 
-  def generationSignature: Array[Byte] = {
+  def genSig: Array[Byte] = {
     val arr = new Array[Byte](32)
     Random.nextBytes(arr)
     arr
@@ -28,7 +28,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   property("Correct consensus parameters distribution of blocks generated with FairPoS") {
 
     val miners = mkMiners
-    val first  = Block(0, defaultBaseTarget, KeyPair(generationSignature), System.currentTimeMillis(), 0)
+    val first  = Block(0, defaultBaseTarget, KeyPair(genSig), System.currentTimeMillis(), 0)
 
     val chain = (1 to 100000 foldLeft NonEmptyList.of(first))((acc, _) => {
       val gg     = acc.tail.lift(1)
@@ -51,7 +51,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   def mineBlock(prev: Block, grand: Option[Block], minerWithBalance: (KeyPair, Long)): Block = {
     val (miner, balance) = minerWithBalance
-    val gs               = generatorSignature(generationSignature, miner)
+    val gs               = generationSignature(genSig, miner)
     val h                = hit(gs)
     val delay            = pos.calculateDelay(h, prev.baseTarget, balance)
     val bt = pos.calculateBaseTarget(
@@ -91,11 +91,11 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
 
   def mkMiners: Map[KeyPair, Long] =
     List(
-      KeyPair(generationSignature) -> 200000000000000L,
-      KeyPair(generationSignature) -> 500000000000000L,
-      KeyPair(generationSignature) -> 1000000000000000L,
-      KeyPair(generationSignature) -> 1500000000000000L,
-      KeyPair(generationSignature) -> 2000000000000000L,
-      KeyPair(generationSignature) -> 2500000000000000L
+      KeyPair(genSig) -> 200000000000000L,
+      KeyPair(genSig) -> 500000000000000L,
+      KeyPair(genSig) -> 1000000000000000L,
+      KeyPair(genSig) -> 1500000000000000L,
+      KeyPair(genSig) -> 2000000000000000L,
+      KeyPair(genSig) -> 2500000000000000L
     ).toMap
 }

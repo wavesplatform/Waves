@@ -95,7 +95,7 @@ trait IntegrationSuiteWithThreeAddresses
       ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     }
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(acc, script, 0.014.waves, System.currentTimeMillis())
+      .selfSigned(1.toByte, acc, script, 0.014.waves, System.currentTimeMillis())
       .right
       .get
     sender

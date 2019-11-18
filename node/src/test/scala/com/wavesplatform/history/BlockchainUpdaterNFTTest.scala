@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
 import org.scalatest._

@@ -14,7 +14,7 @@ import org.scalacheck.Gen
 import play.api.libs.json._
 
 class SetAssetScriptTransactionSpecification extends GenericTransactionSpecification[SetAssetScriptTransaction] {
-  def transactionParser: com.wavesplatform.transaction.TransactionParserFor[SetAssetScriptTransaction] = SetAssetScriptTransaction
+  def transactionParser = SetAssetScriptTransaction
   def updateProofs(tx: SetAssetScriptTransaction, p: Proofs): SetAssetScriptTransaction = {
     tx.copy(proofs = p)
   }
@@ -31,25 +31,32 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
   }
   def jsonRepr: Seq[(JsValue, SetAssetScriptTransaction)] =
     Seq(
-      (Json.parse(
-         s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"feeAssetId":null,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""),
-       SetAssetScriptTransaction
-         .create(
-           AddressScheme.current.chainId,
-           PublicKey.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
-           IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
-           Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
-           78311891L,
-           1868142423132802425L,
-           Proofs(
-             Seq("5sRtXKcdDa",
-                 "9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn",
-                 "",
-                 "3C",
-                 "24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",
-                 "").map(ByteStr.decodeBase58(_).get))
-         )
-         .explicitGet()))
+      (
+        Json.parse(
+          s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"feeAssetId":null,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""
+        ),
+        SetAssetScriptTransaction
+          .create(
+            AddressScheme.current.chainId,
+            PublicKey.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(),
+            IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
+            Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
+            78311891L,
+            1868142423132802425L,
+            Proofs(
+              Seq(
+                "5sRtXKcdDa",
+                "9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn",
+                "",
+                "3C",
+                "24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",
+                ""
+              ).map(ByteStr.decodeBase58(_).get)
+            )
+          )
+          .explicitGet()
+      )
+    )
   def transactionName: String = "SetAssetScriptTransaction"
 
   property("issuer can`t make SetAssetScript tx when Script is Contract") {

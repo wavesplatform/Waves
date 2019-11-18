@@ -87,13 +87,7 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     val entry4 = StringDataEntry("str", "test")
 
     val dtx = DataTransaction
-      .create(
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        List(entry1, entry2, entry3, entry4),
-        100000,
-        1526911531530L,
-        Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get))
-      )
+      .create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get, List(entry1, entry2, entry3, entry4), 100000, 1526911531530L, Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get)))
       .right
       .get
 

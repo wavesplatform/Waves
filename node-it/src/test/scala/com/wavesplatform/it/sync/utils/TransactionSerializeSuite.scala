@@ -104,21 +104,22 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val burnV1 = BurnTransactionV1
+  private val burnV1 = BurnTransaction
     .create(
+      1.toByte,
       publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
       burnFee,
       ts,
-      ByteStr.decodeBase58("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get
+      Proofs(ByteStr.decodeBase58("uapJcAJQryBhWThU43rYgMNmvdT7kY747vx5BBgxr2KvaeTRx8Vsuh4yu1JxBymU9LnAoo1zjQcPrWSuhi6dVPE").get)
     )
     .right
     .get
 
-  private val burnV2 = BurnTransactionV2
+  private val burnV2 = BurnTransaction
     .create(
-      chainId,
+      2.toByte,
       publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       10000000000L,
@@ -154,13 +155,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val data = DataTransaction
-    .create(
-      publicKey,
-      List(IntegerDataEntry("int", 24), BooleanDataEntry("bool", true), BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))),
-      minFee,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get))
-    )
+    .create(1.toByte, publicKey, List(IntegerDataEntry("int", 24), BooleanDataEntry("bool", true), BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))), minFee, ts, Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get)))
     .right
     .get
 
@@ -254,34 +249,27 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   val mass = MassTransferTransaction
-    .create(
-      Waves,
-      publicKey,
-      transfers,
-      ts,
-      2.waves,
-      Base58.tryDecodeWithLimit("59QuUcqP6p").get,
-      Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
-    )
+    .create(1.toByte, publicKey, Waves, transfers, 2.waves, ts, Base58.tryDecodeWithLimit("59QuUcqP6p").get, Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get)))
     .right
     .get
 
-  private val reissueV1 = ReissueTransactionV1
+  private val reissueV1 = ReissueTransaction
     .create(
+      1.toByte,
       publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
       true,
       1.waves,
       ts,
-      ByteStr.decodeBase58("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get
+      Proofs(ByteStr.decodeBase58("3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA").get)
     )
     .right
     .get
 
-  private val reissueV2 = ReissueTransactionV2
+  private val reissueV2 = ReissueTransaction
     .create(
-      chainId,
+      2.toByte,
       publicKey,
       IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get),
       100000000L,
@@ -316,13 +304,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val setscript = SetScriptTransaction
-    .create(
-      publicKey,
-      None,
-      setScriptFee,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
-    )
+    .create(1.toByte, publicKey, None, setScriptFee, ts, Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get)))
     .right
     .get
 
@@ -365,21 +347,12 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
   )
 
   private val invokeScript = InvokeScriptTransaction
-    .create(
-      PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get,
-      PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get,
-      Some(
+    .create(1.toByte, PublicKey.fromBase58String("BqeJY8CP3PeUDaByz57iRekVUGtLxoow4XxPvXfHynaZ").right.get, PublicKey.fromBase58String("Fvk5DXmfyWVZqQVBowUBMwYtRAHDtdyZNNeRrwSjt6KP").right.get, Some(
         Terms.FUNCTION_CALL(
           function = FunctionHeader.User("testfunc"),
           args = List(TRUE)
         )
-      ),
-      Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))),
-      smartMinFee,
-      Waves,
-      ts,
-      Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
-    )
+      ), Seq(InvokeScriptTransaction.Payment(7, IssuedAsset(ByteStr.decodeBase58("73pu8pHFNpj9tmWuYjqnZ962tXzJvLGX86dxjZxGYhoK").get))), smartMinFee, Waves, ts, Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)))
     .right
     .get
 

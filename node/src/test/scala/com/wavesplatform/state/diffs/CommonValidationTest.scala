@@ -50,7 +50,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }
@@ -73,7 +73,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }
@@ -165,12 +165,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (smartAccount)
           Seq(
             SetScriptTransaction
-              .selfSigned(
-                recipientAcc,
-                Some(script),
-                1 * Constants.UnitsInWave,
-                ts
-              )
+              .selfSigned(1.toByte, recipientAcc, Some(script), 1 * Constants.UnitsInWave, ts)
               .explicitGet()
           )
         else Seq.empty
@@ -208,7 +203,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }

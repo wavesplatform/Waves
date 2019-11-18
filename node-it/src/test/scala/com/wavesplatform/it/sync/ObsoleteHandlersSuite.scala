@@ -1,13 +1,11 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.api.http.requests.{
-  BurnV1Request,
   CreateAliasRequest,
   DataRequest,
   LeaseCancelRequest,
   LeaseRequest,
   MassTransferRequest,
-  ReissueV1Request,
   SponsorFeeRequest,
   TransferRequest
 }
@@ -64,12 +62,29 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val issue     = Json.parse(issueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(issue)
 
-    val burnJson = sender.postJson("/assets/burn", BurnV1Request(firstAddress, issue, someAssetAmount / 2, minFee))
-    val burn     = Json.parse(burnJson.getResponseBody).as[Transaction].id
+    val burnJson = sender.postJson(
+      "/assets/burn",
+      Json.obj(
+        "sender"   -> firstAddress,
+        "assetId"  -> issue,
+        "quantity" -> someAssetAmount / 2,
+        "fee"      -> issueFee
+      )
+    )
+    val burn = Json.parse(burnJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(burn)
 
-    val reissueJson = sender.postJson("/assets/reissue", ReissueV1Request(firstAddress, issue, someAssetAmount, true, issueFee))
-    val reissue     = Json.parse(reissueJson.getResponseBody).as[Transaction].id
+    val reissueJson = sender.postJson(
+      "/assets/reissue",
+      Json.obj(
+        "sender"     -> firstAddress,
+        "assetId"    -> issue,
+        "quantity"   -> someAssetAmount,
+        "reissuable" -> true,
+        "fee"        -> issueFee
+      )
+    )
+    val reissue = Json.parse(reissueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(reissue)
 
     val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(firstAddress, issue, Some(100L), sponsorFee))

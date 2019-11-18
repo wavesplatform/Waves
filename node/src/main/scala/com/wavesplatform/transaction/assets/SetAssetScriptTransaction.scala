@@ -57,7 +57,7 @@ case class SetAssetScriptTransaction private (
 
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
 
-  override def checkedAssets(): Seq[IssuedAsset] = Seq(asset)
+  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
   override def version: TxVersion                = 1
 }
 
