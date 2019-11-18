@@ -172,10 +172,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       }(scheduler)
 
     val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
-    def loadBlockAt(height: Int): Option[Block] =
+
+    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
       for {
         id <- blockchainUpdater.blockId(height)
         block <- blockchainUpdater.liquidBlock(id).orElse(history.loadBlockBytes(id).flatMap(bytes => Block.parseBytes(bytes).toOption))
+            .map(b => BlockMeta(b.header, b.signature, height, b.bytes().length, b.transactionData.length, 0L, None) -> b.transactionData)
       } yield block
 
     def loadBlockMetaAt(height: Int): Option[BlockMeta] = None
@@ -195,7 +197,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           case Left(error) => Left(error)
         }
 
-    val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockAt, loadBlockMetaAt)
+    val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
     val cca: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     val csa: CommonAssetsApi   = new CommonAssetsApi(blockchainUpdater)
     val cta: CommonTransactionsApi = CommonTransactionsApi(
@@ -321,7 +323,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, blockchainUpdater, cba),
+        BlocksApiRoute(settings.restAPISettings, cba),
         TransactionsApiRoute(settings.restAPISettings, cta, wallet, blockchainUpdater, Coeval(utxStorage.size), utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),

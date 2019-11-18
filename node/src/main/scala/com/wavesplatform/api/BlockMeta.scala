@@ -4,17 +4,21 @@ import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.block.{BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.Json
 
-case class BlockMeta(header: BlockHeader, size: Int, transactionCount: Int, signature: ByteStr, height: Int) {
+case class BlockMeta(
+    header: BlockHeader,
+    signature: ByteStr,
+    height: Int,
+    size: Int,
+    transactionCount: Int,
+    totalFeeInWaves: Long,
+    reward: Option[Long]
+) {
   def toSignedHeader: SignedBlockHeader = SignedBlockHeader(header, signature)
 
   val json = Coeval.evalOnce {
-    BlockHeaderSerializer.toJson(header, size, transactionCount, signature) ++ Json.obj("height" -> height)
+    BlockHeaderSerializer.toJson(header, size, transactionCount, signature) ++
+      Json.obj("height" -> height, "totalFee" -> totalFeeInWaves) ++ reward.fold(Json.obj())(r => Json.obj("reward" -> r))
   }
-}
-
-object BlockMeta {
-  def json(size: Int, transactionCount: Int, signature: ByteStr): JsObject =
-    Json.obj("signature" -> signature.toString, "blocksize" -> size, "transactionCount" -> transactionCount, "totalFee" -> 0)
 }

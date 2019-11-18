@@ -106,7 +106,7 @@ package object database extends ScorexLogging {
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {
-        case crypto.DigestLength      => new Array[Byte](crypto.DigestLength)
+        case crypto.DigestLength    => new Array[Byte](crypto.DigestLength)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
       b.get(buffer)
@@ -121,7 +121,7 @@ package object database extends ScorexLogging {
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
           b.put(id.arr.length match {
-              case crypto.DigestLength      => crypto.DigestLength.toByte
+              case crypto.DigestLength    => crypto.DigestLength.toByte
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
             .put(id.arr)
@@ -265,8 +265,8 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeBlockInfo(data: BlockMeta): Array[Byte] = {
-    val BlockMeta(bh, size, transactionCount, signature, _) = data
+  def writeBlockMeta(data: BlockMeta): Array[Byte] = {
+    val BlockMeta(bh, signature, _, size, transactionCount, totalFeeInWaves, _) = data
 
     val ndo = newDataOutput()
 
@@ -276,6 +276,7 @@ package object database extends ScorexLogging {
     ndo.writeLong(bh.timestamp)
     ndo.write(bh.reference)
     ndo.writeLong(bh.baseTarget)
+    ndo.writeLong(totalFeeInWaves)
     ndo.write(bh.generationSignature)
 
     if (bh.version == Block.GenesisBlockVersion | bh.version == Block.PlainBlockVersion)
@@ -295,10 +296,10 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readBlockInfo(height: Int)(bs: Array[Byte]): BlockMeta = {
+  def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
     val ndi = newDataInput(bs)
 
-    val size   = ndi.readInt()
+    val size      = ndi.readInt()
     val version   = ndi.readByte()
     val timestamp = ndi.readLong()
 
@@ -306,9 +307,10 @@ package object database extends ScorexLogging {
     ndi.readFully(referenceArr)
 
     val baseTarget = ndi.readLong()
+    val totalFee   = ndi.readLong()
 
     val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig = new Array[Byte](genSigLength)
+    val genSig       = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
@@ -326,7 +328,7 @@ package object database extends ScorexLogging {
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header =  BlockHeader(
+    val header = BlockHeader(
       version,
       timestamp,
       ByteStr(referenceArr),
@@ -337,7 +339,7 @@ package object database extends ScorexLogging {
       rewardVote
     )
 
-    BlockMeta(header, size, transactionCount, ByteStr(signature), height)
+    BlockMeta(header, ByteStr(signature), height, size, transactionCount, totalFee, None)
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum, ByteStr)]) = {
@@ -453,15 +455,13 @@ package object database extends ScorexLogging {
       header.rewardVote
     )
 
-  def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockMetaAt(height)
-
+  def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
-      BlockMeta(header, _, transactionCount, signature, _) <- db.get(headerKey)
-      txs = (0 until transactionCount).toList.flatMap { n =>
+      meta <- db.get(Keys.blockMetaAt(height))
+      txs = (0 until meta.transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }
-      block <- createBlock(header, signature, txs).toOption
+      block <- createBlock(meta.header, meta.signature, txs).toOption
     } yield block
-  }
+
 }

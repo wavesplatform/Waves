@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidBase58, InvalidSignature, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidSignature, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
@@ -97,18 +97,22 @@ package object http extends ApiMarshallers with ScorexLogging {
   val B58Segment: PathMatcher1[ByteStr] = PathMatcher(s"[$Base58Alphabet]+".r)
     .flatMap(str => ByteStr.decodeBase58(str).toOption)
 
-  def base58Segment(requiredLength: Int, error: String => ApiError): PathMatcher1[ByteStr] = Segment.map(str => ByteStr.decodeBase58(str) match {
-    case Success(value) if value.length == requiredLength => value
-    case _ => throw ApiException(error(str))
-  })
+  def base58Segment(requiredLength: Int, error: String => ApiError): PathMatcher1[ByteStr] =
+    Segment.map(
+      str =>
+        ByteStr.decodeBase58(str) match {
+          case Success(value) if value.length == requiredLength => value
+          case _                                                => throw ApiException(error(str))
+        }
+    )
 
   val Signature: PathMatcher1[ByteStr] = base58Segment(crypto.SignatureLength, _ => InvalidSignature)
 
   val AddrSegment: PathMatcher1[Address] = Segment.map { str =>
     (for {
       bytes <- ByteStr.decodeBase58(str).toEither.left.map(t => GenericError(t))
-      addr <- Address.fromBytes(bytes)
-    } yield addr).fold({ ae => println(ae); throw ApiException(ApiError.fromValidationError(ae))}, identity)
+      addr  <- Address.fromBytes(bytes)
+    } yield addr).fold(ae => throw ApiException(ApiError.fromValidationError(ae)), identity)
   }
 
   private val jsonRejectionHandler = RejectionHandler

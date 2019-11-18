@@ -74,7 +74,7 @@ object WavesContext {
         getBinaryByIndexF(version),
         getStringByIndexF(version),
       )
-    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
+    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version)
     val versionSpecificFuncs =
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version))

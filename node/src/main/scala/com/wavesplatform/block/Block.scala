@@ -10,7 +10,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
@@ -45,22 +44,8 @@ case class Block private[block] (
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
 
-  val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
-    val assetFees: Seq[(Asset, Long)] = transactionData.map(_.assetFee)
-    assetFees
-      .map { case (maybeAssetId, vol) => maybeAssetId -> vol }
-      .groupBy(a => a._1)
-      .mapValues((records: Seq[(Asset, Long)]) => records.map(_._2).sum)
-  }.toList.map {
-    case (assetId, feeVolume) =>
-      assetId match {
-        case Waves                  => Portfolio(feeVolume, LeaseBalance.empty, Map.empty)
-        case asset @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(asset -> feeVolume))
-      }
-  }))
-
-  val prevBlockFeePart: Coeval[Portfolio] =
-    Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
+  val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid.combineAll(transactionData.map(_.feeDiff())))
+  val prevBlockFeePart: Coeval[Portfolio] = feesPortfolio.map(total => total.minus(total.multiply(CurrentBlockFeePart)))
 
   private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()

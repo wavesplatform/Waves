@@ -245,7 +245,7 @@ class LevelDBWriter(
           k -> v
         }.toMap
 
-      rw.put(Keys.blockMetaAt(Height(height)), Some(BlockMeta(block.header, block.bytes().length, block.transactionData.size, block.signature, height)))
+      rw.put(Keys.blockMetaAt(Height(height)), Some(BlockMeta(block.header, block.signature, height, block.bytes().length, block.transactionData.size, totalFee, reward)))
       rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
       val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -472,7 +472,7 @@ class LevelDBWriter(
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
-          val BlockMeta(discardedHeader, _, _, discardedSignature, _) = rw
+          val discardedMeta = rw
             .get(Keys.blockMetaAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
@@ -575,7 +575,7 @@ class LevelDBWriter(
           }
 
           rw.delete(Keys.blockMetaAt(h))
-          rw.delete(Keys.heightOf(discardedSignature))
+          rw.delete(Keys.heightOf(discardedMeta.signature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
@@ -587,7 +587,7 @@ class LevelDBWriter(
           }
 
           val hitSource = rw.get(Keys.hitSource(currentHeight)).get
-          val block     = createBlock(discardedHeader, discardedSignature, transactions.map(_._2)).explicitGet()
+          val block     = createBlock(discardedMeta.header, discardedMeta.signature, transactions.map(_._2)).explicitGet()
 
           (block, hitSource)
         }

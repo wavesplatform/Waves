@@ -111,7 +111,7 @@ object Keys {
   val BlockHeaderPrefix: Short = 50
 
   def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo(height), writeBlockInfo)
+    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockMeta(height), writeBlockMeta)
 
   def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
