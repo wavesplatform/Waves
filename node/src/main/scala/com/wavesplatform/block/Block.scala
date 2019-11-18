@@ -7,7 +7,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -19,7 +18,6 @@ import play.api.libs.json._
 
 import scala.util.{Failure, Try}
 
-// todo: (NODE-1972) Add merkle proof
 case class BlockHeader(
     version: Byte,
     timestamp: Long,
@@ -28,10 +26,11 @@ case class BlockHeader(
     generationSignature: ByteStr,
     generator: PublicKey,
     featureVotes: Set[Short],
-    rewardVote: Long
+    rewardVote: Long,
+    merkle: ByteStr
 )
 
-case class Block private[block] (
+case class Block(
     header: BlockHeader,
     signature: ByteStr,
     transactionData: Seq[Transaction]
@@ -63,15 +62,9 @@ case class Block private[block] (
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
-  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
-    if (header.version < ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
-    else PBBlocks.protobuf(copy(signature = ByteStr.empty)).toByteArray
-    // else PBBlocks.protobuf(this).header.get.toByteArray // todo: (NODE-1972) header with merkle proof
-  }
-
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
+    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(this.bytesWithoutSignature()), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -83,19 +76,24 @@ case class Block private[block] (
 
 object Block extends ScorexLogging {
 
-  def build(
+  def create(
       version: Byte,
       timestamp: Long,
       reference: ByteStr,
       baseTarget: Long,
       generationSignature: ByteStr,
-      txs: Seq[Transaction],
       generator: PublicKey,
-      signature: ByteStr,
       featureVotes: Set[Short],
-      rewardVote: Long
-  ): Either[GenericError, Block] =
-    Block(BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote), signature, txs).validate
+      rewardVote: Long,
+      transactionData: Seq[Transaction]
+  ): Block = {
+    val merkle = if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(version, transactionData).rootHash)
+    Block(
+      BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle),
+      ByteStr.empty,
+      transactionData
+    )
+  }
 
   def buildAndSign(
       version: Byte,
@@ -108,7 +106,7 @@ object Block extends ScorexLogging {
       featureVotes: Set[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    build(version, timestamp, reference, baseTarget, generationSignature, txs, signer, ByteStr.empty, featureVotes, rewardVote).map(_.sign(signer))
+    create(version, timestamp, reference, baseTarget, generationSignature, signer, featureVotes, rewardVote, txs).validate.map(_.sign(signer))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     BlockSerializer
@@ -137,7 +135,7 @@ object Block extends ScorexLogging {
       genSig     = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
       reference  = Array.fill(SignatureLength)(-1: Byte)
       timestamp  = genesisSettings.blockTimestamp
-      block <- build(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, txs, generator, ByteStr.empty, Set(), -1L)
+      block <- create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Set(), -1L, txs).validate
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(generator)
         case Some(predefined) => block.copy(signature = predefined)

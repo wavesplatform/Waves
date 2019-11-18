@@ -50,7 +50,8 @@ trait PBImplicitConversions {
         header.generationSignature.toByteStr,
         header.generator.toPublicKey,
         header.featureVotes.map(intToShort).toSet,
-        header.rewardVote
+        header.rewardVote,
+        header.merkle.toByteStr
       )
     }
   }

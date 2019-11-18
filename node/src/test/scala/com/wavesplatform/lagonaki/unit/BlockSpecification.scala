@@ -157,19 +157,17 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(blockGen) {
       case (baseTarget, reference, generationSignature, recipient, transactionData) =>
         val block = Block
-          .build(
+          .create(
             3,
             time,
             reference,
             baseTarget,
             generationSignature,
-            transactionData,
             weakAccount,
-            ByteStr(Array.fill(64)(0: Byte)),
             Set.empty,
-            -1L
-          )
-          .explicitGet()
+            -1L,
+            transactionData
+          ).copy(signature = ByteStr(Array.fill(64)(0: Byte)))
         block.signaturesValid() shouldBe 'left
     }
   }

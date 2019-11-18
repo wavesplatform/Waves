@@ -20,10 +20,11 @@ object PBBlocks {
                featureVotes: Set[Short],
                rewardVote: Long,
                generator: PublicKey,
-               signature: ByteStr): VanillaBlock = {
+               signature: ByteStr,
+               merkle: ByteStr): VanillaBlock = {
       VanillaBlock(
         BlockHeader(
-          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote
+          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle
         ),
         signature,
         transactionData
@@ -43,7 +44,8 @@ object PBBlocks {
         header.featureVotes.map(intToShort).toSet,
         header.rewardVote,
         PublicKey(header.generator.toByteArray),
-        ByteStr(block.signature.toByteArray)
+        ByteStr(block.signature.toByteArray),
+        ByteStr(header.merkle.toByteArray)
       )
     } yield result
   }
@@ -63,7 +65,8 @@ object PBBlocks {
           header.timestamp,
           header.version,
           ByteString.copyFrom(generator),
-          header.rewardVote
+          header.rewardVote,
+          ByteString.copyFrom(header.merkle)
         )),
       ByteString.copyFrom(block.signature),
       transactionData.map(PBTransactions.protobuf)

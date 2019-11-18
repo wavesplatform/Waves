@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 object Validators {
   type Validation[A] = Either[GenericError, A]
 
-  private[block] def validateBlock(b: Block): Validation[Block] =
+  def validateBlock(b: Block): Validation[Block] =
     (for {
       _ <- Either.cond(b.header.reference.arr.length == SignatureLength, (), "Incorrect reference")
       genSigLength = if (b.header.version < ProtoBlockVersion) GenerationSignatureLength else GenerationVRFSignatureLength

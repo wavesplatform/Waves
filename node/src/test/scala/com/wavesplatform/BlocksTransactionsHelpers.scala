@@ -139,24 +139,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         timestamp: Long,
         bTarget: Long = DefaultBaseTarget
     ): Block = {
-      val unsigned: Block = Block(
-        header = BlockHeader(
-          version = version,
-          timestamp = timestamp,
-          reference = reference,
-          baseTarget = bTarget,
-          generationSignature = com.wavesplatform.history.generationSignature,
-          generator = signer,
-          featureVotes = Set.empty,
-          rewardVote = -1L
-        ),
-        signature = ByteStr.empty,
+      val unsigned: Block = Block.create(
+        version = version,
+        timestamp = timestamp,
+        reference = reference,
+        baseTarget = bTarget,
+        generationSignature = com.wavesplatform.history.generationSignature,
+        generator = signer,
+        featureVotes = Set.empty,
+        rewardVote = -1L,
         transactionData = txs
       )
       val toSign =
         if (version < Block.ProtoBlockVersion) unsigned.bytes()
-        else PBBlocks.protobuf(unsigned).toByteArray
-      // else PBBlocks.protobuf(unsigned).header.get.toByteArray // todo: (NODE-1972) header only
+        else PBBlocks.protobuf(unsigned).header.get.toByteArray
       unsigned.copy(signature = ByteStr(crypto.sign(signer, toSign)))
     }
   }

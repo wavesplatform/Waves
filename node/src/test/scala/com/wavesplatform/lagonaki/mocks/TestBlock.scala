@@ -32,7 +32,7 @@ object TestBlock {
         rewardVote = b.header.rewardVote
       )
 
-      x.explicitGet()
+    x.explicitGet()
   }
 
   def create(txs: Seq[Transaction]): Block = create(defaultSigner, txs)
@@ -58,21 +58,18 @@ object TestBlock {
   ): Block =
     sign(
       signer,
-      Block(
-        BlockHeader(
-          timestamp = time,
-          version = version,
-          reference = ref,
-          baseTarget = 2L,
-          generationSignature =
-            if (version < Block.ProtoBlockVersion) ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
-            else ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)),
-          generator = signer,
-          featureVotes = features,
-          rewardVote = rewardVote
-        ),
-        transactionData = txs,
-        signature = ByteStr.empty
+      Block.create(
+        timestamp = time,
+        version = version,
+        reference = ref,
+        baseTarget = 2L,
+        generationSignature =
+          if (version < Block.ProtoBlockVersion) ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
+          else ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)),
+        generator = signer,
+        featureVotes = features,
+        rewardVote = rewardVote,
+        transactionData = txs
       )
     )
 
@@ -88,7 +85,8 @@ object TestBlock {
           randomOfLength(Block.GenerationSignatureLength),
           defaultSigner,
           Set.empty,
-          -1L
+          -1L,
+          ByteStr.empty
         ),
         ByteStr.empty,
         Seq.empty
@@ -98,18 +96,15 @@ object TestBlock {
   def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
     sign(
       defaultSigner,
-      Block(
-        BlockHeader(
-          3.toByte,
-          0,
-          ref,
-          2L,
-          randomOfLength(Block.GenerationSignatureLength),
-          defaultSigner,
-          features,
-          -1L
-        ),
-        ByteStr.empty,
+      Block.create(
+        3.toByte,
+        0,
+        ref,
+        2L,
+        randomOfLength(Block.GenerationSignatureLength),
+        defaultSigner,
+        features,
+        -1L,
         Seq.empty
       )
     )

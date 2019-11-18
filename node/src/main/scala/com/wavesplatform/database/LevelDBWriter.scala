@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -820,8 +820,6 @@ class LevelDBWriter(
 
     val height = Height(h)
 
-    val consensusDataOffset = 1 + 8 + SignatureLength
-
     val headerKey = Keys.blockHeaderBytesAt(height)
 
     def readTransactionBytes(count: Int) = {
@@ -836,18 +834,18 @@ class LevelDBWriter(
 
     db.get(headerKey)
       .map { headerBytes =>
-        val version      = headerBytes.head
-        val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-        // version + timestamp + reference + baseTarget + genSig
-        val txCountOffset      = consensusDataOffset + 8 + genSigLength
-        val bytesBeforeCData   = headerBytes.take(consensusDataOffset)
-        val consensusDataBytes = headerBytes.slice(consensusDataOffset, consensusDataOffset + 40)
+        val version             = headerBytes.head
+        val consensusDataOffset = 1 + Longs.BYTES + SignatureLength // version + timestamp + reference
+        val genSigLength        = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+        val txCountOffset       = consensusDataOffset + Longs.BYTES + genSigLength // baseTarget + genSig
+        val bytesBeforeCData    = headerBytes.take(consensusDataOffset)
+        val consensusDataBytes  = headerBytes.slice(consensusDataOffset, consensusDataOffset + Longs.BYTES + genSigLength)
 
         val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
           val byte = headerBytes(txCountOffset)
           (byte.toInt, Array[Byte](byte))
         } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + 4)
+          val bytes = headerBytes.slice(txCountOffset, txCountOffset + Ints.BYTES)
           (Ints.fromByteArray(bytes), bytes)
         }
 
@@ -855,7 +853,7 @@ class LevelDBWriter(
           if (version > Block.PlainBlockVersion) {
             headerBytes.drop(txCountOffset + txCountBytes.length)
           } else {
-            headerBytes.takeRight(SignatureLength + KeyLength)
+            headerBytes.takeRight(SignatureLength + KeyLength) // featureVotes dropped
           }
 
         val txBytes = txCountBytes ++ readTransactionBytes(txCount)
