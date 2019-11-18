@@ -21,6 +21,7 @@ import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset
@@ -664,11 +665,12 @@ object SyncHttpApi extends Assertions {
                           fee: Long,
                           version: Int = 2,
                           assetId: String = "WAVES",
+                          feeAssetId: String = "WAVES",
                           attachment: ByteString = ByteString.EMPTY,
                           timestamp: Long = System.currentTimeMillis(),
                           waitForTx: Boolean = false
                          ): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment, timestamp)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, feeAssetId, attachment, timestamp)), waitForTx)
     }
 
     def broadcastReissue(source: KeyPair,
@@ -739,6 +741,14 @@ object SyncHttpApi extends Assertions {
 
     def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {
       maybeWaitForTransaction(sync(async(n).grpc.broadcast(tx,proofs)), waitForTx)
+    }
+
+    def broadcastSponsorFee(sender: KeyPair,
+                            minFee: Option[Amount],
+                            fee: Long,
+                            version: Int = 1,
+                            waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastSponsorFee(sender, minFee, fee, version)), waitForTx)
     }
   }
 

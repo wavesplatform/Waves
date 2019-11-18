@@ -814,12 +814,13 @@ object AsyncHttpApi extends Assertions {
                           fee: Long,
                           version: Int = 2,
                           assetId: String = "WAVES",
+                          feeAssetId: String = "WAVES",
                           attachment: ByteString = ByteString.EMPTY,
                           timestamp: Long = System.currentTimeMillis): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
-        Some(Amount.of(ByteString.EMPTY, fee)),
+        Some(Amount.of(if (feeAssetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(feeAssetId)), fee)),
         timestamp,
         version,
         PBTransaction.Data.Transfer(TransferTransactionData.of(
@@ -1006,6 +1007,22 @@ object AsyncHttpApi extends Assertions {
     }
 
     def broadcast(unsignedTx: PBTransaction, proofs: Seq[ByteString]): Future[PBSignedTransaction] = transactions.broadcast(SignedTransaction(Some(unsignedTx), proofs))
+
+    def broadcastSponsorFee(sender: KeyPair,
+                            minFee: Option[Amount],
+                            fee: Long,
+                            version: Int = 1): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(sender.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.SponsorFee(SponsorFeeTransactionData.of(minFee))
+      )
+      val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+    }
 
   }
 }
