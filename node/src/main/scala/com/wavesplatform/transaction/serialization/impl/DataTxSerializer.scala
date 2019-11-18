@@ -20,18 +20,28 @@ object DataTxSerializer {
 
   def bodyBytes(tx: DataTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender,
-      Shorts.toByteArray(data.size.toShort),
-      Bytes.concat(data.view.map(_.toBytes): _*),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version),
+          sender,
+          Shorts.toByteArray(data.size.toShort),
+          Bytes.concat(data.view.map(_.toBytes): _*),
+          Longs.toByteArray(timestamp),
+          Longs.toByteArray(fee)
+        )
+
+      case TxVersion.V2 =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: DataTransaction): Array[Byte] = {
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  def toBytes(tx: DataTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 =>
+      Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+
+    case TxVersion.V2 =>
+      PBTransactionSerializer.toBytesPrefixed(tx)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {
@@ -42,12 +52,18 @@ object DataTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == DataTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
+    require(buf.getByte == 0 && buf.getByte == DataTransaction.typeId, "transaction type mismatch")
 
-    val sender    = buf.getPublicKey
-    val data      = parseDataEntries(buf)
-    val timestamp = buf.getLong // Timestamp before fee
-    val fee       = buf.getLong
-    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs)
+    buf.getByte match {
+      case TxVersion.V1 =>
+        val sender    = buf.getPublicKey
+        val data      = parseDataEntries(buf)
+        val timestamp = buf.getLong // Timestamp before fee
+        val fee       = buf.getLong
+        DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs)
+
+      case TxVersion.V2 =>
+        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), DataTransaction)
+    }
   }
 }

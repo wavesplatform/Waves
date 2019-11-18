@@ -4,8 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -26,7 +25,7 @@ object TransferTxSerializer {
 
   def bodyBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = {
+    lazy val baseBytes = {
       Bytes.concat(
         sender,
         assetId.byteRepr,
@@ -42,6 +41,7 @@ object TransferTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
+      case TxVersion.V3 => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
@@ -50,6 +50,7 @@ object TransferTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx))
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
     }
   }
 
@@ -71,10 +72,16 @@ object TransferTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == TransferTransaction.typeId, "transaction type mismatch")
-      val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
-      val tx     = parseCommonPart(TxVersion.V2, buf)
-      val proofs = buf.getProofs
-      tx.copy(proofs = proofs)
+      bytes(2) match {
+        case TxVersion.V2 =>
+          val buf    = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+          val tx     = parseCommonPart(TxVersion.V2, buf)
+          val proofs = buf.getProofs
+          tx.copy(proofs = proofs)
+
+        case TxVersion.V3 =>
+          PBTransactionSerializer.fromBytesAs(bytes.drop(3), TransferTransaction)
+      }
     } else {
       require(bytes(0) == TransferTransaction.typeId, "transaction type mismatch")
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

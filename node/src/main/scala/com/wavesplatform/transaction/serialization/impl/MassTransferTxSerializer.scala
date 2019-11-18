@@ -30,23 +30,32 @@ object MassTransferTxSerializer {
 
   def bodyBytes(tx: MassTransferTransaction): Array[Byte] = {
     import tx._
-    val transferBytes = transfers
-      .map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
+    version match {
+      case TxVersion.V1 =>
+        val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
 
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender,
-      assetId.byteRepr,
-      Shorts.toByteArray(transfers.size.toShort),
-      Bytes.concat(transferBytes: _*),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee),
-      Deser.serializeArrayWithLength(attachment)
-    )
+        Bytes.concat(
+          Array(builder.typeId, version),
+          sender,
+          assetId.byteRepr,
+          Shorts.toByteArray(transfers.size.toShort),
+          Bytes.concat(transferBytes: _*),
+          Longs.toByteArray(timestamp),
+          Longs.toByteArray(fee),
+          Deser.serializeArrayWithLength(attachment)
+        )
+
+      case TxVersion.V2 =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: MassTransferTransaction): Array[Byte] = {
-    Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
+  def toBytes(tx: MassTransferTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 =>
+      Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
+
+    case TxVersion.V2 =>
+      PBTransactionSerializer.toBytesPrefixed(tx)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
@@ -63,15 +72,21 @@ object MassTransferTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == MassTransferTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
+    require(buf.getByte == MassTransferTransaction.typeId, "transaction type mismatch")
 
-    val sender     = buf.getPublicKey
-    val assetId    = buf.getAsset
-    val transfers  = parseTransfers(buf)
-    val timestamp  = buf.getLong // Timestamp before fee
-    val fee        = buf.getLong
-    val attachment = Deser.parseArrayWithLength(buf)
-    val proofs     = buf.getProofs
-    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, attachment, proofs)
+    buf.getByte match {
+      case TxVersion.V1 =>
+        val sender     = buf.getPublicKey
+        val assetId    = buf.getAsset
+        val transfers  = parseTransfers(buf)
+        val timestamp  = buf.getLong // Timestamp before fee
+        val fee        = buf.getLong
+        val attachment = Deser.parseArrayWithLength(buf)
+        val proofs     = buf.getProofs
+        MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, attachment, proofs)
+
+      case TxVersion.V2 =>
+        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), MassTransferTransaction)
+    }
   }
 }

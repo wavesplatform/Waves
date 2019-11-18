@@ -47,20 +47,30 @@ object InvokeScriptTxSerializer {
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      dAppAddressOrAlias.bytes.arr,
-      Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
-      Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
-      Longs.toByteArray(fee),
-      feeAssetId.byteRepr,
-      Longs.toByteArray(timestamp)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte.get),
+          sender,
+          dAppAddressOrAlias.bytes.arr,
+          Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
+          Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
+          Longs.toByteArray(fee),
+          feeAssetId.byteRepr,
+          Longs.toByteArray(timestamp)
+        )
+
+      case TxVersion.V2 =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: InvokeScriptTransaction): Array[Byte] = {
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  def toBytes(tx: InvokeScriptTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 =>
+      Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+
+    case TxVersion.V2 =>
+      PBTransactionSerializer.toBytesPrefixed(tx)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] = Try {
@@ -72,16 +82,21 @@ object InvokeScriptTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
-    require(buf.getByte == AddressScheme.current.chainId, "chainId mismatch")
+    require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId, "transaction type mismatch")
+    buf.getByte match {
+      case TxVersion.V1 =>
+        require(buf.getByte == AddressScheme.current.chainId, "chainId mismatch")
+        val sender       = buf.getPublicKey
+        val dApp         = buf.getAddressOrAlias
+        val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
+        val payments     = Deser.parseArrays(buf).map(parsePayment)
+        val fee          = buf.getLong
+        val feeAssetId   = buf.getAsset
+        val timestamp    = buf.getLong
+        InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs)
 
-    val sender       = buf.getPublicKey
-    val dApp         = buf.getAddressOrAlias
-    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
-    val payments     = Deser.parseArrays(buf).map(parsePayment)
-    val fee          = buf.getLong
-    val feeAssetId   = buf.getAsset
-    val timestamp    = buf.getLong
-    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs)
+      case TxVersion.V2 =>
+        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), InvokeScriptTransaction)
+    }
   }
 }

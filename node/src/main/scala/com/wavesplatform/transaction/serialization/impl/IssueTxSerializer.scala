@@ -27,7 +27,7 @@ object IssueTxSerializer {
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(
+    lazy val baseBytes = Bytes.concat(
       sender,
       Deser.serializeArrayWithLength(name),
       Deser.serializeArrayWithLength(description),
@@ -48,6 +48,9 @@ object IssueTxSerializer {
           baseBytes,
           Deser.serializeOptionOfArrayWithLength(script)(_.bytes())
         )
+
+      case TxVersion.V3 =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
@@ -56,6 +59,7 @@ object IssueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
     }
   }
 
@@ -76,8 +80,14 @@ object IssueTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == IssueTransaction.typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
-      parseCommonPart(TxVersion.V2, buf).copy(script = buf.getScript, proofs = buf.getProofs)
+      bytes(2) match {
+        case TxVersion.V2 =>
+          val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
+          parseCommonPart(TxVersion.V2, buf).copy(script = buf.getScript, proofs = buf.getProofs)
+
+        case TxVersion.V3 =>
+          PBTransactionSerializer.fromBytesAs(bytes.drop(3), IssueTransaction)
+      }
     } else {
       require(bytes(0) == IssueTransaction.typeId, "transaction type mismatch")
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

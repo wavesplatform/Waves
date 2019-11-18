@@ -21,7 +21,7 @@ object BurnTxSerializer {
 
   def bodyBytes(tx: BurnTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(
+    lazy val baseBytes = Bytes.concat(
       sender,
       asset.id.arr,
       Longs.toByteArray(quantity),
@@ -38,6 +38,9 @@ object BurnTxSerializer {
           Array(builder.typeId, version, chainByte.get),
           baseBytes
         )
+
+      case TxVersion.V3 =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
@@ -46,6 +49,7 @@ object BurnTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
     }
   }
 
@@ -63,8 +67,12 @@ object BurnTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == BurnTransaction.typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
-      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
+      if (bytes(2) >= TxVersion.V3) {
+        PBTransactionSerializer.fromBytesAs(bytes.drop(3), BurnTransaction)
+      } else {
+        val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
+        parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
+      }
     } else {
       require(bytes(0) == BurnTransaction.typeId, "transaction type mismatch")
       val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

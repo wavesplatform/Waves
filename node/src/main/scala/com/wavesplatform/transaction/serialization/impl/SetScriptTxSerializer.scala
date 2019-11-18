@@ -22,30 +22,46 @@ object SetScriptTxSerializer {
 
   def bodyBytes(tx: SetScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte.get),
+          sender,
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
+          Longs.toByteArray(fee),
+          Longs.toByteArray(timestamp)
+        )
+
+      case TxVersion.V2 =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: SetScriptTransaction): Array[Byte] =
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  def toBytes(tx: SetScriptTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 =>
+      Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+
+    case TxVersion.V2 =>
+      PBTransactionSerializer.toBytesPrefixed(tx)
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == SetScriptTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
-    require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
+    require(buf.getByte == 0 && buf.getByte == SetScriptTransaction.typeId, "transaction type mismatch")
+    buf.getByte match {
+      case TxVersion.V1 =>
+        require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
+        val sender    = buf.getPublicKey
+        val script    = buf.getScript
+        val fee       = buf.getLong
+        val timestamp = buf.getLong
+        val proofs    = buf.getProofs
+        SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs)
 
-    val sender    = buf.getPublicKey
-    val script    = buf.getScript
-    val fee       = buf.getLong
-    val timestamp = buf.getLong
-    val proofs    = buf.getProofs
-    SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs)
+      case TxVersion.V2 =>
+        PBTransactionSerializer.fromBytesAs(bytes, SetScriptTransaction)
+    }
   }
 }

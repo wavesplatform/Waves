@@ -23,7 +23,7 @@ object ReissueTxSerializer {
 
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(
+    lazy val baseBytes = Bytes.concat(
       sender,
       asset.id.arr,
       Longs.toByteArray(quantity),
@@ -41,6 +41,9 @@ object ReissueTxSerializer {
           Array(builder.typeId, version, chainByte.get),
           baseBytes
         )
+
+      case TxVersion.V3 =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
@@ -49,6 +52,7 @@ object ReissueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
     }
   }
 
@@ -67,8 +71,14 @@ object ReissueTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == ReissueTransaction.typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
-      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
+      bytes(2) match {
+        case TxVersion.V2 =>
+          val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
+          parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
+
+        case TxVersion.V3 =>
+          PBTransactionSerializer.fromBytesAs(bytes.drop(3), ReissueTransaction)
+      }
     } else {
       require(bytes(0) == ReissueTransaction.typeId, "transaction type mismatch")
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

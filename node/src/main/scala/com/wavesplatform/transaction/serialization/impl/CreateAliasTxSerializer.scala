@@ -19,7 +19,7 @@ object CreateAliasTxSerializer {
   def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
 
-    val base = Bytes.concat(
+    lazy val base = Bytes.concat(
       sender,
       Deser.serializeArrayWithLength(alias.bytes.arr),
       Longs.toByteArray(fee),
@@ -29,6 +29,7 @@ object CreateAliasTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(builder.typeId), base)
       case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version), base)
+      case TxVersion.V3 => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
@@ -38,6 +39,7 @@ object CreateAliasTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
     }
   }
 
@@ -61,6 +63,9 @@ object CreateAliasTxSerializer {
         val timestamp = buf.getLong
         val proofs    = buf.getProofs
         CreateAliasTransaction(Transaction.V2, sender, alias, fee, timestamp, proofs)
+
+      case Array(0, CreateAliasTransaction.typeId, 3) =>
+        PBTransactionSerializer.fromBytesAs(bytes.drop(3), CreateAliasTransaction)
 
       case Array(b1, b2, b3) => throw new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3")
     }

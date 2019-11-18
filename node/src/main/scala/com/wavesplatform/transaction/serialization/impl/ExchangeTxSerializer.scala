@@ -61,6 +61,9 @@ object ExchangeTxSerializer {
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)
         )
+
+      case TxVersion.V3 =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
@@ -69,6 +72,7 @@ object ExchangeTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), proofs.bytes())
+      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
     }
   }
 
@@ -103,8 +107,14 @@ object ExchangeTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == ExchangeTransaction.typeId, "transaction type mismatch")
-      val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
-      parseV2(buf).copy(proofs = buf.getProofs)
+      bytes(2) match {
+        case TxVersion.V2 =>
+          val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+          parseV2(buf).copy(proofs = buf.getProofs)
+
+        case TxVersion.V3 =>
+          PBTransactionSerializer.fromBytesAs(bytes.drop(3), ExchangeTransaction)
+      }
     } else {
       require(bytes(0) == ExchangeTransaction.typeId, "transaction type mismatch")
       val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
