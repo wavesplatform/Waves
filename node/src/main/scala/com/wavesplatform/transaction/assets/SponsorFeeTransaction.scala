@@ -19,7 +19,7 @@ case class SponsorFeeTransaction(
     sender: PublicKey,
     asset: IssuedAsset,
     minSponsoredAssetFee: Option[TxTimestamp],
-    fee: TxTimestamp,
+    fee: TxAmount,
     timestamp: TxTimestamp,
     proofs: Proofs
 ) extends ProvenTransaction
@@ -58,7 +58,7 @@ object SponsorFeeTransaction extends TransactionParserLite {
       sender: PublicKey,
       asset: IssuedAsset,
       minSponsoredAssetFee: Option[TxTimestamp],
-      fee: TxTimestamp,
+      fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
@@ -69,7 +69,7 @@ object SponsorFeeTransaction extends TransactionParserLite {
       sender: PublicKey,
       asset: IssuedAsset,
       minSponsoredAssetFee: Option[TxTimestamp],
-      fee: TxTimestamp,
+      fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
@@ -80,7 +80,7 @@ object SponsorFeeTransaction extends TransactionParserLite {
       sender: KeyPair,
       asset: IssuedAsset,
       minSponsoredAssetFee: Option[TxTimestamp],
-      fee: TxTimestamp,
+      fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransactionT] =
     signed(version, sender, asset, minSponsoredAssetFee, fee, timestamp, sender)
