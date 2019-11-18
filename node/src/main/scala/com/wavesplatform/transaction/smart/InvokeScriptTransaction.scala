@@ -24,7 +24,7 @@ case class InvokeScriptTransaction(
     dAppAddressOrAlias: AddressOrAlias,
     funcCallOpt: Option[FUNCTION_CALL],
     payments: Seq[Payment],
-    fee: TxTimestamp,
+    fee: TxAmount,
     feeAssetId: Asset,
     timestamp: TxTimestamp,
     proofs: Proofs
@@ -62,7 +62,7 @@ object InvokeScriptTransaction extends TransactionParserLite {
   override def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] =
     serializer.parseBytes(bytes)
 
-  case class Payment(amount: Long, assetId: Asset)
+  case class Payment(amount: TxAmount, assetId: Asset)
   object Payment {
     import play.api.libs.json.{Json, _}
     implicit val jsonFormat: Format[Payment] = Json.format
@@ -74,7 +74,7 @@ object InvokeScriptTransaction extends TransactionParserLite {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxTimestamp,
+      fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       proofs: Proofs
@@ -87,7 +87,7 @@ object InvokeScriptTransaction extends TransactionParserLite {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxTimestamp,
+      fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       signer: PrivateKey
@@ -100,7 +100,7 @@ object InvokeScriptTransaction extends TransactionParserLite {
       dappAddress: AddressOrAlias,
       fc: Option[FUNCTION_CALL],
       p: Seq[Payment],
-      fee: TxTimestamp,
+      fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransactionT] =
