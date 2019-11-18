@@ -33,12 +33,16 @@ package object serialization {
       val prefix = buf.get(buf.position())
       prefix match {
         case Address.AddressVersion =>
-          Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
+          getAddress
         case Alias.AddressVersion =>
           val length = buf.getShort(buf.position() + 2)
           Alias.fromBytes(getByteArray(length + 4)).explicitGet()
         case _ => throw new IllegalArgumentException(s"Invalid address or alias prefix: $prefix")
       }
+    }
+
+    def getAddress: Address = {
+      Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
     }
 
     // More explicit name
