@@ -39,7 +39,7 @@ case class SetAssetScriptTransaction(
   override val chainByte: Option[Byte]         = Some(AddressScheme.current.chainId)
 }
 
-object SetAssetScriptTransaction extends TransactionParserLite {
+object SetAssetScriptTransaction extends TransactionParser {
   override type TransactionT = SetAssetScriptTransaction
 
   val typeId: TxType = 15

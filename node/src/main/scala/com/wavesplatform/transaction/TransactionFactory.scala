@@ -284,7 +284,7 @@ object TransactionFactory {
     val typeId  = (jsv \ "type").as[Byte]
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
-    val pf: PartialFunction[TransactionParserLite, Either[ValidationError, Transaction]] = {
+    val pf: PartialFunction[TransactionParser, Either[ValidationError, Transaction]] = {
       case TransferTransaction       => jsv.as[TransferRequest].toTx
       case CreateAliasTransaction    => jsv.as[CreateAliasRequest].toTx
       case LeaseTransaction          => jsv.as[LeaseRequest].toTx

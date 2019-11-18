@@ -382,10 +382,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   def issueReissueBurnGeneratorP(issueQuantity: Long, sender: KeyPair): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
     issueReissueBurnGeneratorP(issueQuantity, issueQuantity, issueQuantity, sender)
 
-  def versionGen(builder: TransactionParser): Gen[Byte] = {
-    Gen.oneOf(builder.supportedVersions.toSeq)
-  }
-
   def createIssue(
       issuer: KeyPair,
       assetName: Array[Byte],

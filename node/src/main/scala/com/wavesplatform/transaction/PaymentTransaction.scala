@@ -27,7 +27,7 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 }
 
-object PaymentTransaction extends TransactionParserLite {
+object PaymentTransaction extends TransactionParser {
   override type TransactionT = PaymentTransaction
 
   override val typeId: TxType                    = 2

@@ -41,7 +41,7 @@ case class ReissueTransaction(
   override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
-object ReissueTransaction extends TransactionParserLite {
+object ReissueTransaction extends TransactionParser {
   override type TransactionT = ReissueTransaction
 
   override val typeId: TxType                         = 5

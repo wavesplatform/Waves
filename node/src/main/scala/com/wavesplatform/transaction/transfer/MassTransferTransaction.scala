@@ -49,7 +49,7 @@ case class MassTransferTransaction(
   }
 }
 
-object MassTransferTransaction extends TransactionParserLite {
+object MassTransferTransaction extends TransactionParser {
   override type TransactionT = MassTransferTransaction
 
   val MaxTransferCount = 100

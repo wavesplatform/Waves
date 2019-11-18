@@ -23,7 +23,7 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 }
 
-object GenesisTransaction extends TransactionParserLite {
+object GenesisTransaction extends TransactionParser {
   override type TransactionT = GenesisTransaction
 
   override val typeId: TxType                    = 1

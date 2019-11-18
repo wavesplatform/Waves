@@ -4,14 +4,14 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.Height
-import com.wavesplatform.transaction.{Transaction, TransactionParserLite}
+import com.wavesplatform.transaction.{Transaction, TransactionParser}
 import monix.reactive.Observable
 
 trait AddressTransactions {
   def addressTransactionsObservable(
-      address: Address,
-      types: Set[TransactionParserLite],
-      fromId: Option[ByteStr] = None
+                                     address: Address,
+                                     types: Set[TransactionParser],
+                                     fromId: Option[ByteStr] = None
   ): Observable[(Height, Transaction)]
 }
 
@@ -24,9 +24,9 @@ object AddressTransactions {
 
   case object Empty extends AddressTransactions {
     override def addressTransactionsObservable(
-        address: Address,
-        types: Set[TransactionParserLite],
-        fromId: Option[BlockId]
+                                                address: Address,
+                                                types: Set[TransactionParser],
+                                                fromId: Option[BlockId]
     ): Observable[(Height, Transaction)] =
       Observable.empty
   }
