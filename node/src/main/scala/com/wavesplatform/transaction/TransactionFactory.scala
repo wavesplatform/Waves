@@ -106,15 +106,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetAssetScriptTransaction.signed(
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        script,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- SetAssetScriptTransaction.signed(1.toByte, sender, IssuedAsset(ByteStr.decodeBase58(request.assetId).get), script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def setAssetScript(request: SetAssetScriptRequest, sender: PublicKey): Either[ValidationError, SetAssetScriptTransaction] =
@@ -123,15 +115,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetAssetScriptTransaction.create(
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        script,
-        request.fee,
-        request.timestamp.getOrElse(0),
-        Proofs.empty
-      )
+      tx <- SetAssetScriptTransaction.create(1.toByte, sender, IssuedAsset(ByteStr.decodeBase58(request.assetId).get), script, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
     } yield tx
 
   def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] =

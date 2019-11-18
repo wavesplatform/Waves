@@ -200,7 +200,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
     ): SetAssetScriptTransaction =
       SetAssetScriptTransaction
-        .signed(AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
+        .signed(1.toByte, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
         .right
         .get
 
@@ -336,20 +336,12 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    val nonIssuerUnsignedTx = SetAssetScriptTransaction(
-      AddressScheme.current.chainId,
-      accountA,
-      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
-      Some(unchangeableScript),
-      setAssetScriptFee + 0.004.waves,
-      System.currentTimeMillis,
-      Proofs.empty
-    )
+    val nonIssuerUnsignedTx = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(unchangeableScript), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty)
 
     val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
 
     val signedTxByB =
-      nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
+      nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)))
 
     val tx =
       sender.signedBroadcast(signedTxByB.json()).id
@@ -357,20 +349,12 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(tx)
 
     //try to change unchangeable script
-    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
-      AddressScheme.current.chainId,
-      accountA,
-      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
-      Some(script),
-      setAssetScriptFee + 0.004.waves,
-      System.currentTimeMillis,
-      Proofs.empty
-    )
+    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(script), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty)
 
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 
     val signedTxByB2 =
-      nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
+      nonIssuerUnsignedTx2.copy(1.toByte, proofs = Proofs(Seq(sigTxB2)))
 
     assertApiError(sender.signedBroadcast(signedTxByB2.json())) { error =>
       error.message shouldBe errNotAllowedByToken

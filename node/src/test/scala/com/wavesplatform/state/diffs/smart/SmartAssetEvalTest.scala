@@ -78,7 +78,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
         .explicitGet()
 
       setAssetScriptTransaction = SetAssetScriptTransaction
-        .signed(AddressScheme.current.chainId, firstAcc, asset, Some(typedScript), 1000, ts + 10, firstAcc)
+        .signed(1.toByte, firstAcc, asset, Some(typedScript), 1000, ts + 10, firstAcc)
         .explicitGet()
 
       assetTransferTransaction = TransferTransaction

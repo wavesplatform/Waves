@@ -282,14 +282,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val setasset = SetAssetScriptTransaction
-    .create(
-      chainId,
-      publicKey,
-      IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
-      Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").right.get),
-      1.waves,
-      ts,
-      Proofs(
+    .create(1.toByte, publicKey, IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get), Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").right.get), 1.waves, ts, Proofs(
         Seq(
           "5sRtXKcdDa",
           "9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn",
@@ -298,8 +291,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
           "24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",
           ""
         ).map(ByteStr.decodeBase58(_).get)
-      )
-    )
+      ))
     .right
     .get
 

@@ -145,7 +145,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   } yield (
     Seq(issue),
     SetAssetScriptTransaction
-      .create(AddressScheme.current.chainId, sender, IssuedAsset(issue.id()), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
+      .create(1.toByte, sender, IssuedAsset(issue.id()), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp, proofs)
       .explicitGet()
   )
 

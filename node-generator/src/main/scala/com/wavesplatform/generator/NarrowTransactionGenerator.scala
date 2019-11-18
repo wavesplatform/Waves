@@ -308,14 +308,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
                 script = Gen.script(complexity = false, estimator)
                 tx <- logOption(
-                  SetAssetScriptTransaction.selfSigned(
-                    AddressScheme.current.chainId,
-                    sender,
-                    IssuedAsset(assetTx.id()),
-                    Some(script),
-                    100400000L,
-                    timestamp
-                  )
+                  SetAssetScriptTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetTx.id()), Some(script), 100400000L, timestamp)
                 )
               } yield tx
             ).logNone("There is no issued smart assets, may be you need to increase issue transaction's probability or pre-configure them")
