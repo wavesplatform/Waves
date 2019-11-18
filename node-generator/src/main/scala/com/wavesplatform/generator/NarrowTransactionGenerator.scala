@@ -218,14 +218,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 }
                 tx <- logOption(
                   MassTransferTransaction
-                    .selfSigned(
-                      Asset.fromCompatId(asset),
-                      sender,
-                      transfers.toList,
-                      timestamp,
-                      100000L + 50000L * transferCount + 400000L,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
-                    )
+                    .selfSigned(1.toByte, sender, Asset.fromCompatId(asset), transfers.toList, 100000L + 50000L * transferCount + 400000L, timestamp, Array.fill(random.nextInt(100))(random.nextInt().toByte))
                 )
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
@@ -249,7 +242,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
             }
             val size = 128 + data.map(_.toBytes.length).sum
             val fee  = 500000L * (size / 1024 + 1)
-            logOption(DataTransaction.selfSigned(sender, data.toList, fee, timestamp))
+            logOption(DataTransaction.selfSigned(1.toByte, sender, data.toList, fee, timestamp))
 
           case SponsorFeeTransaction =>
             (

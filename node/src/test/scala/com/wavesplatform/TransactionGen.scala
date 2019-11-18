@@ -299,7 +299,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   def massTransferGeneratorP(sender: KeyPair, transfers: List[ParsedTransfer], assetId: Asset): Gen[MassTransferTransaction] =
     for {
       (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-    } yield MassTransferTransaction.selfSigned(assetId, sender, transfers, timestamp, feeAmount, attachment).explicitGet()
+    } yield MassTransferTransaction.selfSigned(1.toByte, sender, assetId, transfers, feeAmount, timestamp, attachment).explicitGet()
 
   def createWavesTransfer(
       sender: KeyPair,
@@ -352,7 +352,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         amount    <- Gen.choose(1L, Long.MaxValue / maxTransfersCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.selfSigned(assetId, sender, recipients, timestamp, feeAmount, attachment).explicitGet()
+    } yield MassTransferTransaction.selfSigned(1.toByte, sender, assetId, recipients, feeAmount, timestamp, attachment).explicitGet()
   }
 
   val createAliasGen: Gen[CreateAliasTransaction] =
@@ -882,13 +882,13 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       uniq = data.foldRight(List.empty[DataEntry[_]]) { (e, es) =>
         if (es.exists(_.key == e.key)) es else e :: es
       }
-    } yield DataTransaction.selfSigned(sender, uniq, 15000000, timestamp).explicitGet())
+    } yield DataTransaction.selfSigned(1.toByte, sender, uniq, 15000000, timestamp).explicitGet())
       .label("DataTransaction")
 
   def dataTransactionGenP(sender: KeyPair, data: List[DataEntry[_]]): Gen[DataTransaction] =
     (for {
       timestamp <- timestampGen
-    } yield DataTransaction.selfSigned(sender, data, 15000000, timestamp).explicitGet())
+    } yield DataTransaction.selfSigned(1.toByte, sender, data, 15000000, timestamp).explicitGet())
       .label("DataTransactionP")
 
   def preconditionsTransferAndLease(typed: EXPR): Gen[(GenesisTransaction, SetScriptTransaction, LeaseTransaction, TransferTransaction)] =

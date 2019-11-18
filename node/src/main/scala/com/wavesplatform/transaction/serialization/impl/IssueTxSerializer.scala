@@ -29,8 +29,8 @@ object IssueTxSerializer {
     import tx._
     val baseBytes = Bytes.concat(
       sender,
-      Deser.serializeArray(name),
-      Deser.serializeArray(description),
+      Deser.serializeArrayWithLength(name),
+      Deser.serializeArrayWithLength(description),
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),

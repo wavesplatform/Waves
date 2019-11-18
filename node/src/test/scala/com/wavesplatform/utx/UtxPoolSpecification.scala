@@ -123,7 +123,7 @@ class UtxPoolSpecification
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
     val txs = for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
-      .selfSigned(Waves, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte])
+      .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), Array.empty[Byte])
       .explicitGet()
     txs.label("transferWithRecipient")
   }

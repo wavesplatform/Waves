@@ -49,29 +49,13 @@ object TransactionFactory {
       sender    <- wallet.findPrivateKey(request.sender)
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
-      tx <- MassTransferTransaction.signed(
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        sender,
-        transfers,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        signer
-      )
+      tx <- MassTransferTransaction.signed(1.toByte, sender, Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)), transfers, request.fee, request.timestamp.getOrElse(time.getTimestamp()), request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray), signer)
     } yield tx
 
   def massTransferAsset(request: MassTransferRequest, sender: PublicKey): Either[ValidationError, MassTransferTransaction] =
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
-      tx <- MassTransferTransaction.create(
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        sender,
-        transfers,
-        0,
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        Proofs.empty
-      )
+      tx <- MassTransferTransaction.create(1.toByte, sender, Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)), transfers, request.fee, 0, request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray), Proofs.empty)
     } yield tx
 
   def setScript(request: SetScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, SetScriptTransaction] =
@@ -262,23 +246,11 @@ object TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- DataTransaction.signed(
-        sender,
-        request.data,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- DataTransaction.signed(1.toByte, sender, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =
-    DataTransaction.create(
-      sender,
-      request.data,
-      request.fee,
-      request.timestamp.getOrElse(0),
-      Proofs.empty
-    )
+    DataTransaction.create(1.toByte, sender, request.data, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
 
   def invokeScript(request: InvokeScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
     invokeScript(request, wallet, request.sender, time)

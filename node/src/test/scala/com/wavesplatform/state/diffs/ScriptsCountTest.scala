@@ -127,16 +127,16 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       assetScript = SetAssetScriptTransaction
         .create(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
-      data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
+      data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
         .selfSigned(2.toByte, master, acc, Waves, 10000000000L, Waves, fee, ByteStr(Array()), timestamp)
         .explicitGet()
       tr2 = TransferTransaction
         .selfSigned(2.toByte, master, acc, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, ByteStr(Array()), timestamp)
         .explicitGet()
-      mt1 = MassTransferTransaction.selfSigned(Waves, master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array())).explicitGet()
+      mt1 = MassTransferTransaction.selfSigned(1.toByte, master, Waves, List(ParsedTransfer(acc, 1)), fee, timestamp, ByteStr(Array())).explicitGet()
       mt2 = MassTransferTransaction
-        .selfSigned(IssuedAsset(issueScr.id()), master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array()))
+        .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc, 1)), fee, timestamp, ByteStr(Array()))
         .explicitGet()
       l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
       lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()
@@ -249,16 +249,16 @@ class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with 
       assetScript = SetAssetScriptTransaction
         .create(AddressScheme.current.chainId, master, IssuedAsset(issueScr.id()), Some(allAllowed), fee, timestamp, Proofs.empty)
         .explicitGet()
-      data = DataTransaction.selfSigned(master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
+      data = DataTransaction.selfSigned(1.toByte, master, List(BooleanDataEntry("q", true)), 15000000, timestamp).explicitGet()
       tr1 = TransferTransaction
         .selfSigned(2.toByte, master, acc, Waves, 10000000000L, Waves, fee, ByteStr(Array()), timestamp)
         .explicitGet()
       tr2 = TransferTransaction
         .selfSigned(2.toByte, master, acc, IssuedAsset(issueScr.id()), 1000000000L, Waves, fee, ByteStr(Array()), timestamp)
         .explicitGet()
-      mt1 = MassTransferTransaction.selfSigned(Waves, master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array())).explicitGet()
+      mt1 = MassTransferTransaction.selfSigned(1.toByte, master, Waves, List(ParsedTransfer(acc, 1)), fee, timestamp, ByteStr(Array())).explicitGet()
       mt2 = MassTransferTransaction
-        .selfSigned(IssuedAsset(issueScr.id()), master, List(ParsedTransfer(acc, 1)), timestamp, fee, ByteStr(Array()))
+        .selfSigned(1.toByte, master, IssuedAsset(issueScr.id()), List(ParsedTransfer(acc, 1)), fee, timestamp, ByteStr(Array()))
         .explicitGet()
       l  = LeaseTransaction.selfSigned(2.toByte, master, acc, 1, fee, timestamp).explicitGet()
       lc = LeaseCancelTransaction.selfSigned(2.toByte, master, l.id(), fee, timestamp + 1).explicitGet()

@@ -24,9 +24,6 @@ object TxConstraints {
   def cond(cond: => Boolean, err: => ValidationError): ValidatedNV =
     if (cond) Valid(()) else Invalid(err).toValidatedNel
 
-  def tryDo(cond: => Unit, err: => ValidationError): ValidatedNV =
-    if (Try(cond).isSuccess) Valid(()) else Invalid(err).toValidatedNel
-
   def fee(fee: Long): ValidatedV[Long] = {
     Validated
       .condNel(
@@ -55,7 +52,7 @@ object TxConstraints {
   }
 
   def noOverflow(amounts: Long*): ValidatedV[Long] = {
-    Try(amounts.tail.fold(amounts.head)(Math.addExact))
+    Try(amounts.fold(0L)(Math.addExact))
       .fold[ValidatedV[Long]](
         _ => TxValidationError.OverflowError.invalidNel,
         _.validNel

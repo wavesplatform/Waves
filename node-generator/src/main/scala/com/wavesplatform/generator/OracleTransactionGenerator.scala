@@ -31,7 +31,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
         .explicitGet()
 
     val setDataTx: Transaction = DataTransaction
-      .selfSigned(oracle, settings.requiredData.toList, enoughFee, System.currentTimeMillis())
+      .selfSigned(1.toByte, oracle, settings.requiredData.toList, enoughFee, System.currentTimeMillis())
       .explicitGet()
 
     val now = System.currentTimeMillis()

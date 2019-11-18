@@ -1083,11 +1083,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       val massTransfer =
         MassTransferTransaction
           .selfSigned(
-            assetId = IssuedAsset(issueTx2.id()),
+            1.toByte,
             sender = buyer,
+            assetId = IssuedAsset(issueTx2.id()),
             transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)),
+            fee = 1000L,
             genesisTimestamp + 1000L,
-            feeAmount = 1000L,
             Array.empty[Byte]
           )
           .explicitGet()
