@@ -33,10 +33,8 @@ object SetAssetScriptTxSerializer {
     )
   }
 
-  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
-    import tx._
-    Bytes.concat(Array(0: Byte), bodyBytes(tx), proofs.bytes())
-  }
+  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] =
+    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[SetAssetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")
