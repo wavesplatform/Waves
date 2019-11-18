@@ -280,15 +280,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
 
             logOption(
-              InvokeScriptTransaction.selfSigned(
-                sender,
-                GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
-                maybeFunctionCall,
-                Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)),
-                5300000L,
-                Waves,
-                timestamp
-              )
+              InvokeScriptTransaction.selfSigned(1.toByte, sender, GeneratorSettings.toKeyPair(script.dappAccount).toAddress, maybeFunctionCall, Seq(InvokeScriptTransaction.Payment(random.nextInt(5000), asset)), 5300000L, Waves, timestamp)
             )
 
           case SetScriptTransaction =>
@@ -296,12 +288,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               sender <- randomFrom(accounts)
               script = Gen.script(complexity = false, estimator)
               tx <- logOption(
-                SetScriptTransaction.selfSigned(
-                  sender,
-                  Some(script),
-                  1400000L + random.nextLong(100),
-                  timestamp
-                )
+                SetScriptTransaction.selfSigned(1.toByte, sender, Some(script), 1400000L + random.nextLong(100), timestamp)
               )
             } yield tx
 

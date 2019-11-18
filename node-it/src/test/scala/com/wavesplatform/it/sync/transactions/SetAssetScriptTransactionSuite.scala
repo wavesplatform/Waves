@@ -309,9 +309,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val accountA = pkByAddress(firstAddress)
 
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(
-        accountA,
-        Some(
+      .selfSigned(1.toByte, accountA, Some(
           ScriptCompiler(
             s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
                 |match tx {
@@ -322,10 +320,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             isAssetScript = false,
             estimator
           ).explicitGet()._1
-        ),
-        setScriptFee,
-        System.currentTimeMillis()
-      )
+        ), setScriptFee, System.currentTimeMillis())
       .right
       .get
 

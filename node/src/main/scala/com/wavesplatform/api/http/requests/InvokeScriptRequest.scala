@@ -119,15 +119,6 @@ case class SignedInvokeScriptRequest(
       _feeAssetId  <- parseBase58ToAssetId(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       _proofBytes  <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs      <- Proofs.create(_proofBytes)
-      t <- InvokeScriptTransaction.create(
-        _sender,
-        _dappAddress,
-        call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
-        payment.getOrElse(Seq()),
-        fee,
-        _feeAssetId,
-        timestamp,
-        _proofs
-      )
+      t <- InvokeScriptTransaction.create(1.toByte, _sender, _dappAddress, call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)), payment.getOrElse(Seq()), fee, _feeAssetId, timestamp, _proofs)
     } yield t
 }

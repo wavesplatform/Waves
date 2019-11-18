@@ -141,13 +141,7 @@ object PBTransactions {
         vt.assets.SetAssetScriptTransaction.create(1.toByte, sender, IssuedAsset(assetId), script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction.create(
-          sender,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.smart.SetScriptTransaction.create(1.toByte, sender, script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
 
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         for {
@@ -211,6 +205,7 @@ object PBTransactions {
           _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
 
           tx <- vt.smart.InvokeScriptTransaction.create(
+            1.toByte,
             sender,
             dApp,
             fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
@@ -298,14 +293,7 @@ object PBTransactions {
         vt.assets.SetAssetScriptTransaction(1.toByte, sender, IssuedAsset(assetId), script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction(
-          chainId,
-          sender,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
-          feeAmount,
-          timestamp,
-          proofs
-        )
+        vt.smart.SetScriptTransaction(1.toByte, sender, script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
 
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         vt.lease.LeaseTransaction(version.toByte, sender, recipient.toAddressOrAlias.explicitGet(), amount, feeAmount, timestamp, proofs)
@@ -350,7 +338,7 @@ object PBTransactions {
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
-          chainId,
+          1.toByte,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser

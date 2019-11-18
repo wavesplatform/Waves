@@ -24,6 +24,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
       address   <- Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU")
       proof     <- ByteStr.decodeBase58("4scXzk4WiKMXG8p7V6J2pmznNZCgMjADbbZPSDGg28YLMKgshBmNFNzgYg2TwfKN3wMtgLiNQB77iQQZkH3roUyJ").toEither
       tx <- InvokeScriptTransaction.create(
+        1.toByte,
         sender = publicKey,
         dappAddress = address,
         fc = Some(FUNCTION_CALL(User("func"), List(CONST_STRING("param").explicitGet(), CONST_LONG(1)))),
