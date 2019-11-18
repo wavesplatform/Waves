@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -18,9 +17,6 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
 
   override val builder             = PaymentTransaction
   override val id: Coeval[ByteStr] = Coeval.evalOnce(signature)
-  private val hashBytes: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(Array(builder.typeId), Longs.toByteArray(timestamp), sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee))
-  )
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
