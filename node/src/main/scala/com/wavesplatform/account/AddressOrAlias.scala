@@ -1,7 +1,6 @@
 package com.wavesplatform.account
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
@@ -44,7 +43,7 @@ object AddressOrAlias {
         Address.fromBytes(addressBytes)
 
       case Alias.AddressVersion =>
-        val chainId = buf.get
+        val chainId    = buf.get
         val aliasBytes = Deser.parseArrayWithLength(buf)
         Alias.createWithChainId(new String(aliasBytes, "UTF-8"), chainId)
 

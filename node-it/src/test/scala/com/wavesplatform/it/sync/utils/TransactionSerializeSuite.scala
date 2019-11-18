@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.utils
 
-import com.wavesplatform.account.{Address, AddressScheme, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -25,7 +25,6 @@ import scorex.crypto.encode.Base64
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   private val publicKey         = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
-  private val chainId: Byte     = AddressScheme.current.chainId
   private val ts: Long          = 1526287561757L
   private val tsOrderFrom: Long = 1526992336241L
   private val tsOrderTo: Long   = 1529584336241L
@@ -155,7 +154,14 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val data = DataTransaction
-    .create(1.toByte, publicKey, List(IntegerDataEntry("int", 24), BooleanDataEntry("bool", true), BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))), minFee, ts, Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get)))
+    .create(
+      1.toByte,
+      publicKey,
+      List(IntegerDataEntry("int", 24), BooleanDataEntry("bool", true), BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))),
+      minFee,
+      ts,
+      Proofs(Seq(ByteStr.decodeBase58("32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94").get))
+    )
     .right
     .get
 
@@ -249,7 +255,16 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   val mass = MassTransferTransaction
-    .create(1.toByte, publicKey, Waves, transfers, 2.waves, ts, Base58.tryDecodeWithLimit("59QuUcqP6p").get, Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get)))
+    .create(
+      1.toByte,
+      publicKey,
+      Waves,
+      transfers,
+      2.waves,
+      ts,
+      Base58.tryDecodeWithLimit("59QuUcqP6p").get,
+      Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
+    )
     .right
     .get
 
@@ -282,7 +297,14 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   private val setasset = SetAssetScriptTransaction
-    .create(1.toByte, publicKey, IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get), Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").right.get), 1.waves, ts, Proofs(
+    .create(
+      1.toByte,
+      publicKey,
+      IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get),
+      Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").right.get),
+      1.waves,
+      ts,
+      Proofs(
         Seq(
           "5sRtXKcdDa",
           "9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn",
@@ -291,7 +313,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
           "24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",
           ""
         ).map(ByteStr.decodeBase58(_).get)
-      ))
+      )
+    )
     .right
     .get
 

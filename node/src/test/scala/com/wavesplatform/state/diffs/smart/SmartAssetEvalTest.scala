@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.smart
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.{Expression, V3}
 import com.wavesplatform.lang.script.v1.ExprScript

@@ -6,7 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.FunctionHeader.User
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING, FUNCTION_CALL}
-import com.wavesplatform.lang.v1.evaluator.{ScriptResult, ScriptResultV3}
+import com.wavesplatform.lang.v1.evaluator.ScriptResultV3
 import com.wavesplatform.lang.v1.traits.domain.DataItem.Lng
 import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Recipient}
 import com.wavesplatform.transaction.Asset.Waves
@@ -49,9 +49,11 @@ class TraceResultJsonTest extends PropSpec with Matchers {
           ScriptResultV3(
             List(Lng("3FVV4W61poEVXEbFfPG1qfJhJxJ7Pk4M2To", 700000000)),
             List(AssetTransfer(Recipient.Address(tx.dAppAddressOrAlias.bytes), 1, None))
-          )),
+          )
+        ),
         vars
-      ))
+      )
+    )
 
     val result = TracedResult(Right(tx), trace)
 
@@ -99,7 +101,7 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         |  "timestamp" : 1111
         |}""".stripMargin
 
-   Json.prettyPrint(result.loggedJson) shouldBe
+    Json.prettyPrint(result.loggedJson) shouldBe
       """{
         |  "senderPublicKey" : "9utotH1484Hb1WdAHuAKLjuGAmocPZg7jZDtnc35MuqT",
         |  "fee" : 10000000,
@@ -164,7 +166,8 @@ class TraceResultJsonTest extends PropSpec with Matchers {
         tx.funcCall,
         Left(TxValidationError.ScriptExecutionError(reason, vars, isAssetScript = false)),
         vars
-      ))
+      )
+    )
     val scriptExecutionError = ScriptExecutionError(tx, reason, isTokenScript = false)
 
     val result = TracedResult(Left(scriptExecutionError), trace)

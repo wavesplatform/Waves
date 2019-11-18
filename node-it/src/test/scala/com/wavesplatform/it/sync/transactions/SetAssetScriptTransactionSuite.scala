@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -336,7 +335,15 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    val nonIssuerUnsignedTx = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(unchangeableScript), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty)
+    val nonIssuerUnsignedTx = SetAssetScriptTransaction(
+      1.toByte,
+      accountA,
+      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
+      Some(unchangeableScript),
+      setAssetScriptFee + 0.004.waves,
+      System.currentTimeMillis,
+      Proofs.empty
+    )
 
     val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
 
@@ -349,7 +356,15 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(tx)
 
     //try to change unchangeable script
-    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(script), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty)
+    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
+      1.toByte,
+      accountA,
+      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
+      Some(script),
+      setAssetScriptFee + 0.004.waves,
+      System.currentTimeMillis,
+      Proofs.empty
+    )
 
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 
