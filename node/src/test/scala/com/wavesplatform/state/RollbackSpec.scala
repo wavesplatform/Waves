@@ -46,7 +46,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case 2 =>
         List(
           MassTransferTransaction
-            .selfSigned(Waves, sender, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), nextTs, 10000, Array.empty[Byte])
+            .selfSigned(1.toByte, sender, Waves, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), 10000, nextTs, Array.empty[Byte])
             .explicitGet()
         )
       case _ => List(TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1000, Array.empty[Byte], nextTs).right.get)

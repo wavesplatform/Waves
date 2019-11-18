@@ -299,7 +299,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   def massTransferGeneratorP(sender: KeyPair, transfers: List[ParsedTransfer], assetId: Asset): Gen[MassTransferTransaction] =
     for {
       (_, _, _, _, timestamp, _, feeAmount, attachment) <- transferParamGen
-    } yield MassTransferTransaction.selfSigned(assetId, sender, transfers, timestamp, feeAmount, attachment).explicitGet()
+    } yield MassTransferTransaction.selfSigned(1.toByte, sender, assetId, transfers, feeAmount, timestamp, attachment).explicitGet()
 
   def createWavesTransfer(
       sender: KeyPair,
@@ -352,7 +352,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         amount    <- Gen.choose(1L, Long.MaxValue / maxTransfersCount)
       } yield ParsedTransfer(recipient, amount)
       recipients <- Gen.listOfN(transferCount, transferGen)
-    } yield MassTransferTransaction.selfSigned(assetId, sender, recipients, timestamp, feeAmount, attachment).explicitGet()
+    } yield MassTransferTransaction.selfSigned(1.toByte, sender, assetId, recipients, feeAmount, timestamp, attachment).explicitGet()
   }
 
   val createAliasGen: Gen[CreateAliasTransaction] =

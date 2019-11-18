@@ -185,11 +185,12 @@ object PBTransactions {
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
-          PBAmounts.toVanillaAssetId(mt.assetId),
+          1.toByte,
           sender,
+          PBAmounts.toVanillaAssetId(mt.assetId),
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
-          timestamp,
           feeAmount,
+          timestamp,
           mt.attachment.toByteArray,
           proofs
         )
@@ -347,11 +348,12 @@ object PBTransactions {
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
-          PBAmounts.toVanillaAssetId(mt.assetId),
+          1.toByte,
           sender,
+          PBAmounts.toVanillaAssetId(mt.assetId),
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
-          timestamp,
           feeAmount,
+          timestamp,
           mt.attachment.toByteArray,
           proofs
         )
@@ -456,13 +458,13 @@ object PBTransactions {
         val data = LeaseCancelTransactionData(leaseId)
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.LeaseCancel(data))
 
-      case tx @ MassTransferTransaction(assetId, sender, transfers, timestamp, fee, attachment, proofs) =>
+      case tx @ MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs) =>
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
           attachment: ByteStr
         )
-        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.MassTransfer(data))
+        PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
 
       case tx @ vt.DataTransaction(version, sender, data, fee, timestamp, proofs) =>
         val txData = DataTransactionData(data.map(toPBDataEntry))

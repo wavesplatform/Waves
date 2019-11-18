@@ -249,15 +249,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .get
 
   val mass = MassTransferTransaction
-    .create(
-      Waves,
-      publicKey,
-      transfers,
-      ts,
-      2.waves,
-      Base58.tryDecodeWithLimit("59QuUcqP6p").get,
-      Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
-    )
+    .create(1.toByte, publicKey, Waves, transfers, 2.waves, ts, Base58.tryDecodeWithLimit("59QuUcqP6p").get, Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get)))
     .right
     .get
 

@@ -35,7 +35,7 @@ object TransferTxSerializer {
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
         recipient.bytes.arr,
-        Deser.serializeArray(attachment)
+        Deser.serializeArrayWithLength(attachment)
       )
     }
 

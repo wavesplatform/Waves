@@ -75,11 +75,11 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsigned =
       MassTransferTransaction
-        .create(Waves, notMiner.publicKey, transfers, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfers, calcMassTransferFee(2) + smartFee, currTime, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
 
     val accountSig = ByteStr(crypto.sign(notMiner.privateKey, unsigned.bodyBytes()))
-    val signed     = unsigned.copy(proofs = Proofs(Seq(accountSig)))
+    val signed     = unsigned.copy(1.toByte, proofs = Proofs(Seq(accountSig)))
     val toUsersID  = notMiner.signedBroadcast(signed.json(), waitForTx = true).id
 
     //make transfer with incorrect time
@@ -90,10 +90,10 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsignedToGov =
       MassTransferTransaction
-        .create(Waves, notMiner.publicKey, transfersToGov, currTime, calcMassTransferFee(2) + smartFee, Array.emptyByteArray, Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, currTime, Array.emptyByteArray, Proofs.empty)
         .explicitGet()
     val accountSigToGovFail = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGov.bodyBytes()))
-    val signedToGovFail     = unsignedToGov.copy(proofs = Proofs(Seq(accountSigToGovFail)))
+    val signedToGovFail     = unsignedToGov.copy(1.toByte, proofs = Proofs(Seq(accountSigToGovFail)))
 
     assertBadRequestAndResponse(
       notMiner.signedBroadcast(signedToGovFail.json()),
@@ -105,17 +105,11 @@ class MassTransferSmartContractSuite extends BaseTransactionSuite with CancelAft
 
     val unsignedToGovSecond =
       MassTransferTransaction
-        .create(Waves,
-                notMiner.publicKey,
-                transfersToGov,
-                System.currentTimeMillis(),
-                calcMassTransferFee(2) + smartFee,
-                Array.emptyByteArray,
-                Proofs.empty)
+        .create(1.toByte, notMiner.publicKey, Waves, transfersToGov, calcMassTransferFee(2) + smartFee, System.currentTimeMillis(), Array.emptyByteArray, Proofs.empty)
         .explicitGet()
 
     val accountSigToGov = ByteStr(crypto.sign(notMiner.privateKey, unsignedToGovSecond.bodyBytes()))
-    val signedToGovGood = unsignedToGovSecond.copy(proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
+    val signedToGovGood = unsignedToGovSecond.copy(1.toByte, proofs = Proofs(Seq(accountSigToGov, ByteStr(Base58.tryDecodeWithLimit(toUsersID).get))))
     notMiner.signedBroadcast(signedToGovGood.json(), waitForTx = true).id
   }
 }
