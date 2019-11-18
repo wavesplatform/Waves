@@ -93,8 +93,8 @@ package object utils {
 
   def compilerContext(ds: DirectiveSet): CompilerContext = lazyContexts(ds.copy(imports = Imports()))().compilerContext
 
-  val defaultDecompilerContext: DecompilerContext =
-    lazyContexts(DirectiveSet(V3, Account, DApp).explicitGet())().decompilerContext
+  def getDecompilerContext(v: StdLibVersion): DecompilerContext =
+    lazyContexts(DirectiveSet(v, Account, DApp).explicitGet())().decompilerContext
 
   def varNames(version: StdLibVersion, cType: ContentType): Set[String] =
     compilerContext(version, cType, isAssetScript = false).varDefs.keySet
