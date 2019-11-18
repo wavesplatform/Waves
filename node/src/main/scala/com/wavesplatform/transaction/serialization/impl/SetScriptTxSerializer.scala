@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -40,6 +41,7 @@ object SetScriptTxSerializer {
 
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == SetScriptTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
+    require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
 
     val sender    = buf.getPublicKey
     val script    = buf.getScript
