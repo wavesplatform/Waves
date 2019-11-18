@@ -82,7 +82,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield SetScriptTransaction.selfSigned(from, Some(script), FeeAmount, timestamp).explicitGet()
+      } yield SetScriptTransaction.selfSigned(1.toByte, from, Some(script), FeeAmount, timestamp).explicitGet()
 
     def invokeScript(
         from: KeyPair,

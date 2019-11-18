@@ -76,7 +76,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val script = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(smart, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(1.toByte, smart, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val sstx = sender.signedBroadcast(setScriptTransaction.json()).id

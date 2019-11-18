@@ -284,12 +284,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
               sender <- randomFrom(accounts)
               script = Gen.script(complexity = false, estimator)
               tx <- logOption(
-                SetScriptTransaction.selfSigned(
-                  sender,
-                  Some(script),
-                  1400000L + random.nextLong(100),
-                  timestamp
-                )
+                SetScriptTransaction.selfSigned(1.toByte, sender, Some(script), 1400000L + random.nextLong(100), timestamp)
               )
             } yield tx
 

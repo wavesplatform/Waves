@@ -45,7 +45,7 @@ class BigStringSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(acc0, Some(script), setScriptFee, System.currentTimeMillis())
+      .selfSigned(1.toByte, acc0, Some(script), setScriptFee, System.currentTimeMillis())
       .explicitGet()
 
     val setScriptId = sender

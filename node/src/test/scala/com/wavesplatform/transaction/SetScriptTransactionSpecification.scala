@@ -12,7 +12,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
   def transactionParser = SetScriptTransaction
 
   def updateProofs(tx: SetScriptTransaction, p: Proofs): SetScriptTransaction = {
-    tx.copy(proofs = p)
+    tx.copy(1.toByte, proofs = p)
   }
 
   def assertTxs(first: SetScriptTransaction, second: SetScriptTransaction): Unit = {
@@ -47,13 +47,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
                        }
     """),
         SetScriptTransaction
-          .create(
-            PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-            None,
-            100000,
-            1526983936610L,
-            Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
-          )
+          .create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), None, 100000, 1526983936610L, Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get)))
           .right
           .get
       )
@@ -64,8 +58,8 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
   property("SetScriptTransaction id doesn't depend on proof (spec)") {
     forAll(accountGen, proofsGen, proofsGen, contractOrExpr) {
       case (acc: KeyPair, proofs1, proofs2, script) =>
-        val tx1 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs1).explicitGet()
-        val tx2 = SetScriptTransaction.create(acc, Some(script), 1, 1, proofs2).explicitGet()
+        val tx1 = SetScriptTransaction.create(1.toByte, acc, Some(script), 1, 1, proofs1).explicitGet()
+        val tx2 = SetScriptTransaction.create(1.toByte, acc, Some(script), 1, 1, proofs2).explicitGet()
         tx1.id() shouldBe tx2.id()
     }
   }

@@ -69,13 +69,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.signed(
-        sender,
-        script,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- SetScriptTransaction.signed(1.toByte, sender, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
@@ -84,13 +78,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.create(
-        sender,
-        script,
-        request.fee,
-        0,
-        Proofs.empty
-      )
+      tx <- SetScriptTransaction.create(1.toByte, sender, script, request.fee, 0, Proofs.empty)
     } yield tx
 
   def setAssetScript(
