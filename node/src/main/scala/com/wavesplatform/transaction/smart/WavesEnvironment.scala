@@ -1,11 +1,9 @@
 package com.wavesplatform.transaction.smart
 
-import com.google.common.io.ByteStreams
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
@@ -19,8 +17,6 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
-
-import scala.util.Try
 
 object WavesEnvironment {
   type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
@@ -136,66 +132,5 @@ class WavesEnvironment(
       generator = blockH.generator.toAddress.bytes,
       generatorPublicKey = ByteStr(blockH.generator)
     )
-  }
-
-  override def blockHeaderParser(bytes: Array[Byte]): Option[domain.BlockHeader] =
-    Try {
-      val (header, transactionCount, signature) = readHeaderOnly(bytes)
-
-      domain.BlockHeader(
-        header.timestamp,
-        header.version,
-        header.reference,
-        header.generator.toAddress.bytes,
-        header.generator.bytes,
-        signature,
-        header.baseTarget,
-        header.generationSignature,
-        transactionCount,
-        header.featureVotes.map(_.toLong).toSeq.sorted
-      )
-    }.toOption
-
-  private def readHeaderOnly(bytes: Array[Byte]): (BlockHeader, Int, ByteStr) = {
-    val ndi = ByteStreams.newDataInput(bytes)
-
-    val version   = ndi.readByte()
-    val timestamp = ndi.readLong()
-
-    val referenceArr = new Array[Byte](crypto.SignatureLength)
-    ndi.readFully(referenceArr)
-
-    val baseTarget = ndi.readLong()
-
-    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig       = new Array[Byte](genSigLength)
-    ndi.readFully(genSig)
-
-    val transactionCount = {
-      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
-      else ndi.readInt()
-    }
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-
-    val rewardVote = if (version > 3) ndi.readLong() else -1L
-
-    val generator = new Array[Byte](crypto.KeyLength)
-    ndi.readFully(generator)
-
-    val signature = new Array[Byte](crypto.SignatureLength)
-    ndi.readFully(signature)
-
-    val header = BlockHeader(
-      version,
-      timestamp,
-      referenceArr,
-      baseTarget,
-      genSig,
-      PublicKey(ByteStr(generator)),
-      featureVotes,
-      rewardVote
-    )
-    (header, transactionCount, ByteStr(signature))
   }
 }

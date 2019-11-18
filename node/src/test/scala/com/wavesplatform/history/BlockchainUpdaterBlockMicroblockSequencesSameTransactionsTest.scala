@@ -4,11 +4,11 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -110,7 +110,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
 
   def g(totalTxs: Int, totalScenarios: Int): Gen[(Block, Seq[(BlockAndMicroblockSequence, Block)])] =
     for {
-      aaa @ (accs, miner, genesis, ts)      <- accsAndGenesis()
+      (accs, miner, genesis, ts)            <- accsAndGenesis()
       payments: Seq[TransferTransaction]    <- randomPayments(accs, ts, totalTxs)
       intSeqs: Seq[BlockAndMicroblockSizes] <- randomSequences(totalTxs, totalScenarios)
     } yield {

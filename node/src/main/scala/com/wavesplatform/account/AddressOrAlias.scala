@@ -1,7 +1,7 @@
 package com.wavesplatform.account
+
 import java.nio.ByteBuffer
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser

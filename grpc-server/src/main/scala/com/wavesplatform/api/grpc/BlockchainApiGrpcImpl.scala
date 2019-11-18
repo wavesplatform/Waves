@@ -1,4 +1,5 @@
 package com.wavesplatform.api.grpc
+
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.features.FeatureProvider._

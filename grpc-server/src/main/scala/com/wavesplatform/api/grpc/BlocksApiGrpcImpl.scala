@@ -2,10 +2,12 @@ package com.wavesplatform.api.grpc
 
 import com.google.protobuf.empty.Empty
 import com.google.protobuf.wrappers.UInt32Value
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
 import com.wavesplatform.protobuf.block.PBBlock
+import com.wavesplatform.transaction.Transaction
 import io.grpc.stub.StreamObserver
 import io.grpc.{Status, StatusRuntimeException}
 import monix.execution.Scheduler
@@ -13,6 +15,7 @@ import monix.execution.Scheduler
 import scala.concurrent.Future
 
 class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) extends BlocksApiGrpc.BlocksApi {
+  import BlocksApiGrpcImpl._
 
   override def getCurrentHeight(request: Empty): Future[UInt32Value] = {
     Future.successful(UInt32Value(commonApi.currentHeight))
@@ -25,7 +28,8 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
       if (request.includeTransactions)
         commonApi
           .blocksRange(request.fromHeight, request.toHeight)
-          .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) } else
+          .map(toBlockWithHeight)
+      else
         commonApi
           .metaRange(request.fromHeight, request.toHeight)
           .map { meta =>
@@ -43,13 +47,13 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
       case Request.BlockId(blockId) =>
         commonApi
           .block(blockId)
-          .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) }
+          .map(toBlockWithHeight)
 
       case Request.Height(height) =>
         val actualHeight = if (height > 0) height else commonApi.currentHeight + height
         commonApi
           .blockAtHeight(actualHeight)
-          .map(block => BlockWithHeight(Some(block.toPB), actualHeight))
+          .map(toBlockWithHeight)
 
       case Request.Reference(_) =>
         throw new StatusRuntimeException(Status.UNIMPLEMENTED)
@@ -60,5 +64,11 @@ class BlocksApiGrpcImpl(commonApi: CommonBlocksApi)(implicit sc: Scheduler) exte
 
     val finalResult = if (request.includeTransactions) result else result.map(_.update(_.block.transactions := Nil))
     finalResult.explicitGetErr(BlockDoesNotExist)
+  }
+}
+
+object BlocksApiGrpcImpl {
+  private def toBlockWithHeight(v: (BlockMeta, Seq[Transaction])) = {
+    BlockWithHeight(Some(PBBlock(Some(v._1.header.toPBHeader), v._1.signature.toPBByteString, v._2.map(_.toPB))), v._1.height)
   }
 }

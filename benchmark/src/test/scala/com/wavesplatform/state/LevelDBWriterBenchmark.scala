@@ -43,7 +43,7 @@ class LevelDBWriterBenchmark {
   }
 
   @Benchmark
-  def readBlockHeader_test(st: BlocksByIdSt, bh: Blackhole): Unit = {
+  def readBlockHeader_test(st: BlocksByHeightSt, bh: Blackhole): Unit = {
     bh.consume(st.db.blockHeader(st.allBlocks.random).get)
   }
 
@@ -68,6 +68,11 @@ object LevelDBWriterBenchmark {
   @State(Scope.Benchmark)
   class BlocksByIdSt extends BaseSt {
     val allBlocks: Vector[ByteStr] = load("blocksById", benchSettings.blocksFile)(x => ByteStr(Base58.tryDecodeWithLimit(x).get))
+  }
+
+  @State(Scope.Benchmark)
+  class BlocksByHeightSt extends BaseSt {
+    val allBlocks: Vector[Int] = load("blocksByHeight", benchSettings.blocksFile)(_.toInt)
   }
 
   @State(Scope.Benchmark)

@@ -11,9 +11,9 @@ import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest}
+import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
-import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
@@ -212,7 +212,7 @@ object SyncHttpApi extends Assertions {
     def assetsDetails(assetId: String, fullInfo: Boolean = false): AssetInfo =
       sync(async(n).assetsDetails(assetId, fullInfo))
 
-    def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
+    def addressScriptInfo(address: String): AddressScriptInfo =
       sync(async(n).scriptInfo(address))
 
     def assetsBalance(address: String): FullAssetsInfo =

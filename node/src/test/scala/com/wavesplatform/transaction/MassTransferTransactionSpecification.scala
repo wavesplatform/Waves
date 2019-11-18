@@ -1,14 +1,13 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.{TransactionGen, crypto}
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.api.http.requests.SignedMassTransferRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, ParsedTransfer, Transfer}
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.{TransactionGen, crypto}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json

@@ -3,7 +3,6 @@ package com.wavesplatform.api.grpc
 import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountsApi
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -46,8 +45,12 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
   }
 
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
-    val desc = commonApi.script(request.address.toAddress)
-    ScriptData(desc.script.getOrElse(ByteStr.empty).toPBByteString, desc.scriptText.getOrElse(""), desc.complexity)
+    commonApi.script(request.address.toAddress) match {
+      case None => ScriptData()
+      case Some((script, complexity)) =>
+        ScriptData(script.bytes().toPBByteString, script.expr.toString, complexity)
+
+    }
   }
 
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =

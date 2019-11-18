@@ -79,6 +79,8 @@ class BlockchainUpdaterImpl(
   @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
 
+  def bestLiquidDiffAndFees: Option[(Diff, Long, Long)] = readLock(ngState.map(_.bestLiquidDiffAndFees))
+
   override val settings: BlockchainSettings = wavesSettings.blockchainSettings
 
   override def isLastBlockId(id: ByteStr): Boolean = readLock {
@@ -87,8 +89,6 @@ class BlockchainUpdaterImpl(
 
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
 
-  private def displayFeatures(s: Set[Short]): String =
-    s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = leveldb.height + 1
@@ -396,8 +396,6 @@ class BlockchainUpdaterImpl(
           .foreach(assetId => spendableBalanceChanged.onNext(addr -> assetId))
     }
   }
-
-  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
 
   override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = writeLock {
     ngState match {
@@ -711,6 +709,11 @@ class BlockchainUpdaterImpl(
 }
 
 object BlockchainUpdaterImpl {
+  private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
+
+  private def displayFeatures(s: Set[Short]): String =
+    s"FEATURE${if (s.size > 1) "S" else ""} ${s.mkString(", ")} ${if (s.size > 1) "have been" else "has been"}"
+
   def areVersionsOfSameBlock(b1: Block, b2: Block): Boolean =
     b1.header.generator == b2.header.generator &&
       b1.header.baseTarget == b2.header.baseTarget &&

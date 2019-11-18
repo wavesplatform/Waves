@@ -22,7 +22,7 @@ import com.wavesplatform.api.grpc.{
 }
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
-import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
+import com.wavesplatform.api.http.ConnectReq
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.ActivationStatus
@@ -204,8 +204,8 @@ object AsyncHttpApi extends Assertions {
 
     def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
 
-    def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
-      get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
+    def scriptInfo(address: String): Future[AddressScriptInfo] =
+      get(s"/addresses/scriptInfo/$address").as[AddressScriptInfo]
 
     def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo(txId).transform {
       case Success(tx)                                          => Success(Some(tx))
