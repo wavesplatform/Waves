@@ -4,6 +4,7 @@ import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{BaseGlobal, Serde}
 
 object ScriptReader {
@@ -12,12 +13,18 @@ object ScriptReader {
 
   val checksumLength = 4
 
-  def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
-    val checkSum         = bytes.takeRight(checksumLength)
-    val computedCheckSum = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
-
+  def fromBytes(inBytes: Array[Byte]): Either[ScriptParseError, Script] = {
     for {
-      versionByte <- bytes.headOption.toRight(ScriptParseError("Can't parse empty script bytes"))
+      serVersionByte <- inBytes.headOption.toRight(ScriptParseError("Can't parse empty script bytes"))
+      (versionByte, bytes) <- if (serVersionByte < 4) {
+        Right((serVersionByte, inBytes))
+      } else {
+        Serde.deserialize(inBytes.drop(1), all=false).map({
+          case (CONST_LONG(len), rest) =>
+              val bytes = inBytes.takeRight(rest).take(len.toInt)
+              (bytes.head, bytes)
+              }).left.map({e => ScriptParseError(e.toString)})
+      }
       a <- {
         val contentTypes   = DirectiveDictionary[ContentType].idMap
         val stdLibVersions = DirectiveDictionary[StdLibVersion].idMap
@@ -36,9 +43,13 @@ object ScriptReader {
         }
       }
       (scriptType, stdLibVersion, offset) = a
-      scriptBytes                         = bytes.drop(offset).dropRight(checksumLength)
+      checkedBytes                        = bytes.dropRight(checksumLength)
 
+      checkSum         = bytes.takeRight(checksumLength)
+      computedCheckSum = Global.secureHash(checkedBytes).take(checksumLength)
       _ <- Either.cond(java.util.Arrays.equals(checkSum, computedCheckSum), (), ScriptParseError("Invalid checksum"))
+
+      scriptBytes                         = checkedBytes.drop(offset)
       s <- (scriptType match {
         case Expression | Library =>
           for {

@@ -214,6 +214,7 @@ object InvokeScriptTransactionDiff {
               .flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
               },
+            List() /*XXX*/,
             reissues,
             burns
           )
@@ -352,7 +353,7 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(issue: Issue): TracedResult[ValidationError, Diff] =
-        AssetTransactionsDiff.issue(blockchain)(InvokeScriptIssueTransaction.create(tx.chainId, dAppAddress, issue.name, issue.description, issue.quantity, issue.decimals, issue.reissuable, issue.script, tx.timestamp))
+        InvokeScriptIssueTransaction.create(tx.chainId, ??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, tx.timestamp).flatMap(AssetTransactionsDiff.issue(blockchain))
 
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
         val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)

@@ -10,7 +10,7 @@ import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, CONST_LONG}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
@@ -91,13 +91,21 @@ trait BaseGlobal {
 
   def serializeExpression(expr: EXPR, stdLibVersion: StdLibVersion): Array[Byte] = {
     val s = Array(stdLibVersion.id.toByte) ++ Serde.serialize(expr)
-    s ++ checksum(s)
+    if (stdLibVersion.id >= 4) {
+      Array[Byte](4) ++ Serde.serialize(CONST_LONG(s.size + 4)) ++ s ++ checksum(s)
+    } else {
+      s ++ checksum(s)
+    }
   }
 
   def serializeContract(c: DApp, stdLibVersion: StdLibVersion): Either[String, Array[Byte]] =
     ContractSerDe.serialize(c)
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
-      .map(r => r ++ checksum(r))
+      .map(r => if (stdLibVersion.id >= 4) {
+        Array[Byte](4) ++ Serde.serialize(CONST_LONG(r.size + 4)) ++ r ++ checksum(r)
+      } else {
+        r ++ checksum(r)
+      })
 
   val compileExpression =
     compile(_, _, _, _, _, ExpressionCompiler.compile)
