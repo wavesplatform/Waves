@@ -36,12 +36,7 @@ object GenesisTransaction extends TransactionParser {
     serializer.parseBytes(bytes)
 
   def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
-    val typeBytes      = Ints.toByteArray(typeId) // ???
-    val timestampBytes = Longs.toByteArray(timestamp)
-    val amountBytes    = Longs.toByteArray(amount)
-    val amountFill     = new Array[Byte](Longs.BYTES - amountBytes.length)
-
-    val payload = Bytes.concat(typeBytes, timestampBytes, recipient.bytes.arr, Bytes.concat(amountFill, amountBytes))
+    val payload = Bytes.concat(Ints.toByteArray(typeId), Longs.toByteArray(timestamp), recipient.bytes, Longs.toByteArray(amount))
     val hash    = crypto.fastHash(payload)
     Bytes.concat(hash, hash)
   }
