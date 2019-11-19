@@ -127,6 +127,8 @@ object CommonValidation {
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 
+      case p: LegacyPBSwitch if p.isProtobufVersion => ???
+
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
         activationBarrier(BlockchainFeatures.SmartAccountTrading).flatMap { tx =>

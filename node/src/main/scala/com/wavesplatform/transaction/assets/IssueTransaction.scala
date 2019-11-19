@@ -9,17 +9,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  Proofs,
-  ProvenTransaction,
-  SigProofsSwitch,
-  TransactionParser,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
+import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, ProvenTransaction, SigProofsSwitch, TransactionParser, TxType, TxVersion, TxWithFee, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -42,7 +32,8 @@ case class IssueTransaction(
     with ProvenTransaction
     with FastHashId
     with SigProofsSwitch
-    with TxWithFee.InWaves {
+    with TxWithFee.InWaves
+with LegacyPBSwitch.V3 {
 
   override def builder = IssueTransaction
 

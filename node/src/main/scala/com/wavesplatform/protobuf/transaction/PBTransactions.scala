@@ -452,7 +452,7 @@ object PBTransactions {
 
         val data = InvokeScriptTransactionData(
           Some(PBRecipients.create(dappAddress)),
-          ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
+          ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(fcOpt)(Serde.serialize(_))),
           payment.map(p => (p.assetId, p.amount): Amount)
         )
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 1, proofs, Data.InvokeScript(data))

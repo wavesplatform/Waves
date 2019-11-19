@@ -25,7 +25,8 @@ case class SponsorFeeTransaction(
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V2 {
 
   override val builder: SponsorFeeTransaction.type = SponsorFeeTransaction
 

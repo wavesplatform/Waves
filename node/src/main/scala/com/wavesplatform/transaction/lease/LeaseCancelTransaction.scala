@@ -8,6 +8,7 @@ import com.wavesplatform.transaction.serialization.impl.LeaseCancelTxSerializer
 import com.wavesplatform.transaction.validation.impl.LeaseCancelTxValidator
 import com.wavesplatform.transaction.{
   FastHashId,
+  LegacyPBSwitch,
   Proofs,
   SigProofsSwitch,
   TransactionParser,
@@ -34,8 +35,9 @@ final case class LeaseCancelTransaction(
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
-    with FastHashId {
-  override def builder: TransactionParser      = LeaseCancelTransaction
+    with FastHashId
+    with LegacyPBSwitch.V3 {
+  override def builder: TransactionParser          = LeaseCancelTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTransaction.serializer.toJson(this))

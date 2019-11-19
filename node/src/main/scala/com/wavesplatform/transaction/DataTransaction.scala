@@ -17,7 +17,8 @@ case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[Data
     extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V2 {
 
   //noinspection TypeAnnotation
   override val builder = DataTransaction
