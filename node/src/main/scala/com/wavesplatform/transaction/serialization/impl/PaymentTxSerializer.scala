@@ -16,10 +16,22 @@ object PaymentTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj("recipient" -> recipient.stringRepr, "amount" -> amount)
   }
 
+  def hashBytes(tx: PaymentTransaction): Array[Byte] = {
+    import tx._
+    Bytes.concat(
+      Array(builder.typeId),
+      Longs.toByteArray(timestamp),
+      sender,
+      recipient.bytes.arr,
+      Longs.toByteArray(amount),
+      Longs.toByteArray(fee)
+    )
+  }
+
   def bodyBytes(tx: PaymentTransaction): Array[Byte] = {
     import tx._
     Bytes.concat(
-      Ints.toByteArray(builder.typeId),
+      Ints.toByteArray(builder.typeId), // 4 bytes
       Longs.toByteArray(timestamp),
       sender,
       recipient.bytes.arr,
@@ -29,7 +41,7 @@ object PaymentTxSerializer {
   }
 
   def toBytes(tx: PaymentTransaction): Array[Byte] = {
-    Bytes.concat(this.bodyBytes(tx), tx.signature)
+    Bytes.concat(this.hashBytes(tx), tx.signature)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[PaymentTransaction] = Try {
