@@ -75,7 +75,12 @@ class SponsorFeeTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val sponsoredAssetMinFee = Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAssetId)), token))
     sender.grpc.broadcastSponsorFee(alice, sponsoredAssetMinFee, fee = sponsorFee, waitForTx = true)
 
-    //cancel sponsorship by sponsor None amount of sponsored asset
+    /**
+      * Cancel sponsorship by sponsor None amount of sponsored asset.
+      * As it is optional to pass all parameters to PB objects (Amount(assetId: ByteString, amount: Long) in this case),
+      * we can simply pass unspecific (None) amount by creating Amount(assetId: ByteString). SponsorFeeTransaction with
+      * that kind of Amount will cancel sponsorship.
+    **/
     val sponsoredAssetNullMinFee = Some(Amount(ByteString.copyFrom(Base58.decode(sponsoredAssetId))))
     sender.grpc.broadcastSponsorFee(alice, sponsoredAssetNullMinFee, fee = sponsorFee, waitForTx = true)
 
