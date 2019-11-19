@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 trait LegacyPBSwitch { self: VersionedTransaction =>
   def protobufVersion: TxVersion
+  def lastVersion: TxVersion = protobufVersion
   def isProtobufVersion: Boolean = self.version >= protobufVersion
 }
 
