@@ -108,9 +108,12 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
   def atHeaderOnly: Route = (path("headers" / "at" / IntNumber) & get)(at(_, includeTransactions = false))
 
   private def at(height: Int, includeTransactions: Boolean): StandardRoute = complete {
-    if (includeTransactions)
-      commonApi.blockAtHeight(height).map { case (meta, txs) => meta.json() ++ Json.obj("transactions" -> Json.toJson(txs)) } else
+    if (includeTransactions) {
+      commonApi.blockAtHeight(height).map { case (meta, txs) => meta.json() ++ Json.obj("transactions" -> Json.toJson(txs)) }
+    } else {
+      log.debug(s"${commonApi.metaAtHeight(height)}")
       commonApi.metaAtHeight(height).map(_.json())
+    }
   }
 
   @Path("/seq/{from}/{to}")

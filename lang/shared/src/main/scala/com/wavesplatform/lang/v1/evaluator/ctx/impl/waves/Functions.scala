@@ -464,28 +464,4 @@ object Functions {
           }
       }
     }
-
-//  val parseBlockHeaderF: BaseFunction[Environment] =
-//    NativeFunction.withEnvironment[Environment](
-//      "parseBlockHeader",
-//      100,
-//      BLOCKHEADER_FROM_BYTES,
-//      UNION.create(UNIT :: blockHeader :: Nil),
-//      ("blockHeaderBytes", BYTESTR)
-//    ) {
-//      new ContextfulNativeFunction[Environment] {
-//        override def apply[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-//          input match {
-//            case (env, CONST_BYTESTR(headerBytes) :: Nil) =>
-//              val maybeHeaderObj =
-//                env
-//                  .blockHeaderParser(headerBytes)
-//                  .map(Bindings.blockHeaderObject)
-//
-//              fromOptionCO(maybeHeaderObj).asRight[ExecutionError].pure[F]
-//
-//            case (_, xs) => notImplemented[F](s"parseBlockHeader(u: ByteVector)", xs)
-//          }
-//      }
-//    }
 }

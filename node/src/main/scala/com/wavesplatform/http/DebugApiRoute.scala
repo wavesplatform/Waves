@@ -3,13 +3,18 @@ package com.wavesplatform.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.NotUsed
+import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
+import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
+import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.{Flow, Source}
+import akka.util.ByteString
 import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonTransactionsApi
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block.BlockId
@@ -46,9 +51,8 @@ case class DebugApiRoute(
     time: Time,
     blockchain: Blockchain with NG,
     wallet: Wallet,
+    accountsApi: CommonAccountsApi,
     transactionsApi: CommonTransactionsApi,
-    portfolio: Address => Portfolio,
-    wavesDistribution: Int => Map[Address, Long],
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
@@ -133,7 +137,7 @@ case class DebugApiRoute(
       Address.fromString(rawAddress) match {
         case Left(_) => complete(InvalidAddress)
         case Right(address) =>
-          val base = portfolio(address)
+          val base = Portfolio.empty.copy(assets = accountsApi.portfolio(address))
           val p    = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
           complete(Json.toJson(p))
       }
@@ -163,11 +167,30 @@ case class DebugApiRoute(
     }))
   }
 
+  private implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
+    EntityStreamingSupport.json().withFramingRenderer(Flow[ByteString].intersperse(ByteString("{"), ByteString(","), ByteString("}")))
+  private implicit val balanceAsJson: Marshaller[(Address, Long), ByteString] = Marshaller.strict[(Address, Long), ByteString] {
+    case (address, balance) =>
+      Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => {
+        ByteString(s""""${address.stringRepr}": $balance""")
+      })
+  }
+
+  private def distribution(height: Int): Route = extractScheduler { implicit s =>
+    val assetDistribution: Source[(Address, Long), NotUsed] = Source.fromPublisher(
+      accountsApi
+        .wavesDistribution(height)
+        .toReactivePublisher
+    )
+
+    complete(assetDistribution)
+  }
+
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(wavesDistribution(blockchain.height).map { case (a, b) => a.stringRepr -> b })
+    distribution(blockchain.height)
   }
 
   @Path("/stateWaves/{height}")
@@ -178,7 +201,7 @@ case class DebugApiRoute(
     )
   )
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(wavesDistribution(height).map { case (a, b) => a.stringRepr -> b })
+    distribution(height)
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
@@ -426,7 +449,7 @@ case class DebugApiRoute(
             .invokeScriptResults(address, None, Set.empty, limit, afterOpt)
             .map {
               case (height, Right((ist, isr))) => ist.json() ++ Json.obj("height" -> height, "stateChanges" -> isr)
-              case (height, Left(tx)) => tx.json() ++ Json.obj("height" -> height)
+              case (height, Left(tx))          => tx.json() ++ Json.obj("height"  -> height)
             }
         }
       }

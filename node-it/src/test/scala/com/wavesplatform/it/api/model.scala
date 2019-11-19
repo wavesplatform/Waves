@@ -12,8 +12,7 @@ import scala.util.{Failure, Success}
 case class UnexpectedStatusCodeException(requestMethod: String, requestUrl: String, statusCode: Int, responseBody: String)
     extends Exception(s"Request: $requestMethod $requestUrl; Unexpected status code ($statusCode): $responseBody")
 
-case class GrpcStatusRuntimeException(status: GrpcStatus, metaData: Metadata) extends
-  Exception(s"$status $metaData")
+case class GrpcStatusRuntimeException(status: GrpcStatus, metaData: Metadata) extends Exception(s"$status $metaData")
 
 case class Status(blockchainHeight: Int, stateHeight: Int, updatedTimestamp: Long, updatedDate: String)
 object Status {
@@ -220,7 +219,7 @@ case class Block(
     timestamp: Long,
     generator: String,
     transactions: Seq[Transaction],
-    fee: Long,
+    totalFee: Long,
     features: Option[Seq[Short]],
     reward: Option[Long],
     desiredReward: Option[Long],

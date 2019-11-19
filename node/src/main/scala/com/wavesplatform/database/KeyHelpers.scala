@@ -10,7 +10,7 @@ object KeyHelpers {
   def h(prefix: Short, height: Int): Array[Byte] =
     ByteBuffer.allocate(6).putShort(prefix).putInt(height).array()
 
-  def hBytes(prefix: Short, height: Int, bytes: Array[Byte]): Array[Byte] =
+  def hBytes(prefix: Short, bytes: Array[Byte], height: Int): Array[Byte] =
     ByteBuffer.allocate(6 + bytes.length).putShort(prefix).put(bytes).putInt(height).array()
 
   def bytes(prefix: Short, bytes: Array[Byte]): Array[Byte] =
@@ -20,7 +20,7 @@ object KeyHelpers {
 
   def hash(prefix: Short, hashBytes: ByteStr): Array[Byte] = bytes(prefix, hashBytes.arr)
 
-  def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, height, addressId.toByteArray)
+  def hAddr(prefix: Short, height: Int, addressId: BigInt): Array[Byte] = hBytes(prefix, addressId.toByteArray, height)
 
   def hNum(prefix: Short, height: Int, num: TxNum): Array[Byte] = bytes(prefix, Ints.toByteArray(height) ++ Shorts.toByteArray(num))
 

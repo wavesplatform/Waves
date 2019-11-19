@@ -19,8 +19,6 @@ import monix.eval.Coeval
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.util.Success
-
 @Path("/transactions")
 @Api(value = "/transactions")
 case class TransactionsApiRoute(
@@ -76,14 +74,10 @@ case class TransactionsApiRoute(
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-      path(Segment) { encoded =>
-        ByteStr.decodeBase58(encoded) match {
-          case Success(id) =>
-            commonApi.transactionById(id) match {
-              case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None          => complete(ApiError.TransactionDoesNotExist)
-            }
-          case _ => complete(InvalidSignature)
+      path(B58Segment) { id =>
+        commonApi.transactionById(id) match {
+          case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
+          case None => complete(ApiError.TransactionDoesNotExist)
         }
       }
   }
@@ -117,16 +111,12 @@ case class TransactionsApiRoute(
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-      path(Segment) { encoded =>
-        ByteStr.decodeBase58(encoded) match {
-          case Success(id) =>
-            commonApi.unconfirmedTransactionById(id) match {
-              case Some(tx) =>
-                complete(txToExtendedJson(tx))
-              case None =>
-                complete(ApiError.TransactionDoesNotExist)
-            }
-          case _ => complete(InvalidSignature)
+      path(B58Segment) { id =>
+        commonApi.unconfirmedTransactionById(id) match {
+          case Some(tx) =>
+            complete(txToExtendedJson(tx))
+          case None =>
+            complete(ApiError.TransactionDoesNotExist)
         }
       }
   }
@@ -191,8 +181,8 @@ case class TransactionsApiRoute(
       )
     )
   )
-  def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
-    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, signerAddress, time, _))
+  def signWithSigner: Route = path(AddrSegment) { address =>
+    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.stringRepr, time, _))
   }
 
   @Path("/broadcast")

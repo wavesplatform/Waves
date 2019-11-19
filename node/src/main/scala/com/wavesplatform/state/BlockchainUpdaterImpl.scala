@@ -5,6 +5,7 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -62,7 +63,7 @@ class BlockchainUpdaterImpl(
 
   private val internalLastBlockInfo = ReplaySubject.createLimited[LastBlockInfo](1)
 
-  private def lastBlockReward = this.blockReward(this.height)
+  private def lastBlockReward: Option[Long] = this.blockReward(this.height)
 
   private def publishLastBlockInfo(): Unit =
     for (id <- this.lastBlockId; ts <- ngState.map(_.base.header.timestamp).orElse(leveldb.lastBlockTimestamp)) {
@@ -72,9 +73,13 @@ class BlockchainUpdaterImpl(
 
   publishLastBlockInfo()
 
-  def liquidBlock(id: ByteStr): Option[Block] = readLock {
-    ngState.flatMap(_.totalDiffOf(id).map(_._1))
-  }
+  def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
+
+  def liquidBlockMeta: Option[BlockMeta] = readLock(ngState.map { ng =>
+    val (_, _, totalFee) = ng.bestLiquidDiffAndFees
+    val b = ng.bestLiquidBlock
+    BlockMeta(b.header, b.signature, height, b.bytes().length, b.transactionData.length, totalFee, ng.reward)
+  })
 
   @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
@@ -88,7 +93,6 @@ class BlockchainUpdaterImpl(
   }
 
   override val lastBlockInfo: Observable[LastBlockInfo] = internalLastBlockInfo
-
 
   private def featuresApprovedWithBlock(block: Block): Set[Short] = {
     val height = leveldb.height + 1
@@ -107,9 +111,9 @@ class BlockchainUpdaterImpl(
 
       val unimplementedApproved = approvedFeatures.diff(BlockchainFeatures.implemented)
       if (unimplementedApproved.nonEmpty) {
-        log.warn(s"UNIMPLEMENTED ${displayFeatures(unimplementedApproved)} APPROVED ON BLOCKCHAIN")
-        log.warn("PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE")
-        log.warn("OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION")
+        log.warn(s"""UNIMPLEMENTED ${displayFeatures(unimplementedApproved)} APPROVED ON BLOCKCHAIN
+                    |PLEASE, UPDATE THE NODE AS SOON AS POSSIBLE
+                    |OTHERWISE THE NODE WILL BE STOPPED OR FORKED UPON FEATURE ACTIVATION""".stripMargin)
       }
 
       val activatedFeatures: Set[Short] = leveldb.activatedFeaturesAt(height)

@@ -388,13 +388,13 @@ case class UtilsApiRoute(
       new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
     )
   )
-  def sign: Route = (path("sign" / Segment) & post) { pk =>
+  def sign: Route = (path("sign" / B58Segment) & post) { pk =>
     entity(as[String]) { message =>
       complete(
         Json.obj(
           "message" -> message,
           "signature" ->
-            Base58.encode(crypto.sign(PrivateKey(Base58.tryDecodeWithLimit(pk).get), Base58.tryDecodeWithLimit(message).get))
+            Base58.encode(crypto.sign(PrivateKey(pk.arr), Base58.tryDecodeWithLimit(message).get))
         )
       )
     }

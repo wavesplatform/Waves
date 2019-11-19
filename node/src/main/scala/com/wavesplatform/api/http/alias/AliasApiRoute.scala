@@ -69,11 +69,7 @@ case class AliasApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
-    complete {
-      com.wavesplatform.account.Address
-        .fromString(addressString)
-        .map(addr => commonApi.aliasesOfAddress(addr).map(_._2.alias.stringRepr))
-    }
+  def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
+    complete(commonApi.aliasesOfAddress(address).map(_._2.alias.stringRepr))
   }
 }

@@ -27,7 +27,7 @@ import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
-import scala.util.{Failure, Success, Try}
+import scala.util.{Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
@@ -49,7 +49,7 @@ case class AddressApiRoute(
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      balanceDetails ~ validate ~ seed ~ balanceWithConfirmations ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
@@ -454,13 +454,8 @@ case class AddressApiRoute(
     )
   )
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
-  def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
-    Base58.tryDecodeWithLimit(publicKey) match {
-      case Success(pubKeyBytes) =>
-        val account = Address.fromPublicKey(PublicKey(pubKeyBytes))
-        complete(Json.obj("address" -> account.stringRepr))
-      case Failure(_) => complete(InvalidPublicKey)
-    }
+  def publicKey: Route = (path("publicKey" / B58Segment) & get) { publicKey =>
+    complete(Json.obj("address" -> Address.fromPublicKey(PublicKey(publicKey)).stringRepr))
   }
 }
 

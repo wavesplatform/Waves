@@ -4,6 +4,7 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
+import cats.effect.Resource
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
@@ -18,7 +19,8 @@ import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
-import org.iq80.leveldb.{DB, Options, ReadOptions}
+import monix.eval.Task
+import org.iq80.leveldb._
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -426,8 +428,9 @@ package object database extends ScorexLogging {
       }
     }
 
-    def get[A](key: Key[A]): A    = key.parse(db.get(key.keyBytes))
-    def has(key: Key[_]): Boolean = db.get(key.keyBytes) != null
+    def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
+    def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(key.keyBytes, readOptions))
+    def has(key: Key[_]): Boolean                        = db.get(key.keyBytes) != null
 
     def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)
@@ -439,6 +442,8 @@ package object database extends ScorexLogging {
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
       } finally iterator.close()
     }
+
+    def resource: Resource[Task, DBResource] = Resource.make(Task(DBResource(db)))(r => Task(r.close()))
   }
 
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =

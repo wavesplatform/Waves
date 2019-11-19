@@ -37,7 +37,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Diff, Height, Portfolio}
+import com.wavesplatform.state.{Blockchain, BlockchainUpdated, Diff, Height}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -180,7 +180,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
             .map(b => BlockMeta(b.header, b.signature, height, b.bytes().length, b.transactionData.length, 0L, None) -> b.transactionData)
       } yield block
 
-    def loadBlockMetaAt(height: Int): Option[BlockMeta] = None
+    def loadBlockMetaAt(height: Int): Option[BlockMeta] =
+      blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
 
     val historyReplier = new HistoryReplier(blockchainUpdater.score, history, settings.synchronizationSettings)(historyRepliesScheduler)
 
@@ -335,9 +336,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           time,
           blockchainUpdater,
           wallet,
+          cca,
           cta,
-          _ => Portfolio.empty,
-          _ => Map.empty,
           peerDatabase,
           establishedConnections,
           (id, returnTxs) => rollbackTask(id, returnTxs).map(_.map(_ => ())),

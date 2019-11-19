@@ -298,21 +298,6 @@ class LevelDBWriter(
         }
       }
 
-      for ((asset, newAddressIds) <- newAddressesForAssets) {
-        asset match {
-          case Waves =>
-            val newSeqNr = rw.get(Keys.addressesForWavesSeqNr) + 1
-            rw.put(Keys.addressesForWavesSeqNr, newSeqNr)
-            rw.put(Keys.addressesForWaves(newSeqNr), newAddressIds.toSeq)
-          case a: IssuedAsset =>
-            val seqNrKey  = Keys.addressesForAssetSeqNr(a)
-            val nextSeqNr = rw.get(seqNrKey) + 1
-            val key       = Keys.addressesForAsset(a, nextSeqNr)
-            rw.put(seqNrKey, nextSeqNr)
-            rw.put(key, newAddressIds.toSeq)
-        }
-      }
-
       val changedAddresses = addressTransactions.keys ++ updatedBalanceAddresses
       rw.put(Keys.changedAddresses(height), changedAddresses.toSeq)
 
