@@ -146,7 +146,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardVolumeAndFee(orderId: ByteStr): Unit       = volumeAndFeeCache.invalidate(orderId)
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
 
-  private def withComplexity(s: Script): (Script, Long) = (s, Script.verifierComplexity(s, this.estimator).explicitGet())
+  private def withComplexity(s: Script): (Script, Long) = (s, this.cachedVerifierComplexity(s).explicitGet())
 
   private val scriptCache: LoadingCache[Address, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadScript(_).map(withComplexity))
   protected def loadScript(address: Address): Option[Script]

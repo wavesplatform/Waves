@@ -81,6 +81,10 @@ object Script {
     Script.complexityInfo(script, estimator)
       .map(calcVerifierComplexity(script, _))
 
+  def limitFreeVerifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
+    Script.limitFreeComplexity(script, estimator)
+      .map(calcVerifierComplexity(script, _))
+
   private def calcVerifierComplexity(
     script:     Script,
     complexity: (Long, Map[String, Long])
