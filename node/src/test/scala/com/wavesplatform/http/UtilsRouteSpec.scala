@@ -50,13 +50,13 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
   )
 
   routePath("/script/decompile") in {
-    val base64 = ExprScript(script).explicitGet().bytes().base64
+    val base64 = ExprScript(V3, script).explicitGet().bytes().base64
     Post(routePath("/script/decompile"), base64) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "STDLIB_VERSION").as[Int] shouldBe 1
+      (json \ "STDLIB_VERSION").as[Int] shouldBe 3
       (json \ "CONTENT_TYPE").as[String] shouldBe "EXPRESSION"
       (json \ "script").as[String] shouldBe "" +
-        "{-# STDLIB_VERSION 1 #-}\n" +
+        "{-# STDLIB_VERSION 3 #-}\n" +
         "{-# CONTENT_TYPE EXPRESSION #-}\n" +
         "(1 == 2)"
     }
