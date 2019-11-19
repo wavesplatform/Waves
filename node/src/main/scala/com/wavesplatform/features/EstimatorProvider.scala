@@ -24,7 +24,7 @@ object EstimatorProvider {
       else
         DiffsCommon.functionComplexity(script, estimator, call)
 
-    def cachedVerifierComplexity(script: Script): Either[String, Long] =
+    def verifierComplexity(script: Script): Either[String, Long] =
       if (b.isFeatureActivated(MultiPaymentInvokeScript))
         Script.limitFreeVerifierComplexity(script, estimator)
       else
