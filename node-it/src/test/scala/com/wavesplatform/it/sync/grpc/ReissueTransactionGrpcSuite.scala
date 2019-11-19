@@ -21,7 +21,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val issuedAssetTx = sender.grpc.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      sender.grpc.broadcastReissue(reissuer, issueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
+      sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
 
       sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - 2 * issueFee
       sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - 2 * issueFee
@@ -37,7 +37,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val issuedAssetTx = sender.grpc.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = false, issueFee, waitForTx = true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      assertGrpcError(sender.grpc.broadcastReissue(reissuer, issueFee, issuedAssetId, someAssetAmount, version = v, reissuable = true, waitForTx = true),
+      assertGrpcError(sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, version = v, reissuable = true, waitForTx = true),
         "Asset is not reissuable",
         Code.INVALID_ARGUMENT)
 
@@ -51,12 +51,12 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
     for (v <- supportedVersions) {
       val reissuerBalance = sender.grpc.wavesBalance(reissuerAddress).available
       val reissuerEffBalance = sender.grpc.wavesBalance(reissuerAddress).effective
-      val reissueFee = reissuerEffBalance + 1.waves
+      val hugeReissueFee = reissuerEffBalance + 1.waves
 
       val issuedAssetTx = sender.grpc.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      assertGrpcError(sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true),
+      assertGrpcError(sender.grpc.broadcastReissue(reissuer, hugeReissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true),
         "negative waves balance",
         Code.INVALID_ARGUMENT)
 
@@ -74,9 +74,9 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val issuedAssetTx = sender.grpc.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      sender.grpc.broadcastReissue(reissuer, issueFee, issuedAssetId, someAssetAmount, reissuable = false, version = v, waitForTx = true)
+      sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = false, version = v, waitForTx = true)
 
-      assertGrpcError(sender.grpc.broadcastReissue(reissuer, issueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true),
+      assertGrpcError(sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true),
         "Asset is not reissuable",
         Code.INVALID_ARGUMENT)
 
@@ -94,7 +94,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       val issuedAssetTx = sender.grpc.broadcastIssue(reissuer, "assetname", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true)
       val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
 
-      sender.grpc.broadcastReissue(reissuer, issueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
+      sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
 
       sender.grpc.broadcastTransfer(reissuer, Recipient().withAddress(secondAddress), 2 * someAssetAmount, minFee, assetId = issuedAssetId, waitForTx = true)
       sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - 2 * issueFee - minFee
