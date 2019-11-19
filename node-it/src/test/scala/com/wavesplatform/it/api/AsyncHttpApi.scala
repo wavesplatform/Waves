@@ -22,7 +22,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.script.{ScriptReader, Script}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -777,13 +777,13 @@ object AsyncHttpApi extends Assertions {
     def blockAt(height: Int): Future[Block] = {
       blocks.getBlock(
         BlockRequest.of(
-          includeTransactions = true, BlockRequest.Request.Height.apply(height))).map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
+          includeTransactions = true, BlockRequest.Request.Height(height))).map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
     }
 
     def broadcastIssue(source: KeyPair,
                        name: String,
                        quantity: Long,
-                       decimals: Byte,
+                       decimals: Int,
                        reissuable: Boolean,
                        fee: Long,
                        description: ByteString = ByteString.EMPTY,
@@ -801,11 +801,14 @@ object AsyncHttpApi extends Assertions {
           quantity,
           decimals,
           reissuable,
-          if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes))) else None)))
+          script.map(s => PBScript.of(ByteString.copyFrom(Base64.decode(s)))))))
 
-      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
-
-      transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      script match {
+        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.EMPTY)))
+        case _ =>
+          val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+      }
     }
 
     def broadcastTransfer(source: KeyPair,
