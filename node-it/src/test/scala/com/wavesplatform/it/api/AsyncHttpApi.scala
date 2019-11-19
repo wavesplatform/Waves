@@ -23,12 +23,13 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.{ScriptReader, Script}
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.{FunctionHeader, Serde}
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction._
+import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
@@ -804,10 +805,10 @@ object AsyncHttpApi extends Assertions {
           script.map(s => PBScript.of(ByteString.copyFrom(Base64.decode(s)))))))
 
       script match {
-        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.EMPTY)))
+        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
         case _ =>
           val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
-          transactions.broadcast(SignedTransaction.of(Some(unsigned),Seq(ByteString.copyFrom(proofs))))
+          transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
       }
     }
 
@@ -1027,5 +1028,25 @@ object AsyncHttpApi extends Assertions {
       transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
     }
 
+    def broadcastInvokeScript(caller: KeyPair,
+                              dApp: Recipient,
+                              functionCall: Option[FUNCTION_CALL],
+                              payments: Seq[Amount] = Seq.empty,
+                              fee: Long,
+                              version: Int = 2): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(caller.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis,
+        version,
+        PBTransaction.Data.InvokeScript(InvokeScriptTransactionData(
+          Some(dApp),
+          ByteString.copyFrom(Deser.serializeOption(functionCall)(Serde.serialize(_))),
+          payments
+        )))
+      val proofs = crypto.sign(caller, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+    }
   }
 }
