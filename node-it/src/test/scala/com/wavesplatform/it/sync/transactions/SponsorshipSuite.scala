@@ -86,7 +86,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
         def invalidTx(timestamp: Long): SponsorFeeTransaction.TransactionT =
           SponsorFeeTransaction
-            .selfSigned(sponsor.privateKey, IssuedAsset(ByteStr.decodeBase58(sponsorAssetId).get), Some(SmallFee), minFee, timestamp + 1.day.toMillis)
+            .selfSigned(1.toByte, sponsor.privateKey, IssuedAsset(ByteStr.decodeBase58(sponsorAssetId).get), Some(SmallFee), minFee, timestamp + 1.day.toMillis)
             .right
             .get
 
