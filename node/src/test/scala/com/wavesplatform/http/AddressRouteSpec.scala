@@ -73,9 +73,9 @@ class AddressRouteSpec
 
     forAll(t) { (a, v) =>
       Get(routePath(s"/validate/$a")) ~> route ~> check {
-        val r = responseAs[AddressApiRoute.Validity]
-        r.address shouldEqual a
-        r.valid shouldBe v
+        val r = responseAs[JsObject]
+        (r \ "address").as[String] shouldEqual a
+        (r \ "valid").as[Boolean] shouldBe v
       }
     }
   }

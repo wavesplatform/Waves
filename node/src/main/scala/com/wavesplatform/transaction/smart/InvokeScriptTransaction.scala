@@ -45,7 +45,7 @@ case class InvokeScriptTransaction(
   override def chainByte: Option[TxVersion]    = Some(AddressScheme.current.chainId)
 }
 
-object InvokeScriptTransaction extends TransactionParserLite {
+object InvokeScriptTransaction extends TransactionParser {
   override type TransactionT = InvokeScriptTransaction
 
   override val typeId: TxType                    = 16

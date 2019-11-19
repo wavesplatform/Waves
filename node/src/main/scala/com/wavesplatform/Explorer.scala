@@ -318,57 +318,6 @@ object Explorer extends ScorexLogging {
           pf.assets.toSeq.sortBy(_._1.toString) foreach {
             case (assetId, balance) => log.info(s"$assetId : $balance")
           }
-
-        case "APS" =>
-          val addrs = mutable.Set[Address]()
-
-          println(s"\nWAVES balances\n")
-          for {
-            seqNr     <- (1 to db.get(Keys.addressesForWavesSeqNr)).par
-            addressId <- db.get(Keys.addressesForWaves(seqNr)).par
-            history = db.get(Keys.wavesBalanceHistory(addressId))
-            actualHeight <- history.headOption
-            balance = db.get(Keys.wavesBalance(addressId)(actualHeight))
-            if balance > 0
-          } yield {
-            val addr = db.get(Keys.idToAddress(addressId))
-            println(s"$addr : $balance")
-            addrs += addr
-          }
-
-          val assets = mutable.ListBuffer[ByteStr]()
-          db.iterateOver(10: Short) { e => // iterate over Keys.assetInfoHistory
-            assets += ByteStr(e.getKey.drop(2))
-          }
-
-          println(s"\nAssets balances (${assets.size} assets)")
-          for {
-            assetId <- assets.sorted
-            asset = IssuedAsset(assetId)
-            seqNr <- {
-              println(s"\n$assetId:")
-              1 to db.get(Keys.addressesForAssetSeqNr(asset))
-            }
-            addressId    <- db.get(Keys.addressesForAsset(asset, seqNr))
-            actualHeight <- db.get(Keys.assetBalanceHistory(addressId, asset)).headOption
-            balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight))
-            if balance > 0
-          } yield {
-            val addr = db.get(Keys.idToAddress(addressId))
-            println(s"$addr : $balance")
-            addrs += addr
-          }
-
-          println(s"\nAddress balances (${addrs.size} addresses)")
-          addrs.toSeq.sortBy(_.toString).foreach { addr =>
-            val p = portfolio(addr)
-            println(s"\n$addr : ${p.balance} ${p.lease}:")
-            p.assets.toSeq.sortBy(_._1.id).foreach {
-              case (IssuedAsset(assetId), bal) =>
-                if (bal > 0)
-                  println(s"$assetId : $bal")
-            }
-          }
       }
     } finally db.close()
   }

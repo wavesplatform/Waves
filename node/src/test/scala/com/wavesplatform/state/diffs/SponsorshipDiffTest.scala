@@ -218,11 +218,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
       assetId = IssuedAsset(issueTx.id())
       senderNotIssuer = SponsorFeeTransaction
-        .selfSigned(notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
+        .selfSigned(1.toByte, notSponsor, assetId, None, 1 * Constants.UnitsInWave, ts + 1)
         .right
         .get
       insufficientFee = SponsorFeeTransaction
-        .selfSigned(notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
+        .selfSigned(1.toByte, notSponsor, assetId, None, 1 * Constants.UnitsInWave - 1, ts + 1)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)
@@ -250,11 +250,11 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       assetId = IssuedAsset(issueTx.id())
       minFee <- smallFeeGen
       senderNotIssuer = SponsorFeeTransaction
-        .selfSigned(notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave, ts + 1)
+        .selfSigned(1.toByte, notSponsor, assetId, Some(minFee), 1 * Constants.UnitsInWave, ts + 1)
         .right
         .get
       insufficientFee = SponsorFeeTransaction
-        .selfSigned(master, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
+        .selfSigned(1.toByte, master, assetId, Some(minFee), 1 * Constants.UnitsInWave - 1, ts + 1)
         .right
         .get
     } yield (genesis, issueTx, sponsorTx, senderNotIssuer, insufficientFee)
@@ -293,7 +293,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         )
         .explicitGet()
       assetId = IssuedAsset(issue.id())
-      sponsor = SponsorFeeTransaction.selfSigned(master, assetId, Some(100), 100000000, ts + 2).explicitGet()
+      sponsor = SponsorFeeTransaction.selfSigned(1.toByte, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransaction
         .selfSigned(1.toByte, master, recipient, assetId, issue.quantity, Waves, 100000, Array.emptyByteArray, ts + 3)
         .right

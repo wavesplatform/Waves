@@ -31,7 +31,7 @@ case class ExchangeTransaction(
     with FastHashId
     with SigProofsSwitch {
 
-  override def builder: TransactionParserLite = ExchangeTransaction
+  override def builder: TransactionParser = ExchangeTransaction
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
@@ -46,7 +46,7 @@ case class ExchangeTransaction(
   }
 }
 
-object ExchangeTransaction extends TransactionParserLite {
+object ExchangeTransaction extends TransactionParser {
   implicit val validator = ExchangeTxValidator
   val serializer         = ExchangeTxSerializer
 

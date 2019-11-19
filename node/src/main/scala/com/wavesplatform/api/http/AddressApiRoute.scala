@@ -274,8 +274,8 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
-  def validate: Route = (path("validate" / B58Segment) & get) { addressBytes =>
-    complete(Validity(addressBytes.toString, Address.fromBytes(addressBytes).isRight))
+  def validate: Route = (path("validate" / Segment) & get) { addressBytes =>
+    complete(Json.obj("address" -> addressBytes, "valid" -> Address.fromString(addressBytes).isRight))
   }
 
   // TODO: Remove from API
@@ -454,8 +454,8 @@ case class AddressApiRoute(
     )
   )
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
-  def publicKey: Route = (path("publicKey" / B58Segment) & get) { publicKey =>
-    complete(Json.obj("address" -> Address.fromPublicKey(PublicKey(publicKey)).stringRepr))
+  def publicKey: Route = (path("publicKey" / PublicKeySegment) & get) { publicKey =>
+    complete(Json.obj("address" -> Address.fromPublicKey(publicKey).stringRepr))
   }
 }
 
@@ -467,10 +467,6 @@ object AddressApiRoute {
   case class Balance(address: String, confirmations: Int, balance: Long)
 
   implicit val balanceFormat: Format[Balance] = Json.format
-
-  case class Validity(address: String, valid: Boolean)
-
-  implicit val validityFormat: Format[Validity] = Json.format
 
   case class AccountScriptMeta(address: String, meta: Option[Dic])
   implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]

@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.{
   FastHashId,
   Proofs,
   SigProofsSwitch,
-  TransactionParserLite,
+  TransactionParser,
   TxAmount,
   TxTimestamp,
   TxType,
@@ -35,14 +35,14 @@ final case class LeaseCancelTransaction(
     with VersionedTransaction
     with TxWithFee.InWaves
     with FastHashId {
-  override def builder: TransactionParserLite      = LeaseCancelTransaction
+  override def builder: TransactionParser      = LeaseCancelTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTransaction.serializer.toJson(this))
   override def chainByte: Option[TxType]           = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
-object LeaseCancelTransaction extends TransactionParserLite {
+object LeaseCancelTransaction extends TransactionParser {
   type TransactionT = LeaseCancelTransaction
   val classTag: ClassTag[LeaseCancelTransaction] = ClassTag(classOf[LeaseCancelTransaction])
   val supportedVersions: Set[TxVersion]          = Set(1, 2)

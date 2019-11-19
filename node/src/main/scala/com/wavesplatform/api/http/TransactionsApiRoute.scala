@@ -72,9 +72,9 @@ case class TransactionsApiRoute(
   )
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
-      complete(InvalidSignature)
+      complete(InvalidBase58)
     } ~
-      path(B58Segment) { id =>
+      path(TransactionId) { id =>
         commonApi.transactionById(id) match {
           case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
           case None => complete(ApiError.TransactionDoesNotExist)
@@ -111,7 +111,7 @@ case class TransactionsApiRoute(
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-      path(B58Segment) { id =>
+      path(TransactionId) { id =>
         commonApi.unconfirmedTransactionById(id) match {
           case Some(tx) =>
             complete(txToExtendedJson(tx))

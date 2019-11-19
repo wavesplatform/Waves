@@ -40,7 +40,7 @@ final case class BurnTransaction(
   override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
-object BurnTransaction extends TransactionParserLite {
+object BurnTransaction extends TransactionParser {
   override type TransactionT = BurnTransaction
 
   override val typeId: TxType                    = 6

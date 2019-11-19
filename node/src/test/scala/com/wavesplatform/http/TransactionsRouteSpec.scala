@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidBase58, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -43,7 +43,7 @@ class TransactionsRouteSpec
   private val utxPoolSize         = mockFunction[Int]
 
   private val route =
-    new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, Coeval(utxPoolSize.apply()), utxPoolSynchronizer, new TestTime).route
+    seal(new TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, Coeval(utxPoolSize.apply()), utxPoolSynchronizer, new TestTime).route)
 
   private val invalidBase58Gen = alphaNumStr.map(_ + "0")
 
@@ -216,14 +216,14 @@ class TransactionsRouteSpec
     }
   }
 
-  routePath("/info/{signature}") - {
+  routePath("/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidSignature)
+        Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidBase58)
       }
 
-      Get(routePath(s"/info/")) ~> route should produce(InvalidSignature)
-      Get(routePath(s"/info")) ~> route should produce(InvalidSignature)
+      Get(routePath(s"/info/")) ~> route should produce(InvalidBase58)
+      Get(routePath(s"/info")) ~> route should produce(InvalidBase58)
     }
 
     "working properly otherwise" in {
@@ -284,10 +284,10 @@ class TransactionsRouteSpec
     }
   }
 
-  routePath("/unconfirmed/info/{signature}") - {
+  routePath("/unconfirmed/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidSignature)
+        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidBase58)
       }
 
       Get(routePath(s"/unconfirmed/info/")) ~> route should produce(InvalidSignature)

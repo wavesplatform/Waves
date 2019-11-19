@@ -5,7 +5,6 @@ import java.util.concurrent.Executors
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
@@ -40,7 +39,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
   }
 
   private[this] val decompilerExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
@@ -360,43 +359,6 @@ case class UtilsApiRoute(
   def hashFast: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.fastHash(message))))
-    }
-  }
-  @Path("/sign/{privateKey}")
-  @ApiOperation(value = "Hash", notes = "Return FastCryptographicHash of specified message", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "privateKey",
-        value = "privateKey",
-        required = true,
-        paramType = "path",
-        dataType = "string",
-        example = "3kMEhU5z3v8bmer1ERFUUhW58Dtuhyo9hE5vrhjqAWYT"
-      ),
-      new ApiImplicitParam(
-        name = "message",
-        value = "Message to hash (base58 string)",
-        required = true,
-        paramType = "body",
-        dataType = "string"
-      )
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json with error or json like {\"message\": \"your message\",\"hash\": \"your message hash\"}")
-    )
-  )
-  def sign: Route = (path("sign" / B58Segment) & post) { pk =>
-    entity(as[String]) { message =>
-      complete(
-        Json.obj(
-          "message" -> message,
-          "signature" ->
-            Base58.encode(crypto.sign(PrivateKey(pk.arr), Base58.tryDecodeWithLimit(message).get))
-        )
-      )
     }
   }
 

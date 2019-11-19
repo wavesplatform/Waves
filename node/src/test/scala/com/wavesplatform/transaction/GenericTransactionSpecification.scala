@@ -12,7 +12,7 @@ abstract class GenericTransactionSpecification[T <: com.wavesplatform.transactio
     with Matchers
     with TransactionGen {
 
-  def transactionParser: com.wavesplatform.transaction.TransactionParserLite { type TransactionT <: T }
+  def transactionParser: com.wavesplatform.transaction.TransactionParser { type TransactionT <: T }
   def updateProofs(tx: T, p: Proofs): T
   def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], T))]
   def assertTxs(first: T, second: T): Unit

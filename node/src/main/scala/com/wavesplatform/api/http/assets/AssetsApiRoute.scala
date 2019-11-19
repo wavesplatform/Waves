@@ -72,7 +72,7 @@ case class AssetsApiRoute(
     )
   )
   def balance: Route =
-    (get & path("balance" / AddrSegment / B58Segment)) { (address, assetId) =>
+    (get & path("balance" / AddrSegment / TransactionId)) { (address, assetId) =>
       complete(balanceJson(address, assetId))
     }
 

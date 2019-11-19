@@ -8,7 +8,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParserLite}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParser}
 import com.wavesplatform.{BlockGen, NoShrink}
 import org.scalacheck.Gen
 import org.scalactic.source.Position
@@ -82,7 +82,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
   private def transactionsFromBlockchain(
       blockchain: Blockchain,
       sender: Address,
-      types: Set[TransactionParserLite] = Set.empty,
+      types: Set[TransactionParser] = Set.empty,
       fromId: Option[ByteStr] = None
   ): Seq[(Int, ByteStr)] = ???
 

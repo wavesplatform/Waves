@@ -415,7 +415,7 @@ case class DebugApiRoute(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
     )
   )
-  def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment)) { id =>
+  def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.invokeScriptResultById(id) match {
       case Some((height, ist, isr)) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
       case None                     => complete(ApiError.TransactionDoesNotExist)

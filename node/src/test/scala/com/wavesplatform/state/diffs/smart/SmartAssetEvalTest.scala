@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.smart
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.values.{Expression, V3}
@@ -79,7 +78,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
         .explicitGet()
 
       setAssetScriptTransaction = SetAssetScriptTransaction
-        .signed(AddressScheme.current.chainId, firstAcc, asset, Some(typedScript), 1000, ts + 10, firstAcc)
+        .signed(1.toByte, firstAcc, asset, Some(typedScript), 1000, ts + 10, firstAcc)
         .explicitGet()
 
       assetTransferTransaction = TransferTransaction
