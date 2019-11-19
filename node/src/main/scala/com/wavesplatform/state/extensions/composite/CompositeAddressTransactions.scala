@@ -10,9 +10,9 @@ import monix.reactive.Observable
 private[state] final class CompositeAddressTransactions(baseProvider: AddressTransactions, height: Height, getDiff: () => Option[Diff])
     extends AddressTransactions {
   override def addressTransactionsObservable(
-                                              address: Address,
-                                              types: Set[TransactionParser],
-                                              fromId: Option[ByteStr]
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]
   ): Observable[(Height, Transaction)] = {
     val fromDiff = for {
       diff            <- getDiff().toIterable
