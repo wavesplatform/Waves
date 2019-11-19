@@ -43,6 +43,9 @@ package object history {
 
   val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
   val generationSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
+  val generationVRFSignature = ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte))
+
+  def correctGenerationSignature(version: Byte): ByteStr = if (version < Block.ProtoBlockVersion) generationSignature else generationVRFSignature
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block =
     buildBlockOfTxs(refTo, txs, txs.headOption.fold(0L)(_.timestamp))
@@ -54,7 +57,7 @@ package object history {
       refTo: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair,
-      version: TxVersion,
+      version: Byte,
       timestamp: Long,
       bTarget: Long = DefaultBaseTarget
   ): Block =
@@ -64,7 +67,7 @@ package object history {
         timestamp = timestamp,
         reference = refTo,
         baseTarget = bTarget,
-        generationSignature = generationSignature,
+        generationSignature = correctGenerationSignature(version),
         txs = txs,
         signer = signer,
         Seq.empty,
@@ -77,7 +80,7 @@ package object history {
       prevTotal: Block,
       txs: Seq[Transaction],
       signer: KeyPair,
-      version: TxVersion,
+      version: Byte,
       ts: Long
   ): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
@@ -126,7 +129,7 @@ package object history {
       base: Seq[Transaction],
       micros: Seq[Seq[Transaction]],
       signer: KeyPair,
-      version: TxVersion,
+      version: Byte,
       timestamp: Long
   ): (Block, Seq[MicroBlock]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)

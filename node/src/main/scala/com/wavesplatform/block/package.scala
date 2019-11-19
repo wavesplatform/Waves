@@ -39,13 +39,13 @@ package object block {
       else PBBlocks.protobuf(block).header.get.toByteArray
     }
 
-    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, block.bytesWithoutSignature()))
+    def sign(signer: PrivateKey): Block = block.copy(signature = crypto.sign(signer, ByteStr(bytesWithoutSignature())))
   }
 
   private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {
     private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(microBlock.copy(signature = ByteStr.empty).bytes())
 
-    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, microBlock.bytesWithoutSignature()))
+    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, ByteStr(bytesWithoutSignature())))
   }
 
   // Merkle
@@ -53,7 +53,7 @@ package object block {
     override def hash(input: Message): Digest32 = Digest32(com.wavesplatform.crypto.fastHash(input))
   }
 
-  private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))(FastHash)
+  private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
 
   private[block] implicit class BlockMerkleOps(block: Block) {
     val merkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(block.header.version, block.transactionData))

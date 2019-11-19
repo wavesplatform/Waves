@@ -87,13 +87,20 @@ object Block extends ScorexLogging {
       rewardVote: Long,
       transactionData: Seq[Transaction]
   ): Block = {
-    val merkle = if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(version, transactionData).rootHash)
+    val merkle = mkMerkleRoot(version, transactionData)
     Block(
       BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle),
       ByteStr.empty,
       transactionData
     )
   }
+
+  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr): Block =
+    base.copy(
+      signature = signature,
+      transactionData = transactionData,
+      header = base.header.copy(merkle = mkMerkleRoot(base.header.version, transactionData))
+    )
 
   def buildAndSign(
       version: Byte,
@@ -143,6 +150,9 @@ object Block extends ScorexLogging {
       validBlock <- signedBlock.validateGenesis(genesisSettings)
     } yield validBlock
   }
+
+  private def mkMerkleRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(version, transactionData).rootHash)
 
   case class BlockInfo(
       header: BlockHeader,
