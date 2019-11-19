@@ -36,7 +36,7 @@ trait BlockGen extends TransactionGen { _: Suite =>
         ByteStr(genSig),
         txs,
         signer,
-        Set.empty,
+        Seq.empty,
         -1L
       )
       .explicitGet()

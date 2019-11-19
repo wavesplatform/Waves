@@ -421,7 +421,7 @@ class LevelDBWriter(
       val newlyApprovedFeatures = featureVotes(height)
         .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
         .collect {
-          case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height
+          case (featureId, voteCount) if voteCount + (if (block.header.featureVotes.contains(featureId)) 1 else 0) >= minVotes => featureId -> height
         }
 
       if (newlyApprovedFeatures.nonEmpty) {

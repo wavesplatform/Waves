@@ -67,7 +67,7 @@ package object history {
         generationSignature = generationSignature,
         txs = txs,
         signer = signer,
-        Set.empty,
+        Seq.empty,
         -1L
       )
       .explicitGet()

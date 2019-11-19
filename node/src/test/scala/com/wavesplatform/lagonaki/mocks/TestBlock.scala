@@ -40,7 +40,7 @@ object TestBlock {
   def create(signer: KeyPair, txs: Seq[Transaction]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), txs = txs, signer = signer)
 
-  def create(signer: KeyPair, txs: Seq[Transaction], features: Set[Short]): Block =
+  def create(signer: KeyPair, txs: Seq[Transaction], features: Seq[Short]): Block =
     create(time = Try(txs.map(_.timestamp).max).getOrElse(0), ref = randomSignature(), txs = txs, signer = signer, version = 3, features = features)
 
   def create(time: Long, txs: Seq[Transaction]): Block = create(time, randomSignature(), txs, defaultSigner)
@@ -53,7 +53,7 @@ object TestBlock {
       txs: Seq[Transaction],
       signer: KeyPair = defaultSigner,
       version: Byte = 2,
-      features: Set[Short] = Set.empty[Short],
+      features: Seq[Short] = Seq.empty[Short],
       rewardVote: Long = -1L
   ): Block =
     sign(
@@ -84,7 +84,7 @@ object TestBlock {
           2L,
           randomOfLength(Block.GenerationSignatureLength),
           defaultSigner,
-          Set.empty,
+          Seq.empty,
           -1L,
           ByteStr.empty
         ),
@@ -93,7 +93,7 @@ object TestBlock {
       )
     )
 
-  def withReferenceAndFeatures(ref: ByteStr, features: Set[Short]): Block =
+  def withReferenceAndFeatures(ref: ByteStr, features: Seq[Short]): Block =
     sign(
       defaultSigner,
       Block.create(

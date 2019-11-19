@@ -25,7 +25,7 @@ case class BlockHeader(
     baseTarget: Long,
     generationSignature: ByteStr,
     generator: PublicKey,
-    featureVotes: Set[Short],
+    featureVotes: Seq[Short],
     rewardVote: Long,
     merkle: ByteStr
 )
@@ -83,7 +83,7 @@ object Block extends ScorexLogging {
       baseTarget: Long,
       generationSignature: ByteStr,
       generator: PublicKey,
-      featureVotes: Set[Short],
+      featureVotes: Seq[Short],
       rewardVote: Long,
       transactionData: Seq[Transaction]
   ): Block = {
@@ -103,7 +103,7 @@ object Block extends ScorexLogging {
       generationSignature: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair,
-      featureVotes: Set[Short],
+      featureVotes: Seq[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
     create(version, timestamp, reference, baseTarget, generationSignature, signer, featureVotes, rewardVote, txs).validate.map(_.sign(signer))
@@ -135,7 +135,7 @@ object Block extends ScorexLogging {
       genSig     = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
       reference  = Array.fill(SignatureLength)(-1: Byte)
       timestamp  = genesisSettings.blockTimestamp
-      block <- create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Set(), -1L, txs).validate
+      block <- create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Seq(), -1L, txs).validate
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(generator)
         case Some(predefined) => block.copy(signature = predefined)

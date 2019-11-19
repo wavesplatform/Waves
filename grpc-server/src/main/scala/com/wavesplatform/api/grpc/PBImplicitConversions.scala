@@ -49,7 +49,7 @@ trait PBImplicitConversions {
         header.baseTarget,
         header.generationSignature.toByteStr,
         header.generator.toPublicKey,
-        header.featureVotes.map(intToShort).toSet,
+        header.featureVotes.map(intToShort),
         header.rewardVote,
         header.merkle.toByteStr
       )
@@ -62,7 +62,7 @@ trait PBImplicitConversions {
       header.reference.toPBByteString,
       header.baseTarget,
       header.generationSignature.toPBByteString,
-      header.featureVotes.map(shortToInt).toSeq,
+      header.featureVotes.map(shortToInt),
       header.timestamp,
       header.version,
       ByteString.copyFrom(header.generator)

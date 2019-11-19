@@ -107,7 +107,7 @@ object GenesisBlockGenerator extends App {
         ByteStr(Array.fill(crypto.DigestLength)(0: Byte)),
         txs = genesisTxs,
         signer = genesisSigner,
-        featureVotes = Set.empty,
+        featureVotes = Seq.empty,
         rewardVote = -1L
       )
       .explicitGet()

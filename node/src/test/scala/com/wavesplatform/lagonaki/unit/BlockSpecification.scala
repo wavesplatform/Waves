@@ -52,7 +52,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
         ByteStr(generationSignature),
         Seq.fill(amt)(paymentTransaction),
         recipient,
-        Set.empty,
+        Seq.empty,
         -1L
       )
       .explicitGet()
@@ -70,7 +70,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
               generationSignature,
               transactionData,
               recipient,
-              Set.empty,
+              Seq.empty,
               -1L
             )
             .explicitGet()
@@ -96,7 +96,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             generationSignature,
             transactionData,
             recipient,
-            Set(1),
+            Seq(1),
             -1L
           ) should produce("could not contain feature votes")
       }
@@ -105,7 +105,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
 
   property(s" feature flags limit is ${Block.MaxFeaturesInBlock}") {
     val version           = 3.toByte
-    val supportedFeatures = (0 to Block.MaxFeaturesInBlock * 2).map(_.toShort).toSet
+    val supportedFeatures = (0 to Block.MaxFeaturesInBlock * 2).map(_.toShort)
 
     forAll(blockGen) {
       case (baseTarget, reference, generationSignature, recipient, transactionData) =>
@@ -125,7 +125,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   property(" block with txs bytes/parse roundtrip version 3") {
     val version = 3.toByte
 
-    val faetureSetGen: Gen[Set[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.toSet)
+    val faetureSetGen: Gen[Seq[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.distinct)
 
     forAll(blockGen, faetureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
@@ -164,7 +164,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             baseTarget,
             generationSignature,
             weakAccount,
-            Set.empty,
+            Seq.empty,
             -1L,
             transactionData
           ).copy(signature = ByteStr(Array.fill(64)(0: Byte)))
@@ -177,7 +177,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Set.empty, -1L).explicitGet()
+            Block.buildAndSign(3, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L).explicitGet()
           )
         val (bytes, t1) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))

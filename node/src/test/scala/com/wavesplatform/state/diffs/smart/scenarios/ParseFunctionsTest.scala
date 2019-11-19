@@ -54,7 +54,7 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
         baseTarget,
         genSignature,
         PublicKey(ByteStr(generator)),
-        featureVotes.toSet,
+        featureVotes,
         reward,
         ByteStr.empty
       ),

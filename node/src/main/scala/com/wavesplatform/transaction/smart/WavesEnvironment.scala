@@ -150,7 +150,7 @@ class WavesEnvironment(
         header.baseTarget,
         header.generationSignature,
         transactionCount,
-        header.featureVotes.map(_.toLong).toSeq.sorted
+        header.featureVotes.map(_.toLong).sorted
       )
     }.toOption
 
@@ -174,7 +174,7 @@ class WavesEnvironment(
       else ndi.readInt()
     }
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
 
     val rewardVote = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 

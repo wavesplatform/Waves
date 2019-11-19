@@ -324,7 +324,7 @@ package object database extends ScorexLogging {
     }
 
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
     val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)

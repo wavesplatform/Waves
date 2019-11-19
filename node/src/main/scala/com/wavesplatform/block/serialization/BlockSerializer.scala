@@ -32,7 +32,7 @@ object BlockHeaderSerializer {
 
     val featuresJson =
       if (blockHeader.version < NgBlockVersion) JsObject.empty
-      else Json.obj("features" -> JsArray(blockHeader.featureVotes.map(id => JsNumber(id.toInt)).toSeq))
+      else Json.obj("features" -> JsArray(blockHeader.featureVotes.map(id => JsNumber(id.toInt))))
 
     val rewardJson =
       if (blockHeader.version < RewardBlockVersion) JsObject.empty
@@ -109,7 +109,7 @@ object BlockSerializer {
 
       val transactionData = readTransactionData(version, buf)
 
-      val featureVotes = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSet else Set.empty[Short]
+      val featureVotes = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSeq else Seq.empty[Short]
       val rewardVote   = if (version > Block.NgBlockVersion) buf.getLong else -1L
 
       val generator = buf.getPublicKey

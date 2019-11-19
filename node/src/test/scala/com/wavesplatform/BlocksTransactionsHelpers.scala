@@ -146,7 +146,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         baseTarget = bTarget,
         generationSignature = com.wavesplatform.history.generationSignature,
         generator = signer,
-        featureVotes = Set.empty,
+        featureVotes = Seq.empty,
         rewardVote = -1L,
         transactionData = txs
       )
