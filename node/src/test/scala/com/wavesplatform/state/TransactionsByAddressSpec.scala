@@ -82,10 +82,10 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
     }
 
   private def transactionsFromBlockchain(
-                                          blockchain: Blockchain,
-                                          sender: Address,
-                                          types: Set[TransactionParser] = Set.empty,
-                                          fromId: Option[ByteStr] = None
+      blockchain: Blockchain,
+      sender: Address,
+      types: Set[TransactionParser] = Set.empty,
+      fromId: Option[ByteStr] = None
   ): Seq[(Int, ByteStr)] =
     Await
       .result(blockchain.addressTransactionsObservable(sender, types, fromId).toListL.runToFuture, Duration.Inf)
