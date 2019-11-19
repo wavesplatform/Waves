@@ -1,18 +1,14 @@
 package com.wavesplatform.transaction
 
-import com.google.protobuf.ByteString
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.TransactionGen
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, _}
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CaseObj, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
-import com.wavesplatform.protobuf.{Amount, transaction}
-import com.wavesplatform.protobuf.transaction.{InvokeScriptTransactionData, PBAmounts, PBRecipients, PBTransactions, SignedTransaction}
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -79,30 +75,6 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     tx.json() shouldBe json
     ByteStr(tx.bytes()) shouldBe ByteStr(bytes)
     AddressScheme.current = DefaultAddressScheme
-  }
-
-  property("protobuf roundtrip") {
-    forAll(invokeScriptGen(paymentListGen), accountGen) { (tx, caller) =>
-      val functionCall = Some(FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_LONG(100000))))
-      val unsigned = transaction.PBTransaction(
-        84,
-        ByteString.copyFrom(caller.publicKey),
-        Some(Amount.of(ByteString.EMPTY, tx.fee)),
-        System.currentTimeMillis,
-        1,
-        transaction.PBTransaction.Data.InvokeScript(
-          InvokeScriptTransactionData(
-            Some(PBRecipients.create(tx.dAppAddressOrAlias)),
-            ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(functionCall)(Serde.serialize(_))),
-            tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount))
-          )
-        )
-      )
-      val proof  = crypto.sign(caller, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-      val signed = SignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof)))
-      val convTx = PBTransactions.vanilla(signed).explicitGet()
-      PBTransactions.protobuf(convTx) shouldBe signed
-    }
   }
 
   property("JSON format validation for InvokeScriptTransaction") {
