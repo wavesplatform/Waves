@@ -9,7 +9,13 @@ object FieldNames {
   val ScriptTransferSet    = "transferSet"
   val Data           = "data"
   val ScriptWriteSet       = "writeSet"
-  val DataEntry      = "DataEntry"
+
+  val DataEntry    = "DataEntry"
+  val BooleanEntry = "BooleanEntry"
+  val StringEntry  = "StringEntry"
+  val BinaryEntry  = "BinaryEntry"
+  val IntEntry     = "IntEntry"
+
   val Recipient      = "recipient"
   val Amount         = "amount"
   val Asset          = "asset"

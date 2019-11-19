@@ -87,15 +87,15 @@ object Types {
   private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
 
   val genericDataEntry =
-    CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+    CASETYPEREF(FieldNames.DataEntry, List("key" -> STRING, "value" -> dataEntryValueType))
 
   private def buildTypedEntry(name: String, valueType: REAL) =
     CASETYPEREF(name, List("key" -> STRING, "value" -> valueType))
 
-  val booleanDataEntry: CASETYPEREF = buildTypedEntry("BooleanEntry", BOOLEAN)
-  val stringDataEntry: CASETYPEREF  = buildTypedEntry("StringEntry", STRING)
-  val binaryDataEntry: CASETYPEREF  = buildTypedEntry("BinaryEntry", BYTESTR)
-  val intDataEntry: CASETYPEREF     = buildTypedEntry("IntEntry", LONG)
+  val booleanDataEntry: CASETYPEREF = buildTypedEntry(FieldNames.BooleanEntry, BOOLEAN)
+  val stringDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.StringEntry, STRING)
+  val binaryDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.BinaryEntry, BYTESTR)
+  val intDataEntry: CASETYPEREF     = buildTypedEntry(FieldNames.IntEntry, LONG)
 
   private val typedDataEntries =
     List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry)
