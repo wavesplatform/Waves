@@ -31,8 +31,8 @@ object GenesisTxSerializer {
     import tx._
     val typeBytes      = Array(builder.typeId)
     val timestampBytes = Longs.toByteArray(timestamp)
-    val amountBytes    = Longs.toByteArray(amount)
     val rcpBytes       = recipient.bytes.arr
+    val amountBytes    = Longs.toByteArray(amount)
     require(rcpBytes.length == Address.AddressLength)
     val res = Bytes.concat(typeBytes, timestampBytes, rcpBytes, amountBytes)
     require(res.length == BaseLength + 1)
@@ -43,8 +43,8 @@ object GenesisTxSerializer {
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == GenesisTransaction.typeId, "transaction type mismatch")
     val timestamp = buf.getLong
-    val amount    = buf.getLong
     val recipient = buf.getAddress
+    val amount    = buf.getLong
     GenesisTransaction(recipient, amount, timestamp, ByteStr(GenesisTransaction.generateSignature(recipient, amount, timestamp)))
   }
 }
