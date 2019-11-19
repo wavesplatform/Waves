@@ -27,7 +27,7 @@ case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[Data
   override val json: Coeval[JsObject]         = Coeval.eval(builder.serializer.toJson(this))
 }
 
-object DataTransaction extends TransactionParserLite {
+object DataTransaction extends TransactionParser {
   val MaxBytes: Int      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
   val MaxEntryCount: Int = 100
 

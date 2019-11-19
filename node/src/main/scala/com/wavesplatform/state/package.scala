@@ -89,7 +89,7 @@ package object state {
   def addressTransactionsCompose(
       at: AddressTransactions,
       fromDiffIter: Observable[(Height, Transaction, Set[Address])]
-  )(address: Address, types: Set[TransactionParserLite], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
+  )(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {

@@ -384,7 +384,7 @@ object NarrowTransactionGenerator {
     }
   }
 
-  final case class Settings(transactions: Int, probabilities: Map[TransactionParserLite, Double], scripts: Seq[ScriptSettings])
+  final case class Settings(transactions: Int, probabilities: Map[TransactionParser, Double], scripts: Seq[ScriptSettings])
 
   private val minAliasLength = 4
   private val maxAliasLength = 30

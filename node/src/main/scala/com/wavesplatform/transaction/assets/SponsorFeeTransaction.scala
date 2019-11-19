@@ -36,7 +36,7 @@ case class SponsorFeeTransaction(
   override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
-object SponsorFeeTransaction extends TransactionParserLite {
+object SponsorFeeTransaction extends TransactionParser {
   override type TransactionT = SponsorFeeTransaction
 
   override val typeId: TxType                    = 14
