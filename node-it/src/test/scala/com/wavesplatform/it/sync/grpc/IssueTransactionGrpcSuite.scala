@@ -45,29 +45,6 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     }
   }
 
-  test("Able to issue NFT asset") {
-    for (v <- supportedVersions) {
-      val assetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength + 1).mkString
-      val assetDescription = ByteString.copyFrom("nft asset".getBytes(StandardCharsets.UTF_8))
-      val issuerBalance = sender.grpc.wavesBalance(issuerAddress).available
-      val issuerEffBalance = sender.grpc.wavesBalance(issuerAddress).effective
-      val (nftQuantity, nftDecimals, nftReissuable, nftIssueFee) = (1, 0, false, minFee)
-
-      val issuedAssetTx = sender.grpc.broadcastIssue(issuer, assetName, nftQuantity, nftDecimals, nftReissuable, nftIssueFee, assetDescription, version = v, script = scriptText(v), waitForTx = true)
-      val issuedAssetId = PBTransactions.vanilla(issuedAssetTx).explicitGet().id().base58
-
-      sender.grpc.wavesBalance(issuerAddress).available shouldBe issuerBalance - nftIssueFee
-      sender.grpc.wavesBalance(issuerAddress).effective shouldBe issuerEffBalance - nftIssueFee
-      sender.grpc.assetsBalance(issuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe nftQuantity
-
-      val assetInfo = sender.grpc.getTransaction(issuedAssetId).getTransaction.getIssue
-
-      assetInfo.decimals shouldBe nftDecimals
-      assetInfo.amount shouldBe nftQuantity
-      assetInfo.reissuable shouldBe nftReissuable
-    }
-  }
-
   test("not able to issue asset with fee less then issueFee (minFee for NFT)") {
     for (v <- supportedVersions) {
       val assetName = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength + 1).mkString
