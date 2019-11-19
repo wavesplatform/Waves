@@ -9,9 +9,9 @@ import monix.reactive.Observable
 
 trait AddressTransactions {
   def addressTransactionsObservable(
-                                     address: Address,
-                                     types: Set[TransactionParser],
-                                     fromId: Option[ByteStr] = None
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr] = None
   ): Observable[(Height, Transaction)]
 }
 
@@ -24,9 +24,9 @@ object AddressTransactions {
 
   case object Empty extends AddressTransactions {
     override def addressTransactionsObservable(
-                                                address: Address,
-                                                types: Set[TransactionParser],
-                                                fromId: Option[BlockId]
+        address: Address,
+        types: Set[TransactionParser],
+        fromId: Option[BlockId]
     ): Observable[(Height, Transaction)] =
       Observable.empty
   }
