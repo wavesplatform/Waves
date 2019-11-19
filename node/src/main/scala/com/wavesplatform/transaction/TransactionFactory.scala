@@ -263,14 +263,7 @@ object TransactionFactory {
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
-      tx <- SponsorFeeTransaction.signed(
-        sender,
-        assetId,
-        request.minSponsoredAssetFee,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- SponsorFeeTransaction.signed(1.toByte, sender, assetId, request.minSponsoredAssetFee, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def sponsor(request: SponsorFeeRequest, sender: PublicKey): Either[ValidationError, SponsorFeeTransaction] =
@@ -282,14 +275,7 @@ object TransactionFactory {
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
-      tx <- SponsorFeeTransaction.create(
-        sender,
-        assetId,
-        request.minSponsoredAssetFee,
-        request.fee,
-        request.timestamp.getOrElse(0),
-        Proofs.empty
-      )
+      tx <- SponsorFeeTransaction.create(1.toByte, sender, assetId, request.minSponsoredAssetFee, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
     } yield tx
 
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {

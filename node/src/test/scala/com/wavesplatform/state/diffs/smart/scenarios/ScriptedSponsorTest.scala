@@ -116,13 +116,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
-        .selfSigned(
-          contract,
-          IssuedAsset(issueTx.id()),
-          Some(1),
-          ENOUGH_FEE,
-          timestamp + 4
-        )
+        .selfSigned(1.toByte, contract, IssuedAsset(issueTx.id()), Some(1), ENOUGH_FEE, timestamp + 4)
         .explicitGet()
       transferToRecipient = TransferTransaction
         .selfSigned(
@@ -183,13 +177,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         )
         .explicitGet()
       sponsorTx = SponsorFeeTransaction
-        .selfSigned(
-          sponsor,
-          IssuedAsset(issueTx.id()),
-          Some(1),
-          ENOUGH_FEE,
-          timestamp + 4
-        )
+        .selfSigned(1.toByte, sponsor, IssuedAsset(issueTx.id()), Some(1), ENOUGH_FEE, timestamp + 4)
         .explicitGet()
       transferToContract = TransferTransaction
         .selfSigned(

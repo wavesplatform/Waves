@@ -93,7 +93,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
       case ((allTxsWithValid, validIssueTxs, reissuableIssueTxs, activeLeaseTransactions, aliases), i) =>
         val timestamp = System.currentTimeMillis() + i
 
-        val tx = typeGen.getRandom match {
+        val tx: Option[Transaction] = typeGen.getRandom match {
           case IssueTransaction =>
             val sender      = randomFrom(accounts).get
             val name        = new Array[Byte](10)
@@ -141,7 +141,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                     sender,
                     IssuedAsset(assetTx.id()),
                     Random.nextInt(Int.MaxValue),
-                    true,
+                    reissuable =true,
                     100400000L,
                     timestamp
                   )
@@ -254,7 +254,7 @@ class NarrowTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
                 assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx <- logOption(
-                  SponsorFeeTransaction.selfSigned(sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, timestamp)
+                  SponsorFeeTransaction.selfSigned(1.toByte, sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, timestamp)
                 )
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
