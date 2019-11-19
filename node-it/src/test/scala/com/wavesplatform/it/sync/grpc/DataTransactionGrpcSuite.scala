@@ -27,7 +27,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance - fee
   }
 
-  test("cannot transact without having enough waves") {
+  test("cannot put data without having enough waves") {
     val firstBalance = sender.grpc.wavesBalance(firstAddress).available
     val firstEffBalance = sender.grpc.wavesBalance(firstAddress).effective
     val entry = DataEntry("bool", DataEntry.Value.BoolValue(false))
