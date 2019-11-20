@@ -246,7 +246,7 @@ class LevelDBWriterSpec
 
   "addressTransactions" - {
 
-    "don't parse irrelevant transactions in transferById" in {
+    "don't parse irrelevant transactions in transferById" ignore {
       val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
       forAll(randomTransactionGen) { tx =>

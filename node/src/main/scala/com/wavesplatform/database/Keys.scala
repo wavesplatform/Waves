@@ -7,9 +7,11 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.Transaction
 
 object Keys {
   import KeyHelpers._
@@ -67,8 +69,8 @@ object Keys {
   def idToAddress(id: BigInt): Key[Address]            = Key("id-to-address", bytes(26, id.toByteArray), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("address-script-history", 27, addressId.toByteArray)
-  def addressScript(addressId: BigInt)(height: Int): Key[Option[Script]] =
-    Key.opt("address-script", hAddr(28, height, addressId), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
+  def addressScript(addressId: BigInt)(height: Int): Key[Option[(Script, Long)]] =
+    Key.opt("address-script", hAddr(28, height, addressId), readScript, writeScript)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
@@ -98,8 +100,8 @@ object Keys {
   def carryFee(height: Int): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetScriptHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-script-history", 46, asset.id.arr)
-  def assetScript(asset: IssuedAsset)(height: Int): Key[Option[Script]] =
-    Key.opt("asset-script", hBytes(47, asset.id.arr, height), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
+  def assetScript(asset: IssuedAsset)(height: Int): Key[Option[(Script, Long)]] =
+    Key.opt("asset-script", hBytes(47, asset.id.arr, height), readScript, writeScript)
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
     Key.opt("asset-script", hBytes(47, asset.id.arr, height), _ => (), _ => Array[Byte]())
 
@@ -113,7 +115,7 @@ object Keys {
   def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockMeta(height), writeBlockMeta)
 
-  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
+  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] = // TODO: Store protobuf block header
     Key.opt(
       "block-header-bytes-at-height",
       h(BlockHeaderPrefix, height),
@@ -126,8 +128,8 @@ object Keys {
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
       hNum(TransactionInfoPrefix, height, n),
-      data => TransactionParsers.parseBytes(data).get,
-      _.bytes()
+      data => PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(data)),
+      tx => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
     )
 
   def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =

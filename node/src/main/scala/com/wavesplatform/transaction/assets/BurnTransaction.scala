@@ -26,7 +26,8 @@ final case class BurnTransaction(
     with VersionedTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V3 {
 
   //noinspection TypeAnnotation,ScalaStyle
   override def builder = BurnTransaction

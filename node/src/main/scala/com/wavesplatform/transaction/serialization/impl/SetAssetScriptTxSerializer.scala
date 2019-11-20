@@ -23,18 +23,26 @@ object SetAssetScriptTxSerializer {
 
   def bodyBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      asset.id.arr,
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp),
-      Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte.get),
+          sender,
+          asset.id.arr,
+          Longs.toByteArray(fee),
+          Longs.toByteArray(timestamp),
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] =
+  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[SetAssetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")

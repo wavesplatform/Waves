@@ -5,6 +5,7 @@ import java.nio.ByteBuffer
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.Shorts
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -15,6 +16,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.state.{TxNum, _}
@@ -107,8 +109,8 @@ class LevelDBWriter(
     loadBlock(Height(db.get(Keys.height)), db)
   }
 
-  override protected def loadScript(address: Address): Option[Script] = readOnly { db =>
-    addressId(address).fold(Option.empty[Script]) { addressId =>
+  override protected def loadScript(address: Address): Option[(Script, Long)] = readOnly { db =>
+    addressId(address).fold(Option.empty[(Script, Long)]) { addressId =>
       db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
     }
   }
@@ -119,7 +121,7 @@ class LevelDBWriter(
     }
   }
 
-  override protected def loadAssetScript(asset: IssuedAsset): Option[Script] = readOnly { db =>
+  override protected def loadAssetScript(asset: IssuedAsset): Option[(Script, Long)] = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
   }
 
@@ -169,7 +171,7 @@ class LevelDBWriter(
         val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
         val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script.map(_._1), sponsorship))
       case _ => None
     }
   }
@@ -327,12 +329,12 @@ class LevelDBWriter(
 
       for ((addressId, script) <- scripts) {
         expiredKeys ++= updateHistory(rw, Keys.addressScriptHistory(addressId), threshold, Keys.addressScript(addressId))
-        script.foreach { case (s, _) => rw.put(Keys.addressScript(addressId)(height), Some(s)) }
+        if (script.isDefined) rw.put(Keys.addressScript(addressId)(height), script)
       }
 
       for ((asset, script) <- assetScripts) {
         expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
-        script.foreach { case (s, _) => rw.put(Keys.assetScript(asset)(height), Some(s)) }
+        if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
       }
 
       for ((addressId, addressData) <- data) {
@@ -383,7 +385,7 @@ class LevelDBWriter(
         val newlyApprovedFeatures = featureVotes(height)
           .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
           .collect {
-            case (featureId, voteCount) if voteCount + (if (block.header.featureVotes(featureId)) 1 else 0) >= minVotes => featureId -> height
+            case (featureId, voteCount) if voteCount + (if (block.header.featureVotes.contains(featureId)) 1 else 0) >= minVotes => featureId -> height
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
@@ -616,13 +618,10 @@ class LevelDBWriter(
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
-    val txId = TransactionId(id)
-
     for {
-      (height, num) <- db.get(Keys.transactionHNById(txId))
-      txBytes       <- db.get(Keys.transactionBytesAt(height, num))
-      isTransfer    <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
-    } yield height -> TransactionParsers.parseBytes(txBytes).get.asInstanceOf[TransferTransaction]
+      (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
+      transaction   <- db.get(Keys.transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
+    } yield height -> transaction.asInstanceOf[TransferTransaction]
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
@@ -807,7 +806,7 @@ class LevelDBWriter(
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx  <- TransactionParsers.parseBytes(v)
+        tx = PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
       } txs.append((TxNum(idx), tx))
     }
 

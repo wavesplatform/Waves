@@ -23,19 +23,21 @@ import monix.eval.Coeval
 import shapeless._
 
 object ScriptRunner {
-  type TxOrd = BlockchainContext.In
+  type TxOrd         = BlockchainContext.In
   type PaymentsTxOrd = (Transaction, Option[AttachedPayments]) :+: Order :+: ScriptTransfer :+: CNil
 
-  def apply(in: TxOrd,
-            blockchain: Blockchain,
-            script: Script,
-            isAssetScript: Boolean,
-            scriptContainerAddress: ByteStr): (Log[Id], Either[ExecutionError, EVALUATED]) =
+  def apply(
+      in: TxOrd,
+      blockchain: Blockchain,
+      script: Script,
+      isAssetScript: Boolean,
+      scriptContainerAddress: ByteStr
+  ): (Log[Id], Either[ExecutionError, EVALUATED]) =
     script match {
       case s: ExprScript =>
         val evalCtx = for {
-          ds  <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
-          mi  <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress))
+          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
+          mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress))
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -49,9 +51,9 @@ object ScriptRunner {
         } yield ctx
         EvaluatorV1().applyWithLogging[EVALUATED](evalCtx, s.expr)
       case ContractScript.ContractScriptImpl(_, DApp(_, decls, _, Some(vf))) =>
-         val r = for {
-          ds  <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
-          mi  <- buildThisValue(in, blockchain, ds, None)
+        val r = for {
+          ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
+          mi <- buildThisValue(in, blockchain, ds, None)
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,

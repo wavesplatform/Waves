@@ -30,22 +30,28 @@ object MassTransferTxSerializer {
 
   def bodyBytes(tx: MassTransferTransaction): Array[Byte] = {
     import tx._
-    val transferBytes = transfers
-      .map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
+    version match {
+      case TxVersion.V1 =>
+        val transferBytes = transfers.map { case ParsedTransfer(recipient, amount) => Bytes.concat(recipient.bytes, Longs.toByteArray(amount)) }
 
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender,
-      assetId.byteRepr,
-      Shorts.toByteArray(transfers.size.toShort),
-      Bytes.concat(transferBytes: _*),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee),
-      Deser.serializeArrayWithLength(attachment)
-    )
+        Bytes.concat(
+          Array(builder.typeId, version),
+          sender,
+          assetId.byteRepr,
+          Shorts.toByteArray(transfers.size.toShort),
+          Bytes.concat(transferBytes: _*),
+          Longs.toByteArray(timestamp),
+          Longs.toByteArray(fee),
+          Deser.serializeArrayWithLength(attachment)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
   def toBytes(tx: MassTransferTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
   }
 

@@ -21,7 +21,7 @@ object BurnTxSerializer {
 
   def bodyBytes(tx: BurnTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(
+    lazy val baseBytes = Bytes.concat(
       sender,
       asset.id.arr,
       Longs.toByteArray(quantity),
@@ -38,11 +38,15 @@ object BurnTxSerializer {
           Array(builder.typeId, version, chainByte.get),
           baseBytes
         )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: BurnTransaction): Array[Byte] = {
     import tx._
+    require(!isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())

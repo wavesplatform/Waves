@@ -26,7 +26,8 @@ case class SetAssetScriptTransaction(
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V2 {
 
   //noinspection TypeAnnotation
   override val builder = SetAssetScriptTransaction

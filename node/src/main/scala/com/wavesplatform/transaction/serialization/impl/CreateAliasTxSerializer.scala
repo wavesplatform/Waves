@@ -19,7 +19,7 @@ object CreateAliasTxSerializer {
   def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
 
-    val base = Bytes.concat(
+    lazy val base = Bytes.concat(
       sender,
       Deser.serializeArrayWithLength(alias.bytes.arr),
       Longs.toByteArray(fee),
@@ -29,12 +29,13 @@ object CreateAliasTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(builder.typeId), base)
       case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version), base)
+      case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
-
+    require(!isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
