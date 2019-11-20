@@ -72,7 +72,7 @@ case class Block(
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(this.bytesWithoutSignature()), publicKey)
+    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
   }
 
   private[block] val merkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(header.version, transactionData))
