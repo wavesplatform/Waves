@@ -97,18 +97,12 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
   test("can clear script at acc0") {
     val unsigned = SetScriptTransaction
-      .create(
-        sender = acc0,
-        script = None,
-        fee = setScriptFee + 0.004.waves,
-        timestamp = System.currentTimeMillis(),
-        proofs = Proofs.empty
-      )
+      .create(1.toByte, sender = acc0, script = None, fee = setScriptFee + 0.004.waves, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
       .explicitGet()
     val sig1 = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))
 
-    val signed = unsigned.copy(proofs = Proofs(Seq(sig1, sig2)))
+    val signed = unsigned.copy(1.toByte, proofs = Proofs(Seq(sig1, sig2)))
 
     val removeScriptId = sender
       .signedBroadcast(signed.json(), waitForTx = true)

@@ -185,7 +185,7 @@ class RollbackSuite
     val pkSwapBC1 = KeyPair.fromSeed(sender.seed(firstAddress)).right.get
     val script    = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).right.get._1
     val sc1SetTx = SetScriptTransaction
-      .selfSigned(sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
+      .selfSigned(1.toByte, sender = pkSwapBC1, script = Some(script), fee = setScriptFee, timestamp = System.currentTimeMillis())
       .right
       .get
 

@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -20,8 +20,8 @@ trait Blockchain {
   def height: Int
   def score: BigInt
 
-  def blockHeaderAndSize(height: Int): Option[(BlockHeader, Int, Int, ByteStr)]
-  def blockHeaderAndSize(blockId: ByteStr): Option[(BlockHeader, Int, Int, ByteStr)]
+  def blockInfo(height: Int): Option[BlockInfo]
+  def blockInfo(blockId: ByteStr): Option[BlockInfo]
 
   def lastBlock: Option[Block]
   def carryFee: Long
@@ -93,6 +93,11 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
+
+  /**
+    * Retrieves hit source for the block at height.
+    */
+  def hitSourceAtHeight(height: Int): Option[ByteStr]
 }
 
 object Blockchain extends BlockchainExtensions {

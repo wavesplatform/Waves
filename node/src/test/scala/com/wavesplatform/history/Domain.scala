@@ -5,15 +5,18 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedTransactions, Transaction}
 import monix.execution.Scheduler.Implicits.global
 
 import scala.concurrent.duration.Duration
 
 //noinspection ScalaStyle
 case class Domain(blockchainUpdater: BlockchainUpdater with NG, levelDBWriter: LevelDBWriter) {
+  import Domain._
+
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block) = blockchainUpdater.processBlock(b).explicitGet()
@@ -28,4 +31,11 @@ case class Domain(blockchainUpdater: BlockchainUpdater with NG, levelDBWriter: L
     blockchainUpdater.addressTransactionsObservable(address, Set.empty).take(128).toListL.runSyncUnsafe(Duration.Inf)
 
   def carryFee = blockchainUpdater.carryFee
+}
+
+object Domain {
+  implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
+    def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] =
+      bcu.processBlock(block, block.header.generationSignature)
+  }
 }

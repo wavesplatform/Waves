@@ -1,44 +1,61 @@
 package com.wavesplatform
 
-import java.nio.ByteBuffer
-
-import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.block.Block.{GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, RewardBlockVersion}
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.serialization.Deser.ByteBufferOps
-import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxVersion}
+import cats.syntax.either._
+import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.block.Block.{GenerationSignatureLength, GenerationVRFSignatureLength, MaxFeaturesInBlock, ProtoBlockVersion}
+import com.wavesplatform.crypto.{KeyLength, SignatureLength}
+import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
+import com.wavesplatform.settings.GenesisSettings
+import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
 
 import scala.util.Try
 
 package object block {
-  private[block] def writeTransactionData(version: TxVersion, txs: Seq[Transaction]): Array[Byte] = {
-    val txsCount = version match {
-      case GenesisBlockVersion | PlainBlockVersion => Array(txs.size.toByte)
-      case NgBlockVersion | RewardBlockVersion     => Ints.toByteArray(txs.size)
-    }
+  type Validation[A] = Either[GenericError, A]
 
-    val txsBytesSize = txs.map(_.bytes().length + Ints.BYTES).sum
-    val txsBuf       = ByteBuffer.allocate(txsBytesSize)
-    txs.foreach(tx => txsBuf.put(Ints.toByteArray(tx.bytes().length)).put(tx.bytes()))
+  private[block] def validateBlock(b: Block): Validation[Block] =
+    (for {
+      _ <- Either.cond(b.header.reference.arr.length == SignatureLength, (), "Incorrect reference")
+      genSigLength = if (b.header.version < ProtoBlockVersion) GenerationSignatureLength else GenerationVRFSignatureLength
+      _ <- Either.cond(b.header.generationSignature.arr.length == genSigLength, (), "Incorrect generationSignature")
+      _ <- Either.cond(b.header.generator.length == KeyLength, (), "Incorrect signer")
+      _ <- Either.cond(b.header.version > 2 || b.header.featureVotes.isEmpty,(),s"Block version ${b.header.version} could not contain feature votes")
+      _ <- Either.cond(b.header.featureVotes.size <= MaxFeaturesInBlock, (), s"Block could not contain more than $MaxFeaturesInBlock feature votes")
+    } yield b).leftMap(GenericError(_))
 
-    Bytes.concat(txsCount, txsBuf.array())
+  def validateGenesisBlock(block: Block, genesisSettings: GenesisSettings): Validation[Block] =
+    for {
+      // Common validation
+      _ <- validateBlock(block)
+      // Verify signature
+      _ <- Either.cond(crypto.verify(block.signature, block.bytesWithoutSignature(), block.header.generator), (), GenericError("Passed genesis signature is not valid"))
+      // Verify initial balance
+      txsSum = block.transactionData.collect { case tx: GenesisTransaction => tx.amount }.reduce(Math.addExact(_: Long, _: Long))
+      _ <- Either.cond(txsSum == genesisSettings.initialBalance, (), GenericError(s"Initial balance ${genesisSettings.initialBalance} did not match the distributions sum $txsSum"))
+    } yield block
+
+  def validateMicroBlock(mb: MicroBlock): Validation[MicroBlock] =
+    (for {
+      _ <- Either.cond(mb.prevResBlockSig.arr.length == SignatureLength, (), s"Incorrect prevResBlockSig: ${mb.prevResBlockSig.arr.length}")
+      _ <- Either.cond(mb.totalResBlockSig.arr.length == SignatureLength, (), s"Incorrect totalResBlockSig: ${mb.totalResBlockSig.arr.length}")
+      _ <- Either.cond(mb.sender.length == KeyLength, (), s"Incorrect generator.publicKey: ${mb.sender.length}")
+      _ <- Either.cond(mb.transactionData.nonEmpty, (), "cannot create empty MicroBlock")
+      _ <- Either.cond(mb.transactionData.size <= MaxTransactionsPerMicroblock, (), s"too many txs in MicroBlock: allowed: $MaxTransactionsPerMicroblock, actual: ${mb.transactionData.size}")
+    } yield mb).leftMap(GenericError(_))
+
+  private[block] implicit class BlockOps(block: Block) {
+    def sign(signer: PrivateKey): Block                         = block.copy(signature = crypto.sign(signer, block.bytesWithoutSignature()))
+    def validate: Validation[Block]                             = validateBlock(block)
+    def validateToTry: Try[Block]                               = toTry(validateBlock(block))
+    def validateGenesis(gs: GenesisSettings): Validation[Block] = validateGenesisBlock(block, gs)
   }
 
-  private[block] def readTransactionData(version: Int, buf: ByteBuffer): Seq[Transaction] = {
-    val txCount = version match {
-      case Block.GenesisBlockVersion | Block.PlainBlockVersion => buf.get
-      case Block.NgBlockVersion | Block.RewardBlockVersion     => buf.getInt
-    }
-
-    val txs = (1 to txCount).foldLeft(List.empty[Transaction]) {
-      case (txs, _) =>
-        val size = buf.getInt
-        TransactionParsers.parseBytes(buf.getByteArray(size)).get :: txs
-    }
-    txs.reverse
+  private[block] implicit class MicroBlockOps(microBlock: MicroBlock) {
+    def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, microBlock.bytesWithoutSignature()))
+    def validate: Validation[MicroBlock]     = validateMicroBlock(microBlock)
+    def validateToTry: Try[MicroBlock]       = toTry(validateMicroBlock(microBlock))
   }
 
-  private[block] implicit class ValidationOps[A](v: Either[ValidationError, A]) {
-    def asTry: Try[A] = v.left.map(ve => new IllegalArgumentException(ve.toString)).toTry
-  }
+  private def toTry[A](result: Validation[A]): Try[A] = result.leftMap(ge => new IllegalArgumentException(ge.err)).toTry
 }

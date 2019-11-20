@@ -32,7 +32,7 @@ object BaseTargetChecker {
 
     try {
       val genesisBlock = Block.genesis(settings.blockchainSettings.genesisSettings).explicitGet()
-      blockchainUpdater.processBlock(genesisBlock)
+      blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature)
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
         case cfg if cfg.as[Boolean]("waves.miner.enable") =>

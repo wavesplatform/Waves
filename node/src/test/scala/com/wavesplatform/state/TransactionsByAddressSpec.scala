@@ -8,7 +8,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParserLite}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TransactionParser}
 import com.wavesplatform.{BlockGen, NoShrink}
 import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
@@ -67,7 +67,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
       case (sender, r1, r2, blocks) =>
         withDomain() { d =>
           for (b <- blocks) {
-            d.blockchainUpdater.processBlock(b, verify = false)
+            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
           }
 
           Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))
@@ -84,7 +84,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
   private def transactionsFromBlockchain(
       blockchain: Blockchain,
       sender: Address,
-      types: Set[TransactionParserLite] = Set.empty,
+      types: Set[TransactionParser] = Set.empty,
       fromId: Option[ByteStr] = None
   ): Seq[(Int, ByteStr)] =
     Await

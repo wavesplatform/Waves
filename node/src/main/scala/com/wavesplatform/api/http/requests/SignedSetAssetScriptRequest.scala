@@ -49,6 +49,6 @@ case class SignedSetAssetScriptRequest(
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
       chainId = AddressScheme.current.chainId
-      t <- SetAssetScriptTransaction.create(chainId, _sender, _asset, _script, fee, timestamp, _proofs)
+      t <- SetAssetScriptTransaction.create(1.toByte, _sender, _asset, _script, fee, timestamp, _proofs)
     } yield t
 }

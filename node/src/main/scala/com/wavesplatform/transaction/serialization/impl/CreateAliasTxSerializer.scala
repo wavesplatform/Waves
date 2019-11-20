@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -20,7 +21,7 @@ object CreateAliasTxSerializer {
 
     val base = Bytes.concat(
       sender,
-      Deser.serializeArray(alias.bytes.arr),
+      Deser.serializeArrayWithLength(alias.bytes.arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )

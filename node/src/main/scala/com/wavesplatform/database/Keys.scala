@@ -3,7 +3,7 @@ package com.wavesplatform.database
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
-import com.wavesplatform.block.BlockHeader
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
@@ -96,7 +96,7 @@ object Keys {
   def assetScript(asset: IssuedAsset)(height: Int): Key[Option[Script]] =
     Key.opt("asset-script", hBytes(47, height, asset.id.arr), ScriptReader.fromBytes(_).explicitGet(), _.bytes().arr)
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
-    Key.opt("asset-script", hBytes(47, height, asset.id.arr), (_ => ()), (_ => Array[Byte]()))
+    Key.opt("asset-script", hBytes(47, height, asset.id.arr), _ => (), _ => Array[Byte]())
 
   val safeRollbackHeight: Key[Int] = intKey("safe-rollback-height", 48)
 
@@ -105,8 +105,8 @@ object Keys {
 
   val BlockHeaderPrefix: Short = 50
 
-  def blockHeaderAndSizeAt(height: Height): Key[Option[(BlockHeader, Int, Int, ByteStr)]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockHeaderAndSize, writeBlockHeaderAndSize)
+  def blockInfoAt(height: Height): Key[Option[BlockInfo]] =
+    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo, writeBlockInfo)
 
   def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
@@ -172,6 +172,9 @@ object Keys {
   def blockReward(height: Int): Key[Option[Long]] =
     Key.opt("block-reward", h(BlockRewardPrefix, height), Longs.fromByteArray, Longs.toByteArray)
 
-  val wavesAmountPrefix: Short = 58
-  def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(wavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+  val WavesAmountPrefix: Short = 58
+  def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(WavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+
+  val HitSourcePrefix: Short = 59
+  def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
 }

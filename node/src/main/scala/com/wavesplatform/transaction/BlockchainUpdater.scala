@@ -6,7 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import monix.reactive.Observable
 
 trait BlockchainUpdater {
-  def processBlock(block: Block, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]]
+  def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]]
   def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit]
   def removeAfter(blockId: ByteStr): Either[ValidationError, DiscardedBlocks]
   def lastBlockInfo: Observable[LastBlockInfo]

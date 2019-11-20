@@ -96,7 +96,7 @@ class LevelDBWriterSpec
     def resetGen(ts: Long): Gen[(KeyPair, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
         val unsetScriptTx = SetScriptTransaction
-          .selfSigned(master, None, 5000000, ts + 1)
+          .selfSigned(1.toByte, master, None, 5000000, ts + 1)
           .explicitGet()
 
         val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
@@ -107,7 +107,7 @@ class LevelDBWriterSpec
     def baseGen(ts: Long): Gen[(KeyPair, Seq[Block])] = accountGen.map { master =>
       val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
-        .selfSigned(master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
+        .selfSigned(1.toByte, master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
 
       val block = TestBlock.create(ts, Seq(genesisTx, setScriptTx))
@@ -129,7 +129,7 @@ class LevelDBWriterSpec
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       bcu.shutdown()
@@ -149,7 +149,7 @@ class LevelDBWriterSpec
       val (account, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       bcu.shutdown()
@@ -218,10 +218,10 @@ class LevelDBWriterSpec
           )
         )
 
-      bcu.processBlock(genesisBlock) shouldBe 'right
-      bcu.processBlock(block1) shouldBe 'right
-      bcu.processBlock(block2) shouldBe 'right
-      bcu.processBlock(block3) shouldBe 'right
+      bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block1, block1.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block2, block2.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block3, block3.header.generationSignature) shouldBe 'right
 
       bcu.blockAt(1).get shouldBe genesisBlock
       bcu.blockAt(2).get shouldBe block1
@@ -229,7 +229,7 @@ class LevelDBWriterSpec
       bcu.blockAt(4).get shouldBe block3
 
       for (i <- 1 to db.get(Keys.height)) {
-        db.get(Keys.blockHeaderAndSizeAt(Height(i))).isDefined shouldBe true
+        db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
       }
 
       bcu.blockBytes(1).get shouldBe genesisBlock.bytes()

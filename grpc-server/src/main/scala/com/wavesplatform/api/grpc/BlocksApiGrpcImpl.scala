@@ -5,6 +5,7 @@ import com.google.protobuf.wrappers.UInt32Value
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.grpc.BlockRequest.Request
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.protobuf.block.PBBlock
 import com.wavesplatform.state.Blockchain
 import io.grpc.stub.StreamObserver
@@ -30,7 +31,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) } else
         commonApi
           .blockHeadersRange(request.fromHeight, request.toHeight)
-          .map { case (header, _, _, signature, height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), signature)), height) }
+          .map { case (BlockInfo(header, _, _, signature), height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), signature)), height) }
 
     responseObserver.completeWith(request.filter.generator match {
       case Some(generator) => stream.filter(_.block.exists(_.header.exists(h => h.generator.toAddress == generator.toAddress)))
