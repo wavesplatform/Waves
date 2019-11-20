@@ -49,17 +49,17 @@ object IssueTxSerializer {
           Deser.serializeOptionOfArrayWithLength(script)(_.bytes())
         )
 
-      case TxVersion.V3 =>
+      case _ =>
         PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 

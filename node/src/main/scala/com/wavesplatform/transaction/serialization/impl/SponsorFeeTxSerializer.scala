@@ -32,17 +32,15 @@ object SponsorFeeTxSerializer {
           Longs.toByteArray(timestamp)
         )
 
-      case TxVersion.V2 =>
+      case _ =>
         PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: SponsorFeeTransaction): Array[Byte] = {
     import tx._
-    version match {
-      case TxVersion.V1 => Bytes.concat(Array(0: Byte, builder.typeId, version), this.bodyBytes(tx), proofs.bytes()) // [typeId, version] appears twice
-      case TxVersion.V2 => throw new IllegalArgumentException("Should be serialized with protobuf")
-    }
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
+    Bytes.concat(Array(0: Byte, builder.typeId, version), this.bodyBytes(tx), proofs.bytes()) // [typeId, version] appears twice
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SponsorFeeTransaction] = Try {

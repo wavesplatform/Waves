@@ -34,17 +34,14 @@ object SetAssetScriptTxSerializer {
           Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr)
         )
 
-      case TxVersion.V2 =>
+      case _ =>
         PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 =>
-      Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
-
-    case TxVersion.V2 =>
-      throw new IllegalArgumentException("Should be serialized with protobuf")
+  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
+    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SetAssetScriptTransaction] = Try {

@@ -39,17 +39,17 @@ object BurnTxSerializer {
           baseBytes
         )
 
-      case TxVersion.V3 =>
+      case _ =>
         PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: BurnTransaction): Array[Byte] = {
     import tx._
+    require(!isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 

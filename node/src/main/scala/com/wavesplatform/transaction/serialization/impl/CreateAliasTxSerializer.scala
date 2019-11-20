@@ -29,17 +29,16 @@ object CreateAliasTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(builder.typeId), base)
       case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version), base)
-      case TxVersion.V3 => PBTransactionSerializer.bodyBytes(tx)
+      case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
-
+    require(!isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 

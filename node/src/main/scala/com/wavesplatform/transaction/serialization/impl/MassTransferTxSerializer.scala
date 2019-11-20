@@ -45,17 +45,14 @@ object MassTransferTxSerializer {
           Deser.serializeArrayWithLength(attachment)
         )
 
-      case TxVersion.V2 =>
+      case _ =>
         PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: MassTransferTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 =>
-      Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
-
-    case TxVersion.V2 =>
-      throw new IllegalArgumentException("Should be serialized with protobuf")
+  def toBytes(tx: MassTransferTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
+    Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
   }
 
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
