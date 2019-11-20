@@ -10,6 +10,7 @@ import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockInfo
+import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -290,6 +291,12 @@ package object database extends ScorexLogging {
       ndo.writeLong(bh.rewardVote)
 
     ndo.write(bh.generator)
+
+    if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) Don't write length in case of using standard digest
+      ndo.writeInt(bh.transactionsRoot.arr.length)
+      ndo.writeByteStr(bh.transactionsRoot)
+    }
+
     ndo.write(signature)
 
     ndo.toByteArray
@@ -317,11 +324,13 @@ package object database extends ScorexLogging {
     }
 
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
     val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
+
+    val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ndi.readByteStr(ndi.readInt())
 
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
@@ -334,7 +343,8 @@ package object database extends ScorexLogging {
       ByteStr(genSig),
       PublicKey(ByteStr(generator)),
       featureVotes,
-      rewardVote
+      rewardVote,
+      transactionsRoot
     )
 
     BlockInfo(header, size, transactionCount, ByteStr(signature))
@@ -439,18 +449,7 @@ package object database extends ScorexLogging {
   }
 
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
-    Block.build(
-      header.version,
-      header.timestamp,
-      header.reference,
-      header.baseTarget,
-      header.generationSignature,
-      txs,
-      header.generator,
-      signature,
-      header.featureVotes,
-      header.rewardVote
-    )
+    Validators.validateBlock(Block(header, signature, txs))
 
   def writeScript(script: (Script, Long)): Array[Byte] =
     script._1.bytes().arr ++ Longs.toByteArray(script._2)

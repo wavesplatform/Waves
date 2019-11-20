@@ -17,13 +17,14 @@ object PBBlocks {
                baseTarget: Long,
                generationSignature: ByteStr,
                transactionData: Seq[VanillaTransaction],
-               featureVotes: Set[Short],
+               featureVotes: Seq[Short],
                rewardVote: Long,
                generator: PublicKey,
-               signature: ByteStr): VanillaBlock = {
+               signature: ByteStr,
+               merkle: ByteStr): VanillaBlock = {
       VanillaBlock(
         BlockHeader(
-          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote
+          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle
         ),
         signature,
         transactionData
@@ -40,10 +41,11 @@ object PBBlocks {
         header.baseTarget,
         ByteStr(header.generationSignature.toByteArray),
         transactions,
-        header.featureVotes.map(intToShort).toSet,
+        header.featureVotes.map(intToShort),
         header.rewardVote,
         PublicKey(header.generator.toByteArray),
-        ByteStr(block.signature.toByteArray)
+        ByteStr(block.signature.toByteArray),
+        ByteStr(header.transactionsRoot.toByteArray)
       )
     } yield result
   }
@@ -59,11 +61,12 @@ object PBBlocks {
           ByteString.copyFrom(reference),
           baseTarget,
           ByteString.copyFrom(generationSignature),
-          header.featureVotes.map(shortToInt).toSeq,
+          header.featureVotes.map(shortToInt),
           header.timestamp,
           header.version,
           ByteString.copyFrom(generator),
-          header.rewardVote
+          header.rewardVote,
+          ByteString.copyFrom(header.transactionsRoot)
         )),
       ByteString.copyFrom(block.signature),
       transactionData.map(PBTransactions.protobuf)
