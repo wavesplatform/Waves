@@ -1,14 +1,13 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, Burn, CallableAction, DataItem, Issue, Reissue}
+import com.wavesplatform.lang.v1.traits.domain._
 
 sealed trait ScriptResult
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
@@ -165,7 +164,7 @@ object ScriptResult {
       FieldNames.IntEntry       -> (processDataEntryV4(_, FieldNames.IntEntry,     processIntEntry)),
       FieldNames.BooleanEntry   -> (processDataEntryV4(_, FieldNames.BooleanEntry, processBoolEntry)),
       FieldNames.StringEntry    -> (processDataEntryV4(_, FieldNames.StringEntry,  processStringEntry)),
-      FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBoolEntry)),
+      FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBinaryEntry)),
       FieldNames.Issue          -> processIssue,
       FieldNames.Reissue        -> processReissue,
       FieldNames.Burn           -> processBurn
