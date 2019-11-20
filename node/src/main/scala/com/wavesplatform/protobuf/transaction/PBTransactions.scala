@@ -143,10 +143,25 @@ object PBTransactions {
         vt.assets.BurnTransaction.create(version.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
-        vt.assets.SetAssetScriptTransaction.create(1.toByte, sender, IssuedAsset(assetId), script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
+        vt.assets.SetAssetScriptTransaction.create(
+          1.toByte,
+          sender,
+          IssuedAsset(assetId),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction.create(1.toByte, sender, script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
+        vt.smart.SetScriptTransaction.create(
+          1.toByte,
+          sender,
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         for {
@@ -295,10 +310,25 @@ object PBTransactions {
         vt.assets.BurnTransaction(version.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
-        vt.assets.SetAssetScriptTransaction(1.toByte, sender, IssuedAsset(assetId), script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
+        vt.assets.SetAssetScriptTransaction(
+          1.toByte,
+          sender,
+          IssuedAsset(assetId),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction(1.toByte, sender, script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get), feeAmount, timestamp, proofs)
+        vt.smart.SetScriptTransaction(
+          1.toByte,
+          sender,
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
         vt.lease.LeaseTransaction(version.toByte, sender, recipient.toAddressOrAlias.explicitGet(), amount, feeAmount, timestamp, proofs)
@@ -347,8 +377,8 @@ object PBTransactions {
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser
-            .parseOption(functionCall.toByteArray, 0, functionCall.size() - 1)(Serde.deserialize(_, all = false))
-            ._1
+            .parseByteArrayOptionWithLength(functionCall.asReadOnlyByteBuffer())
+            .map(Serde.deserialize(_, all = false))
             .map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
