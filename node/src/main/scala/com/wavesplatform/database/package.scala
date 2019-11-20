@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -450,5 +450,14 @@ package object database extends ScorexLogging {
       signature,
       header.featureVotes,
       header.rewardVote
+    )
+
+  def writeScript(script: (Script, Long)): Array[Byte] =
+    script._1.bytes().arr ++ Longs.toByteArray(script._2)
+
+  def readScript(b: Array[Byte]): (Script, Long) =
+    (
+      ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
+      ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
 }
