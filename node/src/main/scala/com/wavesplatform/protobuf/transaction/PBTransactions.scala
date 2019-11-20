@@ -212,7 +212,7 @@ object PBTransactions {
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
 
-          desFCOpt = Deser.parseOption(functionCall.toByteArray, 0)(Serde.deserialize(_))._1
+          desFCOpt = Deser.parseByteArrayOptionWithLength(functionCall.asReadOnlyByteBuffer()).map(Serde.deserialize(_))
 
           _ <- Either.cond(
             desFCOpt.isEmpty || desFCOpt.get.isRight,
