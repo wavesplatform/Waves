@@ -4,7 +4,7 @@ import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
@@ -31,12 +31,12 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.assets.{IssueTransaction, InvokeScriptIssueTransaction}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
@@ -127,11 +127,13 @@ object InvokeScriptTransactionDiff {
           dataEntries = dataItems.map(dataItemToEntry)
 
           _ <- TracedResult(checkDataEntries(dataEntries)).leftMap(GenericError(_))
-          _ <- TracedResult(Either.cond(
-            actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
-            (),
-            GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
-          ))
+          _ <- TracedResult(
+            Either.cond(
+              actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
+              (),
+              GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+            )
+          )
 
           _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, transfers))
           _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
@@ -147,7 +149,7 @@ object InvokeScriptTransactionDiff {
           )
 
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
-          assetsComplexity = (tx.checkedAssets().map(_.id) ++ transfers.flatMap(_.assetId))
+          assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
             .map(_._2)
 
@@ -177,7 +179,7 @@ object InvokeScriptTransactionDiff {
           paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
             val totalScriptsInvoked =
-              tx.checkedAssets()
+              tx.checkedAssets
                 .collect { case asset @ IssuedAsset(_) => asset }
                 .count(blockchain.hasAssetScript) +
                 transfers.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
@@ -208,8 +210,8 @@ object InvokeScriptTransactionDiff {
           val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
           val isr = InvokeScriptResult(
-            dataEntries,
-            transfers.toSeq
+            data = dataEntries,
+            transfers = transfers.toSeq
               .filterNot { case (recipient, _) => recipient == dAppAddress }
               .flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
@@ -256,21 +258,21 @@ object InvokeScriptTransactionDiff {
   }
 
   private def paymentsPart(
-    height: Int,
-    tx: InvokeScriptTransaction,
-    dAppAddress: Address,
-    feePart: Map[Address, Portfolio]
+      height: Int,
+      tx: InvokeScriptTransaction,
+      dAppAddress: Address,
+      feePart: Map[Address, Portfolio]
   ): Diff = {
     val payablePart = tx.payments
       .map {
         case InvokeScriptTransaction.Payment(amt, assetId) =>
           assetId match {
-            case asset@IssuedAsset(_) =>
+            case asset @ IssuedAsset(_) =>
               Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
-              Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                Map(dAppAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
             case Waves =>
               Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
-              Map(dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+                Map(dAppAddress       -> Portfolio(amt, LeaseBalance.empty, Map.empty))
           }
       }
       .foldLeft(Map[Address, Portfolio]())(_ |+| _)
@@ -301,32 +303,33 @@ object InvokeScriptTransactionDiff {
 
       def applyTransfer(transfer: AssetTransfer): TracedResult[ValidationError, Diff] = {
         val AssetTransfer(addressRepr, amount, asset) = transfer
-        val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+        val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
         Asset.fromCompatId(asset) match {
           case Waves =>
             val r = Diff.stateOps(
               portfolios =
-                Map(address     -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
-                Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
+                Map(address       -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
+                  Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
             )
             TracedResult.wrapValue(r)
-          case a@IssuedAsset(id) =>
+          case a @ IssuedAsset(id) =>
             val nextDiff = Diff.stateOps(
               portfolios =
-                Map(address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
-                Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
+                Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
+                  Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
             )
             blockchain.assetScript(a) match {
               case None => nextDiff.asRight[ValidationError]
               case Some(script) =>
                 val assetVerifierDiff =
                   if (blockchain.disallowSelfPayment) nextDiff
-                  else nextDiff.copy(
-                    portfolios = Map(
-                      address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-                      dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                  else
+                    nextDiff.copy(
+                      portfolios = Map(
+                        address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
+                        dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                      )
                     )
-                  )
                 val pseudoTx = ScriptTransfer(
                   asset,
                   actionSender,
@@ -353,7 +356,8 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(issue: Issue): TracedResult[ValidationError, Diff] =
-        InvokeScriptIssueTransaction.create(tx.chainId, ??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, tx.timestamp).flatMap(AssetTransactionsDiff.issue(blockchain))
+        IssueTransaction.create(TxVersion.Pseudo, ??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, 0, tx.timestamp, List()).flatMap(AssetTransactionsDiff.issue(blockchain))
+//        InvokeScriptIssueTransaction.create(??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, tx.timestamp).flatMap(AssetTransactionsDiff.issue(blockchain))
 
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
         val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
@@ -397,7 +401,7 @@ object InvokeScriptTransactionDiff {
         case b: Burn          => applyBurn(b)
       }
       diffAcc |+| diff
-  }
+    }
 
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
     totalDiff: Diff,

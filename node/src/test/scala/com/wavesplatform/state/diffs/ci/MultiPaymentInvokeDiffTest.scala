@@ -189,16 +189,16 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
         if (multiPayment)
           Gen.listOfN(
             ContractLimits.MaxAttachedPaymentAmount - 1,
-            smartIssueTransactionGen(invoker, Gen.const(Some(commonAssetScript)))
+            issueV2TransactionGen(invoker, Gen.const(Some(commonAssetScript)))
           )
         else Gen.const(List())
-      specialIssue <- smartIssueTransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
+      specialIssue <- issueV2TransactionGen(invoker, additionalAssetScript.fold(Gen.const(none[Script]))(_.map(Some(_))))
     } yield {
       for {
         genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-        setVerifier <- SetScriptTransaction.selfSigned(invoker, Some(accountScript), fee, ts + 2)
-        setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp(invoker)), fee, ts + 2)
+        setVerifier <- SetScriptTransaction.selfSigned(1.toByte, invoker, Some(accountScript), fee, ts + 2)
+        setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(invoker)), fee, ts + 2)
         (issues, payments) =
           if (repeatAdditionalAsset) {
             val issues = specialIssue :: commonIssues.drop(1)
@@ -209,7 +209,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
             val payments = issues.map(i => Payment(1, IssuedAsset(i.id.value)))
             (issues, payments)
           }
-        ci <- InvokeScriptTransaction.selfSigned(invoker, master, None, payments, fee, Waves, ts + 3)
+        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, payments, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setVerifier, setDApp, ci, issues, master, invoker, fee)
     }.explicitGet()
 

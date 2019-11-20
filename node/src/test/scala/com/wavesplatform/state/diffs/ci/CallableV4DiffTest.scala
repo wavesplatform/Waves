@@ -13,7 +13,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, assertDiffEi, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -84,8 +84,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       for {
         genesis     <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
         genesis2    <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-        setDApp     <- SetScriptTransaction.selfSigned(master, Some(dApp(issue.id.value, reissueAmount, burnAmount)), fee, ts + 2)
-        ci <- InvokeScriptTransaction.selfSigned(invoker, master, None, Nil, fee, Waves, ts + 3)
+        setDApp     <- SetScriptTransaction.selfSigned(1.toByte, master, Some(dApp(issue.id.value, reissueAmount, burnAmount)), fee, ts + 2)
+        ci <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 

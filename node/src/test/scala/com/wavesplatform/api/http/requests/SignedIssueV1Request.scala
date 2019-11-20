@@ -3,7 +3,8 @@ package com.wavesplatform.api.http.requests
 import com.google.common.base.Charsets
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.assets.IssueTransactionV1
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.{Format, Json}
 
@@ -32,20 +33,22 @@ case class SignedIssueV1Request(
     @ApiModelProperty(required = true)
     signature: String
 ) {
-  def toTx: Either[ValidationError, IssueTransactionV1] =
+  def toTx: Either[ValidationError, IssueTransaction] =
     for {
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
       _signature <- parseBase58(signature, "invalid signature", SignatureStringLength)
-      _t <- IssueTransactionV1.create(
+      _t <- IssueTransaction.create(
+        TxVersion.V1,
         _sender,
         name.getBytes(Charsets.UTF_8),
         description.getBytes(Charsets.UTF_8),
         quantity,
         decimals,
         reissuable,
+        script = None,
         fee,
         timestamp,
-        _signature
+        Proofs(_signature)
       )
     } yield _t
 }

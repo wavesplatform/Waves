@@ -31,7 +31,7 @@ case class ExchangeTransaction(
     with FastHashId
     with SigProofsSwitch {
 
-  override def builder: TransactionParserLite = ExchangeTransaction
+  override def builder: TransactionParser = ExchangeTransaction
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
@@ -40,13 +40,13 @@ case class ExchangeTransaction(
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(ExchangeTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(ExchangeTransaction.serializer.toJson(this))
 
-  override def checkedAssets(): Seq[IssuedAsset] = {
+  override def checkedAssets: Seq[IssuedAsset] = {
     val pair = buyOrder.assetPair
     Seq(pair.priceAsset, pair.amountAsset) collect { case a: IssuedAsset => a }
   }
 }
 
-object ExchangeTransaction extends TransactionParserLite {
+object ExchangeTransaction extends TransactionParser {
   implicit val validator = ExchangeTxValidator
   val serializer         = ExchangeTxSerializer
 

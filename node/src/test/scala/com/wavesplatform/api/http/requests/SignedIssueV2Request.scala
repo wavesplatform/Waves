@@ -2,11 +2,11 @@ package com.wavesplatform.api.http.requests
 
 import cats.implicits._
 import com.google.common.base.Charsets
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
@@ -59,7 +59,7 @@ case class SignedIssueV2Request(
     @ApiModelProperty(value = "Base58 encoded compiled asset script")
     script: Option[String]
 ) {
-  def toTx: Either[ValidationError, IssueTransactionV2] =
+  def toTx: Either[ValidationError, IssueTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
@@ -68,8 +68,8 @@ case class SignedIssueV2Request(
         case None    => Right(None)
         case Some(s) => Script.fromBase64String(s).map(Some(_))
       }
-      t <- IssueTransactionV2.create(
-        AddressScheme.current.chainId,
+      t <- IssueTransaction.create(
+        TxVersion.V2,
         _sender,
         name.getBytes(Charsets.UTF_8),
         description.getBytes(Charsets.UTF_8),

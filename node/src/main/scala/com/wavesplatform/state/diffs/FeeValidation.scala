@@ -126,8 +126,8 @@ object FeeValidation {
         .exists(_.script.isDefined)
 
     val assetsCount = tx match {
-      case tx: ExchangeTransaction => tx.checkedAssets().count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
-      case _                       => tx.checkedAssets().count(blockchain.hasAssetScript)
+      case tx: ExchangeTransaction => tx.checkedAssets.count(blockchain.hasAssetScript) /* *3 if we deside to check orders and transaction */
+      case _                       => tx.checkedAssets.count(blockchain.hasAssetScript)
     }
 
     val finalAssetsCount =

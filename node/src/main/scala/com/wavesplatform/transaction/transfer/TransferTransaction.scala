@@ -38,15 +38,15 @@ case class TransferTransaction(
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
 
-  override def checkedAssets(): Seq[IssuedAsset] = assetId match {
+  override def checkedAssets: Seq[IssuedAsset] = assetId match {
     case a: IssuedAsset => Seq(a)
     case Waves          => Nil
   }
 
-  override def builder: TransactionParserLite = TransferTransaction
+  override def builder: TransactionParser = TransferTransaction
 }
 
-object TransferTransaction extends TransactionParserLite {
+object TransferTransaction extends TransactionParser {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 

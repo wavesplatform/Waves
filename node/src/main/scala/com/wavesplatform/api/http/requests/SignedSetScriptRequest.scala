@@ -45,6 +45,6 @@ case class SignedSetScriptRequest(
       }
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- SetScriptTransaction.create(_sender, _script, fee, timestamp, _proofs)
+      t           <- SetScriptTransaction.create(1.toByte, _sender, _script, fee, timestamp, _proofs)
     } yield t
 }

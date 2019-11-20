@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart.predef
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
@@ -13,21 +13,21 @@ import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -68,7 +68,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
       ExprScript(compilerScript).explicitGet()
     }
-    setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(recipient, Some(typedScript), 100000000L, ts).explicitGet()
+    setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1.toByte, recipient, Some(typedScript), 100000000L, ts).explicitGet()
 
   } yield (master, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
 
@@ -286,9 +286,9 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val reissuable  = true
           val assetScript = None
           val sponsored   = false
-          val issueTx = IssueTransactionV2
+          val issueTx = IssueTransaction
             .selfSigned(
-              AddressScheme.current.chainId,
+              TxVersion.V2,
               masterAcc,
               "testAsset".getBytes("UTF-8"),
               "Test asset".getBytes("UTF-8"),
@@ -339,7 +339,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -364,7 +364,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  |
                  | let lastBlockBaseTarget = lastBlock.baseTarget == 2
                  | let lastBlockGenerationSignature = lastBlock.generationSignature == base58'${ByteStr(
-                   Array.fill(Block.GeneratorSignatureLength)(0: Byte))}'
+                   Array.fill(Block.GenerationSignatureLength)(0: Byte)
+                 )}'
                  | let lastBlockGenerator = lastBlock.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let lastBlockGeneratorPublicKey = lastBlock.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  |
@@ -377,7 +378,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -386,7 +387,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("block info by height") {
-    val generatorSignature = ByteStr(Array.fill(Block.GeneratorSignatureLength)(0: Byte))
+    val generatorSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
 
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
@@ -421,7 +422,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -467,23 +468,16 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                   WavesContext.build(
                     DirectiveSet(V3, Account, Expression).explicitGet()
                   )
-                ))
+                )
+              )
           }
 
           val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
-          val setScriptTx    = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx    = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = InvokeScriptTransaction
-            .selfSigned(
-              masterAcc,
-              masterAcc,
-              Some(fc),
-              Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
+            .selfSigned(1.toByte, masterAcc, masterAcc, Some(fc), Seq.empty, FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee), Waves, System.currentTimeMillis())
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
@@ -554,12 +548,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             ._1
 
           val setScriptTx = SetScriptTransaction
-            .selfSigned(
-              masterAcc,
-              Some(script),
-              1000000L,
-              transferTx.timestamp + 5
-            )
+            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
@@ -591,7 +580,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -626,12 +615,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             ._1
 
           val setScriptTx = SetScriptTransaction
-            .selfSigned(
-              masterAcc,
-              Some(script),
-              1000000L,
-              transferTx.timestamp + 5
-            )
+            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()

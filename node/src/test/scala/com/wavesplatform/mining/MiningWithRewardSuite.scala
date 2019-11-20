@@ -119,14 +119,14 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           account      = createAccount
           ts           = ntpTime.correctedTime() - 60000
           genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()))
-          _ <- Task(blockchainUpdater.processBlock(genesisBlock))
+          _ <- Task(blockchainUpdater.processBlock(genesisBlock, genesisBlock.header.generationSignature))
           blocks = bps.foldLeft {
             (ts + 1, Seq[Block](genesisBlock))
           } {
             case ((ts, chain), bp) =>
               (ts + 3, bp(ts + 3, chain.head.uniqueId, account) +: chain)
           }._2
-          added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b)))
+          added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b, b.header.generationSignature)))
           _   = added.foreach(_.explicitGet())
           _   = txs.foreach(tx => utxPool.putIfNew(tx(ts + 6, account)).resultE.explicitGet())
           env = Env(blocks, account, miner, blockchainUpdater)

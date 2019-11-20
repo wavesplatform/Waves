@@ -595,7 +595,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     js shouldEqual tx.json()
   }
 
-  property("JSON format validation V2 Order") {
+  property("JSON format validation V2 OrderV3") {
     val js = Json.parse("""{
          "version": 2,
          "type":7,

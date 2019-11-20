@@ -124,11 +124,8 @@ object CommonValidation {
     }
 
     tx match {
-      case _: BurnTransactionV1    => Right(tx)
-      case _: PaymentTransaction   => Right(tx)
-      case _: GenesisTransaction   => Right(tx)
-      case _: IssueTransactionV1   => Right(tx)
-      case _: ReissueTransactionV1 => Right(tx)
+      case _: PaymentTransaction => Right(tx)
+      case _: GenesisTransaction => Right(tx)
 
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
@@ -148,7 +145,7 @@ object CommonValidation {
           case Some(sc) => scriptActivation(sc)
         }
 
-      case it: IssueTransactionV2 =>
+      case it: IssueTransaction =>
         it.script match {
           case None     => Right(tx)
           case Some(sc) => scriptActivation(sc)
@@ -162,15 +159,17 @@ object CommonValidation {
           }
         }
 
-      case t: TransferTransaction     => generic1or2Barrier(t, "transfer")
-      case t: CreateAliasTransaction  => generic1or2Barrier(t, "create alias")
-      case t: LeaseTransaction        => generic1or2Barrier(t, "lease")
-      case t: LeaseCancelTransaction  => generic1or2Barrier(t, "lease cancel")
-      case _: ReissueTransactionV2    => activationBarrier(BlockchainFeatures.SmartAccounts)
-      case _: BurnTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
+      case t: TransferTransaction    => generic1or2Barrier(t, "transfer")
+      case t: CreateAliasTransaction => generic1or2Barrier(t, "create alias")
+      case t: LeaseTransaction       => generic1or2Barrier(t, "lease")
+      case t: LeaseCancelTransaction => generic1or2Barrier(t, "lease cancel")
+      case t: ReissueTransaction     => generic1or2Barrier(t, "reissue")
+      case t: BurnTransaction        => generic1or2Barrier(t, "burn")
+
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
-      case _                          => Left(GenericError("Unknown transaction must be explicitly activated"))
+
+      case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }
 

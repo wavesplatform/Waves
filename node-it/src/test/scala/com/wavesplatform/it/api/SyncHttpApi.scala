@@ -8,11 +8,11 @@ import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -23,7 +23,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -243,10 +243,7 @@ object SyncHttpApi extends Assertions {
         script: Option[String],
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = IssueTransactionV2
-        .selfSigned(
-          chainId = AddressScheme.current.chainId,
-          sender = source,
+      val tx = IssueTransaction.selfSigned(TxVersion.V2, sender = source,
           name = name.getBytes(StandardCharsets.UTF_8),
           description = description.getBytes(StandardCharsets.UTF_8),
           quantity = quantity,
@@ -457,10 +454,7 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).signedBroadcast(tx)), waitForTx)
     }
 
-    def signedIssue(tx: SignedIssueV1Request): Transaction =
-      sync(async(n).signedIssue(tx))
-
-    def signedIssue(tx: SignedIssueV2Request): Transaction =
+    def signedIssue(tx: IssueRequest): Transaction =
       sync(async(n).signedIssue(tx))
 
     def ensureTxDoesntExist(txId: String): Unit =
@@ -704,7 +698,7 @@ object SyncHttpApi extends Assertions {
     }
 
     def wavesBalance(address: ByteString): WavesBalances = {
-      sync(async(n).grpc.wavesBalance(address))
+      accounts.getBalances(BalancesRequest.of(address, Seq(ByteString.EMPTY))).next().getWaves
     }
 
     def getTransaction(id: String): PBSignedTransaction = {

@@ -1,15 +1,31 @@
 package com.wavesplatform
 
+import java.lang.reflect.Constructor
+
 import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.utils.ScorexLogging
+import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
-package object crypto {
+import scala.util.Try
+
+package object crypto extends ScorexLogging {
   // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
   val DigestLength: Int    = 32
+
+  // Additional provider
+  private val provider: OpportunisticCurve25519Provider = {
+    val constructor = classOf[OpportunisticCurve25519Provider].getDeclaredConstructors.head
+      .asInstanceOf[Constructor[OpportunisticCurve25519Provider]]
+    constructor.setAccessible(true)
+    constructor.newInstance()
+  }
 
   // Digests
   def fastHash(m: Array[Byte]): Array[Byte]   = Blake2b256.hash(m)
@@ -21,8 +37,18 @@ package object crypto {
   def sign(account: PrivateKey, message: ByteStr): ByteStr =
     Curve25519.sign(SPrivateKey(account.arr), message)
 
+  def signVRF(account: PrivateKey, message: ByteStr): ByteStr =
+    ByteStr(provider.calculateVrfSignature(provider.getRandom(DigestLength), account.arr, message.arr))
+
   def verify(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Boolean =
     Curve25519.verify(Signature(signature.arr), message, SPublicKey(publicKey.arr))
+
+  def verifyVRF(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Either[ValidationError, ByteStr] =
+    Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))).toEither.left
+      .map { e =>
+        log.warn("Generation signatures does not match", e)
+        GenericError("Generation signatures does not match")
+      }
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 

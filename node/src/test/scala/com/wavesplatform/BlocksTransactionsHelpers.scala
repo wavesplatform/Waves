@@ -1,4 +1,5 @@
 package com.wavesplatform
+
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -6,9 +7,10 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.history.DefaultBaseTarget
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV1}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -68,17 +70,19 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
       for {
         timestamp <- timestamp
-      } yield DataTransaction.selfSigned(from, List(StringDataEntry(dataKey, Gen.numStr.sample.get)), FeeAmount, timestamp).explicitGet()
+      } yield DataTransaction.selfSigned(1.toByte, from, List(StringDataEntry(dataKey, Gen.numStr.sample.get)), FeeAmount, timestamp).explicitGet()
 
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransactionV1.selfSigned(from, "test".getBytes(), "".getBytes(), 1, 0, reissuable = false, 100000000L, timestamp).explicitGet()
+      } yield IssueTransaction
+        .selfSigned(TxVersion.V1, from, "test".getBytes(), "".getBytes(), 1, 0, reissuable = false, script = None, 100000000L, timestamp)
+        .explicitGet()
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield SetScriptTransaction.selfSigned(from, Some(script), FeeAmount, timestamp).explicitGet()
+      } yield SetScriptTransaction.selfSigned(1.toByte, from, Some(script), FeeAmount, timestamp).explicitGet()
 
     def invokeScript(
         from: KeyPair,
@@ -89,7 +93,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[InvokeScriptTransaction] =
       for {
         timestamp <- timestamp
-      } yield InvokeScriptTransaction.selfSigned(from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp).explicitGet()
+      } yield InvokeScriptTransaction.selfSigned(1.toByte, from, dapp, Some(call), payments, FeeAmount * 2, Waves, timestamp).explicitGet()
   }
 
   object UnsafeBlocks {
@@ -149,7 +153,11 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         signature = ByteStr.empty,
         transactionData = txs
       )
-      unsigned.copy(signature = ByteStr(crypto.sign(signer, unsigned.bytes())))
+      val toSign =
+        if (version < Block.ProtoBlockVersion) unsigned.bytes()
+        else PBBlocks.protobuf(unsigned).toByteArray
+      // else PBBlocks.protobuf(unsigned).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
+      unsigned.copy(signature = ByteStr(crypto.sign(signer, toSign)))
     }
   }
 }

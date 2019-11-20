@@ -8,6 +8,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._
@@ -107,7 +108,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     ) = {
       val txEi = for {
         parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-        tx              <- MassTransferTransaction.selfSigned(Waves, sender.privateKey, parsedTransfers, timestamp, fee, attachment)
+        tx              <- MassTransferTransaction.selfSigned(1.toByte, sender.privateKey, Waves, parsedTransfers, fee, timestamp, attachment)
       } yield tx
 
       val (signature, idOpt) = txEi.fold(_ => (List(fakeSignature), None), tx => (tx.proofs.base58().toList, Some(tx.id())))
@@ -170,7 +171,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
         "/transactions/sign",
         Json.obj(
           "type"      -> MassTransferTransaction.typeId,
-          "version"   -> MassTransferTransaction.version,
+          "version"   -> TxVersion.V1,
           "sender"    -> firstAddress,
           "transfers" -> transfers,
           "fee"       -> fee

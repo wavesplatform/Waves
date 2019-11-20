@@ -72,12 +72,7 @@ object StateSyntheticBenchmark {
       val setScriptBlock = nextBlock(
         Seq(
           SetScriptTransaction
-            .selfSigned(
-              richAccount,
-              Some(ExprScript(typedScript).explicitGet()),
-              1000000,
-              System.currentTimeMillis()
-            )
+            .selfSigned(1.toByte, richAccount, Some(ExprScript(typedScript).explicitGet()), 1000000, System.currentTimeMillis())
             .explicitGet()
         )
       )

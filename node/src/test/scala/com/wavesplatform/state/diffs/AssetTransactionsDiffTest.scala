@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -14,7 +13,7 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
@@ -38,7 +37,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   property("Issue+Reissue+Burn do not break waves invariant and updates state") {
     forAll(issueReissueBurnTxs(isReissuable = true)) {
-      case (((gen, issue), (reissue, burn))) =>
+      case ((gen, issue), (reissue, burn)) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen, issue))), TestBlock.create(Seq(reissue, burn))) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
@@ -63,7 +62,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     } yield (genesis, reissue, burn)
 
     forAll(setup) {
-      case ((gen, reissue, burn)) =>
+      case (gen, reissue, burn) =>
         assertDiffEi(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(reissue))) { blockDiffEi =>
           blockDiffEi should produce("Referenced assetId not found")
         }
@@ -81,8 +80,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable2            <- Arbitrary.arbitrary[Boolean]
       fee                    <- Gen.choose(1L, 2000000L)
       timestamp              <- timestampGen
-      reissue = ReissueTransactionV1.selfSigned(other, IssuedAsset(issue.assetId), quantity, reissuable2, fee, timestamp).explicitGet()
-      burn    = BurnTransactionV1.selfSigned(other, IssuedAsset(issue.assetId), quantity, fee, timestamp).explicitGet()
+      reissue = ReissueTransaction.selfSigned(1.toByte, other, IssuedAsset(issue.assetId), quantity, reissuable2, fee, timestamp).explicitGet()
+      burn    = BurnTransaction.selfSigned(1.toByte, other, IssuedAsset(issue.assetId), quantity, fee, timestamp).explicitGet()
     } yield ((gen, issue), reissue, burn)
 
     forAll(setup) {
@@ -105,7 +104,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       (issue, _, _) <- issueReissueBurnGeneratorP(ENOUGH_AMT, issuer)
       assetTransfer <- transferGeneratorP(issuer, burner, IssuedAsset(issue.assetId), Waves)
       wavesTransfer <- wavesTransferGeneratorP(issuer, burner)
-      burn = BurnTransactionV1.selfSigned(burner, IssuedAsset(issue.assetId), assetTransfer.amount, wavesTransfer.amount, timestamp).explicitGet()
+      burn = BurnTransaction
+        .selfSigned(1.toByte, burner, IssuedAsset(issue.assetId), assetTransfer.amount, wavesTransfer.amount, timestamp)
+        .explicitGet()
     } yield (genesis, issue, assetTransfer, wavesTransfer, burn)
 
     val fs =
@@ -133,9 +134,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
+      issue       <- createIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
-      reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).explicitGet()
+      reissue = ReissueTransaction.selfSigned(1.toByte, issuer, assetId, Long.MaxValue, reissuable = true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
     val fs =
@@ -145,7 +146,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         )
 
     forAll(setup) {
-      case (issuer, assetId, genesis, issue, reissue) =>
+      case (_, _, genesis, issue, reissue) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(reissue)), fs) { ei =>
           ei should produce("Asset total value overflow")
         }
@@ -162,16 +163,16 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
+      issue       <- createIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
-      reissue = ReissueTransactionV1.selfSigned(issuer, assetId, Long.MaxValue, true, 1, timestamp).explicitGet()
+      reissue = ReissueTransaction.selfSigned(1.toByte, issuer, assetId, Long.MaxValue, reissuable = true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
 
     val fs =
       TestFunctionalitySettings.Enabled
 
     forAll(setup) {
-      case (issuer, assetId, genesis, issue, reissue) =>
+      case (_, _, genesis, issue, reissue) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(reissue)), fs) { ei =>
           ei should produce("negative asset balance")
         }
@@ -189,11 +190,13 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue       <- createIssue(issuer, assetName, description, quantity, decimals, true, fee, timestamp)
+      issue       <- createIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder, assetId, quantity - 1, Waves, fee, attachment, timestamp).explicitGet()
-      reissue  = ReissueTransactionV1.selfSigned(issuer, assetId, (Long.MaxValue - quantity) + 1, true, 1, timestamp).explicitGet()
+      reissue = ReissueTransaction
+        .selfSigned(1.toByte, issuer, assetId, (Long.MaxValue - quantity) + 1, reissuable = true, 1, timestamp)
+        .explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue, transfer)
 
     val fs =
@@ -203,7 +206,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         )
 
     forAll(setup) {
-      case (issuer, assetId, genesis, issue, reissue, transfer) =>
+      case (_, _, genesis, issue, reissue, transfer) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue, transfer))), TestBlock.create(Seq(reissue)), fs) { ei =>
           ei should produce("Asset total value overflow")
         }
@@ -224,9 +227,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransactionV2, TransferTransaction, ReissueTransactionV1)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction)] =
     for {
-      version            <- Gen.oneOf(IssueTransactionV2.supportedVersions.toSeq)
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
       accountA           <- accountGen
@@ -236,32 +238,21 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      issue = IssueTransactionV2
-        .selfSigned(
-          AddressScheme.current.chainId,
-          accountA,
-          assetName,
-          description,
-          quantity,
-          decimals,
-          reissuable,
-          Some(createScript(code)),
-          smallFee,
-          timestamp + 1
-        )
+      issue = IssueTransaction
+        .selfSigned(TxVersion.V2, accountA, assetName, description, quantity, decimals, reissuable, Some(createScript(code)), smallFee, timestamp + 1)
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(1.toByte, accountA, accountB, assetId, issue.quantity, Waves, smallFee, Array.empty, timestamp + 2)
+        .selfSigned(TxVersion.V1, accountA, accountB, assetId, issue.quantity, Waves, smallFee, Array.empty, timestamp + 2)
         .explicitGet()
-      reissue = ReissueTransactionV1.selfSigned(accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+      reissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
 
   property("Can issue smart asset with script") {
     forAll(for {
       acc        <- accountGen
       genesis    <- genesisGeneratorP(acc)
-      smartIssue <- smartIssueTransactionGen(acc)
+      smartIssue <- issueV2TransactionGen(acc)
     } yield (genesis, smartIssue)) {
       case (gen, issue) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {

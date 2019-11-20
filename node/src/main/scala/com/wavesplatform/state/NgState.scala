@@ -21,6 +21,7 @@ class NgState(
     baseBlockTotalFee: Long,
     val approvedFeatures: Set[Short],
     val reward: Option[Long],
+    val hitSource: ByteStr,
     leasesToCancel: Map[ByteStr, Diff]
 ) {
 
@@ -31,12 +32,12 @@ class NgState(
   private[this] val microBlocks: MList[MicroBlock]             = MList.empty // fresh head
 
   def cancelExpiredLeases(diff: Diff): Diff =
-      leasesToCancel
-        .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
-        .foldLeft(diff) {
-          case (d, ld) =>
-            Monoid.combine(d, ld)
-        }
+    leasesToCancel
+      .collect { case (id, ld) if diff.leaseState.getOrElse(id, true) => ld }
+      .foldLeft(diff) {
+        case (d, ld) =>
+          Monoid.combine(d, ld)
+      }
 
   def microBlockIds: Seq[BlockId] =
     microBlocks.map(_.totalResBlockSig)
@@ -95,7 +96,8 @@ class NgState(
   /** HACK: this method returns LPOS portfolio as though expired leases have already been cancelled.
     * It was added to make sure miner gets proper generating balance when scheduling next mining attempt.
     */
-  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio = cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
+  def balanceDiffAt(address: Address, blockId: BlockId): Portfolio =
+    cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
 
   def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.uniqueId)(_.totalResBlockSig))
 

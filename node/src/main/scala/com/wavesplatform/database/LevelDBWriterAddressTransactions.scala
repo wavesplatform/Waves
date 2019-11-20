@@ -9,7 +9,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
-import com.wavesplatform.transaction.{Transaction, TransactionParserLite, TransactionParsers}
+import com.wavesplatform.transaction.{Transaction, TransactionParser, TransactionParsers}
 import monix.eval.Task
 import monix.reactive.Observable
 
@@ -20,9 +20,11 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
 
   import levelDBWriter.{dbSettings, readOnlyNoClose}
 
-  override def addressTransactionsObservable(address: Address,
-                                             types: Set[TransactionParserLite],
-                                             fromId: Option[ByteStr]): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
+  override def addressTransactionsObservable(
+      address: Address,
+      types: Set[TransactionParser],
+      fromId: Option[ByteStr]
+  ): Observable[(Height, Transaction)] = readOnlyNoClose { (snapshot, db) =>
     val maybeAfter = fromId.flatMap(id => db.get(Keys.transactionHNById(TransactionId(id))))
 
     db.get(Keys.addressId(address)).fold(Observable.empty[(Height, Transaction)]) { id =>
@@ -41,15 +43,19 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
 
         val addressId = AddressId(id)
         val heightNumStream = (db.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).toIterator
-          .flatMap(seqNr =>
-            db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
-              case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
-              case None                   => Nil
-          })
+          .flatMap(
+            seqNr =>
+              db.get(Keys.addressTransactionHN(addressId, seqNr)) match {
+                case Some((height, txNums)) => txNums.map { case (txType, txNum) => (height, txType, txNum) }
+                case None                   => Nil
+              }
+          )
 
-        (takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
-           .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
-         () => ())
+        (
+          takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
+            .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
+          () => ()
+        )
       } else {
         def takeAfter(txNums: Iterator[(Height, TxNum, Transaction)], maybeAfter: Option[(Height, TxNum)]) = maybeAfter match {
           case None => txNums
@@ -72,7 +78,7 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
     }
   }
 
-  private[this] def transactionsIterator(ofTypes: Seq[TransactionParserLite], reverse: Boolean): (Iterator[(Height, TxNum, Transaction)], () => Unit) =
+  private[this] def transactionsIterator(ofTypes: Seq[TransactionParser], reverse: Boolean): (Iterator[(Height, TxNum, Transaction)], () => Unit) =
     readOnlyNoClose { (snapshot, db) =>
       def iterateOverStream(prefix: Array[Byte]) = {
         import scala.collection.JavaConverters._
