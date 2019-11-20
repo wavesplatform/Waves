@@ -61,11 +61,15 @@ object ExchangeTxSerializer {
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)
         )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: ExchangeTransaction): Array[Byte] = {
     import tx._
+    require(!isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), proofs.bytes())

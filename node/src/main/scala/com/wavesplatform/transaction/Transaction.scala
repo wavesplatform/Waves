@@ -1,13 +1,12 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.serialization.{BytesSerializable, JsonSerializable}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.eval.Coeval
-import play.api.libs.json.Json
+import play.api.libs.json.{JsObject, Json}
 
-trait Transaction extends BytesSerializable with JsonSerializable {
+trait Transaction {
   val id: Coeval[ByteStr]
 
   def typeId: Byte = builder.typeId
@@ -16,8 +15,9 @@ trait Transaction extends BytesSerializable with JsonSerializable {
   def timestamp: Long
   def chainByte: Option[Byte] = None
 
+  val bytes: Coeval[Array[Byte]]
+  val json: Coeval[JsObject]
   override def toString: String = json().toString
-
   def toPrettyString: String = json.map(Json.prettyPrint).value
 
   override def equals(other: Any): Boolean = other match {

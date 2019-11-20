@@ -127,6 +127,15 @@ object CommonValidation {
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 
+      case v: VersionedTransaction if v.version < 1 =>
+        throw new IllegalArgumentException(s"Invalid tx version: $v")
+
+      case p: VersionedTransaction with LegacyPBSwitch if p.version > p.lastVersion =>
+        throw new IllegalArgumentException(s"Invalid tx version: $p")
+
+      case p: LegacyPBSwitch if p.isProtobufVersion =>
+        activationBarrier(BlockchainFeatures.BlockV5)
+
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
         activationBarrier(BlockchainFeatures.SmartAccountTrading).flatMap { tx =>

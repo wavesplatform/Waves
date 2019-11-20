@@ -27,7 +27,8 @@ case class ReissueTransaction(
     with ProvenTransaction
     with SigProofsSwitch
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V3 {
 
   //noinspection TypeAnnotation
   override val builder = ReissueTransaction

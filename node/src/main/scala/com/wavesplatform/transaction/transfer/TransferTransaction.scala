@@ -29,7 +29,8 @@ case class TransferTransaction(
 ) extends VersionedTransaction
     with SigProofsSwitch
     with FastHashId
-    with TxWithFee.InCustomAsset {
+    with TxWithFee.InCustomAsset
+    with LegacyPBSwitch.V3 {
 
   override val typeId: TxType = TransferTransaction.typeId
 
@@ -47,22 +48,21 @@ case class TransferTransaction(
 }
 
 object TransferTransaction extends TransactionParser {
+  override type TransactionT = TransferTransaction
+
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
+  val typeId: TxType                    = 4.toByte
+  val supportedVersions: Set[TxVersion] = Set(1.toByte, 2.toByte)
+  val classTag                          = ClassTag(classOf[TransferTransaction])
+
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
-  val serializer                                           = TransferTxSerializer
-
-  val typeId: TxType = 4.toByte
-
-  override def supportedVersions: Set[TxVersion] = Set(1.toByte, 2.toByte)
-
-  override type TransactionT = TransferTransaction
-
-  override def classTag: ClassTag[TransferTransaction] = ClassTag(classOf[TransferTransaction])
 
   implicit def sign(tx: TransferTransaction, privateKey: PrivateKey): TransferTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
+  val serializer = TransferTxSerializer
 
   override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
 
