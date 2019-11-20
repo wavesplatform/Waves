@@ -23,12 +23,6 @@ object EstimatorProvider {
         DiffsCommon.limitFreeComplexity(script, estimator, call)
       else
         DiffsCommon.functionComplexity(script, estimator, call)
-
-    def verifierComplexity(script: Script): Either[String, Long] =
-      if (b.isFeatureActivated(MultiPaymentInvokeScript))
-        Script.limitFreeVerifierComplexity(script, estimator)
-      else
-        Script.verifierComplexity(script, estimator)
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {
