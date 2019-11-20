@@ -14,6 +14,7 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -657,13 +658,10 @@ class LevelDBWriter(
   }
 
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
-    val txId = TransactionId(id)
-
     for {
-      (height, num) <- db.get(Keys.transactionHNById(txId))
-      txBytes       <- db.get(Keys.transactionBytesAt(height, num))
-      isTransfer    <- Try(txBytes.head == TransferTransaction.typeId || txBytes(1) == TransferTransaction.typeId).toOption if isTransfer
-    } yield height -> TransactionParsers.parseBytes(txBytes).get.asInstanceOf[TransferTransaction]
+      (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
+      transaction   <- db.get(Keys.transactionAt(height, num))
+    } yield height -> transaction.asInstanceOf[TransferTransaction]
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
@@ -991,7 +989,7 @@ class LevelDBWriter(
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx  <- TransactionParsers.parseBytes(v)
+        tx = PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
       } txs.append((TxNum(idx), tx))
     }
 
