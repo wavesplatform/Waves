@@ -57,7 +57,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             .map {
               case (account, script) =>
                 SetScriptTransaction
-                  .selfSigned(account, Some(script), FEE, ts + accounts.length + accounts.indexOf(account) + 1)
+                  .selfSigned(1.toByte, account, Some(script), FEE, ts + accounts.length + accounts.indexOf(account) + 1)
                   .explicitGet()
             }
 
@@ -109,7 +109,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
           val lastBlock = bcu.lastBlock.get
 
           val newScriptTx = SetScriptTransaction
-            .selfSigned(account, None, FEE, lastBlock.header.timestamp + 1)
+            .selfSigned(1.toByte, account, None, FEE, lastBlock.header.timestamp + 1)
             .explicitGet()
 
           val blockWithEmptyScriptTx = TestBlock
@@ -120,7 +120,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             )
 
           bcu
-            .processBlock(blockWithEmptyScriptTx)
+            .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature)
             .explicitGet()
 
           bcu.accountScript(account.toAddress) shouldEqual None
@@ -140,7 +140,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       val (accounts, blocks) = gen(ntpTime).sample.get
 
       blocks.foreach { block =>
-        bcu.processBlock(block).explicitGet()
+        bcu.processBlock(block, block.header.generationSignature).explicitGet()
       }
 
       f(accounts, bcu)

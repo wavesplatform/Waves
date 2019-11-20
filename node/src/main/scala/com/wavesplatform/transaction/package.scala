@@ -3,16 +3,17 @@ package com.wavesplatform
 import cats.data.ValidatedNel
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.utils.base58Length
 
 package object transaction {
-  val AssetIdLength: Int       = com.wavesplatform.crypto.DigestSize
+  val AssetIdLength: Int       = com.wavesplatform.crypto.DigestLength
   val AssetIdStringLength: Int = base58Length(AssetIdLength)
 
   type DiscardedTransactions = Seq[Transaction]
-  type DiscardedBlocks       = Seq[Block]
+  type DiscardedBlocks       = Seq[(Block, ByteStr)]
   type DiscardedMicroBlocks  = Seq[MicroBlock]
   type AuthorizedTransaction = Authorized with Transaction
 
@@ -27,12 +28,12 @@ package object transaction {
   type TxTimestamp = Long
   type TxByteArray = Array[Byte]
 
-  implicit class TransactionValidationOps[T <: Transaction: TxValidator](tx: T) {
+  implicit class TransactionValidationOps[T: TxValidator](tx: T) {
     def validatedNel: ValidatedNel[ValidationError, T] = implicitly[TxValidator[T]].validate(tx)
     def validatedEither: Either[ValidationError, T]    = this.validatedNel.toEither.left.map(_.head)
   }
 
-  implicit class TransactionSignOps[T <: Transaction](tx: T)(implicit sign: (T, PrivateKey) => T) {
+  implicit class TransactionSignOps[T](tx: T)(implicit sign: (T, PrivateKey) => T) {
     def signWith(privateKey: PrivateKey): T = sign(tx, privateKey)
   }
 }

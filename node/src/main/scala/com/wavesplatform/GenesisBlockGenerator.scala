@@ -104,7 +104,7 @@ object GenesisBlockGenerator extends App {
         timestamp = timestamp,
         reference = reference,
         settings.baseTarget,
-        ByteStr(Array.fill(crypto.DigestSize)(0: Byte)),
+        ByteStr(Array.fill(crypto.DigestLength)(0: Byte)),
         txs = genesisTxs,
         signer = genesisSigner,
         featureVotes = Set.empty,

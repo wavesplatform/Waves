@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -11,10 +10,10 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransactionV1, IssueTransactionV2, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Matchers, PropSpec}
@@ -51,7 +50,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }
@@ -74,7 +73,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }
@@ -97,9 +96,9 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       val issueTx =
         if (smartToken)
-          IssueTransactionV2
+          IssueTransaction
             .selfSigned(
-              AddressScheme.current.chainId,
+              TxVersion.V2,
               richAcc,
               "test".getBytes("UTF-8"),
               "desc".getBytes("UTF-8"),
@@ -112,8 +111,19 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             )
             .explicitGet()
         else
-          IssueTransactionV1
-            .selfSigned(richAcc, "test".getBytes("UTF-8"), "desc".getBytes("UTF-8"), Long.MaxValue, 2, reissuable = false, Constants.UnitsInWave, ts)
+          IssueTransaction
+            .selfSigned(
+              TxVersion.V1,
+              richAcc,
+              "test".getBytes("UTF-8"),
+              "desc".getBytes("UTF-8"),
+              Long.MaxValue,
+              2,
+              reissuable = false,
+              script = None,
+              Constants.UnitsInWave,
+              ts
+            )
             .explicitGet()
 
       val transferWavesTx = TransferTransaction
@@ -121,18 +131,28 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         .explicitGet()
 
       val transferAssetTx = TransferTransaction
-        .selfSigned(1.toByte, richAcc, recipientAcc, IssuedAsset(issueTx.id()), 100, Waves, if (smartToken) {
+        .selfSigned(
+          1.toByte,
+          richAcc,
+          recipientAcc,
+          IssuedAsset(issueTx.id()),
+          100,
+          Waves,
+          if (smartToken) {
             1 * Constants.UnitsInWave + ScriptExtraFee
           } else {
             1 * Constants.UnitsInWave
-          }, Array.emptyByteArray, ts)
+          },
+          Array.emptyByteArray,
+          ts
+        )
         .explicitGet()
 
       val sponsorTx =
         if (sponsorship)
           Seq(
             SponsorFeeTransaction
-              .selfSigned(richAcc, IssuedAsset(issueTx.id()), Some(10), if (smartToken) {
+              .selfSigned(1.toByte, richAcc, IssuedAsset(issueTx.id()), Some(10), if (smartToken) {
                 Constants.UnitsInWave + ScriptExtraFee
               } else {
                 Constants.UnitsInWave
@@ -145,18 +165,23 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         if (smartAccount)
           Seq(
             SetScriptTransaction
-              .selfSigned(
-                recipientAcc,
-                Some(script),
-                1 * Constants.UnitsInWave,
-                ts
-              )
+              .selfSigned(1.toByte, recipientAcc, Some(script), 1 * Constants.UnitsInWave, ts)
               .explicitGet()
           )
         else Seq.empty
 
       val transferBackTx = TransferTransaction
-        .selfSigned(1.toByte, recipientAcc, richAcc, IssuedAsset(issueTx.id()), 1, if (feeInAssets) IssuedAsset(issueTx.id()) else Waves, feeAmount, Array.emptyByteArray, ts)
+        .selfSigned(
+          1.toByte,
+          recipientAcc,
+          richAcc,
+          IssuedAsset(issueTx.id()),
+          1,
+          if (feeInAssets) IssuedAsset(issueTx.id()) else Waves,
+          feeAmount,
+          Array.emptyByteArray,
+          ts
+        )
         .explicitGet()
 
       (TestBlock.create(Vector[Transaction](genesisTx, issueTx, transferWavesTx, transferAssetTx) ++ sponsorTx ++ setScriptTx), transferBackTx)
@@ -178,7 +203,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
         withLevelDBWriter(settings) { blockchain =>
           val BlockDiffer.Result(preconditionDiff, preconditionFees, totalFee, _, _) =
             BlockDiffer.fromBlock(blockchain, None, genesisBlock, MiningConstraint.Unlimited).explicitGet()
-          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock)
+          blockchain.append(preconditionDiff, preconditionFees, totalFee, None, genesisBlock.header.generationSignature, genesisBlock)
 
           f(FeeValidation(blockchain, transferTx))
         }

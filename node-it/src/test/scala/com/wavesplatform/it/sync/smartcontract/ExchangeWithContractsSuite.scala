@@ -55,7 +55,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
     val entry3 = BinaryDataEntry("blob", ByteStr(Base64.decode("YWxpY2U=")))
     val entry4 = StringDataEntry("str", "test")
 
-    dtx = DataTransaction.selfSigned(acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
+    dtx = DataTransaction.selfSigned(1.toByte, acc0, List(entry1, entry2, entry3, entry4), minFee, ntpTime.correctedTime()).explicitGet()
     sender.signedBroadcast(dtx.json(), waitForTx = true)
   }
 
@@ -172,18 +172,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
         val amount = math.min(buy.amount, sell.amount)
-        val tx = ExchangeTransactionV2
-          .create(
-            matcher = matcher,
-            buyOrder = buy,
+        val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
             sellOrder = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
             sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
             fee = smartMatcherFee,
-            timestamp = ntpTime.correctedTime()
-          )
+            timestamp = ntpTime.correctedTime())
           .explicitGet()
           .json()
 
@@ -213,18 +209,14 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
       val amount = math.min(buy.amount, sell.amount)
-      val tx = ExchangeTransactionV2
-        .create(
-          matcher = matcher,
-          buyOrder = buy,
+      val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
           sellOrder = sell,
           amount = amount,
           price = sellPrice,
           buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
           sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong,
           fee = smartMatcherFee,
-          timestamp = ntpTime.correctedTime()
-        )
+          timestamp = ntpTime.correctedTime())
         .explicitGet()
         .json()
 

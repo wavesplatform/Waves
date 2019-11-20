@@ -138,7 +138,7 @@ object Gen {
         case ((sender, count), i) =>
           val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
           val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(Waves, sender, transfers, now + i, fee, Array.emptyByteArray)
+          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, Array.emptyByteArray)
       }
       .collect { case Right(tx) => tx }
   }

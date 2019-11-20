@@ -216,7 +216,7 @@ case class TransactionsApiRoute(
     import com.wavesplatform.transaction.lease.LeaseTransaction
     tx match {
       case lease: LeaseTransaction =>
-        import com.wavesplatform.transaction.lease.LeaseTransaction.Status._
+        import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus._
         lease.json() ++ Json.obj("status" -> (if (blockchain.leaseDetails(lease.id()).exists(_.isActive)) Active else Canceled))
 
       case leaseCancel: LeaseCancelTransaction =>
@@ -266,5 +266,12 @@ case class TransactionsApiRoute(
         case None => Right(None)
       }
     } yield createTransactionsJsonArray(address, limit, maybeAfter)
+  }
+}
+
+object TransactionsApiRoute {
+  object LeaseStatus {
+    val Active   = "active"
+    val Canceled = "canceled"
   }
 }

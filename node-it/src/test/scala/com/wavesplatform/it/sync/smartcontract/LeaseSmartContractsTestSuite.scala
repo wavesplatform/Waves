@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -10,7 +9,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
@@ -43,13 +42,14 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     sender.setScript(acc0.stringRepr, Some(script), setScriptFee, waitForTx = true).id
 
     val unsignedLeasing =
-      LeaseTransactionV2
+      LeaseTransaction
         .create(
+          2.toByte,
           acc0,
+          acc2,
           transferAmount,
           minFee + 0.2.waves,
           System.currentTimeMillis(),
-          acc2,
           Proofs.empty
         )
         .explicitGet()
@@ -63,15 +63,17 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
     val leasingId =
       sender.signedBroadcast(signedLeasing.json(), waitForTx = true).id
 
-    miner.assertBalances(firstAddress,
-                         balance1 + 10 * transferAmount - (minFee + setScriptFee + 0.2.waves),
-                         eff1 + 9 * transferAmount - (minFee + setScriptFee + 0.2.waves))
+    miner.assertBalances(
+      firstAddress,
+      balance1 + 10 * transferAmount - (minFee + setScriptFee + 0.2.waves),
+      eff1 + 9 * transferAmount - (minFee + setScriptFee + 0.2.waves)
+    )
     miner.assertBalances(thirdAddress, balance2, eff2 + transferAmount)
 
     val unsignedCancelLeasing =
-      LeaseCancelTransactionV2
+      LeaseCancelTransaction
         .create(
-          chainId = AddressScheme.current.chainId,
+          version = 2.toByte,
           sender = acc0,
           leaseId = ByteStr.decodeBase58(leasingId).get,
           fee = minFee + 0.2.waves,
@@ -88,9 +90,11 @@ class LeaseSmartContractsTestSuite extends BaseTransactionSuite with CancelAfter
 
     sender.signedBroadcast(signedLeasingCancel.json(), waitForTx = true).id
 
-    miner.assertBalances(firstAddress,
-                         balance1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves),
-                         eff1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves))
+    miner.assertBalances(
+      firstAddress,
+      balance1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves),
+      eff1 + 10 * transferAmount - (2 * minFee + setScriptFee + 2 * 0.2.waves)
+    )
     miner.assertBalances(thirdAddress, balance2, eff2)
 
   }

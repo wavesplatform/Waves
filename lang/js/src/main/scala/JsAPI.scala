@@ -90,7 +90,7 @@ object JsAPI {
       "MaxInvokeScriptArgs"        -> ContractLimits.MaxInvokeScriptArgs,
       "MaxInvokeScriptSizeInBytes" -> ContractLimits.MaxInvokeScriptSizeInBytes,
       "MaxWriteSetSizeInBytes"     -> ContractLimits.MaxWriteSetSizeInBytes,
-      "MaxPaymentAmount"           -> ContractLimits.MaxTransferPaymentAmount,
+      "MaxPaymentAmount"           -> ContractLimits.MaxCallableActionsAmount,
       "MaxAttachedPaymentAmount"   -> ContractLimits.MaxAttachedPaymentAmount
     )
   }

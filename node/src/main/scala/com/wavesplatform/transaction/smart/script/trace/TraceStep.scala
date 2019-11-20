@@ -5,7 +5,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult}
+import com.wavesplatform.lang.v1.evaluator.{Log, ScriptResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.transaction.TxValidationError.{ScriptExecutionError, TransactionNotAllowedByScript}
 import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
@@ -68,25 +68,30 @@ case class InvokeScriptTrace(
     )
   }
 
-  private def toJson(v: ScriptResult) = Json.obj(
-    "data" -> v.ds.map(
-      item =>
+  private def toJson(v: ScriptResult) =
+    v match {
+      case ScriptResultV3(ds, ts) =>
         Json.obj(
-          "key"   -> item.key,
-          "value" -> item.value.toString
-      )),
-    "transfers" -> v.ts.map {
-      case (address, amount, assetId) =>
-        Json.obj(
-          "address" -> address.bytes.toString,
-          "amount"  -> amount,
-          "assetId" -> (assetId match {
-            case Some(id) => id.toString
-            case None     => JsNull
-          })
+          "data" -> ds.map(
+            item =>
+              Json.obj(
+                "key"   -> item.key,
+                "value" -> item.value.toString
+              )),
+          "transfers" -> ts.map {
+            transfer =>
+              Json.obj(
+                "address" -> transfer.recipient.bytes.toString,
+                "amount"  -> transfer.amount,
+                "assetId" -> (transfer.assetId match {
+                  case Some(id) => id.toString
+                  case None     => JsNull
+                })
+              )
+          }
         )
+      case ScriptResultV4(actions) => ??? //todo
     }
-  )
 }
 
 object TraceStep {

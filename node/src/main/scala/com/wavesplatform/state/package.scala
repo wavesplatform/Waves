@@ -3,7 +3,7 @@ package com.wavesplatform
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.Block.BlockId
+import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.lang.ValidationError
@@ -89,7 +89,7 @@ package object state {
   def addressTransactionsCompose(
       at: AddressTransactions,
       fromDiffIter: Observable[(Height, Transaction, Set[Address])]
-  )(address: Address, types: Set[TransactionParserLite], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
+  )(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {
@@ -159,8 +159,8 @@ package object state {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val (_, _, _, signature) =
-        blockchain.blockHeaderAndSize(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
+      val BlockInfo(_, _, _, signature) =
+        blockchain.blockInfo(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
       val balances = blockchain.balanceSnapshots(address, bottomLimit, signature)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }

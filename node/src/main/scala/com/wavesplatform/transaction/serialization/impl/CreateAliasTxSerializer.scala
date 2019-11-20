@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -10,12 +11,17 @@ import play.api.libs.json.{JsObject, Json}
 import scala.util.Try
 
 object CreateAliasTxSerializer {
+  def toJson(tx: CreateAliasTransaction): JsObject = {
+    import tx._
+    BaseTxJson.toJson(tx) ++ Json.obj("alias" -> alias.name)
+  }
+
   def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
 
     val base = Bytes.concat(
       sender,
-      Deser.serializeArray(alias.bytes.arr),
+      Deser.serializeArrayWithLength(alias.bytes.arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )
@@ -36,7 +42,7 @@ object CreateAliasTxSerializer {
   }
 
   def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {
-    require(bytes.length > 3, "Invalid tx bytes")
+    require(bytes.length > 3, "buffer underflow while parsing transaction")
     bytes.take(3) match {
       case Array(CreateAliasTransaction.typeId, _, _) =>
         val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
@@ -58,13 +64,5 @@ object CreateAliasTxSerializer {
 
       case Array(b1, b2, b3) => throw new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3")
     }
-  }
-
-  def toJson(tx: CreateAliasTransaction): JsObject = {
-    import tx._
-    ProvenTxJson.toJson(tx) ++ Json.obj(
-      "version" -> version.toByte,
-      "alias"   -> alias.name
-    )
   }
 }

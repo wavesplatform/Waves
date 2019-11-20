@@ -58,7 +58,7 @@ object Proofs {
       r    <- createWithBytes(arrs.map(ByteStr(_)), ab)
     } yield r
 
-  def apply(proof1: ByteStr, proofs: ByteStr*): Proofs = new Proofs((proof1 +: proofs))
+  def apply(proof1: ByteStr, proofs: ByteStr*): Proofs = new Proofs(proof1 +: proofs)
   implicit def apply(proofs: Seq[ByteStr]): Proofs = new Proofs(proofs)
   implicit def toSeq(proofs: Proofs): Seq[ByteStr] = proofs.proofs
 }

@@ -1,87 +1,121 @@
 package com.wavesplatform.transaction.assets
 
-import java.nio.charset.StandardCharsets
-
-import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.validation._
-import com.wavesplatform.transaction.{Asset, ProvenTransaction, TxType, VersionedTransaction}
-import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
-
-trait IssueTransaction extends ProvenTransaction with VersionedTransaction {
-  def name: Array[Byte]
-  def description: Array[Byte]
-  def quantity: Long
-  def decimals: Byte
-  def reissuable: Boolean
-  def fee: Long
-  def script: Option[Script]
-
-  override final val assetFee: (Asset, Long) = (Waves, fee)
-
-  val issueJson: Coeval[JsObject] = Coeval.evalOnce(
-    jsonBase() ++ Json.obj(
-      "version"     -> version,
-      "assetId"     -> id().toString,
-      "name"        -> new String(name, StandardCharsets.UTF_8),
-      "quantity"    -> quantity,
-      "reissuable"  -> reissuable,
-      "decimals"    -> decimals,
-      "description" -> new String(description, StandardCharsets.UTF_8)
-    )
-  )
-
-  final protected val bytesBase: Coeval[Array[Byte]] = Coeval.evalOnce(
-    Bytes.concat(
-      sender,
-      Deser.serializeArray(name),
-      Deser.serializeArray(description),
-      Longs.toByteArray(quantity),
-      Array(decimals),
-      Deser.serializeBoolean(reissuable),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
-  )
+import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.impl.IssueTxValidator
+import com.wavesplatform.transaction.{
+  FastHashId,
+  Proofs,
+  ProvenTransaction,
+  SigProofsSwitch,
+  TransactionParser,
+  TxType,
+  TxVersion,
+  TxWithFee,
+  VersionedTransaction
 }
-object IssueTransaction {
-  val typeId: TxType = 3.toByte
+import monix.eval.Coeval
+import play.api.libs.json.JsObject
 
-  val MaxDescriptionLength = 1000
-  val MaxAssetNameLength   = 16
-  val MinAssetNameLength   = 4
-  val MaxDecimals          = 8
+import scala.reflect.ClassTag
+import scala.util.Try
 
-  def validateIssueParams(tx: IssueTransaction): Either[ValidationError, Unit] = {
-    validateIssueParams(tx.name, tx.description, tx.quantity, tx.decimals, tx.reissuable, tx.fee)
-  }
+case class IssueTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    name: Array[Byte],
+    description: Array[Byte],
+    quantity: Long,
+    decimals: Byte,
+    reissuable: Boolean,
+    script: Option[Script],
+    fee: Long,
+    timestamp: Long,
+    proofs: Proofs
+) extends VersionedTransaction
+    with ProvenTransaction
+    with FastHashId
+    with SigProofsSwitch
+    with TxWithFee.InWaves {
 
-  def validateIssueParams(
+  override def builder = IssueTransaction
+
+  override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
+  override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
+  override val json: Coeval[JsObject]           = Coeval.evalOnce(builder.serializer.toJson(this))
+
+  override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
+}
+
+object IssueTransaction extends TransactionParser {
+  val MinAssetNameLength        = 4
+  val MaxAssetNameLength        = 16
+  val MaxAssetDescriptionLength = 1000
+  val MaxAssetDecimals          = 8
+
+  override type TransactionT = IssueTransaction
+
+  override val typeId: TxType                       = 3
+  override val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
+
+  val serializer = IssueTxSerializer
+
+  implicit val validator: TxValidator[IssueTransaction] = IssueTxValidator
+  implicit def sign(tx: IssueTransaction, privateKey: PrivateKey): IssueTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
       name: Array[Byte],
       description: Array[Byte],
       quantity: Long,
       decimals: Byte,
       reissuable: Boolean,
-      fee: Long
-  ): Either[ValidationError, Unit] = {
-    //noinspection UnnecessaryPartialFunction
-    (
-      validateAmount(quantity, "assets"),
-      validateName(name),
-      validateDescription(description),
-      validateDecimals(decimals),
-      validateFee(fee)
-    ).mapN { case _ => () }
-      .leftMap(_.head)
-      .toEither
-  }
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] =
+    IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs).validatedEither
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      name: Array[Byte],
+      description: Array[Byte],
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
+    create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      name: Array[Byte],
+      description: Array[Byte],
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+
+  override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()

@@ -9,6 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -105,7 +106,7 @@ package object database extends ScorexLogging {
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {
-        case crypto.DigestSize      => new Array[Byte](crypto.DigestSize)
+        case crypto.DigestLength      => new Array[Byte](crypto.DigestLength)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
       b.get(buffer)
@@ -120,7 +121,7 @@ package object database extends ScorexLogging {
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
           b.put(id.arr.length match {
-              case crypto.DigestSize      => crypto.DigestSize.toByte
+              case crypto.DigestLength      => crypto.DigestLength.toByte
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
             .put(id.arr)
@@ -264,8 +265,8 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeBlockHeaderAndSize(data: (BlockHeader, Int, Int, ByteStr)): Array[Byte] = {
-    val (bh, size, transactionCount, signature) = data
+  def writeBlockInfo(data: BlockInfo): Array[Byte] = {
+    val BlockInfo(bh, size, transactionCount, signature) = data
 
     val ndo = newDataOutput()
 
@@ -294,7 +295,7 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readBlockHeaderAndSize(bs: Array[Byte]): (BlockHeader, Int, Int, ByteStr) = {
+  def readBlockInfo(bs: Array[Byte]): BlockInfo = {
     val ndi = newDataInput(bs)
 
     val size   = ndi.readInt()
@@ -306,17 +307,18 @@ package object database extends ScorexLogging {
 
     val baseTarget = ndi.readLong()
 
-    val genSig = new Array[Byte](Block.GeneratorSignatureLength)
+    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
+    val genSig = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
-      if (version == 1 || version == 2) ndi.readByte()
+      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
       else ndi.readInt()
     }
+
     val featureVotesCount = ndi.readInt()
     val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
-
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
@@ -324,7 +326,7 @@ package object database extends ScorexLogging {
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header =  new BlockHeader(
+    val header =  BlockHeader(
       version,
       timestamp,
       ByteStr(referenceArr),
@@ -335,7 +337,7 @@ package object database extends ScorexLogging {
       rewardVote
     )
 
-    (header, size, transactionCount, ByteStr(signature))
+    BlockInfo(header, size, transactionCount, ByteStr(signature))
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
@@ -388,8 +390,8 @@ package object database extends ScorexLogging {
   }
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
-    import com.wavesplatform.crypto.DigestSize
-    def extractId(offset: Int = 2, length: Int = DigestSize): ByteStr = {
+    import com.wavesplatform.crypto.DigestLength
+    def extractId(offset: Int = 2, length: Int = DigestLength): ByteStr = {
       val id = ByteStr(new Array[Byte](length))
       Array.copy(e.getKey, offset, id.arr, 0, length)
       id

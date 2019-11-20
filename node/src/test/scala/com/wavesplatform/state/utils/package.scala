@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
 import com.wavesplatform.transaction.TransactionParsers.all
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParserLite}
+import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
@@ -30,7 +30,7 @@ package object utils {
       BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
   }
 
-  private def forTypeSet(types: Set[Byte]): Set[TransactionParserLite] =
+  private def forTypeSet(types: Set[Byte]): Set[TransactionParser] =
     all.values.filter(tp => types.contains(tp.typeId)).toSet
 
   implicit class BlockchainAddressTransactionsList(b: Blockchain) {

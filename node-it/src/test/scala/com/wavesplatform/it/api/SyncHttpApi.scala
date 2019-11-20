@@ -8,11 +8,11 @@ import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
-import com.wavesplatform.api.http.requests.{SignedIssueV1Request, SignedIssueV2Request}
+import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -23,13 +23,13 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
-import com.wavesplatform.transaction.{Asset, TxVersion}
-import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.lease.{LeaseCancelTransactionV2, LeaseTransactionV2}
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import org.asynchttpclient.Response
@@ -74,8 +74,10 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
     case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-      Assertions.assert(statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
-                        s"\nexpected '$errorRegex'\nactual '$responseBody'")
+      Assertions.assert(
+        statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
+        s"\nexpected '$errorRegex'\nactual '$responseBody'"
+      )
     case Failure(e) => Assertions.fail(e)
     case _          => Assertions.fail("Expecting bad request")
   }
@@ -89,8 +91,11 @@ object SyncHttpApi extends Assertions {
     }
 
   def assertGrpcError[R](f: => R, errorMessage: String, expectedCode: Code): Assertion = Try(f) match {
-    case Failure(GrpcStatusRuntimeException(status, _)) => Assertions.assert(status.getCode == expectedCode
-      && status.getDescription.contains(errorMessage))
+    case Failure(GrpcStatusRuntimeException(status, _)) =>
+      Assertions.assert(
+        status.getCode == expectedCode
+          && status.getDescription.contains(errorMessage)
+      )
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
@@ -176,7 +181,7 @@ object SyncHttpApi extends Assertions {
     def blockHeadersAt(height: Int): BlockHeaders = sync(async(n).blockHeadersAt(height))
 
     def postForm(path: String, params: (String, String)*): Response =
-      sync(async(n).postForm(path, params:_*))
+      sync(async(n).postForm(path, params: _*))
 
     def postJson[A: Writes](path: String, body: A): Response =
       sync(async(n).postJson(path, body))
@@ -228,20 +233,17 @@ object SyncHttpApi extends Assertions {
     def debugPortfoliosFor(address: String, considerUnspent: Boolean): Portfolio = sync(async(n).debugPortfoliosFor(address, considerUnspent))
 
     def broadcastIssue(
-                        source: KeyPair,
-                        name: String,
-                        description: String,
-                        quantity: Long,
-                        decimals: Byte,
-                        reissuable: Boolean,
-                        fee: Long,
-                        script: Option[String],
-                        waitForTx: Boolean = false
-                      ): Transaction = {
-      val tx = IssueTransactionV2
-        .selfSigned(
-          chainId = AddressScheme.current.chainId,
-          sender = source,
+        source: KeyPair,
+        name: String,
+        description: String,
+        quantity: Long,
+        decimals: Byte,
+        reissuable: Boolean,
+        fee: Long,
+        script: Option[String],
+        waitForTx: Boolean = false
+    ): Transaction = {
+      val tx = IssueTransaction.selfSigned(TxVersion.V2, sender = source,
           name = name.getBytes(StandardCharsets.UTF_8),
           description = description.getBytes(StandardCharsets.UTF_8),
           quantity = quantity,
@@ -302,7 +304,14 @@ object SyncHttpApi extends Assertions {
 
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
-    def burn(sourceAddress: String, assetId: String, quantity: Long, fee: Long, version: TxVersion = TxVersion.V1, waitForTx: Boolean = false): Transaction =
+    def burn(
+        sourceAddress: String,
+        assetId: String,
+        quantity: Long,
+        fee: Long,
+        version: TxVersion = TxVersion.V1,
+        waitForTx: Boolean = false
+    ): Transaction =
       maybeWaitForTransaction(sync(async(n).burn(sourceAddress, assetId, quantity, fee, version)), waitForTx)
 
     def sponsorAsset(sourceAddress: String, assetId: String, baseFee: Long, fee: Long = 100000000, waitForTx: Boolean = false): Transaction = {
@@ -371,13 +380,14 @@ object SyncHttpApi extends Assertions {
     }
 
     def broadcastLease(source: KeyPair, recipient: String, leasingAmount: Long, leasingFee: Long, waitForTx: Boolean = false): Transaction = {
-      val tx = LeaseTransactionV2
+      val tx = LeaseTransaction
         .selfSigned(
+          2.toByte,
           sender = source,
+          recipient = AddressOrAlias.fromString(recipient).explicitGet(),
           amount = leasingAmount,
           fee = leasingFee,
-          timestamp = System.currentTimeMillis(),
-          recipient = AddressOrAlias.fromString(recipient).explicitGet()
+          timestamp = System.currentTimeMillis()
         )
         .explicitGet()
 
@@ -407,13 +417,13 @@ object SyncHttpApi extends Assertions {
       sync(async(n).getDataByKey(sourceAddress, key))
 
     def getDataList(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataList(sourceAddress, keys:_*))
+      sync(async(n).getDataList(sourceAddress, keys: _*))
 
     def getDataListJson(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataListJson(sourceAddress, keys:_*))
+      sync(async(n).getDataListJson(sourceAddress, keys: _*))
 
     def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
-      sync(async(n).getDataListPost(sourceAddress, keys:_*))
+      sync(async(n).getDataListPost(sourceAddress, keys: _*))
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
@@ -422,9 +432,9 @@ object SyncHttpApi extends Assertions {
       sync(async(n).activeLeases(sourceAddress))
 
     def broadcastCancelLease(source: KeyPair, leaseId: String, fee: Long, waitForTx: Boolean = false): Transaction = {
-      val tx = LeaseCancelTransactionV2
+      val tx = LeaseCancelTransaction
         .selfSigned(
-          chainId = AddressScheme.current.chainId,
+          version = TxVersion.V2,
           sender = source,
           leaseId = ByteStr.decodeBase58(leaseId).get,
           fee = fee,
@@ -444,10 +454,7 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).signedBroadcast(tx)), waitForTx)
     }
 
-    def signedIssue(tx: SignedIssueV1Request): Transaction =
-      sync(async(n).signedIssue(tx))
-
-    def signedIssue(tx: SignedIssueV2Request): Transaction =
+    def signedIssue(tx: IssueRequest): Transaction =
       sync(async(n).signedIssue(tx))
 
     def ensureTxDoesntExist(txId: String): Unit =
@@ -620,9 +627,9 @@ object SyncHttpApi extends Assertions {
     def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
       try Await.result(awaitable, atMost)
       catch {
-        case gsre: StatusRuntimeException        => throw GrpcStatusRuntimeException(gsre.getStatus, gsre.getTrailers)
-        case te: TimeoutException                => throw te
-        case NonFatal(cause)                     => throw new Exception(cause)
+        case gsre: StatusRuntimeException => throw GrpcStatusRuntimeException(gsre.getStatus, gsre.getTrailers)
+        case te: TimeoutException         => throw te
+        case NonFatal(cause)              => throw new Exception(cause)
       }
 
     def resolveAlias(alias: String): Addr = {
@@ -630,55 +637,68 @@ object SyncHttpApi extends Assertions {
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
     }
 
-    def exchange(matcher: KeyPair,
-                 buyOrder: Order,
-                 sellOrder: Order,
-                 amount: Long,
-                 price: Long,
-                 buyMatcherFee: Long,
-                 sellMatcherFee: Long,
-                 fee: Long,
-                 timestamp: Long,
-                 version: Byte,
-                 matcherFeeAssetId: String = "WAVES",
-                 waitForTx: Boolean = false): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.exchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, version, matcherFeeAssetId)), waitForTx)
+    def exchange(
+        matcher: KeyPair,
+        buyOrder: Order,
+        sellOrder: Order,
+        amount: Long,
+        price: Long,
+        buyMatcherFee: Long,
+        sellMatcherFee: Long,
+        fee: Long,
+        timestamp: Long,
+        version: Byte,
+        matcherFeeAssetId: String = "WAVES",
+        waitForTx: Boolean = false
+    ): PBSignedTransaction = {
+      maybeWaitForTransaction(
+        sync(
+          async(n).grpc
+            .exchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, version, matcherFeeAssetId)
+        ),
+        waitForTx
+      )
     }
 
-    def broadcastIssue(source: KeyPair,
-                       name: String,
-                       quantity: Long,
-                       decimals: Byte,
-                       reissuable: Boolean,
-                       fee: Long,
-                       description: ByteString = ByteString.EMPTY,
-                       script: Option[String] = None,
-                       version: Int = 2,
-                       waitForTx: Boolean = false
-                      ): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.broadcastIssue(source, name, quantity, decimals, reissuable, fee, description, script, version)), waitForTx)
+    def broadcastIssue(
+        source: KeyPair,
+        name: String,
+        quantity: Long,
+        decimals: Byte,
+        reissuable: Boolean,
+        fee: Long,
+        description: ByteString = ByteString.EMPTY,
+        script: Option[String] = None,
+        version: Int = 2,
+        waitForTx: Boolean = false
+    ): PBSignedTransaction = {
+      maybeWaitForTransaction(
+        sync(async(n).grpc.broadcastIssue(source, name, quantity, decimals, reissuable, fee, description, script, version)),
+        waitForTx
+      )
     }
 
-    def broadcastTransfer(source: KeyPair,
-                          recipient: Recipient,
-                          amount: Long,
-                          fee: Long,
-                          version: Int = 2,
-                          assetId: String = "WAVES",
-                          attachment: ByteString = ByteString.EMPTY,
-                          waitForTx: Boolean = false
-                         ): PBSignedTransaction = {
+    def broadcastTransfer(
+        source: KeyPair,
+        recipient: Recipient,
+        amount: Long,
+        fee: Long,
+        version: Int = 2,
+        assetId: String = "WAVES",
+        attachment: ByteString = ByteString.EMPTY,
+        waitForTx: Boolean = false
+    ): PBSignedTransaction = {
       maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment)), waitForTx)
     }
 
     def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
       val pbAssetIds = assetIds.map(a => ByteString.copyFrom(Base58.decode(a)))
-      val balances = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
+      val balances   = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
       balances.map(b => Base58.encode(b.getAsset.assetId.toByteArray) -> b.getAsset.amount).toMap
     }
 
     def wavesBalance(address: ByteString): WavesBalances = {
-      sync(async(n).grpc.wavesBalance(address))
+      accounts.getBalances(BalancesRequest.of(address, Seq(ByteString.EMPTY))).next().getWaves
     }
 
     def getTransaction(id: String): PBSignedTransaction = {
