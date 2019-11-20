@@ -456,5 +456,8 @@ package object database extends ScorexLogging {
     script._1.bytes().arr ++ Longs.toByteArray(script._2)
 
   def readScript(b: Array[Byte]): (Script, Long) =
-    (ScriptReader.fromBytes(b).explicitGet(), ByteBuffer.wrap(b, b.length - 8, 8).getLong)
+    (
+      ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
+      ByteBuffer.wrap(b, b.length - 8, 8).getLong
+    )
 }
