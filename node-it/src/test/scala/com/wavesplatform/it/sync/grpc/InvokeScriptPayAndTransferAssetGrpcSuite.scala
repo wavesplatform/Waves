@@ -149,5 +149,4 @@ class InvokeScriptPayAndTransferAssetGrpcSuite extends GrpcBaseTransactionSuite 
       waitForTx = true
     )
   }
-
 }
