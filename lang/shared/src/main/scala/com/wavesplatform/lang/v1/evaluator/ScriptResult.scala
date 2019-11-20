@@ -1,13 +1,13 @@
 package com.wavesplatform.lang.v1.evaluator
+
 import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import com.wavesplatform.lang.v1.traits.domain.{Burn, CallableAction, DataItem, Issue, Reissue, AssetTransfer}
+import com.wavesplatform.lang.v1.traits.domain._
 
 sealed trait ScriptResult
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
@@ -16,20 +16,57 @@ case class ScriptResultV4(actions: List[CallableAction]) extends ScriptResult
 object ScriptResult {
   type E[A] = Either[String, A]
 
-  private def err(actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, Nothing] =
+  private def err[A](actual: AnyRef, version: StdLibVersion, expected: String = ""): Either[ExecutionError, A] =
     Types.callableReturnType(version)
       .flatMap(t => Left(
         callableResultError(t, actual) + (if (expected.isEmpty) "" else s" instead of '$expected")
       ))
 
-  private def processDataEntry(dataEntryFields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, DataItem[_]] =
-    (dataEntryFields.get(FieldNames.Key), dataEntryFields.get(FieldNames.Value)) match {
-      case (Some(CONST_STRING(k)), Some(CONST_BOOLEAN(b))) => Right(DataItem.Bool(k, b))
-      case (Some(CONST_STRING(k)), Some(CONST_STRING(b)))  => Right(DataItem.Str(k, b))
-      case (Some(CONST_STRING(k)), Some(CONST_LONG(b)))    => Right(DataItem.Lng(k, b))
-      case (Some(CONST_STRING(k)), Some(CONST_BYTESTR(b))) => Right(DataItem.Bin(k, b))
-      case other => err(s"can't reconstruct ${FieldNames.DataEntry} from $other", version)
-    }
+  private def processDataEntryV3(fields: Map[String, EVALUATED]): Either[ExecutionError, DataItem[_]] =
+    (processIntEntry orElse processBoolEntry orElse processBinaryEntry orElse processStringEntry)
+      .lift((fields.get(FieldNames.Key), fields.get(FieldNames.Value)))
+      .fold(err[DataItem[_]](s"can't reconstruct ${FieldNames.DataEntry} from $fields", V3))(Right(_))
+
+  private def processDataEntryV4(
+    fields: Map[String, EVALUATED],
+    dataType: String,
+    entryHandler: PartialFunction[(Option[EVALUATED], Option[EVALUATED]), DataItem[_]]
+  ): Either[ExecutionError, DataItem[_]] =
+    entryHandler
+      .lift((fields.get(FieldNames.Key), fields.get(FieldNames.Value)))
+      .fold(err[DataItem[_]](s"can't reconstruct $dataType from $fields", V4))(Right(_))
+
+  private val processIntEntry =
+    processDataEntryPartially(
+      { case CONST_LONG(v) => v },
+      (k, v) => DataItem.Lng(k, v)
+    )
+
+  private val processBoolEntry =
+    processDataEntryPartially(
+      { case CONST_BOOLEAN(v) => v },
+      (k, v) => DataItem.Bool(k, v)
+    )
+
+  private val processBinaryEntry =
+    processDataEntryPartially(
+      { case CONST_BYTESTR(v) => v },
+      (k, v) => DataItem.Bin(k, v)
+    )
+
+  private val processStringEntry =
+    processDataEntryPartially(
+      { case CONST_STRING(v) => v },
+      (k, v) => DataItem.Str(k, v)
+    )
+
+  private def processDataEntryPartially[V, R <: DataItem[V]](
+    valueExtractor: PartialFunction[EVALUATED, V],
+    constructor: (String, V) => R,
+  ): PartialFunction[(Option[EVALUATED], Option[EVALUATED]), R] = {
+    case (Some(CONST_STRING(key)), Some(value)) if valueExtractor.isDefinedAt(value) =>
+      constructor(key, valueExtractor(value))
+  }
 
   private def processScriptTransfer(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, AssetTransfer] =
     (fields(FieldNames.Recipient), fields(FieldNames.Amount), fields(FieldNames.Asset)) match {
@@ -53,8 +90,8 @@ object ScriptResult {
     fields(FieldNames.Data) match {
       case ARR(xs) =>
         xs.toList.traverse {
-          case CaseObj(tpe, dataEntryFields) if tpe.name == FieldNames.DataEntry => processDataEntry(dataEntryFields, V3)
-          case other                                                             => err(other, V3, FieldNames.DataEntry)
+          case CaseObj(tpe, fields) if tpe.name == FieldNames.DataEntry => processDataEntryV3(fields)
+          case other                                                    => err(other, V3, FieldNames.DataEntry)
         }
       case other => err(other, V3, s"List(${FieldNames.Data})")
     }
@@ -112,14 +149,26 @@ object ScriptResult {
   private def processScriptResultV4(actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
-         case CaseObj(t, fields) if t.name == FieldNames.ScriptTransfer => processScriptTransfer(fields, V4)
-         case CaseObj(t, fields) if t.name == FieldNames.DataEntry      => processDataEntry(fields, V4)
-         case CaseObj(t, fields) if t.name == FieldNames.Issue          => processIssue(fields)
-         case CaseObj(t, fields) if t.name == FieldNames.Reissue        => processReissue(fields)
-         case CaseObj(t, fields) if t.name == FieldNames.Burn           => processBurn(fields)
+         case obj@CaseObj(actionType, fields) =>
+           v4ActionHandlers.get(actionType.name)
+             .map(_(fields))
+             .getOrElse(err(obj, V4))
+
          case other => err(other, V4)
       }
       .map(ScriptResultV4)
+
+  private val v4ActionHandlers: Map[String, Map[String, EVALUATED] => Either[ExecutionError, CallableAction]] =
+    Map(
+      FieldNames.ScriptTransfer -> (processScriptTransfer(_, V4)),
+      FieldNames.IntEntry       -> (processDataEntryV4(_, FieldNames.IntEntry,     processIntEntry)),
+      FieldNames.BooleanEntry   -> (processDataEntryV4(_, FieldNames.BooleanEntry, processBoolEntry)),
+      FieldNames.StringEntry    -> (processDataEntryV4(_, FieldNames.StringEntry,  processStringEntry)),
+      FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBinaryEntry)),
+      FieldNames.Issue          -> processIssue,
+      FieldNames.Reissue        -> processReissue,
+      FieldNames.Burn           -> processBurn
+    )
 
 
   def fromObj(e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =

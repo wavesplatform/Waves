@@ -156,7 +156,7 @@ object Block extends ScorexLogging {
       genSig     = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
       reference  = Array.fill(SignatureLength)(-1: Byte)
       timestamp  = genesisSettings.blockTimestamp
-      block <- create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Seq(), -1L, txs).validate
+      block      = create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Seq(), -1L, txs)
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(generator)
         case Some(predefined) => block.copy(signature = predefined)
