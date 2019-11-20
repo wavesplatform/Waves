@@ -41,7 +41,7 @@ object DataTxSerializer {
       Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
     case TxVersion.V2 =>
-      PBTransactionSerializer.toBytesPrefixed(tx)
+      throw new IllegalArgumentException("Should be serialized with protobuf")
   }
 
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {
@@ -52,18 +52,12 @@ object DataTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == DataTransaction.typeId, "transaction type mismatch")
+    require(buf.getByte == 0 && buf.getByte == DataTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
 
-    buf.getByte match {
-      case TxVersion.V1 =>
-        val sender    = buf.getPublicKey
-        val data      = parseDataEntries(buf)
-        val timestamp = buf.getLong // Timestamp before fee
-        val fee       = buf.getLong
-        DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs)
-
-      case TxVersion.V2 =>
-        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), DataTransaction)
-    }
+    val sender    = buf.getPublicKey
+    val data      = parseDataEntries(buf)
+    val timestamp = buf.getLong // Timestamp before fee
+    val fee       = buf.getLong
+    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs)
   }
 }

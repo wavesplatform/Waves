@@ -49,7 +49,7 @@ object BurnTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
+      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 
@@ -67,12 +67,8 @@ object BurnTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == BurnTransaction.typeId, "transaction type mismatch")
-      if (bytes(2) >= TxVersion.V3) {
-        PBTransactionSerializer.fromBytesAs(bytes.drop(3), BurnTransaction)
-      } else {
-        val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
-        parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
-      }
+      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
+      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {
       require(bytes(0) == BurnTransaction.typeId, "transaction type mismatch")
       val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

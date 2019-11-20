@@ -7,9 +7,11 @@ import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.transaction.Transaction
 
 object Keys {
   import KeyHelpers._
@@ -39,7 +41,7 @@ object Keys {
   def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
     Key("lease-balance", hAddr(13, height, addressId), readLeaseBalance, writeLeaseBalance)
   def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey("lease-status-history", 14, leaseId.arr)
-  val LeaseStatusPrefix: Short = 15
+  val LeaseStatusPrefix: Short                            = 15
   def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
     Key("lease-status", hBytes(LeaseStatusPrefix, height, leaseId.arr), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
 
@@ -121,8 +123,8 @@ object Keys {
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
       hNum(TransactionInfoPrefix, height, n),
-      data => TransactionParsers.parseBytes(data).get,
-      _.bytes()
+      data => PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(data)),
+      tx => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
     )
 
   def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =
@@ -172,9 +174,9 @@ object Keys {
   def blockReward(height: Int): Key[Option[Long]] =
     Key.opt("block-reward", h(BlockRewardPrefix, height), Longs.fromByteArray, Longs.toByteArray)
 
-  val WavesAmountPrefix: Short = 58
+  val WavesAmountPrefix: Short              = 58
   def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(WavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
 
-  val HitSourcePrefix: Short = 59
+  val HitSourcePrefix: Short                   = 59
   def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
 }

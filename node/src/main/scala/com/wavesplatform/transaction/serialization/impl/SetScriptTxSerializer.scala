@@ -38,30 +38,22 @@ object SetScriptTxSerializer {
   }
 
   def toBytes(tx: SetScriptTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 =>
-      Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
-
-    case TxVersion.V2 =>
-      PBTransactionSerializer.toBytesPrefixed(tx)
+    case TxVersion.V1 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    case TxVersion.V2 => throw new IllegalArgumentException("Should be serialized with protobuf")
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == SetScriptTransaction.typeId, "transaction type mismatch")
-    buf.getByte match {
-      case TxVersion.V1 =>
-        require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
-        val sender    = buf.getPublicKey
-        val script    = buf.getScript
-        val fee       = buf.getLong
-        val timestamp = buf.getLong
-        val proofs    = buf.getProofs
-        SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs)
+    require(buf.getByte == 0 && buf.getByte == SetScriptTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
+    require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
 
-      case TxVersion.V2 =>
-        PBTransactionSerializer.fromBytesAs(bytes, SetScriptTransaction)
-    }
+    val sender    = buf.getPublicKey
+    val script    = buf.getScript
+    val fee       = buf.getLong
+    val timestamp = buf.getLong
+    val proofs    = buf.getProofs
+    SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs)
   }
 }

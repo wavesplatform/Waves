@@ -44,28 +44,22 @@ object SetAssetScriptTxSerializer {
       Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
     case TxVersion.V2 =>
-      PBTransactionSerializer.toBytesPrefixed(tx)
+      throw new IllegalArgumentException("Should be serialized with protobuf")
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SetAssetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == SetAssetScriptTransaction.typeId, "transaction type mismatch")
+    require(buf.getByte == 0 && buf.getByte == SetAssetScriptTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
+    require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
 
-    buf.getByte match {
-      case TxVersion.V1 =>
-        require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
-        val sender    = buf.getPublicKey
-        val asset     = buf.getIssuedAsset
-        val fee       = buf.getLong
-        val timestamp = buf.getLong
-        val script    = buf.getScript
-        val proofs    = buf.getProofs
-        SetAssetScriptTransaction(TxVersion.V1, sender, asset, script, fee, timestamp, proofs)
-
-      case TxVersion.V2 =>
-        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), SetAssetScriptTransaction)
-    }
+    val sender    = buf.getPublicKey
+    val asset     = buf.getIssuedAsset
+    val fee       = buf.getLong
+    val timestamp = buf.getLong
+    val script    = buf.getScript
+    val proofs    = buf.getProofs
+    SetAssetScriptTransaction(TxVersion.V1, sender, asset, script, fee, timestamp, proofs)
   }
 }

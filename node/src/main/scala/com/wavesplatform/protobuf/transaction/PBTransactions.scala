@@ -35,6 +35,11 @@ object PBTransactions {
     )
   }
 
+  def vanillaUnsafe(signedTx: PBSignedTransaction): VanillaTransaction = {
+    import com.wavesplatform.common.utils._
+    vanilla(signedTx, unsafe = true).explicitGet()
+  }
+
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     for {
       parsedTx <- signedTx.transaction.toRight(GenericError("Transaction must be specified"))

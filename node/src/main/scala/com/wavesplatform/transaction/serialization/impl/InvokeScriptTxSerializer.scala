@@ -70,7 +70,7 @@ object InvokeScriptTxSerializer {
       Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
     case TxVersion.V2 =>
-      PBTransactionSerializer.toBytesPrefixed(tx)
+      throw new IllegalArgumentException("Should be serialized with protobuf")
   }
 
   def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] = Try {
@@ -82,21 +82,16 @@ object InvokeScriptTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId, "transaction type mismatch")
-    buf.getByte match {
-      case TxVersion.V1 =>
-        require(buf.getByte == AddressScheme.current.chainId, "chainId mismatch")
-        val sender       = buf.getPublicKey
-        val dApp         = buf.getAddressOrAlias
-        val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
-        val payments     = Deser.parseArrays(buf).map(parsePayment)
-        val fee          = buf.getLong
-        val feeAssetId   = buf.getAsset
-        val timestamp    = buf.getLong
-        InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs)
+    require(buf.getByte == 0 && buf.getByte == InvokeScriptTransaction.typeId && buf.getByte == 1, "transaction type mismatch")
+    require(buf.getByte == AddressScheme.current.chainId, "chainId mismatch")
 
-      case TxVersion.V2 =>
-        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), InvokeScriptTransaction)
-    }
+    val sender       = buf.getPublicKey
+    val dApp         = buf.getAddressOrAlias
+    val functionCall = Deser.parseOption(buf)(Serde.deserialize(_).explicitGet().asInstanceOf[FUNCTION_CALL])
+    val payments     = Deser.parseArrays(buf).map(parsePayment)
+    val fee          = buf.getLong
+    val feeAssetId   = buf.getAsset
+    val timestamp    = buf.getLong
+    InvokeScriptTransaction(TxVersion.V1, sender, dApp, functionCall, payments, fee, feeAssetId, timestamp, buf.getProofs)
   }
 }

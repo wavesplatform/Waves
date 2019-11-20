@@ -59,7 +59,7 @@ object IssueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
+      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 
@@ -80,14 +80,8 @@ object IssueTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == IssueTransaction.typeId, "transaction type mismatch")
-      bytes(2) match {
-        case TxVersion.V2 =>
-          val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
-          parseCommonPart(TxVersion.V2, buf).copy(script = buf.getScript, proofs = buf.getProofs)
-
-        case TxVersion.V3 =>
-          PBTransactionSerializer.fromBytesAs(bytes.drop(3), IssueTransaction)
-      }
+      val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
+      parseCommonPart(TxVersion.V2, buf).copy(script = buf.getScript, proofs = buf.getProofs)
     } else {
       require(bytes(0) == IssueTransaction.typeId, "transaction type mismatch")
       val buf       = ByteBuffer.wrap(bytes, 1, bytes.length - 1)

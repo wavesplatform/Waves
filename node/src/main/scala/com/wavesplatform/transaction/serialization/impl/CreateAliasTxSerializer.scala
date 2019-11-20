@@ -39,7 +39,7 @@ object CreateAliasTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
+      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 
@@ -63,9 +63,6 @@ object CreateAliasTxSerializer {
         val timestamp = buf.getLong
         val proofs    = buf.getProofs
         CreateAliasTransaction(Transaction.V2, sender, alias, fee, timestamp, proofs)
-
-      case Array(0, CreateAliasTransaction.typeId, 3) =>
-        PBTransactionSerializer.fromBytesAs(bytes.drop(3), CreateAliasTransaction)
 
       case Array(b1, b2, b3) => throw new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3")
     }

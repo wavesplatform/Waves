@@ -55,7 +55,7 @@ object MassTransferTxSerializer {
       Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
 
     case TxVersion.V2 =>
-      PBTransactionSerializer.toBytesPrefixed(tx)
+      throw new IllegalArgumentException("Should be serialized with protobuf")
   }
 
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
@@ -72,21 +72,15 @@ object MassTransferTxSerializer {
     }
 
     val buf = ByteBuffer.wrap(bytes)
-    require(buf.getByte == MassTransferTransaction.typeId, "transaction type mismatch")
+    require(buf.getByte == MassTransferTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
 
-    buf.getByte match {
-      case TxVersion.V1 =>
-        val sender     = buf.getPublicKey
-        val assetId    = buf.getAsset
-        val transfers  = parseTransfers(buf)
-        val timestamp  = buf.getLong // Timestamp before fee
-        val fee        = buf.getLong
-        val attachment = Deser.parseArrayWithLength(buf)
-        val proofs     = buf.getProofs
-        MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, attachment, proofs)
-
-      case TxVersion.V2 =>
-        PBTransactionSerializer.fromBytesAs(buf.getByteArray(buf.remaining()), MassTransferTransaction)
-    }
+    val sender     = buf.getPublicKey
+    val assetId    = buf.getAsset
+    val transfers  = parseTransfers(buf)
+    val timestamp  = buf.getLong // Timestamp before fee
+    val fee        = buf.getLong
+    val attachment = Deser.parseArrayWithLength(buf)
+    val proofs     = buf.getProofs
+    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, attachment, proofs)
   }
 }

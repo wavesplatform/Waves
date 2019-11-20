@@ -36,7 +36,7 @@ object LeaseTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-      case TxVersion.V3 => PBTransactionSerializer.toBytesPrefixed(tx)
+      case TxVersion.V3 => throw new IllegalArgumentException("Should be serialized with protobuf")
     }
   }
 
@@ -54,15 +54,9 @@ object LeaseTxSerializer {
 
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseTransaction.typeId, "transaction type mismatch")
-      bytes(2) match {
-        case TxVersion.V2 =>
-          val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
-          require(buf.getAsset == Waves, "Leasing assets is not supported yet")
-          parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
-
-        case TxVersion.V3 =>
-          PBTransactionSerializer.fromBytesAs(bytes.drop(3), LeaseTransaction)
-      }
+      val buf = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
+      require(buf.getAsset == Waves, "Leasing assets is not supported yet")
+      parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {
       require(bytes(0) == LeaseTransaction.typeId, "transaction type mismatch")
       val buf = ByteBuffer.wrap(bytes, 1, bytes.length - 1)
