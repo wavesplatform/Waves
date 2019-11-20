@@ -292,7 +292,7 @@ package object database extends ScorexLogging {
 
     ndo.write(bh.generator)
 
-    if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) In case of standard digest don't write length
+    if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) Don't write length in case of using standard digest
       ndo.writeInt(bh.merkle.arr.length)
       ndo.writeByteStr(bh.merkle)
     }

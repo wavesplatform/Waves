@@ -24,6 +24,8 @@ case class MicroBlock(
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
 
+  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce(copy(signature = ByteStr.empty).bytes())
+
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature.arr, this.bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 

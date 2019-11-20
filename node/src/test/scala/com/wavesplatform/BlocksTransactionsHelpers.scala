@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.history.DefaultBaseTarget

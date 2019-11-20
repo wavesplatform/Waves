@@ -7,6 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,6 +16,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
+import scorex.crypto.authds.merkle.MerkleTree
+import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
 
@@ -62,9 +65,20 @@ case class Block(
   val prevBlockFeePart: Coeval[Portfolio] =
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
+  private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
+    if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
+    else PBBlocks.protobuf(this).header.get.toByteArray
+  }
+
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
     !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(this.bytesWithoutSignature()), publicKey)
+  }
+
+  private[block] val merkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(header.version, transactionData))
+
+  val merkleRootValid: Coeval[Boolean] = Coeval.evalOnce {
+    header.version < Block.ProtoBlockVersion || ((merkleTree().rootHash untag Digest32) sameElements header.merkle.arr)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
