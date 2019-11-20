@@ -1,7 +1,6 @@
 package com.wavesplatform.transaction
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.{TransactionGen, crypto}
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.{InvokeScriptRequest, SignedInvokeScriptRequest}
 import com.wavesplatform.common.state.ByteStr
@@ -10,13 +9,14 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CONST_LONG, CaseObj}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, Serde}
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.protobuf.{Amount, transaction}
-import com.wavesplatform.protobuf.transaction.{InvokeScriptTransactionData, PBAmounts, PBRecipients, PBTransactions, SignedTransaction}
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.NonPositiveAmount
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
+import com.wavesplatform.{TransactionGen, crypto}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.{JsObject, Json}
@@ -58,11 +58,11 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
           )
         )
       )
-      val proof  = crypto.sign(caller, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-      val signed = SignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof)))
-      val convTx = PBTransactions.vanilla(signed).explicitGet()
+      val proof        = crypto.sign(caller, PBTransactions.vanilla(PBSignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+      val signed       = PBSignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof)))
+      val convTx       = PBTransactions.vanilla(signed).explicitGet()
       val unsafeConvTx = PBTransactions.vanillaUnsafe(signed)
-      val modTx  = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
+      val modTx        = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
       convTx.json() shouldBe modTx.json()
       unsafeConvTx.json() shouldBe modTx.json()
       crypto.verify(modTx.proofs.toSignature, modTx.bodyBytes(), modTx.sender) shouldBe true
