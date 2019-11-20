@@ -61,8 +61,10 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       val proof  = crypto.sign(caller, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
       val signed = SignedTransaction(Some(unsigned), Seq(ByteString.copyFrom(proof)))
       val convTx = PBTransactions.vanilla(signed).explicitGet()
+      val convUnsafeTx = PBTransactions.vanilla(signed, unsafe = true).explicitGet()
       val modTx  = tx.copy(sender = caller.publicKey, proofs = Proofs(List(proof)))
       convTx.json() shouldBe modTx.json()
+      convUnsafeTx.json() shouldBe modTx.json()
       crypto.verify(modTx.proofs.toSignature, modTx.bodyBytes(), modTx.sender) shouldBe true
 
       val convToPbTx = PBTransactions.protobuf(modTx)
