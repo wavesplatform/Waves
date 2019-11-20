@@ -21,7 +21,7 @@ object CreateAliasTxSerializer {
 
     val base = Bytes.concat(
       sender,
-      Deser.serializeArray(alias.bytes.arr),
+      Deser.serializeArrayWithLength(alias.bytes.arr),
       Longs.toByteArray(fee),
       Longs.toByteArray(timestamp)
     )

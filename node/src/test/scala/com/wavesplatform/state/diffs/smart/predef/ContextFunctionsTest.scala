@@ -68,7 +68,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       val compilerScript = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1
       ExprScript(compilerScript).explicitGet()
     }
-    setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(recipient, Some(typedScript), 100000000L, ts).explicitGet()
+    setScriptTransaction: SetScriptTransaction = SetScriptTransaction.selfSigned(1.toByte, recipient, Some(typedScript), 100000000L, ts).explicitGet()
 
   } yield (master, Seq(genesis1, genesis2), setScriptTransaction, dataTransaction, transfer, transfer2)
 
@@ -339,7 +339,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -378,7 +378,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -422,7 +422,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -473,19 +473,11 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           }
 
           val compiledScript = ContractScript(V3, compiler.ContractCompiler(ctx.compilerContext, expr, V3).explicitGet()).explicitGet()
-          val setScriptTx    = SetScriptTransaction.selfSigned(masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx    = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(compiledScript), 1000000L, transferTx.timestamp + 5).explicitGet()
           val fc             = Terms.FUNCTION_CALL(FunctionHeader.User("compareBlocks"), List.empty)
 
           val ci = InvokeScriptTransaction
-            .selfSigned(
-              masterAcc,
-              masterAcc,
-              Some(fc),
-              Seq.empty,
-              FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee),
-              Waves,
-              System.currentTimeMillis()
-            )
+            .selfSigned(1.toByte, masterAcc, masterAcc, Some(fc), Seq.empty, FeeValidation.FeeUnit * (FeeValidation.FeeConstants(InvokeScriptTransaction.typeId) + FeeValidation.ScriptExtraFee), Waves, System.currentTimeMillis())
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
@@ -556,12 +548,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             ._1
 
           val setScriptTx = SetScriptTransaction
-            .selfSigned(
-              masterAcc,
-              Some(script),
-              1000000L,
-              transferTx.timestamp + 5
-            )
+            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
@@ -593,7 +580,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .explicitGet()
             ._1
 
-          val setScriptTx = SetScriptTransaction.selfSigned(masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
+          val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5).explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
@@ -628,12 +615,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             ._1
 
           val setScriptTx = SetScriptTransaction
-            .selfSigned(
-              masterAcc,
-              Some(script),
-              1000000L,
-              transferTx.timestamp + 5
-            )
+            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
             .explicitGet()
 
           append(Seq(setScriptTx)).explicitGet()

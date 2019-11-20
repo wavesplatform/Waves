@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -820,13 +820,13 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
-        .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
+        .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
       setSellerScript = SetScriptTransaction
-        .selfSigned(seller, sellerScript, enoughFee, ts + 6)
+        .selfSigned(1.toByte, seller, sellerScript, enoughFee, ts + 6)
         .explicitGet()
       setBuyerScript = SetScriptTransaction
-        .selfSigned(buyer, buyerScript, enoughFee, ts + 7)
+        .selfSigned(1.toByte, buyer, buyerScript, enoughFee, ts + 7)
         .explicitGet()
       assetPair = AssetPair(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))
       o1 <- Gen.oneOf(
@@ -911,13 +911,13 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
-        .selfSigned(MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
+        .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
       setSellerScript = SetScriptTransaction
-        .selfSigned(seller, sellerScript, enoughFee, ts + 6)
+        .selfSigned(1.toByte, seller, sellerScript, enoughFee, ts + 6)
         .explicitGet()
       setBuyerScript = SetScriptTransaction
-        .selfSigned(buyer, buyerScript, enoughFee, ts + 7)
+        .selfSigned(1.toByte, buyer, buyerScript, enoughFee, ts + 7)
         .explicitGet()
       assetPair = AssetPair(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))
       o1        = Order.buy(Order.V2, seller, MATCHER, assetPair, 1000000, 1000000, ts + 8, ts + 10000, enoughFee)
@@ -1082,11 +1082,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       val massTransfer =
         MassTransferTransaction
           .selfSigned(
-            assetId = IssuedAsset(issueTx2.id()),
+            1.toByte,
             sender = buyer,
+            assetId = IssuedAsset(issueTx2.id()),
             transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)),
+            fee = 1000L,
             genesisTimestamp + 1000L,
-            feeAmount = 1000L,
             Array.empty[Byte]
           )
           .explicitGet()

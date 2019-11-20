@@ -125,6 +125,9 @@ object Serde {
       .map((_, bb.remaining()))
   }
 
+  def deserialize(bb: ByteBuffer): Either[String, EXPR] =
+    Try(desAux(bb).value).toEither.left.map(_.getMessage)
+
   def serAux(out: ByteArrayOutputStream, acc: Coeval[Unit], expr: EXPR): Coeval[Unit] = acc.flatMap { _ =>
     expr match {
       case CONST_LONG(n) =>

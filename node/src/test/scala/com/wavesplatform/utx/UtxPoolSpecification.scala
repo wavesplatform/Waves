@@ -125,7 +125,7 @@ class UtxPoolSpecification
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
     val txs = for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
-      .selfSigned(Waves, sender, transfers, time.getTimestamp(), fee, Array.empty[Byte])
+      .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), Array.empty[Byte])
       .explicitGet()
     txs.label("transferWithRecipient")
   }
@@ -311,7 +311,7 @@ class UtxPoolSpecification
     for {
       ts <- timestampGen
     } yield {
-      val setScript = SetScriptTransaction.selfSigned(master, Some(script), 100000, ts + 1).explicitGet()
+      val setScript = SetScriptTransaction.selfSigned(1.toByte, master, Some(script), 100000, ts + 1).explicitGet()
       Seq(TestBlock.create(ts + 1, lastBlockId, Seq(setScript)))
     }
 
@@ -435,13 +435,7 @@ class UtxPoolSpecification
                 GenesisTransaction.create(richAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 GenesisTransaction.create(randomAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 SetScriptTransaction
-                  .signed(
-                    richAccount,
-                    Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
-                    QuickTX.FeeAmount * 4,
-                    ntpNow,
-                    richAccount
-                  )
+                  .signed(1.toByte, richAccount, Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()), QuickTX.FeeAmount * 4, ntpNow, richAccount)
                   .explicitGet()
               ),
               signer = TestBlock.defaultSigner,

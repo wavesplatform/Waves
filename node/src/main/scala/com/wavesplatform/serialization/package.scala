@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.{Asset, Proofs}
 
 package object serialization {
   implicit class ByteBufferOps(private val buf: ByteBuffer) extends AnyVal {
-    def getPrefixedByteArray: Array[Byte] = {
+    def getByteArrayWithLength: Array[Byte] = {
       val prefix = buf.getShort
       require(prefix >= 0, "negative array length")
       if (prefix > 0) getByteArray(prefix) else Array.emptyByteArray
@@ -33,12 +33,16 @@ package object serialization {
       val prefix = buf.get(buf.position())
       prefix match {
         case Address.AddressVersion =>
-          Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
+          getAddress
         case Alias.AddressVersion =>
           val length = buf.getShort(buf.position() + 2)
           Alias.fromBytes(getByteArray(length + 4)).explicitGet()
         case _ => throw new IllegalArgumentException(s"Invalid address or alias prefix: $prefix")
       }
+    }
+
+    def getAddress: Address = {
+      Address.fromBytes(getByteArray(Address.AddressLength)).explicitGet()
     }
 
     // More explicit name
@@ -72,7 +76,7 @@ package object serialization {
 
     def getScript: Option[Script] = Deser.parseByteArrayOptionWithLength(buf).map(ScriptReader.fromBytes(_).explicitGet())
 
-    def getAlias: Alias = Alias.fromBytes(buf.getPrefixedByteArray).explicitGet()
+    def getAlias: Alias = Alias.fromBytes(buf.getByteArrayWithLength).explicitGet()
 
     def getVersionedOrder: Order = {
       val length  = buf.getInt

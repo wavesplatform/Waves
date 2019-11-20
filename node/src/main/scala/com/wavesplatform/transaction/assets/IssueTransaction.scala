@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.{
   Proofs,
   ProvenTransaction,
   SigProofsSwitch,
-  TransactionParserLite,
+  TransactionParser,
   TxType,
   TxVersion,
   TxWithFee,
@@ -53,7 +53,7 @@ case class IssueTransaction(
   override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
-object IssueTransaction extends TransactionParserLite {
+object IssueTransaction extends TransactionParser {
   val MinAssetNameLength        = 4
   val MaxAssetNameLength        = 16
   val MaxAssetDescriptionLength = 1000

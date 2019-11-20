@@ -7,7 +7,6 @@ import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -22,9 +21,6 @@ import com.wavesplatform.wallet.Wallet
 import play.api.libs.json.{JsObject, JsValue}
 
 object TransactionFactory {
-
-  private val EmptySignature = ByteStr(Array.fill(SignatureLength)(0: Byte))
-
   def transferAsset(request: TransferRequest, wallet: Wallet, time: Time): Either[ValidationError, TransferTransaction] =
     for {
       _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
@@ -53,29 +49,13 @@ object TransactionFactory {
       sender    <- wallet.findPrivateKey(request.sender)
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
-      tx <- MassTransferTransaction.signed(
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        sender,
-        transfers,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        signer
-      )
+      tx <- MassTransferTransaction.signed(1.toByte, sender, Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)), transfers, request.fee, request.timestamp.getOrElse(time.getTimestamp()), request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray), signer)
     } yield tx
 
   def massTransferAsset(request: MassTransferRequest, sender: PublicKey): Either[ValidationError, MassTransferTransaction] =
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
-      tx <- MassTransferTransaction.create(
-        Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
-        sender,
-        transfers,
-        0,
-        request.fee,
-        request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray),
-        Proofs.empty
-      )
+      tx <- MassTransferTransaction.create(1.toByte, sender, Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)), transfers, request.fee, 0, request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray), Proofs.empty)
     } yield tx
 
   def setScript(request: SetScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, SetScriptTransaction] =
@@ -89,13 +69,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.signed(
-        sender,
-        script,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- SetScriptTransaction.signed(1.toByte, sender, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
@@ -104,13 +78,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.create(
-        sender,
-        script,
-        request.fee,
-        0,
-        Proofs.empty
-      )
+      tx <- SetScriptTransaction.create(1.toByte, sender, script, request.fee, 0, Proofs.empty)
     } yield tx
 
   def setAssetScript(
@@ -126,15 +94,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetAssetScriptTransaction.signed(
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        script,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- SetAssetScriptTransaction.signed(1.toByte, sender, IssuedAsset(ByteStr.decodeBase58(request.assetId).get), script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def setAssetScript(request: SetAssetScriptRequest, sender: PublicKey): Either[ValidationError, SetAssetScriptTransaction] =
@@ -143,15 +103,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetAssetScriptTransaction.create(
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        script,
-        request.fee,
-        request.timestamp.getOrElse(0),
-        Proofs.empty
-      )
+      tx <- SetAssetScriptTransaction.create(1.toByte, sender, IssuedAsset(ByteStr.decodeBase58(request.assetId).get), script, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
     } yield tx
 
   def lease(request: LeaseRequest, wallet: Wallet, time: Time): Either[ValidationError, LeaseTransaction] =
@@ -244,59 +196,20 @@ object TransactionFactory {
       signedTx = tx.signWith(signer)
     } yield signedTx
 
-  def burnAssetV1(request: BurnV1Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV1] =
-    burnAssetV1(request, wallet, request.sender, time)
-
-  def burnAssetV1(request: BurnV1Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, BurnTransactionV1] =
+  def burn(request: BurnRequest, wallet: Wallet, time: Time): Either[ValidationError, BurnTransaction] =
     for {
-      sender <- wallet.findPrivateKey(request.sender)
-      signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- BurnTransactionV1.signed(
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        request.quantity,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      _  <- Either.cond(request.sender.nonEmpty, (), GenericError("invalid.sender"))
+      tx <- burn(request, wallet, request.sender.get, time)
     } yield tx
 
-  def burnAssetV1(request: BurnV1Request, sender: PublicKey): Either[ValidationError, BurnTransactionV1] = BurnTransactionV1.create(
-    sender,
-    IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-    request.quantity,
-    request.fee,
-    request.timestamp.getOrElse(0),
-    EmptySignature
-  )
-
-  def burnAssetV2(request: BurnV2Request, wallet: Wallet, time: Time): Either[ValidationError, BurnTransactionV2] =
-    burnAssetV2(request, wallet, request.sender, time)
-
-  def burnAssetV2(request: BurnV2Request, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, BurnTransactionV2] =
+  def burn(request: BurnRequest, wallet: Wallet, signerAddress: String, time: Time): Either[ValidationError, BurnTransaction] =
     for {
-      sender <- wallet.findPrivateKey(request.sender)
-      signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- BurnTransactionV2.signed(
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-        request.quantity,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
-    } yield tx
-
-  def burnAssetV2(request: BurnV2Request, sender: PublicKey): Either[ValidationError, BurnTransactionV2] = BurnTransactionV2.create(
-    AddressScheme.current.chainId,
-    sender,
-    IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
-    request.quantity,
-    request.fee,
-    request.timestamp.getOrElse(0),
-    Proofs.empty
-  )
+      _      <- Either.cond(request.sender.isDefined, (), GenericError("invalid.sender"))
+      sender <- wallet.findPrivateKey(request.sender.get)
+      tx     <- request.copy(timestamp = request.timestamp.orElse(Some(time.getTimestamp()))).toTxFrom(sender)
+      signer <- if (request.sender.get == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
+      signedTx = tx.signWith(signer)
+    } yield signedTx
 
   def data(request: DataRequest, wallet: Wallet, time: Time): Either[ValidationError, DataTransaction] =
     data(request, wallet, request.sender, time)
@@ -305,23 +218,11 @@ object TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx <- DataTransaction.signed(
-        sender,
-        request.data,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- DataTransaction.signed(1.toByte, sender, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =
-    DataTransaction.create(
-      sender,
-      request.data,
-      request.fee,
-      request.timestamp.getOrElse(0),
-      Proofs.empty
-    )
+    DataTransaction.create(1.toByte, sender, request.data, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
 
   def invokeScript(request: InvokeScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
     invokeScript(request, wallet, request.sender, time)
@@ -337,32 +238,14 @@ object TransactionFactory {
       signer   <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       contract <- AddressOrAlias.fromString(request.dApp)
 
-      tx <- InvokeScriptTransaction.signed(
-        sender,
-        contract,
-        request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
-        request.payment,
-        request.fee,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- InvokeScriptTransaction.signed(1.toByte, sender, contract, request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)), request.payment, request.fee, Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)), request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def invokeScript(request: InvokeScriptRequest, sender: PublicKey): Either[ValidationError, InvokeScriptTransaction] =
     for {
       addressOrAlias <- AddressOrAlias.fromString(request.dApp)
       fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
-      tx <- InvokeScriptTransaction.create(
-        sender,
-        addressOrAlias,
-        fcOpt,
-        request.payment,
-        request.fee,
-        Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)),
-        request.timestamp.getOrElse(0),
-        Proofs.empty
-      )
+      tx <- InvokeScriptTransaction.create(1.toByte, sender, addressOrAlias, fcOpt, request.payment, request.fee, Asset.fromCompatId(request.feeAssetId.map(s => ByteStr.decodeBase58(s).get)), request.timestamp.getOrElse(0), Proofs.empty)
 
     } yield tx
 
@@ -380,14 +263,7 @@ object TransactionFactory {
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
-      tx <- SponsorFeeTransaction.signed(
-        sender,
-        assetId,
-        request.minSponsoredAssetFee,
-        request.fee,
-        request.timestamp.getOrElse(time.getTimestamp()),
-        signer
-      )
+      tx <- SponsorFeeTransaction.signed(1.toByte, sender, assetId, request.minSponsoredAssetFee, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def sponsor(request: SponsorFeeRequest, sender: PublicKey): Either[ValidationError, SponsorFeeTransaction] =
@@ -399,14 +275,7 @@ object TransactionFactory {
         .map(IssuedAsset)
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
-      tx <- SponsorFeeTransaction.create(
-        sender,
-        assetId,
-        request.minSponsoredAssetFee,
-        request.fee,
-        request.timestamp.getOrElse(0),
-        Proofs.empty
-      )
+      tx <- SponsorFeeTransaction.create(1.toByte, sender, assetId, request.minSponsoredAssetFee, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
     } yield tx
 
   def fromSignedRequest(jsv: JsValue): Either[ValidationError, Transaction] = {
@@ -415,16 +284,15 @@ object TransactionFactory {
     val typeId  = (jsv \ "type").as[Byte]
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
-    val pf: PartialFunction[TransactionParserLite, Either[ValidationError, Transaction]] = {
+    val pf: PartialFunction[TransactionParser, Either[ValidationError, Transaction]] = {
       case TransferTransaction       => jsv.as[TransferRequest].toTx
       case CreateAliasTransaction    => jsv.as[CreateAliasRequest].toTx
       case LeaseTransaction          => jsv.as[LeaseRequest].toTx
       case LeaseCancelTransaction    => jsv.as[LeaseCancelRequest].toTx
       case IssueTransaction          => jsv.as[IssueRequest].toTx
       case ReissueTransaction        => jsv.as[ReissueRequest].toTx
+      case BurnTransaction           => jsv.as[BurnRequest].toTx
       case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
-      case BurnTransactionV1         => jsv.as[SignedBurnV1Request].toTx
-      case BurnTransactionV2         => jsv.as[SignedBurnV2Request].toTx
       case DataTransaction           => jsv.as[SignedDataRequest].toTx
       case InvokeScriptTransaction   => jsv.as[SignedInvokeScriptRequest].toTx
       case SetScriptTransaction      => jsv.as[SignedSetScriptRequest].toTx
@@ -463,8 +331,7 @@ object TransactionFactory {
               case LeaseCancelTransaction    => TransactionFactory.leaseCancel(txJson.as[LeaseCancelRequest], wallet, signerAddress, time)
               case IssueTransaction          => TransactionFactory.issue(txJson.as[IssueRequest], wallet, signerAddress, time)
               case ReissueTransaction        => TransactionFactory.reissue(txJson.as[ReissueRequest], wallet, signerAddress, time)
-              case BurnTransactionV1         => TransactionFactory.burnAssetV1(txJson.as[BurnV1Request], wallet, signerAddress, time)
-              case BurnTransactionV2         => TransactionFactory.burnAssetV2(txJson.as[BurnV2Request], wallet, signerAddress, time)
+              case BurnTransaction           => TransactionFactory.burn(txJson.as[BurnRequest], wallet, signerAddress, time)
               case MassTransferTransaction   => TransactionFactory.massTransferAsset(txJson.as[MassTransferRequest], wallet, signerAddress, time)
               case DataTransaction           => TransactionFactory.data(txJson.as[DataRequest], wallet, signerAddress, time)
               case InvokeScriptTransaction   => TransactionFactory.invokeScript(txJson.as[InvokeScriptRequest], wallet, signerAddress, time)
