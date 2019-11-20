@@ -43,10 +43,10 @@ case class TransferTransaction(
     case Waves          => Nil
   }
 
-  override def builder: TransactionParserLite = TransferTransaction
+  override def builder: TransactionParser = TransferTransaction
 }
 
-object TransferTransaction extends TransactionParserLite {
+object TransferTransaction extends TransactionParser {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 

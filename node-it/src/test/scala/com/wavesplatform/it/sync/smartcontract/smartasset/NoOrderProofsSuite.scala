@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -9,7 +8,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.BurnTransactionV2
+import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
@@ -76,16 +75,27 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       )
       .id
 
-    val incorrectTrTx = TransferTransaction(2.toByte, pkByAddress(firstAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(assetWProofs).get), 1, Waves, smartMinFee, Array.emptyByteArray, System.currentTimeMillis + 10.minutes.toMillis, Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))))
+    val incorrectTrTx = TransferTransaction(
+      2.toByte,
+      pkByAddress(firstAddress),
+      pkByAddress(thirdAddress),
+      IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
+      1,
+      Waves,
+      smartMinFee,
+      Array.emptyByteArray,
+      System.currentTimeMillis + 10.minutes.toMillis,
+      Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
+    )
 
     assertBadRequestAndMessage(
       sender.signedBroadcast(incorrectTrTx.json()),
       errProofMsg
     )
 
-    val incorrectBrTx = BurnTransactionV2
+    val incorrectBrTx = BurnTransaction
       .create(
-        AddressScheme.current.chainId,
+        2.toByte,
         pkByAddress(firstAddress),
         IssuedAsset(ByteStr.decodeBase58(assetWProofs).get),
         1,

@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 
 sealed trait Alias extends AddressOrAlias {
   lazy val stringRepr: String = Alias.Prefix + chainId.toChar + ":" + name
-  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: chainId +: Deser.serializeArray(name.getBytes("UTF-8")))
+  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: chainId +: Deser.serializeArrayWithLength(name.getBytes("UTF-8")))
 
   val name: String
   val chainId: Byte

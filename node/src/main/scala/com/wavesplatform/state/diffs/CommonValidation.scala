@@ -124,7 +124,6 @@ object CommonValidation {
     }
 
     tx match {
-      case _: BurnTransactionV1  => Right(tx)
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 
@@ -165,8 +164,8 @@ object CommonValidation {
       case t: LeaseTransaction       => generic1or2Barrier(t, "lease")
       case t: LeaseCancelTransaction => generic1or2Barrier(t, "lease cancel")
       case t: ReissueTransaction     => generic1or2Barrier(t, "reissue")
+      case t: BurnTransaction        => generic1or2Barrier(t, "burn")
 
-      case _: BurnTransactionV2       => activationBarrier(BlockchainFeatures.SmartAccounts)
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
 

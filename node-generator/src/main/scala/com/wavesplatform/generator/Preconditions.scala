@@ -85,7 +85,7 @@ object Preconditions {
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
                 val Right((script, _)) = ScriptCompiler.compile(scriptText, estimator)
-                val Right(tx)          = SetScriptTransaction.selfSigned(acc, Some(script), Fee, time.correctedTime())
+                val Right(tx)          = SetScriptTransaction.selfSigned(1.toByte, acc, Some(script), Fee, time.correctedTime())
                 (script, tx)
               }
 

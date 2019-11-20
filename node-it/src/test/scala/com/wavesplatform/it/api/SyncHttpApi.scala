@@ -698,7 +698,7 @@ object SyncHttpApi extends Assertions {
     }
 
     def wavesBalance(address: ByteString): WavesBalances = {
-      sync(async(n).grpc.wavesBalance(address))
+      accounts.getBalances(BalancesRequest.of(address, Seq(ByteString.EMPTY))).next().getWaves
     }
 
     def getTransaction(id: String): PBSignedTransaction = {

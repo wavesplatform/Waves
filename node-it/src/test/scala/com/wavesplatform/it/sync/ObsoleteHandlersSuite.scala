@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.api.http.requests.{
-  BurnV1Request,
   CreateAliasRequest,
   DataRequest,
   LeaseCancelRequest,
@@ -63,8 +62,16 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val issue     = Json.parse(issueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(issue)
 
-    val burnJson = sender.postJson("/assets/burn", BurnV1Request(firstAddress, issue, someAssetAmount / 2, minFee))
-    val burn     = Json.parse(burnJson.getResponseBody).as[Transaction].id
+    val burnJson = sender.postJson(
+      "/assets/burn",
+      Json.obj(
+        "sender"   -> firstAddress,
+        "assetId"  -> issue,
+        "quantity" -> someAssetAmount / 2,
+        "fee"      -> issueFee
+      )
+    )
+    val burn = Json.parse(burnJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(burn)
 
     val reissueJson = sender.postJson(

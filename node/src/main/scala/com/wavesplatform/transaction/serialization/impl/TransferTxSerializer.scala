@@ -35,7 +35,7 @@ object TransferTxSerializer {
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
         recipient.bytes.arr,
-        Deser.serializeArray(attachment)
+        Deser.serializeArrayWithLength(attachment)
       )
     }
 
@@ -62,7 +62,7 @@ object TransferTxSerializer {
       val amount     = buf.getLong
       val fee        = buf.getLong
       val recipient  = buf.getAddressOrAlias
-      val attachment = buf.getPrefixedByteArray
+      val attachment = buf.getByteArrayWithLength
 
       TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, attachment, ts, Proofs.empty)
     }
