@@ -110,7 +110,7 @@ object Keys {
   def blockInfoAt(height: Height): Key[Option[BlockInfo]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo, writeBlockInfo)
 
-  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
+  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] = // TODO: Store protobuf block header
     Key.opt(
       "block-header-bytes-at-height",
       h(BlockHeaderPrefix, height),

@@ -660,7 +660,7 @@ class LevelDBWriter(
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      transaction   <- db.get(Keys.transactionAt(height, num))
+      transaction   <- db.get(Keys.transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
     } yield height -> transaction.asInstanceOf[TransferTransaction]
   }
 
@@ -824,8 +824,9 @@ class LevelDBWriter(
 
     def readTransactionBytes(count: Int) = {
       (0 until count).toArray.flatMap { n =>
-        db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
-          .map { txBytes =>
+        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+          .map { tx =>
+            val txBytes = tx.bytes()
             Ints.toByteArray(txBytes.length) ++ txBytes
           }
           .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
