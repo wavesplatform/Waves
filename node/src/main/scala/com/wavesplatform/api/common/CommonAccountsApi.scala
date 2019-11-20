@@ -23,6 +23,7 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 
@@ -126,14 +127,26 @@ object CommonAccountsApi extends ScorexLogging {
         balanceOf: Portfolio => Long
     ): Observable[(Address, Long)] = {
       val overrides = if (height == blockchain.height) diff.portfolios else Map.empty[Address, Portfolio]
+      log.info(s"height: $height, overrides: $overrides")
       Observable
         .fromResource(db.resource)
         .flatMap { resource =>
-          resource.iterator.seek(globalPrefix)
+          val bytes = Shorts.toByteArray(5.toShort) ++ Array.fill[Byte](32)(0xff.toByte)
+          resource.iterator.seek(bytes)
+          while (!resource.iterator.peekNext().getKey.startsWith(globalPrefix)) println(
+            s"Skipping key ${resource.iterator.next().getKey.mkString(",")}"
+          )
+
+          println(s"Max address id: ${resource.get(Keys.lastAddressId)}")
+
           Observable.fromIterator(Task(new AbstractIterator[(Address, Long)] {
-            private[this] var pendingPortfolios: Map[Address, Portfolio] = overrides
-            override def computeNext(): (Address, Long) =
-              if (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(globalPrefix)) {
+            private[this] var pendingPortfolios = overrides
+            private[this] var counter           = 0
+            @tailrec
+            private def findNextBalance(): Option[(Address, Long)] = {
+              if (!resource.iterator.hasNext) None
+              else if (!resource.iterator.peekNext().getKey.startsWith(globalPrefix)) None
+              else {
                 val current       = resource.iterator.next()
                 val addressPrefix = current.getKey.dropRight(4)
                 val address       = resource.get(Keys.idToAddress(addressId(current.getKey)))
@@ -143,18 +156,38 @@ object CommonAccountsApi extends ScorexLogging {
                   val nextHeight = Ints.fromByteArray(next.getKey.takeRight(4))
                   if (nextHeight <= height) {
                     balance = Longs.fromByteArray(next.getValue)
+                  } else {
+                    log.info(s"Skipping $nextHeight for $address")
                   }
                 }
 
                 pendingPortfolios -= address
-                address -> longSemigroup.combine(balance, overrides.get(address).fold(0L)(balanceOf))
-              } else if (pendingPortfolios.nonEmpty) {
-                val (address, portfolio) = pendingPortfolios.head
-                pendingPortfolios -= address
-                address -> balanceOf(portfolio)
-              } else {
-                endOfData()
+                counter += 1
+
+                val adjustedBalance = longSemigroup.combine(balance, overrides.get(address).fold(0L)(balanceOf))
+                if (adjustedBalance > 0) Some(address -> adjustedBalance)
+                else {
+                  log.info(s"Skipping $address because balance is 0")
+                  findNextBalance()
+                }
               }
+            }
+
+            override def computeNext(): (Address, Long) = {
+              findNextBalance() match {
+                case Some(balance) => balance
+                case None =>
+                  if (pendingPortfolios.nonEmpty) {
+                    val (address, portfolio) = pendingPortfolios.head
+                    pendingPortfolios -= address
+                    counter += 1
+                    address -> balanceOf(portfolio)
+                  } else {
+                    log.info(s"Total addresses collected: $counter")
+                    endOfData()
+                  }
+              }
+            }
           }.asScala))
         }
     }

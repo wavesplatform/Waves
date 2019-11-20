@@ -67,14 +67,18 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
 
-    val requests = generateTransfersToRandomAddresses(190, nodeAddresses)
-    Await.result(processRequests(requests), 2.minutes)
+    val requests = generateTransfersToRandomAddresses(200, nodeAddresses)
+    Await.result(processRequests(requests), 10.minutes)
 
     nodes.waitFor[Int]("empty utx")(1.second)(_.utxSize, _.forall(_ == 0))
 
-    nodes.waitForHeightArise()
+    nodes.waitForHeight(miner.height + 3)
 
-    sender.debugStateAt(sender.height).size shouldBe stateBeforeApply.size + 190
+    val recipients = miner.blockSeq(startHeight, miner.height).map(_.transactions.size).sum
+
+    val stringToLong = sender.debugStateAt(sender.height)
+    println(s"After: ${stringToLong.size}, transaction count: ${recipients}")
+    stringToLong.size shouldBe stateBeforeApply.size + recipients
 
     nodes.rollback(startHeight, returnToUTX = false)
 

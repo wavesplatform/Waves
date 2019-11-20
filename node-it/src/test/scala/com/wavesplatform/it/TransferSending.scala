@@ -2,6 +2,7 @@ package com.wavesplatform.it
 
 import java.util.concurrent.ThreadLocalRandom
 
+import com.google.common.primitives.Ints
 import com.typesafe.config.Config
 import com.wavesplatform.account._
 import com.wavesplatform.api.http.requests.TransferRequest
@@ -82,16 +83,17 @@ trait TransferSending extends ScorexLogging {
   }
 
   def generateTransfersToRandomAddresses(n: Int, excludeSrcAddresses: Set[String]): Seq[Req] = {
-    val fee      = 100000
-    val seedSize = 32
+    val fee = 100000
 
     val seeds = NodeConfigs.Default.collect {
       case config if !excludeSrcAddresses.contains(config.getString("address")) => config.getString("account-seed")
     }
 
-    val sourceAndDest = (1 to n).map { _ =>
+    val prefix = Ints.toByteArray(Random.nextInt())
+
+    val sourceAndDest = (1 to n).map { id =>
       val srcSeed  = Random.shuffle(seeds).head
-      val destPk   = Array.fill[Byte](seedSize)(Random.nextInt(Byte.MaxValue).toByte)
+      val destPk   = prefix ++ Ints.toByteArray(id) ++ new Array[Byte](24)
       val destAddr = Address.fromPublicKey(PublicKey(destPk)).stringRepr
 
       (srcSeed, destAddr)
