@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, assertDiffEi, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
@@ -101,8 +101,110 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  property("complex check") {
-    forAll(complexPaymentPreconditions) {
+  property("action state changes affects subsequent actions") {
+    def multiActionDApp(
+      assetId: ByteStr,
+      recipient: Address,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long
+    ): Script =
+      dApp(
+        s"""
+           | [
+           |   IntEntry("int", 1),
+           |   BooleanEntry("bool", true),
+           |
+           |   Reissue(base58'$assetId', true, $reissueAmount),
+           |   Burn(base58'$assetId', $burnAmount),
+           |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId'),
+           |
+           |   StringEntry("str", "str"),
+           |   BinaryEntry("bin", base58'$assetId'),
+           |
+           |   Reissue(base58'$assetId', false, $reissueAmount),
+           |   Burn(base58'$assetId', $burnAmount),
+           |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId')
+           | ]
+       """.stripMargin
+      )
+
+    def checkStateAsset(
+      startAmount: Long,
+      reissueAmount: Long,
+      burnAmount: Long,
+      transferAmount: Long,
+      recipient: Address
+    ): Script = {
+      val reissueCheckAmount1  = startAmount
+      val burnCheckAmount1     = reissueCheckAmount1 + reissueAmount
+      val transferCheckAmount1 = burnCheckAmount1 - burnAmount
+
+      val reissueCheckAmount2  = transferCheckAmount1
+      val burnCheckAmount2     = reissueCheckAmount2 + reissueAmount
+      val transferCheckAmount2 = burnCheckAmount2 - burnAmount
+
+      assetVerifier(
+        s"""
+           | let recipient = Address(base58'${recipient.bytes}')
+           |
+           | func checkState(expectedAmount1: Int, expectedAmount2: Int) =
+           |   this.issuer.getInteger("int") == 1     &&
+           |   this.issuer.getBoolean("bool") == true &&
+           |   (
+           |     this.quantity == expectedAmount1      &&     # first action evaluation
+           |     this.issuer.getString("str") == unit  &&
+           |     this.issuer.getBinary("bin") == unit  &&
+           |     recipient.assetBalance(this.id) == 0  ||
+           |
+           |     this.quantity == expectedAmount2        &&   # second action evaluation
+           |     this.issuer.getString("str") == "str"   &&
+           |     this.issuer.getBinary("bin") == this.id &&
+           |     recipient.assetBalance(this.id) == $transferAmount
+           |   )
+           |
+           | match tx {
+           |   case t: ReissueTransaction =>
+           |     t.quantity == $reissueAmount &&
+           |     checkState($reissueCheckAmount1, $reissueCheckAmount2)
+           |
+           |   case t: BurnTransaction =>
+           |     t.quantity == $burnAmount &&
+           |     checkState($burnCheckAmount1, $burnCheckAmount2)
+           |
+           |   case t: TransferTransaction =>
+           |     t.amount == $transferAmount &&
+           |     checkState($transferCheckAmount1, $transferCheckAmount2)
+           |
+           |   case _ => throw("unexpected")
+           | }
+      """.stripMargin
+      )
+    }
+
+    val multiActionPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, KeyPair, Long, Long, Long)] =
+      for {
+        master          <- accountGen
+        invoker         <- accountGen
+        ts              <- timestampGen
+        fee             <- ciFee(2)
+        startAmount     <- positiveLongGen
+        reissueAmount   <- positiveLongGen
+        burnAmount      <- Gen.choose(0, reissueAmount)
+        transferAmount  <- Gen.choose(0, reissueAmount - burnAmount)
+        assetScript = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, transferAmount, invoker.toAddress))
+        issue   <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true), quantityParam = Some(startAmount))
+      } yield {
+        val dApp = Some(multiActionDApp(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
+        for {
+          genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+          genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+          setDApp  <- SetScriptTransaction.selfSigned(TxVersion.V1, master, dApp, fee, ts + 2)
+          ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master, None, Nil, fee, Waves, ts + 3)
+        } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
+      }.explicitGet()
+
+    forAll(multiActionPreconditions) {
       case (genesis, setScript, invoke, issue, master, invoker, reissueAmount, burnAmount, transferAmount) =>
         assertDiffAndState(
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
@@ -120,7 +222,6 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         }
     }
   }
-
 
   private def paymentPreconditions(
     assetScript: Option[Script] = None
@@ -143,61 +244,14 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
-  private def complexPaymentPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, KeyPair, Long, Long, Long)] =
-    for {
-      master          <- accountGen
-      invoker         <- accountGen
-      ts              <- timestampGen
-      fee             <- ciFee(1)
-      startAmount     <- positiveLongGen
-      reissueAmount   <- positiveLongGen
-      burnAmount      <- Gen.choose(0, reissueAmount)
-      transferAmount  <- Gen.choose(0, reissueAmount - burnAmount)
-      assetScript = Some(complexAsset(startAmount, reissueAmount, burnAmount, transferAmount))
-      issue   <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true))
-
-    } yield {
-      val dApp = Some(dAppWithComplexResult(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
-      for {
-        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-        setDApp  <- SetScriptTransaction.selfSigned(master, dApp, fee, ts + 2)
-        ci       <- InvokeScriptTransaction.selfSigned(invoker, master, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
-    }.explicitGet()
-
-  private def complexAsset(
-    startAmount: Long,
-    reissueAmount: Long,
-    burnAmount: Long,
-    transferAmount: Long
-  ): Script = {
-    val reissueAmount1  = startAmount + reissueAmount
-    val burnAmount1     = reissueAmount1 - burnAmount
-    val transferAmount1 = burnAmount1 - transferAmount
-    val reissueAmount2  = transferAmount1 + reissueAmount
-    val burnAmount2     = reissueAmount2 - burnAmount
-    val transferAmount2 = burnAmount2 - transferAmount
-    assetVerifier(
-     s"""
-        | match tx {
-        |   case t: ReissueTransaction  => t.quantity == $reissueAmount  && (this.quantity == $reissueAmount1  || this.quantity == $reissueAmount2)
-        |   case t: BurnTransaction     => t.quantity == $burnAmount     && (this.quantity == $burnAmount1     || this.quantity == $burnAmount2)
-        |   case t: TransferTransaction => t.amount   == $transferAmount && (this.quantity == $transferAmount1 || this.quantity == $transferAmount2)
-        |   case _ => false
-        | }
-      """.stripMargin
-    )
-  }
-
-  private def assetVerifier(result: String): Script = {
+  private def assetVerifier(body: String): Script = {
     val script =
       s"""
          | {-# STDLIB_VERSION 4          #-}
          | {-# CONTENT_TYPE   EXPRESSION #-}
          | {-# SCRIPT_TYPE    ASSET      #-}
          |
-         | $result
+         | $body
          |
        """.stripMargin
 
@@ -216,34 +270,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
        """.stripMargin
     )
 
-  private def dAppWithComplexResult(
-    assetId: ByteStr,
-    recipient: Address,
-    reissueAmount: Long,
-    burnAmount: Long,
-    transferAmount: Long
-  ): Script =
-    dApp(
-      s"""
-         | [
-         |   IntEntry("key1", 1),
-         |   BooleanEntry("key2", true),
-         |
-         |   Reissue(base58'$assetId', true, $reissueAmount),
-         |   Burn(base58'$assetId', $burnAmount),
-         |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId'),
-         |
-         |   StringEntry("key3", "str"),
-         |   BinaryEntry("key4", base58'$assetId'),
-         |
-         |   Reissue(base58'$assetId', false, $reissueAmount),
-         |   Burn(base58'$assetId', $burnAmount),
-         |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId')
-         | ]
-       """.stripMargin
-    )
-
-  private def dApp(result: String): Script = {
+  private def dApp(body: String): Script = {
     val script =
       s"""
          | {-# STDLIB_VERSION 4       #-}
@@ -251,8 +278,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          | {-# SCRIPT_TYPE    ACCOUNT #-}
          |
          | @Callable(i)
-         | func default() =
-         | $result
+         | func default() = $body
          |
        """.stripMargin
 

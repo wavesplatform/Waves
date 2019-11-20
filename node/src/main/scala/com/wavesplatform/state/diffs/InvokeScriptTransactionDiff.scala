@@ -305,15 +305,15 @@ object InvokeScriptTransactionDiff {
           case Waves =>
             val r = Diff.stateOps(
               portfolios =
-                Map(address       -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
-                  Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
+                Map(address     -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
+                Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
             )
             TracedResult.wrapValue(r)
           case a @ IssuedAsset(id) =>
             val nextDiff = Diff.stateOps(
               portfolios =
-                Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
-                  Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
+                Map(address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
+                Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
             )
             blockchain.assetScript(a) match {
               case None => nextDiff.asRight[ValidationError]
