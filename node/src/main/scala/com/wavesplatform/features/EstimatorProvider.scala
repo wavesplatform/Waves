@@ -18,11 +18,11 @@ object EstimatorProvider {
       else if (b.isFeatureActivated(BlockReward)) ScriptEstimatorV2
       else ScriptEstimatorV1
 
-    def invocationComplexity(script: Script, call: Option[FUNCTION_CALL]): Either[String, Long] =
+    val invocationComplexity: (Script, ScriptEstimator, Option[FUNCTION_CALL]) => Either[String, Long] =
       if (b.isFeatureActivated(MultiPaymentInvokeScript))
-        DiffsCommon.limitFreeComplexity(script, estimator, call)
+        DiffsCommon.limitFreeComplexity
       else
-        DiffsCommon.functionComplexity(script, estimator, call)
+        DiffsCommon.functionComplexity
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {
