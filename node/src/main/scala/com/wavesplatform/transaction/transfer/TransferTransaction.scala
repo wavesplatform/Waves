@@ -71,9 +71,9 @@ object TransferTransaction extends TransactionParser {
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxTimestamp,
+      amount: TxAmount,
       feeAsset: Asset,
-      fee: TxTimestamp,
+      fee: TxAmount,
       attachment: TxByteArray,
       timestamp: TxTimestamp,
       proofs: Proofs
@@ -85,9 +85,9 @@ object TransferTransaction extends TransactionParser {
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxTimestamp,
+      amount: TxAmount,
       feeAsset: Asset,
-      fee: TxTimestamp,
+      fee: TxAmount,
       attachment: TxByteArray,
       timestamp: TxTimestamp,
       signer: PrivateKey
@@ -99,9 +99,9 @@ object TransferTransaction extends TransactionParser {
       sender: KeyPair,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxTimestamp,
+      amount: TxAmount,
       feeAsset: Asset,
-      fee: TxTimestamp,
+      fee: TxAmount,
       attachment: TxByteArray,
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
