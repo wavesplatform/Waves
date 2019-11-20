@@ -177,16 +177,16 @@ object InvokeScriptTransactionDiff {
           wavesFee = feeInfo._1
           paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
+            val smartAssetInvocations =
+              tx.checkedAssets                              ++
+              transfers.flatMap(_.assetId).map(IssuedAsset) ++
+              reissues.map(r => IssuedAsset(r.assetId))     ++
+              burns.map(b => IssuedAsset(b.assetId))
+
             val totalScriptsInvoked =
-              tx.checkedAssets
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                transfers.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) {
-                   1
-                 } else {
-                   0
-                 })
+              smartAssetInvocations.count(blockchain.hasAssetScript) +
+              (if (blockchain.hasScript(tx.sender)) 1 else 0)
+
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
