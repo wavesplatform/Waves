@@ -3,14 +3,10 @@ package com.wavesplatform.it.sync.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
-import com.wavesplatform.transaction.Asset
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 

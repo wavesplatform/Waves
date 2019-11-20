@@ -6,8 +6,6 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
-import com.wavesplatform.state.{BinaryDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.util._
