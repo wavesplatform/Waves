@@ -34,7 +34,6 @@ class InvokeScriptTransactionSuite extends GrpcBaseTransactionSuite {
         |  WriteSet([DataEntry("a", "b"), DataEntry("sender", "senderId")])
         | }
         |
-<<<<<<< HEAD
         |@Verifier(tx)
         |func verify() = {
         |    match tx {
@@ -42,12 +41,6 @@ class InvokeScriptTransactionSuite extends GrpcBaseTransactionSuite {
         |        case _ => true
         |    }
         |}
-=======
-        | @Verifier(t)
-        | func verify() = {
-        |  true
-        | }
->>>>>>> 0afa7a38faf783981004422a5ee0ae37609f793a
         |
         |
         """.stripMargin
