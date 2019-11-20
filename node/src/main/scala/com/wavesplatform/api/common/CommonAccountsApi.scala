@@ -7,6 +7,7 @@ import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
+import com.wavesplatform.crypto
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -17,6 +18,7 @@ import com.wavesplatform.state.{Blockchain, DataEntry, Diff, Height, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -54,7 +56,7 @@ trait CommonAccountsApi {
   def assetDistribution(asset: IssuedAsset, height: Int): Observable[(Address, Long)]
 }
 
-object CommonAccountsApi {
+object CommonAccountsApi extends ScorexLogging {
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
   def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
@@ -93,9 +95,8 @@ object CommonAccountsApi {
 
     override def script(address: Address): Option[(Script, Long)] = blockchain.accountScript(address)
 
-    override def data(address: Address, key: String): Option[DataEntry[_]] = {
+    override def data(address: Address, key: String): Option[DataEntry[_]] =
       blockchain.accountData(address, key)
-    }
 
     override def dataStream(address: Address, regex: Option[String]): Observable[DataEntry[_]] = {
       val entriesFromDiff = diff.accountData.get(address).fold[Map[String, DataEntry[_]]](Map.empty)(_.data)
@@ -118,35 +119,55 @@ object CommonAccountsApi {
     override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] =
       Observable.fromIterable(Seq.empty)
 
-    override def wavesDistribution(height: Int): Observable[(Address, Long)] = {
+    private def balanceDistribution(
+        height: Int,
+        globalPrefix: Array[Byte],
+        addressId: Array[Byte] => BigInt,
+        balanceOf: Portfolio => Long
+    ): Observable[(Address, Long)] = {
       val overrides = if (height == blockchain.height) diff.portfolios else Map.empty[Address, Portfolio]
       Observable
         .fromResource(db.resource)
         .flatMap { resource =>
-          val wavesBalancePrefix = Shorts.toByteArray(Keys.WavesBalancePrefix)
-          resource.iterator.seek(wavesBalancePrefix)
+          resource.iterator.seek(globalPrefix)
           Observable.fromIterator(Task(new AbstractIterator[(Address, Long)] {
+            private[this] var pendingPortfolios: Map[Address, Portfolio] = overrides
             override def computeNext(): (Address, Long) =
-              if (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(wavesBalancePrefix)) {
-                val current   = resource.iterator.next()
-                val prefix    = current.getKey.dropRight(4)
-                val addressId = prefix.drop(2)
-                var balance   = Longs.fromByteArray(current.getValue)
-                while (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(prefix)) {
+              if (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(globalPrefix)) {
+                val current       = resource.iterator.next()
+                val addressPrefix = current.getKey.dropRight(4)
+                val address       = resource.get(Keys.idToAddress(addressId(current.getKey)))
+                var balance       = Longs.fromByteArray(current.getValue)
+                while (resource.iterator.hasNext && resource.iterator.peekNext().getKey.startsWith(addressPrefix)) {
                   val next       = resource.iterator.next()
                   val nextHeight = Ints.fromByteArray(next.getKey.takeRight(4))
                   if (nextHeight <= height) {
                     balance = Longs.fromByteArray(next.getValue)
-                  } else {}
+                  }
                 }
 
-                val address = resource.get(Keys.idToAddress(BigInt(addressId)))
-                address -> longSemigroup.combine(balance, overrides.getOrElse(address, Portfolio.empty).balance)
-              } else endOfData()
+                pendingPortfolios -= address
+                address -> longSemigroup.combine(balance, overrides.get(address).fold(0L)(balanceOf))
+              } else if (pendingPortfolios.nonEmpty) {
+                val (address, portfolio) = pendingPortfolios.head
+                pendingPortfolios -= address
+                address -> balanceOf(portfolio)
+              } else {
+                endOfData()
+              }
           }.asScala))
         }
     }
 
-    override def assetDistribution(asset: IssuedAsset, height: Int) = ???
+    override def wavesDistribution(height: Int): Observable[(Address, Long)] =
+      balanceDistribution(height, Shorts.toByteArray(Keys.WavesBalancePrefix), bs => BigInt(bs.slice(2, bs.length - 4)), _.balance)
+
+    override def assetDistribution(asset: IssuedAsset, height: Int): Observable[(Address, Long)] =
+      balanceDistribution(
+        height,
+        Shorts.toByteArray(Keys.AssetBalancePrefix) ++ asset.id.arr,
+        bs => BigInt(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
+        _.assets.getOrElse(asset, 0L)
+      )
   }
 }

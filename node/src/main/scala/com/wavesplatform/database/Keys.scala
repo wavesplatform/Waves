@@ -34,7 +34,7 @@ object Keys {
   def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =
     Key(
       "asset-balance",
-      hBytes(AssetBalancePrefix, addressId.toByteArray ++ asset.id.arr, height),
+      hBytes(AssetBalancePrefix,  asset.id.arr ++ addressId.toByteArray, height),
       Option(_).fold(0L)(Longs.fromByteArray),
       Longs.toByteArray
     )
