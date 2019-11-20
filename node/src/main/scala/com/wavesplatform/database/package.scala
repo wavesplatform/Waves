@@ -293,8 +293,8 @@ package object database extends ScorexLogging {
     ndo.write(bh.generator)
 
     if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) Don't write length in case of using standard digest
-      ndo.writeInt(bh.merkle.arr.length)
-      ndo.writeByteStr(bh.merkle)
+      ndo.writeInt(bh.transactionsRoot.arr.length)
+      ndo.writeByteStr(bh.transactionsRoot)
     }
 
     ndo.write(signature)
@@ -330,7 +330,7 @@ package object database extends ScorexLogging {
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
 
-    val merkle = if (version < Block.ProtoBlockVersion) ByteStr.empty else ndi.readByteStr(ndi.readInt())
+    val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ndi.readByteStr(ndi.readInt())
 
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
@@ -344,7 +344,7 @@ package object database extends ScorexLogging {
       PublicKey(ByteStr(generator)),
       featureVotes,
       rewardVote,
-      merkle
+      transactionsRoot
     )
 
     BlockInfo(header, size, transactionCount, ByteStr(signature))

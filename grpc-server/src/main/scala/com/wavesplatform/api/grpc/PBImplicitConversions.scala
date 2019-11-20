@@ -51,7 +51,7 @@ trait PBImplicitConversions {
         header.generator.toPublicKey,
         header.featureVotes.map(intToShort),
         header.rewardVote,
-        header.merkle.toByteStr
+        header.transactionsRoot.toByteStr
       )
     }
   }

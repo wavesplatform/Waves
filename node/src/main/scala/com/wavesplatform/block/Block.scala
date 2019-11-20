@@ -30,7 +30,7 @@ case class BlockHeader(
     generator: PublicKey,
     featureVotes: Seq[Short],
     rewardVote: Long,
-    merkle: ByteStr
+    transactionsRoot: ByteStr
 )
 
 case class Block(
@@ -75,10 +75,10 @@ case class Block(
     !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
   }
 
-  private[block] val merkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(header.version, transactionData))
+  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(transactionData))
 
-  val merkleRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    header.version < Block.ProtoBlockVersion || ((merkleTree().rootHash untag Digest32) sameElements header.merkle.arr)
+  val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
+    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
@@ -101,9 +101,9 @@ object Block extends ScorexLogging {
       rewardVote: Long,
       transactionData: Seq[Transaction]
   ): Block = {
-    val merkle = mkMerkleRoot(version, transactionData)
+    val transactionsRoot = mkTransactionsRoot(version, transactionData)
     Block(
-      BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle),
+      BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot),
       ByteStr.empty,
       transactionData
     )
@@ -113,7 +113,7 @@ object Block extends ScorexLogging {
     base.copy(
       signature = signature,
       transactionData = transactionData,
-      header = base.header.copy(merkle = mkMerkleRoot(base.header.version, transactionData))
+      header = base.header.copy(transactionsRoot = mkTransactionsRoot(base.header.version, transactionData))
     )
 
   def buildAndSign(
@@ -165,8 +165,8 @@ object Block extends ScorexLogging {
     } yield validBlock
   }
 
-  private def mkMerkleRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
-    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(version, transactionData).rootHash)
+  private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(transactionData).rootHash)
 
   case class BlockInfo(
       header: BlockHeader,

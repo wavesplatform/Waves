@@ -45,7 +45,7 @@ object PBBlocks {
         header.rewardVote,
         PublicKey(header.generator.toByteArray),
         ByteStr(block.signature.toByteArray),
-        ByteStr(header.merkle.toByteArray)
+        ByteStr(header.transactionsRoot.toByteArray)
       )
     } yield result
   }
@@ -66,7 +66,7 @@ object PBBlocks {
           header.version,
           ByteString.copyFrom(generator),
           header.rewardVote,
-          ByteString.copyFrom(header.merkle)
+          ByteString.copyFrom(header.transactionsRoot)
         )),
       ByteString.copyFrom(block.signature),
       transactionData.map(PBTransactions.protobuf)

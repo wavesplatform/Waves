@@ -20,7 +20,14 @@ import scorex.crypto.hash.{Digest, Digest32}
 
 import scala.annotation.tailrec
 
-class BlockMerkleSpec extends FreeSpec with OptionValues with ScalaCheckPropertyChecks with BlockGen with TransactionGen with NoShrink with Matchers {
+class TransactionsRootSpec
+    extends FreeSpec
+    with OptionValues
+    with ScalaCheckPropertyChecks
+    with BlockGen
+    with TransactionGen
+    with NoShrink
+    with Matchers {
   val commonGen: Gen[(KeyPair, List[TransferTransaction])] =
     for {
       signer    <- accountGen
@@ -39,14 +46,14 @@ class BlockMerkleSpec extends FreeSpec with OptionValues with ScalaCheckProperty
 
   "Merkle tree for block should validate correct transaction" in forAll(happyPathScenario) {
     case (block, transaction) =>
-      block.merkleRootValid() shouldBe true
+      block.transactionsRootValid() shouldBe true
 
-      val merkleTree  = block.merkleTree()
-      val merkleProof = block.merkleProof(transaction)
+      val merkleTree  = block.transactionsMerkleTree()
+      val merkleProof = block.transactionProof(transaction)
 
       merkleProof shouldBe 'defined
       merkleProof.value.valid(merkleTree.rootHash) shouldBe true
-      merkleProof.value.valid(Digest32 @@ block.header.merkle.arr) shouldBe true
+      merkleProof.value.valid(Digest32 @@ block.header.transactionsRoot.arr) shouldBe true
   }
 
   val emptyTxsDataScenario: Gen[(Block, TransferTransaction)] =
@@ -58,8 +65,8 @@ class BlockMerkleSpec extends FreeSpec with OptionValues with ScalaCheckProperty
 
   "Merkle tree for empty block should ignore any transaction" in forAll(emptyTxsDataScenario) {
     case (block, transaction) =>
-      block.merkleRootValid() shouldBe true
-      block.merkleProof(transaction) shouldBe 'empty
+      block.transactionsRootValid() shouldBe true
+      block.transactionProof(transaction) shouldBe 'empty
   }
 
   val incorrectTransactionScenario: Gen[(Block, Transaction)] =
@@ -73,26 +80,26 @@ class BlockMerkleSpec extends FreeSpec with OptionValues with ScalaCheckProperty
 
   "Merkle tree for block should ignore incorrect transaction" in forAll(incorrectTransactionScenario) {
     case (block, transaction) =>
-      block.merkleRootValid() shouldBe true
-      block.merkleProof(transaction) shouldBe 'empty
+      block.transactionsRootValid() shouldBe true
+      block.transactionProof(transaction) shouldBe 'empty
   }
 
   val incorrectProofScenario: Gen[(Block, Transaction, MerkleProof[Digest32])] =
     for {
       (block, _)                  <- happyPathScenario
       (anotherBlock, transaction) <- happyPathScenario
-      proof = anotherBlock.merkleProof(transaction).get
+      proof = anotherBlock.transactionProof(transaction).get
     } yield (block, transaction, proof)
 
   "Merkle tree for block should invalidate incorrect proof" in forAll(incorrectProofScenario) {
     case (block, transaction, proof) =>
-      block.merkleRootValid() shouldBe true
+      block.transactionsRootValid() shouldBe true
 
-      val merkleTree = block.merkleTree()
+      val merkleTree = block.transactionsMerkleTree()
 
-      block.merkleProof(transaction) shouldBe 'empty
+      block.transactionProof(transaction) shouldBe 'empty
       proof.valid(merkleTree.rootHash) shouldBe false
-      proof.valid(Digest32 @@ block.header.merkle.arr) shouldBe false
+      proof.valid(Digest32 @@ block.header.transactionsRoot.arr) shouldBe false
   }
 
   def proofBytes(proof: MerkleProof[Digest32]): Array[Byte] =
@@ -124,8 +131,8 @@ class BlockMerkleSpec extends FreeSpec with OptionValues with ScalaCheckProperty
 
   "Serialized merkle proof can be deserialized and validated" in forAll(happyPathScenario) {
     case (block, transaction) =>
-      val merkleTree  = block.merkleTree()
-      val merkleProof = block.merkleProof(transaction).value
+      val merkleTree  = block.transactionsMerkleTree()
+      val merkleProof = block.transactionProof(transaction).value
 
       val serializedValidMerkleProof = ByteStr(proofBytes(merkleProof)).toString
       val validMerkleProof           = parseProofBytes(serializedValidMerkleProof)
@@ -133,6 +140,6 @@ class BlockMerkleSpec extends FreeSpec with OptionValues with ScalaCheckProperty
       validMerkleProof.leafData shouldBe merkleProof.leafData
       validMerkleProof.levels.map { case (d, s) => (d.toList, s) } shouldBe merkleProof.levels.map { case (d, s) => (d.toList, s) }
       validMerkleProof.valid(merkleTree.rootHash) shouldBe true
-      validMerkleProof.valid(Digest32 @@ block.header.merkle.arr) shouldBe true
+      validMerkleProof.valid(Digest32 @@ block.header.transactionsRoot.arr) shouldBe true
   }
 }

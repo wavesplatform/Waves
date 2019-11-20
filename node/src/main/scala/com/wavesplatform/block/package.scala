@@ -46,15 +46,16 @@ package object block {
   private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
 
   private[block] implicit class BlockMerkleOps(block: Block) {
-    def merkleProof(transaction: Transaction): Option[MerkleProof[Digest32]] = block.merkleTree().proofByElement(transaction.mkMerkleLeaf())
+    def transactionProof(transaction: Transaction): Option[MerkleProof[Digest32]] =
+      block.transactionsMerkleTree().proofByElement(transaction.mkMerkleLeaf())
   }
 
   private[block] implicit class TransactionMerkleOps(transaction: Transaction) {
     def mkMerkleLeaf(): Leaf[Digest32] = Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
   }
 
-  private[block] def mkMerkleTree(version: Byte, transactions: Seq[Transaction]): MerkleTree[Digest32] = {
-    require(version >= Block.ProtoBlockVersion, s"Merkle should be used only for Block version >= ${Block.ProtoBlockVersion}")
+  /** Creates transactions merkle root */
+  private[block] def mkMerkleTree(transactions: Seq[Transaction]): MerkleTree[Digest32] = {
     if (transactions.isEmpty) EmptyMerkleTree else MerkleTree(transactions.map(_.mkMerkleLeaf().data))
   }
 }

@@ -27,7 +27,7 @@ object BlockHeaderSerializer {
         Json.obj(
           "baseTarget"          -> blockHeader.baseTarget,
           "generationSignature" -> blockHeader.generationSignature.toString,
-          "merkle"              -> blockHeader.merkle.toString
+          "transactionsRoot"    -> blockHeader.transactionsRoot.toString
         )
 
     val featuresJson =
@@ -72,9 +72,9 @@ object BlockSerializer {
       case _                           => Longs.toByteArray(header.rewardVote)
     }
 
-    val merkleBytes = header.version match {
+    val transactionsRootBytes = header.version match {
       case v if v < ProtoBlockVersion => Array.empty[Byte]
-      case _                          => Bytes.concat(Ints.toByteArray(header.merkle.arr.length), header.merkle.arr)
+      case _                          => Bytes.concat(Ints.toByteArray(header.transactionsRoot.arr.length), header.transactionsRoot.arr)
     }
 
     Bytes.concat(
@@ -88,7 +88,7 @@ object BlockSerializer {
       featureVotesBytes,
       rewardVoteBytes,
       header.generator.arr,
-      merkleBytes,
+      transactionsRootBytes,
       signature.arr
     )
   }
@@ -114,11 +114,11 @@ object BlockSerializer {
 
       val generator = buf.getPublicKey
 
-      val merkle = if (version < Block.ProtoBlockVersion) ByteStr.empty else ByteStr(buf.getByteArray(buf.getInt()))
+      val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ByteStr(buf.getByteArray(buf.getInt()))
 
       val signature = ByteStr(buf.getByteArray(SignatureLength))
 
-      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle)
+      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot)
 
       Block(header, signature, transactionData)
     }
