@@ -1042,7 +1042,7 @@ object AsyncHttpApi extends Assertions {
         version,
         PBTransaction.Data.InvokeScript(InvokeScriptTransactionData(
           Some(dApp),
-          ByteString.copyFrom(Deser.serializeOption(functionCall)(Serde.serialize(_))),
+          ByteString.copyFrom(Deser.serializeOptionOfArray(functionCall)(Serde.serialize(_))),
           payments
         )))
       val proofs = crypto.sign(caller, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())

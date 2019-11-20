@@ -47,7 +47,7 @@ class InvokeScriptErrorMsgSuite extends GrpcBaseTransactionSuite {
     sender.grpc.setScript(caller, Some(scriptBase64), setScriptFee, waitForTx = true)
   }
 
-  test("error message is informative") {
+  test("cannot invoke script without having enough fee; error message is informative") {
     val asset1 = PBTransactions.vanilla(sender.grpc.
       broadcastIssue(
         caller,

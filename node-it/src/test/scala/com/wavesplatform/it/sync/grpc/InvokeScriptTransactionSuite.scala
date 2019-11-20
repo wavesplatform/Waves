@@ -14,12 +14,13 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.Recipient
+import io.grpc.Status.Code
 
 class InvokeScriptTransactionSuite extends GrpcBaseTransactionSuite {
-  private val (contract, contractAddress) = (firstAcc, firstAddress)
+  private val (dApp, dAppAddress) = (firstAcc, firstAddress)
   private val caller   = secondAcc
 
-  test("set contract to contract account") {
+  test("set contract to dApp account") {
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
@@ -35,71 +36,60 @@ class InvokeScriptTransactionSuite extends GrpcBaseTransactionSuite {
         |  WriteSet([DataEntry("a", "b"), DataEntry("sender", "senderId")])
         | }
         |
-        | @Verifier(t)
-        | func verify() = {
-        |  true
-        | }
+        |@Verifier(tx)
+        |func verify() = {
+        |    match tx {
+        |        case TransferTransaction => false
+        |        case _ => true
+        |    }
+        |}
         |
         |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.grpc.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+    sender.grpc.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
 
     val scriptInfo = sender.grpc.scriptInfo(firstAddress)
 
     scriptInfo.scriptBytes shouldBe ByteString.copyFrom(Base64.decode(script))
   }
 
-  test("contract caller invokes a function on a contract") {
+  test("dApp caller invokes a function on a dApp") {
     val arg               = ByteStr(Array(42: Byte))
 
     sender.grpc.broadcastInvokeScript(
       caller,
-      Recipient().withAddress(contractAddress),
+      Recipient().withAddress(dAppAddress),
       Some(FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTESTR(arg).explicitGet()))),
       fee = 1.waves,
       waitForTx = true
     )
 
-    sender.grpc.getDataByKey(contractAddress, "a") shouldBe List(BinaryDataEntry("a", arg))
-    sender.grpc.getDataByKey(contractAddress, "sender") shouldBe List(BinaryDataEntry("sender", caller.toAddress.bytes))
+    sender.grpc.getDataByKey(dAppAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg))))
+    sender.grpc.getDataByKey(dAppAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.BinaryValue(ByteString.copyFrom(caller.toAddress.bytes))))
   }
 
-  test("contract caller invokes a default function on a contract") {
-
-
+  test("dApp caller invokes a default function on a dApp") {
     sender.grpc.broadcastInvokeScript(
       caller,
-      Recipient().withAddress(contractAddress),
+      Recipient().withAddress(dAppAddress),
       functionCall = None,
       fee = 1.waves,
       waitForTx = true
     )
-    sender.grpc.getDataByKey(contractAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.StringValue("b")))
-    sender.grpc.getDataByKey(contractAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.StringValue("senderId")))
+    sender.grpc.getDataByKey(dAppAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.StringValue("b")))
+    sender.grpc.getDataByKey(dAppAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.StringValue("senderId")))
   }
 
-//  test("verifier works") {
-//
-//    val tx =
-//      DataTransaction
-//        .create(
-//          sender = contract,
-//          data = List(StringDataEntry("a", "OOO")),
-//          feeAmount = 1.waves,
-//          timestamp = System.currentTimeMillis(),
-//          proofs = Proofs.empty
-//        )
-//        .explicitGet()
-//
-//    val dataTxId = sender
-//      .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
-//      .id
-//
-//    nodes.waitForHeightAriseAndTxPresent(dataTxId)
-//
-//    sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "OOO")
-//  }
+  test("verifier works") {
+    val dAppBalance = sender.grpc.wavesBalance(dAppAddress)
+    assertGrpcError(
+    sender.grpc.broadcastTransfer(dApp, Recipient().withAddress(dAppAddress), transferAmount, minFee),
+      "Transaction is not allowed by account-script",
+      Code.INVALID_ARGUMENT
+    )
+    sender.grpc.wavesBalance(dAppAddress) shouldBe dAppBalance
+  }
 
 
 }
