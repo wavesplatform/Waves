@@ -87,10 +87,6 @@ package object requests {
     }
   }
 
-  private[requests] implicit class RequestStrExt(private val str: String) extends AnyVal {
-    def utf8Bytes: Array[Byte] = str.getBytes(StandardCharsets.UTF_8)
-  }
-
   private[requests] def defaultVersion = TxVersion.V1
   private[requests] def defaultTimestamp = 0L
 }

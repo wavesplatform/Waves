@@ -73,6 +73,9 @@ object Attachment {
 
         case JsNull =>
           JsSuccess(Empty)
+
+        case _ =>
+          JsError("Expected object or null")
       },
       Writes {
         case Num(value)  => Json.obj("type" -> "integer", "value" -> value)

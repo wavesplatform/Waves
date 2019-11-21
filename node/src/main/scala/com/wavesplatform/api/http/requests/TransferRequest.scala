@@ -2,7 +2,7 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import play.api.libs.json._
 
 case class TransferRequest(
@@ -34,7 +34,7 @@ case class TransferRequest(
         amount,
         validFeeAssetId,
         fee,
-        validAttachment,
+        Attachment.fromBytes(validAttachment),
         timestamp.getOrElse(0L),
         validProofs
       )

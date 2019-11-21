@@ -31,8 +31,8 @@ case class IssueRequest(
       tx <- IssueTransaction.create(
         version.getOrElse(defaultVersion),
         sender,
-        name.utf8Bytes,
-        description.utf8Bytes,
+        name,
+        description,
         quantity,
         decimals,
         reissuable,
