@@ -54,6 +54,6 @@ object TracedResult {
     (a, b) =>
       TracedResult(
         a.resultE |+| b.resultE,
-        a.trace |+| b.trace
-    )
+        if (a.resultE.isRight) a.trace |+| b.trace else a.trace
+      )
 }

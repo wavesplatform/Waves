@@ -178,16 +178,16 @@ object InvokeScriptTransactionDiff {
           wavesFee = feeInfo._1
           paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
+            val smartAssetInvocations =
+              tx.checkedAssets                              ++
+              transfers.flatMap(_.assetId).map(IssuedAsset) ++
+              reissues.map(r => IssuedAsset(r.assetId))     ++
+              burns.map(b => IssuedAsset(b.assetId))
+
             val totalScriptsInvoked =
-              tx.checkedAssets
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                transfers.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) {
-                   1
-                 } else {
-                   0
-                 })
+              smartAssetInvocations.count(blockchain.hasAssetScript) +
+              (if (blockchain.hasScript(tx.sender)) 1 else 0)
+
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
@@ -210,8 +210,8 @@ object InvokeScriptTransactionDiff {
           val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
           val isr = InvokeScriptResult(
-            data = dataEntries,
-            transfers = transfers.toSeq
+            dataEntries,
+            transfers.toSeq
               .filterNot { case (recipient, _) => recipient == dAppAddress }
               .flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
@@ -294,8 +294,8 @@ object InvokeScriptTransactionDiff {
     }
 
   private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address)(
-    ps: List[CallableAction],
-    paymentsDiff: Diff
+      ps: List[CallableAction],
+      paymentsDiff: Diff
   ): TracedResult[ValidationError, Diff] =
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
 
@@ -308,15 +308,15 @@ object InvokeScriptTransactionDiff {
           case Waves =>
             val r = Diff.stateOps(
               portfolios =
-                Map(address       -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
-                  Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
+                Map(address     -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
+                Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
             )
             TracedResult.wrapValue(r)
           case a @ IssuedAsset(id) =>
             val nextDiff = Diff.stateOps(
               portfolios =
-                Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
-                  Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
+                Map(address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
+                Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
             )
             blockchain.assetScript(a) match {
               case None => nextDiff.asRight[ValidationError]
