@@ -682,7 +682,7 @@ object SyncHttpApi extends Assertions {
         decimals: Byte,
         reissuable: Boolean,
         fee: Long,
-        description: ByteString = ByteString.EMPTY,
+        description: String = "",
         script: Option[String] = None,
         version: Int = 2,
         waitForTx: Boolean = false

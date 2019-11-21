@@ -10,7 +10,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 
 import scala.concurrent.duration._
 
@@ -83,7 +83,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       1,
       Waves,
       smartMinFee,
-      Array.emptyByteArray,
+      Attachment.Empty,
       System.currentTimeMillis + 10.minutes.toMillis,
       Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
     )

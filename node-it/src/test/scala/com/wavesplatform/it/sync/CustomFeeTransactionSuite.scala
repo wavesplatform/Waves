@@ -79,8 +79,8 @@ object CustomFeeTransactionSuite {
     .selfSigned(
       TxVersion.V1,
       sender = pk,
-      name = "asset".getBytes("UTF-8"),
-      description = "asset description".getBytes("UTF-8"),
+      name = "asset",
+      description = "asset description",
       quantity = defaultAssetQuantity,
       decimals = 2,
       reissuable = false,

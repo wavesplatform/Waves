@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
@@ -37,7 +37,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val now = System.currentTimeMillis()
     val transactions: List[Transaction] = (1 to settings.transactions).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, scriptedAccount, oracle, Waves, 1.waves, Waves, enoughFee, Array.emptyByteArray, now + i)
+        .selfSigned(2.toByte, scriptedAccount, oracle, Waves, 1.waves, Waves, enoughFee, Attachment.Empty, now + i)
         .explicitGet()
     }.toList
 

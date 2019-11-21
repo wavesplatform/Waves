@@ -77,8 +77,8 @@ class NarrowTransactionGenerator(
                 .selfSigned(
                   TxVersion.V2,
                   sender,
-                  name,
-                  description,
+                  new String(name),
+                  new String(description),
                   amount,
                   Random.nextInt(9).toByte,
                   reissuable,
@@ -104,7 +104,7 @@ class NarrowTransactionGenerator(
                       500,
                       Waves,
                       500000L,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte),
+                      Attachment.fromBytes(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
                       timestamp
                     )
                 )
@@ -213,7 +213,7 @@ class NarrowTransactionGenerator(
                       transfers.toList,
                       100000L + 50000L * transferCount + 400000L,
                       timestamp,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
+                      Attachment.fromBytes(Array.fill(random.nextInt(100))(random.nextInt().toByte))
                     )
                 )
               } yield tx
@@ -457,7 +457,7 @@ object NarrowTransactionGenerator {
               val account = GeneratorSettings.toKeyPair(s"${UUID.randomUUID().toString}")
 
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, richAccount, account, Waves, balance, Waves, fee, "Generator".getBytes("UTF-8"), time.correctedTime())
+                .selfSigned(2.toByte, richAccount, account, Waves, balance, Waves, fee, Attachment.Empty, time.correctedTime())
                 .explicitGet()
 
               val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
@@ -479,8 +479,8 @@ object NarrowTransactionGenerator {
                   .selfSigned(
                     TxVersion.V2,
                     issuer,
-                    UUID.randomUUID().toString.getBytes("UTF-8").take(16),
-                    s"$description #$i".getBytes("UTF-8"),
+                    UUID.randomUUID().toString.take(16),
+                    s"$description #$i",
                     amount,
                     decimals.toByte,
                     reissuable,
@@ -503,8 +503,8 @@ object NarrowTransactionGenerator {
         .selfSigned(
           TxVersion.V2,
           trader,
-          "TRADE".getBytes("UTF-8"),
-          "Waves DEX is the best exchange ever".getBytes("UTF-8"),
+          "TRADE",
+          "Waves DEX is the best exchange ever",
           100000000,
           2,
           reissuable = true,
@@ -526,7 +526,7 @@ object NarrowTransactionGenerator {
               tradeAsset.quantity / Universe.Accounts.size,
               Waves,
               900000,
-              Array.fill(random.nextInt(100))(random.nextInt().toByte),
+              Attachment.fromBytes(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
               System.currentTimeMillis()
             )
             .right

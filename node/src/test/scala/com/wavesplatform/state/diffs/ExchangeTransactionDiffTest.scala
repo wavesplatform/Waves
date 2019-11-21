@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
@@ -1088,7 +1088,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)),
             fee = 1000L,
             genesisTimestamp + 1000L,
-            Array.empty[Byte]
+            Attachment.Empty
           )
           .explicitGet()
 

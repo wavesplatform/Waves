@@ -106,7 +106,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let quantity = t.quantity == ${t.quantity}
                  |   let decimals = t.decimals == ${t.decimals}
                  |   let reissuable = t.reissuable == ${t.reissuable}
-                 |   let name = t.name == base58'${ByteStr(t.name).toString}'
+                 |   let name = t.name == base58'${ByteStr(t.nameBytes).toString}'
                  |   let description = t.description == base58'${ByteStr(t.descBytes).toString}'
                  |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
                    .map(_.bytes().base64)
@@ -446,7 +446,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
-                      |     let attachment = t.attachment == base58'${ByteStr(t.attachmentBytes).toString}'
+                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment.asBytes).toString}'
                       |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment

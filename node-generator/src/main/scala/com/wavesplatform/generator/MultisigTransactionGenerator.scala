@@ -10,7 +10,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Proofs, Transaction}
 
 import scala.util.Random
@@ -44,7 +44,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         totalAmountOnNewAccount - 2 * enoughFee - i,
         Waves,
         enoughFee,
-        Array.emptyByteArray,
+        Attachment.Empty,
         now + i,
         Proofs.empty
       )
