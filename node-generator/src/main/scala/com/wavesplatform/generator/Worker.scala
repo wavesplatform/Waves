@@ -8,7 +8,6 @@ import cats.Show
 import cats.effect.concurrent.Ref
 import cats.syntax.apply._
 import cats.syntax.flatMap._
-import com.typesafe.config.Config
 import com.wavesplatform.generator.Worker.{EmptyState, Settings, SkipState, State}
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.transaction.Transaction
@@ -16,7 +15,6 @@ import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.Channel
 import monix.eval.Task
 import monix.execution.Scheduler
-import net.ceedubs.ficus.readers.ValueReader
 import org.asynchttpclient.AsyncHttpClient
 import play.api.libs.json.Json
 
@@ -32,7 +30,8 @@ class Worker(
     nodeRestAddress: URL,
     canContinue: () => Boolean,
     initial: Seq[Transaction],
-    richAccountAddresses: Seq[String]
+    richAccountAddresses: Seq[String],
+    tailInitial: Seq[Transaction] = Seq()
 )(implicit httpClient: AsyncHttpClient, ec: ExecutionContext)
     extends ScorexLogging {
 
@@ -46,7 +45,7 @@ class Worker(
         case Some(warmUp) => Ref.of[Task, State](EmptyState(warmUp))
         case None         => Ref.of[Task, State](SkipState(settings.utxLimit))
       }
-      channel <- getChannel
+      channel <- withReconnect(getChannel)
       _       <- logInfo("INITIAL PHASE")
       channel <- withReconnect(writeInitial(channel, initState))
       _       <- logInfo("GENERAL PHASE")
@@ -94,17 +93,32 @@ class Worker(
         _            <- logInfo(s"Sending initial transactions to $validChannel")
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
-        r <- if (cntToSend >= txs.size) afterInitial *> Task.now(validChannel)
+        r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.tailInitialDelay) *> writeTailInitial(validChannel, state)
         else sleep(settings.delay) *> Task.defer(writeInitial(channel, state, txs.drop(cntToSend)))
       } yield r
 
-  private[this] def afterInitial: Task[Unit] =
-    if (!settings.waitForEmptyUtxAfterInitial) sleep(settings.initialDelay)
+  private[this] def sleepOrWaitEmptyUtx(strategy: Either[FiniteDuration, FiniteDuration]): Task[Unit] =
+    strategy match {
+      case Left(duration) => sleep(duration)
+      case Right(duration) =>
+        for {
+          _ <- sleep(duration)
+          _ <- nodeUTXTransactionsToSendCount >>= (cnt => if (cnt == settings.utxLimit) Task.unit else Task.defer(sleepOrWaitEmptyUtx(strategy)))
+        } yield ()
+    }
+
+  private[this] def writeTailInitial(channel: Channel, state: Ref[Task, State], txs: Seq[Transaction] = tailInitial): Task[Channel] =
+    if (!canContinue())
+      Task.now(channel)
     else
       for {
-        _ <- sleep(settings.initialDelay)
-        _ <- nodeUTXTransactionsToSendCount >>= (cnt => if (cnt == settings.utxLimit) Task.unit else Task.defer(afterInitial))
-      } yield ()
+        validChannel <- validateChannel(channel)
+        _            <- logInfo(s"Sending tail initial transactions to $validChannel")
+        cntToSend    <- calcAndSaveCntToSend(state)
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs.take(cntToSend).toStream: _*))
+        r <- if (cntToSend >= txs.size) sleepOrWaitEmptyUtx(settings.initialDelay) *> Task.now(validChannel)
+        else sleep(settings.delay) *> Task.defer(writeTailInitial(validChannel, state, txs.drop(cntToSend)))
+      } yield r
 
   private[this] def pullAndWrite(channel: Channel, state: Ref[Task, State], cnt: Int = 0): Task[Channel] =
     if (!canContinue())
@@ -115,7 +129,9 @@ class Worker(
         validChannel <- validateChannel(channel)
         cntToSend    <- calcAndSaveCntToSend(state)
         _            <- logInfo(s"Sending $cntToSend transactions to $validChannel")
-        _            <- Task.deferFuture(networkSender.send(validChannel, transactionSource.take(cntToSend).toStream: _*))
+        txs          <- Task(transactionSource.take(cntToSend).toStream)
+        _            <- txs.headOption.fold(Task.unit)(tx => logInfo(s"Head transaction id: ${tx.id()}"))
+        _            <- Task.deferFuture(networkSender.send(validChannel, txs: _*))
         _            <- sleep(settings.delay)
         r            <- Task.defer(pullAndWrite(validChannel, state, (cnt + 1) % 10))
       } yield r
@@ -152,13 +168,11 @@ class Worker(
 }
 
 object Worker {
-  import net.ceedubs.ficus.Ficus._
-
   case class Settings(
       utxLimit: Int,
       delay: FiniteDuration,
-      initialDelay: FiniteDuration,
-      waitForEmptyUtxAfterInitial: Boolean,
+      tailInitialDelay: Either[FiniteDuration, FiniteDuration],
+      initialDelay: Either[FiniteDuration, FiniteDuration],
       workingTime: FiniteDuration,
       autoReconnect: Boolean,
       reconnectDelay: FiniteDuration,
@@ -189,7 +203,7 @@ object Worker {
               case _ =>
                 val mayBeNextCnt = math.min(cnt + warmUp.step, warmUp.end)
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
-                val nextRaised   = if (nextCnt == warmUp.end && warmUp.once) true else false
+                val nextRaised   = nextCnt == warmUp.end && warmUp.once
                 WorkState(nextCnt, nextRaised, endAfter, warmUp)
             }
           }
@@ -208,30 +222,6 @@ object Worker {
 
   final case class SkipState(cnt: Int) extends State {
     override def toString: String = "SkipState"
-  }
-
-  implicit val settingsReader: ValueReader[Settings] = (config: Config, path: String) => {
-    val utxLimit                    = config.as[Int](s"$path.utx-limit")
-    val delay                       = config.as[FiniteDuration](s"$path.delay")
-    val initialDelay                = config.as[Option[FiniteDuration]](s"$path.delay").getOrElse(delay)
-    val waitForEmptyUtxAfterInitial = config.as[Option[Boolean]](s"$path.wait-for-empty-utx-after-initial").getOrElse(false)
-    val workingTime                 = config.as[FiniteDuration](s"$path.working-time")
-    val autoReconnect               = config.as[Boolean](s"$path.auto-reconnect")
-    val reconnectDelay              = config.as[FiniteDuration](s"$path.reconnect-delay")
-
-    def readWarmUp(warmUpConfig: Config): WarmUp = {
-      val warmUpStart    = warmUpConfig.as[Int](s"start")
-      val warmUpEnd      = warmUpConfig.as[Option[Int]](s"end").getOrElse(utxLimit)
-      val warmUpStep     = warmUpConfig.as[Int](s"step")
-      val warmUpDuration = warmUpConfig.as[Option[FiniteDuration]](s"duration")
-      val warmUpOnce     = warmUpConfig.as[Option[Boolean]](s"once").getOrElse(true)
-      WarmUp(warmUpStart, warmUpEnd, warmUpStep, warmUpDuration, warmUpOnce)
-    }
-
-    val warmUp     = readWarmUp(config.getConfig(s"$path.warm-up"))
-    val initWarmUp = if (config.hasPath(s"$path.initial-warm-up")) Some(readWarmUp(config.getConfig(s"$path.init-warm-up"))) else None
-
-    Settings(utxLimit, delay, initialDelay, waitForEmptyUtxAfterInitial, workingTime, autoReconnect, reconnectDelay, warmUp, initWarmUp)
   }
 
   implicit val toPrintable: Show[Settings] = { x =>

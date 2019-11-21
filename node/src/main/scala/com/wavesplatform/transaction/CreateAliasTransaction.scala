@@ -16,8 +16,9 @@ import scala.util.Try
 final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, alias: Alias, fee: TxAmount, timestamp: TxTimestamp, proofs: Proofs)
     extends SigProofsSwitch
     with VersionedTransaction
-    with TxWithFee.InWaves {
-  override def builder: TransactionParser      = CreateAliasTransaction
+    with TxWithFee.InWaves
+    with LegacyPBSwitch.V3 {
+  override def builder: TransactionParser          = CreateAliasTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(CreateAliasTransaction.serializer.toJson(this))

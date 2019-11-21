@@ -29,7 +29,8 @@ case class ExchangeTransaction(
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with SigProofsSwitch {
+    with SigProofsSwitch
+    with LegacyPBSwitch.V3 {
 
   override def builder: TransactionParser = ExchangeTransaction
 

@@ -339,7 +339,7 @@ object FPPoSSelectorTest {
           ByteStr(gs),
           Seq.empty,
           miner,
-          Set.empty,
+          Seq.empty,
           -1L
         )
         .explicitGet()
@@ -390,7 +390,7 @@ object FPPoSSelectorTest {
         updateGS(cData.generationSignature),
         Seq.empty,
         miner,
-        Set.empty,
+        Seq.empty,
         0.toByte
       )
       .explicitGet()

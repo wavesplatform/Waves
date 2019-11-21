@@ -4,7 +4,7 @@ libraryDependencies ++= Dependencies.grpc
 
 extensionClasses += "com.wavesplatform.api.grpc.GRPCServerExtension"
 
-resolvers += "Sonatype OSS Snapshots" at "https://oss.sonatype.org/content/repositories/snapshots"
+resolvers += Resolver.sonatypeRepo("snapshots")
 
 inConfig(Compile)(Seq(
   PB.protoSources in Compile := Seq(PB.externalIncludePath.value),

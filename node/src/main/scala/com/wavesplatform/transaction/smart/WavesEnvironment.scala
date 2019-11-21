@@ -26,12 +26,12 @@ object WavesEnvironment {
 }
 
 class WavesEnvironment(
-  nByte: Byte,
-  in: Coeval[Environment.InputEntity],
-  h: Coeval[Int],
-  blockchain: Blockchain,
-  address: Coeval[ByteStr],
-  ds: DirectiveSet
+    nByte: Byte,
+    in: Coeval[Environment.InputEntity],
+    h: Coeval[Int],
+    blockchain: Blockchain,
+    address: Coeval[ByteStr],
+    ds: DirectiveSet
 ) extends Environment[Id] {
 
   override def height: Long = h()
@@ -149,7 +149,7 @@ class WavesEnvironment(
         header.baseTarget,
         header.generationSignature,
         transactionCount,
-        header.featureVotes.map(_.toLong).toSeq.sorted
+        header.featureVotes.map(_.toLong).sorted
       )
     }.toOption
 
@@ -165,7 +165,7 @@ class WavesEnvironment(
     val baseTarget = ndi.readLong()
 
     val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig = new Array[Byte](genSigLength)
+    val genSig       = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
@@ -173,25 +173,32 @@ class WavesEnvironment(
       else ndi.readInt()
     }
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
 
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](crypto.KeyLength)
     ndi.readFully(generator)
 
+    val merkle = if (version > Block.RewardBlockVersion) {
+      val result = new Array[Byte](ndi.readInt())
+      ndi.readFully(result)
+      result
+    } else Array.emptyByteArray
+
     val signature = new Array[Byte](crypto.SignatureLength)
     ndi.readFully(signature)
 
-    val header = new BlockHeader(
+    val header = BlockHeader(
       version,
       timestamp,
-      referenceArr,
+      ByteStr(referenceArr),
       baseTarget,
-      genSig,
+      ByteStr(genSig),
       PublicKey(ByteStr(generator)),
       featureVotes,
-      rewardVote
+      rewardVote,
+      ByteStr(merkle)
     )
     (header, transactionCount, ByteStr(signature))
   }

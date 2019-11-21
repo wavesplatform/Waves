@@ -20,17 +20,24 @@ object DataTxSerializer {
 
   def bodyBytes(tx: DataTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender,
-      Shorts.toByteArray(data.size.toShort),
-      Bytes.concat(data.view.map(_.toBytes): _*),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version),
+          sender,
+          Shorts.toByteArray(data.size.toShort),
+          Bytes.concat(data.view.map(_.toBytes): _*),
+          Longs.toByteArray(timestamp),
+          Longs.toByteArray(fee)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
   def toBytes(tx: DataTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
   }
 

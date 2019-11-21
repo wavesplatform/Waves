@@ -4,8 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -26,7 +25,7 @@ object TransferTxSerializer {
 
   def bodyBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = {
+    lazy val baseBytes = {
       Bytes.concat(
         sender,
         assetId.byteRepr,
@@ -42,11 +41,13 @@ object TransferTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
+      case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx))
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())

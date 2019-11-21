@@ -22,17 +22,25 @@ object SetScriptTxSerializer {
 
   def bodyBytes(tx: SetScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte.get),
+          sender,
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
+          Longs.toByteArray(fee),
+          Longs.toByteArray(timestamp)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: SetScriptTransaction): Array[Byte] =
+  def toBytes(tx: SetScriptTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")

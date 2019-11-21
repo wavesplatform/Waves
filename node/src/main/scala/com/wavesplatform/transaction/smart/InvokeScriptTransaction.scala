@@ -31,7 +31,8 @@ case class InvokeScriptTransaction(
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V2 {
 
   val funcCall = funcCallOpt.getOrElse(FUNCTION_CALL(FunctionHeader.User(ContractEvaluator.DEFAULT_FUNC_NAME), List.empty))
 
