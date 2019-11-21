@@ -5,7 +5,6 @@ import java.nio.ByteBuffer
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.Shorts
-import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId

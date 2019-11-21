@@ -4,10 +4,6 @@ import java.util.concurrent._
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import cats.instances.either.catsStdInstancesForEither
-import cats.instances.option.catsStdInstancesForOption
-import cats.syntax.either._
-import cats.syntax.traverse._
 import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
@@ -16,24 +12,22 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import monix.eval.Task
 import monix.execution.Scheduler
 import play.api.libs.json._
 
@@ -76,35 +70,26 @@ case class AssetsApiRoute(
       complete(balanceJson(address, assetId))
     }
 
-  def assetDistributionTask(params: DistributionParams): Task[ToResponseMarshallable] = Task.raiseError(new NotImplementedError)
-
-  @Deprecated
-  @Path("/{assetId}/distribution")
-  @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  def balanceDistribution: Route =
-    (get & path(Segment / "distribution")) { assetParam =>
-      val assetEi = AssetsApiRoute
-        .validateAssetId(assetParam)
-
-      val distributionTask = assetEi match {
-        case Left(err) => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
-        case Right(asset) =>
-          Task.raiseError(new NotImplementedError)
+  private def balanceDistribution(assetId: IssuedAsset, height: Int, limit: Int, after: Option[Address])(f: List[(Address, Long)] => JsValue) =
+    complete {
+      try {
+        commonAccountApi
+          .assetDistribution(assetId, height, after)
+          .take(limit)
+          .toListL
+          .map(f)
+          .runAsyncLogErr(distributionTaskScheduler)
+      } catch {
+        case _: RejectedExecutionException =>
+          val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
+          Future.successful(errMsg.json: ToResponseMarshallable)
       }
+    }
 
-      complete {
-        try {
-          distributionTask.runAsyncLogErr(distributionTaskScheduler)
-        } catch {
-          case _: RejectedExecutionException =>
-            val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
-            Future.successful(errMsg.json: ToResponseMarshallable)
-        }
+  def balanceDistribution: Route =
+    (get & path(TransactionId / "distribution")) { assetId =>
+      balanceDistribution(IssuedAsset(assetId), blockchain.height, settings.distributionAddressLimit, None) { l =>
+        Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
       }
     }
 
@@ -123,25 +108,22 @@ case class AssetsApiRoute(
     )
   )
   def balanceDistributionAtHeight: Route =
-    (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
-      (assetParam, heightParam, limitParam, afterParam) =>
+    (get & path(TransactionId / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
+      (assetId, heightParam, limitParam, afterParam) =>
         val paramsEi: Either[ValidationError, DistributionParams] =
           AssetsApiRoute
-            .validateDistributionParams(blockchain, assetParam, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
+            .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
 
-        val resultTask = paramsEi match {
-          case Left(err)     => Task.pure(ApiError.fromValidationError(err): ToResponseMarshallable)
-          case Right(params) => assetDistributionTask(params)
-        }
-
-        complete {
-          try {
-            resultTask.runAsyncLogErr(distributionTaskScheduler)
-          } catch {
-            case _: RejectedExecutionException =>
-              val errMsg = CustomValidationError("Asset distribution currently unavailable, try again later")
-              Future.successful(errMsg.json: ToResponseMarshallable)
-          }
+        paramsEi match {
+          case Right((height, limit, after)) =>
+            balanceDistribution(IssuedAsset(assetId), height, limit, after) { l =>
+              Json.obj(
+                "hasNext"  -> (l.length == limit),
+                "lastItem" -> l.lastOption.map(_._1),
+                "items"    -> Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
+              )
+            }
+          case Left(error) => complete(error)
         }
     }
 
@@ -153,7 +135,7 @@ case class AssetsApiRoute(
     )
   )
   def balances: Route =
-    (get & path("balance" / Segment)) { address =>
+    (get & path("balance" / AddrSegment)) { address =>
       complete(fullAccountAssetsInfo(address))
     }
 
@@ -166,7 +148,7 @@ case class AssetsApiRoute(
     )
   )
   def details: Route =
-    (get & path("details" / Segment)) { id =>
+    (get & path("details" / TransactionId)) { id =>
       parameters('full.as[Boolean].?) { full =>
         complete(assetDetails(id, full.getOrElse(false)))
       }
@@ -226,35 +208,30 @@ case class AssetsApiRoute(
       "balance" -> JsNumber(BigDecimal(blockchain.balance(address, IssuedAsset(assetId))))
     )
 
-  private def fullAccountAssetsInfo(address: String): Either[ApiError, JsObject] =
-    (for {
-      acc <- Address.fromString(address)
-    } yield {
-      Json.obj(
-        "address" -> acc.stringRepr,
-        "balances" -> JsArray(
-          (for {
-            (asset @ IssuedAsset(assetId), balance)                                <- commonAccountApi.portfolio(acc)
-            CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) <- commonAssetsApi.fullInfo(asset)
-          } yield Json.obj(
-            "assetId"    -> assetId,
-            "balance"    -> balance,
-            "reissuable" -> assetInfo.reissuable,
-            "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-              case 0           => JsNull
-              case sponsorship => JsNumber(sponsorship)
-            }),
-            "sponsorBalance"   -> sponsorBalance,
-            "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-            "issueTransaction" -> issueTransaction.json()
-          )).toSeq
-        )
+  private def fullAccountAssetsInfo(acc: Address): JsObject =
+    Json.obj(
+      "address" -> acc.stringRepr,
+      "balances" -> JsArray(
+        (for {
+          (asset @ IssuedAsset(assetId), balance)                                <- commonAccountApi.portfolio(acc)
+          CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) <- commonAssetsApi.fullInfo(asset)
+        } yield Json.obj(
+          "assetId"    -> assetId,
+          "balance"    -> balance,
+          "reissuable" -> assetInfo.reissuable,
+          "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+            case 0           => JsNull
+            case sponsorship => JsNumber(sponsorship)
+          }),
+          "sponsorBalance"   -> sponsorBalance,
+          "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
+          "issueTransaction" -> issueTransaction.json()
+        )).toSeq
       )
-    }).left.map(ApiError.fromValidationError)
+    )
 
-  private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] =
+  private def assetDetails(id: ByteStr, full: Boolean): Either[ApiError, JsObject] =
     (for {
-      id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
       tt <- blockchain.transactionInfo(id).toRight("Failed to find issue transaction by ID")
       (h, mtx) = tt
       tx <- (mtx match {
@@ -295,34 +272,21 @@ case class AssetsApiRoute(
 object AssetsApiRoute {
   val MAX_DISTRIBUTION_TASKS = 5
 
-  type DistributionParams = (IssuedAsset, Int, Int, Option[Address])
+  type DistributionParams = (Int, Int, Option[Address])
 
   def validateDistributionParams(
       blockchain: Blockchain,
-      assetParam: String,
       heightParam: Int,
       limitParam: Int,
       maxLimit: Int,
       afterParam: Option[String]
   ): Either[ValidationError, DistributionParams] = {
     for {
-      limit   <- validateLimit(limitParam, maxLimit)
-      height  <- validateHeight(blockchain, heightParam)
-      assetId <- validateAssetId(assetParam)
-      after   <- afterParam.traverse[Either[ValidationError, ?], Address](Address.fromString)
-    } yield (assetId, height, limit, after)
-  }
-
-  def validateAssetId(assetParam: String): Either[ValidationError, IssuedAsset] = {
-    for {
-      _ <- Either.cond(assetParam.length <= AssetIdStringLength, (), GenericError("Unexpected assetId length"))
-      assetId <- Base58
-        .tryDecodeWithLimit(assetParam)
-        .fold(
-          _ => GenericError("Must be base58-encoded assetId").asLeft[IssuedAsset],
-          arr => IssuedAsset(ByteStr(arr)).asRight[ValidationError]
-        )
-    } yield assetId
+      limit  <- validateLimit(limitParam, maxLimit)
+      height <- validateHeight(blockchain, heightParam)
+      after <- afterParam
+        .fold[Either[ValidationError, Option[Address]]](Right(None))(addrString => Address.fromString(addrString).map(Some(_)))
+    } yield (height, limit, after)
   }
 
   def validateHeight(blockchain: Blockchain, height: Int): Either[ValidationError, Int] = {

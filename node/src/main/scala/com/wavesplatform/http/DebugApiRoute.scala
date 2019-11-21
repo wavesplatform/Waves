@@ -172,14 +172,14 @@ case class DebugApiRoute(
   private implicit val balanceAsJson: Marshaller[(Address, Long), ByteString] = Marshaller.strict[(Address, Long), ByteString] {
     case (address, balance) =>
       Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => {
-        ByteString(s""""${address.stringRepr}": $balance""")
+        ByteString(s""""${address.stringRepr}":$balance""")
       })
   }
 
   private def distribution(height: Int): Route = extractScheduler { implicit s =>
     val assetDistribution: Source[(Address, Long), NotUsed] = Source.fromPublisher(
       accountsApi
-        .wavesDistribution(height)
+        .wavesDistribution(height, None)
         .toReactivePublisher
     )
 

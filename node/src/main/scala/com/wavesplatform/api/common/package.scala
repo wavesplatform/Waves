@@ -1,20 +1,27 @@
 package com.wavesplatform.api
-import com.google.common.primitives.{Longs, Shorts}
+import com.google.common.collect.AbstractIterator
+import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{DBExt, Keys, ReadOnlyDB}
+import com.wavesplatform.state.Portfolio.longSemigroup
 import com.wavesplatform.state.{AddressId, Diff, Height, InvokeScriptResult, Portfolio, TransactionId}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, Transaction}
+import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Task
+import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
+import scala.annotation.tailrec
+import scala.collection.JavaConverters._
 import scala.collection.mutable
 
-package object common {
+package object common extends ScorexLogging {
   def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)])(address: Address): Seq[(Height, CreateAliasTransaction)] = {
     val hijackedAliases = db.get(Keys.disabledAliases)
     addressTransactions(db, maybeDiff, address, None, Set(CreateAliasTransaction.typeId), Int.MaxValue, None)
@@ -223,4 +230,68 @@ package object common {
     for {
       (h, txNum) <- db.get(Keys.transactionHNById(TransactionId(id)))
     } yield db.get(Keys.invokeScriptResult(h, txNum))
+
+  def balanceDistribution(
+      db: DB,
+      height: Int,
+      after: Option[Address],
+      overrides: Map[Address, Portfolio],
+      globalPrefix: Array[Byte],
+      addressId: Array[Byte] => BigInt,
+      balanceOf: Portfolio => Long
+  ): Observable[(Address, Long)] =
+    Observable
+      .fromResource(db.resource)
+      .flatMap { resource =>
+        resource.iterator.seek(
+          globalPrefix ++ after.flatMap(address => resource.get(Keys.addressId(address))).fold(Array.emptyByteArray)(_.toByteArray)
+        )
+        Observable.fromIterator(Task(new AbstractIterator[(Address, Long)] {
+          private[this] var pendingPortfolios = overrides
+          @inline
+          private def stillSameAddress(expected: BigInt): Boolean = resource.iterator.hasNext && {
+            val maybeNext = resource.iterator.peekNext().getKey
+            maybeNext.startsWith(globalPrefix) && addressId(maybeNext) == expected
+          }
+          @tailrec
+          private def findNextBalance(): Option[(Address, Long)] = {
+            if (!resource.iterator.hasNext) None
+            else if (!resource.iterator.peekNext().getKey.startsWith(globalPrefix)) None
+            else {
+              val current       = resource.iterator.next()
+              val aid           = addressId(current.getKey)
+              val address       = resource.get(Keys.idToAddress(aid))
+              var balance       = Longs.fromByteArray(current.getValue)
+              var currentHeight = Ints.fromByteArray(current.getKey.takeRight(4))
+
+              while (stillSameAddress(aid)) {
+                val next       = resource.iterator.next()
+                val nextHeight = Ints.fromByteArray(next.getKey.takeRight(4))
+                if (nextHeight <= height) {
+                  currentHeight = nextHeight
+                  balance = Longs.fromByteArray(next.getValue)
+                }
+              }
+
+              pendingPortfolios -= address
+              val adjustedBalance = longSemigroup.combine(balance, overrides.get(address).fold(0L)(balanceOf))
+
+              if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
+              else findNextBalance()
+            }
+          }
+
+          override def computeNext(): (Address, Long) = findNextBalance() match {
+            case Some(balance) => balance
+            case None =>
+              if (pendingPortfolios.nonEmpty) {
+                val (address, portfolio) = pendingPortfolios.head
+                pendingPortfolios -= address
+                address -> balanceOf(portfolio)
+              } else {
+                endOfData()
+              }
+          }
+        }.asScala))
+      }
 }
