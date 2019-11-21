@@ -14,7 +14,7 @@ import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.Recipient
 import io.grpc.Status.Code
 
-class InvokeScriptTransactionSuite extends GrpcBaseTransactionSuite {
+class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   private val (dApp, dAppAddress) = (firstAcc, firstAddress)
   private val caller   = secondAcc
 

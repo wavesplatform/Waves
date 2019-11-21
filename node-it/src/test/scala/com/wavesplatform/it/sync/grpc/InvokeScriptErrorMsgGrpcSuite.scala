@@ -10,7 +10,7 @@ import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 
-class InvokeScriptErrorMsgSuite extends GrpcBaseTransactionSuite {
+class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
   private val (contract, contractAddress) = (firstAcc, firstAddress)
   private val caller   = secondAcc
 
@@ -77,7 +77,7 @@ class InvokeScriptErrorMsgSuite extends GrpcBaseTransactionSuite {
         payments = payments,
         fee = 1300000
       ),
-      "State check failed. Reason: Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES.",
+      "Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value",
       Code.INVALID_ARGUMENT
     )
   }
