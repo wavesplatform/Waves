@@ -70,7 +70,7 @@ object RealTransactionWrapper {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t).asRight
       case i: IssueTransaction =>
-        Tx.Issue(proven(i), i.quantity, ByteStr(i.name), ByteStr(i.description), i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
+        Tx.Issue(proven(i), i.quantity, ByteStr(i.nameBytes), ByteStr(i.descBytes), i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
@@ -83,7 +83,7 @@ object RealTransactionWrapper {
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
             transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-            attachment = ByteStr(ms.attachment)
+            attachment = ByteStr(ms.attachment.asBytes) // TODO: Support typed attachment
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
@@ -124,6 +124,6 @@ object RealTransactionWrapper {
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = ByteStr(t.attachment)
+      attachment = ByteStr(t.attachment.asBytes) // TODO: Support typed attachment
     )
 }

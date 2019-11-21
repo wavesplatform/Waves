@@ -46,7 +46,7 @@ final case class LeaseTransaction(
 object LeaseTransaction extends TransactionParser {
   type TransactionT = LeaseTransaction
   val classTag: ClassTag[LeaseTransaction] = ClassTag(classOf[LeaseTransaction])
-  val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
   val typeId: TxType                       = 8
 
   implicit val validator = LeaseTxValidator

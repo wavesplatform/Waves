@@ -127,11 +127,8 @@ object CommonValidation {
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 
-      case v: VersionedTransaction if v.version < 1 =>
+      case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
         throw new IllegalArgumentException(s"Invalid tx version: $v")
-
-      case p: VersionedTransaction with LegacyPBSwitch if p.version > p.lastVersion =>
-        throw new IllegalArgumentException(s"Invalid tx version: $p")
 
       case p: LegacyPBSwitch if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)

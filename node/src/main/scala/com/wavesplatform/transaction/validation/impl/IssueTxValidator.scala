@@ -39,9 +39,6 @@ object IssueTxValidator extends TxValidator[IssueTransaction] {
     }
 
     import tx._
-    val nameBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
-    val descBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
-
     V.seq(tx)(
       V.positiveAmount(quantity, "assets"),
       assetName(nameBytes),

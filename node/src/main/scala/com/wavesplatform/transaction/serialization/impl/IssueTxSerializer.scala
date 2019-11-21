@@ -1,11 +1,9 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -17,11 +15,11 @@ object IssueTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"     -> id().toString,
-      "name"        -> new String(name, StandardCharsets.UTF_8),
+      "name"        -> name,
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
-      "description" -> new String(description, StandardCharsets.UTF_8)
+      "description" -> description
     ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte, "script" -> script.map(_.bytes().base64)) else JsObject.empty)
   }
 
@@ -29,8 +27,8 @@ object IssueTxSerializer {
     import tx._
     lazy val baseBytes = Bytes.concat(
       sender,
-      Deser.serializeArrayWithLength(name),
-      Deser.serializeArrayWithLength(description),
+      Deser.serializeArrayWithLength(nameBytes),
+      Deser.serializeArrayWithLength(descBytes),
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
@@ -73,7 +71,19 @@ object IssueTxSerializer {
       val reissuable  = buf.getBoolean
       val fee         = buf.getLong
       val timestamp   = buf.getLong
-      IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, None, fee, timestamp, Nil)
+      IssueTransaction(
+        version,
+        sender,
+        IssueTransaction.asStringLiteral(name),
+        IssueTransaction.asStringLiteral(description),
+        quantity,
+        decimals,
+        reissuable,
+        None,
+        fee,
+        timestamp,
+        Nil
+      )
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

@@ -1,5 +1,7 @@
 package com.wavesplatform.transaction.assets
 
+import java.nio.charset.StandardCharsets
+
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -9,18 +11,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  LegacyPBSwitch,
-  Proofs,
-  ProvenTransaction,
-  SigProofsSwitch,
-  TransactionParser,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
+import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, ProvenTransaction, SigProofsSwitch, TransactionParser, TxType, TxVersion, TxWithFee, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -53,6 +44,9 @@ case class IssueTransaction(
   override val json: Coeval[JsObject]           = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
+
+  private[wavesplatform] lazy val nameBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
+  private[wavesplatform] lazy val descBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
 }
 
 object IssueTransaction extends TransactionParser {
@@ -64,7 +58,7 @@ object IssueTransaction extends TransactionParser {
   override type TransactionT = IssueTransaction
 
   override val typeId: TxType                       = 3
-  override val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  override val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
   override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
 
   val serializer = IssueTxSerializer

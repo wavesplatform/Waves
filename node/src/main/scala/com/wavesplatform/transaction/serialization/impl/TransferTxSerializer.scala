@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
@@ -19,7 +19,7 @@ object TransferTxSerializer {
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
-      "attachment" -> Base58.encode(attachment)
+      "attachment" -> (if (isProtobufVersion) Json.toJson(attachment) else Base58.encode(attachment.asBytesExactly))
     )
   }
 
@@ -34,7 +34,7 @@ object TransferTxSerializer {
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
         recipient.bytes.arr,
-        Deser.serializeArrayWithLength(attachment)
+        Deser.serializeArrayWithLength(attachment.asBytesExactly)
       )
     }
 
@@ -65,7 +65,7 @@ object TransferTxSerializer {
       val recipient  = buf.getAddressOrAlias
       val attachment = buf.getByteArrayWithLength
 
-      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, attachment, ts, Proofs.empty)
+      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, Attachment.fromBytes(attachment), ts, Proofs.empty)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

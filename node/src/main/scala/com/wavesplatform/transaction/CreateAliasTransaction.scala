@@ -36,7 +36,7 @@ final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, a
 object CreateAliasTransaction extends TransactionParser {
   type TransactionT = CreateAliasTransaction
   val classTag: ClassTag[CreateAliasTransaction] = ClassTag(classOf[CreateAliasTransaction])
-  val supportedVersions: Set[TxVersion]          = Set(1, 2)
+  val supportedVersions: Set[TxVersion]          = Set(1, 2, 3)
   val typeId: TxType                             = 10
 
   implicit val validator = TxFeeValidator.asInstanceOf[TxValidator[CreateAliasTransaction]]
