@@ -3,7 +3,7 @@ package com.wavesplatform.block.serialization
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
-import com.wavesplatform.block.Block.{NgBlockVersion, RewardBlockVersion}
+import com.wavesplatform.block.Block.{NgBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
@@ -16,7 +16,7 @@ import scala.util.Try
 object BlockHeaderSerializer {
   def toJson(blockHeader: BlockHeader): JsObject = {
     val consensusJson =
-      if (blockHeader.version < Block.ProtoBlockVersion)
+      if (blockHeader.version < ProtoBlockVersion)
         Json.obj(
           "nxt-consensus" -> Json.obj(
             "base-target"          -> blockHeader.baseTarget,
@@ -26,15 +26,16 @@ object BlockHeaderSerializer {
       else
         Json.obj(
           "baseTarget"          -> blockHeader.baseTarget,
-          "generationSignature" -> blockHeader.generationSignature.toString
+          "generationSignature" -> blockHeader.generationSignature.toString,
+          "transactionsRoot"    -> blockHeader.transactionsRoot.toString
         )
 
     val featuresJson =
-      if (blockHeader.version < Block.NgBlockVersion) JsObject.empty
-      else Json.obj("features" -> JsArray(blockHeader.featureVotes.map(id => JsNumber(id.toInt)).toSeq))
+      if (blockHeader.version < NgBlockVersion) JsObject.empty
+      else Json.obj("features" -> JsArray(blockHeader.featureVotes.map(id => JsNumber(id.toInt))))
 
     val rewardJson =
-      if (blockHeader.version < Block.RewardBlockVersion) JsObject.empty
+      if (blockHeader.version < RewardBlockVersion) JsObject.empty
       else Json.obj("desiredReward" -> JsNumber(blockHeader.rewardVote))
 
     val generatorJson =
@@ -71,6 +72,11 @@ object BlockSerializer {
       case _                           => Longs.toByteArray(header.rewardVote)
     }
 
+    val transactionsRootBytes = header.version match {
+      case v if v < ProtoBlockVersion => Array.empty[Byte]
+      case _                          => Bytes.concat(Ints.toByteArray(header.transactionsRoot.arr.length), header.transactionsRoot.arr)
+    }
+
     Bytes.concat(
       Array(header.version),
       Longs.toByteArray(header.timestamp),
@@ -82,6 +88,7 @@ object BlockSerializer {
       featureVotesBytes,
       rewardVoteBytes,
       header.generator.arr,
+      transactionsRootBytes,
       signature.arr
     )
   }
@@ -102,13 +109,16 @@ object BlockSerializer {
 
       val transactionData = readTransactionData(version, buf)
 
-      val featureVotes = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSet else Set.empty[Short]
+      val featureVotes = if (version > Block.PlainBlockVersion) buf.getShortArray(buf.getInt).toSeq else Seq.empty[Short]
       val rewardVote   = if (version > Block.NgBlockVersion) buf.getLong else -1L
 
       val generator = buf.getPublicKey
+
+      val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ByteStr(buf.getByteArray(buf.getInt()))
+
       val signature = ByteStr(buf.getByteArray(SignatureLength))
 
-      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote)
+      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot)
 
       Block(header, signature, transactionData)
     }
@@ -117,5 +127,4 @@ object BlockSerializer {
     BlockHeaderSerializer.toJson(block.header, block.bytes().length, block.transactionData.length, block.signature) ++
       Json.obj("fee"          -> block.transactionData.map(_.assetFee).collect { case (Waves, feeAmt) => feeAmt }.sum) ++
       Json.obj("transactions" -> JsArray(block.transactionData.map(_.json())))
-
 }

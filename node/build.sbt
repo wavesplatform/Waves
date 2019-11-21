@@ -6,6 +6,7 @@ import sbtassembly.MergeStrategy
 
 enablePlugins(RunApplicationSettings, JavaServerAppPackaging, UniversalDeployPlugin, JDebPackaging, SystemdPlugin, GitVersioning, VersionObject)
 
+resolvers += Resolver.sonatypeRepo("snapshots")
 resolvers ++= Seq(
   Resolver.bintrayRepo("ethereum", "maven"),
   Resolver.bintrayRepo("dnvriend", "maven"),

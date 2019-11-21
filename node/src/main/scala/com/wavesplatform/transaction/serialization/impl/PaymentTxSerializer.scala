@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.account.Address
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.PaymentTransaction
 import play.api.libs.json.{JsObject, Json}

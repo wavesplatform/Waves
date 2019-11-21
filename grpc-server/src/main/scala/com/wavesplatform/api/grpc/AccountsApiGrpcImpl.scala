@@ -13,7 +13,6 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 
 import scala.concurrent.Future
-import scala.util.control.NonFatal
 
 class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends AccountsApiGrpc.AccountsApi {
   private[this] val commonApi = new CommonAccountApi(blockchain)
@@ -22,7 +21,8 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
     val wavesOption = if (request.assets.exists(_.isEmpty)) {
       val details = commonApi.balanceDetails(request.address.toAddress)
       Some(
-        BalanceResponse.WavesBalances(details.regular, details.generating, details.available, details.effective, details.leaseIn, details.leaseOut))
+        BalanceResponse.WavesBalances(details.regular, details.generating, details.available, details.effective, details.leaseIn, details.leaseOut)
+      )
     } else {
       None
     }
@@ -52,11 +52,12 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
     ScriptData(desc.script.getOrElse(ByteStr.empty).toPBByteString, desc.scriptText.getOrElse(""), desc.complexity)
   }
 
-  override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit = responseObserver.interceptErrors {
-    val transactions = commonApi.activeLeases(request.address.toAddress)
-    val result = transactions.map { case (height, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB)) }
-    responseObserver.completeWith(result)
-  }
+  override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
+    responseObserver.interceptErrors {
+      val transactions = commonApi.activeLeases(request.address.toAddress)
+      val result       = transactions.map { case (height, transaction) => TransactionResponse(transaction.id(), height, Some(transaction.toPB)) }
+      responseObserver.completeWith(result)
+    }
 
   override def getDataEntries(request: DataRequest, responseObserver: StreamObserver[DataEntryResponse]): Unit = responseObserver.interceptErrors {
     val stream = commonApi

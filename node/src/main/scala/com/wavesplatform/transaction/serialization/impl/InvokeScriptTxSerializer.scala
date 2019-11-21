@@ -47,19 +47,26 @@ object InvokeScriptTxSerializer {
 
   def bodyBytes(tx: InvokeScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      dAppAddressOrAlias.bytes.arr,
-      Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
-      Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
-      Longs.toByteArray(fee),
-      feeAssetId.byteRepr,
-      Longs.toByteArray(timestamp)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte.get),
+          sender,
+          dAppAddressOrAlias.bytes.arr,
+          Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
+          Deser.serializeArrays(payments.map(pmt => Longs.toByteArray(pmt.amount) ++ pmt.assetId.byteRepr)),
+          Longs.toByteArray(fee),
+          feeAssetId.byteRepr,
+          Longs.toByteArray(timestamp)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
   def toBytes(tx: InvokeScriptTransaction): Array[Byte] = {
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
   }
 

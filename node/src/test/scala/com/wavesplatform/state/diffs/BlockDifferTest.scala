@@ -123,7 +123,7 @@ class BlockDifferTest extends FreeSpecLike with Matchers with BlockGen with With
   private def getTwoMinersBlockChain(from: KeyPair, to: KeyPair, numPayments: Int): Seq[Block] = {
     val ts                   = System.currentTimeMillis() - 100000
     val genesisTx            = GenesisTransaction.create(from, Long.MaxValue - 1, ts).explicitGet()
-    val features: Set[Short] = Set[Short](2)
+    val features: Seq[Short] = Seq[Short](2)
 
     val paymentTxs = (1 to numPayments).map { i =>
       createWavesTransfer(
