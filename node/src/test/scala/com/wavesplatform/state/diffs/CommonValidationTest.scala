@@ -100,8 +100,8 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .selfSigned(
               TxVersion.V2,
               richAcc,
-              "test".getBytes("UTF-8"),
-              "desc".getBytes("UTF-8"),
+              "test",
+              "desc",
               Long.MaxValue,
               2,
               reissuable = false,
@@ -115,8 +115,8 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
             .selfSigned(
               TxVersion.V1,
               richAcc,
-              "test".getBytes("UTF-8"),
-              "desc".getBytes("UTF-8"),
+              "test",
+              "desc",
               Long.MaxValue,
               2,
               reissuable = false,

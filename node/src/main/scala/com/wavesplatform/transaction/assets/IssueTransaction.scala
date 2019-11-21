@@ -111,52 +111,6 @@ object IssueTransaction extends TransactionParser {
   ): Either[ValidationError, TransactionT] =
     signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
 
-  // Compatibility
-  def create(
-      version: TxVersion,
-      sender: PublicKey,
-      name: Array[Byte],
-      description: Array[Byte],
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long,
-      proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
-    create(version, sender, asStringLiteral(name), asStringLiteral(description), quantity, decimals, reissuable, script, fee, timestamp, proofs)
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      name: Array[Byte],
-      description: Array[Byte],
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long,
-      signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
-    create(version, sender, asStringLiteral(name), asStringLiteral(description), quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
-      .map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      name: Array[Byte],
-      description: Array[Byte],
-      quantity: Long,
-      decimals: Byte,
-      reissuable: Boolean,
-      script: Option[Script],
-      fee: Long,
-      timestamp: Long
-  ): Either[ValidationError, TransactionT] =
-    signed(version, sender, asStringLiteral(name), asStringLiteral(description), quantity, decimals, reissuable, script, fee, timestamp, sender)
-
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {

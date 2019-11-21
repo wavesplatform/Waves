@@ -5,6 +5,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.PaymentTxSerializer
+import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
+import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -35,6 +37,9 @@ object PaymentTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[TxVersion]): Try[PaymentTransaction] =
     serializer.parseBytes(bytes)
 
+
+  implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
+
   def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
@@ -48,15 +53,6 @@ object PaymentTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       signature: ByteStr
-  ): Either[ValidationError, TransactionT] = {
-    if (amount <= 0) {
-      Left(TxValidationError.NonPositiveAmount(amount, "waves")) //CHECK IF AMOUNT IS POSITIVE
-    } else if (fee <= 0) {
-      Left(TxValidationError.InsufficientFee()) //CHECK IF FEE IS POSITIVE
-    } else if (Try(Math.addExact(amount, fee)).isFailure) {
-      Left(TxValidationError.OverflowError) // CHECK THAT fee+amount won't overflow Long
-    } else {
-      Right(PaymentTransaction(sender, recipient, amount, fee, timestamp, signature))
-    }
-  }
+  ): Either[ValidationError, TransactionT] =
+    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature).validatedEither
 }

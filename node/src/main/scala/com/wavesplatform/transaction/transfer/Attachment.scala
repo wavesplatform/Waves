@@ -67,6 +67,7 @@ object Attachment {
             case "boolean" => Bool((o \ "value").as[Boolean])
             case "binary"  => Bin((o \ "value").as[Array[Byte]])
             case "string"  => Str((o \ "value").as[String])
+            case v         => throw new IllegalArgumentException(s"Attachment type not supported: $v")
           }
           JsSuccess(result)
 

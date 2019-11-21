@@ -117,42 +117,6 @@ object MassTransferTransaction extends TransactionParser {
   ): Either[ValidationError, TransactionT] =
     signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
 
-  // Compatibility
-  def create(
-      version: TxVersion,
-      sender: PublicKey,
-      assetId: Asset,
-      transfers: Seq[ParsedTransfer],
-      fee: TxAmount,
-      timestamp: TxTimestamp,
-      attachment: Array[Byte],
-      proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
-    MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, Attachment.fromBytes(attachment), proofs).validatedEither
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      assetId: Asset,
-      transfers: Seq[ParsedTransfer],
-      fee: TxAmount,
-      timestamp: TxTimestamp,
-      attachment: Array[Byte],
-      signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
-    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      assetId: Asset,
-      transfers: Seq[ParsedTransfer],
-      fee: TxAmount,
-      timestamp: TxTimestamp,
-      attachment: Array[Byte]
-  ): Either[ValidationError, TransactionT] =
-    signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
-
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {
     transfers.traverse {
       case Transfer(recipient, amount) =>

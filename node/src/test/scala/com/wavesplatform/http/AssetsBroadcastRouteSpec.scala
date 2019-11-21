@@ -183,7 +183,7 @@ class AssetsBroadcastRouteSpec
         amount = 1 * Waves,
         feeAssetId = Asset.Waves,
         fee = Waves / 3,
-        attachment = Array.emptyByteArray,
+        attachment = Attachment.Empty,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty)
       )
@@ -218,7 +218,7 @@ class AssetsBroadcastRouteSpec
       fee,
       feeAssetId.maybeBase58Repr,
       timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
+      Some(Base58.encode(attachment.asBytesExactly)),
       proofs.toSignature.toString
     )
   }
@@ -233,7 +233,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
+      Some(Base58.encode(attachment.asBytesExactly)),
       proofs.proofs.map(_.toString).toList
     )
   }

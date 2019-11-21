@@ -239,7 +239,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
       issue = IssueTransaction
-        .selfSigned(TxVersion.V2, accountA, assetName, description, quantity, decimals, reissuable, Some(createScript(code)), smallFee, timestamp + 1)
+        .selfSigned(TxVersion.V2, accountA, new String(assetName), new String(description), quantity, decimals, reissuable, Some(createScript(code)), smallFee, timestamp + 1)
         .explicitGet()
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
@@ -260,8 +260,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
             newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
               AssetDescription(
                 issue.sender,
-                issue.name,
-                issue.description,
+                issue.nameBytes,
+                issue.descBytes,
                 issue.decimals,
                 issue.reissuable,
                 BigInt(issue.quantity),

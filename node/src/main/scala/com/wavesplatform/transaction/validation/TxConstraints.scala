@@ -5,7 +5,6 @@ import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 
 import scala.util.Try
@@ -63,7 +62,6 @@ object TxConstraints {
   def transferAttachment(allowTyped: Boolean, attachment: Attachment): ValidatedV[Attachment] = {
     this.seq(attachment)(
       cond(attachment.size <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray),
-
       if (allowTyped) Valid(attachment)
       else cond(attachment.isInstanceOf[Attachment.Bin] || attachment == Attachment.Empty, TxValidationError.TooBigArray)
     )

@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.validation.impl
 
-import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.MaxTransferCount
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 
 object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {

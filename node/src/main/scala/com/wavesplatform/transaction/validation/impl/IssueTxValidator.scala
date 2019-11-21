@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.validation.impl
 
-import java.nio.charset.StandardCharsets
-
 import cats.data.Validated
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.TxValidationError.GenericError
