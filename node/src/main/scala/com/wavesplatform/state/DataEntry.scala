@@ -7,6 +7,7 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.transaction.TxVersion
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 
@@ -27,16 +28,22 @@ sealed abstract class DataEntry[T](
     }
   }
 
-  def toJson: JsObject = Json.obj("key" -> key, "type" -> `type`)
-  def valid: Boolean   = key.length <= MaxKeySize
+  def toJson: JsObject =
+    Json.obj("key" -> key, "type" -> `type`)
+
+  def isValid(version: TxVersion): Boolean = version match {
+    case TxVersion.V1 => key.length <= MaxKeySize
+    case _            => key.getBytes(UTF_8).length <= MaxPBKeySize
+  }
 }
 
 object DataEntry {
 
   type DataBytesOpt = Option[Array[Byte]]
 
-  val MaxKeySize: Byte = 100
-  val MaxValueSize     = Short.MaxValue
+  val MaxKeySize   = 100
+  val MaxPBKeySize = 400
+  val MaxValueSize = Short.MaxValue
 
   object Type extends Enumeration {
     val Integer = Value(0)
@@ -155,7 +162,7 @@ case class BinaryDataEntry(override val key: String, override val value: ByteStr
 
   override def toJson: JsObject = super.toJson + ("value" -> JsString(value.base64))
 
-  override def valid: Boolean = super.valid && value.arr.length <= MaxValueSize
+  override def isValid(version: TxVersion): Boolean = super.isValid(version) && value.arr.length <= MaxValueSize
 }
 
 case class StringDataEntry(override val key: String, override val value: String)(implicit dataBytesOpt: DataBytesOpt = None)
@@ -164,5 +171,5 @@ case class StringDataEntry(override val key: String, override val value: String)
 
   override def toJson: JsObject = super.toJson + ("value" -> JsString(value))
 
-  override def valid: Boolean = super.valid && value.getBytes(UTF_8).length <= MaxValueSize
+  override def isValid(version: TxVersion): Boolean = super.isValid(version) && value.getBytes(UTF_8).length <= MaxValueSize
 }

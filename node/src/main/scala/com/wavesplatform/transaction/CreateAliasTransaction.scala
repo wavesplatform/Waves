@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.account.{Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -22,7 +23,14 @@ final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, a
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(CreateAliasTransaction.serializer.toJson(this))
-  override val id: Coeval[ByteStr]                 = Coeval.evalOnce(ByteStr(crypto.fastHash(builder.typeId +: alias.bytes.arr)))
+
+  override val id: Coeval[ByteStr] = Coeval.evalOnce {
+    val payload = version match {
+      case TxVersion.V1 => Bytes.concat(Array(builder.typeId), alias.bytes)
+      case _            => bodyBytes()
+    }
+    crypto.fastHash(payload)
+  }
 }
 
 object CreateAliasTransaction extends TransactionParser {

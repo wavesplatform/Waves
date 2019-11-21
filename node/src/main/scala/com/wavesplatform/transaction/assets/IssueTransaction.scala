@@ -9,7 +9,18 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, ProvenTransaction, SigProofsSwitch, TransactionParser, TxType, TxVersion, TxWithFee, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  FastHashId,
+  LegacyPBSwitch,
+  Proofs,
+  ProvenTransaction,
+  SigProofsSwitch,
+  TransactionParser,
+  TxType,
+  TxVersion,
+  TxWithFee,
+  VersionedTransaction
+}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -19,8 +30,8 @@ import scala.util.Try
 case class IssueTransaction(
     version: TxVersion,
     sender: PublicKey,
-    name: Array[Byte],
-    description: Array[Byte],
+    name: String,
+    description: String,
     quantity: Long,
     decimals: Byte,
     reissuable: Boolean,
@@ -33,7 +44,7 @@ case class IssueTransaction(
     with FastHashId
     with SigProofsSwitch
     with TxWithFee.InWaves
-with LegacyPBSwitch.V3 {
+    with LegacyPBSwitch.V3 {
 
   override def builder = IssueTransaction
 
@@ -65,6 +76,51 @@ object IssueTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
+      name: String,
+      description: String,
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] =
+    IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs).validatedEither
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      name: String,
+      description: String,
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
+    create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      name: String,
+      description: String,
+      quantity: Long,
+      decimals: Byte,
+      reissuable: Boolean,
+      script: Option[Script],
+      fee: Long,
+      timestamp: Long
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+
+  // Compatibility
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
       name: Array[Byte],
       description: Array[Byte],
       quantity: Long,
@@ -75,7 +131,7 @@ object IssueTransaction extends TransactionParser {
       timestamp: Long,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
-    IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs).validatedEither
+    create(version, sender, asStringLiteral(name), asStringLiteral(description), quantity, decimals, reissuable, script, fee, timestamp, proofs)
 
   def signed(
       version: TxVersion,
@@ -90,7 +146,8 @@ object IssueTransaction extends TransactionParser {
       timestamp: Long,
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
-    create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, asStringLiteral(name), asStringLiteral(description), quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty)
+      .map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
@@ -104,7 +161,7 @@ object IssueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, TransactionT] =
-    signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
+    signed(version, sender, asStringLiteral(name), asStringLiteral(description), quantity, decimals, reissuable, script, fee, timestamp, sender)
 
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)
 
@@ -117,4 +174,7 @@ object IssueTransaction extends TransactionParser {
       blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
     }
   }
+
+  private[transaction] def asStringLiteral(bs: Array[Byte]): String = new String(bs.map(_.toChar))
+  private[transaction] def asBytesLiteral(s: String): Array[Byte]   = s.toCharArray.map(_.toByte)
 }

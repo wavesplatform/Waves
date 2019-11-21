@@ -15,7 +15,7 @@ object BurnTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
-      "amount"  -> quantity
+      if (version < TxVersion.V3) "amount"  -> quantity else "quantity"  -> quantity,
     ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
   }
 

@@ -6,7 +6,7 @@ import cats.syntax.validated._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 
 import scala.util.Try
 
@@ -60,39 +60,12 @@ object TxConstraints {
   }
 
   // Transaction specific
-  def transferAttachment(attachment: Array[Byte]): ValidatedV[Array[Byte]] = {
-    Validated
-      .condNel(
-        attachment.length <= TransferTransaction.MaxAttachmentSize,
-        attachment,
-        TxValidationError.TooBigArray
-      )
-  }
+  def transferAttachment(allowTyped: Boolean, attachment: Attachment): ValidatedV[Attachment] = {
+    this.seq(attachment)(
+      cond(attachment.size <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray),
 
-  def assetName(name: Array[Byte]): ValidatedV[Array[Byte]] = {
-    Validated
-      .condNel(
-        name.length >= IssueTransaction.MinAssetNameLength && name.length <= IssueTransaction.MaxAssetNameLength,
-        name,
-        TxValidationError.InvalidName
-      )
-  }
-
-  def assetDescription(description: Array[Byte]): ValidatedV[Array[Byte]] = {
-    Validated
-      .condNel(
-        description.length <= IssueTransaction.MaxAssetDescriptionLength,
-        description,
-        TxValidationError.TooBigArray
-      )
-  }
-
-  def assetDecimals(decimals: Byte): ValidatedV[Byte] = {
-    Validated
-      .condNel(
-        decimals >= 0 && decimals <= IssueTransaction.MaxAssetDecimals,
-        decimals,
-        TxValidationError.TooBigArray
-      )
+      if (allowTyped) Valid(attachment)
+      else cond(attachment.isInstanceOf[Attachment.Bin] || attachment == Attachment.Empty, TxValidationError.TooBigArray)
+    )
   }
 }

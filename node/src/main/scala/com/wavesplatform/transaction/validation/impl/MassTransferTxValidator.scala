@@ -11,7 +11,7 @@ object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
     V.seq(tx)(
       V.noOverflow(fee +: transfers.map(_.amount): _*),
       V.cond(transfers.length <= MaxTransferCount, GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount")),
-      V.cond(attachment.length <= TransferTransaction.MaxAttachmentSize, TooBigArray),
+      V.transferAttachment(isProtobufVersion, attachment),
       V.cond(transfers.forall(_.amount >= 0), GenericError("One of the transfers has negative amount")),
       V.fee(fee)
     )

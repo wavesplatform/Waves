@@ -26,7 +26,7 @@ case class MassTransferTransaction(
     transfers: Seq[ParsedTransfer],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    attachment: Array[Byte],
+    attachment: Attachment,
     proofs: Proofs
 ) extends ProvenTransaction
     with VersionedTransaction
@@ -89,10 +89,46 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Array[Byte],
+      attachment: Attachment,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
     MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs).validatedEither
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      assetId: Asset,
+      transfers: Seq[ParsedTransfer],
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      attachment: Attachment,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
+    create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      assetId: Asset,
+      transfers: Seq[ParsedTransfer],
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      attachment: Attachment
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
+
+  // Compatibility
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
+      assetId: Asset,
+      transfers: Seq[ParsedTransfer],
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      attachment: Array[Byte],
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] =
+    MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, Attachment.fromBytes(attachment), proofs).validatedEither
 
   def signed(
       version: TxVersion,

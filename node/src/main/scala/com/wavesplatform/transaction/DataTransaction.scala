@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
@@ -26,10 +27,13 @@ case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[Data
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.eval(builder.serializer.toJson(this))
+
+  private[wavesplatform] lazy val protoDataPayload = PBTransactions.protobuf(this).getTransaction.getDataTransaction.toByteArray
 }
 
 object DataTransaction extends TransactionParser {
   val MaxBytes: Int      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
+  val MaxProtoBytes: Int = 165890
   val MaxEntryCount: Int = 100
 
   override type TransactionT = DataTransaction

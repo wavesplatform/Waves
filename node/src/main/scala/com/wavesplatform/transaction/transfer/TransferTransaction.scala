@@ -23,7 +23,7 @@ case class TransferTransaction(
     amount: TxAmount,
     feeAssetId: Asset,
     fee: TxAmount,
-    attachment: TxByteArray,
+    attachment: Attachment,
     timestamp: TxTimestamp,
     proofs: Proofs
 ) extends VersionedTransaction
@@ -74,11 +74,53 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: TxByteArray,
+      attachment: Attachment,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
     TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs).validatedEither
+
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      recipient: AddressOrAlias,
+      asset: Asset,
+      amount: TxAmount,
+      feeAsset: Asset,
+      fee: TxAmount,
+      attachment: Attachment,
+      timestamp: TxTimestamp,
+      signer: PrivateKey
+  ): Either[ValidationError, TransferTransaction] =
+    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      recipient: AddressOrAlias,
+      asset: Asset,
+      amount: TxAmount,
+      feeAsset: Asset,
+      fee: TxAmount,
+      attachment: Attachment,
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransferTransaction] =
+    signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)
+
+  // Compatibility
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
+      recipient: AddressOrAlias,
+      asset: Asset,
+      amount: TxAmount,
+      feeAsset: Asset,
+      fee: TxAmount,
+      attachment: TxByteArray,
+      timestamp: TxTimestamp,
+      proofs: Proofs
+  ): Either[ValidationError, TransferTransaction] =
+    create(version, sender, recipient, asset, amount, feeAsset, fee, Attachment.fromBytes(attachment), timestamp, proofs)
 
   def signed(
       version: TxVersion,

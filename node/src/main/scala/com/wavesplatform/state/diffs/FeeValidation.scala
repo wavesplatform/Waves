@@ -78,8 +78,12 @@ object FeeValidation {
           case tx: MassTransferTransaction =>
             baseFee + (tx.transfers.size + 1) / 2
           case tx: DataTransaction =>
-            val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes() else tx.bytes()
-            baseFee + (base.length - 1) / 1024
+            val payload =
+              if (tx.isProtobufVersion) tx.protoDataPayload
+              else if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes()
+              else tx.bytes()
+
+            baseFee + (payload.length - 1) / 1024
           case itx: IssueTransaction =>
             lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
             val multiplier        = if (itx.isNFT && nftActivated) NFTMultiplier else 1
