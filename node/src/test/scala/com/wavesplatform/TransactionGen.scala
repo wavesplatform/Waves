@@ -115,7 +115,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val MinIssueFee = 100000000
 
-  val issueParamGen: Gen[(KeyPair, Array[TxVersion], Array[TxVersion], TxTimestamp, TxVersion, Boolean, Int, TxTimestamp)] = for {
+  val issueParamGen: Gen[(KeyPair, Array[Byte], Array[Byte], Long, Byte, Boolean, Int, TxTimestamp)] = for {
     sender      <- accountGen
     assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
