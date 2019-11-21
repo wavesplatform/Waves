@@ -46,7 +46,7 @@ case class IssueTransaction(
   override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 
   private[wavesplatform] lazy val nameBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
-  private[wavesplatform] lazy val descBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
+  private[wavesplatform] lazy val descBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(description)
 }
 
 object IssueTransaction extends TransactionParser {
@@ -123,6 +123,6 @@ object IssueTransaction extends TransactionParser {
     }
   }
 
-  private[transaction] def asStringLiteral(bs: Array[Byte]): String = new String(bs.map(_.toChar))
-  private[transaction] def asBytesLiteral(s: String): Array[Byte]   = s.toCharArray.map(_.toByte)
+  def asStringLiteral(bs: Array[Byte]): String = new String(bs.map(_.toChar))
+  def asBytesLiteral(s: String): Array[Byte]   = s.toCharArray.map(_.toByte)
 }

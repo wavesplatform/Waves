@@ -51,27 +51,14 @@ object AssetInfo {
 
 case class AssetDescription(
     issuer: PublicKey,
-    name: Array[Byte],
-    description: Array[Byte],
+    name: ByteStr,
+    description: ByteStr,
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
     script: Option[Script],
     sponsorship: Long
-) {
-  override def equals(obj: scala.Any) = obj match {
-    case o: AssetDescription =>
-      o.issuer == this.issuer &&
-        java.util.Arrays.equals(o.name, name) &&
-        java.util.Arrays.equals(o.description, description) &&
-        o.decimals == decimals &&
-        o.reissuable == reissuable &&
-        o.totalVolume == totalVolume &&
-        o.script == script &&
-        o.sponsorship == sponsorship
-    case _ => false
-  }
-}
+)
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 

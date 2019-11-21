@@ -253,7 +253,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val issueTransaction =
             IssueTransaction
-              .selfSigned(TxVersion.V1, sender, new String(name), new String(description), 2000, 8, reissuable = true, script = None, 1, nextTs)
+              .selfSigned(TxVersion.V1, sender, IssueTransaction.asStringLiteral(name), IssueTransaction.asStringLiteral(description), 2000, 8, reissuable = true, script = None, 1, nextTs)
               .explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
@@ -267,9 +267,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithIssue = d.lastBlockId
 
-          d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, reissuable = true, BigInt(2000), None, 0)
-          )
+          val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
+          val desc1 = AssetDescription(sender, name, description, 8, reissuable = true, BigInt(2000), None, 0)
+          actualDesc shouldBe Some(desc1)
 
           d.appendBlock(
             TestBlock.create(

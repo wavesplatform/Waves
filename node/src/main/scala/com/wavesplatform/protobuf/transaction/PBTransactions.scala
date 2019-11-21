@@ -116,7 +116,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(toVanillaScript),
           feeAmount,
           timestamp,
           proofs
