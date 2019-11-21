@@ -91,7 +91,7 @@ class ReissueTransactionDiffTest
           BlockDiffer.fromBlock(blockchain, blockchain.lastBlock, block, MiningConstraint.Unlimited).explicitGet()
         blockchain.append(preconditionDiff, preconditionFees, totalFee, None, block.header.generationSignature, block)
       }
-      f(FeeValidation(blockchain, txs._1), FeeValidation(blockchain, txs._2), FeeValidation(blockchain, txs._3))
+      f((FeeValidation(blockchain, txs._1), FeeValidation(blockchain, txs._2), FeeValidation(blockchain, txs._3)))
     }
 
   private def genesis: Gen[(KeyPair, Block)] =
