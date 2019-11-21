@@ -19,10 +19,11 @@ object ScriptReader {
       (versionByte, bytes) <- if (serVersionByte < 4) {
         Right((serVersionByte, inBytes))
       } else {
-        Serde.deserialize(inBytes.drop(1), all=false).map({
+        Serde.deserialize(inBytes.drop(1), all=false).flatMap({
           case (CONST_LONG(len), rest) =>
               val bytes = inBytes.takeRight(rest).take(len.toInt)
-              (bytes.head, bytes)
+              Right((bytes.head, bytes))
+          case _ => Left("Can't parse V4 stript length.")
               }).left.map({e => ScriptParseError(e.toString)})
       }
       a <- {
