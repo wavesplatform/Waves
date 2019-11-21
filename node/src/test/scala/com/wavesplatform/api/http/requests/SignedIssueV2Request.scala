@@ -71,8 +71,8 @@ case class SignedIssueV2Request(
       t <- IssueTransaction.create(
         TxVersion.V2,
         _sender,
-        name.getBytes(Charsets.UTF_8),
-        description.getBytes(Charsets.UTF_8),
+        name,
+        description,
         quantity,
         decimals,
         reissuable,

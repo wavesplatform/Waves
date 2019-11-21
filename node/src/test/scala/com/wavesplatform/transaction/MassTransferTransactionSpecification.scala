@@ -102,7 +102,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
         val feeOverflowEi = create(1.toByte, sender, assetId, feeOverflow, oneHalf, timestamp, attachment, proofs)
         feeOverflowEi shouldBe Left(TxValidationError.OverflowError)
 
-        val longAttachment   = Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte)
+        val longAttachment   = Attachment.fromBytes(Array.fill(TransferTransaction.MaxAttachmentSize + 1)(1: Byte))
         val longAttachmentEi = create(1.toByte, sender, assetId, transfers, fee, timestamp, longAttachment, proofs)
         longAttachmentEi shouldBe Left(TxValidationError.TooBigArray)
 

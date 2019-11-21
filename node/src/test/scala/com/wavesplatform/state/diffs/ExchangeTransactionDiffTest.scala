@@ -814,10 +814,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
       asset1 = IssueTransaction
-        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
+        .selfSigned(TxVersion.V2, buyer, "Asset#1", "", 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
       asset2 = IssueTransaction
-        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
+        .selfSigned(TxVersion.V2, seller, "Asset#2", "", 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
@@ -905,10 +905,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
       asset1 = IssueTransaction
-        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
+        .selfSigned(TxVersion.V2, buyer, "Asset#1", "", 1000000, 8, false, None, enoughFee, ts + 3)
         .explicitGet()
       asset2 = IssueTransaction
-        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
+        .selfSigned(TxVersion.V2, seller, "Asset#2", "", 1000000, 8, false, None, enoughFee, ts + 4)
         .explicitGet()
       setMatcherScript = SetScriptTransaction
         .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)

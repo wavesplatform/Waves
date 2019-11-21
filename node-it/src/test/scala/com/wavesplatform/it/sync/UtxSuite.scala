@@ -7,7 +7,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import monix.eval.Task
 import monix.execution.Scheduler
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
@@ -32,7 +32,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     val account = KeyPair(seed)
 
     val transferToAccount = TransferTransaction
-      .selfSigned(1.toByte, miner.privateKey, account, Waves, AMOUNT, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis())
+      .selfSigned(1.toByte, miner.privateKey, account, Waves, AMOUNT, Waves, ENOUGH_FEE, Attachment.Empty, System.currentTimeMillis())
       .explicitGet()
 
     miner.signedBroadcast(transferToAccount.json())
@@ -40,11 +40,11 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
 
     val firstTransfer = TransferTransaction
-      .selfSigned(1.toByte, account, miner.privateKey, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis())
+      .selfSigned(1.toByte, account, miner.privateKey, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, Attachment.Empty, System.currentTimeMillis())
       .explicitGet()
 
     val secondTransfer = TransferTransaction
-      .selfSigned(1.toByte, account, notMiner.privateKey, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, Array.emptyByteArray, System.currentTimeMillis())
+      .selfSigned(1.toByte, account, notMiner.privateKey, Waves, AMOUNT - ENOUGH_FEE, Waves, ENOUGH_FEE, Attachment.Empty, System.currentTimeMillis())
       .explicitGet()
 
     val tx2Id = notMiner.signedBroadcast(secondTransfer.json()).id

@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -105,8 +105,8 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .selfSigned(
           TxVersion.V1,
           sender = contract,
-          name = "Asset#1".getBytes("UTF-8"),
-          description = "description".getBytes("UTF-8"),
+          name = "Asset#1",
+          description = "description",
           quantity = Long.MaxValue,
           decimals = 8,
           reissuable = false,
@@ -127,7 +127,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           ENOUGH_FEE * 3,
           Waves,
           ENOUGH_FEE,
-          Array.emptyByteArray,
+          Attachment.Empty,
           System.currentTimeMillis() + 4
         )
         .explicitGet()
@@ -143,7 +143,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           1,
           IssuedAsset(issueTx.id()),
           ENOUGH_FEE,
-          Array.emptyByteArray,
+          Attachment.Empty,
           System.currentTimeMillis() + 8
         )
         .explicitGet()
@@ -166,8 +166,8 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
         .selfSigned(
           TxVersion.V1,
           sender = sponsor,
-          name = "Asset#1".getBytes("UTF-8"),
-          description = "description".getBytes("UTF-8"),
+          name = "Asset#1",
+          description = "description",
           quantity = Long.MaxValue,
           decimals = 8,
           reissuable = false,
@@ -188,7 +188,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           ENOUGH_FEE * 3,
           Waves,
           ENOUGH_FEE,
-          Array.emptyByteArray,
+          Attachment.Empty,
           System.currentTimeMillis() + 4
         )
         .explicitGet()
@@ -204,7 +204,7 @@ class ScriptedSponsorTest extends PropSpec with PropertyChecks with Matchers wit
           1,
           IssuedAsset(issueTx.id()),
           ENOUGH_FEE,
-          Array.emptyByteArray,
+          Attachment.Empty,
           System.currentTimeMillis() + 8
         )
         .explicitGet()

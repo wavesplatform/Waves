@@ -85,7 +85,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.toString).getOrElse("")}'
            |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
            |      }
-           |    let attachment = t.attachment == base58'${ByteStr(t.attachment).toString}'
+           |    let attachment = t.attachment == base58'${ByteStr(t.attachmentBytes).toString}'
            |   ${assertProvenPart("t")} && amount && feeAssetId && assetId && recipient && attachment
            | case other => throw()
            | }
@@ -107,7 +107,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let decimals = t.decimals == ${t.decimals}
                  |   let reissuable = t.reissuable == ${t.reissuable}
                  |   let name = t.name == base58'${ByteStr(t.name).toString}'
-                 |   let description = t.description == base58'${ByteStr(t.description).toString}'
+                 |   let description = t.description == base58'${ByteStr(t.descBytes).toString}'
                  |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
                    .map(_.bytes().base64)
                    .getOrElse("")}' else isDefined(t.script) == false
@@ -446,7 +446,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
-                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment).toString}'
+                      |     let attachment = t.attachment == base58'${ByteStr(t.attachmentBytes).toString}'
                       |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment

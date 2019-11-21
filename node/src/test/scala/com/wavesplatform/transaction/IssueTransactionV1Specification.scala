@@ -78,8 +78,8 @@ class IssueTransactionV1Specification extends PropSpec with PropertyChecks with 
       .create(
         TxVersion.V1,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        "Gigacoin".getBytes("UTF-8"),
-        "Gigacoin".getBytes("UTF-8"),
+        "Gigacoin",
+        "Gigacoin",
         10000000000L,
         8,
         true,

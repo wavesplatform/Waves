@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
@@ -87,6 +85,6 @@ package object requests {
     }
   }
 
-  private[requests] def defaultVersion = TxVersion.V1
+  private[requests] def defaultVersion   = TxVersion.V1
   private[requests] def defaultTimestamp = 0L
 }

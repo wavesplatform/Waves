@@ -47,6 +47,7 @@ case class TransferTransaction(
   override def builder: TransactionParser = TransferTransaction
 
   private[wavesplatform] lazy val attachmentBytes = attachment.asBytes
+  private[wavesplatform] lazy val attachmentBytesOpt = Some(attachment.asBytes).filter(_.nonEmpty)
 }
 
 object TransferTransaction extends TransactionParser {

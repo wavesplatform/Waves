@@ -18,7 +18,7 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import scorex.crypto.encode.Base64
@@ -169,8 +169,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       TxVersion.V1,
       publicKey,
-      "Gigacoin".getBytes("UTF-8"),
-      "Gigacoin".getBytes("UTF-8"),
+      "Gigacoin",
+      "Gigacoin",
       someAssetAmount,
       8,
       true,
@@ -186,8 +186,8 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .create(
       TxVersion.V2,
       publicKey,
-      "Gigacoin".getBytes("UTF-8"),
-      "Gigacoin".getBytes("UTF-8"),
+      "Gigacoin",
+      "Gigacoin",
       someAssetAmount,
       8,
       true,
@@ -262,7 +262,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       transfers,
       2.waves,
       ts,
-      Base58.tryDecodeWithLimit("59QuUcqP6p").get,
+      Attachment.fromBytes(Base58.tryDecodeWithLimit("59QuUcqP6p").get),
       Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
     )
     .right
@@ -336,7 +336,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     1900000,
     Waves,
     minFee,
-    Base58.tryDecodeWithLimit("").get,
+    Attachment.Empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
   )
@@ -349,7 +349,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     100000000,
     Waves,
     minFee,
-    Base58.tryDecodeWithLimit("").get,
+    Attachment.Empty,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
   )

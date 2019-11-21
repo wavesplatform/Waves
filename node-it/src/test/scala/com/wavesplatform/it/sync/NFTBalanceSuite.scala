@@ -34,7 +34,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
 
   private val node: Node = nodes.head
 
-  private val issuer: KeyPair = KeyPair("issuer#1".getBytes("UTF-8"))
+  private val issuer: KeyPair = KeyPair("issuer#1")
 
   private val (simple, nft) = fillPortfolio(issuer, 100, 100)
 
@@ -164,8 +164,8 @@ object NFTBalanceSuite {
         .selfSigned(
           TxVersion.V1,
           issuer,
-          s"SimpleAsset".getBytes("UTF-8"),
-          s"Simple Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
+          s"SimpleAsset",
+          s"Simple Test Asset ${Random.nextInt(1000)}",
           1000,
           8,
           reissuable = true,
@@ -181,8 +181,8 @@ object NFTBalanceSuite {
         .selfSigned(
           TxVersion.V1,
           issuer,
-          "NonFungibleAsset".getBytes("UTF-8"),
-          s"NFT Test Asset ${Random.nextInt(1000)}".getBytes("UTF-8"),
+          "NonFungibleAsset",
+          s"NFT Test Asset ${Random.nextInt(1000)}",
           1,
           0,
           reissuable = false,

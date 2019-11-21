@@ -14,7 +14,7 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSetti
 import com.wavesplatform.state.NG
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -128,7 +128,7 @@ class BlockV5Test
 
   private def createTx(sender: KeyPair, recipient: AddressOrAlias): Transaction =
     TransferTransaction
-      .selfSigned(TxVersion.V1, sender, recipient, Waves, 10 * Constants.UnitsInWave, Waves, 100000, Array.emptyByteArray, ntpTime.getTimestamp())
+      .selfSigned(TxVersion.V1, sender, recipient, Waves, 10 * Constants.UnitsInWave, Waves, 100000, Attachment.Empty, ntpTime.getTimestamp())
       .explicitGet()
 
   private val updaterScenario = for {

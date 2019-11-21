@@ -61,7 +61,7 @@ case class SignedTransferV1Request(
         amount,
         _feeAssetId,
         fee,
-        _attachment.arr,
+        Attachment.fromBytes(_attachment.arr),
         timestamp,
         Proofs(_signature)
       )

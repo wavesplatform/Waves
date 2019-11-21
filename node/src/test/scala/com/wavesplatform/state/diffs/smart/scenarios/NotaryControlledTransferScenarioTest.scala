@@ -77,8 +77,8 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .selfSigned(
           TxVersion.V2,
           company,
-          "name".getBytes(StandardCharsets.UTF_8),
-          "description".getBytes(StandardCharsets.UTF_8),
+          "name",
+          "description",
           100,
           0,
           false,
@@ -95,11 +95,11 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .explicitGet()
 
       transferFromCompanyToA = TransferTransaction
-        .selfSigned(1.toByte, company, accountA, assetId, 1, Waves, 1000, Array.empty, ts + 20)
+        .selfSigned(1.toByte, company, accountA, assetId, 1, Waves, 1000, Attachment.Empty, ts + 20)
         .explicitGet()
 
       transferFromAToB = TransferTransaction
-        .selfSigned(1.toByte, accountA, accountB, assetId, 1, Waves, 1000, Array.empty, ts + 30)
+        .selfSigned(1.toByte, accountA, accountB, assetId, 1, Waves, 1000, Attachment.Empty, ts + 30)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction

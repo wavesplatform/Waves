@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
@@ -12,7 +13,6 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, GenesisTransaction}
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -34,26 +34,66 @@ class BlockchainUpdaterSponsoredFeeBlockTest
     master                      <- accountGen
     ts                          <- timestampGen
     transferAssetWavesFee       <- smallFeeGen
-    sponsor                     <- accountGen
+    _                           <- accountGen
     alice                       <- accountGen
     bob                         <- accountGen
     (feeAsset, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(alice)
     wavesFee                    = Sponsorship.toWaves(sponsorTx.minSponsoredAssetFee.get, sponsorTx.minSponsoredAssetFee.get)
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, master, alice, Waves, feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
+      .selfSigned(
+        1.toByte,
+        master,
+        alice,
+        Waves,
+        feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
+        Waves,
+        transferAssetWavesFee,
+        Attachment.Empty,
+        ts + 1
+      )
       .right
       .get
     aliceToBob: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, alice, bob, Asset.fromCompatId(Some(feeAsset.id())), feeAsset.quantity / 2, Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 2)
+      .selfSigned(
+        1.toByte,
+        alice,
+        bob,
+        Asset.fromCompatId(Some(feeAsset.id())),
+        feeAsset.quantity / 2,
+        Waves,
+        transferAssetWavesFee,
+        Attachment.Empty,
+        ts + 2
+      )
       .right
       .get
     bobToMaster: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 3)
+      .selfSigned(
+        1.toByte,
+        bob,
+        master,
+        Asset.fromCompatId(Some(feeAsset.id())),
+        amtTx,
+        Asset.fromCompatId(Some(feeAsset.id())),
+        sponsorTx.minSponsoredAssetFee.get,
+        Attachment.Empty,
+        ts + 3
+      )
       .right
       .get
     bobToMaster2: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, bob, master, Asset.fromCompatId(Some(feeAsset.id())), amtTx, Asset.fromCompatId(Some(feeAsset.id())), sponsorTx.minSponsoredAssetFee.get, Array.emptyByteArray, ts + 4)
+      .selfSigned(
+        1.toByte,
+        bob,
+        master,
+        Asset.fromCompatId(Some(feeAsset.id())),
+        amtTx,
+        Asset.fromCompatId(Some(feeAsset.id())),
+        sponsorTx.minSponsoredAssetFee.get,
+        Attachment.Empty,
+        ts + 4
+      )
       .right
       .get
   } yield (genesis, masterToAlice, feeAsset, sponsorTx, aliceToBob, bobToMaster, bobToMaster2)
@@ -92,7 +132,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
   property("calculates valid total fee for microblocks") {
     scenario(sponsorPreconditions, SponsoredActivatedAt0WavesSettings) {
-      case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
+      case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, _)) =>
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(Seq(masterToAlice, feeAsset, sponsor), Seq(aliceToBob, bobToMaster)))
 
         val block0TotalFee = block0.transactionData

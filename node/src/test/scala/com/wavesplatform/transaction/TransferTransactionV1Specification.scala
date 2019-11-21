@@ -93,7 +93,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
       1900000,
       Waves,
       100000,
-      Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
+      Attachment.fromBytes(Base58.tryDecodeWithLimit("4t2Xazb2SX").get),
       1526552510868L,
       Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
     )
@@ -104,7 +104,6 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
   property("negative") {
     for {
       (_, sender, recipient, amount, timestamp, _, feeAmount, attachment) <- transferParamGen
-      sender                                                              <- accountGen
     } yield TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, feeAmount, attachment, timestamp) should produce(
       "insufficient fee"
     )

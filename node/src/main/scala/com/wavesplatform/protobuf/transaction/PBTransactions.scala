@@ -370,7 +370,7 @@ object PBTransactions {
     ScriptReader.fromBytes(array).explicitGet()
   }
 
-  private[this] def toPBScript(script: com.wavesplatform.lang.script.Script): Script = {
+  def toPBScript(script: com.wavesplatform.lang.script.Script): Script = {
     Script.of(script.bytes().drop(1), script.stdLibVersion.id)
   }
 }

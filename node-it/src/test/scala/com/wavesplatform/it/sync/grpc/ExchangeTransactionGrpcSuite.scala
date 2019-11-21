@@ -96,8 +96,8 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       .selfSigned(
         TxVersion.V1,
         sender = sender.privateKey,
-        name = "myasset".getBytes("UTF-8"),
-        description = "my asset description".getBytes("UTF-8"),
+        name = "myasset",
+        description = "my asset description",
         quantity = someAssetAmount,
         decimals = 2,
         reissuable = true,

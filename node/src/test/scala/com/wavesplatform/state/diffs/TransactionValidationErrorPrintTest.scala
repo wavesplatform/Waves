@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalatest.{Inside, PropSpec}
 
@@ -64,8 +64,8 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
       .selfSigned(
         TxVersion.V2,
         sender = KeyPair(seed.bytes),
-        name = "name".getBytes(StandardCharsets.UTF_8),
-        description = "description".getBytes(StandardCharsets.UTF_8),
+        name = "name",
+        description = "description",
         quantity = 100,
         decimals = 0,
         reissuable = false,
@@ -84,7 +84,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = Array[Byte](),
+        attachment = Attachment.Empty,
         timestamp = 0
       )
       .explicitGet()

@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
@@ -29,7 +28,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
@@ -244,9 +243,12 @@ object SyncHttpApi extends Assertions {
         script: Option[String],
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = IssueTransaction.selfSigned(TxVersion.V2, sender = source,
-          name = name.getBytes(StandardCharsets.UTF_8),
-          description = description.getBytes(StandardCharsets.UTF_8),
+      val tx = IssueTransaction
+        .selfSigned(
+          TxVersion.V2,
+          sender = source,
+          name = name,
+          description = description,
           quantity = quantity,
           decimals = decimals,
           reissuable = reissuable,
@@ -349,7 +351,7 @@ object SyncHttpApi extends Assertions {
           amount = amount,
           feeAsset = Asset.fromString(feeAssetId),
           fee = fee,
-          attachment = Array.emptyByteArray,
+          attachment = Attachment.Empty,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -380,7 +382,13 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
     }
 
-    def broadcastLease(source: KeyPair, recipient: String, leasingAmount: Long, leasingFee: Long = minFee, waitForTx: Boolean = false): Transaction = {
+    def broadcastLease(
+        source: KeyPair,
+        recipient: String,
+        leasingAmount: Long,
+        leasingFee: Long = minFee,
+        waitForTx: Boolean = false
+    ): Transaction = {
       val tx = LeaseTransaction
         .selfSigned(
           2.toByte,
@@ -536,7 +544,13 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).setScript(sender, script, fee)), waitForTx)
     }
 
-    def setAssetScript(assetId: String, sender: String, fee: Long = issueFee, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
+    def setAssetScript(
+        assetId: String,
+        sender: String,
+        fee: Long = issueFee,
+        script: Option[String] = None,
+        waitForTx: Boolean = false
+    ): Transaction = {
       maybeWaitForTransaction(sync(async(n).setAssetScript(assetId, sender, fee, script)), waitForTx)
     }
 

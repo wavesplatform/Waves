@@ -108,7 +108,15 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     ) = {
       val txEi = for {
         parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-        tx              <- MassTransferTransaction.selfSigned(1.toByte, sender.privateKey, Waves, parsedTransfers, fee, timestamp, attachment)
+        tx <- MassTransferTransaction.selfSigned(
+          1.toByte,
+          sender.privateKey,
+          Waves,
+          parsedTransfers,
+          fee,
+          timestamp,
+          Attachment.fromBytes(attachment)
+        )
       } yield tx
 
       val (signature, idOpt) = txEi.fold(_ => (List(fakeSignature), None), tx => (tx.proofs.base58().toList, Some(tx.id())))

@@ -167,7 +167,7 @@ class AssetsBroadcastRouteSpec
           1 * Waves,
           Asset.Waves,
           Waves / 3,
-          Array.emptyByteArray,
+          Attachment.Empty,
           System.currentTimeMillis()
         )
         .right

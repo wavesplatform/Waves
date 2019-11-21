@@ -290,8 +290,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
             .selfSigned(
               TxVersion.V2,
               masterAcc,
-              "testAsset".getBytes("UTF-8"),
-              "Test asset".getBytes("UTF-8"),
+              "testAsset",
+              "Test asset",
               quantity,
               decimals,
               reissuable,
@@ -517,7 +517,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | }
                  |
                  | let checkAmount     = transfer.amount == ${transferTx.amount}
-                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment)}'
+                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachmentBytes)}'
                  |
                  | let checkAssetId = match transfer.assetId {
                  |    case _: Unit => true

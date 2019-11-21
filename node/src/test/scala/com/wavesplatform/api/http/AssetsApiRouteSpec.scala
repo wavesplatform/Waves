@@ -30,8 +30,8 @@ class AssetsApiRouteSpec
   private val smartAssetTx = issueV2TransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
     issuer = smartAssetTx.sender,
-    name = smartAssetTx.name,
-    description = smartAssetTx.description,
+    name = smartAssetTx.nameBytes,
+    description = smartAssetTx.descBytes,
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
@@ -48,8 +48,8 @@ class AssetsApiRouteSpec
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe smartAssetTx.timestamp
       (response \ "issuer").as[String] shouldBe smartAssetTx.sender.stringRepr
-      (response \ "name").as[String] shouldBe new String(smartAssetTx.name, StandardCharsets.UTF_8)
-      (response \ "description").as[String] shouldBe new String(smartAssetTx.description, StandardCharsets.UTF_8)
+      (response \ "name").as[String] shouldBe smartAssetTx.name
+      (response \ "description").as[String] shouldBe smartAssetTx.description
       (response \ "decimals").as[Int] shouldBe smartAssetTx.decimals
       (response \ "reissuable").as[Boolean] shouldBe smartAssetTx.reissuable
       (response \ "quantity").as[BigDecimal] shouldBe smartAssetDesc.totalVolume
@@ -60,8 +60,8 @@ class AssetsApiRouteSpec
   private val sillyAssetTx = issueGen.sample.get
   private val sillyAssetDesc = AssetDescription(
     issuer = sillyAssetTx.sender,
-    name = sillyAssetTx.name,
-    description = sillyAssetTx.description,
+    name = sillyAssetTx.nameBytes,
+    description = sillyAssetTx.descBytes,
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
@@ -77,8 +77,8 @@ class AssetsApiRouteSpec
       (response \ "issueHeight").as[Long] shouldBe 1
       (response \ "issueTimestamp").as[Long] shouldBe sillyAssetTx.timestamp
       (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.stringRepr
-      (response \ "name").as[String] shouldBe new String(sillyAssetTx.name, StandardCharsets.UTF_8)
-      (response \ "description").as[String] shouldBe new String(sillyAssetTx.description, StandardCharsets.UTF_8)
+      (response \ "name").as[String] shouldBe sillyAssetTx.name
+      (response \ "description").as[String] shouldBe sillyAssetTx.description
       (response \ "decimals").as[Int] shouldBe sillyAssetTx.decimals
       (response \ "reissuable").as[Boolean] shouldBe sillyAssetTx.reissuable
       (response \ "quantity").as[BigDecimal] shouldBe sillyAssetDesc.totalVolume

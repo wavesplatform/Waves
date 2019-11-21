@@ -13,7 +13,7 @@ import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySetti
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{NTPTime, RequestGen, WithDB}
@@ -71,7 +71,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransaction
-      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, Array.emptyByteArray, ts)
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, Attachment.Empty, ts)
       .explicitGet()
   }
 

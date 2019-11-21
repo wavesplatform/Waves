@@ -14,8 +14,8 @@ import play.api.libs.json.{JsNumber, JsString, Json}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   var exchAsset: IssueTransaction = IssueTransaction.selfSigned(TxVersion.V1, sender = sender.privateKey,
-      name = "myasset".getBytes("UTF-8"),
-      description = "my asset description".getBytes("UTF-8"),
+      name = "myasset",
+      description = "my asset description",
       quantity = someAssetAmount,
       decimals = 2,
       reissuable = true, script = None,
@@ -128,8 +128,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val assetDescription = "my asset description"
 
     val IssueTx: IssueTransaction = IssueTransaction.selfSigned(TxVersion.V1, sender = buyer,
-        name = "myasset".getBytes("UTF-8"),
-        description = assetDescription.getBytes("UTF-8"),
+        name = "myasset",
+        description = assetDescription,
         quantity = someAssetAmount,
         decimals = 8,
         reissuable = true, script = None,
