@@ -71,7 +71,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  private def paymentPreconditions(assetScript: Option[Script] = None): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransactionV2, KeyPair, Long, Long)] =
+  private def paymentPreconditions(assetScript: Option[Script] = None): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Long, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
