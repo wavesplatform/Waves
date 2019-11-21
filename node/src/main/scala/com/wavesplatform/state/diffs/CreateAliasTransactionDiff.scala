@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.api.http.ApiError.AlreadyInState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -18,7 +19,7 @@ object CreateAliasTransactionDiff {
         Diff(
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-          aliases = Map(tx.alias -> tx.sender.toAddress),
+          aliases = Map(tx.alias               -> tx.sender.toAddress),
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         )
       )

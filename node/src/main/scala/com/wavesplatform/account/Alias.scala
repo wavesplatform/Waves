@@ -1,4 +1,5 @@
 package com.wavesplatform.account
+import com.google.common.primitives.Bytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.serialization.Deser
@@ -6,7 +7,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 
 sealed trait Alias extends AddressOrAlias {
   lazy val stringRepr: String = Alias.Prefix + chainId.toChar + ":" + name
-  lazy val bytes: ByteStr     = ByteStr(Alias.AddressVersion +: chainId +: Deser.serializeArrayWithLength(name.getBytes("UTF-8")))
+  lazy val bytes: ByteStr     = Bytes.concat(Array(Alias.AddressVersion, chainId), Deser.serializeArrayWithLength(name.getBytes("UTF-8")))
 
   val name: String
   val chainId: Byte

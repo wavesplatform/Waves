@@ -26,8 +26,8 @@ final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, a
 
   override val id: Coeval[ByteStr] = Coeval.evalOnce {
     val payload = version match {
-      case TxVersion.V1 => Bytes.concat(Array(builder.typeId), alias.bytes)
-      case _            => bodyBytes()
+      case TxVersion.V1 | TxVersion.V2 => Bytes.concat(Array(builder.typeId), alias.bytes)
+      case _                           => bodyBytes()
     }
     crypto.fastHash(payload)
   }
