@@ -382,12 +382,13 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("DataTransaction binding") {
     forAll(dataTransactionGen(10, useForScript = true)) { t =>
-      def pg(i: Int) = {
+      def pg(i: Int): String = {
         val v = t.data(i) match {
           case e: IntegerDataEntry => e.value.toString
           case e: BooleanDataEntry => e.value.toString
           case e: BinaryDataEntry  => s"base64'${e.value.base64}'"
           case e: StringDataEntry  => Json.toJson(e.value)
+          case EmptyDataEntry(_)   => "()"
         }
 
         s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}

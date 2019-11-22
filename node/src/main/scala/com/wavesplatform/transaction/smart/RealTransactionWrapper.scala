@@ -94,7 +94,7 @@ object RealTransactionWrapper {
       case d: DataTransaction =>
         Tx.Data(
             proven(d),
-            d.data.map {
+            d.data.collect {
               case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
               case StringDataEntry(key, value)  => DataItem.Str(key, value)
               case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
