@@ -16,14 +16,12 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.transaction.smart.buildThisValue
+import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
@@ -273,15 +271,15 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     forAll(invokeScriptGen(paymentOptionGen)) { t =>
       val checkArgsScript = if (t.funcCallOpt.get.args.nonEmpty) {
         t.funcCallOpt.get.args
-      .collect {
-        case CONST_LONG(i)    => i.toString
-        case CONST_STRING(s)  => s""""$s""""
-        case CONST_BOOLEAN(b) => b.toString
-        case CONST_BYTESTR(b) => s"base64'${b.base64}'"
-      }
-      .zipWithIndex
-      .map { case (str, i) => s"t.args[$i] == $str" }
-      .mkString("let checkArgs = ", " && ", "\n")
+          .collect {
+            case CONST_LONG(i)    => i.toString
+            case CONST_STRING(s)  => s""""$s""""
+            case CONST_BOOLEAN(b) => b.toString
+            case CONST_BYTESTR(b) => s"base64'${b.base64}'"
+          }
+          .zipWithIndex
+          .map { case (str, i) => s"t.args[$i] == $str" }
+          .mkString("let checkArgs = ", " && ", "\n")
       } else {
         "let checkArgs = true"
       }
@@ -319,6 +317,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw()
            | }
            |""".stripMargin
+      println(script)
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V3)
       result shouldBe evaluated(true)
     }
@@ -352,7 +351,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | }
            |""".stripMargin
 
-      val blockchain  = stub[Blockchain]
+      val blockchain = stub[Blockchain]
       (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
 
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
@@ -561,7 +560,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                    .getOrElse("")}'
                  |   else isDefined(t.matcherFeeAssetId) == false
                  |   id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
-                   "t")} && assetPairAmount && assetPairPrice && matcherFeeAssetId
+                   "t"
+                 )} && assetPairAmount && assetPairPrice && matcherFeeAssetId
                  | case other => throw()
                  | }
                  |""".stripMargin
@@ -637,11 +637,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
-    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
+    val directives       = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
       PureContext.build(Global, V2).withEnvironment[Environment] |+|
-      CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-      WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
+        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+        WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
 
     val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(???), directives)
     for {
@@ -658,13 +658,13 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val Success(expr, _) = Parser.parseExpr(script)
 
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
-    val blockchain  = stub[Blockchain]
+    val blockchain = stub[Blockchain]
     (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
 
     val ctx =
       PureContext.build(Global, V2).withEnvironment[Environment] |+|
-      CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-      WavesContext.build(directives)
+        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+        WavesContext.build(directives)
 
     val env = new WavesEnvironment(
       chainId,

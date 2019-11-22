@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -539,7 +539,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val argGen: Gen[EXPR] = Gen.const(CONST_LONG(11))
 
   val funcCallGen: Gen[FUNCTION_CALL] = for {
-    functionName <- genBoundedString(1, 32).map(_.toString)
+    functionName <- genBoundedString(1, 32).map(_.filter(_.isLetter))
     amt          <- Gen.choose(0, ContractLimits.MaxInvokeScriptArgs)
     args         <- Gen.listOfN(amt, argGen)
 
