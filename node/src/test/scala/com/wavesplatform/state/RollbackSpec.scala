@@ -245,7 +245,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
-    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, byteArrayGen(10), byteArrayGen(12)) {
+    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, stringGen(10), stringGen(12)) {
       case (sender, initialBalance, name, description) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
@@ -253,7 +253,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val issueTransaction =
             IssueTransaction
-              .selfSigned(TxVersion.V1, sender, IssueTransaction.asStringLiteral(name), IssueTransaction.asStringLiteral(description), 2000, 8, reissuable = true, script = None, 1, nextTs)
+              .selfSigned(TxVersion.V1, sender, name, description, 2000, 8, reissuable = true, script = None, 1, nextTs)
               .explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 

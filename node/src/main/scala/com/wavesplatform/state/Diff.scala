@@ -9,7 +9,9 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils.StrUtils
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -51,14 +53,17 @@ object AssetInfo {
 
 case class AssetDescription(
     issuer: PublicKey,
-    name: ByteStr,
-    description: ByteStr,
+    name: String,
+    description: String,
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
     script: Option[Script],
     sponsorship: Long
-)
+) {
+  def nameBytes: ByteStr = StrUtils.toBytesExact(name)
+  def descBytes: ByteStr = StrUtils.toBytesExact(description)
+}
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 

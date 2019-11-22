@@ -2,7 +2,7 @@ package com.wavesplatform
 
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -35,11 +35,11 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   protected def waves(n: Float): Long = (n * 100000000L).toLong
 
   def byteArrayGen(length: Int): Gen[Array[Byte]] = Gen.containerOfN[Array, Byte](length, Arbitrary.arbitrary[Byte])
+  def stringGen(length: Int): Gen[String]         = Gen.containerOfN[Array, Char](length, Arbitrary.arbitrary[Char]).map(new String(_))
 
-  val bytes32gen: Gen[Array[Byte]] = byteArrayGen(32)
-  val bytes64gen: Gen[Array[Byte]] = byteArrayGen(64)
+  val bytes32gen: Gen[Array[Byte]]   = byteArrayGen(32)
+  val bytes64gen: Gen[Array[Byte]]   = byteArrayGen(64)
   val attachmentGen: Gen[Attachment] = bytes32gen.map(Attachment.fromBytes)
-
 
   def genBoundedBytes(minSize: Int, maxSize: Int): Gen[Array[Byte]] =
     for {

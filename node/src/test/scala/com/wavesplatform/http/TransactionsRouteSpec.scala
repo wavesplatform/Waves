@@ -174,8 +174,8 @@ class TransactionsRouteSpec
             Some(
               AssetDescription(
                 issuer = accountGen.sample.get,
-                name = "foo".getBytes("UTF-8"),
-                description = "bar".getBytes("UTF-8"),
+                name = "foo",
+                description = "bar",
                 decimals = 8,
                 reissuable = false,
                 totalVolume = Long.MaxValue,
@@ -222,8 +222,8 @@ class TransactionsRouteSpec
             Some(
               AssetDescription(
                 issuer = accountGen.sample.get,
-                name = "foo".getBytes("UTF-8"),
-                description = "bar".getBytes("UTF-8"),
+                name = "foo",
+                description = "bar",
                 decimals = 8,
                 reissuable = false,
                 totalVolume = Long.MaxValue,
@@ -393,8 +393,8 @@ class TransactionsRouteSpec
 
   routePath("/sign") - {
     "function call without args" in {
-      val acc1       = wallet.generateNewAccount().get
-      val acc2       = wallet.generateNewAccount().get
+      val acc1 = wallet.generateNewAccount().get
+      val acc2 = wallet.generateNewAccount().get
 
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)

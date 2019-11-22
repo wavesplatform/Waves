@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
@@ -30,8 +28,8 @@ class AssetsApiRouteSpec
   private val smartAssetTx = issueV2TransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
     issuer = smartAssetTx.sender,
-    name = smartAssetTx.nameBytes,
-    description = smartAssetTx.descBytes,
+    name = smartAssetTx.name,
+    description = smartAssetTx.description,
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
@@ -60,8 +58,8 @@ class AssetsApiRouteSpec
   private val sillyAssetTx = issueGen.sample.get
   private val sillyAssetDesc = AssetDescription(
     issuer = sillyAssetTx.sender,
-    name = sillyAssetTx.nameBytes,
-    description = sillyAssetTx.descBytes,
+    name = sillyAssetTx.name,
+    description = sillyAssetTx.description,
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,

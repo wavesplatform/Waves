@@ -1,7 +1,5 @@
 package com.wavesplatform.transaction.assets
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -11,7 +9,19 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, ProvenTransaction, SigProofsSwitch, TransactionParser, TxType, TxVersion, TxWithFee, VersionedTransaction}
+import com.wavesplatform.transaction.{
+  FastHashId,
+  LegacyPBSwitch,
+  Proofs,
+  ProvenTransaction,
+  SigProofsSwitch,
+  TransactionParser,
+  TxType,
+  TxVersion,
+  TxWithFee,
+  VersionedTransaction
+}
+import com.wavesplatform.utils.StrUtils
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -37,6 +47,7 @@ case class IssueTransaction(
     with TxWithFee.InWaves
     with LegacyPBSwitch.V3 {
 
+  //noinspection TypeAnnotation,ScalaStyle
   override def builder = IssueTransaction
 
   override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
@@ -45,8 +56,8 @@ case class IssueTransaction(
 
   override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 
-  private[wavesplatform] lazy val nameBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(name)
-  private[wavesplatform] lazy val descBytes = if (isProtobufVersion) name.getBytes(StandardCharsets.UTF_8) else IssueTransaction.asBytesLiteral(description)
+  private[wavesplatform] lazy val nameBytes = if (isProtobufVersion) StrUtils.toBytesUTF8(name) else StrUtils.toBytesExact(name)
+  private[wavesplatform] lazy val descBytes = if (isProtobufVersion) StrUtils.toBytesUTF8(description) else StrUtils.toBytesExact(description)
 }
 
 object IssueTransaction extends TransactionParser {
@@ -122,7 +133,4 @@ object IssueTransaction extends TransactionParser {
       blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
     }
   }
-
-  def asStringLiteral(bs: Array[Byte]): String = new String(bs.map(_.toChar))
-  def asBytesLiteral(s: String): Array[Byte]   = s.toCharArray.map(_.toByte)
 }

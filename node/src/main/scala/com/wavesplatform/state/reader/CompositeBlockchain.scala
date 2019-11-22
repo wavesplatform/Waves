@@ -76,7 +76,7 @@ final case class CompositeBlockchain(
           .get(asset.id)
           .collectFirst {
             case (it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.nameBytes, it.descBytes, it.decimals, it.reissuable, it.quantity, script, sponsorship)
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
     }

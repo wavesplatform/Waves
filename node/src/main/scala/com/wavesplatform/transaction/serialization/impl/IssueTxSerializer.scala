@@ -6,6 +6,7 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.utils.StrUtils
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -74,8 +75,8 @@ object IssueTxSerializer {
       IssueTransaction(
         version,
         sender,
-        IssueTransaction.asStringLiteral(name),
-        IssueTransaction.asStringLiteral(description),
+        StrUtils.toStringExact(name),
+        StrUtils.toStringExact(description),
         quantity,
         decimals,
         reissuable,
