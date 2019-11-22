@@ -372,6 +372,7 @@ object PBTransactions {
   }
 
   def toPBScript(script: com.wavesplatform.lang.script.Script): Script = {
-    Script.of(script.bytes().drop(1), script.stdLibVersion.id)
+    val Array(ver, body @ _*) = script.bytes().arr
+    Script.of(ByteString.copyFrom(body.toArray), ver)
   }
 }
