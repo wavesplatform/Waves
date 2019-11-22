@@ -317,7 +317,6 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case other => throw()
            | }
            |""".stripMargin
-      println(script)
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V3)
       result shouldBe evaluated(true)
     }
