@@ -84,6 +84,7 @@ object DataEntry {
 
   def parseValue(key: String, buf: ByteBuffer): DataEntry[_] = {
     buf.get match {
+      case 0xff                      => EmptyDataEntry(key)
       case t if t == Type.Integer.id => IntegerDataEntry(key, buf.getLong)
       case t if t == Type.Boolean.id => BooleanDataEntry(key, buf.get != 0)
       case t if t == Type.Binary.id  => BinaryDataEntry(key, ByteStr(Deser.parseArrayWithLength(buf)))
@@ -132,7 +133,11 @@ object DataEntry {
                 case _                        => JsError("value is missing or not a string")
               }
             case JsDefined(JsString(t)) => JsError(s"unknown type $t")
-            case _                      => JsError("type is missing")
+            case _ =>
+              jsv \ "value" match {
+                case _: JsUndefined | JsDefined(JsNull) => JsSuccess(EmptyDataEntry(key))
+                case _                                  => JsError("type is missing")
+              }
           }
         case _ => JsError("key is missing")
       }
@@ -144,32 +149,31 @@ object DataEntry {
 
 case class IntegerDataEntry(override val key: String, override val value: Long)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[Long]("integer", key, value) {
-  override def valueBytes: Array[Byte] = Type.Integer.id.toByte +: Longs.toByteArray(value)
-
-  override def toJson: JsObject = super.toJson + ("value" -> JsNumber(value))
+  override def valueBytes: Array[Byte] = Bytes.concat(Array(Type.Integer.id.toByte), Longs.toByteArray(value))
+  override def toJson: JsObject        = super.toJson + ("value" -> JsNumber(value))
 }
 
 case class BooleanDataEntry(override val key: String, override val value: Boolean)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[Boolean]("boolean", key, value) {
   override def valueBytes: Array[Byte] = Array(Type.Boolean.id, if (value) 1 else 0).map(_.toByte)
-
-  override def toJson: JsObject = super.toJson + ("value" -> JsBoolean(value))
+  override def toJson: JsObject        = super.toJson + ("value" -> JsBoolean(value))
 }
 
 case class BinaryDataEntry(override val key: String, override val value: ByteStr)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[ByteStr]("binary", key, value) {
-  override def valueBytes: Array[Byte] = Type.Binary.id.toByte +: Deser.serializeArrayWithLength(value.arr)
-
-  override def toJson: JsObject = super.toJson + ("value" -> JsString(value.base64))
-
+  override def valueBytes: Array[Byte]              = Bytes.concat(Array(Type.Binary.id.toByte), Deser.serializeArrayWithLength(value.arr))
+  override def toJson: JsObject                     = super.toJson + ("value" -> JsString(value.base64))
   override def isValid(version: TxVersion): Boolean = super.isValid(version) && value.arr.length <= MaxValueSize
 }
 
 case class StringDataEntry(override val key: String, override val value: String)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[String]("string", key, value) {
-  override def valueBytes: Array[Byte] = Type.String.id.toByte +: Deser.serializeArrayWithLength(value.getBytes(UTF_8))
-
-  override def toJson: JsObject = super.toJson + ("value" -> JsString(value))
-
+  override def valueBytes: Array[Byte]              = Bytes.concat(Array(Type.String.id.toByte), Deser.serializeArrayWithLength(value.getBytes(UTF_8)))
+  override def toJson: JsObject                     = super.toJson + ("value" -> JsString(value))
   override def isValid(version: TxVersion): Boolean = super.isValid(version) && value.getBytes(UTF_8).length <= MaxValueSize
+}
+
+case class EmptyDataEntry(override val key: String)(implicit dataBytesOpt: DataBytesOpt = None) extends DataEntry[Unit]("empty", key, ()) {
+  override def valueBytes: Array[TxVersion] = Array(0xff.toByte)
+  override def toJson: JsObject             = Json.obj("key" -> key, "value" -> JsNull)
 }

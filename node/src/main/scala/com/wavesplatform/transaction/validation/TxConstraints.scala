@@ -4,8 +4,8 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.{TxValidationError, TxVersion, VersionedTransaction}
 
 import scala.util.Try
 
@@ -22,6 +22,16 @@ object TxConstraints {
 
   def cond(cond: => Boolean, err: => ValidationError): ValidatedNV =
     if (cond) Valid(()) else Invalid(err).toValidatedNel
+
+  def byVersionSet[T <: VersionedTransaction](tx: T)(f: (Set[TxVersion], () => ValidatedV[Any])*): ValidatedV[T] = {
+    seq(tx)(f.collect {
+      case (v, func) if v.contains(tx.version) =>
+        func()
+    }: _*)
+  }
+
+  def byVersion[T <: VersionedTransaction](tx: T)(f: (TxVersion, () => ValidatedV[Any])*): ValidatedV[T] =
+    byVersionSet(tx)(f.map { case (v, f) => (Set(v), f) }: _*)
 
   def fee(fee: Long): ValidatedV[Long] = {
     Validated

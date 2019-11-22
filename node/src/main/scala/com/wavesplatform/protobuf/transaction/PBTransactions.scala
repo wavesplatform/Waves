@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.serialization.Deser
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -324,7 +324,7 @@ object PBTransactions {
       case BoolValue(bool)    => BooleanDataEntry(de.key, bool)
       case BinaryValue(bytes) => BinaryDataEntry(de.key, bytes.toByteArray)
       case StringValue(str)   => StringDataEntry(de.key, str)
-      case Empty              => throw new IllegalArgumentException(s"Empty entries not supported: $de")
+      case Empty              => EmptyDataEntry(de.key)
     }
   }
 
@@ -336,6 +336,7 @@ object PBTransactions {
         case BooleanDataEntry(_, value) => DataTransactionData.DataEntry.Value.BoolValue(value)
         case BinaryDataEntry(_, value)  => DataTransactionData.DataEntry.Value.BinaryValue(value)
         case StringDataEntry(_, value)  => DataTransactionData.DataEntry.Value.StringValue(value)
+        case EmptyDataEntry(_)          => DataTransactionData.DataEntry.Value.Empty
       }
     )
   }
