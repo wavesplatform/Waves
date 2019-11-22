@@ -2,10 +2,12 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
+import com.wavesplatform.lang.v1.traits.domain.{Burn => BurnAction}
 
 case class TransferItem(recipient: Recipient, amount: Long)
 
 trait Tx
+sealed trait PseudoTx
 
 object Tx {
   case class ScriptTransfer(assetId: Option[ByteStr],
@@ -13,7 +15,21 @@ object Tx {
                             recipient: Recipient.Address,
                             amount: Long,
                             timestamp: Long,
-                            id: ByteStr)
+                            id: ByteStr) extends PseudoTx
+
+  case class ReissuePseudoTx(
+    reissue: Reissue,
+    sender: Recipient.Address,
+    txId: ByteStr,
+    timestamp: Long
+  ) extends PseudoTx
+
+  case class BurnPseudoTx(
+    burn: BurnAction,
+    sender: Recipient.Address,
+    txId: ByteStr,
+    timestamp: Long
+  ) extends PseudoTx
 
   case class Header(id: ByteStr, fee: Long, timestamp: Long, version: Long)
   case class Proven(h: Header, sender: Recipient.Address, bodyBytes: ByteStr, senderPk: ByteStr, proofs: IndexedSeq[ByteStr])
