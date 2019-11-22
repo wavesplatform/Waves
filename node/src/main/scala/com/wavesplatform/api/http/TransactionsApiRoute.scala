@@ -1,9 +1,14 @@
 package com.wavesplatform.api.http
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import cats.instances.list._
+import cats.instances.try_._
+import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -37,9 +42,9 @@ case class TransactionsApiRoute(
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast
+      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   @Path("/address/{address}/limit/{limit}")
@@ -211,6 +216,49 @@ case class TransactionsApiRoute(
     )
   )
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
+
+  def merkleProof: Route = path("proofMerkleRoot")(getMerkleProof ~ postMerkleProof)
+
+  @Path("/proofMerkleRoot")
+  @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "id",
+        required = true,
+        paramType = "query",
+        dataType = "string",
+        value = "Transaction IDs"
+      )
+    )
+  )
+  def getMerkleProof: Route = (get & parameters('id.*))(ids => complete(merkleInfo(ids.toList)))
+
+  @Path("/proofMerkleRoot")
+  @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "json",
+        required = true,
+        paramType = "body",
+        dataType = "string",
+        value = "Transaction IDs",
+        example = """{"ids": ["some1", "some2"]}"""
+      )
+    )
+  )
+  def postMerkleProof: Route = jsonPost[JsObject](jsv => merkleInfo((jsv \ "ids").as[List[String]]))
+
+  private def merkleInfo(encodedIds: List[String]): ToResponseMarshallable =
+    encodedIds.traverse(ByteStr.decodeBase58) match {
+      case Success(txIds) =>
+        commonApi.transactionsMerkleInfo(txIds) match {
+          case Nil    => CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+          case proofs => Json.obj("transactions" -> proofs)
+        }
+      case _ => InvalidSignature
+    }
 
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction

@@ -45,7 +45,7 @@ package object block {
 
   private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
 
-  private[block] implicit class BlockMerkleOps(block: Block) {
+  implicit class BlockMerkleOps(block: Block) {
     def transactionProof(transaction: Transaction): Option[MerkleProof[Digest32]] =
       block.transactionsMerkleTree().proofByElement(transaction.mkMerkleLeaf())
   }
