@@ -131,7 +131,36 @@ object Bindings {
         recipient = ct.recipient,
         attachment = ByteStr.empty
       ),
-      false
+      proofsEnabled = false
+    )
+
+  def mapReissuePseudoTx(r: ReissuePseudoTx): CaseObj =
+    reissueTransactionObject(
+      proofsEnabled = false,
+      Proven(
+        h = Header(id = r.txId, fee = 0, timestamp = r.timestamp, version = 0),
+        sender = r.sender,
+        bodyBytes = ByteStr.empty,
+        senderPk = ByteStr.empty,
+        proofs = IndexedSeq.empty
+      ),
+      r.reissue.quantity,
+      r.reissue.assetId,
+      r.reissue.isReissuable
+    )
+
+  def mapBurnPseudoTx(b: BurnPseudoTx): CaseObj =
+    burnTransactionObject(
+      proofsEnabled = false,
+      Proven(
+        h = Header(id = b.txId, fee = 0, timestamp = b.timestamp, version = 0),
+        sender = b.sender,
+        bodyBytes = ByteStr.empty,
+        senderPk = ByteStr.empty,
+        proofs = IndexedSeq.empty
+      ),
+      b.burn.quantity,
+      b.burn.assetId
     )
 
   def transactionObject(tx: Tx, proofsEnabled: Boolean, version: StdLibVersion = V3): CaseObj =
@@ -158,24 +187,9 @@ object Bindings {
           )
         )
       case ReIssue(p, quantity, assetId, reissuable) =>
-        CaseObj(
-          buildReissueTransactionType(proofsEnabled),
-          combine(Map(
-                    "quantity"   -> quantity,
-                    "assetId"    -> assetId,
-                    "reissuable" -> reissuable,
-                  ),
-                  provenTxPart(p, proofsEnabled))
-        )
+        reissueTransactionObject(proofsEnabled, p, quantity, assetId, reissuable)
       case Tx.Burn(p, quantity, assetId) =>
-        CaseObj(
-          buildBurnTransactionType(proofsEnabled),
-          combine(Map(
-                    "quantity" -> quantity,
-                    "assetId"  -> assetId
-                  ),
-                  provenTxPart(p, proofsEnabled))
-        )
+        burnTransactionObject(proofsEnabled, p, quantity, assetId)
       case CI(p, addressOrAlias, payments, feeAssetId, funcName, funcArgs) =>
         CaseObj(
           buildInvokeScriptTransactionType(proofsEnabled, version),
@@ -279,6 +293,42 @@ object Bindings {
           )
         )
     }
+
+  private def reissueTransactionObject(
+    proofsEnabled: Boolean,
+    p: Proven,
+    quantity: Long,
+    assetId: ByteStr,
+    reissuable: Boolean
+  ): CaseObj =
+    CaseObj(
+      buildReissueTransactionType(proofsEnabled),
+      combine(
+        Map(
+          "quantity" -> quantity,
+          "assetId" -> assetId,
+          "reissuable" -> reissuable,
+        ),
+        provenTxPart(p, proofsEnabled)
+      )
+    )
+
+  private def burnTransactionObject(
+    proofsEnabled: Boolean,
+    p: Proven,
+    quantity: Long,
+    assetId: ByteStr
+  ): CaseObj =
+    CaseObj(
+      buildBurnTransactionType(proofsEnabled),
+      combine(
+        Map(
+          "quantity" -> quantity,
+          "assetId"  -> assetId
+        ),
+        provenTxPart(p, proofsEnabled)
+      )
+    )
 
   def blockHeaderObject(header: BlockHeader): CaseObj =
     CaseObj(

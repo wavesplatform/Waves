@@ -120,7 +120,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   }
 
   val MinIssueFee = 100000000
-
+  
   val issueParamGen: Gen[(KeyPair, String, String, TxAmount, Byte, Boolean, Int, TxTimestamp)] = for {
     sender      <- accountGen
     assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
@@ -896,13 +896,15 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   def issueV2TransactionGen(
       senderGen: Gen[KeyPair] = accountGen,
       _scriptGen: Gen[Option[Script]] = Gen.option(scriptGen),
-      forceReissuable: Boolean = false
+      reissuableParam: Option[Boolean] = None,
+      quantityParam: Option[Long] = None
   ): Gen[IssueTransaction] =
     for {
       script                                                                               <- _scriptGen
-      (_, assetName, description, quantity, decimals, generatedReissuable, fee, timestamp) <- issueParamGen
+      (_, assetName, description, generatedQuantity, decimals, generatedReissuable, fee, timestamp) <- issueParamGen
       sender                                                                               <- senderGen
-      reissuable = if (forceReissuable) true else generatedReissuable
+      reissuable = reissuableParam.getOrElse(generatedReissuable)
+      quantity   = quantityParam.getOrElse(generatedQuantity)
     } yield IssueTransaction
       .selfSigned(TxVersion.V2, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .explicitGet()
