@@ -45,7 +45,11 @@ object Script {
   type DirectiveMeta = List[(String, Any)]
 
   def decompile(s: Script): (String, DirectiveMeta) = {
-    val ctx = defaultDecompilerContext
+    val cType: ContentType = s match {
+      case _: ExprScript => Expression
+      case _ => DAppType
+    }
+    val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = s match {
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
       case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))

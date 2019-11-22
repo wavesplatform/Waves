@@ -244,7 +244,7 @@ package object common extends ScorexLogging {
       .fromResource(db.resource)
       .flatMap { resource =>
         resource.iterator.seek(
-          globalPrefix ++ after.flatMap(address => resource.get(Keys.addressId(address))).fold(Array.emptyByteArray)(_.toByteArray)
+          globalPrefix ++ after.flatMap(address => resource.get(Keys.addressId(address))).fold(Array.emptyByteArray)(id => (id + 1).toByteArray)
         )
         Observable.fromIterator(Task(new AbstractIterator[(Address, Long)] {
           private[this] var pendingPortfolios = overrides

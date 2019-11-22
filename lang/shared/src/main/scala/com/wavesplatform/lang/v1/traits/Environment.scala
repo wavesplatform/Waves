@@ -1,13 +1,12 @@
 package com.wavesplatform.lang.v1.traits
 
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain._
 import shapeless._
 
 import scala.language.higherKinds
 
 object Environment {
-  type InputEntity = Tx :+: Ord :+: ScriptTransfer :+: CNil
+  type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
 }
 
 trait Environment[F[_]] {

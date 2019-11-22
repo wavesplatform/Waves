@@ -32,22 +32,25 @@ package object compiler {
                    ("p2", TYPEPARAM('T'))) { case l => Right(l.head) }
 
   private val arr = ARR(IndexedSeq[EVALUATED](null, null))
-  val testContext = Monoid
-    .combine(
-      PureContext.build(Global, V3),
-      CTX[NoContext](
-        Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
-        Map(
-          ("p", (Common.AorB, null)),
-          ("tv", (Common.AorBorC, null)),
-          ("l", (LIST(LONG), ContextfulVal.pure[NoContext](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)))))),
-          ("lpa", (LIST(Common.pointTypeA), ContextfulVal.pure[NoContext](arr))),
-          ("lpabc", (LIST(Common.AorBorC), ContextfulVal.pure[NoContext](arr)))
-        ),
-        Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
-      )
-    )
 
-  val compilerContext = testContext.compilerContext
+  def getTestContext(v: StdLibVersion): CTX[NoContext] = {
+    Monoid
+      .combine(
+        PureContext.build(Global, v),
+        CTX[NoContext](
+          Seq(pointType, Common.pointTypeA, Common.pointTypeB, Common.pointTypeC),
+          Map(
+            ("p", (Common.AorB, null)),
+            ("tv", (Common.AorBorC, null)),
+            ("l", (LIST(LONG), ContextfulVal.pure[NoContext](ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)))))),
+            ("lpa", (LIST(Common.pointTypeA), ContextfulVal.pure[NoContext](arr))),
+            ("lpabc", (LIST(Common.AorBorC), ContextfulVal.pure[NoContext](arr)))
+          ),
+          Array(multiplierFunction, functionWithTwoPrarmsOfTheSameType, idT, returnsListLong, idOptionLong)
+        )
+      )
+  }
+
+  val compilerContext = getTestContext(V3).compilerContext
 
 }

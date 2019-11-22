@@ -246,7 +246,8 @@ class UtxPoolSpecification
   private def massTransferWithBlacklisted(allowRecipients: Boolean) =
     (for {
       (sender, senderBalance, bcu) <- stateGen
-      addressGen = Gen.listOf(accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
+      addressesSize <- Gen.choose(1, MassTransferTransaction.MaxTransferCount)
+      addressGen = Gen.listOfN(addressesSize, accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
       recipients <- addressGen.map(_.map(_.publicKey))
       time = new TestTime()
       txs <- Gen.nonEmptyListOf(massTransferWithRecipients(sender, recipients, senderBalance / 10, time))

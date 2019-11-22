@@ -9,8 +9,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -19,7 +18,7 @@ import monix.eval.Coeval
 import shapeless._
 
 object WavesEnvironment {
-  type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
+  type In = Transaction :+: Order :+: PseudoTx :+: CNil
 }
 
 class WavesEnvironment(
