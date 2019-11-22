@@ -23,8 +23,8 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
 
       sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
 
-      sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - 2 * issueFee
-      sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - 2 * issueFee
+      sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - issueFee - reissueFee
+      sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - issueFee - reissueFee
       sender.grpc.assetsBalance(reissuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 2 * someAssetAmount
     }
   }
@@ -80,8 +80,8 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
         "Asset is not reissuable",
         Code.INVALID_ARGUMENT)
 
-      sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - 2 * issueFee
-      sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - 2 * issueFee
+      sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - issueFee - reissueFee
+      sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - issueFee - reissueFee
       sender.grpc.assetsBalance(reissuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 2 * someAssetAmount
     }
   }
@@ -97,8 +97,8 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
       sender.grpc.broadcastReissue(reissuer, reissueFee, issuedAssetId, someAssetAmount, reissuable = true, version = v, waitForTx = true)
 
       sender.grpc.broadcastTransfer(reissuer, Recipient().withAddress(secondAddress), 2 * someAssetAmount, minFee, assetId = issuedAssetId, waitForTx = true)
-      sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - 2 * issueFee - minFee
-      sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - 2 * issueFee - minFee
+      sender.grpc.wavesBalance(reissuerAddress).available shouldBe reissuerBalance - issueFee - reissueFee - minFee
+      sender.grpc.wavesBalance(reissuerAddress).effective shouldBe reissuerEffBalance - issueFee - reissueFee - minFee
       sender.grpc.assetsBalance(reissuerAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
       sender.grpc.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 2 * someAssetAmount
     }
