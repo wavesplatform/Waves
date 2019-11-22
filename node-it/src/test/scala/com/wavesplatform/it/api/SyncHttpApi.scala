@@ -416,6 +416,9 @@ object SyncHttpApi extends Assertions {
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
       sync(async(n).putData(sourceAddress, data, fee))
 
+    def removeData(sourceAddress: String, data: Seq[String], fee: Long): Transaction =
+      sync(async(n).removeData(sourceAddress, data, fee))
+
     def getData(sourceAddress: String): List[DataEntry[_]] =
       sync(async(n).getData(sourceAddress))
 

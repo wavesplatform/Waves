@@ -19,7 +19,7 @@ object TransferTxSerializer {
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
-      "attachment" -> (if (isProtobufVersion) Json.toJson(attachment) else Base58.encode(attachment.asBytesExactly))
+      "attachment" -> (if (isProtobufVersion) Json.toJson(attachment) else Base58.encode(attachment.toBytesExact))
     )
   }
 
@@ -34,7 +34,7 @@ object TransferTxSerializer {
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
         recipient.bytes.arr,
-        Deser.serializeArrayWithLength(attachment.asBytesExactly)
+        Deser.serializeArrayWithLength(attachment.toBytesExact)
       )
     }
 

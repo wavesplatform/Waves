@@ -35,7 +35,7 @@ object Attachment {
     if (bs.isEmpty) Empty else Bin(bs)
 
   implicit class AttachmentExt(private val a: Attachment) extends AnyVal {
-    def asBytes: Array[Byte] = a match {
+    def toBytes: Array[Byte] = a match {
       case Bin(value)  => value
       case Num(value)  => Longs.toByteArray(value)
       case Bool(value) => if (value) Array(1: Byte) else Array(0: Byte)
@@ -43,7 +43,7 @@ object Attachment {
       case Empty       => Array.emptyByteArray
     }
 
-    def asBytesExactly: Array[Byte] = a match {
+    def toBytesExact: Array[Byte] = a match {
       case Bin(value) => value
       case Empty      => Array.emptyByteArray
       case _          => throw new IllegalArgumentException(s"Not a bytes attachment: $a")

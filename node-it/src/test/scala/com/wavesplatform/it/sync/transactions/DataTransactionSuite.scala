@@ -7,7 +7,7 @@ import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
@@ -311,5 +311,21 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getDataByKey(thirdAddress, s"integer$r") shouldBe IntegerDataEntry(s"integer$r", 1000 - r)
 
     sender.getData(thirdAddress).size shouldBe 1000
+  }
+
+  test("remove keys") {
+    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
+    val boolData    = List(BooleanDataEntry(nonLatinKey, true))
+    val boolDataFee = calcDataFee(boolData)
+    val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(firstTx)
+    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
+
+    val removeData = List(EmptyDataEntry(nonLatinKey))
+    val removeDataFee = calcDataFee(removeData)
+    val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(secondTx)
+    intercept[IllegalArgumentException](sender.getDataByKey(firstAddress, nonLatinKey))
+    sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
   }
 }

@@ -218,7 +218,7 @@ class AssetsBroadcastRouteSpec
       fee,
       feeAssetId.maybeBase58Repr,
       timestamp,
-      Some(Base58.encode(attachment.asBytesExactly)),
+      Some(Base58.encode(attachment.toBytesExact)),
       proofs.toSignature.toString
     )
   }
@@ -233,7 +233,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
-      Some(Base58.encode(attachment.asBytesExactly)),
+      Some(Base58.encode(attachment.toBytesExact)),
       proofs.proofs.map(_.toString).toList
     )
   }

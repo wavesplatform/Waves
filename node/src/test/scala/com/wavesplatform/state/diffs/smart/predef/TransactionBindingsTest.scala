@@ -445,7 +445,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
-                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment.asBytes).toString}'
+                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment.toBytes).toString}'
                       |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment

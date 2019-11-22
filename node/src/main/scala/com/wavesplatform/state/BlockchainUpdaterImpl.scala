@@ -733,9 +733,8 @@ class BlockchainUpdaterImpl(
       val fromDiff = ng.bestLiquidDiff.accountData
         .getOrElse(address, AccountDataInfo.accountDataInfoMonoid.empty)
         .data
-        .keySet
 
-      fromInner ++ fromDiff
+      (fromInner ++ fromDiff.keySet).filterNot(key => fromDiff.get(key).exists(_.isEmpty))
     }
   }
 
@@ -743,14 +742,14 @@ class BlockchainUpdaterImpl(
     ngState.fold(blockchain.accountData(acc)) { ng =>
       val fromInner = blockchain.accountData(acc)
       val fromDiff  = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      fromInner.combine(fromDiff)
+      fromInner.combine(fromDiff).filterEmpty
     }
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
     ngState.fold(blockchain.accountData(acc, key)) { ng =>
       val diffData = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      diffData.data.get(key).orElse(blockchain.accountData(acc, key))
+      diffData.data.get(key).orElse(blockchain.accountData(acc, key)).filterNot(_.isEmpty)
     }
   }
 

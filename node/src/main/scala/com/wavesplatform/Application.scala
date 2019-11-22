@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.io.File
+import java.net.URL
 import java.security.Security
 import java.util.concurrent.ConcurrentHashMap
 import java.util.concurrent.atomic.AtomicBoolean
@@ -11,6 +12,7 @@ import akka.http.scaladsl.Http.ServerBinding
 import akka.stream.ActorMaterializer
 import cats.instances.all._
 import cats.syntax.option._
+import com.google.common.io.ByteStreams
 import com.typesafe.config._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.actor.RootActorSystem
@@ -54,6 +56,7 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ConcurrentSubject
 import org.influxdb.dto.Point
 import org.slf4j.LoggerFactory
+import play.api.libs.json.Json
 
 import scala.concurrent.ExecutionContext.Implicits.global
 import scala.concurrent.duration._
@@ -118,6 +121,20 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   }
 
   def run(): Unit = {
+    def getTimestamp(h: Int): Long = {
+      val url = s"https://nodes.wavesnodes.com/blocks/headers/at/$h"
+      val json = Json.parse(new URL(url).openStream())
+      (json \ "timestamp").as[Long]
+    }
+
+    val intervals = (1700000 to 1800000)
+      .map(getTimestamp)
+        .grouped(2)
+        .collect { case Seq(t1, t2) => math.abs(t2 - t1) }
+
+    println((intervals.sum / 100000).millis)
+    System.exit(0)
+
     // initialization
     implicit val as: ActorSystem                 = actorSystem
     implicit val materializer: ActorMaterializer = ActorMaterializer()

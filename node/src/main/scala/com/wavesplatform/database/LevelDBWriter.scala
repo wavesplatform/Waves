@@ -138,7 +138,7 @@ class LevelDBWriter(
   override def accountData(address: Address): AccountDataInfo = readOnly { db =>
     AccountDataInfo((for {
       key   <- accountDataKeys(address)
-      value <- accountData(address, key)
+      value <- accountData(address, key) if !value.isInstanceOf[EmptyDataEntry]
     } yield key -> value).toMap)
   }
 

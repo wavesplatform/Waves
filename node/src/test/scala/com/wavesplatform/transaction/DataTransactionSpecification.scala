@@ -6,7 +6,8 @@ import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest._
@@ -179,7 +180,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     }
   }
 
-  property(testName = "JSON format validation") {
+  property("JSON format validation") {
     val js = Json.parse("""{
                        "type": 12,
                        "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
@@ -230,4 +231,14 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     js shouldEqual tx.json()
   }
 
+  property("handle null keys") {
+    val emptyDataEntry = EmptyDataEntry("123")
+
+    forAll(accountGen, dataTransactionGen) { (sender, tx) =>
+      val tx1 = DataTransaction.selfSigned(TxVersion.V1, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      tx1 shouldBe Left(GenericError("Empty data is not allowed in V1"))
+      val tx2 = DataTransaction.selfSigned(TxVersion.V2, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      tx2 shouldBe 'right
+    }
+  }
 }

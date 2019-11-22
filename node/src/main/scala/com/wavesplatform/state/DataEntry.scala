@@ -145,6 +145,10 @@ object DataEntry {
 
     def writes(item: DataEntry[_]): JsValue = item.toJson
   }
+
+  implicit class DataEntryExt(private val de: DataEntry[_]) extends AnyVal {
+    def isEmpty: Boolean = de.isInstanceOf[EmptyDataEntry]
+  }
 }
 
 case class IntegerDataEntry(override val key: String, override val value: Long)(implicit dataBytesOpt: DataBytesOpt = None)

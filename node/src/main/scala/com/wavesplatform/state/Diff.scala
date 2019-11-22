@@ -73,6 +73,11 @@ object AccountDataInfo {
 
     override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
   }
+
+  implicit class AccountDataInfoExt(private val ad: AccountDataInfo) extends AnyVal {
+    def filterEmpty: AccountDataInfo =
+      ad.copy(ad.data.filterNot(_._2.isEmpty))
+  }
 }
 
 sealed abstract class Sponsorship
