@@ -476,7 +476,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def removeData(sourceAddress: String, data: Seq[String], fee: Long): Future[Transaction] = {
-      signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 2, "data" -> data.map(EmptyDataEntry)))
+      signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 2, "data" -> data.map(EmptyDataEntry(_))))
     }
 
     def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
