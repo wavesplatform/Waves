@@ -15,28 +15,33 @@ object DataRequest {
   implicit val signedDataRequestReads   = Json.reads[SignedDataRequest]
 }
 
-case class DataRequest(sender: String,
-                       @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
-                       @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
-                       timestamp: Option[Long] = None)
+case class DataRequest(
+    version: Byte,
+    sender: String,
+    @(ApiModelProperty @field)(required = true) data: List[DataEntry[_]],
+    @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
+    timestamp: Option[Long] = None
+)
 
 @ApiModel(value = "Signed Data transaction")
-case class SignedDataRequest(@(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true)
-                             senderPublicKey: String,
-                             @(ApiModelProperty @field)(value = "Data to put into blockchain", required = true)
-                             data: List[DataEntry[_]],
-                             @(ApiModelProperty @field)(required = true)
-                             fee: Long,
-                             @(ApiModelProperty @field)(required = true, value = "1000")
-                             timestamp: Long,
-                             @(ApiModelProperty @field)(required = true)
-                             proofs: List[String])
-    {
+case class SignedDataRequest(
+    version: Byte,
+    @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true)
+    senderPublicKey: String,
+    @(ApiModelProperty @field)(value = "Data to put into blockchain", required = true)
+    data: List[DataEntry[_]],
+    @(ApiModelProperty @field)(required = true)
+    fee: Long,
+    @(ApiModelProperty @field)(required = true, value = "1000")
+    timestamp: Long,
+    @(ApiModelProperty @field)(required = true)
+    proofs: List[String]
+) {
   def toTx: Either[ValidationError, DataTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      t           <- DataTransaction.create(1.toByte, _sender, data, fee, timestamp, _proofs)
+      t           <- DataTransaction.create(version, _sender, data, fee, timestamp, _proofs)
     } yield t
 }

@@ -128,7 +128,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
       StringDataEntry("str", "AAA-AAA")
     )
     val fee  = calcDataFee(data)
-    val json = sender.postJson("/addresses/data", DataRequest(firstAddress, data, fee))
+    val json = sender.postJson("/addresses/data", DataRequest(1.toByte, firstAddress, data, fee))
     val tx   = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }

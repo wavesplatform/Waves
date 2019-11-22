@@ -325,7 +325,9 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val removeDataFee = calcDataFee(removeData)
     val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
     nodes.waitForHeightAriseAndTxPresent(secondTx)
-    intercept[IllegalArgumentException](sender.getDataByKey(firstAddress, nonLatinKey))
+    assertApiError(sender.getDataByKey(firstAddress, nonLatinKey)) { error =>
+      error.statusCode shouldBe 404
+    }
     sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
   }
 }
