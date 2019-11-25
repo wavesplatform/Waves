@@ -41,16 +41,8 @@ object DiffsCommon {
     address:      Address,
   ): Either[String, Long] =
     blockchain.callableFunctionComplexity(address, functionCall.function.funcName)
-      .map(_.pure[Either[String, ?]])
-      .getOrElse(calcFunctionComplexity(script, functionCall.function.funcName, blockchain.estimator))
-
-  private def calcFunctionComplexity(
-    script:    Script,
-    call:      String,
-    estimator: ScriptEstimator
-  ): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
-      .map { case (totalComplexity, complexityMap) => complexityMap.getOrElse(call, totalComplexity) }
+      .get
+      .pure[Either[String, ?]]
 
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
