@@ -83,7 +83,10 @@ final case class CompositeBlockchain(
   }
 
   override def callableFunctionComplexity(dAppAddress: Address, functionName: String): Option[Long] =
-    inner.callableFunctionComplexity(dAppAddress, functionName)
+    diff.callableFunctionComplexities.get((dAppAddress, functionName)) match {
+      case c@Some(_) => c
+      case None      => inner.callableFunctionComplexity(dAppAddress, functionName)
+    }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse

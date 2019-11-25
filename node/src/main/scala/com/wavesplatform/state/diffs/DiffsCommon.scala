@@ -34,16 +34,6 @@ object DiffsCommon {
     }
   }
 
-  def functionComplexity(
-    blockchain:   Blockchain,
-    script:       Script,
-    functionCall: FUNCTION_CALL,
-    address:      Address,
-  ): Either[String, Long] =
-    blockchain.callableFunctionComplexity(address, functionCall.function.funcName)
-      .get
-      .pure[Either[String, ?]]
-
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
 
