@@ -1,5 +1,5 @@
 package com.wavesplatform.api.common
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
@@ -46,12 +46,12 @@ class CommonAccountApi(blockchain: Blockchain) {
     blockchain.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
-    val script: Option[(Script, Long)] = blockchain.accountScriptWithComplexity(address)
+    val script: Option[(PublicKey, Script, Long)] = blockchain.accountScriptWithComplexity(address)
 
     AddressScriptInfo(
-      script = script.map(_._1.bytes()),
-      scriptText = script.map(_._1.expr.toString), // [WAIT] script.map(Script.decompile),
-      complexity = script.map(_._2).getOrElse(0),
+      script = script.map(_._2.bytes()),
+      scriptText = script.map(_._2.expr.toString), // [WAIT] script.map(Script.decompile),
+      complexity = script.map(_._3).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }

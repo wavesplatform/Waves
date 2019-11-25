@@ -2,7 +2,7 @@ package com.wavesplatform.state.reader
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -37,7 +37,7 @@ final case class CompositeBlockchain(
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] =
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] =
     maybeDiff
       .flatMap(_.assetScripts.get(asset))
       .getOrElse(inner.assetScriptWithComplexity(asset))
@@ -154,7 +154,7 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
+  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long)] = {
     diff.scripts.get(address) match {
       case None            => inner.accountScriptWithComplexity(address)
       case Some(None)      => None

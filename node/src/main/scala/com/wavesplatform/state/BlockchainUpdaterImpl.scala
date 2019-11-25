@@ -4,7 +4,7 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -690,7 +690,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = readLock {
+  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long)] = readLock {
     ngState.fold(blockchain.accountScriptWithComplexity(address)) { ng =>
       ng.bestLiquidDiff.scripts.get(address) match {
         case None      => blockchain.accountScriptWithComplexity(address)
@@ -709,7 +709,7 @@ class BlockchainUpdaterImpl(
       .getOrElse(blockchain.hasScript(address))
   }
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = readLock {
     ngState.fold(blockchain.assetScriptWithComplexity(asset)) { ng =>
       ng.bestLiquidDiff.assetScripts.get(asset) match {
         case None      => blockchain.assetScriptWithComplexity(asset)

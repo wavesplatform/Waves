@@ -1,6 +1,6 @@
 package com.wavesplatform.state
 
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -69,12 +69,12 @@ trait Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
 
-  def accountScriptWithComplexity(address: Address): Option[(Script, Long)]
-  def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_._1)
+  def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long)]
+  def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_._2)
   def hasScript(address: Address): Boolean
 
-  def assetScriptWithComplexity(id: IssuedAsset): Option[(Script, Long)]
-  def assetScript(id: IssuedAsset): Option[Script] = assetScriptWithComplexity(id).map(_._1)
+  def assetScriptWithComplexity(id: IssuedAsset): Option[(PublicKey, Script, Long)]
+  def assetScript(id: IssuedAsset): Option[Script] = assetScriptWithComplexity(id).map(_._2)
   def hasAssetScript(id: IssuedAsset): Boolean
 
   def accountDataKeys(address: Address): Set[String]

@@ -11,7 +11,7 @@ object SetScriptTransactionDiff {
         script =>Diff(
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-          scripts = Map(tx.sender.toAddress -> script),
+          scripts = Map(tx.sender.toAddress -> script.map(script => ((tx.sender, script._1, script._2)))),
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         )
       )

@@ -20,7 +20,7 @@ object AssetTransactionsDiff {
           tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
         assetInfos = Map(asset               -> info),
-        assetScripts = Map(asset -> script),
+        assetScripts = Map(asset -> script.map(script => ((tx.sender, script._1, script._2)))),
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         )
       )
@@ -34,7 +34,7 @@ object AssetTransactionsDiff {
             Diff(
               tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-            assetScripts = Map(tx.asset          -> script),
+            assetScripts = Map(tx.asset          -> script.map(script => ((tx.sender, script._1, script._2)))),
               scriptsRun =
                 // Asset script doesn't count before Ride4DApps activation
                 if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {

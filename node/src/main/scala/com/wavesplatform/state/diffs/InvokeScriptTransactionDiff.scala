@@ -4,7 +4,7 @@ import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
@@ -50,11 +50,11 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
-    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
+    val accScriptEi   = dAppAddressEi.map(blockchain.accountScriptWithComplexity)
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
+      case Right(Some((pk, sc @ ContractScriptImpl(version, contract), complexity))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -148,10 +148,10 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
+          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._3)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
-            .map(_._2)
+            .map(_._3)
 
           feeInfo <- TracedResult(tx.assetFee._1 match {
             case Waves => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
@@ -201,7 +201,7 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress)(actions, paymentsDiff)
+          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -293,7 +293,7 @@ object InvokeScriptTransactionDiff {
         Right(())
     }
 
-  private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address)(
+  private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],
       paymentsDiff: Diff
   ): TracedResult[ValidationError, Diff] =
@@ -355,8 +355,8 @@ object InvokeScriptTransactionDiff {
           Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
         )
 
-      def applyIssue(issue: Issue): TracedResult[ValidationError, Diff] =
-        IssueTransaction.create(TxVersion.Pseudo, ??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, 0, tx.timestamp, List()).flatMap(AssetTransactionsDiff.issue(blockchain))
+      def applyIssue(pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] =
+        IssueTransaction.create(TxVersion.Pseudo, pk /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, 0, tx.timestamp, List()).flatMap(AssetTransactionsDiff.issue(blockchain))
 //        InvokeScriptIssueTransaction.create(??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, tx.timestamp).flatMap(AssetTransactionsDiff.issue(blockchain))
 
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
@@ -396,7 +396,7 @@ object InvokeScriptTransactionDiff {
       val diff = action match {
         case t: AssetTransfer => applyTransfer(t)
         case d: DataItem[_]   => applyDataItem(d)
-        case i: Issue         => applyIssue(i)
+        case i: Issue         => applyIssue(pk, i)
         case r: Reissue       => applyReissue(r)
         case b: Burn          => applyBurn(b)
       }

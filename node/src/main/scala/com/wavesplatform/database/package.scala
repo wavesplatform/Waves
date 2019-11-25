@@ -451,12 +451,22 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeScript(script: (Script, Long)): Array[Byte] =
-    script._1.bytes().arr ++ Longs.toByteArray(script._2)
+  def writeScript(script: (PublicKey, Script, Long)): Array[Byte] = {
+    script match {
+      case (pk, script, c) => 
+        val pkb = pk.arr
+        assert(pkb.size == KeyLength)
+        pkb ++ script.bytes().arr ++ Longs.toByteArray(c)
+    }
+  }
 
-  def readScript(b: Array[Byte]): (Script, Long) =
+  def readScript(b: Array[Byte]): (PublicKey, Script, Long) = {
+    val pkb = b.take(KeyLength)
+    val script = b.slice(KeyLength, b.length - 8) 
     (
-      ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
+      PublicKey(pkb),
+      ScriptReader.fromBytes(script).explicitGet(),
       ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
+  }
 }

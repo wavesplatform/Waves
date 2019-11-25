@@ -5,7 +5,7 @@ import java.util
 import cats.syntax.monoid._
 import cats.syntax.option._
 import com.google.common.cache._
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
@@ -146,22 +146,22 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardVolumeAndFee(orderId: ByteStr): Unit       = volumeAndFeeCache.invalidate(orderId)
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
 
-  private val scriptCache: LoadingCache[Address, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadScript)
-  protected def loadScript(address: Address): Option[(Script, Long)]
+  private val scriptCache: LoadingCache[Address, Option[(PublicKey, Script, Long)]] = cache(dbSettings.maxCacheSize, loadScript)
+  protected def loadScript(address: Address): Option[(PublicKey, Script, Long)]
   protected def hasScriptBytes(address: Address): Boolean
   protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = scriptCache.get(address)
+  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long)] = scriptCache.get(address)
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] =
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(PublicKey, Script, Long)]] =
     cache(dbSettings.maxCacheSize, loadAssetScript)
-  protected def loadAssetScript(asset: IssuedAsset): Option[(Script, Long)]
+  protected def loadAssetScript(asset: IssuedAsset): Option[(PublicKey, Script, Long)]
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = assetScriptCache.get(asset)
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = assetScriptCache.get(asset)
   override def hasAssetScript(asset: IssuedAsset): Boolean =
     assetScriptCache.getIfPresent(asset) match {
       case null => hasAssetScriptBytes(asset)
@@ -208,8 +208,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       leaseStates: Map[ByteStr, Boolean],
       reissuedAssets: Map[IssuedAsset, AssetInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
-      scripts: Map[BigInt, Option[(Script, Long)]],
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      scripts: Map[BigInt, Option[(PublicKey, Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
