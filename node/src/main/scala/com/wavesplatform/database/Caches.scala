@@ -9,8 +9,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
@@ -168,11 +166,26 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       case x    => x.nonEmpty
     }
 
+  private val callableFunctionComplexityCache: LoadingCache[(Address, String), Option[Long]] =
+    cache(dbSettings.maxCacheSize, loadCallableFunctionComplexity)
+  protected def loadCallableFunctionComplexity(dAppWithFunction: (Address, String)): Option[Long]
+  override def callableFunctionComplexity(dAppAddress: Address, functionName: String): Option[Long] =
+    callableFunctionComplexityCache.get((dAppAddress, functionName))
+  protected def discardCallableFunctionComplexity(dAppWithFunction: (Address, String)): Unit =
+    callableFunctionComplexityCache.invalidate(dAppWithFunction)
+
   private var lastAddressId = loadMaxAddressId()
   protected def loadMaxAddressId(): BigInt
 
   private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
   protected def loadAddressId(address: Address): Option[BigInt]
+
+  private var lastCallableFunctionId = loadMaxCallableFunctionId()
+  protected def loadMaxCallableFunctionId(): BigInt
+
+  private val callableFunctionIdCache: LoadingCache[(Address, String), BigInt] =
+    cache(dbSettings.maxCacheSize, loadCallableFunctionId)
+  protected def loadCallableFunctionId(dAppWithFunction: (Address, String)): BigInt
 
   private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, loadAccountData)
 
@@ -181,6 +194,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]]
 
   private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
+  private[database] def callableFunctionId(dAppWithFunction: (Address, String)): BigInt =
+    callableFunctionIdCache.get(dAppWithFunction)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -202,6 +217,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       block: Block,
       carry: Long,
       newAddresses: Map[Address, BigInt],
+      newCallableFunctions: Map[(Address, String), BigInt],
       balances: Map[BigInt, Map[Asset, Long]],
       leaseBalances: Map[BigInt, LeaseBalance],
       addressTransactions: Map[AddressId, List[TransactionId]],
@@ -210,6 +226,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      callableFunctionComplexities: Map[BigInt, Long],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
@@ -238,6 +255,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     log.trace(s"CACHE newAddressIds = $newAddressIds")
     log.trace(s"CACHE lastAddressId = $lastAddressId")
+
+    val newCallableFunctionComplexityIds =
+      diff.callableFunctionComplexities
+        .keys
+        .zipWithIndex
+        .map { case (function, offset) => function -> (lastCallableFunctionId + offset + 1) }
+        .toMap
+
+    def callableFunctionId(dAppAddressWithFunc: (Address, String)): BigInt =
+      newCallableFunctionComplexityIds.getOrElse(dAppAddressWithFunc, callableFunctionIdCache.get(dAppAddressWithFunc))
+
+    lastCallableFunctionId += newCallableFunctionComplexityIds.size
+
+    log.trace(s"CACHE newCallableFunctionComplexityIds = $newCallableFunctionComplexityIds")
+    log.trace(s"CACHE lastCallableFunctionId = $lastCallableFunctionId")
 
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
@@ -278,6 +310,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       block,
       carryFee,
       newAddressIds,
+      newCallableFunctionComplexityIds,
       updatedBalances.map { case (a, v) => addressId(a) -> v },
       leaseBalances,
       addressTransactions,
@@ -286,6 +319,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       newFills,
       diff.scripts.map { case (address, s) => addressId(address) -> s },
       diff.assetScripts,
+      diff.callableFunctionComplexities.map { case (func, c) => callableFunctionId(func) -> c },
       diff.accountData.map { case (address, data) => addressId(address) -> data },
       diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
       diff.sponsorship,
@@ -309,6 +343,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       }
 
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
+    for ((function, id)          <- newCallableFunctionComplexityIds) callableFunctionIdCache.put(function, id)
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
     for (address                 <- newPortfolios) discardPortfolio(address)

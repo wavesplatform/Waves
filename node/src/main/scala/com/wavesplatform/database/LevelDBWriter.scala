@@ -13,6 +13,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
@@ -102,6 +103,11 @@ class LevelDBWriter(
 
   override protected def loadAddressId(address: Address): Option[BigInt] = readOnly(db => db.get(Keys.addressId(address)))
 
+  override protected def loadMaxCallableFunctionId(): BigInt = readOnly(_.get(Keys.lastCallableFunctionId).getOrElse(BigInt(0)))
+
+  override protected def loadCallableFunctionId(dAppWithFunction: (Address, String)): BigInt =
+    readOnly(_.get(Keys.callableFunctionId(dAppWithFunction)))
+
   override protected def loadHeight(): Int = readOnly(_.get(Keys.height))
 
   override protected def safeRollbackHeight: Int = readOnly(_.get(Keys.safeRollbackHeight))
@@ -131,6 +137,11 @@ class LevelDBWriter(
 
   override protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScriptPresent(asset)).flatten.nonEmpty
+  }
+
+  override protected def loadCallableFunctionComplexity(dAppWithFunction: (Address, String)): Option[Long] = readOnly { db =>
+    val id = callableFunctionId(dAppWithFunction)
+    db.fromHistory(Keys.callableFunctionComplexityHistory(id), Keys.callableFunctionComplexity(id))
   }
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
@@ -233,6 +244,7 @@ class LevelDBWriter(
       block: Block,
       carry: Long,
       newAddresses: Map[Address, BigInt],
+      newCallableFunctions: Map[(Address, String), BigInt],
       balances: Map[BigInt, Map[Asset, Long]],
       leaseBalances: Map[BigInt, LeaseBalance],
       addressTransactions: Map[AddressId, List[TransactionId]],
@@ -241,6 +253,7 @@ class LevelDBWriter(
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      callableFunctionComplexities: Map[BigInt, Long],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
@@ -271,8 +284,10 @@ class LevelDBWriter(
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
+    val lastCallableFunctionId = loadMaxCallableFunctionId() + newCallableFunctions.size
 
     rw.put(Keys.lastAddressId, Some(lastAddressId))
+    rw.put(Keys.lastCallableFunctionId, Some(lastCallableFunctionId))
     rw.put(Keys.score(height), rw.get(Keys.score(height - 1)) + block.blockScore())
 
     for ((address, id) <- newAddresses) {
@@ -281,6 +296,12 @@ class LevelDBWriter(
       rw.put(Keys.idToAddress(id), address)
     }
     log.trace(s"WRITE lastAddressId = $lastAddressId")
+
+    for ((function, id) <- newCallableFunctions) {
+      rw.put(Keys.callableFunctionId(function), id)
+      log.trace(s"WRITE callable function $function -> $id")
+    }
+    log.trace(s"WRITE lastCallableFunctionId = $lastCallableFunctionId")
 
     val threshold        = height - dbSettings.maxRollbackDepth
     val balanceThreshold = height - balanceSnapshotMaxRollbackDepth
@@ -372,6 +393,11 @@ class LevelDBWriter(
     for ((asset, script) <- assetScripts) {
       expiredKeys ++= updateHistory(rw, Keys.assetScriptHistory(asset), threshold, Keys.assetScript(asset))
       if (script.isDefined) rw.put(Keys.assetScript(asset)(height), script)
+    }
+
+    for ((id, complexity) <- callableFunctionComplexities) {
+      expiredKeys ++= updateHistory(rw, Keys.callableFunctionComplexityHistory(id), threshold, Keys.callableFunctionComplexity(id))
+      rw.put(Keys.callableFunctionComplexity(id)(height), complexity)
     }
 
     for ((addressId, addressData) <- data) {
@@ -486,6 +512,7 @@ class LevelDBWriter(
         val assetInfoToInvalidate   = Seq.newBuilder[IssuedAsset]
         val ordersToInvalidate      = Seq.newBuilder[ByteStr]
         val scriptsToDiscard        = Seq.newBuilder[Address]
+        val callablesToDiscard      = Seq.newBuilder[(Address, String)]
         val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
         val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
 
@@ -575,6 +602,17 @@ class LevelDBWriter(
                     rw.filterHistory(Keys.addressScriptHistory(addressId), currentHeight)
                   }
 
+                  loadScript(address) match {
+                    case Some((cs: ContractScriptImpl, _)) =>
+                      val functions = cs.expr.callableFuncs.map(f => (address, f.u.name))
+                      callablesToDiscard ++= functions
+                      for (functionId <- functions.map(callableFunctionId)) {
+                        rw.delete(Keys.callableFunctionComplexity(functionId)(currentHeight))
+                        rw.filterHistory(Keys.callableFunctionComplexityHistory(functionId), currentHeight)
+                      }
+                    case _ =>
+                  }
+
                 case tx: SetAssetScriptTransaction =>
                   val asset = tx.asset
                   assetScriptsToDiscard += asset
@@ -621,6 +659,7 @@ class LevelDBWriter(
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
+        callablesToDiscard.result().foreach(discardCallableFunctionComplexity)
         accountDataToInvalidate.result().foreach {
           case ak @ (addr, _) =>
             discardAccountData(ak)

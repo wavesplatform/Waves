@@ -727,6 +727,15 @@ class BlockchainUpdaterImpl(
     }
   }
 
+  override def callableFunctionComplexity(dAppAddress: Address, functionName: String): Option[Long] = readLock {
+    ngState.fold(blockchain.callableFunctionComplexity(dAppAddress, functionName)) { ng =>
+      ng.bestLiquidDiff.callableFunctionComplexities.get((dAppAddress, functionName)) match {
+        case None => blockchain.callableFunctionComplexity(dAppAddress, functionName)
+        case c    => c
+      }
+    }
+  }
+
   override def accountDataKeys(address: Address): Set[String] = {
     ngState.fold(blockchain.accountDataKeys(address)) { ng =>
       val fromInner = blockchain.accountDataKeys(address)

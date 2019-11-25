@@ -1,12 +1,14 @@
 package com.wavesplatform.database
 
+import java.nio.charset.StandardCharsets
+
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
@@ -179,4 +181,33 @@ object Keys {
 
   val HitSourcePrefix: Short                   = 59
   def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
+
+  val LastCallableFunctionIdKeyPrefix: Byte = 60
+  val lastCallableFunctionId: Key[Option[BigInt]] = Key.opt("last-callable-function-id", Array[Byte](0, LastCallableFunctionIdKeyPrefix), BigInt(_), _.toByteArray)
+
+  val CallableFunctionIdKeyPrefix: Short = 61
+  def callableFunctionId(dAppWithFunction: (Address, String)): Key[BigInt] =
+    Key(
+      "callable-function-id",
+      bytes(CallableFunctionIdKeyPrefix, dAppWithFunction._1.bytes.arr ++ dAppWithFunction._2.getBytes(StandardCharsets.UTF_8)),
+      BigInt(_),
+      _.toByteArray
+    )
+
+  val CallableFunctionComplexityHistoryKeyPrefix: Short = 62
+  def callableFunctionComplexityHistory(dAppAddressId: BigInt): Key[Seq[Int]] =
+    historyKey(
+      "callable-function-complexity-history",
+      CallableFunctionComplexityHistoryKeyPrefix,
+      dAppAddressId.toByteArray
+    )
+
+  val CallableFunctionComplexityKeyPrefix: Short = 63
+  def callableFunctionComplexity(callableFunctionId: BigInt)(height: Int): Key[Long] =
+    Key(
+      "callable-function-complexity",
+      hAddr(CallableFunctionComplexityKeyPrefix, height, callableFunctionId),
+      Longs.fromByteArray,
+      Longs.toByteArray
+    )
 }

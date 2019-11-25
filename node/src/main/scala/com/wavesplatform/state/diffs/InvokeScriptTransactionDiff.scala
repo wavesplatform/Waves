@@ -60,7 +60,6 @@ object InvokeScriptTransactionDiff {
             val result = for {
               directives           <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               input                <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
-              invocationComplexity <- blockchain.invocationComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
               payments             <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
               invocation = ContractEvaluator.Invocation(
                 functioncall,
@@ -94,6 +93,8 @@ object InvokeScriptTransactionDiff {
                 invocation,
                 version
               )
+              dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
+              invocationComplexity <- DiffsCommon.functionComplexity(blockchain, sc, tx.funcCall, dAppAddress).leftMap((_, List.empty[LogItem[Id]]))
             } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
