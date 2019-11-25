@@ -94,7 +94,8 @@ object InvokeScriptTransactionDiff {
                 version
               )
               dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
-              invocationComplexity <- callableComplexity(blockchain, sc, tx.funcCall, dAppAddress).leftMap((_, List.empty[LogItem[Id]]))
+              invocationComplexity <- blockchain.callableFunctionComplexity(dAppAddress, tx.funcCall.function.funcName)
+                .toRight((s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress", List.empty[LogItem[Id]]))
             } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
@@ -231,16 +232,6 @@ object InvokeScriptTransactionDiff {
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))
     }
   }
-
-  private def callableComplexity(
-    blockchain:   Blockchain,
-    script:       Script,
-    functionCall: FUNCTION_CALL,
-    address:      Address,
-  ): Either[String, Long] =
-    blockchain.callableFunctionComplexity(address, functionCall.function.funcName)
-      .get
-      .pure[Either[String, ?]]
 
   private def dataItemToEntry(item: DataItem[_]): DataEntry[_] =
     item match {
