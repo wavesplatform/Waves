@@ -1,7 +1,6 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.api.common
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto.SignatureLength
@@ -80,15 +79,6 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     "forget rollbacked transaction for querying" in forAll(accountGen, accountGen, Gen.nonEmptyListOf(Gen.choose(1, 10))) {
       case (sender, recipient, txCount) =>
         withDomain(createSettings(MassTransfer -> 0)) { d =>
-          def addressTransactions(address: Address): Seq[(Height, Transaction)] =
-            common.addressTransactions(db, d.blockchainUpdater.bestLiquidDiff.map(diff => Height(d.blockchainUpdater.height) -> diff),
-              address,
-              None,
-              Set.empty,
-              Int.MaxValue,
-              None
-            )
-
           d.appendBlock(genesisBlock(nextTs, sender, com.wavesplatform.state.diffs.ENOUGH_AMT))
 
           val genesisSignature = d.lastBlockId
@@ -107,8 +97,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          val stransactions1 = addressTransactions(sender).sortBy(_._2.timestamp)
-          val rtransactions1 = addressTransactions(recipient).sortBy(_._2.timestamp)
+          val stransactions1 = d.addressTransactions(sender).sortBy(_._2.timestamp)
+          val rtransactions1 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
 
           d.removeAfter(genesisSignature)
 
@@ -122,8 +112,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          val stransactions2 = addressTransactions(sender).sortBy(_._2.timestamp)
-          val rtransactions2 = addressTransactions(recipient).sortBy(_._2.timestamp)
+          val stransactions2 = d.addressTransactions(sender).sortBy(_._2.timestamp)
+          val rtransactions2 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
 
           stransactions1 shouldBe stransactions2
           rtransactions1 shouldBe rtransactions2
@@ -268,7 +258,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0)
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0, false)
           )
 
           d.appendBlock(
@@ -282,12 +272,12 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0)
+            AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0, false)
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0)
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0, false)
           )
 
           d.removeAfter(genesisBlockId)

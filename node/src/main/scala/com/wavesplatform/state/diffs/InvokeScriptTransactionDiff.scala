@@ -214,12 +214,14 @@ object InvokeScriptTransactionDiff {
             burns
           )
 
-          compositeDiff.copy(
+          val d = compositeDiff.copy(
             transactions = Seq((tx, compositeDiff.transactions.head._2 ++ transfers.keys ++ compositeDiff.accountData.keys)),
             scriptsRun = scriptsInvoked + 1,
             scriptResults = Map(tx.id() -> isr),
             scriptsComplexity = invocationComplexity + verifierComplexity.getOrElse(0L) + assetsComplexity.sum
           )
+          println(s"${d.portfolios}")
+          d
         }
       case Left(l) => TracedResult(Left(l))
       case _       => TracedResult(Left(GenericError(s"No contract at address ${tx.dAppAddressOrAlias}")))

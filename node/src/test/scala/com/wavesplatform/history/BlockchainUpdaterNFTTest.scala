@@ -1,9 +1,7 @@
 package com.wavesplatform.history
 
-import cats.syntax.option._
 import com.wavesplatform._
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -35,30 +33,20 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftTransfer()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)) { d =>
-          def nftList(address: Address): Seq[IssueTransaction] =
-            common.nftList(
-              db,
-              d.blockchainUpdater.bestLiquidDiff.orEmpty,
-              d.blockchainUpdater.balance,
-              address,
-              Int.MaxValue,
-              None
-            )
-
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          nftList(firstAccount) shouldBe Seq(issue)
-          nftList(secondAccount) shouldBe Nil
+          d.nftList(firstAccount) shouldBe Seq(issue)
+          d.nftList(secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount) shouldBe Seq(issue)
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount) shouldBe Seq(issue)
         }
     }
   }
@@ -74,30 +62,20 @@ class BlockchainUpdaterNFTTest
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          def nftList(address: Address): Seq[IssueTransaction] =
-            common.nftList(
-              db,
-              d.blockchainUpdater.bestLiquidDiff.orEmpty,
-              d.blockchainUpdater.balance,
-              address,
-              Int.MaxValue,
-              None
-            )
-
           d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          nftList(firstAccount) shouldBe Seq(issue)
-          nftList(secondAccount) shouldBe Nil
+          d.nftList(firstAccount) shouldBe Seq(issue)
+          d.nftList(secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount) shouldBe Seq(issue)
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
-          nftList(firstAccount) shouldBe Nil
-          nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(firstAccount) shouldBe Nil
+          d.nftList(secondAccount) shouldBe Seq(issue)
         }
     }
   }

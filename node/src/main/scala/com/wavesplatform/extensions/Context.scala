@@ -26,6 +26,7 @@ trait Context {
   def transactionsApi: CommonTransactionsApi
   def blocksApi: CommonBlocksApi
   def accountsApi: CommonAccountsApi
+  def assetsApi: CommonAssetsApi
 
   def broadcastTransaction(tx: Transaction): TracedResult[ValidationError, Boolean]
   def spendableBalanceChanged: Observable[(Address, Asset)]

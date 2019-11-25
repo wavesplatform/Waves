@@ -11,7 +11,6 @@ import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
@@ -258,18 +257,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
       case (gen, issue) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(gen))), TestBlock.create(Seq(issue)), smartEnabledFS) {
           case (blockDiff, newState) =>
-            newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
-              AssetDescription(
-                issue.sender,
-                issue.name,
-                issue.description,
-                issue.decimals,
-                issue.reissuable,
-                BigInt(issue.quantity),
-                issue.script,
-                0L
-              )
-            )
+            newState.assetDescription(IssuedAsset(issue.id())).flatMap(_.script.map(_._1)) shouldBe issue.script
             blockDiff.transactionMap().get(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldBe true
             newState.transactionInfo(issue.id()).isDefined shouldEqual true

@@ -1,19 +1,16 @@
 package com.wavesplatform.api.common
 
-import cats.instances.map._
-import cats.syntax.monoid._
 import com.google.common.base.Charsets
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
-import com.wavesplatform.crypto
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.Portfolio.longSemigroup
-import com.wavesplatform.state.{Blockchain, DataEntry, Diff, Height, Portfolio}
+import com.wavesplatform.state.{Blockchain, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -34,9 +31,9 @@ trait CommonAccountsApi {
 
   def assetBalance(address: Address, asset: IssuedAsset): Long
 
-  def portfolio(address: Address): Map[IssuedAsset, Long]
+  def portfolio(address: Address): Observable[(IssuedAsset, Long)]
 
-  def nftPortfolio(address: Address, limit: Int, from: Option[IssuedAsset]): Observable[IssueTransaction]
+  def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction]
 
   def script(address: Address): Option[(Script, Long)]
 
@@ -47,10 +44,6 @@ trait CommonAccountsApi {
   def activeLeases(address: Address): Observable[(Height, LeaseTransaction)]
 
   def resolveAlias(alias: Alias): Either[ValidationError, Address]
-
-  def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)]
-
-  def assetDistribution(asset: IssuedAsset, height: Int, after: Option[Address]): Observable[(Address, Long)]
 }
 
 object CommonAccountsApi extends ScorexLogging {
@@ -80,15 +73,24 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
-    override def portfolio(address: Address): Map[IssuedAsset, Long] =
-      (diff.portfolios.getOrElse(address, Portfolio.empty).assets |+| common.portfolio(
+    override def portfolio(address: Address): Observable[(IssuedAsset, Long)] =
+      common.portfolio(
         db,
         address,
-        blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
-      )).filter(_._2 > 0)
+        diff.portfolios.get(address).fold(Map.empty[IssuedAsset, Long])(_.assets),
+        assetId => !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.isNFT)
+      )
 
-    override def nftPortfolio(address: Address, count: Int, from: Option[IssuedAsset]): Observable[IssueTransaction] =
-      Observable.fromIterable(nftList(db, diff, blockchain.balance, address, count, from.map(_.id)))
+    override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
+      log.info(s"Diff: $diff")
+      nftList(
+        db,
+        address,
+        diff,
+        id => blockchain.assetDescription(id).exists(_.isNFT),
+        from
+      )
+    }
 
     override def script(address: Address): Option[(Script, Long)] = blockchain.accountScript(address)
 
@@ -115,29 +117,14 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)
 
-    override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] =
-      Observable.fromIterable(Seq.empty)
-
-    override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
-      balanceDistribution(
-        db,
-        height,
-        after,
-        if (height == blockchain.height) diff.portfolios else Map.empty[Address, Portfolio],
-        Shorts.toByteArray(Keys.WavesBalancePrefix),
-        bs => BigInt(bs.slice(2, bs.length - 4)),
-        _.balance
-      )
-
-    override def assetDistribution(asset: IssuedAsset, height: Int, after: Option[Address]): Observable[(Address, Long)] =
-      balanceDistribution(
-        db,
-        height,
-        after,
-        if (height == blockchain.height) diff.portfolios else Map.empty[Address, Portfolio],
-        Shorts.toByteArray(Keys.AssetBalancePrefix) ++ asset.id.arr,
-        bs => BigInt(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
-        _.assets.getOrElse(asset, 0L)
-      )
+    override def activeLeases(address: Address): Observable[(Height, LeaseTransaction)] = {
+      def leaseIsActive(id: ByteStr): Boolean = {
+        val leaseDetails = blockchain.leaseDetails(id)
+        val active       = leaseDetails.exists(_.isActive)
+        log.info(s"Lease $id: $leaseDetails, active=$active")
+        active
+      }
+      common.activeLeases(db, Some(Height(blockchain.height) -> diff), address, leaseIsActive)
+    }
   }
 }

@@ -57,10 +57,11 @@ case class AssetDescription(
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
-    script: Option[Script],
-    sponsorship: Long
+    script: Option[(Script, Long)],
+    sponsorship: Long,
+    isNFT: Boolean
 ) {
-  override def equals(obj: scala.Any) = obj match {
+  override def equals(obj: scala.Any): Boolean = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
         java.util.Arrays.equals(o.name, name) &&
@@ -69,7 +70,8 @@ case class AssetDescription(
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
         o.script == script &&
-        o.sponsorship == sponsorship
+        o.sponsorship == sponsorship &&
+        o.isNFT == isNFT
     case _ => false
   }
 }

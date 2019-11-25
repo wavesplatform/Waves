@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import monix.eval.Coeval
+import monix.reactive.Observable
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
@@ -197,7 +198,7 @@ class TransactionsRouteSpec
       "address and limit" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect")) {
           case (address, limit) =>
-            (addressTransactions.transactionsByAddress _).expects(*, *, *, limit, None).returning(Seq.empty).once()
+            (addressTransactions.transactionsByAddress _).expects(*, *, *, None).returning(Observable.empty).once()
             Get(routePath(s"/address/$address/limit/$limit")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
             }
@@ -207,7 +208,7 @@ class TransactionsRouteSpec
       "address, limit and after" in {
         forAll(addressGen, choose(1, MaxTransactionsPerRequest).label("limitCorrect"), bytes32StrGen) {
           case (address, limit, txId) =>
-            (addressTransactions.transactionsByAddress _).expects(*, *, *, limit, *).returning(Seq.empty).once()
+            (addressTransactions.transactionsByAddress _).expects(*, *, *, *).returning(Observable.empty).once()
             Get(routePath(s"/address/$address/limit/$limit?after=$txId")) ~> route ~> check {
               status shouldEqual StatusCodes.OK
             }

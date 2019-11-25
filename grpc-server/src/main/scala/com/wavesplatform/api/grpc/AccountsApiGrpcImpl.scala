@@ -29,8 +29,8 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
       if (assetIdSet.isEmpty)
         Observable.empty
       else
-        Observable
-          .defer(Observable.fromIterable(commonApi.portfolio(request.address.toAddress)))
+        commonApi
+          .portfolio(request.address.toAddress)
           .collect {
             case (IssuedAsset(assetId), balance) if request.assets.isEmpty || assetIdSet.contains(assetId.toPBByteString) =>
               Amount(assetId, balance)

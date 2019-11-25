@@ -142,6 +142,7 @@ object Importer extends ScorexLogging {
         override def transactionsApi = ???
         override def blocksApi       = ???
         override def accountsApi     = ???
+        override def assetsApi       = ???
       }
     }
 

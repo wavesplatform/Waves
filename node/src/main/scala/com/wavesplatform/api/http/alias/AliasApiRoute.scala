@@ -1,6 +1,9 @@
 package com.wavesplatform.api.http.alias
 
+import akka.NotUsed
+import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Source
 import cats.syntax.either._
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonTransactionsApi
@@ -15,7 +18,7 @@ import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import play.api.libs.json.Json
+import play.api.libs.json.{JsString, JsValue, Json}
 
 @Path("/alias")
 @Api(value = "/alias")
@@ -62,6 +65,8 @@ case class AliasApiRoute(
     }
   }
 
+  private implicit val ess: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+
   @Path("/by-address/{address}")
   @ApiOperation(value = "Aliases by address", notes = "Returns a collection of aliases associated with an address", httpMethod = "GET")
   @ApiImplicitParams(
@@ -70,6 +75,10 @@ case class AliasApiRoute(
     )
   )
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
-    complete(commonApi.aliasesOfAddress(address).map(_._2.alias.stringRepr))
+    extractScheduler { implicit s =>
+      val value: Source[JsValue, NotUsed] =
+        Source.fromPublisher(commonApi.aliasesOfAddress(address).map { case (_, tx) => JsString(tx.alias.stringRepr) }.toReactivePublisher)
+      complete(value)
+    }
   }
 }

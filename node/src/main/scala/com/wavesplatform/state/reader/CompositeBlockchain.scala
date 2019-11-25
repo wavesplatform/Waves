@@ -41,7 +41,7 @@ final case class CompositeBlockchain(
       .getOrElse(inner.assetScript(asset))
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
-    val script: Option[Script] = assetScript(asset).map(_._1)
+    val script = assetScript(asset)
     inner.assetDescription(asset) match {
       case Some(ad) =>
         diff.issuedAssets
@@ -65,11 +65,12 @@ final case class CompositeBlockchain(
           case SponsorshipValue(sp) => sp
           case SponsorshipNoInfo    => 0L
         }
-        diff.transactionMap()
+        diff
+          .transactionMap()
           .get(asset.id)
           .collectFirst {
             case (it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
+              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship, it.isNFT)
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
     }
@@ -84,7 +85,8 @@ final case class CompositeBlockchain(
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = {
-    diff.transactionMap()
+    diff
+      .transactionMap()
       .get(id)
       .collect {
         case (tx: TransferTransaction, _) => (height, tx)
@@ -93,13 +95,15 @@ final case class CompositeBlockchain(
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
-    diff.transactionMap()
+    diff
+      .transactionMap()
       .get(id)
       .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
-    diff.transactionMap()
+    diff
+      .transactionMap()
       .get(id)
       .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
@@ -168,7 +172,7 @@ final case class CompositeBlockchain(
   override def blockHeader(height: Int): Option[SignedBlockHeader] =
     newBlock match {
       case Some(b) if this.height == height => Some(SignedBlockHeader(b.header, b.signature))
-      case _ => inner.blockHeader(height)
+      case _                                => inner.blockHeader(height)
     }
 
   override def heightOf(blockId: ByteStr): Option[Int] = newBlock.filter(_.uniqueId == blockId).map(_ => height) orElse inner.heightOf(blockId)

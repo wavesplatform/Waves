@@ -19,16 +19,15 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
             subject.toAddressOrAlias,
             Option(request.sender).filter(!_.isEmpty).map(_.toAddress),
             Set.empty,
-            Int.MaxValue,
             None
           )
         case None =>
-          request.transactionIds.flatMap(id => commonApi.transactionById(id.toByteStr))
+          Observable.fromIterable(request.transactionIds.flatMap(id => commonApi.transactionById(id.toByteStr)))
       }
 
-      responseObserver.completeWith(Observable.fromIterable(stream.map {
+      responseObserver.completeWith(stream.map {
         case (h, tx) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB))
-      }))
+      })
     }
 
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =

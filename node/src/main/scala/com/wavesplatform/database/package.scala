@@ -4,11 +4,11 @@ import java.io.File
 import java.nio.ByteBuffer
 import java.util.{Map => JMap}
 
-import cats.effect.Resource
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
@@ -21,7 +21,10 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
+import monix.reactive.Observable
 import org.iq80.leveldb._
+import com.wavesplatform.database.proto.{BlockMeta => PBBlockMeta}
+import com.wavesplatform.protobuf.block.PBBlocks
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -268,93 +271,31 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeBlockMeta(data: BlockMeta): Array[Byte] = {
-    val BlockMeta(bh, signature, _, size, transactionCount, totalFeeInWaves, _) = data
-
-    val ndo = newDataOutput()
-
-    ndo.writeInt(size)
-
-    ndo.writeByte(bh.version)
-    ndo.writeLong(bh.timestamp)
-    ndo.write(bh.reference)
-    ndo.writeLong(bh.baseTarget)
-    ndo.writeLong(totalFeeInWaves)
-    ndo.write(bh.generationSignature)
-
-    if (bh.version == Block.GenesisBlockVersion | bh.version == Block.PlainBlockVersion)
-      ndo.writeByte(transactionCount)
-    else
-      ndo.writeInt(transactionCount)
-
-    ndo.writeInt(bh.featureVotes.size)
-    bh.featureVotes.foreach(s => ndo.writeShort(s))
-
-    if (bh.version > Block.NgBlockVersion)
-      ndo.writeLong(bh.rewardVote)
-
-    ndo.write(bh.generator)
-
-    if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) Don't write length in case of using standard digest
-      ndo.writeInt(bh.transactionsRoot.arr.length)
-      ndo.writeByteStr(bh.transactionsRoot)
-    }
-
-    ndo.write(signature)
-
-    ndo.toByteArray
-  }
+  def writeBlockMeta(data: BlockMeta): Array[Byte] =
+    PBBlockMeta(
+      Some(PBBlocks.protobuf(data.header)),
+      ByteString.copyFrom(data.signature),
+      data.height,
+      data.size,
+      data.transactionCount,
+      data.totalFeeInWaves,
+      data.reward.getOrElse(-1L)
+    ).toByteArray
 
   def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
-    val ndi = newDataInput(bs)
-
-    val size      = ndi.readInt()
-    val version   = ndi.readByte()
-    val timestamp = ndi.readLong()
-
-    val referenceArr = new Array[Byte](SignatureLength)
-    ndi.readFully(referenceArr)
-
-    val baseTarget = ndi.readLong()
-    val totalFee   = ndi.readLong()
-
-    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig       = new Array[Byte](genSigLength)
-    ndi.readFully(genSig)
-
-    val transactionCount = {
-      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
-      else ndi.readInt()
-    }
-
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
-    val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
-
-    val generator = new Array[Byte](KeyLength)
-    ndi.readFully(generator)
-
-    val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ndi.readByteStr(ndi.readInt())
-
-    val signature = new Array[Byte](SignatureLength)
-    ndi.readFully(signature)
-
-    val header = BlockHeader(
-      version,
-      timestamp,
-      ByteStr(referenceArr),
-      baseTarget,
-      ByteStr(genSig),
-      PublicKey(ByteStr(generator)),
-      featureVotes,
-      rewardVote,
-      transactionsRoot
+    val pbbm   = PBBlockMeta.parseFrom(bs)
+    BlockMeta(
+      PBBlocks.vanilla(pbbm.header.get),
+      ByteStr(pbbm.signature.toByteArray),
+      pbbm.height,
+      pbbm.size,
+      pbbm.transactionCount,
+      pbbm.totalFeeInWaves,
+      Option(pbbm.reward).filter(_ >= 0)
     )
-
-    BlockMeta(header, ByteStr(signature), height, size, transactionCount, totalFee, None)
   }
 
-  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum, ByteStr)]) = {
+  def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
     val ndi          = newDataInput(bs)
     val height       = Height(ndi.readInt())
     val numSeqLength = ndi.readInt()
@@ -362,11 +303,11 @@ package object database extends ScorexLogging {
     (height, List.fill(numSeqLength) {
       val tp  = ndi.readByte()
       val num = TxNum(ndi.readShort())
-      (tp, num, bs.drop(6))
+      (tp, num)
     })
   }
 
-  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum, ByteStr)])): Array[Byte] = {
+  def writeTransactionHNSeqAndType(v: (Height, Seq[(Byte, TxNum)])): Array[Byte] = {
     val (height, numSeq) = v
     val numSeqLength     = numSeq.length
 
@@ -376,10 +317,9 @@ package object database extends ScorexLogging {
     ndo.writeInt(height)
     ndo.writeInt(numSeqLength)
     numSeq.foreach {
-      case (tp, num, id) =>
+      case (tp, num) =>
         ndo.writeByte(tp)
         ndo.writeShort(num)
-        ndo.write(id.arr)
     }
 
     ndo.toByteArray
@@ -453,7 +393,7 @@ package object database extends ScorexLogging {
       } finally iterator.close()
     }
 
-    def resource: Resource[Task, DBResource] = Resource.make(Task(DBResource(db)))(r => Task(r.close()))
+    def resourceObservable: Observable[DBResource] = Observable.resource(Task(DBResource(db)))(r => Task(r.close()))
   }
 
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =

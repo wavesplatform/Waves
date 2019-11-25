@@ -1,6 +1,9 @@
 package com.wavesplatform.api.http
 
+import akka.NotUsed
+import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Source
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
@@ -17,6 +20,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.Coeval
 import monix.execution.Scheduler
+import monix.reactive.Observable
 import play.api.libs.json._
 
 @Path("/transactions")
@@ -58,8 +62,13 @@ case class TransactionsApiRoute(
     )
   )
   def addressLimit: Route = {
-    (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
-      extractScheduler(implicit sc => complete(transactionsByAddress(address, limit, maybeAfter)))
+    (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
+      val after =
+        maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
+      extractScheduler { implicit sc =>
+        implicit val jsonStreamingSupport: EntityStreamingSupport = jsonStream("[[", ",", "]]")
+        complete(transactionsByAddress(address, limit, after))
+      }
     }
   }
 
@@ -77,7 +86,7 @@ case class TransactionsApiRoute(
       path(TransactionId) { id =>
         commonApi.transactionById(id) match {
           case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-          case None => complete(ApiError.TransactionDoesNotExist)
+          case None          => complete(ApiError.TransactionDoesNotExist)
         }
       }
   }
@@ -214,44 +223,32 @@ case class TransactionsApiRoute(
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
-      implicit sc: Scheduler
-  ): Either[ApiError, JsArray] = {
-    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): JsArray = {
-      lazy val addressesCached =
-        concurrent.blocking(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias } :+ address).toSet
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Source[JsObject, NotUsed] =
+    Source.fromPublisher(
+      Observable
+        .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
+        .flatMap { aliases =>
+          val addressesCached = (aliases :+ address).toSet
 
-      /**
-        * Produces compact representation for large transactions by stripping unnecessary data.
-        * Currently implemented for MassTransfer transaction only.
-        */
-      def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-        import com.wavesplatform.transaction.transfer._
-        tx match {
-          case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
-          case _                                                               => txToExtendedJson(tx)
+          /**
+            * Produces compact representation for large transactions by stripping unnecessary data.
+            * Currently implemented for MassTransfer transaction only.
+            */
+          def txToCompactJson(address: Address, tx: Transaction): JsObject = {
+            import com.wavesplatform.transaction.transfer._
+            tx match {
+              case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
+              case _                                                               => txToExtendedJson(tx)
+            }
+          }
+
+          commonApi
+            .transactionsByAddress(address, None, Set.empty, maybeAfter)
+            .take(limitParam)
+            .map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }
         }
-      }
-
-      val txs = commonApi.transactionsByAddress(address, None, Set.empty, limit, fromId)
-      Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }))
-    }
-
-    for {
-      address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-      limit   <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
-      maybeAfter <- maybeAfterParam match {
-        case Some(v) =>
-          ByteStr
-            .decodeBase58(v)
-            .fold(
-              _ => Left(CustomValidationError(s"Unable to decode transaction id $v")),
-              id => Right(Some(id))
-            )
-        case None => Right(None)
-      }
-    } yield createTransactionsJsonArray(address, limit, maybeAfter)
-  }
+        .toReactivePublisher
+    )
 }
 
 object TransactionsApiRoute {

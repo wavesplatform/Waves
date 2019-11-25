@@ -186,11 +186,11 @@ object AsyncHttpApi extends Assertions {
 
     def blockSeqByAddress(address: String, from: Int, to: Int): Future[Seq[Block]] = get(s"/blocks/address/$address/$from/$to").as[Seq[Block]]
 
-    def blockHeadersAt(height: Int): Future[BlockHeaders] = get(s"/blocks/headers/at/$height").as[BlockHeaders]
+    def blockHeadersAt(height: Int): Future[BlockHeader] = get(s"/blocks/headers/at/$height").as[BlockHeader]
 
-    def blockHeadersSeq(from: Int, to: Int): Future[Seq[BlockHeaders]] = get(s"/blocks/headers/seq/$from/$to").as[Seq[BlockHeaders]]
+    def blockHeadersSeq(from: Int, to: Int): Future[Seq[BlockHeader]] = get(s"/blocks/headers/seq/$from/$to").as[Seq[BlockHeader]]
 
-    def lastBlockHeaders: Future[BlockHeaders] = get("/blocks/headers/last").as[BlockHeaders]
+    def lastBlockHeader: Future[BlockHeader] = get("/blocks/headers/last").as[BlockHeader]
 
     def status: Future[Status] = get("/node/status").as[Status]
 
@@ -437,7 +437,7 @@ object AsyncHttpApi extends Assertions {
     def assetsBalance(address: String): Future[FullAssetsInfo] =
       get(s"/assets/balance/$address").as[FullAssetsInfo]
 
-    def nftAssetsBalance(address: String, limit: Int): Future[Seq[NFTAssetInfo]] =
+    def nftList(address: String, limit: Int): Future[Seq[NFTAssetInfo]] =
       get(s"/assets/nft/$address/limit/$limit").as[Seq[NFTAssetInfo]]
 
     def nftAssetsBalance(address: String, limit: Int, after: String): Future[Seq[NFTAssetInfo]] =
@@ -586,9 +586,9 @@ object AsyncHttpApi extends Assertions {
     def createAddress: Future[String] =
       post(s"${n.nodeApiEndpoint}/addresses").as[JsValue].map(v => (v \ "address").as[String])
 
-    def waitForNextBlock: Future[BlockHeaders] =
+    def waitForNextBlock: Future[BlockHeader] =
       for {
-        currentBlock <- lastBlockHeaders
+        currentBlock <- lastBlockHeader
         actualBlock  <- findBlockHeaders(_.height > currentBlock.height, currentBlock.height)
       } yield actualBlock
 
@@ -618,11 +618,11 @@ object AsyncHttpApi extends Assertions {
       load(from, (from + 19).min(to))
     }
 
-    def findBlockHeaders(cond: BlockHeaders => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[BlockHeaders] = {
-      def load(_from: Int, _to: Int): Future[BlockHeaders] = blockHeadersSeq(_from, _to).flatMap { blocks =>
+    def findBlockHeaders(cond: BlockHeader => Boolean, from: Int = 1, to: Int = Int.MaxValue): Future[BlockHeader] = {
+      def load(_from: Int, _to: Int): Future[BlockHeader] = blockHeadersSeq(_from, _to).flatMap { blocks =>
         blocks
           .find(cond)
-          .fold[Future[BlockHeaders]] {
+          .fold[Future[BlockHeader]] {
             val maybeLastBlock = blocks.lastOption
             if (maybeLastBlock.exists(_.height >= to)) {
               Future.failed(new NoSuchElementException)
@@ -766,7 +766,7 @@ object AsyncHttpApi extends Assertions {
       def waitHeight = waitFor[Int](s"all heights >= $height")(retryInterval)(_.height, _.forall(_ >= height))
 
       def waitSameBlockHeaders =
-        waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
+        waitFor[BlockHeader](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
           val sig = blocks.map(_.signature)
           sig.forall(_ == sig.head)
         })

@@ -8,14 +8,13 @@ import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSup
 import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
 import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.{Flow, Source}
+import akka.stream.scaladsl.Source
 import akka.util.ByteString
 import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.{CommonAccountsApi, CommonTransactionsApi}
-import com.wavesplatform.api.http.ApiError.InvalidAddress
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
@@ -53,6 +52,7 @@ case class DebugApiRoute(
     wallet: Wallet,
     accountsApi: CommonAccountsApi,
     transactionsApi: CommonTransactionsApi,
+    assetsApi: CommonAssetsApi,
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
@@ -132,14 +132,13 @@ case class DebugApiRoute(
     )
   )
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json portfolio")))
-  def portfolios: Route = path("portfolios" / Segment) { rawAddress =>
+  def portfolios: Route = path("portfolios" / AddrSegment) { address =>
     (get & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
-      Address.fromString(rawAddress) match {
-        case Left(_) => complete(InvalidAddress)
-        case Right(address) =>
-          val base = Portfolio.empty.copy(assets = accountsApi.portfolio(address))
-          val p    = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
-          complete(Json.toJson(p))
+      extractScheduler { implicit s =>
+        complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
+          val base = Portfolio.empty.copy(assets = assetList.toMap)
+          if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
+        })
       }
     }
   }
@@ -167,8 +166,7 @@ case class DebugApiRoute(
     }))
   }
 
-  private implicit val jsonStreamingSupport: JsonEntityStreamingSupport =
-    EntityStreamingSupport.json().withFramingRenderer(Flow[ByteString].intersperse(ByteString("{"), ByteString(","), ByteString("}")))
+  private implicit val jsonStreamingSupport: EntityStreamingSupport = jsonStream("{", ",", "}")
   private implicit val balanceAsJson: Marshaller[(Address, Long), ByteString] = Marshaller.strict[(Address, Long), ByteString] {
     case (address, balance) =>
       Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => {
@@ -178,7 +176,7 @@ case class DebugApiRoute(
 
   private def distribution(height: Int): Route = extractScheduler { implicit s =>
     val assetDistribution: Source[(Address, Long), NotUsed] = Source.fromPublisher(
-      accountsApi
+      assetsApi
         .wavesDistribution(height, None)
         .toReactivePublisher
     )
@@ -444,13 +442,20 @@ case class DebugApiRoute(
   def stateChangesByAddress: Route =
     (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.as[ByteStr].?)) { (address, limit, afterOpt) =>
       validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
-        complete {
-          transactionsApi
-            .invokeScriptResults(address, None, Set.empty, limit, afterOpt)
-            .map {
-              case (height, Right((ist, isr))) => ist.json() ++ Json.obj("height" -> height, "stateChanges" -> isr)
-              case (height, Left(tx))          => tx.json() ++ Json.obj("height"  -> height)
-            }
+        extractScheduler { implicit s =>
+          complete {
+            implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
+
+            Source.fromPublisher(
+              transactionsApi
+                .invokeScriptResults(address, None, Set.empty, afterOpt)
+                .map {
+                  case (height, Right((ist, isr))) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
+                  case (height, Left(tx))          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
+                }
+                .toReactivePublisher
+            )
+          }
         }
       }
     }

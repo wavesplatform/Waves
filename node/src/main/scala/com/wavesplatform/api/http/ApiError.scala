@@ -465,4 +465,10 @@ object ApiError {
     override val message = "Invalid Base58 string"
     override val code = StatusCodes.BadRequest
   }
+
+  case object InvalidAssetId extends ApiError {
+    override val id = 407
+    override val message = "Invalid asset id"
+    override val code = StatusCodes.BadRequest
+  }
 }

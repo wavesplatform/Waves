@@ -62,12 +62,12 @@ object Verifier extends ScorexLogging {
           case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
           case _                  => None
         }
-        .foldRight(TracedResult(tx.asRight[ValidationError])) { (assetInfo, txr) =>
-          txr.flatMap(
-            tx =>
+        .foldRight(TracedResult(tx.asRight[ValidationError])) {
+          case (((script, _), id), txr) =>
+            txr.flatMap { tx =>
               stats.assetScriptExecution
-                .measureForType(tx.typeId)(verifyTx(blockchain, assetInfo._1, tx, Some(assetInfo._2.id)))
-          )
+                .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(id.id)))
+            }
         }
     }
   }
@@ -171,12 +171,13 @@ object Verifier extends ScorexLogging {
     def orderVerification(order: Order): TracedResult[ValidationError, Order] = {
       val verificationResult = blockchain
         .accountScript(order.sender.toAddress)
-        .map { case (script, _) =>
-          if (order.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, script, order))
-          } else {
-            Left(GenericError("Can't process order with signature from scripted account"))
-          }
+        .map {
+          case (script, _) =>
+            if (order.version != 1) {
+              stats.orderValidation.measure(verifyOrder(blockchain, script, order))
+            } else {
+              Left(GenericError("Can't process order with signature from scripted account"))
+            }
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)))
 

@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidBase58, InvalidPublicKey, InvalidSignature, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBase58, InvalidPublicKey, InvalidSignature, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
@@ -16,6 +16,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -93,23 +94,23 @@ package object http extends ApiMarshallers with ScorexLogging {
     }
   }
 
-  private def base58Segment(requiredLength: Option[Int], error: String => ApiError): PathMatcher1[ByteStr] =
-    Segment.map(
-      str =>
-        ByteStr.decodeBase58(str) match {
-          case Success(value) if requiredLength.forall(_ == value.length) => value
-          case _                                                          => throw ApiException(error(str))
-        }
-    )
+  private def base58Segment(requiredLength: Option[Int], error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
+    ByteStr.decodeBase58(str) match {
+      case Success(value) if requiredLength.forall(_ == value.length) => value
+      case _                                                          => throw ApiException(error(str))
+    }
+  }
 
-  val TransactionId: PathMatcher1[ByteStr] =
-    Segment.map(
-      str =>
-        ByteStr.decodeBase58(str) match {
-          case Success(value) if value.length == crypto.DigestLength || value.length == crypto.SignatureLength => value
-          case _                                                                                               => throw ApiException(InvalidBase58)
-        }
-    )
+  val TransactionId: PathMatcher1[ByteStr] = Segment.map { str =>
+    ByteStr.decodeBase58(str) match {
+      case Success(value) if value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength => value
+      case other =>
+        log.warn(s"Error decoding $str: $other")
+        throw ApiException(InvalidBase58)
+    }
+  }
+
+  val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset)
 
   val Signature: PathMatcher1[ByteStr] = base58Segment(Some(crypto.SignatureLength), _ => InvalidSignature)
 
@@ -154,7 +155,8 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
-  private val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
+  val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
+    case ApiException(error)   => complete(error)
     case e: StackOverflowError => log.error("Stack overflow error", e); complete(ApiError.Unknown)
     case NonFatal(e)           => log.error("Uncaught error", e); complete(ApiError.Unknown)
   }

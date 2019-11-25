@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedTransactions, _}
 
 case class Domain(blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
@@ -23,6 +24,9 @@ case class Domain(blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: Level
 
   def balance(address: Address): Long = blockchainUpdater.balance(address)
   def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
+
+  def nftList(address: Address): Seq[IssueTransaction] = ???
+  def addressTransactions(address: Address): Seq[(Height, Transaction)] = ???
 }
 
 object Domain {

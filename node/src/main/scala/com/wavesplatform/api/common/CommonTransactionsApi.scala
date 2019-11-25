@@ -12,18 +12,18 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, Transaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
+import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 trait CommonTransactionsApi {
-  def aliasesOfAddress(address: Address): Seq[(Height, CreateAliasTransaction)]
+  def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)]
 
   def transactionsByAddress(
       subject: AddressOrAlias,
       sender: Option[Address],
       transactionTypes: Set[Byte],
-      count: Int,
       fromId: Option[ByteStr] = None
-  ): Seq[(Height, Transaction)]
+  ): Observable[(Height, Transaction)]
 
   def transactionById(txId: ByteStr): Option[(Int, Transaction)]
 
@@ -39,9 +39,8 @@ trait CommonTransactionsApi {
       subject: AddressOrAlias,
       sender: Option[Address],
       transactionTypes: Set[Byte],
-      count: Int,
       fromId: Option[ByteStr] = None
-  ): Seq[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])]
+  ): Observable[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])]
 
   def invokeScriptResultById(txId: ByteStr): Option[(Height, InvokeScriptTransaction, InvokeScriptResult)]
 }
@@ -57,16 +56,15 @@ object CommonTransactionsApi {
   ): CommonTransactionsApi = new CommonTransactionsApi {
     private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
 
-    override def aliasesOfAddress(address: Address): Seq[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff)(address)
+    override def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)] = common.aliasesOfAddress(db, maybeDiff, address)
 
     override def transactionsByAddress(
         subject: AddressOrAlias,
         sender: Option[Address],
         transactionTypes: Set[Byte],
-        count: Int,
         fromId: Option[ByteStr] = None
-    ): Seq[(Height, Transaction)] = resolve(subject).fold(Seq.empty[(Height, Transaction)]) { subjectAddress =>
-      common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, count, fromId)
+    ): Observable[(Height, Transaction)] = resolve(subject).fold(Observable.empty[(Height, Transaction)]) { subjectAddress =>
+      common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
     }
 
     override def transactionById(transactionId: ByteStr): Option[(Int, Transaction)] =
@@ -91,14 +89,13 @@ object CommonTransactionsApi {
         subject: AddressOrAlias,
         sender: Option[Address],
         transactionTypes: Set[Byte],
-        count: Int,
         fromId: Option[ByteStr] = None
-    ): Seq[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])] =
-      resolve(subject).fold(Seq.empty[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])]) { subjectAddress =>
-        common.invokeScriptResults(db, maybeDiff, subjectAddress, sender, transactionTypes, count, fromId)
+    ): Observable[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])] =
+      resolve(subject).fold(Observable.empty[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])]) { subjectAddress =>
+        common.invokeScriptResults(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
       }
 
     override def invokeScriptResultById(txId: ByteStr): Option[(Height, InvokeScriptTransaction, InvokeScriptResult)] =
-      common.invokeScriptResults(db, maybeDiff, txId)
+      ???
   }
 }

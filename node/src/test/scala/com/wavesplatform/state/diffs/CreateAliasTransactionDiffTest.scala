@@ -2,13 +2,13 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.common.aliasesOfAddress
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.utils.addressTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
@@ -51,7 +51,9 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with W
             val senderAcc = anotherAliasTx.sender.toAddress
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-            aliasesOfAddress(db, Some(Height(newState.height + 1) -> blockDiff))(senderAcc).map(_._2.alias).toSet shouldBe Set(
+            addressTransactions(db, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(CreateAliasTransaction.typeId), None).collect {
+              case (_, cat: CreateAliasTransaction) => cat.alias
+            }.toSet shouldBe Set(
               anotherAliasTx.alias,
               aliasTx.alias
             )

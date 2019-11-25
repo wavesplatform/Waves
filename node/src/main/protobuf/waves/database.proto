@@ -1,0 +1,15 @@
+syntax = "proto3";
+package waves.database;
+option java_package = "com.wavesplatform.database.proto";
+
+import "waves/block.proto";
+
+message BlockMeta {
+    Block.Header header = 1;
+    bytes signature = 2;
+    int32 height = 3;
+    int32 size = 4;
+    int32 transaction_count = 5;
+    int64 total_fee_in_waves = 6;
+    int64 reward = 7;
+}

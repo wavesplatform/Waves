@@ -28,10 +28,9 @@ object Keys {
   def wavesBalance(addressId: BigInt)(height: Int): Key[Long] =
     Key("waves-balance", hAddr(WavesBalancePrefix, height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetList(addressId: BigInt): Key[List[IssuedAsset]] =
-    Key("asset-list", addr(7, addressId), readTxIds(_).map(IssuedAsset), assets => writeTxIds(assets.map(_.id)))
+  val AssetBalanceHistoryPrefix = 8.toShort
   def assetBalanceHistory(addressId: BigInt, asset: IssuedAsset): Key[Seq[Int]] =
-    historyKey("asset-balance-history", 8, addressId.toByteArray ++ asset.id.arr)
+    historyKey("asset-balance-history", AssetBalanceHistoryPrefix, addressId.toByteArray ++ asset.id.arr)
   val AssetBalancePrefix: Short = 9
   def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =
     Key(
@@ -145,7 +144,7 @@ object Keys {
     bytesSeqNr("address-transaction-seq-nr", AddressTransactionSeqNrPrefix, addressId.toByteArray)
 
   val AddressTransactionHNPrefix: Short = 53
-  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum, ByteStr)])]] =
+  def addressTransactionHN(addressId: AddressId, seqNr: Int): Key[Option[(Height, Seq[(Byte, TxNum)])]] =
     Key.opt(
       "address-transaction-height-type-and-nums",
       hBytes(AddressTransactionHNPrefix, addressId.toByteArray, seqNr),

@@ -229,7 +229,7 @@ object Block {
   implicit val blockFormat: Format[Block] = Json.format
 }
 
-case class BlockHeaders(
+case class BlockHeader(
     signature: String,
     height: Int,
     timestamp: Long,
@@ -242,8 +242,8 @@ case class BlockHeaders(
     totalFee: Long,
     version: Option[Byte] = None
 )
-object BlockHeaders {
-  implicit val blockHeadersFormat: Format[BlockHeaders] = Json.format
+object BlockHeader {
+  implicit val blockHeadersFormat: Format[BlockHeader] = Json.format
 }
 
 case class MatcherMessage(id: String)

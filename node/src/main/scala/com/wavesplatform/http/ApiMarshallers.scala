@@ -1,9 +1,11 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.marshalling.{Marshaller, PredefinedToEntityMarshallers, ToEntityMarshaller, ToResponseMarshaller}
 import akka.http.scaladsl.model.MediaTypes.{`application/json`, `text/plain`}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.http.scaladsl.unmarshalling.{FromEntityUnmarshaller, PredefinedFromEntityUnmarshallers, Unmarshaller}
+import akka.stream.scaladsl.Flow
 import akka.util.ByteString
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.common.state.ByteStr
@@ -33,23 +35,20 @@ trait ApiMarshallers {
   implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
 
   implicit lazy val tracedResultMarshaller: ToResponseMarshaller[TracedResult[ApiError, Transaction]] =
-    fromStatusCodeAndValue[StatusCode, JsValue]
-      .compose(
-        ae =>
-          (
-            ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.json
-        ))
+    fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
+      (
+        ae.resultE.fold(_.code, _ => StatusCodes.OK),
+        ae.json
+      )
+    }
 
   implicit lazy val tracedJsValueMarshaller: ToResponseMarshaller[TracedResult[ApiError, JsValue]] =
-    fromStatusCodeAndValue[StatusCode, JsValue]
-      .compose(
-        ae =>
-          (
-            ae.resultE.fold(_.code, _ => StatusCodes.OK),
-            ae.resultE.fold(_.json, (j => j))
-        ))
-
+    fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
+      (
+        ae.resultE.fold(_.code, _ => StatusCodes.OK),
+        ae.resultE.fold(_.json, (j => j))
+      )
+    }
 
   private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
@@ -88,6 +87,11 @@ trait ApiMarshallers {
 
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)
+
+  def jsonStream(prefix: String, delimiter: String, suffix: String): EntityStreamingSupport =
+    EntityStreamingSupport
+      .json()
+      .withFramingRenderer(Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix)))
 }
 
 object ApiMarshallers extends ApiMarshallers

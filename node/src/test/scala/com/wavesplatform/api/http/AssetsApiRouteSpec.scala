@@ -36,8 +36,9 @@ class AssetsApiRouteSpec
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
-    script = smartAssetTx.script,
-    sponsorship = 0
+    script = smartAssetTx.script.map(_ -> 0L),
+    sponsorship = 0,
+    isNFT = false
   )
 
   (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
@@ -66,8 +67,9 @@ class AssetsApiRouteSpec
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
-    script = sillyAssetTx.script,
-    sponsorship = 0
+    script = sillyAssetTx.script.map(_ -> 0L),
+    sponsorship = 0,
+    isNFT = false
   )
   (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))

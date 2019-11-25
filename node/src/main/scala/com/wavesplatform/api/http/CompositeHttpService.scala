@@ -53,9 +53,3 @@ case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], 
     } else base
   }
 }
-
-object CompositeHttpService {
-  implicit val exceptionHandler: ExceptionHandler = ExceptionHandler {
-    case ApiException(apiError) => complete(apiError)
-  }
-}

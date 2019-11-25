@@ -170,7 +170,7 @@ class LevelDBWriter(
         val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
         val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script.map(_._1), sponsorship))
+        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship, i.isNFT))
       case _ => None
     }
   }
@@ -246,7 +246,10 @@ class LevelDBWriter(
           k -> v
         }.toMap
 
-      rw.put(Keys.blockMetaAt(Height(height)), Some(BlockMeta(block.header, block.signature, height, block.bytes().length, block.transactionData.size, totalFee, reward)))
+      rw.put(
+        Keys.blockMetaAt(Height(height)),
+        Some(BlockMeta(block.header, block.signature, height, block.bytes().length, block.transactionData.size, totalFee, reward))
+      )
       rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
       val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -264,38 +267,20 @@ class LevelDBWriter(
 
       // balances
       val updatedBalanceAddresses = ArrayBuffer.empty[BigInt]
-      val newAddressesForAssets   = mutable.AnyRefMap.empty[Asset, Set[BigInt]]
-      def addNewAddressForAsset(asset: Asset, addressId: BigInt): Unit =
-        newAddressesForAssets += asset -> (newAddressesForAssets.getOrElse(asset, Set.empty) + addressId)
 
       for ((addressId, updatedBalances) <- balances) {
-        lazy val prevAssets    = rw.get(Keys.assetList(addressId))
-        lazy val prevAssetsSet = prevAssets.toSet
-        val newAssets          = ArrayBuffer.empty[IssuedAsset]
-
         for ((asset, balance) <- updatedBalances) {
           asset match {
             case Waves =>
               val kwbh = Keys.wavesBalanceHistory(addressId)
               val wbh  = rw.get(kwbh)
-              if (wbh.isEmpty) {
-                addNewAddressForAsset(Waves, addressId)
-              }
               updatedBalanceAddresses += addressId
               rw.put(Keys.wavesBalance(addressId)(height), balance)
               expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
             case a: IssuedAsset =>
-              if (!prevAssetsSet.contains(a)) {
-                newAssets += a
-                addNewAddressForAsset(a, addressId)
-              }
               rw.put(Keys.assetBalance(addressId, a)(height), balance)
               expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, a), threshold, Keys.assetBalance(addressId, a))
           }
-        }
-
-        if (newAssets.nonEmpty) {
-          rw.put(Keys.assetList(addressId), newAssets.toList ++ prevAssets)
         }
       }
 
@@ -322,6 +307,7 @@ class LevelDBWriter(
       }
 
       for ((leaseId, state) <- leaseStates) {
+        log.info(s"Lease $leaseId: active=$state")
         rw.put(Keys.leaseStatus(leaseId)(height), state)
         expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
       }
@@ -363,7 +349,7 @@ class LevelDBWriter(
         val txTypeNumSeq = txIds.map { txId =>
           val (tx, num) = transactions(txId)
 
-          (tx.typeId, num, tx.id())
+          (tx.typeId, num)
         }
         rw.put(Keys.addressTransactionHN(addressId, nextSeqNr), Some((Height(height), txTypeNumSeq.sortBy(-_._2))))
         rw.put(kk, nextSeqNr)
@@ -384,7 +370,8 @@ class LevelDBWriter(
         val newlyApprovedFeatures = featureVotes(height)
           .filterNot { case (featureId, _) => settings.functionalitySettings.preActivatedFeatures.contains(featureId) }
           .collect {
-            case (featureId, voteCount) if voteCount + (if (block.header.featureVotes.contains(featureId)) 1 else 0) >= minVotes => featureId -> height
+            case (featureId, voteCount) if voteCount + (if (block.header.featureVotes.contains(featureId)) 1 else 0) >= minVotes =>
+              featureId -> height
           }
 
         if (newlyApprovedFeatures.nonEmpty) {
@@ -462,15 +449,20 @@ class LevelDBWriter(
             .get(Keys.blockMetaAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
+          rw.delete(Keys.blockMetaAt(h))
+
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
             val addressId = AddressId(aId)
             val address   = rw.get(Keys.idToAddress(addressId))
-            balancesToInvalidate += (address -> Waves)
 
-            for (assetId <- rw.get(Keys.assetList(addressId))) {
-              balancesToInvalidate += (address -> assetId)
-              rw.delete(Keys.assetBalance(addressId, assetId)(currentHeight))
-              rw.filterHistory(Keys.assetBalanceHistory(addressId, assetId), currentHeight)
+            rw.iterateOver(Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ aId.toByteArray) { e =>
+              val assetId = IssuedAsset(ByteStr(e.getKey.drop(aId.toByteArray.length).dropRight(4)))
+              val history = readIntSeq(e.getKey)
+              if (history.nonEmpty && history.head == currentHeight) {
+                balancesToInvalidate += address -> assetId
+                rw.delete(Keys.assetBalance(addressId, assetId)(history.head))
+                rw.put(e.getKey, writeIntSeq(history.tail))
+              }
             }
 
             for (k <- rw.get(Keys.changedDataKeys(currentHeight, addressId))) {
@@ -480,6 +472,7 @@ class LevelDBWriter(
               rw.filterHistory(Keys.dataHistory(addressId, k), currentHeight)
             }
 
+            balancesToInvalidate += (address -> Waves)
             rw.delete(Keys.wavesBalance(addressId)(currentHeight))
             rw.filterHistory(Keys.wavesBalanceHistory(addressId), currentHeight)
 
@@ -727,8 +720,8 @@ class LevelDBWriter(
 
     val activeLeaseTransactions = for {
       leaseId <- activeLeaseIds
-      (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx     <- db.get(Keys.transactionAt(h, n)).collect { case lt: LeaseTransaction if filter(lt) => lt }
+      (h, n)  <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
+      tx      <- db.get(Keys.transactionAt(h, n)).collect { case lt: LeaseTransaction if filter(lt) => lt }
     } yield tx
 
     activeLeaseTransactions.toSeq

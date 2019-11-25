@@ -41,7 +41,7 @@ class GRPCServerExtension(context: ExtensionContext) extends Extension with Scor
       .addService(TransactionsApiGrpc.bindService(new TransactionsApiGrpcImpl(context.transactionsApi), apiScheduler))
       .addService(BlocksApiGrpc.bindService(new BlocksApiGrpcImpl(context.blocksApi), apiScheduler))
       .addService(AccountsApiGrpc.bindService(new AccountsApiGrpcImpl(context.accountsApi), apiScheduler))
-      .addService(AssetsApiGrpc.bindService(new AssetsApiGrpcImpl(context.blockchain), apiScheduler))
+      .addService(AssetsApiGrpc.bindService(new AssetsApiGrpcImpl(context.assetsApi), apiScheduler))
       .addService(BlockchainApiGrpc.bindService(new BlockchainApiGrpcImpl(context.blockchain, context.settings.featuresSettings), apiScheduler))
       .build()
       .start()

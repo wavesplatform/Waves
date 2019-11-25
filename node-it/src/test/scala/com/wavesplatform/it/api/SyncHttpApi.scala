@@ -177,9 +177,9 @@ object SyncHttpApi extends Assertions {
 
     def lastBlock: Block = sync(async(n).lastBlock)
 
-    def lastBlockHeaders: BlockHeaders = sync(async(n).lastBlockHeaders)
+    def lastBlockHeader: BlockHeader = sync(async(n).lastBlockHeader)
 
-    def blockHeadersAt(height: Int): BlockHeaders = sync(async(n).blockHeadersAt(height))
+    def blockHeadersAt(height: Int): BlockHeader = sync(async(n).blockHeadersAt(height))
 
     def postForm(path: String, params: (String, String)*): Response =
       sync(async(n).postForm(path, params: _*))
@@ -219,8 +219,8 @@ object SyncHttpApi extends Assertions {
     def assetsBalance(address: String): FullAssetsInfo =
       sync(async(n).assetsBalance(address))
 
-    def nftAssetsBalance(address: String, limit: Int): Seq[NFTAssetInfo] =
-      sync(async(n).nftAssetsBalance(address, limit))
+    def nftList(address: String, limit: Int): Seq[NFTAssetInfo] =
+      sync(async(n).nftList(address, limit))
 
     def nftAssetsBalance(address: String, limit: Int, after: String): Seq[NFTAssetInfo] =
       sync(async(n).nftAssetsBalance(address, limit, after))
@@ -502,7 +502,7 @@ object SyncHttpApi extends Assertions {
 
     def blockSeqByAddress(address: String, from: Int, to: Int): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to))
 
-    def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
+    def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeader] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))

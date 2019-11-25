@@ -173,12 +173,12 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
 
-    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
-      for {
-        id <- blockchainUpdater.blockId(height)
-        block <- blockchainUpdater.liquidBlock(id).orElse(history.loadBlockBytes(id).flatMap(bytes => Block.parseBytes(bytes).toOption))
-            .map(b => BlockMeta(b.header, b.signature, height, b.bytes().length, b.transactionData.length, 0L, None) -> b.transactionData)
-      } yield block
+    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] = loadBlockMetaAt(height).map { meta =>
+      meta -> blockchainUpdater
+        .liquidBlock(meta.signature)
+        .orElse(history.loadBlockBytes(meta.signature).flatMap(bytes => Block.parseBytes(bytes).toOption))
+        .fold(Seq.empty[Transaction])(_.transactionData)
+    }
 
     def loadBlockMetaAt(height: Int): Option[BlockMeta] =
       blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))
@@ -200,7 +200,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
     val cca: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-    val csa: CommonAssetsApi   = new CommonAssetsApi(blockchainUpdater)
+    val csa: CommonAssetsApi   = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     val cta: CommonTransactionsApi = CommonTransactionsApi(
       blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
       db,
@@ -223,9 +223,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def actorSystem: ActorSystem                                                      = app.actorSystem
       override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
 
-      override def transactionsApi = cta
-      override def blocksApi       = cba
-      override def accountsApi     = cca
+      override def transactionsApi: CommonTransactionsApi = cta
+      override def blocksApi: CommonBlocksApi             = cba
+      override def accountsApi: CommonAccountsApi         = cca
+      override def assetsApi: CommonAssetsApi             = csa
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -338,6 +339,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           wallet,
           cca,
           cta,
+          csa,
           peerDatabase,
           establishedConnections,
           (id, returnTxs) => rollbackTask(id, returnTxs).map(_.map(_ => ())),

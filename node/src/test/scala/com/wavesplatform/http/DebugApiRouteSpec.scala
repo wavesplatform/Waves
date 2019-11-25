@@ -20,6 +20,7 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
       null,
       null,
       null,
+      null,
       PeerDatabase.NoOp,
       null,
       (_, _) => Task.raiseError(new NotImplementedError("")),
