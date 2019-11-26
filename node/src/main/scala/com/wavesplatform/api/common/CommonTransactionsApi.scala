@@ -1,6 +1,6 @@
 package com.wavesplatform.api.common
 
-import com.google.common.primitives.{Bytes, Ints}
+import com.google.common.primitives.Bytes
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi.MerkleInfo
 import com.wavesplatform.block.{Block, BlockMerkleOps}
@@ -71,7 +71,7 @@ private[api] object CommonTransactionsApi {
     def proofBytes(proof: MerkleProof[Digest32]): Array[Byte] =
       (proof.levels foldLeft Array.emptyByteArray) {
         case (acc, (d, s)) =>
-          Bytes.concat(acc, Array(s), Ints.toByteArray(d.size), d)
+          Bytes.concat(acc, Array(s), Array(d.length.toByte), d)
       }
 
     implicit val merkleInfoWrites: Writes[MerkleInfo] = Writes { mi =>
