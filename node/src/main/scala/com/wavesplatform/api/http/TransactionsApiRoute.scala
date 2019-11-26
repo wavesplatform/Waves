@@ -248,7 +248,14 @@ case class TransactionsApiRoute(
       )
     )
   )
-  def postMerkleProof: Route = jsonPost[JsObject](jsv => merkleInfo((jsv \ "ids").as[List[String]]))
+  def postMerkleProof: Route =
+    jsonPost[JsObject](
+      jsv =>
+        (jsv \ "ids").validate[List[String]] match {
+          case JsSuccess(ids, _) => merkleInfo(ids)
+          case JsError(err)      => WrongJson(errors = err)
+        }
+    )
 
   private def merkleInfo(encodedIds: List[String]): ToResponseMarshallable =
     encodedIds.traverse(ByteStr.decodeBase58) match {

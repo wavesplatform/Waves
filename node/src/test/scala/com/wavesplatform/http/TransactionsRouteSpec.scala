@@ -439,7 +439,7 @@ class TransactionsRouteSpec
 
   routePath("/proofMerkleRoot") - {
     val transactionsGen = for {
-      txsSize <- Gen.choose(0, 10)
+      txsSize <- Gen.choose(1, 10)
       txs     <- Gen.listOfN(txsSize, randomTransactionGen)
     } yield txs
 
