@@ -166,7 +166,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   test("can't attach with zero asset amount") {
     assertApiError(
       sender.invokeScript(caller, dApp, payment = Seq(Payment(0, asset1), Payment(1, Waves))),
-      NonPositiveAmount("0 of IssuedAsset(8AR25efHFnS1WgBtdRxgLJqPd4THXRwxYvJhTQ7Az5gC)")
+      NonPositiveAmount(s"0 of IssuedAsset(${asset1.id.toString})")
     )
   }
 
