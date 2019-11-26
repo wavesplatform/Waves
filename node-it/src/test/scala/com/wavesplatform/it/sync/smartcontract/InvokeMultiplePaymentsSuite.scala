@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
@@ -69,89 +70,105 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   test("can invoke with single payment of Waves") {
     sender.invokeScript(caller, dApp, payment = Seq(Payment(1.waves, Waves)), waitForTx = true)
     sender.getData(dApp).size shouldBe 2
-    sender.getDataByKey(dApp, "amount_0") shouldBe IntegerDataEntry("amount_0", 1.waves)
-    sender.getDataByKey(dApp, "asset_0") shouldBe BinaryDataEntry("asset_0", ByteStr.empty)
+    sender.getDataByKey(dApp, "amount_0").as[IntegerDataEntry].value shouldBe 1.waves
+    sender.getDataByKey(dApp, "asset_0").as[BinaryDataEntry].value shouldBe ByteStr.empty
   }
 
   test("can invoke with single payment of asset") {
     sender.invokeScript(caller, dApp, payment = Seq(Payment(10, asset1)), waitForTx = true)
     sender.getData(dApp).size shouldBe 2
-    sender.getDataByKey(dApp, "amount_0") shouldBe IntegerDataEntry("amount_0", 10)
-    sender.getDataByKey(dApp, "asset_0") shouldBe BinaryDataEntry("asset_0", asset1.id)
-
-    sender.getDataByKey(dApp, "asset_0").as[BinaryDataEntry].value shouldBe asset1.id //TODO test
-    sender.getDataByKey(dApp, "asset_0").value shouldBe asset1.id //TODO test
+    sender.getDataByKey(dApp, "amount_0").as[IntegerDataEntry].value shouldBe 10
+    sender.getDataByKey(dApp, "asset_0").as[BinaryDataEntry].value shouldBe asset1.id
   }
 
   test("can invoke with two payments of Waves") {
     sender.invokeScript(caller, dApp, payment = Seq(Payment(5, Waves), Payment(17, Waves)), waitForTx = true)
     sender.getData(dApp).size shouldBe 4
-    sender.getDataByKey(dApp, "amount_0") shouldBe IntegerDataEntry("amount_0", 5)
-    sender.getDataByKey(dApp, "asset_0") shouldBe BinaryDataEntry("asset_0", ByteStr.empty)
-    sender.getDataByKey(dApp, "amount_1") shouldBe IntegerDataEntry("amount_1", 17)
-    sender.getDataByKey(dApp, "asset_1") shouldBe BinaryDataEntry("asset_1", ByteStr.empty)
+    sender.getDataByKey(dApp, "amount_0").as[IntegerDataEntry].value shouldBe 5
+    sender.getDataByKey(dApp, "asset_0").as[BinaryDataEntry].value shouldBe ByteStr.empty
+    sender.getDataByKey(dApp, "amount_1").as[IntegerDataEntry].value shouldBe 17
+    sender.getDataByKey(dApp, "asset_1").as[BinaryDataEntry].value shouldBe ByteStr.empty
   }
 
   test("can invoke with two payments of the same asset") {
     sender.invokeScript(caller, dApp, payment = Seq(Payment(8, asset1), Payment(21, asset1)), waitForTx = true)
     sender.getData(dApp).size shouldBe 4
-    sender.getDataByKey(dApp, "amount_0") shouldBe IntegerDataEntry("amount_0", 8)
-    sender.getDataByKey(dApp, "asset_0") shouldBe BinaryDataEntry("asset_0", asset1.id)
-    sender.getDataByKey(dApp, "amount_1") shouldBe IntegerDataEntry("amount_1", 21)
-    sender.getDataByKey(dApp, "asset_1") shouldBe BinaryDataEntry("asset_1", asset1.id)
+    sender.getDataByKey(dApp, "amount_0").as[IntegerDataEntry].value shouldBe 8
+    sender.getDataByKey(dApp, "asset_0").as[BinaryDataEntry].value shouldBe asset1.id
+    sender.getDataByKey(dApp, "amount_1").as[IntegerDataEntry].value shouldBe 21
+    sender.getDataByKey(dApp, "asset_1").as[BinaryDataEntry].value shouldBe asset1.id
   }
 
   test("can invoke with two payments of different assets") {
     sender.invokeScript(caller, dApp, payment = Seq(Payment(3, asset1), Payment(6, asset2)), waitForTx = true)
     sender.getData(dApp).size shouldBe 4
-    sender.getDataByKey(dApp, "amount_0") shouldBe IntegerDataEntry("amount_0", 3)
-    sender.getDataByKey(dApp, "asset_0") shouldBe BinaryDataEntry("asset_0", asset1.id)
-    sender.getDataByKey(dApp, "amount_1") shouldBe IntegerDataEntry("amount_1", 6)
-    sender.getDataByKey(dApp, "asset_1") shouldBe BinaryDataEntry("asset_1", asset2.id)
+    sender.getDataByKey(dApp, "amount_0").as[IntegerDataEntry].value shouldBe 3
+    sender.getDataByKey(dApp, "asset_0").as[BinaryDataEntry].value shouldBe asset1.id
+    sender.getDataByKey(dApp, "amount_1").as[IntegerDataEntry].value shouldBe 6
+    sender.getDataByKey(dApp, "asset_1").as[BinaryDataEntry].value shouldBe asset2.id
   }
 
   test("can't invoke with three payments") {
-    sender.invokeScript(
-      caller, dApp, payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves)), waitForTx = true)
-    //TODO check error
+    assertApiError(sender.invokeScript(
+      caller,
+      dApp,
+      payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
+    )) { error =>
+      error.message should include("Script payment amount=3 should not exceed 2")
+      error.id shouldBe ScriptExecutionError.Id
+      error.statusCode shouldBe 400
+    }
   }
 
   test("can't attach more than balance") {
     val wavesBalance = sender.accountBalances(caller)._1
     val asset1Balance = sender.assetBalance(caller, asset1.id.toString).balance
 
-    sender.invokeScript(
+    assertApiError(sender.invokeScript(
       caller,
       dApp,
-      payment = Seq(Payment(wavesBalance - 1.waves, Waves), Payment(2.waves, Waves)),
-      waitForTx = true)
-    //TODO check error
+      payment = Seq(Payment(wavesBalance - 1.waves, Waves), Payment(2.waves, Waves))
+    )) { error =>
+      error.message should include("Accounts balance errors") //TODO детализировать ошибку
+      error.id shouldBe StateCheckFailed.Id
+      error.statusCode shouldBe 400
+    }
 
-    sender.invokeScript(caller,
+    assertApiError(sender.invokeScript(
+      caller,
       dApp,
-      payment = Seq(Payment(asset1Balance - 1000, asset1), Payment(1001, asset1)),
-      waitForTx = true)
-    //TODO check error
+      payment = Seq(Payment(asset1Balance - 1000, asset1), Payment(1001, asset1))
+    )) { error =>
+      error.message should include("Accounts balance errors")
+      error.id shouldBe StateCheckFailed.Id
+      error.statusCode shouldBe 400
+    }
   }
 
   test("can't attach leased Waves") {
     val wavesBalance = sender.accountBalances(caller)._1
     sender.lease(caller, dApp, wavesBalance - 1.waves, waitForTx = true)
-    sender.invokeScript(caller, dApp, payment = Seq(Payment(2.waves, Waves)), waitForTx = true)
-    //TODO check error
+
+    assertApiError(sender.invokeScript(caller, dApp, payment = Seq(Payment(0.5.waves, Waves), Payment(1.5.waves, Waves)))) { error =>
+        error.message should include("Accounts balance errors")
+        error.id shouldBe StateCheckFailed.Id
+        error.statusCode shouldBe 400
+    }
   }
 
   test("can't attach with zero Waves amount") {
-    sender.invokeScript(caller, dApp, payment = Seq(Payment(1, asset1), Payment(0, Waves)), waitForTx = true)
-    //TODO check error
+    assertApiError(
+      sender.invokeScript(caller, dApp, payment = Seq(Payment(1, asset1), Payment(0, Waves))),
+      NonPositiveAmount("0 of Waves")
+    )
   }
 
-  test("can't attach with zero amount") {
-    sender.invokeScript(caller, dApp, payment = Seq(Payment(1, Waves), Payment(0, asset1)), waitForTx = true)
-    //TODO check error
+  test("can't attach with zero asset amount") {
+    assertApiError(
+      sender.invokeScript(caller, dApp, payment = Seq(Payment(0, asset1), Payment(1, Waves))),
+      NonPositiveAmount("0 of IssuedAsset(8AR25efHFnS1WgBtdRxgLJqPd4THXRwxYvJhTQ7Az5gC)")
+    )
   }
-
-  //TODO not existed asset id
 
 }
 
