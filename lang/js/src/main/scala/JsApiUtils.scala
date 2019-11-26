@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, LIST, NOTHING, TYPE, UNION}
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.PART
+import com.wavesplatform.lang.v1.parser.Expressions.{PART, Type}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
@@ -144,6 +144,7 @@ package object JsApiUtils {
       "type"       -> "MATCH_CASE",
       "posStart"   -> c.position.start,
       "posEnd"     -> c.position.end,
+      "varName"    -> c.newVarName.map(serPartStr).orUndefined,
       "varTypes"   -> c.types.map(serPartStr).toJSArray,
       "resultType" -> c.resultType.getOrElse(NOTHING).toString,
       "expr"       -> serExpr(c.expr),
@@ -170,6 +171,19 @@ package object JsApiUtils {
   }
 
   def serDec(dec: Expressions.Declaration): js.Object = {
+
+    def serFuncArg(argName: PART[String], argTypeList: Seq[Type]): js.Object = {
+      jObj.applyDynamic("apply")(
+        "argName" -> serPartStr(argName),
+        "typeList" -> argTypeList.map { t =>
+          jObj.applyDynamic("apply")(
+            "typeName"  -> serPartStr(t._1),
+            "typeParam" -> t._2.map(serPartStr).orUndefined
+          )
+        }.toJSArray
+      )
+    }
+
     dec match {
       case Expressions.LET(p, name, expr, _, _) =>
         jObj.applyDynamic("apply")(
@@ -179,12 +193,13 @@ package object JsApiUtils {
           "name"     -> serPartStr(name),
           "expr"     -> serExpr(expr)
         )
-      case Expressions.FUNC(p, name, _, expr) =>
+      case Expressions.FUNC(p, name, args, expr) =>
         jObj.applyDynamic("apply")(
           "type"     -> "FUNC",
           "posStart" -> p.start,
           "posEnd"   -> p.end,
           "name"     -> serPartStr(name),
+          "argList"  -> args.map(arg => serFuncArg(arg._1, arg._2)).toJSArray,
           "expr"     -> serExpr(expr)
         )
       case t => jObj.applyDynamic("apply")("[not_supported]stringRepr" -> t.toString)

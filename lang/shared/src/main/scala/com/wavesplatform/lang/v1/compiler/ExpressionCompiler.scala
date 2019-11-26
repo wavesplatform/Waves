@@ -46,11 +46,15 @@ object ExpressionCompiler {
     }
   }
 
-  def compileWithParseResult(input: String, ctx: CompilerContext): Either[String, (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] = {
+  def compileWithParseResult(
+      input: String,
+      ctx: CompilerContext,
+      saveExprContext: Boolean = true
+  ): Either[String, (EXPR, Expressions.SCRIPT, Iterable[CompilationError])] = {
     val res = ParserV2.parseExpression(input)
     res match {
       case Right((parseResult, removedCharPosOpt)) =>
-        compileExprWithCtx(parseResult.expr)
+        compileExprWithCtx(parseResult.expr, saveExprContext)
           .run(ctx)
           .value
           ._2
@@ -87,7 +91,7 @@ object ExpressionCompiler {
   def compileExpr(expr: Expressions.EXPR): CompileM[(Terms.EXPR, FINAL, Expressions.EXPR)] =
     compileExprWithCtx(expr).map(r => (r.expr, r.t, r.parseNodeExpr))
 
-  def compileExprWithCtx(expr: Expressions.EXPR): CompileM[CompilationStepResultExpr] = {
+  def compileExprWithCtx(expr: Expressions.EXPR, saveExprContext: Boolean = false): CompileM[CompilationStepResultExpr] = {
     get[Id, CompilerContext, CompilationError].flatMap { ctx =>
       // TODO MAP ERROR TO RESULT
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
@@ -107,18 +111,18 @@ object ExpressionCompiler {
         case x: Expressions.CONST_STRING                    => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
         case x: Expressions.TRUE                            => CompilationStepResultExpr(ctx, TRUE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
         case x: Expressions.FALSE                           => CompilationStepResultExpr(ctx, FALSE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
-        case Expressions.GETTER(p, ref, field, _, _)        => compileGetter(p, field, ref)
-        case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body)
-        case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse)
-        case Expressions.REF(p, key, _, _)                  => compileRef(p, key)
-        case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args)
-        case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList)
+        case Expressions.GETTER(p, ref, field, _, _)        => compileGetter(p, field, ref, saveExprContext)
+        case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body, saveExprContext)
+        case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse, saveExprContext)
+        case Expressions.REF(p, key, _, _)                  => compileRef(p, key, saveExprContext)
+        case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args, saveExprContext)
+        case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList, saveExprContext)
         case Expressions.INVALID(p, message, _, _)          => raiseError(Generic(p.start, p.end, message))
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
           op match {
-            case AND_OP => compileIf(p, a, b, Expressions.FALSE(p))
-            case OR_OP  => compileIf(p, a, Expressions.TRUE(p), b)
-            case _      => compileFunctionCall(p, PART.VALID(p, BinaryOperation.opsToFunctions(op)), List(a, b))
+            case AND_OP => compileIf(p, a, b, Expressions.FALSE(p), saveExprContext)
+            case OR_OP  => compileIf(p, a, Expressions.TRUE(p), b, saveExprContext)
+            case _      => compileFunctionCall(p, PART.VALID(p, BinaryOperation.opsToFunctions(op)), List(a, b), saveExprContext)
           }
       }
     }
@@ -129,7 +133,8 @@ object ExpressionCompiler {
       p: Pos,
       condExpr: Expressions.EXPR,
       ifTrueExpr: Expressions.EXPR,
-      ifFalseExpr: Expressions.EXPR
+      ifFalseExpr: Expressions.EXPR,
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
       condWithErr <- local {
@@ -141,10 +146,16 @@ object ExpressionCompiler {
       ifTrue  <- local(compileExprWithCtx(ifTrueExpr))
       ifFalse <- local(compileExprWithCtx(ifFalseExpr))
 
-      ctx           = ifFalse.ctx
-      t             = TypeInferrer.findCommonType(ifTrue.t, ifFalse.t)
-      parseNodeExpr = Expressions.IF(p, condWithErr._1.parseNodeExpr, ifTrue.parseNodeExpr, ifFalse.parseNodeExpr, ctxOpt = Some(ctx))
-      errorList     = condWithErr._1.errors ++ ifTrue.errors ++ ifFalse.errors
+      ctx = ifFalse.ctx
+      t   = TypeInferrer.findCommonType(ifTrue.t, ifFalse.t)
+      parseNodeExpr = Expressions.IF(
+        p,
+        condWithErr._1.parseNodeExpr,
+        ifTrue.parseNodeExpr,
+        ifFalse.parseNodeExpr,
+        ctxOpt = saveExprContext.toOption(ctx)
+      )
+      errorList = condWithErr._1.errors ++ ifTrue.errors ++ ifFalse.errors
 
       result = if (condWithErr._2.isEmpty) {
         CompilationStepResultExpr(
@@ -217,7 +228,8 @@ object ExpressionCompiler {
   private def compileMatch(
       p: Pos,
       expr: Expressions.EXPR,
-      cases: List[Expressions.MATCH_CASE]
+      cases: List[Expressions.MATCH_CASE],
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
       ctx       <- get[Id, CompilerContext, CompilationError]
@@ -239,7 +251,7 @@ object ExpressionCompiler {
           mkIfCases(
             updatedCtx,
             cases,
-            Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = Some(updatedCtx)),
+            Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx)),
             allowShadowVarName,
             exprTypes
           ).toCompileM
@@ -248,8 +260,9 @@ object ExpressionCompiler {
         p,
         Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty),
         ifCasesWithErr._1.getOrElse(
-          Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = Some(ctx))
-        )
+          Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = saveExprContext.toOption(ctx))
+        ),
+        saveExprContext
       )
       checkWithErr <- cases
         .flatMap(_.types)
@@ -277,7 +290,7 @@ object ExpressionCompiler {
           ctx,
           FAILED_EXPR(),
           NOTHING,
-          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = Some(ctx)),
+          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = saveExprContext.toOption(ctx)),
           errorList ++ typedExpr.errors
         )
       }
@@ -287,11 +300,12 @@ object ExpressionCompiler {
   def compileBlock(
       pos: Expressions.Pos,
       declaration: Expressions.Declaration,
-      expr: Expressions.EXPR
+      expr: Expressions.EXPR,
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     declaration match {
-      case l: Expressions.LET  => compileLetBlock(pos, l, expr)
-      case f: Expressions.FUNC => compileFuncBlock(pos, f, expr)
+      case l: Expressions.LET  => compileLetBlock(pos, l, expr, saveExprContext)
+      case f: Expressions.FUNC => compileFuncBlock(pos, f, expr, saveExprContext)
     }
 
   private def handleTypeUnion(types: List[String], f: FINAL, ctx: CompilerContext) =
@@ -308,10 +322,10 @@ object ExpressionCompiler {
     } yield letName
   }
 
-  def compileLet(p: Pos, let: Expressions.LET): CompileM[CompilationStepResultDec] =
+  def compileLet(p: Pos, let: Expressions.LET, saveExprContext: Boolean): CompileM[CompilationStepResultDec] =
     for {
       letNameWithErr <- validateShadowing(p, let).handleError()
-      compiledLet    <- compileExprWithCtx(let.value)
+      compiledLet    <- compileExprWithCtx(let.value, saveExprContext)
       ctx            <- get[Id, CompilerContext, CompilationError]
       letTypesWithErr <- let.types.toList
         .traverse[CompileM, String](handlePart)
@@ -334,6 +348,7 @@ object ExpressionCompiler {
   def compileFunc(
       p: Pos,
       func: Expressions.FUNC,
+      saveExprContext: Boolean,
       annListVars: List[String] = List.empty
   ): CompileM[(CompilationStepResultDec, List[(String, FINAL)])] = {
     for {
@@ -364,7 +379,7 @@ object ExpressionCompiler {
       compiledFuncBody <- local {
         val newArgs: VariableTypes = argTypesWithErr._1.getOrElse(List.empty).toMap
         modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ newArgs))
-          .flatMap(_ => compileExprWithCtx(func.expr))
+          .flatMap(_ => compileExprWithCtx(func.expr, saveExprContext))
       }
 
       errorList     = funcNameWithErr._2 ++ argsWithErr._2 ++ argTypesWithErr._2
@@ -393,14 +408,15 @@ object ExpressionCompiler {
   private def compileLetBlock(
       p: Pos,
       let: Expressions.LET,
-      body: Expressions.EXPR
+      body: Expressions.EXPR,
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
-      compLetResult <- compileLet(p, let)
+      compLetResult <- compileLet(p, let, saveExprContext)
       letName = compLetResult.dec.name
       compiledBody <- local {
         updateCtx(letName, compLetResult.t, p)
-          .flatMap(_ => compileExprWithCtx(body))
+          .flatMap(_ => compileExprWithCtx(body, saveExprContext))
       }
 
       parseNodeExpr = Expressions.BLOCK(
@@ -408,7 +424,7 @@ object ExpressionCompiler {
         compLetResult.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        ctxOpt = Some(compiledBody.ctx)
+        ctxOpt = saveExprContext.toOption(compiledBody.ctx)
       )
       result = if (!compLetResult.dec.isItFailed) {
         LET_BLOCK(compLetResult.dec.asInstanceOf[LET], compiledBody.expr)
@@ -420,16 +436,17 @@ object ExpressionCompiler {
   private def compileFuncBlock(
       p: Pos,
       func: Expressions.FUNC,
-      body: Expressions.EXPR
+      body: Expressions.EXPR,
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] = {
     for {
-      compFuncRes <- compileFunc(p, func)
+      compFuncRes <- compileFunc(p, func, saveExprContext)
       (compFuncStepRes, argTypes) = compFuncRes
       funcname                    = compFuncStepRes.dec.name
       typeSig                     = FunctionTypeSignature(compFuncStepRes.t, argTypes, FunctionHeader.User(funcname))
       compiledBody <- local {
         updateCtx(funcname, typeSig)
-          .flatMap(_ => compileExprWithCtx(body))
+          .flatMap(_ => compileExprWithCtx(body, saveExprContext))
       }
 
       expr = BLOCK(compFuncStepRes.dec, compiledBody.expr)
@@ -438,7 +455,7 @@ object ExpressionCompiler {
         compFuncStepRes.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        ctxOpt = Some(compFuncStepRes.ctx)
+        ctxOpt = saveExprContext.toOption(compFuncStepRes.ctx)
       )
     } yield CompilationStepResultExpr(compiledBody.ctx, expr, compiledBody.t, parseNodeExpr, compFuncStepRes.errors ++ compiledBody.errors)
   }
@@ -446,7 +463,8 @@ object ExpressionCompiler {
   private def compileGetter(
       p: Pos,
       fieldPart: PART[String],
-      refExpr: Expressions.EXPR
+      refExpr: Expressions.EXPR,
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
       ctx           <- get[Id, CompilerContext, CompilationError]
@@ -455,7 +473,7 @@ object ExpressionCompiler {
       getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
-      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = Some(ctx))
+      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx))
 
       result = if (errorList.isEmpty) {
         val (ctx, expr, t) = getterWithErr._1.get
@@ -468,14 +486,15 @@ object ExpressionCompiler {
   private def compileFunctionCall(
       p: Pos,
       namePart: PART[String],
-      args: List[Expressions.EXPR]
+      args: List[Expressions.EXPR],
+      saveExprContext: Boolean
   ): CompileM[CompilationStepResultExpr] =
     for {
       ctx         <- get[Id, CompilerContext, CompilationError]
       nameWithErr <- handlePart(namePart).handleError()
       name = nameWithErr._1.getOrElse("NO_NAME")
       signatures   <- get[Id, CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name))
-      compiledArgs <- args.traverse(compileExprWithCtx)
+      compiledArgs <- args.traverse(arg => compileExprWithCtx(arg))
       funcCallWithErr <- (signatures match {
         case Nil           => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_.t.toString)).asLeft[(EXPR, FINAL)]
         case single :: Nil => matchFuncOverload(p, name, args, compiledArgs, ctx.predefTypes, single)
@@ -493,7 +512,7 @@ object ExpressionCompiler {
 
       errorList     = nameWithErr._2 ++ funcCallWithErr._2
       argErrorList  = compiledArgs.flatMap(_.errors)
-      parseNodeExpr = Expressions.FUNCTION_CALL(p, namePart, compiledArgs.map(_.parseNodeExpr), ctxOpt = Some(ctx))
+      parseNodeExpr = Expressions.FUNCTION_CALL(p, namePart, compiledArgs.map(_.parseNodeExpr), ctxOpt = saveExprContext.toOption(ctx))
 
       result = if (errorList.isEmpty) {
         val (expr, t) = funcCallWithErr._1.get
@@ -503,7 +522,7 @@ object ExpressionCompiler {
       }
     } yield result
 
-  private def compileRef(p: Pos, keyPart: PART[String]): CompileM[CompilationStepResultExpr] =
+  private def compileRef(p: Pos, keyPart: PART[String], saveExprContext: Boolean): CompileM[CompilationStepResultExpr] =
     for {
       keyWithErr <- handlePart(keyPart).handleError()
       ctx        <- get[Id, CompilerContext, CompilationError]
@@ -520,10 +539,10 @@ object ExpressionCompiler {
           ctx,
           REF(keyWithErr._1.get),
           typeWithErr._1.get,
-          Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = Some(ctx))
+          Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = saveExprContext.toOption(ctx))
         )
       } else {
-        CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.REF(p, keyPart, ctxOpt = Some(ctx)), errorList)
+        CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx)), errorList)
       }
     } yield result
 
@@ -651,6 +670,10 @@ object ExpressionCompiler {
   def handlePart[T](part: PART[T]): CompileM[T] = part match {
     case PART.VALID(_, x)         => x.pure[CompileM]
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
+  }
+
+  implicit class RichBoolean(val b: Boolean) extends AnyVal {
+    final def toOption[A](a: => A): Option[A] = if (b) Some(a) else None
   }
 
   def apply(c: CompilerContext, expr: Expressions.EXPR): Either[String, (EXPR, FINAL)] =

@@ -23,8 +23,8 @@ object ContractCompiler {
 
   def compileAnnotatedFunc(
       af: Expressions.ANNOTATEDFUNC,
-      version: StdLibVersion
-  ): CompileM[(Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])] = {
+      version: StdLibVersion,
+      saveExprContext: Boolean): CompileM[(Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])] = {
 
     def getCompiledAnnotatedFunc(
         annListWithErr: (Option[Iterable[Annotation]], Iterable[CompilationError]),
@@ -72,7 +72,7 @@ object ContractCompiler {
       annotationBindings = annotationsWithErr._1.map(_.flatMap(_.dic(version).toList)).getOrElse(List.empty)
       compiledBody <- local {
         modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(
-          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, annotationBindings.map(_._1))
+          _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1))
         )
       }
       annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
@@ -89,16 +89,16 @@ object ContractCompiler {
     } yield (resultAnnFunc, typedParams, parseNodeExpr, errorList)
   }
 
-  def compileDeclaration(dec: Expressions.Declaration): CompileM[CompilationStepResultDec] = {
+  def compileDeclaration(dec: Expressions.Declaration, saveExprContext: Boolean): CompileM[CompilationStepResultDec] = {
     dec match {
       case l: Expressions.LET =>
         for {
-          compiledLet      <- compileLet(dec.position, l)
+          compiledLet      <- compileLet(dec.position, l, saveExprContext)
           updateCtxWithErr <- updateCtx(compiledLet.dec.name, compiledLet.t, dec.position).handleError()
         } yield compiledLet.copy(errors = compiledLet.errors ++ updateCtxWithErr._2)
       case f: FUNC =>
         for {
-          compiledFunc <- compileFunc(dec.position, f)
+          compiledFunc <- compileFunc(dec.position, f, saveExprContext)
           (funcName, compiledFuncBodyType, argTypes) = (compiledFunc._1.dec.name, compiledFunc._1.t, compiledFunc._2)
           typeSig                                    = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(funcName))
           updateCtxWithErr <- updateCtx(funcName, typeSig).handleError()
@@ -109,10 +109,11 @@ object ContractCompiler {
   private def compileContract(
       ctx: CompilerContext,
       parsedDapp: Expressions.DAPP,
-      version: StdLibVersion
+      version: StdLibVersion,
+      saveExprContext: Boolean = false
   ): CompileM[(Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     for {
-      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](compileDeclaration)
+      decsCompileResult <- parsedDapp.decs.traverse[CompileM, CompilationStepResultDec](dec => compileDeclaration(dec, saveExprContext))
       decs           = decsCompileResult.map(_.dec)
       parsedNodeDecs = decsCompileResult.map(_.parseNodeExpr)
       duplicateVarsErr   <- validateDuplicateVarsInContract(parsedDapp).handleError()
@@ -136,7 +137,7 @@ object ContractCompiler {
         .handleError()
       compiledAnnFuncsWithErr <- parsedDapp.fs
         .traverse[CompileM, (Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])](
-          af => local(compileAnnotatedFunc(af, version))
+          af => local(compileAnnotatedFunc(af, version, saveExprContext))
         )
       annotatedFuncs   = compiledAnnFuncsWithErr.filter(_._1.nonEmpty).map(_._1.get)
       parsedNodeAFuncs = compiledAnnFuncsWithErr.map(_._3)
@@ -301,11 +302,12 @@ object ContractCompiler {
   def compileWithParseResult(
       input: String,
       ctx: CompilerContext,
-      version: StdLibVersion
+      version: StdLibVersion,
+      saveExprContext: Boolean = true
   ): Either[String, (Option[DApp], Expressions.DAPP, Iterable[CompilationError])] = {
     ParserV2.parseDAPP(input) match {
       case Right((parseResult, removedCharPosOpt)) =>
-        compileContract(ctx, parseResult, version)
+        compileContract(ctx, parseResult, version, saveExprContext)
           .run(ctx)
           .map(
             _._2

@@ -489,8 +489,9 @@ object ParserV2 {
       .flatMap {
         case ex: ParseError => {
           val errorLastPos = ex.position.index
-          val tmpStr = (new ParserV2(source.toString())).formatError(ex, new ErrorFormatter(showTraces = true))
-          println(tmpStr)
+          //TODO remove debug code
+          //val tmpStr = (new ParserV2(source.toString())).formatError(ex, new ErrorFormatter(showTraces = true))
+          //println(tmpStr)
           val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
           val posList = Set(errorLastPos, lastRemovedCharPos)
           if (lastRemovedCharPos > 0) {
