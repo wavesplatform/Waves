@@ -45,7 +45,7 @@ object SetAssetScriptTransaction extends TransactionParser {
 
   val typeId: TxType = 15
 
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   override val classTag = ClassTag(classOf[SetAssetScriptTransaction])
 

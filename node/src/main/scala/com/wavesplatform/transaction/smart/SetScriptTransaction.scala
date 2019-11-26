@@ -42,7 +42,7 @@ object SetScriptTransaction extends TransactionParser {
   override type TransactionT = SetScriptTransaction
 
   override val typeId: TxType                    = 13
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2)
   override val classTag                          = ClassTag(classOf[SetScriptTransaction])
 
   implicit val validator: TxValidator[SetScriptTransaction] =

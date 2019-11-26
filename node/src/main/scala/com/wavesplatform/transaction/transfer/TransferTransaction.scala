@@ -54,7 +54,7 @@ object TransferTransaction extends TransactionParser {
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
   val typeId: TxType                    = 4.toByte
-  val supportedVersions: Set[TxVersion] = Set(1.toByte, 2.toByte)
+  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
   val classTag                          = ClassTag(classOf[TransferTransaction])
 
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
