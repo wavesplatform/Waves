@@ -45,7 +45,7 @@ object BurnTransaction extends TransactionParser {
   override type TransactionT = BurnTransaction
 
   override val typeId: TxType                    = 6
-  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
   override val classTag                          = ClassTag(classOf[BurnTransaction])
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
