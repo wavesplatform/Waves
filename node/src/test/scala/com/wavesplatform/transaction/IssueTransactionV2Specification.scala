@@ -13,8 +13,10 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, utils}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.utils.StrUtils
 import com.wavesplatform.{TransactionGen, WithDB, crypto}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -162,5 +164,31 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     )
 
     tx shouldBe 'left
+  }
+
+  property("parses invalid UTF-8 string") {
+    forAll(byteArrayGen(16), accountGen) { (bytes, sender) =>
+      val tx = IssueTransaction
+        .selfSigned(
+          2.toByte,
+          sender,
+          StrUtils.toStringExact(bytes),
+          StrUtils.toStringExact(bytes),
+          1,
+          1,
+          reissuable = false,
+          None,
+          1000000,
+          System.currentTimeMillis()
+        )
+        .explicitGet()
+
+      tx.nameBytes shouldBe bytes
+      tx.descBytes shouldBe bytes
+
+      val pb     = PBTransactions.protobuf(tx)
+      val fromPB = PBTransactions.vanillaUnsafe(pb)
+      fromPB shouldBe tx
+    }
   }
 }
