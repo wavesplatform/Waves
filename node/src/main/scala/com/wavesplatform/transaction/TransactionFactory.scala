@@ -254,11 +254,11 @@ object TransactionFactory {
     for {
       sender <- wallet.findPrivateKey(request.sender)
       signer <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
-      tx     <- DataTransaction.signed(1.toByte, sender, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
+      tx     <- DataTransaction.signed(request.version, sender, request.data, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def data(request: DataRequest, sender: PublicKey): Either[ValidationError, DataTransaction] =
-    DataTransaction.create(1.toByte, sender, request.data, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
+    DataTransaction.create(request.version, sender, request.data, request.fee, request.timestamp.getOrElse(0), Proofs.empty)
 
   def invokeScript(request: InvokeScriptRequest, wallet: Wallet, time: Time): Either[ValidationError, InvokeScriptTransaction] =
     invokeScript(request, wallet, request.sender, time)
