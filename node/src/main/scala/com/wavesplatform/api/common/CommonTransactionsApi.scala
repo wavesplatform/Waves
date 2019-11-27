@@ -1,8 +1,8 @@
 package com.wavesplatform.api.common
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.common.CommonTransactionsApi.MerkleInfo
+import com.wavesplatform.api.http.ApiError.InvalidSignature
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.block.{Block, BlockMerkleOps}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64
@@ -16,9 +16,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
-import play.api.libs.json.{Json, Writes}
-import scorex.crypto.authds.merkle.MerkleProof
-import scorex.crypto.hash.Digest32
+import play.api.libs.json._
 
 private[api] class CommonTransactionsApi(
     blockchain: Blockchain,
@@ -46,36 +44,36 @@ private[api] class CommonTransactionsApi(
           (asset, feeInAsset, feeInWaves)
       }
 
-  def transactionsMerkleInfo(transactionIds: List[ByteStr]): List[MerkleInfo] =
+  def transactionsMerkleInfo(transactionIds: List[ByteStr]): List[TransactionProof] =
     for {
       transactionId         <- transactionIds
       (height, transaction) <- transactionById(transactionId)
       block                 <- blockchain.blockAt(height) if block.header.version >= Block.ProtoBlockVersion
       merkleProof           <- block.transactionProof(transaction)
-    } yield MerkleInfo(transactionId, merkleProof)
+    } yield merkleProof
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }
 
 private[api] object CommonTransactionsApi {
-  case class MerkleInfo(
-      id: ByteStr,
-      merkleProof: MerkleProof[Digest32]
-  )
 
-  object MerkleInfo {
+  def proofBytes(levels: Seq[Array[Byte]]): List[String] =
+    (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
 
-    def proofBytes(proof: MerkleProof[Digest32]): Array[Byte] =
-      (proof.levels foldLeft Array.emptyByteArray) {
-        case (acc, (d, s)) =>
-          Bytes.concat(acc, Array(s), Array(d.length.toByte), d)
-      }
+  implicit val merkleInfoWrites: Writes[TransactionProof] = Writes { mi =>
+    Json.obj(
+      "id"               -> mi.id.toString,
+      "transactionIndex" -> mi.transactionIndex,
+      "merkleProof"      -> proofBytes(mi.digests)
+    )
+  }
 
-    implicit val merkleInfoWrites: Writes[MerkleInfo] = Writes { mi =>
-      Json.obj(
-        "id"          -> mi.id.toString,
-        "merkleProof" -> s"${Base64.Prefix}${Base64.encode(proofBytes(mi.merkleProof))}"
-      )
-    }
+  implicit val merkleInfoReads: Reads[TransactionProof] = Reads { jsv =>
+    for {
+      encoded          <- (jsv \ "id").validate[String]
+      id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
+      transactionIndex <- (jsv \ "transactionIndex").validate[Int]
+      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base64.decode))
+    } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 }

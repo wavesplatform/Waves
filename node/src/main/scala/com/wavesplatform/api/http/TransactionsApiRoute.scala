@@ -9,7 +9,9 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -39,6 +41,7 @@ case class TransactionsApiRoute(
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
+  import TransactionsApiRoute._
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
@@ -328,5 +331,25 @@ object TransactionsApiRoute {
   object LeaseStatus {
     val Active   = "active"
     val Canceled = "canceled"
+  }
+
+  implicit val merkleInfoWrites: Writes[TransactionProof] = Writes { mi =>
+    def proofBytes(levels: Seq[Array[Byte]]): List[String] =
+      (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
+
+    Json.obj(
+      "id"               -> mi.id.toString,
+      "transactionIndex" -> mi.transactionIndex,
+      "merkleProof"      -> proofBytes(mi.digests)
+    )
+  }
+
+  implicit val merkleInfoReads: Reads[TransactionProof] = Reads { jsv =>
+    for {
+      encoded          <- (jsv \ "id").validate[String]
+      id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
+      transactionIndex <- (jsv \ "transactionIndex").validate[Int]
+      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base64.decode))
+    } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 }

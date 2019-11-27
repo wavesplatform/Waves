@@ -6,6 +6,7 @@ import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
@@ -20,7 +21,6 @@ import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
-import com.wavesplatform.utils.Merkle
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
@@ -31,7 +31,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
-import scorex.crypto.authds.LeafData
 
 import scala.util.Random
 
@@ -439,7 +438,7 @@ class TransactionsRouteSpec
   }
 
   routePath("/merkleProof") - {
-    import com.wavesplatform.block.TransactionMerkleOps
+    import com.wavesplatform.block.BlockMerkleOps
 
     val transactionsGen = for {
       txsSize <- Gen.choose(1, 10)
@@ -488,18 +487,18 @@ class TransactionsRouteSpec
       proofs.size shouldBe txIdsToBlock.size
 
       proofs.foreach { p =>
-        val transactionId = (p \ "id").as[String]
+        val transactionId    = (p \ "id").as[String]
+        val transactionIndex = (p \ "transactionIndex").as[Int]
+        val digests          = (p \ "merkleProof").as[List[String]].map(Base64.decode)
 
         val block       = txIdsToBlock(transactionId)
         val transaction = block.transactionData.find(_.id().toString == transactionId)
 
         transaction shouldBe 'defined
         txIdsToBlock.keySet should contain(transactionId)
+        transactionIndex shouldBe block.transactionData.indexOf(transaction.value)
 
-        val proof = Base64.decode((p \ "merkleProof").as[String])
-        val value = transaction.value.mkMerkleLeaf().data untag LeafData
-
-        Merkle.verify(block.header.transactionsRoot, proof, value) shouldBe true
+        block.verifyTransactionProof(TransactionProof(transaction.value.id(), transactionIndex, digests)) shouldBe true
       }
     }
 
