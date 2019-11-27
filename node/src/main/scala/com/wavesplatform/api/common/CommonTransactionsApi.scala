@@ -44,13 +44,13 @@ private[api] class CommonTransactionsApi(
           (asset, feeInAsset, feeInWaves)
       }
 
-  def transactionsMerkleInfo(transactionIds: List[ByteStr]): List[TransactionProof] =
+  def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
     for {
       transactionId         <- transactionIds
       (height, transaction) <- transactionById(transactionId)
       block                 <- blockchain.blockAt(height) if block.header.version >= Block.ProtoBlockVersion
-      merkleProof           <- block.transactionProof(transaction)
-    } yield merkleProof
+      transactionProof      <- block.transactionProof(transaction)
+    } yield transactionProof
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }

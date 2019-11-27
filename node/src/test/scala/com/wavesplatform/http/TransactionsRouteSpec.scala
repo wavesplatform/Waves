@@ -482,7 +482,7 @@ class TransactionsRouteSpec
     def validateSuccess(txIdsToBlock: Map[String, Block], response: HttpResponse): Unit = {
       response.status shouldBe StatusCodes.OK
 
-      val proofs = (responseAs[JsObject] \ "transactions").as[List[JsObject]]
+      val proofs = responseAs[List[JsObject]]
 
       proofs.size shouldBe txIdsToBlock.size
 
@@ -542,7 +542,7 @@ class TransactionsRouteSpec
           val requestBody = Json.obj("ids" -> requestedIds)
 
           def validate(response: HttpResponse): Unit = {
-            val proofsSize = (responseAs[JsObject] \ "transactions").as[List[JsObject]].size
+            val proofsSize = responseAs[List[JsObject]].size
             proofsSize shouldBe (requestedIds.size - invalidBlocks.map(_.transactionData.size).sum - unknownTransactions.size)
             validateSuccess(txIdsToBlock, response)
           }

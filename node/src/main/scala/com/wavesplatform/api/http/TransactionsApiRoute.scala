@@ -263,9 +263,9 @@ case class TransactionsApiRoute(
   private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
     encodedIds.traverse(ByteStr.decodeBase58) match {
       case Success(txIds) =>
-        commonApi.transactionsMerkleInfo(txIds) match {
+        commonApi.transactionProofs(txIds) match {
           case Nil    => CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
-          case proofs => Json.obj("transactions" -> proofs)
+          case proofs => proofs
         }
       case _ => InvalidSignature
     }
@@ -333,7 +333,7 @@ object TransactionsApiRoute {
     val Canceled = "canceled"
   }
 
-  implicit val merkleInfoWrites: Writes[TransactionProof] = Writes { mi =>
+  implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
     def proofBytes(levels: Seq[Array[Byte]]): List[String] =
       (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
 
@@ -344,7 +344,7 @@ object TransactionsApiRoute {
     )
   }
 
-  implicit val merkleInfoReads: Reads[TransactionProof] = Reads { jsv =>
+  implicit val transactionProofReads: Reads[TransactionProof] = Reads { jsv =>
     for {
       encoded          <- (jsv \ "id").validate[String]
       id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
