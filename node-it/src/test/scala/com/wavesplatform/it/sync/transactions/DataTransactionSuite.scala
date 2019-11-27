@@ -17,6 +17,23 @@ import scala.util.{Failure, Random, Try}
 
 //noinspection NameBooleanParameters
 class DataTransactionSuite extends BaseTransactionSuite {
+  test("remove keys") {
+    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
+    val boolData    = List(BooleanDataEntry(nonLatinKey, true))
+    val boolDataFee = calcDataFee(boolData)
+    val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(firstTx)
+    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
+
+    val removeData = List(EmptyDataEntry(nonLatinKey))
+    val removeDataFee = calcDataFee(removeData)
+    val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(secondTx)
+    assertApiError(sender.getDataByKey(firstAddress, nonLatinKey)) { error =>
+      error.statusCode shouldBe 404
+    }
+    sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
+  }
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = miner.accountBalances(firstAddress)
@@ -311,23 +328,5 @@ class DataTransactionSuite extends BaseTransactionSuite {
     sender.getDataByKey(thirdAddress, s"integer$r") shouldBe IntegerDataEntry(s"integer$r", 1000 - r)
 
     sender.getData(thirdAddress).size shouldBe 1000
-  }
-
-  test("remove keys") {
-    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
-    val boolData    = List(BooleanDataEntry(nonLatinKey, true))
-    val boolDataFee = calcDataFee(boolData)
-    val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
-    nodes.waitForHeightAriseAndTxPresent(firstTx)
-    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
-
-    val removeData = List(EmptyDataEntry(nonLatinKey))
-    val removeDataFee = calcDataFee(removeData)
-    val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
-    nodes.waitForHeightAriseAndTxPresent(secondTx)
-    assertApiError(sender.getDataByKey(firstAddress, nonLatinKey)) { error =>
-      error.statusCode shouldBe 404
-    }
-    sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
   }
 }

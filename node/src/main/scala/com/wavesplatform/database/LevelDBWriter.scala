@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import cats.Monoid
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -824,15 +825,18 @@ class LevelDBWriter(
       (0 until count).toArray.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
           .map { tx =>
-            val txBytes = tx.bytes()
-            Ints.toByteArray(txBytes.length) ++ txBytes
+            val txBytes = tx match {
+              case p: LegacyPBSwitch if p.isProtobufVersion => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
+              case _ => tx.bytes()
+            }
+            Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)
           }
           .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
       }
     }
 
     db.get(headerKey)
-      .map { headerBytes =>
+      .map { headerBytes => // TODO: Only protobuf serialization
         val version             = headerBytes.head
         val consensusDataOffset = 1 + Longs.BYTES + SignatureLength // version + timestamp + reference
         val genSigLength        = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength

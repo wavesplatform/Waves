@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import com.google.common.cache.{CacheBuilder, CacheLoader}
 import com.google.common.util.concurrent.UncheckedExecutionException
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
@@ -34,8 +35,8 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
   private val knownBlocks = CacheBuilder
     .newBuilder()
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
-    .build(new CacheLoader[ByteStr, Array[Byte]] {
-      override def load(key: ByteStr) = ng.blockBytes(key).get
+    .build(new CacheLoader[ByteStr, Block] {
+      override def load(key: ByteStr) = ng.blockById(key).get
     })
 
   private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Message]]): Unit =
@@ -73,7 +74,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
       )
 
     case GetBlock(sig) =>
-      respondWith(ctx, Task(handlingNSE(knownBlocks.get(sig)).map(bytes => RawBytes(BlockSpec.messageCode, bytes))))
+      respondWith(ctx, Task(handlingNSE(knownBlocks.get(sig)).map(block => RawBytes.fromBlock(block))))
 
     case MicroBlockRequest(totalResBlockSig) =>
       respondWith(ctx, Task(handlingNSE(knownMicroBlocks.get(totalResBlockSig)).map(bytes => RawBytes(MicroBlockResponseSpec.messageCode, bytes))))

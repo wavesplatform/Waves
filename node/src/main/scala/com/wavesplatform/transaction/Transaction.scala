@@ -15,6 +15,7 @@ trait Transaction {
   def timestamp: Long
   def chainByte: Option[Byte] = None
 
+  def bytesSize: Int = bytes().length
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
   override def toString: String = json().toString

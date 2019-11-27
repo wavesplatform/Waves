@@ -40,7 +40,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
-      V.cond(Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false), TooBigArray)
+      V.cond(Try(tx.bytesSize <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false), TooBigArray)
     )
   }
 }

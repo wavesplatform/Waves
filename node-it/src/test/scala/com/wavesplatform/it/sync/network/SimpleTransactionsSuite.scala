@@ -33,7 +33,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
       .right
       .get
 
-    node.sendByNetwork(RawBytes.from(tx))
+    node.sendByNetwork(RawBytes.fromTransaction(tx))
     node.waitForTransaction(tx.id().toString)
 
   }
@@ -44,7 +44,7 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
       .right
       .get
 
-    node.sendByNetwork(RawBytes.from(tx))
+    node.sendByNetwork(RawBytes.fromTransaction(tx))
     val maxHeight = nodes.map(_.height).max
     nodes.waitForHeight(maxHeight + 1)
     node.ensureTxDoesntExist(tx.id().toString)

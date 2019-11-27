@@ -35,12 +35,13 @@ case class MicroBlock(
 object MicroBlock extends ScorexLogging {
 
   def buildAndSign(
+      version: Byte,
       generator: KeyPair,
       transactionData: Seq[Transaction],
       prevResBlockSig: BlockId,
       totalResBlockSig: BlockId
   ): Either[ValidationError, MicroBlock] =
-    MicroBlock(version = 3.toByte, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).validate
+    MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).validate
       .map(_.sign(generator))
 
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =

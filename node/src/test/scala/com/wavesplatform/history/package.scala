@@ -85,12 +85,7 @@ package object history {
   ): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val nonSigned = MicroBlock
-      .buildAndSign(
-        generator = signer,
-        transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
-      )
+      .buildAndSign(version, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
       .explicitGet()
     (newTotalBlock, nonSigned)
   }
@@ -98,12 +93,7 @@ package object history {
   def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val nonSigned = MicroBlock
-      .buildAndSign(
-        generator = signer,
-        transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
-      )
+      .buildAndSign(3.toByte, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
       .explicitGet()
     (newTotalBlock, nonSigned)
   }
