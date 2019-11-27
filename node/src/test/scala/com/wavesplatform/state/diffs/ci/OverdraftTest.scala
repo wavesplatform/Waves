@@ -34,14 +34,14 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
   private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId)    * FeeValidation.FeeUnit
   private val IssueFee     = FeeConstants(IssueTransaction.typeId)        * FeeValidation.FeeUnit
 
-  private val dAppVersionsWithActivatedV4: List[(StdLibVersion, Boolean)] =
+  private val dAppVersionsWithActivation: List[(StdLibVersion, Boolean)] =
     DirectiveDictionary[StdLibVersion].all
       .filter(_ >= V3)
       .map((_, true))
       .toList
 
   private val allDAppVersions: Gen[(StdLibVersion, Boolean)] =
-    Gen.oneOf((V3, false) :: dAppVersionsWithActivatedV4)
+    Gen.oneOf((V3, false) :: dAppVersionsWithActivation)
 
   property("insufficient fee") {
     forAll(
@@ -90,12 +90,27 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
   property("overdraft with payment V4") {
     forAll(
       for {
-        (genesis, setDApp, ci, issue) <- paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(V4))
-      } yield (genesis, setDApp, ci, issue)
+        (version, activation)         <- Gen.oneOf(dAppVersionsWithActivation.filter(_._1 >= V4))
+        (genesis, setDApp, ci, issue) <- paymentPreconditions(withEnoughFee = true, withPayment = true, payingDApp(version))
+      } yield (genesis, setDApp, ci, issue, activation)
     ) {
-      case (genesis, setDApp, ci, issue) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), features(withV4 = true)) {
+      case (genesis, setDApp, ci, issue, activation) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), features(activation)) {
           _ shouldBe 'right
+        }
+    }
+  }
+
+  property("attach unexisting tokens using multiple payment") {
+    forAll(
+      for {
+        (version, activation)         <- Gen.oneOf(dAppVersionsWithActivation)
+        (genesis, setDApp, ci, issue) <- splitPaymentPreconditions(version)
+      } yield (genesis, setDApp, ci, issue, activation)
+    ) {
+      case (genesis, setDApp, ci, issue, activation) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ List(setDApp, issue))), TestBlock.create(Seq(ci)), features(activation)) {
+          _ should produce("Attempt to transfer unavailable funds: Transaction application leads to negative asset")
         }
     }
   }
@@ -125,6 +140,25 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
       } yield (List(genesis, genesis2), setDApp, ci, issue)
     }.explicitGet()
 
+  private def splitPaymentPreconditions(
+    version: StdLibVersion
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction)] =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      issue   <- issueV2TransactionGen(invoker, Gen.const(None), feeParam = Some(IssueFee))
+    } yield {
+      val count = ContractLimits.MaxAttachedPaymentAmount
+      val payments = (1 to count).map(_ => Payment(issue.quantity / count + 1, IssuedAsset(issue.id.value())))
+      for {
+        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, Some(payingAssetDApp(version, issue.assetId)), SetScriptFee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, payments, InvokeFee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, issue)
+    }.explicitGet()
+
   private def emptyResultDApp(version: StdLibVersion): Script = {
     val body = if (version >= V4) "[]" else "WriteSet([])"
     dApp(body, version)
@@ -132,6 +166,12 @@ class OverdraftTest extends PropSpec with PropertyChecks with Matchers with Tran
 
   private def payingDApp(version: StdLibVersion): Script = {
     val transfer = s"ScriptTransfer(i.caller, $InvokeFee, unit)"
+    val body = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
+    dApp(body, version)
+  }
+
+  private def payingAssetDApp(version: StdLibVersion, assetId: ByteStr): Script = {
+    val transfer = s"ScriptTransfer(i.caller, $InvokeFee, base58'${assetId.toString}')"
     val body = if (version >= V4) s"[$transfer]" else s"TransferSet([$transfer])"
     dApp(body, version)
   }
