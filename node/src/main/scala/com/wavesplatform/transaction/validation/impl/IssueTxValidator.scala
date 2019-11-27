@@ -14,7 +14,11 @@ object IssueTxValidator extends TxValidator[IssueTransaction] {
       V.assetName(name),
       V.assetDescription(description),
       V.assetDecimals(decimals),
-      V.fee(fee),
+      (if(version == TxVersion.Pseudo) {
+        V.zeroFee(fee)
+      } else {
+       V.fee(fee)
+      }),
       V.cond(version > TxVersion.V1 || script.isEmpty, GenericError("Script not supported")),
       V.cond(script.forall(_.isInstanceOf[ExprScript]), GenericError(s"Asset can only be assigned with Expression script, not Contract"))
     )

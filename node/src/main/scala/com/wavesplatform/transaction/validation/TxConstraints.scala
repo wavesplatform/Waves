@@ -4,7 +4,7 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError
+import com.wavesplatform.transaction.{TxValidationError, TxVersion}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
@@ -30,6 +30,15 @@ object TxConstraints {
         fee > 0,
         fee,
         TxValidationError.InsufficientFee()
+      )
+  }
+
+  def zeroFee(fee: Long): ValidatedV[Long] = {
+    Validated
+      .condNel(
+        fee == 0,
+        fee,
+        TxValidationError.UnsupportedVersion(TxVersion.Pseudo)
       )
   }
 
