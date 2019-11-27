@@ -36,6 +36,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.smart.script.trace.TracedResult.applicativeTracedResult
 import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -46,6 +47,9 @@ object InvokeScriptTransactionDiff {
 
   private val stats = TxProcessingStats
   import stats.TxTimerExt
+
+  def prepareIssue(tx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): Either[ValidationError, IssueTransaction] =
+    IssueTransaction.create(TxVersion.Pseudo, pk, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, 0, tx.timestamp, List())
 
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
@@ -114,6 +118,7 @@ object InvokeScriptTransactionDiff {
 
           actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
           transfers = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+          issues   <- actionsByType(classOf[Issue])        .asInstanceOf[List[Issue]].map(i => TracedResult.wrapE(prepareIssue(tx, pk, i))).sequence
           reissues  = actionsByType(classOf[Reissue])      .asInstanceOf[List[Reissue]]
           burns     = actionsByType(classOf[Burn])         .asInstanceOf[List[Burn]]
 
@@ -216,7 +221,7 @@ object InvokeScriptTransactionDiff {
               .flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
               },
-            List() /*XXX*/,
+            issues,
             reissues,
             burns
           )
@@ -356,8 +361,7 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] =
-        IssueTransaction.create(TxVersion.Pseudo, pk /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, 0, tx.timestamp, List()).flatMap(AssetTransactionsDiff.issue(blockchain))
-//        InvokeScriptIssueTransaction.create(??? /*dAppAddress*/, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, tx.timestamp).flatMap(AssetTransactionsDiff.issue(blockchain))
+        prepareIssue(tx, pk, issue).flatMap(AssetTransactionsDiff.issue(blockchain))
 
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
         val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)

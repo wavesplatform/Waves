@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart.script.trace
 
 import cats.implicits._
+import cats.{Applicative, Apply, Functor}
 import cats.kernel.Semigroup
 import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.transaction.Transaction
@@ -56,4 +57,17 @@ object TracedResult {
         a.resultE |+| b.resultE,
         if (a.resultE.isRight) a.trace |+| b.trace else a.trace
       )
+
+  implicit def applicativeTracedResult[L]: Applicative[TracedResult[L, ?]] with Apply[TracedResult[L, ?]] with Functor[TracedResult[L, ?]]  = new Applicative[TracedResult[L, ?]] {
+    def pure[A](v:A) = wrapValue[A, L](v)
+    def ap[A,B](fb: TracedResult[L, A=>B])(fa: TracedResult[L, A]) : TracedResult[L, B] = {
+      TracedResult(fa.resultE ap fb.resultE, fa.trace ++ fb.trace)
+    }
+    override def product[A,B](fa: TracedResult[L, A], fb: TracedResult[L, B]) : TracedResult[L, (A,B)] = {
+      TracedResult(fa.resultE product fb.resultE, fa.trace ++ fb.trace)
+    }
+    override def map[A,B](x: TracedResult[L, A])(f: A=>B) : TracedResult[L, B] = {
+      TracedResult[L,B](x.resultE map f, x.trace)
+    }
+  }
 }
