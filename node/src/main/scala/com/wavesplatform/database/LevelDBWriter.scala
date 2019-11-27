@@ -186,13 +186,23 @@ class LevelDBWriter(
   )
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(asset.id, db) match {
-      case Some((_, i: IssueTransaction)) =>
-        val ai          = db.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).getOrElse(AssetInfo(i.reissuable, i.quantity))
+    transactionInfo(asset.id, db) collect {
+      case (h, i: IssueTransaction) =>
+        lazy val defaultAssetInfo = AssetInfo(new String(i.name), new String(i.description))
+
+        val ad = db.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset)).getOrElse(AssetDetails(i.reissuable, i.quantity))
+
+        val (ai, lastUpdateHeight) =
+          (for {
+            lastUpdateHeight <- db.get(Keys.assetInfoHistory(asset)).headOption
+            assetInfo = db.get(Keys.assetInfo(asset)(height))
+          } yield (assetInfo, Height @@ lastUpdateHeight))
+            .getOrElse((defaultAssetInfo, Height @@ h))
+
         val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
         val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-        Some(AssetDescription(i.sender, i.name, i.description, i.decimals, ai.isReissuable, ai.volume, script.map(_._1), sponsorship))
-      case _ => None
+
+        AssetDescription(i.sender, ai.name, ai.description, i.decimals, ad.isReissuable, ad.volume, lastUpdateHeight, script.map(_._1), sponsorship)
     }
   }
 
@@ -237,7 +247,7 @@ class LevelDBWriter(
       leaseBalances: Map[BigInt, LeaseBalance],
       addressTransactions: Map[AddressId, List[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
-      reissuedAssets: Map[IssuedAsset, AssetInfo],
+      reissuedAssets: Map[IssuedAsset, AssetDetails],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
@@ -352,11 +362,11 @@ class LevelDBWriter(
     }
 
     for ((asset, assetInfo) <- reissuedAssets) {
-      val combinedAssetInfo = rw.fromHistory(Keys.assetInfoHistory(asset), Keys.assetInfo(asset)).fold(assetInfo) { p =>
+      val combinedAssetInfo = rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset)).fold(assetInfo) { p =>
         Monoid.combine(p, assetInfo)
       }
-      rw.put(Keys.assetInfo(asset)(height), combinedAssetInfo)
-      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(asset), threshold, Keys.assetInfo(asset))
+      rw.put(Keys.assetDetails(asset)(height), combinedAssetInfo)
+      expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
     }
 
     for ((leaseId, state) <- leaseStates) {
@@ -635,8 +645,8 @@ class LevelDBWriter(
   }
 
   private def rollbackAssetInfo(rw: RW, asset: IssuedAsset, currentHeight: Int): IssuedAsset = {
-    rw.delete(Keys.assetInfo(asset)(currentHeight))
-    rw.filterHistory(Keys.assetInfoHistory(asset), currentHeight)
+    rw.delete(Keys.assetDetails(asset)(currentHeight))
+    rw.filterHistory(Keys.assetDetailsHistory(asset), currentHeight)
     asset
   }
 

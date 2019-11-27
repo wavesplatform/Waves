@@ -20,8 +20,8 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       yield
         AssetInfoResponse(
           info.description.issuer,
-          ByteString.copyFrom(info.description.name),
-          ByteString.copyFrom(info.description.description),
+          ByteString.copyFrom(info.description.name.getBytes),
+          ByteString.copyFrom(info.description.description.getBytes),
           info.description.decimals,
           info.description.reissuable,
           info.description.totalVolume.longValue(),

@@ -66,6 +66,8 @@ case class UpdateAssetInfoTransaction(
 }
 
 object UpdateAssetInfoTransaction extends TransactionParser {
+  val MIN_UPDATE_INFO_INTERVAL: Int = 100000
+
   override type TransactionT = UpdateAssetInfoTransaction
 
   override val typeId: TxType                                 = 17: Byte

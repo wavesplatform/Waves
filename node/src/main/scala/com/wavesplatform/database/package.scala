@@ -107,7 +107,7 @@ package object database extends ScorexLogging {
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {
-        case crypto.DigestLength      => new Array[Byte](crypto.DigestLength)
+        case crypto.DigestLength    => new Array[Byte](crypto.DigestLength)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
       b.get(buffer)
@@ -122,7 +122,7 @@ package object database extends ScorexLogging {
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
           b.put(id.arr.length match {
-              case crypto.DigestLength      => crypto.DigestLength.toByte
+              case crypto.DigestLength    => crypto.DigestLength.toByte
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
             .put(id.arr)
@@ -252,18 +252,43 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readAssetInfo(data: Array[Byte]): AssetInfo = {
+  def readAssetDetails(data: Array[Byte]): AssetDetails = {
     val ndi     = newDataInput(data)
     val reissue = ndi.readBoolean()
     val volume  = ndi.readBigInt()
-    AssetInfo(reissue, volume)
+    AssetDetails(reissue, volume)
   }
 
-  def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
+  def writeAssetDetails(ai: AssetDetails): Array[Byte] = {
     val ndo = newDataOutput()
     ndo.writeBoolean(ai.isReissuable)
     ndo.writeBigInt(ai.volume)
     ndo.toByteArray
+  }
+
+  def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
+    val ndo = newDataOutput()
+
+    val nameBytes        = ai.name.getBytes("UTF-8")
+    val descriptionBytes = ai.description.getBytes("UTF-8")
+
+    ndo.writeByte(nameBytes.length.toByte)
+    ndo.write(nameBytes)
+    ndo.writeShort(descriptionBytes.length.toShort)
+    ndo.write(descriptionBytes)
+
+    ndo.toByteArray
+  }
+
+  def readAssetInfo(arr: Array[Byte]): AssetInfo = {
+    val ndi = newDataInput(arr)
+
+    val nameBytesLength        = ndi.readByte().toInt
+    val nameBytes              = ndi.readBytes(nameBytesLength)
+    val descriptionBytesLength = ndi.readShort()
+    val descriptionBytes       = ndi.readBytes(descriptionBytesLength)
+
+    AssetInfo(new String(nameBytes), new String(descriptionBytes))
   }
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
@@ -305,7 +330,7 @@ package object database extends ScorexLogging {
   def readBlockInfo(bs: Array[Byte]): BlockInfo = {
     val ndi = newDataInput(bs)
 
-    val size   = ndi.readInt()
+    val size      = ndi.readInt()
     val version   = ndi.readByte()
     val timestamp = ndi.readLong()
 
@@ -315,7 +340,7 @@ package object database extends ScorexLogging {
     val baseTarget = ndi.readLong()
 
     val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig = new Array[Byte](genSigLength)
+    val genSig       = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
@@ -335,7 +360,7 @@ package object database extends ScorexLogging {
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header =  BlockHeader(
+    val header = BlockHeader(
       version,
       timestamp,
       ByteStr(referenceArr),

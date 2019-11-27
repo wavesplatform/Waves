@@ -40,30 +40,33 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: BigInt)
-object AssetInfo {
-  implicit val assetInfoMonoid: Monoid[AssetInfo] = new Monoid[AssetInfo] {
-    override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)
-    override def combine(x: AssetInfo, y: AssetInfo): AssetInfo =
-      AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
+case class AssetInfo(name: String, description: String)
+
+case class AssetDetails(isReissuable: Boolean, volume: BigInt)
+object AssetDetails {
+  implicit val assetInfoMonoid: Monoid[AssetDetails] = new Monoid[AssetDetails] {
+    override def empty: AssetDetails = AssetDetails(isReissuable = true, 0)
+    override def combine(x: AssetDetails, y: AssetDetails): AssetDetails =
+      AssetDetails(x.isReissuable && y.isReissuable, x.volume + y.volume)
   }
 }
 
 case class AssetDescription(
     issuer: PublicKey,
-    name: Array[Byte],
-    description: Array[Byte],
+    name: String,
+    description: String,
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
+    lastInfoUpdateHeight: Height,
     script: Option[Script],
     sponsorship: Long
 ) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
-        java.util.Arrays.equals(o.name, name) &&
-        java.util.Arrays.equals(o.description, description) &&
+        o.name.equals(name) &&
+        o.description.equals(description) &&
         o.decimals == decimals &&
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
@@ -126,38 +129,41 @@ object Sponsorship {
 }
 
 case class Diff(
-    transactions: Map[ByteStr, (Transaction, Set[Address])],
-    portfolios: Map[Address, Portfolio],
-    issuedAssets: Map[IssuedAsset, AssetInfo],
-    aliases: Map[Alias, Address],
-    orderFills: Map[ByteStr, VolumeAndFee],
-    leaseState: Map[ByteStr, Boolean],
-    scripts: Map[Address, Option[(Script, Long)]],
-    assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
-    accountData: Map[Address, AccountDataInfo],
-    sponsorship: Map[IssuedAsset, Sponsorship],
-    scriptsRun: Int,
-    scriptsComplexity: Long,
-    scriptResults: Map[ByteStr, InvokeScriptResult]
+                 transactions: Map[ByteStr, (Transaction, Set[Address])],
+                 portfolios: Map[Address, Portfolio],
+                 issuedAssets: Map[IssuedAsset, AssetDetails],
+                 updatedAssets: Map[IssuedAsset, AssetInfo],
+                 aliases: Map[Alias, Address],
+                 orderFills: Map[ByteStr, VolumeAndFee],
+                 leaseState: Map[ByteStr, Boolean],
+                 scripts: Map[Address, Option[(Script, Long)]],
+                 assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+                 accountData: Map[Address, AccountDataInfo],
+                 sponsorship: Map[IssuedAsset, Sponsorship],
+                 scriptsRun: Int,
+                 scriptsComplexity: Long,
+                 scriptResults: Map[ByteStr, InvokeScriptResult]
 )
 
 object Diff {
   def stateOps(
-      portfolios: Map[Address, Portfolio] = Map.empty,
-      assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
-      aliases: Map[Alias, Address] = Map.empty,
-      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(Script, Long)]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
-      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+                portfolios: Map[Address, Portfolio] = Map.empty,
+                assetDetails: Map[IssuedAsset, AssetDetails] = Map.empty,
+                assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
+                aliases: Map[Alias, Address] = Map.empty,
+                orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+                leaseState: Map[ByteStr, Boolean] = Map.empty,
+                scripts: Map[Address, Option[(Script, Long)]] = Map.empty,
+                assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
+                accountData: Map[Address, AccountDataInfo] = Map.empty,
+                sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+                scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
       transactions = Map(),
       portfolios = portfolios,
-      issuedAssets = assetInfos,
+      issuedAssets = assetDetails,
+      updatedAssets = assetInfos,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -171,24 +177,26 @@ object Diff {
     )
 
   def apply(
-      tx: Transaction,
-      portfolios: Map[Address, Portfolio] = Map.empty,
-      assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
-      aliases: Map[Alias, Address] = Map.empty,
-      orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
-      leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(Script, Long)]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
-      accountData: Map[Address, AccountDataInfo] = Map.empty,
-      sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
-      scriptsRun: Int = 0,
-      scriptsComplexity: Long = 0,
-      scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
+             tx: Transaction,
+             portfolios: Map[Address, Portfolio] = Map.empty,
+             assetDetails: Map[IssuedAsset, AssetDetails] = Map.empty,
+             assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
+             aliases: Map[Alias, Address] = Map.empty,
+             orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
+             leaseState: Map[ByteStr, Boolean] = Map.empty,
+             scripts: Map[Address, Option[(Script, Long)]] = Map.empty,
+             assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
+             accountData: Map[Address, AccountDataInfo] = Map.empty,
+             sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
+             scriptsRun: Int = 0,
+             scriptsComplexity: Long = 0,
+             scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
       transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
-      issuedAssets = assetInfos,
+      issuedAssets = assetDetails,
+      updatedAssets = assetInfos,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -201,9 +209,9 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
-  implicit val diffMonoid = new Monoid[Diff] {
+  implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
 
     override def combine(older: Diff, newer: Diff): Diff =
@@ -211,6 +219,7 @@ object Diff {
         transactions = older.transactions ++ newer.transactions,
         portfolios = older.portfolios.combine(newer.portfolios),
         issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
+        updatedAssets = older.updatedAssets ++ newer.updatedAssets,
         aliases = older.aliases ++ newer.aliases,
         orderFills = older.orderFills.combine(newer.orderFills),
         leaseState = older.leaseState ++ newer.leaseState,

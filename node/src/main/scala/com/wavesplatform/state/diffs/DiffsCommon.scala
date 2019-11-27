@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
-import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetDetails, Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -139,7 +139,7 @@ object DiffsCommon {
             Right(
               Diff.stateOps(
                 portfolios = Map(sender -> Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> reissue.quantity))),
-                assetInfos = Map(IssuedAsset(reissue.assetId) -> AssetInfo(volume = reissue.quantity, isReissuable = reissue.isReissuable)),
+                assetDetails = Map(IssuedAsset(reissue.assetId) -> AssetDetails(volume = reissue.quantity, isReissuable = reissue.isReissuable)),
               )
             )
           }
@@ -156,7 +156,7 @@ object DiffsCommon {
     validateAsset(blockchain, asset, sender, !burnAnyTokensEnabled).map { _ =>
       Diff.stateOps(
         portfolios = Map(sender -> Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> -burn.quantity))),
-        assetInfos = Map(asset -> AssetInfo(isReissuable = true, volume = -burn.quantity)),
+        assetDetails = Map(asset -> AssetDetails(isReissuable = true, volume = -burn.quantity)),
       )
     }
   }

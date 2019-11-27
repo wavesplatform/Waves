@@ -54,7 +54,7 @@ final case class CompositeBlockchain(
         diff.issuedAssets
           .get(asset)
           .map { newAssetInfo =>
-            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume)
+            val oldAssetInfo = AssetDetails(ad.reissuable, ad.totalVolume)
             val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
             ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
           }
@@ -76,7 +76,17 @@ final case class CompositeBlockchain(
           .get(asset.id)
           .collectFirst {
             case (it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
+              AssetDescription(
+                it.sender,
+                new String(it.name),
+                new String(it.description),
+                it.decimals,
+                it.reissuable,
+                it.quantity,
+                Height @@ this.height,
+                script,
+                sponsorship
+              )
           }
           .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
     }
@@ -250,7 +260,9 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
 
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {
       case Some(ng) if to == height =>
