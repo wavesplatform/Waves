@@ -5,15 +5,15 @@ import com.wavesplatform.transaction.validation.TxValidator
 import scala.reflect.ClassTag
 import scala.util.Try
 
-trait TransactionManifest {
+trait TransactionParser {
   type TransactionT <: Transaction
 
   def classTag: ClassTag[TransactionT]
-  def typeId: TxType
-  def supportedVersions: Set[TxVersion]
-}
 
-trait TransactionParser extends TransactionManifest {
+  def typeId: TxType
+
+  def supportedVersions: Set[TxVersion]
+
   def parseBytes(bytes: Array[Byte]): Try[TransactionT]
   def validator: TxValidator[TransactionT]
 }
