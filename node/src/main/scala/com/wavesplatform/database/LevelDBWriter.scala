@@ -248,6 +248,7 @@ class LevelDBWriter(
       addressTransactions: Map[AddressId, List[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
       reissuedAssets: Map[IssuedAsset, AssetDetails],
+      updatedAssets: Map[IssuedAsset, AssetInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
@@ -361,12 +362,17 @@ class LevelDBWriter(
       expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
     }
 
-    for ((asset, assetInfo) <- reissuedAssets) {
-      val combinedAssetInfo = rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset)).fold(assetInfo) { p =>
-        Monoid.combine(p, assetInfo)
+    for ((asset, assetDetails) <- reissuedAssets) {
+      val combinedAssetInfo = rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset)).fold(assetDetails) { p =>
+        Monoid.combine(p, assetDetails)
       }
       rw.put(Keys.assetDetails(asset)(height), combinedAssetInfo)
       expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
+    }
+
+    for ((asset, assetInfo) <- updatedAssets) {
+      rw.put(Keys.assetInfo(asset)(height), assetInfo)
+      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(asset), threshold, Keys.assetInfo(asset))
     }
 
     for ((leaseId, state) <- leaseStates) {
@@ -491,13 +497,13 @@ class LevelDBWriter(
       log.debug(s"Rolling back to block $targetBlockId at $targetHeight")
 
       val discardedBlocks: Seq[(Block, ByteStr)] = for (currentHeight <- height until targetHeight by -1) yield {
-        val balancesToInvalidate    = Seq.newBuilder[(Address, Asset)]
-        val portfoliosToInvalidate  = Seq.newBuilder[Address]
-        val assetInfoToInvalidate   = Seq.newBuilder[IssuedAsset]
-        val ordersToInvalidate      = Seq.newBuilder[ByteStr]
-        val scriptsToDiscard        = Seq.newBuilder[Address]
-        val assetScriptsToDiscard   = Seq.newBuilder[IssuedAsset]
-        val accountDataToInvalidate = Seq.newBuilder[(Address, String)]
+        val balancesToInvalidate     = Seq.newBuilder[(Address, Asset)]
+        val portfoliosToInvalidate   = Seq.newBuilder[Address]
+        val assetDetailsToInvalidate = Seq.newBuilder[IssuedAsset]
+        val ordersToInvalidate       = Seq.newBuilder[ByteStr]
+        val scriptsToDiscard         = Seq.newBuilder[Address]
+        val assetScriptsToDiscard    = Seq.newBuilder[IssuedAsset]
+        val accountDataToInvalidate  = Seq.newBuilder[(Address, String)]
 
         val h = Height(currentHeight)
 
@@ -565,13 +571,13 @@ class LevelDBWriter(
                 // balances already restored
 
                 case tx: IssueTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
+                  assetDetailsToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
                 case tx: ReissueTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
+                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: BurnTransaction =>
-                  assetInfoToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
+                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: SponsorFeeTransaction =>
-                  assetInfoToInvalidate += rollbackSponsorship(rw, tx.asset, currentHeight)
+                  assetDetailsToInvalidate += rollbackSponsorship(rw, tx.asset, currentHeight)
                 case tx: LeaseTransaction =>
                   rollbackLeaseStatus(rw, tx.id(), currentHeight)
                 case tx: LeaseCancelTransaction =>
@@ -590,6 +596,10 @@ class LevelDBWriter(
                   assetScriptsToDiscard += asset
                   rw.delete(Keys.assetScript(asset)(currentHeight))
                   rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
+
+                case tx: UpdateAssetInfoTransaction =>
+                  rw.delete(Keys.assetInfo(tx.assetId)(currentHeight))
+                  rw.filterHistory(Keys.assetInfoHistory(tx.assetId), currentHeight)
 
                 case _: DataTransaction => // see changed data keys removal
 
@@ -627,7 +637,7 @@ class LevelDBWriter(
 
         balancesToInvalidate.result().foreach(discardBalance)
         portfoliosToInvalidate.result().foreach(discardPortfolio)
-        assetInfoToInvalidate.result().foreach(discardAssetDescription)
+        assetDetailsToInvalidate.result().foreach(discardAssetDescription)
         ordersToInvalidate.result().foreach(discardVolumeAndFee)
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
