@@ -50,7 +50,7 @@ package object block {
       block.transactionsMerkleTree().proofByElement(transaction.mkMerkleLeaf())
   }
 
-  private[block] implicit class TransactionMerkleOps(transaction: Transaction) {
+  implicit class TransactionMerkleOps(transaction: Transaction) {
     def mkMerkleLeaf(): Leaf[Digest32] = Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
   }
 

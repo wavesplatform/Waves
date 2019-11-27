@@ -5,6 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi.MerkleInfo
 import com.wavesplatform.block.{Block, BlockMerkleOps}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.diffs.FeeValidation
@@ -50,10 +51,8 @@ private[api] class CommonTransactionsApi(
       transactionId         <- transactionIds
       (height, transaction) <- transactionById(transactionId)
       block                 <- blockchain.blockAt(height) if block.header.version >= Block.ProtoBlockVersion
-      merkleProof      = block.transactionProof(transaction).get
-      transactionHash  = merkleProof.leafData
-      transactionsRoot = block.header.transactionsRoot
-    } yield MerkleInfo(transactionId, ByteStr(transactionHash), transactionsRoot, merkleProof)
+      merkleProof           <- block.transactionProof(transaction)
+    } yield MerkleInfo(transactionId, merkleProof)
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }
@@ -61,8 +60,6 @@ private[api] class CommonTransactionsApi(
 private[api] object CommonTransactionsApi {
   case class MerkleInfo(
       id: ByteStr,
-      transactionHash: ByteStr,
-      transactionsRoot: ByteStr,
       merkleProof: MerkleProof[Digest32]
   )
 
@@ -76,10 +73,8 @@ private[api] object CommonTransactionsApi {
 
     implicit val merkleInfoWrites: Writes[MerkleInfo] = Writes { mi =>
       Json.obj(
-        "id"               -> mi.id.toString,
-        "transactionHash"  -> mi.transactionHash.toString,
-        "transactionsRoot" -> mi.transactionsRoot.toString,
-        "merkleProof"      -> ByteStr(proofBytes(mi.merkleProof)).toString
+        "id"          -> mi.id.toString,
+        "merkleProof" -> s"${Base64.Prefix}${Base64.encode(proofBytes(mi.merkleProof))}"
       )
     }
   }

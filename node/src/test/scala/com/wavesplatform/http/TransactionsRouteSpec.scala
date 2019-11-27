@@ -7,7 +7,7 @@ import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, To
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
@@ -31,6 +31,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
+import scorex.crypto.authds.LeafData
 
 import scala.util.Random
 
@@ -437,7 +438,9 @@ class TransactionsRouteSpec
     }
   }
 
-  routePath("/proofMerkleRoot") - {
+  routePath("/merkleProof") - {
+    import com.wavesplatform.block.TransactionMerkleOps
+
     val transactionsGen = for {
       txsSize <- Gen.choose(1, 10)
       txs     <- Gen.listOfN(txsSize, randomTransactionGen)
@@ -468,10 +471,6 @@ class TransactionsRouteSpec
         blocks           <- Gen.listOfN(blockchainHeight, invalidBlockGen)
       } yield blocks
 
-    def parseStr(str: String): ByteStr =
-      if (str.startsWith("base64:")) ByteStr.decodeBase64(str).get
-      else ByteStr(Base58.decode(str))
-
     def prepareBlockchain(blocks: List[Block]): Blockchain = { // resetting blockchain for each property check iteration
       val blockchain        = mock[Blockchain]
       val heightToBlock     = blocks.zipWithIndex.map { case (b, h) => (h + 1, b) }.toMap
@@ -489,17 +488,18 @@ class TransactionsRouteSpec
       proofs.size shouldBe txIdsToBlock.size
 
       proofs.foreach { p =>
-        val block = txIdsToBlock((p \ "id").as[String])
-
         val transactionId = (p \ "id").as[String]
-        val root          = (p \ "transactionsRoot").as[String]
-        val proof         = (p \ "merkleProof").as[String]
-        val leaf          = (p \ "transactionHash").as[String]
 
+        val block       = txIdsToBlock(transactionId)
+        val transaction = block.transactionData.find(_.id().toString == transactionId)
+
+        transaction shouldBe 'defined
         txIdsToBlock.keySet should contain(transactionId)
-        block.transactionData.find(_.id().toString == transactionId) shouldBe 'defined
-        block.header.transactionsRoot.toString shouldBe root
-        Merkle.verify(parseStr(root).arr, parseStr(proof).arr, parseStr(leaf).arr) shouldBe true
+
+        val proof = Base64.decode((p \ "merkleProof").as[String])
+        val value = transaction.value.mkMerkleLeaf().data untag LeafData
+
+        Merkle.verify(block.header.transactionsRoot, proof, value) shouldBe true
       }
     }
 
@@ -518,11 +518,11 @@ class TransactionsRouteSpec
         val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
         val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
 
-        Get(routePath(s"/proofMerkleRoot$queryParams")) ~> route ~> check {
+        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
           validateSuccess(txIdsToBlock, response)
         }
 
-        Post(routePath("/proofMerkleRoot"), requestBody) ~> route ~> check {
+        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
           validateSuccess(txIdsToBlock, response)
         }
       }
@@ -548,11 +548,11 @@ class TransactionsRouteSpec
             validateSuccess(txIdsToBlock, response)
           }
 
-          Get(routePath(s"/proofMerkleRoot$queryParams")) ~> route ~> check {
+          Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
             validate(response)
           }
 
-          Post(routePath("/proofMerkleRoot"), requestBody) ~> route ~> check {
+          Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
             validate(response)
           }
       }
@@ -568,11 +568,11 @@ class TransactionsRouteSpec
         val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
         val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
 
-        Get(routePath(s"/proofMerkleRoot$queryParams")) ~> route ~> check {
+        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
           validateFailure(response)
         }
 
-        Post(routePath("/proofMerkleRoot"), requestBody) ~> route ~> check {
+        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
           validateFailure(response)
         }
       }
@@ -588,9 +588,9 @@ class TransactionsRouteSpec
         val queryParams = invalidIds.map(id => s"id=$id").mkString("?", "&", "")
         val requestBody = Json.obj("ids" -> invalidIds)
 
-        Get(routePath(s"/proofMerkleRoot$queryParams")) ~> route should produce(InvalidSignature)
+        Get(routePath(s"/merkleProof$queryParams")) ~> route should produce(InvalidSignature)
 
-        Post(routePath("/proofMerkleRoot"), requestBody) ~> route should produce(InvalidSignature)
+        Post(routePath("/merkleProof"), requestBody) ~> route should produce(InvalidSignature)
       }
     }
   }

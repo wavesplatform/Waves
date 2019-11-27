@@ -217,9 +217,9 @@ case class TransactionsApiRoute(
   )
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
-  def merkleProof: Route = path("proofMerkleRoot")(getMerkleProof ~ postMerkleProof)
+  def merkleProof: Route = path("merkleProof")(getMerkleProof ~ postMerkleProof)
 
-  @Path("/proofMerkleRoot")
+  @Path("/merkleProof")
   @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
@@ -232,9 +232,9 @@ case class TransactionsApiRoute(
       )
     )
   )
-  def getMerkleProof: Route = (get & parameters('id.*))(ids => complete(merkleInfo(ids.toList)))
+  def getMerkleProof: Route = (get & parameters('id.*))(ids => complete(merkleProof(ids.toList)))
 
-  @Path("/proofMerkleRoot")
+  @Path("/merkleProof")
   @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "POST")
   @ApiImplicitParams(
     Array(
@@ -252,12 +252,12 @@ case class TransactionsApiRoute(
     jsonPost[JsObject](
       jsv =>
         (jsv \ "ids").validate[List[String]] match {
-          case JsSuccess(ids, _) => merkleInfo(ids)
+          case JsSuccess(ids, _) => merkleProof(ids)
           case JsError(err)      => WrongJson(errors = err)
         }
     )
 
-  private def merkleInfo(encodedIds: List[String]): ToResponseMarshallable =
+  private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
     encodedIds.traverse(ByteStr.decodeBase58) match {
       case Success(txIds) =>
         commonApi.transactionsMerkleInfo(txIds) match {
