@@ -1,33 +1,26 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.{ValidationError, directives}
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.DirectiveDictionary
-import com.wavesplatform.lang.directives.values.{StdLibVersion, V1, V2, V3, V4}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
 import com.wavesplatform.lang.script.{ContractScript, Script}
-import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
+import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffEi, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.collection.immutable
 
 class OverdraftTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
   private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
