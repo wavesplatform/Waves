@@ -1,11 +1,8 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -19,12 +16,6 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterFailure {
   import InvokeMultiplePaymentsSuite._
-
-//  override protected def nodeConfigs: Seq[Config] =
-//    NodeConfigs.Builder(Default, 1, Seq.empty)
-//      .overrideBase(_.quorum(0))
-//      .overrideBase(_.preactivatedFeatures((16, 2)))
-//      .buildNonConflicting()
 
   private val dApp = pkByAddress(firstAddress).stringRepr
   private val caller = pkByAddress(secondAddress).stringRepr
@@ -149,7 +140,9 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     val wavesBalance = sender.accountBalances(caller)._1
     sender.lease(caller, dApp, wavesBalance - 1.waves, waitForTx = true)
 
-    assertApiError(sender.invokeScript(caller, dApp, payment = Seq(Payment(0.5.waves, Waves), Payment(1.5.waves, Waves)))) { error =>
+    assertApiError(
+      sender.invokeScript(caller, dApp, payment = Seq(Payment(0.5.waves, Waves), Payment(1.5.waves, Waves)))
+    ) { error =>
         error.message should include("Accounts balance errors")
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe 400
