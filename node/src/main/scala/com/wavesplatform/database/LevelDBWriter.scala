@@ -821,12 +821,12 @@ class LevelDBWriter(
 
     val headerKey = Keys.blockHeaderBytesAt(height)
 
-    def readTransactionBytes(count: Int) = {
+    def readTransactionBytes(version: Byte, count: Int) = {
       (0 until count).toArray.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
           .map { tx =>
-            val txBytes = tx match {
-              case p: LegacyPBSwitch if p.isProtobufVersion => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
+            val txBytes = version match {
+              case Block.ProtoBlockVersion => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
               case _ => tx.bytes()
             }
             Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)
@@ -859,7 +859,7 @@ class LevelDBWriter(
             headerBytes.takeRight(SignatureLength + KeyLength) // featureVotes dropped
           }
 
-        val txBytes = txCountBytes ++ readTransactionBytes(txCount)
+        val txBytes = txCountBytes ++ readTransactionBytes(version, txCount)
 
         val bytes = bytesBeforeCData ++
           Ints.toByteArray(consensusDataBytes.length) ++

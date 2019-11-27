@@ -170,7 +170,7 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
+        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
