@@ -19,6 +19,7 @@ object TxValidationError {
   case class InsufficientFee(msg: String = "insufficient fee") extends ValidationError
   case object TooBigArray                                      extends ValidationError
   case object InvalidName                                      extends ValidationError
+  case object InvalidAssetId                                   extends ValidationError
   case object OverflowError                                    extends ValidationError
   case object ToSelf                                           extends ValidationError
   case object MissingSenderPrivateKey                          extends ValidationError
@@ -105,6 +106,6 @@ object TxValidationError {
   }
 
   case class ToBigProof(max: Int, actual: Int) extends ValidationError {
-    override def toString: String = s"Too large proof ($actual), must be max $max bytes" 
+    override def toString: String = s"Too large proof ($actual), must be max $max bytes"
   }
 }

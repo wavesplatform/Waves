@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.{ProvenTransaction, SigProofsSwitch, VersionedTransaction}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
-private[impl] object BaseTxJson {
+object BaseTxJson {
   def toJson(tx: ProvenTransaction): JsObject = {
     import tx._
     Json.obj(
