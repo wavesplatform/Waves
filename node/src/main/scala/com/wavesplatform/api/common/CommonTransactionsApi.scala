@@ -54,26 +54,3 @@ private[api] class CommonTransactionsApi(
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }
-
-private[api] object CommonTransactionsApi {
-
-  def proofBytes(levels: Seq[Array[Byte]]): List[String] =
-    (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
-
-  implicit val merkleInfoWrites: Writes[TransactionProof] = Writes { mi =>
-    Json.obj(
-      "id"               -> mi.id.toString,
-      "transactionIndex" -> mi.transactionIndex,
-      "merkleProof"      -> proofBytes(mi.digests)
-    )
-  }
-
-  implicit val merkleInfoReads: Reads[TransactionProof] = Reads { jsv =>
-    for {
-      encoded          <- (jsv \ "id").validate[String]
-      id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
-      transactionIndex <- (jsv \ "transactionIndex").validate[Int]
-      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base64.decode))
-    } yield TransactionProof(id, transactionIndex, merkleProof)
-  }
-}
