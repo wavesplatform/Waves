@@ -52,7 +52,7 @@ object CommonValidation {
         val newWavesBalance     = oldWavesBalance + spendings.balance
         val feeUncheckedBalance = oldWavesBalance + amountDiff.balance
 
-        val overdraftFilter = allowFeeOverdraft && blockchain.useCorrectPaymentCheck && feeUncheckedBalance >= 0
+        val overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
         if (!overdraftFilter && newWavesBalance < 0) {
           Left(
             GenericError(
@@ -96,7 +96,7 @@ object CommonValidation {
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
-              case Some(ContractScriptImpl(version, _)) if version >= V4 => true
+              case Some(ContractScriptImpl(version, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _ => false
             }
             check <- foldPayments(citx.payments)
