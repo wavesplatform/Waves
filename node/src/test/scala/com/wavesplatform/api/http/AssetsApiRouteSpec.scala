@@ -8,6 +8,7 @@ import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -44,16 +45,15 @@ class AssetsApiRouteSpec
   routePath(s"/details/${smartAssetTx.id().toString}") in {
     Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
       val response = responseAs[JsObject]
-      (response \ "assetId").as[String] shouldBe smartAssetTx.id().toString
-      (response \ "issueHeight").as[Long] shouldBe 1
-      (response \ "issueTimestamp").as[Long] shouldBe smartAssetTx.timestamp
-      (response \ "issuer").as[String] shouldBe smartAssetTx.sender.stringRepr
-      (response \ "name").as[String] shouldBe new String(smartAssetTx.name, StandardCharsets.UTF_8)
-      (response \ "description").as[String] shouldBe new String(smartAssetTx.description, StandardCharsets.UTF_8)
-      (response \ "decimals").as[Int] shouldBe smartAssetTx.decimals
-      (response \ "reissuable").as[Boolean] shouldBe smartAssetTx.reissuable
-      (response \ "quantity").as[BigDecimal] shouldBe smartAssetDesc.totalVolume
-      (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
+      checkResponse(smartAssetTx, smartAssetDesc, response)
+    }
+    Get(routePath(s"/details?id=${smartAssetTx.id().toString}")) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(smartAssetTx, smartAssetDesc, response))
+    }
+    Post(routePath("/details"), Json.obj("ids" -> List(s"${smartAssetTx.id().toString}"))) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(smartAssetTx, smartAssetDesc, response))
     }
   }
 
@@ -73,16 +73,29 @@ class AssetsApiRouteSpec
   routePath(s"/details/${sillyAssetTx.id().toString}") in {
     Get(routePath(s"/details/${sillyAssetTx.id().toString}")) ~> route ~> check {
       val response = responseAs[JsObject]
-      (response \ "assetId").as[String] shouldBe sillyAssetTx.id().toString
-      (response \ "issueHeight").as[Long] shouldBe 1
-      (response \ "issueTimestamp").as[Long] shouldBe sillyAssetTx.timestamp
-      (response \ "issuer").as[String] shouldBe sillyAssetTx.sender.stringRepr
-      (response \ "name").as[String] shouldBe new String(sillyAssetTx.name, StandardCharsets.UTF_8)
-      (response \ "description").as[String] shouldBe new String(sillyAssetTx.description, StandardCharsets.UTF_8)
-      (response \ "decimals").as[Int] shouldBe sillyAssetTx.decimals
-      (response \ "reissuable").as[Boolean] shouldBe sillyAssetTx.reissuable
-      (response \ "quantity").as[BigDecimal] shouldBe sillyAssetDesc.totalVolume
-      (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
+      checkResponse(sillyAssetTx, sillyAssetDesc, response)
     }
+    Get(routePath(s"/details?id=${sillyAssetTx.id().toString}")) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(sillyAssetTx, sillyAssetDesc, response))
+    }
+    Post(routePath("/details"), Json.obj("ids" -> List(s"${sillyAssetTx.id().toString}"))) ~> route ~> check {
+      val responses = responseAs[List[JsObject]]
+      responses.foreach(response => checkResponse(sillyAssetTx, sillyAssetDesc, response))
+    }
+  }
+
+  private def checkResponse(tx: IssueTransaction, desc: AssetDescription, response: JsObject): Unit = {
+    (response \ "assetId").as[String] shouldBe tx.id().toString
+    (response \ "issueHeight").as[Long] shouldBe 1
+    (response \ "issueTimestamp").as[Long] shouldBe tx.timestamp
+    (response \ "issuer").as[String] shouldBe tx.sender.stringRepr
+    (response \ "name").as[String] shouldBe new String(tx.name, StandardCharsets.UTF_8)
+    (response \ "description").as[String] shouldBe new String(tx.description, StandardCharsets.UTF_8)
+    (response \ "decimals").as[Int] shouldBe tx.decimals
+    (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
+    (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
+    (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
+    (response \ "issueTransactionId").as[String] shouldBe tx.id().toString
   }
 }

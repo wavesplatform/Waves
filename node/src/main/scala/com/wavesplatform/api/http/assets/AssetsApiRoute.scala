@@ -14,15 +14,7 @@ import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
-import com.wavesplatform.api.http.requests.{
-  BurnRequest,
-  ExchangeRequest,
-  IssueRequest,
-  MassTransferRequest,
-  ReissueRequest,
-  SponsorFeeRequest,
-  TransferRequest
-}
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
@@ -35,6 +27,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.{Time, _}
@@ -175,6 +168,10 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       complete(fullAccountAssetsInfo(address))
     }
 
+  def details: Route = pathPrefix("details")(singleDetails ~ multipleDetails)
+
+  private val fullDetails = parameters('full.as[Boolean].?)
+
   @Path("/details/{assetId}")
   @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
   @ApiImplicitParams(
@@ -183,10 +180,48 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
     )
   )
-  def details: Route =
-    (get & path("details" / Segment)) { id =>
-      parameters('full.as[Boolean].?) { full =>
-        complete(assetDetails(id, full.getOrElse(false)))
+  def singleDetails: Route =
+    (get & path(Segment) & fullDetails) { (id, full) =>
+      complete(assetDetails(id, full.getOrElse(false)))
+    }
+
+  def multipleDetails: Route = pathEndOrSingleSlash(multipleDetailsGet ~ multipleDetailsPost)
+
+  @Path("/details")
+  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "id", value = "IDs of the asset", required = true, dataType = "string", paramType = "query"),
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
+    )
+  )
+  def multipleDetailsGet: Route =
+    (get & parameters('id.*) & fullDetails) { (ids, full) =>
+      complete(ids.toList.map(id => assetDetails(id, full.getOrElse(false)).fold(_.json, identity)))
+    }
+
+  @Path("/details")
+  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "json",
+        value = "IDs of the asset",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        example = """{"ids": ["some1", "some2"]}"""
+      ),
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
+    )
+  )
+  def multipleDetailsPost: Route =
+    fullDetails { full =>
+      jsonPost[JsObject] { jsv =>
+        (jsv \ "ids").validate[List[String]] match {
+          case JsSuccess(ids, _) => ids.map(id => assetDetails(id, full.getOrElse(false)).fold(_.json, identity))
+          case JsError(err)      => WrongJson(errors = err)
+        }
       }
     }
 
@@ -294,15 +329,24 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       )
     }).left.map(ApiError.fromValidationError)
 
-  private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] =
+  private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] = {
+    // (transactionId, timestamp, height)
+    def additionalInfo(id: ByteStr): Either[String, (ByteStr, Long, Int)] =
+      for {
+        // todo: (NODE-1966) InvokeScript tx which generated this asset
+        tt <- blockchain.transactionInfo(id).toRight("Failed to find issue/invokeScript transaction by ID")
+        (h, mtx) = tt
+        tx <- (mtx match {
+          case t: IssueTransaction        => Some(t)
+          case t: InvokeScriptTransaction => Some(t)
+          case _                          => None
+        }).toRight("No issue/invokeScript transaction found with given asset ID")
+      } yield (tx.id(), tx.timestamp, h)
+
     (for {
-      id <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
-      tt <- blockchain.transactionInfo(id).toRight("Failed to find issue transaction by ID")
-      (h, mtx) = tt
-      tx <- (mtx match {
-        case t: IssueTransaction => Some(t)
-        case _                   => None
-      }).toRight("No issue transaction found with given asset ID")
+      id  <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
+      tsh <- additionalInfo(id)
+      (txId, ts, h) = tsh
       description <- blockchain.assetDescription(IssuedAsset(id)).toRight("Failed to get description of the asset")
       script = description.script.filter(_ => full)
       complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
@@ -311,18 +355,19 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         Seq(
           "assetId"        -> JsString(id.toString),
           "issueHeight"    -> JsNumber(h),
-          "issueTimestamp" -> JsNumber(tx.timestamp),
-          "issuer"         -> JsString(tx.sender.stringRepr),
-          "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
-          "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
-          "decimals"       -> JsNumber(tx.decimals.toInt),
+          "issueTimestamp" -> JsNumber(ts),
+          "issuer"         -> JsString(description.issuer.stringRepr),
+          "name"           -> JsString(new String(description.name, Charsets.UTF_8)),
+          "description"    -> JsString(new String(description.description, Charsets.UTF_8)),
+          "decimals"       -> JsNumber(description.decimals),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
           "scripted"       -> JsBoolean(description.script.nonEmpty),
           "minSponsoredAssetFee" -> (description.sponsorship match {
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
-          })
+          }),
+          "issueTransactionId" -> JsString(txId.toString)
         ) ++ script.toSeq.map { script =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
@@ -332,6 +377,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         }
       )
     }).left.map(m => CustomValidationError(m))
+  }
 }
 
 object AssetsApiRoute {
