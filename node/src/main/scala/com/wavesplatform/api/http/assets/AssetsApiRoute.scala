@@ -288,7 +288,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
             }),
             "sponsorBalance"   -> sponsorBalance,
             "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-            "issueTransaction" -> issueTransaction.json()
+            "issueTransaction" -> issueTransaction.fold[JsValue](JsNull)(_.json())
           )).toSeq
         )
       )

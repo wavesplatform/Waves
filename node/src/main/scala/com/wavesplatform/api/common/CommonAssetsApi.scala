@@ -1,4 +1,5 @@
 package com.wavesplatform.api.common
+
 import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -12,12 +13,15 @@ class CommonAssetsApi(blockchain: Blockchain) {
 
   def fullInfo(assetId: IssuedAsset): Option[AssetInfo] =
     for {
-      assetInfo                               <- blockchain.assetDescription(assetId)
-      (_, issueTransaction: IssueTransaction) <- blockchain.transactionInfo(assetId.id)
-      sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(issueTransaction.sender).spendableBalance) else None
+      assetInfo <- blockchain.assetDescription(assetId)
+      issueTransaction = blockchain.transactionInfo(assetId.id).collect { case (_, tx: IssueTransaction) => tx }
+      sponsorBalance = issueTransaction match {
+        case Some(tx) if assetInfo.sponsorship != 0 => Some(blockchain.wavesPortfolio(tx.sender).spendableBalance)
+        case _                                      => None
+      }
     } yield AssetInfo(assetInfo, issueTransaction, sponsorBalance)
 }
 
 object CommonAssetsApi {
-  final case class AssetInfo(description: AssetDescription, issueTransaction: IssueTransaction, sponsorBalance: Option[Long])
+  final case class AssetInfo(description: AssetDescription, issueTransaction: Option[IssueTransaction], sponsorBalance: Option[Long])
 }

@@ -34,7 +34,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
               )
           ),
           info.description.sponsorship,
-          Some(info.issueTransaction.toPB),
+          info.issueTransaction.map(_.toPB),
           info.sponsorBalance.getOrElse(0)
         )
     result.explicitGetErr(TransactionDoesNotExist)
