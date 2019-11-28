@@ -9,8 +9,6 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings

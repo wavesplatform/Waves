@@ -53,7 +53,7 @@ object IssueTransaction extends TransactionParser {
   override type TransactionT = IssueTransaction
 
   override val typeId: TxType                       = 3
-  override val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  override val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
   override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
 
   val serializer = IssueTxSerializer
