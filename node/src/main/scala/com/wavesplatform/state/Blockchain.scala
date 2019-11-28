@@ -11,7 +11,6 @@ import com.wavesplatform.state.extensions.{AddressTransactions, BlockchainExtens
 import com.wavesplatform.state.reader.LeaseDetails
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
@@ -70,15 +69,13 @@ trait Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
 
-  def accountScriptWithComplexity(address: Address): Option[(Script, Long)]
+  def accountScriptWithComplexity(address: Address): Option[(Script, Long, Map[String, Long])]
   def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_._1)
   def hasScript(address: Address): Boolean
 
   def assetScriptWithComplexity(id: IssuedAsset): Option[(Script, Long)]
   def assetScript(id: IssuedAsset): Option[Script] = assetScriptWithComplexity(id).map(_._1)
   def hasAssetScript(id: IssuedAsset): Boolean
-
-  def callableFunctionComplexity(dAppAddress: Address, functionName: String): Option[Long]
 
   def accountDataKeys(address: Address): Set[String]
   def accountData(acc: Address, key: String): Option[DataEntry[_]]

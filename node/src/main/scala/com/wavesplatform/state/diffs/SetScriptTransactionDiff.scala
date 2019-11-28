@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import shapeless.syntax.std.tuple._
 import cats.implicits._
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.ValidationError
@@ -19,13 +20,12 @@ object SetScriptTransactionDiff {
         case _ =>
           Right((0L, Map[String, Long]()))
       }
-      complexitiesWithAddress = callableComplexities._2.map { case (f, cost) => (tx.sender.toAddress, f) -> cost }
       verifierWithComplexity <- DiffsCommon.countScriptComplexity(tx.script, blockchain)
+      scriptWithComplexities = verifierWithComplexity.map(_ :+ callableComplexities._2)
     } yield Diff(
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-        scripts = Map(tx.sender.toAddress -> verifierWithComplexity),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        callableFunctionComplexities = complexitiesWithAddress
+        scripts = Map(tx.sender.toAddress -> scriptWithComplexities),
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
 }

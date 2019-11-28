@@ -132,9 +132,8 @@ case class Diff(
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
-    scripts: Map[Address, Option[(Script, Long)]],
+    scripts: Map[Address, Option[(Script, Long, Map[String, Long])]],
     assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
-    callableFunctionComplexities: Map[(Address, String), Long],
     accountData: Map[Address, AccountDataInfo],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
@@ -149,9 +148,8 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(Script, Long)]] = Map.empty,
+      scripts: Map[Address, Option[(Script, Long, Map[String, Long])]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
-      callableFunctionComplexities: Map[(Address, String), Long] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
@@ -165,7 +163,6 @@ object Diff {
       leaseState = leaseState,
       scripts = scripts,
       assetScripts = assetScripts,
-      callableFunctionComplexities = callableFunctionComplexities,
       accountData = accountData,
       sponsorship = sponsorship,
       scriptsRun = 0,
@@ -180,9 +177,8 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(Script, Long)]] = Map.empty,
+      scripts: Map[Address, Option[(Script, Long, Map[String, Long])]] = Map.empty,
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
-      callableFunctionComplexities: Map[(Address, String), Long] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,
@@ -198,7 +194,6 @@ object Diff {
       leaseState = leaseState,
       scripts = scripts,
       assetScripts = assetScripts,
-      callableFunctionComplexities = callableFunctionComplexities,
       accountData = accountData,
       sponsorship = sponsorship,
       scriptsRun = scriptsRun,
@@ -206,7 +201,7 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -221,7 +216,6 @@ object Diff {
         leaseState = older.leaseState ++ newer.leaseState,
         scripts = older.scripts ++ newer.scripts,
         assetScripts = older.assetScripts ++ newer.assetScripts,
-        callableFunctionComplexities = older.callableFunctionComplexities |+| newer.callableFunctionComplexities,
         accountData = older.accountData.combine(newer.accountData),
         sponsorship = older.sponsorship.combine(newer.sponsorship),
         scriptsRun = older.scriptsRun.combine(newer.scriptsRun),

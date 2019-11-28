@@ -7,7 +7,6 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.lang._
@@ -49,11 +48,11 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
-    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
+    val accScriptEi   = dAppAddressEi.map(blockchain.accountScriptWithComplexity)
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
+      case Right(Some((ContractScriptImpl(version, contract), _, callableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -94,7 +93,7 @@ object InvokeScriptTransactionDiff {
                 version
               )
               dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
-              invocationComplexity <- blockchain.callableFunctionComplexity(dAppAddress, tx.funcCall.function.funcName)
+              invocationComplexity <- callableComplexities.get(tx.funcCall.function.funcName)
                 .toRight((s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress", List.empty[LogItem[Id]]))
             } yield (evaluator, invocationComplexity)
 

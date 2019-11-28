@@ -82,12 +82,6 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def callableFunctionComplexity(dAppAddress: Address, functionName: String): Option[Long] =
-    diff.callableFunctionComplexities.get((dAppAddress, functionName)) match {
-      case c@Some(_) => c
-      case None      => inner.callableFunctionComplexity(dAppAddress, functionName)
-    }
-
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
@@ -160,7 +154,7 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long, Map[String, Long])] = {
     diff.scripts.get(address) match {
       case None            => inner.accountScriptWithComplexity(address)
       case Some(None)      => None
