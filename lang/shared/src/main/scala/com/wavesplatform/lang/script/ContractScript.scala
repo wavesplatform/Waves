@@ -72,16 +72,6 @@ object ContractScript {
       )
     } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
 
-  def limitFreeComplexity(
-    version:   StdLibVersion,
-    contract:  DApp,
-    estimator: ScriptEstimator
-  ): Either[String, (Long, Map[String, Long])] =
-    for {
-      cbf <- estimateComplexityByFunction(version, contract, estimator)
-      max = cbf.maximumOption(_._2 compareTo _._2)
-    } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
-
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {
     val funcWithAnnotationContext =
       BLOCK(
