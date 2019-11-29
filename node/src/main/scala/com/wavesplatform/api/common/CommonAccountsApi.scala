@@ -9,8 +9,7 @@ import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.{Blockchain, DataEntry, Diff, Height}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -35,7 +34,7 @@ trait CommonAccountsApi {
 
   def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction]
 
-  def script(address: Address): Option[(Script, Long)]
+  def script(address: Address): Option[AccountScriptInfo]
 
   def data(address: Address, key: String): Option[DataEntry[_]]
 
@@ -92,7 +91,7 @@ object CommonAccountsApi extends ScorexLogging {
       )
     }
 
-    override def script(address: Address): Option[(Script, Long)] = blockchain.accountScript(address)
+    override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)
 
     override def data(address: Address, key: String): Option[DataEntry[_]] =
       blockchain.accountData(address, key)

@@ -29,20 +29,7 @@ trait AddressPortfolio {
       from: Option[IssuedAsset]
   ): Observable[IssueTransaction] =
     db.resourceObservable.flatMap { resource =>
-      val maybeAddressId = resource.get(Keys.addressId(address))
-
-      maybeAddressId.foreach { addressId =>
-        resource.iterator.seek(Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ addressId.toByteArray ++ from.fold(Array.emptyByteArray)(_.id.arr))
-
-        for (fromAssetId <- from if resource.iterator.hasNext && resource.iterator.peekNext().getKey.endsWith(fromAssetId.id.arr)) {
-          resource.iterator.next()
-        }
-      }
-
-      Observable
-        .fromIterator(Task(new BalanceIterator(maybeAddressId, isNFT, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala))
-        .filter(_._2 != 0)
-        .flatMap { case (assetId, _) => Observable.fromIterable(loadIssueTransaction(diff, resource, assetId)) }
+      Observable.fromIterator(Task(loadNftList(resource, address, diff, isNFT, from)))
     }
 
   def portfolio(db: DB, address: Address, overrides: Map[IssuedAsset, Long], includeAsset: IssuedAsset => Boolean): Observable[(IssuedAsset, Long)] =
@@ -59,6 +46,28 @@ trait AddressPortfolio {
 }
 
 object AddressPortfolio {
+  def loadNftList(
+      resource: DBResource,
+      address: Address,
+      diff: Diff,
+      isNFT: IssuedAsset => Boolean,
+      from: Option[IssuedAsset]
+  ): Iterator[IssueTransaction] = {
+    val maybeAddressId = resource.get(Keys.addressId(address))
+
+    maybeAddressId.foreach { addressId =>
+      resource.iterator.seek(Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ addressId.toByteArray ++ from.fold(Array.emptyByteArray)(_.id.arr))
+
+      for (fromAssetId <- from if resource.iterator.hasNext && resource.iterator.peekNext().getKey.endsWith(fromAssetId.id.arr)) {
+        resource.iterator.next()
+      }
+    }
+
+    new BalanceIterator(maybeAddressId, isNFT, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
+      .filter(_._2 != 0)
+      .flatMap { case (assetId, _) => loadIssueTransaction(diff, resource, assetId).iterator }
+  }
+
   private def loadIssueTransaction(diff: Diff, resource: DBResource, assetId: IssuedAsset): Option[IssueTransaction] =
     diff
       .transactionMap()

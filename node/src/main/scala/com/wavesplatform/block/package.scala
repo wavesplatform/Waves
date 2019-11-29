@@ -4,12 +4,7 @@ import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
-import com.wavesplatform.transaction.Transaction
-import scorex.crypto.authds.LeafData
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
 
 import scala.util.Try
 
@@ -36,26 +31,5 @@ package object block {
 
   private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {
     def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, ByteStr(microBlock.bytesWithoutSignature())))
-  }
-
-  // Merkle
-  private[block] implicit object FastHash extends CryptographicHash32 { // todo: (NODE-1972) Replace with appropriate hash function
-    override def hash(input: Message): Digest32 = Digest32(com.wavesplatform.crypto.fastHash(input))
-  }
-
-  private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
-
-  private[block] implicit class BlockMerkleOps(block: Block) {
-    def transactionProof(transaction: Transaction): Option[MerkleProof[Digest32]] =
-      block.transactionsMerkleTree().proofByElement(transaction.mkMerkleLeaf())
-  }
-
-  private[block] implicit class TransactionMerkleOps(transaction: Transaction) {
-    def mkMerkleLeaf(): Leaf[Digest32] = Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
-  }
-
-  /** Creates transactions merkle root */
-  private[block] def mkMerkleTree(transactions: Seq[Transaction]): MerkleTree[Digest32] = {
-    if (transactions.isEmpty) EmptyMerkleTree else MerkleTree(transactions.map(_.mkMerkleLeaf().data))
   }
 }

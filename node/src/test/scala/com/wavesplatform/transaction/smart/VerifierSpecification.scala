@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier.ValidationResult
@@ -42,7 +42,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       val (script, complexity) = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()
 
       (bc.accountScript _).when(tx.sellOrder.sender.toAddress).returns(None)
-      (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(script -> complexity))
+      (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(AccountScriptInfo(script, complexity)))
       (bc.accountScript _).when(tx.sender.toAddress).returns(None)
 
       (bc.height _).when().returns(0)

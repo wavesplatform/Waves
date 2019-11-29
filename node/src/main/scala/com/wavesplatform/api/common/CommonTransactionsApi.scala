@@ -1,7 +1,10 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.{Address, AddressOrAlias}
-import com.wavesplatform.api.common
+import com.wavesplatform.api.{BlockMeta, common}
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
@@ -16,6 +19,8 @@ import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
 trait CommonTransactionsApi {
+  import CommonTransactionsApi._
+
   def aliasesOfAddress(address: Address): Observable[(Height, CreateAliasTransaction)]
 
   def transactionsByAddress(
@@ -25,7 +30,7 @@ trait CommonTransactionsApi {
       fromId: Option[ByteStr] = None
   ): Observable[(Height, Transaction)]
 
-  def transactionById(txId: ByteStr): Option[(Int, Transaction)]
+  def transactionById(txId: ByteStr): Option[TransactionMeta]
 
   def unconfirmedTransactions: Seq[Transaction]
 
@@ -40,19 +45,22 @@ trait CommonTransactionsApi {
       sender: Option[Address],
       transactionTypes: Set[Byte],
       fromId: Option[ByteStr] = None
-  ): Observable[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])]
+  ): Observable[TransactionMeta]
 
-  def invokeScriptResultById(txId: ByteStr): Option[(Height, InvokeScriptTransaction, InvokeScriptResult)]
+  def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof]
 }
 
 object CommonTransactionsApi {
+  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])])
+
   def apply(
       maybeDiff: => Option[(Height, Diff)],
       db: DB,
       blockchain: Blockchain,
       utx: UtxPool,
       wallet: Wallet,
-      publishTransaction: Transaction => TracedResult[ValidationError, Boolean]
+      publishTransaction: Transaction => TracedResult[ValidationError, Boolean],
+      blockAt: Int => Option[(BlockMeta, Seq[Transaction])]
   ): CommonTransactionsApi = new CommonTransactionsApi {
     private def resolve(subject: AddressOrAlias): Option[Address] = blockchain.resolveAlias(subject).toOption
 
@@ -67,8 +75,16 @@ object CommonTransactionsApi {
       common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
     }
 
-    override def transactionById(transactionId: ByteStr): Option[(Int, Transaction)] =
-      blockchain.transactionInfo(transactionId)
+    override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
+      blockchain.transactionInfo(transactionId).map {
+        case (height, ist: InvokeScriptTransaction) =>
+          Height(height) ->
+            Right(
+              ist -> maybeDiff.flatMap(_._2.scriptResults.get(transactionId)).orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
+            )
+        case (height, tx) => Height(height) -> Left(tx)
+
+      }
 
     override def unconfirmedTransactions: Seq[Transaction] = utx.all
 
@@ -90,12 +106,17 @@ object CommonTransactionsApi {
         sender: Option[Address],
         transactionTypes: Set[Byte],
         fromId: Option[ByteStr] = None
-    ): Observable[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])] =
-      resolve(subject).fold(Observable.empty[(Height, Either[Transaction, (Transaction, Option[InvokeScriptResult])])]) { subjectAddress =>
+    ): Observable[TransactionMeta] =
+      resolve(subject).fold(Observable.empty[TransactionMeta]) { subjectAddress =>
         common.invokeScriptResults(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
       }
 
-    override def invokeScriptResultById(txId: ByteStr): Option[(Height, InvokeScriptTransaction, InvokeScriptResult)] =
-      ???
+    override def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
+      for {
+        transactionId           <- transactionIds
+        (height, transaction)   <- blockchain.transactionInfo(transactionId)
+        (meta, allTransactions) <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
+        transactionProof        <- Merkle.calcTransactionProof(allTransactions, transaction)
+      } yield transactionProof
   }
 }

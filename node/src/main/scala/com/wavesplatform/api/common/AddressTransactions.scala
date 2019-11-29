@@ -54,6 +54,9 @@ object AddressTransactions {
       (h, txNum) <- resource.get(Keys.transactionHNById(TransactionId(txId)))
     } yield resource.get(Keys.invokeScriptResult(h, txNum))
 
+  def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
+    db.withResource(r => loadInvokeScriptResult(r, txId))
+
   def allAddressTransactions(
       resource: DBResource,
       maybeDiff: Option[(Height, Diff)],
@@ -89,7 +92,7 @@ object AddressTransactions {
       (txType, txNum) <- transactionIds.reverse.view
     } yield (height, txNum, txType))
       .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
-      .collect { case (h, txNum, txType) if (types.isEmpty || types(txType)) => h -> txNum }
+      .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
       .flatMap { case (h, txNum) => loadTransaction(resource, h, txNum, sender) }
 
   }

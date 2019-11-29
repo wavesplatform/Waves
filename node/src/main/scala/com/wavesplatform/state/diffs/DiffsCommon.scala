@@ -9,9 +9,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
 import com.wavesplatform.state.{AssetInfo, Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -35,45 +33,6 @@ object DiffsCommon {
     }
   }
 
-  def functionComplexity(
-    script:    Script,
-    estimator: ScriptEstimator,
-    maybeCall: Option[FUNCTION_CALL]
-  ): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
-      .map(calcFunctionComplexity(script, maybeCall, _))
-
-  def limitFreeComplexity(
-    script:    Script,
-    estimator: ScriptEstimator,
-    maybeCall: Option[FUNCTION_CALL]
-  ): Either[String, Long] =
-    Script.limitFreeComplexity(script, estimator)
-      .map(calcFunctionComplexity(script, maybeCall, _))
-
-  private def calcFunctionComplexity(
-    script:     Script,
-    maybeCall:  Option[FUNCTION_CALL],
-    complexity: (Long, Map[String, Long])
-  ): Long = {
-    val (totalComplexity, cm) = complexity
-    maybeCall match {
-      case Some(call) =>
-        cm.getOrElse(call.function.funcName, totalComplexity)
-
-      case None =>
-        script.expr match {
-          case DApp(_, _, callables, _) =>
-            callables
-              .find(f => (f.u.name == DEFAULT_FUNC_NAME) && f.u.args.isEmpty)
-              .flatMap(f => cm.get(f.u.name))
-              .getOrElse(totalComplexity)
-
-          case _ => totalComplexity
-        }
-    }
-  }
-
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
@@ -86,7 +45,7 @@ object DiffsCommon {
 
     val accountComplexity = blockchain
       .accountScript(tx.sender.toAddress)
-      .map(_._2)
+      .map(_.verifierComplexity)
 
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }

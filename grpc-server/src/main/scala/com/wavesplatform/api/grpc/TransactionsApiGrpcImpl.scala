@@ -22,7 +22,9 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
             None
           )
         case None =>
-          Observable.fromIterable(request.transactionIds.flatMap(id => commonApi.transactionById(id.toByteStr)))
+          Observable.fromIterable(request.transactionIds.flatMap(id => commonApi.transactionById(id.toByteStr))).map {
+            case (h, e) => h -> e.fold(identity, _._1)
+          }
       }
 
       responseObserver.completeWith(stream.map {
@@ -51,8 +53,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       import com.wavesplatform.state.{InvokeScriptResult => VISR}
 
       val result = Observable(request.transactionIds: _*)
-        .flatMap(txId => Observable.fromIterable(commonApi.invokeScriptResultById(txId.toByteStr)))
-        .map { case (_, _, isr) => VISR.toPB(isr) }
+        .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
+        .collect { case (_, Right((_, Some(isr)))) => VISR.toPB(isr) }
 
       responseObserver.completeWith(result)
     }

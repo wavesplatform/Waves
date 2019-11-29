@@ -39,7 +39,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       case (genesis, setScript) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_._1) shouldBe setScript.script
+            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
         }
     }
   }
@@ -66,7 +66,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
       case (genesis, setScript) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), fs) {
           case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_._1) shouldBe setScript.script
+            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
         }
     }
   }

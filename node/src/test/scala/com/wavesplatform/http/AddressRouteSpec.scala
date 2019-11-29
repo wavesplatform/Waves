@@ -15,7 +15,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, WithDB, crypto}
 import org.scalacheck.Gen
@@ -154,8 +154,8 @@ class AddressRouteSpec
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     val script = ExprScript(TRUE).explicitGet()
 
-    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(script -> 1L)).once()
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(script -> 1L)).once()
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(script, 1L))).once()
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(script, 1L))).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -206,8 +206,8 @@ class AddressRouteSpec
     )
 
     val contractScript     = ContractScript(V3, contractWithMeta).explicitGet()
-    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(contractScript -> 11L)).once()
-    (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(contractScript -> 11L))
+    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(contractScript, 11L))).once()
+    (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(AccountScriptInfo(contractScript, 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -236,7 +236,7 @@ class AddressRouteSpec
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
     (blockchain.accountScript _)
       .when(allAccounts(4).toAddress)
-      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
+      .onCall((_: AddressOrAlias) => Some(AccountScriptInfo(ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]

@@ -207,7 +207,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       blockchainUpdater,
       utxStorage,
       wallet,
-      utxSynchronizer.publish
+      utxSynchronizer.publish,
+      loadBlockAt
     )
 
     // Extensions start

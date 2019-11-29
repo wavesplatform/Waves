@@ -2,6 +2,7 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.block.merkle.Merkle
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -16,7 +17,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
-import scorex.crypto.authds.merkle.MerkleTree
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
@@ -75,10 +75,11 @@ case class Block(
     !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
   }
 
-  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(transactionData))
+  protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr)
+    val transactionsMerkleTree = Merkle.mkMerkleTree(transactionData)
+    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree.rootHash untag Digest32) sameElements header.transactionsRoot.arr)
   }
 
   override def toString: String =
@@ -164,7 +165,7 @@ object Block extends ScorexLogging {
   }
 
   private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
-    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(transactionData).rootHash)
+    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(Merkle.calcTransactionRoot(transactionData))
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend

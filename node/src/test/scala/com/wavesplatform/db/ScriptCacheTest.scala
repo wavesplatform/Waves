@@ -86,7 +86,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
                 val scriptFromCache =
                   bc.accountScript(address)
-                    .map(_._1)
+                    .map(_.script)
                     .toRight(s"No script for acc: $account")
                     .explicitGet()
 
@@ -99,11 +99,11 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
     }
 
     "Return correct script after rollback" in {
-      val scripts @ List(script) = mkScripts(1)
+      val scripts @ List((script, complexity)) = mkScripts(1)
 
       withBlockchain(blockGen(scripts, _)) {
         case (List(account), bcu) =>
-          bcu.accountScript(account.toAddress) shouldEqual Some(script)
+          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(script, complexity))
 
           val SignedBlockHeader(lastBlock, uniqueId) = bcu.lastBlockHeader.get
 
@@ -124,7 +124,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
           bcu.accountScript(account.toAddress) shouldEqual None
           bcu.removeAfter(uniqueId)
-          bcu.accountScript(account.toAddress) shouldEqual Some(script)
+          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(script, complexity))
       }
     }
 

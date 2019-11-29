@@ -73,14 +73,6 @@ object Script {
         ContractScript.estimateComplexity(version, contract, estimator)
     }
 
-  def limitFreeComplexity(s: Script, estimator: ScriptEstimator): Either[String, (Long, Map[String, Long])] =
-    s match {
-      case script: ExprScript =>
-        ExprScript.limitFreeEstimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
-      case ContractScriptImpl(version, contract) =>
-        ContractScript.limitFreeComplexity(version, contract, estimator)
-    }
-
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
     Script.complexityInfo(script, estimator)
       .map(calcVerifierComplexity(script, _))

@@ -4,9 +4,11 @@ import cats._
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.settings.FunctionalitySettings
@@ -17,6 +19,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
@@ -26,7 +29,14 @@ object CommonValidation {
 
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
-      def checkTransfer(sender: Address, assetId: Asset, amount: Long, feeAssetId: Asset, feeAmount: Long) = {
+      def checkTransfer(
+        sender: Address,
+        assetId: Asset,
+        amount: Long,
+        feeAssetId: Asset,
+        feeAmount: Long,
+        allowFeeOverdraft: Boolean = false
+      ) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
           case Waves                => Portfolio(-amount, LeaseBalance.empty, Map.empty)
@@ -39,8 +49,11 @@ object CommonValidation {
         val spendings       = Monoid.combine(amountDiff, feeDiff)
         val oldWavesBalance = blockchain.balance(sender, Waves)
 
-        val newWavesBalance = oldWavesBalance + spendings.balance
-        if (newWavesBalance < 0) {
+        val newWavesBalance     = oldWavesBalance + spendings.balance
+        val feeUncheckedBalance = oldWavesBalance + amountDiff.balance
+
+        val overdraftFilter = allowFeeOverdraft && feeUncheckedBalance >= 0
+        if (!overdraftFilter && newWavesBalance < 0) {
           Left(
             GenericError(
               "Attempt to transfer unavailable funds: Transaction application leads to " +
@@ -73,7 +86,25 @@ object CommonValidation {
         case ttx: TransferTransaction     => checkTransfer(ttx.sender, ttx.assetId, ttx.amount, ttx.feeAssetId, ttx.fee)
         case mtx: MassTransferTransaction => checkTransfer(mtx.sender, mtx.assetId, mtx.transfers.map(_.amount).sum, Waves, mtx.fee)
         case citx: InvokeScriptTransaction =>
-          citx.payments.map(p => checkTransfer(citx.sender, p.assetId, p.amount, citx.feeAssetId, citx.fee)).find(_.isLeft).getOrElse(Right(tx))
+          val foldPayments: Iterable[Payment] => Iterable[Payment] =
+            if (blockchain.useCorrectPaymentCheck)
+              _.groupBy(_.assetId)
+                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
+            else
+              identity
+
+          for {
+            address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
+            allowFeeOverdraft = blockchain.accountScript(address) match {
+              case Some(AccountScriptInfo(ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
+              case _ => false
+            }
+            check <- foldPayments(citx.payments)
+              .map(p => checkTransfer(citx.sender, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
+              .find(_.isLeft)
+              .getOrElse(Right(tx))
+          } yield check
+
         case _ => Right(tx)
       }
     } else Right(tx)

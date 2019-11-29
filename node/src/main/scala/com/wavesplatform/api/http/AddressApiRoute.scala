@@ -64,11 +64,12 @@ case class AddressApiRoute(
     val script = blockchain.accountScript(address)
     complete(
       Json.obj(
-        "address"    -> address.stringRepr,
-        "script"     -> script.map(_._1.bytes().base64),
-        "scriptText" -> script.map(_._1.expr.toString),
-        "complexity" -> script.fold(0L)(_._2),
-        "extraFee"   -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
+        "address"            -> address.stringRepr,
+        "script"             -> script.map(_.script.bytes().base64),
+        "scriptText"         -> script.map(_.script.expr.toString),
+        "complexity"         -> script.fold(0L)(_.verifierComplexity),
+        "callableComplexity" -> script.fold[JsValue](JsNull)(m => Json.toJson(m.callableComplexity)),
+        "extraFee"           -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
       )
     )
   }
@@ -389,7 +390,7 @@ case class AddressApiRoute(
     val accountScript = blockchain.accountScript(account)
 
     accountScript
-      .map(_._1)
+      .map(_.script)
       .traverse(Global.dAppFuncTypes)
       .map(AccountScriptMeta(account.stringRepr, _))
   }

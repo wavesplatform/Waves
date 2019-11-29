@@ -56,7 +56,7 @@ trait Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
 
-  def accountScript(address: Address): Option[(Script, Long)]
+  def accountScript(address: Address): Option[AccountScriptInfo]
   def hasAccountScript(address: Address): Boolean
 
   def assetScript(id: IssuedAsset): Option[(Script, Long)]

@@ -23,7 +23,7 @@ object TransactionParsers {
     TransferTransaction
   ).map { x =>
     x.typeId -> x
-  }(collection.breakOut)
+  }.toMap
 
   private[this] val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
     DataTransaction,
@@ -43,7 +43,7 @@ object TransactionParsers {
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
     }
-  }(collection.breakOut)
+  }.toMap
 
   val all: Map[(Byte, Byte), TransactionParser] = old.flatMap {
     case (typeId, builder) =>

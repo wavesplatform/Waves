@@ -37,16 +37,16 @@ class BlockchainUpdaterNFTTest
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          d.nftList(firstAccount) shouldBe Seq(issue)
-          d.nftList(secondAccount) shouldBe Nil
+          d.nftList(db, firstAccount) shouldBe Seq(issue)
+          d.nftList(db, secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
-          d.nftList(firstAccount) shouldBe Nil
-          d.nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(db, firstAccount) shouldBe Nil
+          d.nftList(db, secondAccount) shouldBe Seq(issue)
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
-          d.nftList(firstAccount) shouldBe Nil
-          d.nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(db, firstAccount) shouldBe Nil
+          d.nftList(db, secondAccount) shouldBe Seq(issue)
         }
     }
   }
@@ -66,16 +66,16 @@ class BlockchainUpdaterNFTTest
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          d.nftList(firstAccount) shouldBe Seq(issue)
-          d.nftList(secondAccount) shouldBe Nil
+          d.nftList(db, firstAccount) shouldBe Seq(issue)
+          d.nftList(db, secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
-          d.nftList(firstAccount) shouldBe Nil
-          d.nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(db, firstAccount) shouldBe Nil
+          d.nftList(db, secondAccount) shouldBe Seq(issue)
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
-          d.nftList(firstAccount) shouldBe Nil
-          d.nftList(secondAccount) shouldBe Seq(issue)
+          d.nftList(db, firstAccount) shouldBe Nil
+          d.nftList(db, secondAccount) shouldBe Seq(issue)
         }
     }
   }

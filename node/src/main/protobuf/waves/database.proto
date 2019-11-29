@@ -13,3 +13,9 @@ message BlockMeta {
     int64 total_fee_in_waves = 6;
     int64 reward = 7;
 }
+
+message AccountScriptInfo {
+    bytes script_bytes = 1;
+    int64 verifier_complexity = 2;
+    map<string, int64> callable_complexity = 3;
+}

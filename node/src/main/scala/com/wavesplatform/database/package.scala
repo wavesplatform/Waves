@@ -16,15 +16,15 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.database.proto.{AccountScriptInfo => PBAccountScriptInfo, BlockMeta => PBBlockMeta}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
-import com.wavesplatform.database.proto.{BlockMeta => PBBlockMeta}
-import com.wavesplatform.protobuf.block.PBBlocks
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -283,7 +283,7 @@ package object database extends ScorexLogging {
     ).toByteArray
 
   def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
-    val pbbm   = PBBlockMeta.parseFrom(bs)
+    val pbbm = PBBlockMeta.parseFrom(bs)
     BlockMeta(
       PBBlocks.vanilla(pbbm.header.get),
       ByteStr(pbbm.signature.toByteArray),
@@ -394,19 +394,40 @@ package object database extends ScorexLogging {
     }
 
     def resourceObservable: Observable[DBResource] = Observable.resource(Task(DBResource(db)))(r => Task(r.close()))
+
+    def withResource[A](f: DBResource => A): A = {
+      val resource = DBResource(db)
+      try f(resource)
+      finally resource.close()
+    }
   }
 
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeScript(script: (Script, Long)): Array[Byte] =
+  def writeAssetScript(script: (Script, Long)): Array[Byte] =
     script._1.bytes().arr ++ Longs.toByteArray(script._2)
 
-  def readScript(b: Array[Byte]): (Script, Long) =
+  def readAssetScript(b: Array[Byte]): (Script, Long) =
     (
       ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
       ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
+
+  def writeScript(scriptInfo: AccountScriptInfo): Array[Byte] = {
+    PBAccountScriptInfo.toByteArray(
+      PBAccountScriptInfo(
+        ByteString.copyFrom(scriptInfo.script.bytes()),
+        scriptInfo.verifierComplexity,
+        scriptInfo.callableComplexity
+      )
+    )
+  }
+
+  def readScript(b: Array[Byte]): AccountScriptInfo = {
+    val asi = PBAccountScriptInfo.parseFrom(b)
+    AccountScriptInfo(ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(), asi.verifierComplexity, asi.callableComplexity)
+  }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {

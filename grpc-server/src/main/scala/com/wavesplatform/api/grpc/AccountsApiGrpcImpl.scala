@@ -5,6 +5,7 @@ import com.wavesplatform.account.Alias
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
@@ -47,7 +48,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
     commonApi.script(request.address.toAddress) match {
       case None => ScriptData()
-      case Some((script, complexity)) =>
+      case Some(AccountScriptInfo(script, complexity, _)) =>
         ScriptData(script.bytes().toPBByteString, script.expr.toString, complexity)
 
     }

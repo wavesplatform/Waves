@@ -97,8 +97,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          val stransactions1 = d.addressTransactions(sender).sortBy(_._2.timestamp)
-          val rtransactions1 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
+          val stransactions1 = d.addressTransactions(db, sender).sortBy(_._2.timestamp)
+          val rtransactions1 = d.addressTransactions(db, recipient).sortBy(_._2.timestamp)
 
           d.removeAfter(genesisSignature)
 
@@ -112,8 +112,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          val stransactions2 = d.addressTransactions(sender).sortBy(_._2.timestamp)
-          val rtransactions2 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
+          val stransactions2 = d.addressTransactions(db, sender).sortBy(_._2.timestamp)
+          val rtransactions2 = d.addressTransactions(db, recipient).sortBy(_._2.timestamp)
 
           stransactions1 shouldBe stransactions2
           rtransactions1 shouldBe rtransactions2
@@ -346,7 +346,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockWithScriptId = d.lastBlockId
 
-          d.blockchainUpdater.accountScript(sender) should contain(script -> 1)
+          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(script, 1))
 
           d.appendBlock(
             TestBlock.create(
@@ -359,7 +359,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
 
           d.removeAfter(blockWithScriptId)
-          d.blockchainUpdater.accountScript(sender) should contain(script -> 1)
+          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(script, 1))
 
           d.removeAfter(genesisBlockId)
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
