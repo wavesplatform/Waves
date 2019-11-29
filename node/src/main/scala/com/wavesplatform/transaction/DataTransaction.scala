@@ -35,7 +35,7 @@ object DataTransaction extends TransactionParser {
   override type TransactionT = DataTransaction
 
   override val typeId: TxType                    = 12
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2)
   override val classTag                          = ClassTag(classOf[DataTransaction])
 
   implicit val validator: TxValidator[DataTransaction] = DataTxValidator

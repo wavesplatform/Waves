@@ -454,12 +454,45 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeScript(script: (Script, Long)): Array[Byte] =
+  def writeAssetScript(script: (Script, Long)): Array[Byte] =
     script._1.bytes().arr ++ Longs.toByteArray(script._2)
 
-  def readScript(b: Array[Byte]): (Script, Long) =
+  def readAssetScript(b: Array[Byte]): (Script, Long) =
     (
       ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
       ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
+
+
+  def writeScript(script: (Script, Long, Map[String, Long])): Array[Byte] = {
+    val (expr, complexity, callableComplexities) = script
+    val output = newDataOutput()
+
+    output.writeInt(expr.bytes().size)
+    output.writeByteStr(expr.bytes())
+
+    output.writeLong(complexity)
+
+    output.writeInt(callableComplexities.size)
+    callableComplexities.foreach {
+      case (name, cost) =>
+        output.writeUTF(name)
+        output.writeLong(cost)
+    }
+    output.toByteArray
+  }
+
+  def readScript(b: Array[Byte]): (Script, Long, Map[String, Long]) = {
+    val input = newDataInput(b)
+    val scriptSize = input.readInt()
+    val script = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
+    val complexity = input.readLong()
+    val callableComplexitiesCount = input.readInt()
+    val callableComplexities =
+      (1 to callableComplexitiesCount)
+        .map(_ => (input.readUTF(), input.readLong()))
+        .toMap
+
+    (script, complexity, callableComplexities)
+  }
 }
