@@ -244,7 +244,10 @@ object SyncHttpApi extends Assertions {
         script: Option[String],
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = IssueTransaction.selfSigned(TxVersion.V2, sender = source,
+      val tx = IssueTransaction
+        .selfSigned(
+          TxVersion.V2,
+          sender = source,
           name = name.getBytes(StandardCharsets.UTF_8),
           description = description.getBytes(StandardCharsets.UTF_8),
           quantity = quantity,
@@ -274,8 +277,15 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script)), waitForTx)
     }
 
-    def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = reissueFee): Transaction =
-      sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
+    def reissue(
+        sourceAddress: String,
+        assetId: String,
+        quantity: Long,
+        reissuable: Boolean,
+        fee: Long = reissueFee,
+        waitForTx: Boolean = false
+    ): Transaction =
+      maybeWaitForTransaction(sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee)), waitForTx)
 
     def debugStateChanges(transactionId: String): DebugStateChanges = {
       sync(async(n).debugStateChanges(transactionId))
@@ -380,7 +390,13 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, assetId)), waitForTx)
     }
 
-    def broadcastLease(source: KeyPair, recipient: String, leasingAmount: Long, leasingFee: Long = minFee, waitForTx: Boolean = false): Transaction = {
+    def broadcastLease(
+        source: KeyPair,
+        recipient: String,
+        leasingAmount: Long,
+        leasingFee: Long = minFee,
+        waitForTx: Boolean = false
+    ): Transaction = {
       val tx = LeaseTransaction
         .selfSigned(
           2.toByte,
@@ -536,7 +552,13 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).setScript(sender, script, fee)), waitForTx)
     }
 
-    def setAssetScript(assetId: String, sender: String, fee: Long = issueFee, script: Option[String] = None, waitForTx: Boolean = false): Transaction = {
+    def setAssetScript(
+        assetId: String,
+        sender: String,
+        fee: Long = issueFee,
+        script: Option[String] = None,
+        waitForTx: Boolean = false
+    ): Transaction = {
       maybeWaitForTransaction(sync(async(n).setAssetScript(assetId, sender, fee, script)), waitForTx)
     }
 
