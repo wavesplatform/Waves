@@ -281,7 +281,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         |func default() = nil
         |
         |@Callable(inv)
-        |func default() = []
+        |func default2() = []
         |
         |@Callable(inv)
         |func paySelf(asset: String) = {

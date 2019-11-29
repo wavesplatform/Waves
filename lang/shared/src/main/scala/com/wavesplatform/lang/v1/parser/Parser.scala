@@ -256,7 +256,7 @@ object Parser {
   )
 
   val maybeAccessP: P[EXPR] =
-    P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).rep)
+    P(Index ~~ extractableAtom ~~ Index ~~ NoCut(accessP).repX)
       .map {
         case (start, obj, objEnd, accessors) =>
           accessors.foldLeft(obj) {
