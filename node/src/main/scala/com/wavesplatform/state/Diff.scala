@@ -132,7 +132,6 @@ case class Diff(
                  transactions: Map[ByteStr, (Transaction, Set[Address])],
                  portfolios: Map[Address, Portfolio],
                  issuedAssets: Map[IssuedAsset, AssetDetails],
-                 updatedAssets: Map[IssuedAsset, AssetInfo],
                  aliases: Map[Alias, Address],
                  orderFills: Map[ByteStr, VolumeAndFee],
                  leaseState: Map[ByteStr, Boolean],
@@ -149,7 +148,6 @@ object Diff {
   def stateOps(
                 portfolios: Map[Address, Portfolio] = Map.empty,
                 assetDetails: Map[IssuedAsset, AssetDetails] = Map.empty,
-                assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
                 aliases: Map[Alias, Address] = Map.empty,
                 orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
                 leaseState: Map[ByteStr, Boolean] = Map.empty,
@@ -163,7 +161,6 @@ object Diff {
       transactions = Map(),
       portfolios = portfolios,
       issuedAssets = assetDetails,
-      updatedAssets = assetInfos,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -180,7 +177,6 @@ object Diff {
              tx: Transaction,
              portfolios: Map[Address, Portfolio] = Map.empty,
              assetDetails: Map[IssuedAsset, AssetDetails] = Map.empty,
-             assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
              aliases: Map[Alias, Address] = Map.empty,
              orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
              leaseState: Map[ByteStr, Boolean] = Map.empty,
@@ -196,7 +192,6 @@ object Diff {
       transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = assetDetails,
-      updatedAssets = assetInfos,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -209,7 +204,7 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
@@ -219,7 +214,6 @@ object Diff {
         transactions = older.transactions ++ newer.transactions,
         portfolios = older.portfolios.combine(newer.portfolios),
         issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
-        updatedAssets = older.updatedAssets ++ newer.updatedAssets,
         aliases = older.aliases ++ newer.aliases,
         orderFills = older.orderFills.combine(newer.orderFills),
         leaseState = older.leaseState ++ newer.leaseState,

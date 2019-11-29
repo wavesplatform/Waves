@@ -1,10 +1,12 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
 import com.wavesplatform.transaction.{
@@ -74,6 +76,9 @@ object UpdateAssetInfoTransaction extends TransactionParser {
   override val supportedVersions: Set[TxVersion]              = Set(1)
   override def classTag: ClassTag[UpdateAssetInfoTransaction] = ClassTag(classOf[UpdateAssetInfoTransaction])
 
+  implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
   implicit val validator: TxValidator[UpdateAssetInfoTransaction] = UpdateAssetInfoTxValidator
 
   override def parseBytes(bytes: Array[TxType]): Try[UpdateAssetInfoTransaction] =
@@ -109,4 +114,17 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       proofs
     ).validatedEither
   }
+
+  def selfSigned(
+      version: Byte,
+      chainId: Byte,
+      sender: KeyPair,
+      assetId: ByteStr,
+      name: String,
+      description: String,
+      timestamp: TxTimestamp,
+      feeAmount: TxAmount,
+      feeAsset: Asset
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
+    create(version, chainId, sender, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender))
 }

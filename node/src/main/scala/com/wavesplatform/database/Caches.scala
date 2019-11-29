@@ -9,8 +9,6 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.metrics.LevelDBStats
 import com.wavesplatform.settings.DBSettings
@@ -199,25 +197,24 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   //noinspection ScalaStyle
   protected def doAppend(
-                          block: Block,
-                          carry: Long,
-                          newAddresses: Map[Address, BigInt],
-                          balances: Map[BigInt, Map[Asset, Long]],
-                          leaseBalances: Map[BigInt, LeaseBalance],
-                          addressTransactions: Map[AddressId, List[TransactionId]],
-                          leaseStates: Map[ByteStr, Boolean],
-                          reissuedAssets: Map[IssuedAsset, AssetDetails],
-                          updatedAssets: Map[IssuedAsset, AssetInfo],
-                          filledQuantity: Map[ByteStr, VolumeAndFee],
-                          scripts: Map[BigInt, Option[(Script, Long)]],
-                          assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
-                          data: Map[BigInt, AccountDataInfo],
-                          aliases: Map[Alias, BigInt],
-                          sponsorship: Map[IssuedAsset, Sponsorship],
-                          totalFee: Long,
-                          reward: Option[Long],
-                          hitSource: ByteStr,
-                          scriptResults: Map[ByteStr, InvokeScriptResult]
+      block: Block,
+      carry: Long,
+      newAddresses: Map[Address, BigInt],
+      balances: Map[BigInt, Map[Asset, Long]],
+      leaseBalances: Map[BigInt, LeaseBalance],
+      addressTransactions: Map[AddressId, List[TransactionId]],
+      leaseStates: Map[ByteStr, Boolean],
+      reissuedAssets: Map[IssuedAsset, AssetDetails],
+      filledQuantity: Map[ByteStr, VolumeAndFee],
+      scripts: Map[BigInt, Option[(Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      data: Map[BigInt, AccountDataInfo],
+      aliases: Map[Alias, BigInt],
+      sponsorship: Map[IssuedAsset, Sponsorship],
+      totalFee: Long,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
@@ -284,7 +281,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       addressTransactions,
       diff.leaseState,
       diff.issuedAssets,
-      diff.updatedAssets,
       newFills,
       diff.scripts.map { case (address, s) => addressId(address) -> s },
       diff.assetScripts,

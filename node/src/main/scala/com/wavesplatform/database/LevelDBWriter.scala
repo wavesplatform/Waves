@@ -194,8 +194,14 @@ class LevelDBWriter(
 
         val (ai, lastUpdateHeight) =
           (for {
-            lastUpdateHeight <- db.get(Keys.assetInfoHistory(asset)).headOption
-            assetInfo = db.get(Keys.assetInfo(asset)(height))
+            lastUpdateHeight <- db.get(Keys.assetUpdateTxNumHistory(asset)).headOption
+            assetUpdateTxNum = db.get(Keys.assetUpdateTxNum(asset)(lastUpdateHeight))
+            assetInfo <- db
+              .get(Keys.transactionAt(Height @@ lastUpdateHeight, assetUpdateTxNum))
+              .collect {
+                case t: IssueTransaction           => AssetInfo(new String(t.name), new String(t.description))
+                case t: UpdateAssetInfoTransaction => AssetInfo(t.name, t.description)
+              }
           } yield (assetInfo, Height @@ lastUpdateHeight))
             .getOrElse((defaultAssetInfo, Height @@ h))
 
@@ -238,6 +244,13 @@ class LevelDBWriter(
     c2.drop(1).map(kf(_).keyBytes)
   }
 
+  private def updateAsset(rw: RW)(assetId: IssuedAsset, height: Height, num: TxNum): Unit = {
+    val history = rw.get(Keys.assetUpdateTxNumHistory(assetId))
+
+    rw.put(Keys.assetUpdateTxNumHistory(assetId), height +: history)
+    rw.put(Keys.assetUpdateTxNum(assetId)(height), num)
+  }
+
   //noinspection ScalaStyle
   override protected def doAppend(
       block: Block,
@@ -248,7 +261,6 @@ class LevelDBWriter(
       addressTransactions: Map[AddressId, List[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
       reissuedAssets: Map[IssuedAsset, AssetDetails],
-      updatedAssets: Map[IssuedAsset, AssetInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
@@ -370,11 +382,6 @@ class LevelDBWriter(
       expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
     }
 
-    for ((asset, assetInfo) <- updatedAssets) {
-      rw.put(Keys.assetInfo(asset)(height), assetInfo)
-      expiredKeys ++= updateHistory(rw, Keys.assetInfoHistory(asset), threshold, Keys.assetInfo(asset))
-    }
-
     for ((leaseId, state) <- leaseStates) {
       rw.put(Keys.leaseStatus(leaseId)(height), state)
       expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
@@ -428,6 +435,13 @@ class LevelDBWriter(
     }
 
     for ((id, (tx, num)) <- transactions) {
+
+      tx match {
+        case tx: UpdateAssetInfoTransaction => updateAsset(rw)(tx.assetId, Height @@ height, num)
+        case tx: IssueTransaction           => updateAsset(rw)(IssuedAsset(tx.assetId), Height @@ height, num)
+        case _                              => ()
+      }
+
       rw.put(Keys.transactionAt(Height(height), num), Some(tx))
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
@@ -572,6 +586,14 @@ class LevelDBWriter(
 
                 case tx: IssueTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
+                  rw.delete(Keys.assetUpdateTxNum(IssuedAsset(tx.assetId))(currentHeight))
+                  rw.filterHistory(Keys.assetUpdateTxNumHistory(IssuedAsset(tx.assetId)), currentHeight)
+
+                case tx: UpdateAssetInfoTransaction =>
+                  assetDetailsToInvalidate += tx.assetId
+                  rw.delete(Keys.assetUpdateTxNum(tx.assetId)(currentHeight))
+                  rw.filterHistory(Keys.assetUpdateTxNumHistory(tx.assetId), currentHeight)
+
                 case tx: ReissueTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: BurnTransaction =>
@@ -596,10 +618,6 @@ class LevelDBWriter(
                   assetScriptsToDiscard += asset
                   rw.delete(Keys.assetScript(asset)(currentHeight))
                   rw.filterHistory(Keys.assetScriptHistory(asset), currentHeight)
-
-                case tx: UpdateAssetInfoTransaction =>
-                  rw.delete(Keys.assetInfo(tx.assetId)(currentHeight))
-                  rw.filterHistory(Keys.assetInfoHistory(tx.assetId), currentHeight)
 
                 case _: DataTransaction => // see changed data keys removal
 

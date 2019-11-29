@@ -111,7 +111,6 @@ object AssetTransactionsDiff {
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
-        assetInfos = Map(tx.assetId -> AssetInfo(tx.name, tx.description))
       )
     }
 }

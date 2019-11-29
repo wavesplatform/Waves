@@ -6,7 +6,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
@@ -180,6 +180,8 @@ object Keys {
   val HitSourcePrefix: Short                   = 59
   def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
 
-  def assetInfoHistory(asset: IssuedAsset): Key[Seq[Int]]        = historyKey("asset-info-history", 60, asset.id.arr)
-  def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] = Key("asset-info", hBytes(61, height, asset.id.arr), readAssetInfo, writeAssetInfo)
+  def assetUpdateTxNumHistory(asset: IssuedAsset): Key[Seq[Int]] =
+    historyKey("asset-update-tx-num-history", 60, asset.id.arr)
+  def assetUpdateTxNum(asset: IssuedAsset)(height: Int): Key[TxNum] =
+    Key("asset-update-tx-num", hBytes(61, height, asset.id.arr), readAssetUpdateTxNum, writeAssetUpdateTxNum)
 }

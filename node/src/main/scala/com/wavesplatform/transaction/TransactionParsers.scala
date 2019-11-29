@@ -3,6 +3,7 @@ package com.wavesplatform.transaction
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
@@ -76,9 +77,12 @@ object TransactionParsers {
       }
     }
 
+    def oldOrProtoParseBytes: Try[Transaction] =
+      oldParseBytes.orElse(PBTransactionSerializer.parseBytes(bytes))
+
     for {
-      _  <- Either.cond(bytes.length > 2, (), BufferUnderflow).toTry
-      tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes
+      _  <- Either.cond(bytes.length > 4, (), BufferUnderflow).toTry
+      tx <- if (bytes(0) == 0) modernParseBytes else oldOrProtoParseBytes
     } yield tx
   }
 }

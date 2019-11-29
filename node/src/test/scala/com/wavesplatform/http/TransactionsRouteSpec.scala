@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL, TRUE}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -174,11 +174,12 @@ class TransactionsRouteSpec
             Some(
               AssetDescription(
                 issuer = accountGen.sample.get,
-                name = "foo".getBytes("UTF-8"),
-                description = "bar".getBytes("UTF-8"),
+                name = "foo",
+                description = "bar",
                 decimals = 8,
                 reissuable = false,
                 totalVolume = Long.MaxValue,
+                lastInfoUpdateHeight = Height @@ 0,
                 script = None,
                 sponsorship = 5
               )
@@ -222,11 +223,12 @@ class TransactionsRouteSpec
             Some(
               AssetDescription(
                 issuer = accountGen.sample.get,
-                name = "foo".getBytes("UTF-8"),
-                description = "bar".getBytes("UTF-8"),
+                name = "foo",
+                description = "bar",
                 decimals = 8,
                 reissuable = false,
                 totalVolume = Long.MaxValue,
+                lastInfoUpdateHeight = Height @@ 0,
                 script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
                 sponsorship = 5
               )

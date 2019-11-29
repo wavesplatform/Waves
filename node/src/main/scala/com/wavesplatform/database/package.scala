@@ -266,30 +266,8 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
-    val ndo = newDataOutput()
-
-    val nameBytes        = ai.name.getBytes("UTF-8")
-    val descriptionBytes = ai.description.getBytes("UTF-8")
-
-    ndo.writeByte(nameBytes.length.toByte)
-    ndo.write(nameBytes)
-    ndo.writeShort(descriptionBytes.length.toShort)
-    ndo.write(descriptionBytes)
-
-    ndo.toByteArray
-  }
-
-  def readAssetInfo(arr: Array[Byte]): AssetInfo = {
-    val ndi = newDataInput(arr)
-
-    val nameBytesLength        = ndi.readByte().toInt
-    val nameBytes              = ndi.readBytes(nameBytesLength)
-    val descriptionBytesLength = ndi.readShort()
-    val descriptionBytes       = ndi.readBytes(descriptionBytesLength)
-
-    AssetInfo(new String(nameBytes), new String(descriptionBytes))
-  }
+  def writeAssetUpdateTxNum(ai: TxNum): Array[Byte] = Shorts.toByteArray(ai)
+  def readAssetUpdateTxNum(arr: Array[Byte]): TxNum = TxNum @@ Shorts.fromByteArray(arr)
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
     val BlockInfo(bh, size, transactionCount, signature) = data

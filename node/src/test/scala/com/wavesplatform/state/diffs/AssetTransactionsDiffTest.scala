@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -9,7 +10,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -260,11 +261,12 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
             newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
               AssetDescription(
                 issue.sender,
-                issue.name,
-                issue.description,
+                new String(issue.name),
+                new String(issue.description),
                 issue.decimals,
                 issue.reissuable,
                 BigInt(issue.quantity),
+                Height @@ 0,
                 issue.script,
                 0L
               )
@@ -314,5 +316,72 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         }
     }
   }
+
+  val assetInfoUpdateEnabled: FunctionalitySettings = TestFunctionalitySettings.Enabled
+    .copy(
+      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+    )
+
+  property("Can't update before activation") {
+    forAll(genesisIssueUpdate) {
+      case (gen, issue, update) =>
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, update))) { ei =>
+          ei should produce("VRF and Protobuf feature has not been activated yet")
+        }
+    }
+  }
+
+  property("Can't update right after issue") {
+    forAll(genesisIssueUpdate) {
+      case (gen, issue, update) =>
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, update)), assetInfoUpdateEnabled) { ei =>
+          ei should produce("Can't update asset info before 100002 block")
+        }
+    }
+  }
+
+  property(s"Can update after ${UpdateAssetInfoTransaction.MIN_UPDATE_INFO_INTERVAL}") {
+    forAll(genesisIssueUpdate) {
+      case (gen, issue, update) =>
+        val blocks = Seq.fill(UpdateAssetInfoTransaction.MIN_UPDATE_INFO_INTERVAL)(TestBlock.create(Seq.empty))
+        assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
+          ei should produce("Can't update asset info before 100002 block")
+        }
+    }
+  }
+
+  trait MySer[F[_, _]] {
+
+  }
+
+  private val genesisIssueUpdate =
+    for {
+      timestamp          <- timestampGen
+      initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
+      accountA           <- accountGen
+      accountB           <- accountGen
+      smallFee           <- Gen.choose(1L, 10L)
+      genesisTx1 = GenesisTransaction.create(accountA, initialWavesAmount, timestamp).explicitGet()
+      genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
+      (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
+      (_, updName, updDescription, _, _, _, _, _)              <- issueParamGen
+      issue = IssueTransaction
+        .selfSigned(TxVersion.V2, accountA, assetName, description, quantity, decimals, false, None, smallFee, timestamp + 1)
+        .explicitGet()
+      assetId = IssuedAsset(issue.id())
+      update = UpdateAssetInfoTransaction
+        .selfSigned(
+          TxVersion.V1,
+          AddressScheme.current.chainId,
+          accountA,
+          assetId.id,
+          new String(updName),
+          new String(updDescription),
+          timestamp,
+          smallFee,
+          Waves
+        )
+        .explicitGet()
+    } yield (Seq(genesisTx1, genesisTx2), issue, update)
 
 }
