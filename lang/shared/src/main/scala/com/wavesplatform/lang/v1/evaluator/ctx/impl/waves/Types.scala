@@ -405,6 +405,18 @@ object Types {
     )
   )
 
+  def buildUpdateAssetInfoTransactionType(proofsEnabled: Boolean) =
+    CASETYPEREF(
+      "UpdateAssetInfoTransaction",
+      addProofsIfNeeded(
+        List(
+          "assetId"     -> BYTESTR,
+          "name"        -> STRING,
+          "description" -> STRING
+        ) ++ header ++ proven,
+        proofsEnabled
+      )
+    )
 
   def buildDataTransactionType(proofsEnabled: Boolean, v: StdLibVersion) =
     CASETYPEREF(

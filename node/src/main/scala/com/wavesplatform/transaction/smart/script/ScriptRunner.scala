@@ -24,7 +24,6 @@ import shapeless._
 
 object ScriptRunner {
   type TxOrd         = BlockchainContext.In
-  type PaymentsTxOrd = (Transaction, Option[AttachedPayments]) :+: Order :+: ScriptTransfer :+: CNil
 
   def apply(
       in: TxOrd,
