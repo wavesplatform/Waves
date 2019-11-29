@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.WalletSettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -254,7 +254,7 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height) =>
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(height -> tx)).once()
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(Height(height) -> Left(tx))).once()
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
@@ -398,14 +398,6 @@ class TransactionsRouteSpec
         blocks           <- Gen.listOfN(blockchainHeight, invalidBlockGen)
       } yield blocks
 
-    def prepareBlockchain(blocks: List[Block]): Blockchain = { // resetting blockchain for each property check iteration
-      val blockchain        = mock[Blockchain]
-      val heightToBlock     = blocks.zipWithIndex.map { case (b, h) => (h + 1, b) }.toMap
-      val txIdToHeightAndTx = heightToBlock.flatMap { case (h, b) => b.transactionData.map(tx => (tx.id(), (h, tx))) }
-//      (blockchain.transactionInfo _).expects(*).onCall((x: ByteStr) => txIdToHeightAndTx.get(x)).anyNumberOfTimes()
-      blockchain
-    }
-
     def validateSuccess(txIdsToBlock: Map[String, Block], response: HttpResponse): Unit = {
       response.status shouldBe StatusCodes.OK
 
@@ -436,15 +428,11 @@ class TransactionsRouteSpec
 
     "returns merkle proofs" in {
       forAll(validBlocksGen) { blocks =>
-        val blockchain = prepareBlockchain(blocks)
-        val route      = TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, Coeval(0), utxPoolSynchronizer, new TestTime).route
-
         val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
-
-        val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
-        val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
-
         (addressTransactions.transactionProofs _).expects(*).returning(Nil).anyNumberOfTimes()
+
+        val queryParams = txIdsToBlock.keys.map(id => s"id=$id").mkString("?", "&", "")
+        val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
 
         Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
           validateSuccess(txIdsToBlock, response)
@@ -460,10 +448,6 @@ class TransactionsRouteSpec
       val gen = validBlocksGen.flatMap(bs => invalidBlocksGen.flatMap(ibs => transactionsGen.map(txs => (bs, ibs, txs))))
       forAll(gen) {
         case (validBlocks, invalidBlocks, unknownTransactions) =>
-          val blockchain = prepareBlockchain(validBlocks ++ invalidBlocks)
-          val route =
-            TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, Coeval(0), utxPoolSynchronizer, new TestTime).route
-
           val txIdsToBlock = validBlocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
 
           val requestedIds = ((validBlocks ++ invalidBlocks).flatMap(_.transactionData) ++ unknownTransactions).map(_.id().toString)
@@ -477,6 +461,8 @@ class TransactionsRouteSpec
             validateSuccess(txIdsToBlock, response)
           }
 
+          (addressTransactions.transactionProofs _).expects(*).returning(Nil).anyNumberOfTimes()
+
           Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
             validate(response)
           }
@@ -489,13 +475,14 @@ class TransactionsRouteSpec
 
     "returns error in case of all transactions are filtered" in {
       forAll(invalidBlocksGen) { blocks =>
-        val blockchain = prepareBlockchain(blocks)
-        val route      = TransactionsApiRoute(restAPISettings, addressTransactions, wallet, blockchain, Coeval(0), utxPoolSynchronizer, new TestTime).route
+        prepareBlockchain(blocks)
 
         val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
 
         val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
         val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
+
+        (addressTransactions.transactionProofs _).expects(*).returning(Nil).anyNumberOfTimes()
 
         Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
           validateFailure(response)

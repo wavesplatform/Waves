@@ -125,8 +125,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
         minerTx.size shouldBe 1
 
         val sponsorTx = sponsor.transactionsByAddress(sponsor.address, 100)
-//        sponsorTx.head.size shouldBe 4
-//        sponsorTx.head.count(tx => tx.sender.contains(sponsor.address) || tx.recipient.contains(sponsor.address)) shouldBe 4
         sponsorTx.map(_.id) should contain allElementsOf Seq(sponsorId, transferTxToAlice, sponsorAssetId)
       }
 
@@ -291,7 +289,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
 
       val sponsorAssetId2 =
         sponsor
-          .issue(sponsor.address, "Another", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = true, fee = issueFee)
+          .issue(sponsor.address, "Another", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, fee = issueFee)
           .id
       nodes.waitForHeightAriseAndTxPresent(sponsorAssetId2)
       sponsor.sponsorAsset(sponsor.address, sponsorAssetId2, baseFee = Token, fee = sponsorFee).id
@@ -327,7 +325,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
       val minerBalance = miner.accountBalances(miner.address)
       val minersSpondorAssetId =
         miner
-          .issue(miner.address, "MinersAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 8, reissuable = true, fee = issueFee)
+          .issue(miner.address, "MinersAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 8, fee = issueFee)
           .id
       nodes.waitForHeightAriseAndTxPresent(minersSpondorAssetId)
       val makeAssetSponsoredTx = miner.sponsorAsset(miner.address, minersSpondorAssetId, baseFee = Token, fee = sponsorFee).id
@@ -347,7 +345,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
     }
 
     "tx is declined if sponsor has not enough effective balance to pay fee" in {
-      val (sponsorBalance, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
+      val (_, sponsorEffectiveBalance) = sponsor.accountBalances(sponsor.address)
       val sponsorLeaseAllAvaliableWaves             = sponsor.lease(sponsor.address, bob.address, sponsorEffectiveBalance - leasingFee, leasingFee).id
       nodes.waitForHeightAriseAndTxPresent(sponsorLeaseAllAvaliableWaves)
       assertBadRequestAndMessage(alice.transfer(alice.address, bob.address, 10 * Token, LargeFee, Some(sponsorAssetId), Some(sponsorAssetId)),

@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
 import com.wavesplatform.state.{AddressId, Diff, Height, InvokeScriptResult, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import com.wavesplatform.transaction.{Authorized, Transaction}
+import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
@@ -46,6 +46,7 @@ object AddressTransactions {
   private def loadTransaction(resource: DBResource, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction)] =
     resource.get(Keys.transactionAt(height, txNum)) match {
       case Some(tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => Some(height -> tx)
+      case Some(gt: GenesisTransaction) if sender.isEmpty                  => Some(height -> gt)
       case _                                                               => None
     }
 
@@ -86,7 +87,7 @@ object AddressTransactions {
       fromId.flatMap(id => resource.get(Keys.transactionHNById(TransactionId(id)))).getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
 
     (for {
-      seqNr                    <- (resource.get(Keys.addressTransactionSeqNr(addressId)) to 1 by -1).view
+      seqNr                    <- (resource.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
       (height, transactionIds) <- resource.get(Keys.addressTransactionHN(addressId, seqNr)).view
       if height <= maxHeight
       (txType, txNum) <- transactionIds.reverse.view
