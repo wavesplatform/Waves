@@ -30,7 +30,7 @@ import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
-import com.wavesplatform.utils.{Time, _}
+import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -314,7 +314,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
             (asset @ IssuedAsset(assetId), balance)                                <- commonAccountApi.portfolio(acc) if balance > 0
             CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) <- commonAssetsApi.fullInfo(asset)
           } yield Json.obj(
-            "assetId"    -> assetId,
+            "assetId"    -> assetId.toString,
             "balance"    -> balance,
             "reissuable" -> assetInfo.reissuable,
             "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
