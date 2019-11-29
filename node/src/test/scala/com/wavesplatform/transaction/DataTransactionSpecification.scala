@@ -11,7 +11,7 @@ import com.wavesplatform.{TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.Json
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -100,8 +100,6 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("JSON roundtrip") {
-    implicit val signedFormat: Format[SignedDataRequest] = Json.format[SignedDataRequest]
-
     forAll(dataTransactionGen) { tx =>
       val json = tx.json()
       json.toString shouldEqual tx.toString

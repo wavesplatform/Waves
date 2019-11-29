@@ -46,7 +46,7 @@ class CommonAccountApi(blockchain: Blockchain) {
     blockchain.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
-    val script: Option[(Script, Long)] = blockchain.accountScriptWithComplexity(address)
+    val script: Option[(Script, Long, Map[String, Long])] = blockchain.accountScriptWithComplexity(address)
 
     AddressScriptInfo(
       script = script.map(_._1.bytes()),

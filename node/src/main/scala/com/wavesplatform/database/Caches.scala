@@ -144,12 +144,12 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def discardVolumeAndFee(orderId: ByteStr): Unit       = volumeAndFeeCache.invalidate(orderId)
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = volumeAndFeeCache.get(orderId)
 
-  private val scriptCache: LoadingCache[Address, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadScript)
-  protected def loadScript(address: Address): Option[(Script, Long)]
+  private val scriptCache: LoadingCache[Address, Option[(Script, Long, Map[String, Long])]] = cache(dbSettings.maxCacheSize, loadScript)
+  protected def loadScript(address: Address): Option[(Script, Long, Map[String, Long])]
   protected def hasScriptBytes(address: Address): Boolean
   protected def discardScript(address: Address): Unit = scriptCache.invalidate(address)
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = scriptCache.get(address)
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long, Map[String, Long])] = scriptCache.get(address)
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
@@ -206,7 +206,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       leaseStates: Map[ByteStr, Boolean],
       reissuedAssets: Map[IssuedAsset, AssetInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
-      scripts: Map[BigInt, Option[(Script, Long)]],
+      scripts: Map[BigInt, Option[(Script, Long, Map[String, Long])]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],

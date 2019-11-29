@@ -1,31 +1,32 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.ReissueTransaction
-import play.api.libs.json.Json
+import play.api.libs.json.{Format, Json}
 
 case class ReissueRequest(
     version: Option[Byte],
     sender: Option[String],
     senderPublicKey: Option[String],
-    assetId: String,
+    assetId: IssuedAsset,
     quantity: Long,
     reissuable: Boolean,
     fee: Long,
     timestamp: Option[Long],
-    signature: Option[String],
-    proofs: Option[List[String]]
+    signature: Option[ByteStr],
+    proofs: Option[Proofs]
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, ReissueTransaction] =
     for {
-      validProofs <- toProofs(version, signature, proofs)
-      validAsset  <- toAsset(Some(assetId))
+      validProofs <- toProofs(signature, proofs)
       tx <- ReissueTransaction.create(
         version.getOrElse(defaultVersion),
         sender,
-        validAsset.asInstanceOf[IssuedAsset],
+        assetId,
         quantity,
         reissuable,
         fee,
@@ -36,5 +37,5 @@ case class ReissueRequest(
 }
 
 object ReissueRequest {
-  implicit val jsonFormat = Json.format[ReissueRequest]
+  implicit val jsonFormat: Format[ReissueRequest] = Json.format
 }
