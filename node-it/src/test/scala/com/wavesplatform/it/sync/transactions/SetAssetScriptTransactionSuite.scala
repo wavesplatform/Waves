@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed}
+import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -216,7 +217,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       ),
       (
         sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz9ekQuYn92natMnMq8").get)),
-        CustomValidationError("invalid.assetId").assertive(true)
+        AssertiveApiError(WrongJson.Id, "failed to parse json", StatusCodes.BadRequest, true)
       ),
       (
         sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get)),
