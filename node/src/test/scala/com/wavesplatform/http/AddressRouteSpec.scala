@@ -161,7 +161,7 @@ class AddressRouteSpec
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(1).toAddress)
-      .onCall((a: AddressOrAlias) => Some((address2account(a.toString).publicKey, ExprScript(TRUE).explicitGet(), 1L)))
+      .onCall((a: AddressOrAlias) => Some((address2account(a.toString).publicKey, ExprScript(TRUE).explicitGet(), 1L, Map[String, Long]())))
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -214,7 +214,7 @@ class AddressRouteSpec
 
     (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(3).toAddress)
-      .onCall((a: AddressOrAlias) => Some((address2account(a.toString).publicKey, ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
+      .onCall((a: AddressOrAlias) => Some((address2account(a.toString).publicKey, ContractScript(V3, contractWithMeta).explicitGet(), 11L, Map[String, Long]())))
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))

@@ -451,7 +451,7 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeScript(script: (PublicKey, Script, Long)): Array[Byte] = {
+  def writeAssetScript(script: (PublicKey, Script, Long)): Array[Byte] = {
     script match {
       case (pk, script, c) => 
         val pkb = pk.arr
@@ -460,7 +460,7 @@ package object database extends ScorexLogging {
     }
   }
 
-  def readScript(b: Array[Byte]): (PublicKey, Script, Long) = {
+  def readAssetScript(b: Array[Byte]): (PublicKey, Script, Long) = {
     val pkb = b.take(KeyLength)
     val script = b.slice(KeyLength, b.length - 8) 
     (
@@ -468,5 +468,42 @@ package object database extends ScorexLogging {
       ScriptReader.fromBytes(script).explicitGet(),
       ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
+  }
+
+  def writeScript(script: (PublicKey, Script, Long, Map[String, Long])): Array[Byte] = {
+    val (pk, expr, complexity, callableComplexities) = script
+    val pkb = pk.arr
+    assert(pkb.size == KeyLength)
+    val output = newDataOutput()
+
+    output.writeByteStr(pkb)
+
+    output.writeInt(expr.bytes().size)
+    output.writeByteStr(expr.bytes())
+
+    output.writeLong(complexity)
+
+    output.writeInt(callableComplexities.size)
+    callableComplexities.foreach {
+      case (name, cost) =>
+        output.writeUTF(name)
+        output.writeLong(cost)
+    }
+    output.toByteArray
+  }
+
+  def readScript(b: Array[Byte]): (PublicKey, Script, Long, Map[String, Long]) = {
+    val input = newDataInput(b)
+    val pk = PublicKey(input.readByteStr(KeyLength))
+    val scriptSize = input.readInt()
+    val script = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
+    val complexity = input.readLong()
+    val callableComplexitiesCount = input.readInt()
+    val callableComplexities =
+      (1 to callableComplexitiesCount)
+        .map(_ => (input.readUTF(), input.readLong()))
+        .toMap
+
+    (pk, script, complexity, callableComplexities)
   }
 }

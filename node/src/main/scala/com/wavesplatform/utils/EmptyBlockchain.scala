@@ -83,7 +83,7 @@ case object EmptyBlockchain extends Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
-  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long)] = None
+  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = None
 
   override def hasScript(address: Address): Boolean = false
 
