@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.api.http.ApiError.AlreadyInState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError

@@ -9,7 +9,6 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.StrUtils
 import play.api.libs.json._

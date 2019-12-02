@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
   def create(addressOrAlias: AddressOrAlias): Recipient = addressOrAlias match {
-    case a: Address => Recipient().withAddress(ByteString.copyFrom(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
+    case a: Address => Recipient().withPublicKeyHash(ByteString.copyFrom(a.bytes.arr.slice(2, a.bytes.arr.length - Address.ChecksumLength)))
     case a: Alias   => Recipient().withAlias(a.name)
     case _          => sys.error("Should not happen " + addressOrAlias)
   }
@@ -31,7 +31,7 @@ object PBRecipients {
   }
 
   def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {
-    case Recipient.Recipient.Address(bytes) => toAddress(bytes.toByteArray)
+    case Recipient.Recipient.PublicKeyHash(bytes) => toAddress(bytes.toByteArray)
     case _                                  => Left(GenericError(s"Not an address: $r"))
   }
 
@@ -41,7 +41,7 @@ object PBRecipients {
   }
 
   def toAddressOrAlias(r: Recipient): Either[ValidationError, AddressOrAlias] = {
-    if (r.recipient.isAddress) toAddress(r)
+    if (r.recipient.isPublicKeyHash) toAddress(r)
     else if (r.recipient.isAlias) toAlias(r)
     else Left(GenericError(s"Not an address or alias: $r"))
   }

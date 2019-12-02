@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
+import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto

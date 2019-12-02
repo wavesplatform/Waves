@@ -216,7 +216,7 @@ object PBTransactions {
 
     tx match {
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
-        val data = GenesisTransactionData(PBRecipients.create(recipient).getAddress, amount)
+        val data = GenesisTransactionData(PBRecipients.create(recipient).getPublicKeyHash, amount)
         PBTransactions.create(
           sender = PublicKey(Array.emptyByteArray),
           chainId = 0: Byte,
@@ -227,7 +227,7 @@ object PBTransactions {
         )
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
-        val data = PaymentTransactionData(PBRecipients.create(recipient).getAddress, amount)
+        val data = PaymentTransactionData(PBRecipients.create(recipient).getPublicKeyHash, amount)
         PBTransactions.create(sender, chainId, fee, Waves, timestamp, 1, Seq(signature), Data.Payment(data))
 
       case tx: vt.transfer.TransferTransaction =>

@@ -38,6 +38,11 @@ object RawBytes {
   def fromBlock(b: Block): RawBytes =
     if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))
     else RawBytes(PBBlockSpec.messageCode, PBBlockSpec.serializeData(b))
+
+  def fromMicroblock(mb: MicroBlock): RawBytes =
+    if (mb.version < Block.ProtoBlockVersion)
+      RawBytes(MicroBlockResponseSpec.messageCode, MicroBlockResponseSpec.serializeData(MicroBlockResponse(mb)))
+    else RawBytes(PBMicroBlockSpec.messageCode, PBMicroBlockSpec.serializeData(mb))
 }
 
 case class BlockForged(block: Block) extends Message

@@ -198,11 +198,11 @@ class MinerImpl(
     val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
+      val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)
+      log.info(s"")
       for {
-        expectedTS <- pos
-          .getValidBlockDelay(height, account, block.header.baseTarget, balance)
-          .map(_ + block.header.timestamp)
-          .leftMap(_.toString)
+        delay <- blockDelayE.leftMap(_.toString)
+        expectedTS = delay + block.header.timestamp
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,
           expectedTS,
@@ -236,7 +236,7 @@ class MinerImpl(
       }
     } match {
       case Right(offset) =>
-        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f")
+        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
         generateOneBlockTask(account)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
@@ -291,7 +291,7 @@ class MinerImpl(
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
   private[this] object metrics {
-    val blockBuildTimeStats: TimerMetric = Kamon.timer("miner.pack-and-forge-block-time")
+    val blockBuildTimeStats: TimerMetric      = Kamon.timer("miner.pack-and-forge-block-time")
     val microBlockBuildTimeStats: TimerMetric = Kamon.timer("miner.forge-microblock-time")
   }
 }

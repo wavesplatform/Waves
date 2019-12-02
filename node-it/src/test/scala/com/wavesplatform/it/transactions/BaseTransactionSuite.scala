@@ -10,11 +10,8 @@ import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
-trait BaseTransactionSuiteLike
-    extends WaitForHeight2
-    with IntegrationSuiteWithThreeAddresses
-    with BeforeAndAfterAll
-    with NodesFromDocker { this: Suite =>
+trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithThreeAddresses with BeforeAndAfterAll with NodesFromDocker {
+  this: Suite =>
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
