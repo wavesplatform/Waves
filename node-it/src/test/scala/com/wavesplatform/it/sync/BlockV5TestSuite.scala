@@ -151,45 +151,6 @@ class BlockV5TestSuite
       val blockAtActivationHeight3 = nodes.head.blockAt(ActivationHeight + 1)
       blockAtActivationHeight3.version.value shouldBe Block.ProtoBlockVersion
     }
-
-    "rollback to height before activation/at activation/after activation height" in {
-      //rollback to height one block before activation height
-      nodes.rollback(ActivationHeight - 1, returnToUTX = false)
-
-      val blockBeforeActivationHeight1 = nodes.head.blockAt(ActivationHeight - 1)
-      blockBeforeActivationHeight1.version shouldBe 'defined
-      blockBeforeActivationHeight1.version.value should not be Block.ProtoBlockVersion
-
-      nodes.head.waitForHeight(ActivationHeight, 2.minutes)
-      val blockAtActivationHeight1 = nodes.head.blockAt(ActivationHeight)
-      blockAtActivationHeight1.version shouldBe 'defined
-      blockAtActivationHeight1.version.value should not be Block.ProtoBlockVersion
-
-      nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
-      val blockAfterActivationHeight1 = nodes.head.blockAt(ActivationHeight + 1)
-      blockAfterActivationHeight1.version shouldBe 'defined
-      blockAfterActivationHeight1.version.value shouldBe Block.ProtoBlockVersion
-
-      //rollback to activation height
-      nodes.rollback(ActivationHeight, returnToUTX = false)
-
-      val blockAtActivationHeight2 = nodes.head.blockAt(ActivationHeight)
-      blockAtActivationHeight2.version shouldBe 'defined
-      blockAtActivationHeight2.version.value should not be Block.ProtoBlockVersion
-
-      nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
-      val blockAfterActivationHeight2 = nodes.head.blockAt(ActivationHeight + 1)
-      blockAfterActivationHeight2.version shouldBe 'defined
-      blockAfterActivationHeight2.version.value shouldBe Block.ProtoBlockVersion
-      nodes.foreach(n => n.waitForHeight(ActivationHeight + 3, 2.minutes))
-
-      //rollback to height after activation height using rollback to block with signature method
-      nodes.rollbackToBlockWithSignature(nodes.head.blockAt(ActivationHeight + 1).signature)
-
-      val blockAtActivationHeight3 = nodes.head.blockAt(ActivationHeight + 1)
-      blockAtActivationHeight3.version shouldBe 'defined
-      blockAtActivationHeight3.version.value shouldBe Block.ProtoBlockVersion
-    }
   }
 }
 
