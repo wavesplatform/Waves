@@ -1,5 +1,6 @@
 package com.wavesplatform.state.reader
 
+import cats.data.Ior
 import cats.implicits._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
@@ -76,14 +77,22 @@ final case class CompositeBlockchain(
         .assetDescription(asset)
         .orElse(fromDiff)
         .map { description =>
-          diff.reissuedAssets
+          diff.updatedAssets
             .get(asset)
-            .fold(description) { updVolumeInfo =>
-              description
-                .copy(
-                  reissuable = description.reissuable && updVolumeInfo.isReissuable,
-                  totalVolume = description.totalVolume + updVolumeInfo.volume
-                )
+            .fold(description) {
+              case Ior.Left(info) =>
+                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
+              case Ior.Right(vol) =>
+                description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
+              case Ior.Both(info, vol) =>
+                description
+                  .copy(
+                    reissuable = description.reissuable && vol.isReissuable,
+                    totalVolume = description.totalVolume + vol.volume,
+                    name = info.name,
+                    description = info.description,
+                    lastUpdatedAt = info.lastUpdatedAt
+                  )
             }
         }
         .map { description =>

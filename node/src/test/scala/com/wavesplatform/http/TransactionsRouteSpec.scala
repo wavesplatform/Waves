@@ -179,7 +179,7 @@ class TransactionsRouteSpec
                 decimals = 8,
                 reissuable = false,
                 totalVolume = Long.MaxValue,
-                lastInfoUpdateHeight = Height @@ 0,
+                lastUpdatedAt = Height @@ 0,
                 script = None,
                 sponsorship = 5
               )
@@ -228,7 +228,7 @@ class TransactionsRouteSpec
                 decimals = 8,
                 reissuable = false,
                 totalVolume = Long.MaxValue,
-                lastInfoUpdateHeight = Height @@ 0,
+                lastUpdatedAt = Height @@ 0,
                 script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
                 sponsorship = 5
               )

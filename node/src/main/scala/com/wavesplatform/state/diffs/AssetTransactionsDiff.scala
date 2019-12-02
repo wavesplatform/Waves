@@ -103,7 +103,7 @@ object AssetTransactionsDiff {
       for {
         lastUpdateHeight <- blockchain
           .assetDescription(tx.assetId)
-          .map(_.lastInfoUpdateHeight)
+          .map(_.lastUpdatedAt)
           .toRight(GenericError("Asset doesn't exist"))
         updateAllowedAt = lastUpdateHeight + UpdateAssetInfoTransaction.MIN_UPDATE_INFO_INTERVAL
         _ <- Either.cond(
@@ -111,9 +111,11 @@ object AssetTransactionsDiff {
           (),
           GenericError(s"Can't update asset info before $updateAllowedAt block")
         )
+        updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
       } yield Diff(
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
+        updatedAssets = Map(tx.assetId       -> updatedInfo.leftIor),
         scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
     }

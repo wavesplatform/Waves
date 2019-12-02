@@ -35,7 +35,7 @@ class AssetsApiRouteSpec
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
-    lastInfoUpdateHeight = Height @@ 0,
+    lastUpdatedAt = Height @@ 0,
     script = smartAssetTx.script,
     sponsorship = 0
   )
@@ -66,7 +66,7 @@ class AssetsApiRouteSpec
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
-    lastInfoUpdateHeight = Height @@ 0,
+    lastUpdatedAt = Height @@ 0,
     script = sillyAssetTx.script,
     sponsorship = 0
   )

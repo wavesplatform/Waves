@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
+import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Longs, Shorts}
@@ -246,7 +247,7 @@ class LevelDBWriter(
       addressTransactions: Map[AddressId, List[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
-      reissuedAssets: Map[IssuedAsset, AssetVolumeInfo],
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
@@ -365,16 +366,22 @@ class LevelDBWriter(
       rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
     }
 
-    for ((asset, volumeDiff) <- reissuedAssets) {
+    for ((asset, infoToUpdate) <- updatedAssets) {
       rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
         .orElse(issuedAssets.get(asset).map { case (_, i, vi) => (i, vi) })
         .foreach {
-          case (info, volumeInfo) =>
-            rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo |+| volumeDiff))
+          case (info, vol) =>
+            val updInfo = infoToUpdate.left
+              .fold(info)(identity)
+
+            val updVol = infoToUpdate.right
+              .fold(vol)(_ |+| vol)
+
+            rw.put(Keys.assetDetails(asset)(height), (updInfo, updVol))
         }
     }
 
-    for (asset <- issuedAssets.keySet ++ reissuedAssets.keySet) {
+    for (asset <- issuedAssets.keySet ++ updatedAssets.keySet) {
       expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
     }
 
@@ -431,12 +438,6 @@ class LevelDBWriter(
     }
 
     for ((id, (tx, num)) <- transactions) {
-
-      tx match {
-        case tx: UpdateAssetInfoTransaction => ???
-        case _                              => ()
-      }
-
       rw.put(Keys.transactionAt(Height(height), num), Some(tx))
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }

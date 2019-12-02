@@ -1,7 +1,8 @@
 package com.wavesplatform.state
 
+import cats.data.Ior
 import cats.implicits._
-import cats.kernel.Monoid
+import cats.kernel.{Monoid, Semigroup}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -41,6 +42,11 @@ object VolumeAndFee {
 }
 
 case class AssetInfo(name: String, description: String, lastUpdatedAt: Height)
+
+object AssetInfo {
+  implicit val sg: Semigroup[AssetInfo] = (x, y) => y
+}
+
 case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int)
 case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 
@@ -59,7 +65,7 @@ case class AssetDescription(
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
-    lastInfoUpdateHeight: Height,
+    lastUpdatedAt: Height,
     script: Option[Script],
     sponsorship: Long
 ) {
@@ -133,7 +139,7 @@ case class Diff(
     transactions: Map[ByteStr, (Transaction, Set[Address])],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
-    reissuedAssets: Map[IssuedAsset, AssetVolumeInfo],
+    updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
@@ -150,7 +156,7 @@ object Diff {
   def stateOps(
       portfolios: Map[Address, Portfolio] = Map.empty,
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
-      reissuedAssets: Map[IssuedAsset, AssetVolumeInfo] = Map.empty,
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
@@ -164,7 +170,7 @@ object Diff {
       transactions = Map(),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
-      reissuedAssets = reissuedAssets,
+      updatedAssets = updatedAssets,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -181,7 +187,7 @@ object Diff {
       tx: Transaction,
       portfolios: Map[Address, Portfolio] = Map.empty,
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
-      reissuedAssets: Map[IssuedAsset, AssetVolumeInfo] = Map.empty,
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
@@ -197,7 +203,7 @@ object Diff {
       transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
-      reissuedAssets = reissuedAssets,
+      updatedAssets = updatedAssets,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -221,7 +227,7 @@ object Diff {
         transactions = older.transactions ++ newer.transactions,
         portfolios = older.portfolios.combine(newer.portfolios),
         issuedAssets = older.issuedAssets ++ newer.issuedAssets,
-        reissuedAssets = older.reissuedAssets |+| newer.reissuedAssets,
+        updatedAssets = older.updatedAssets |+| newer.updatedAssets,
         aliases = older.aliases ++ newer.aliases,
         orderFills = older.orderFills.combine(newer.orderFills),
         leaseState = older.leaseState ++ newer.leaseState,

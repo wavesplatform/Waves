@@ -142,8 +142,8 @@ object DiffsCommon {
 
             Right(
               Diff.stateOps(
-                portfolios = Map(sender                           -> portfolio),
-                reissuedAssets = Map(IssuedAsset(reissue.assetId) -> volumeInfo)
+                portfolios = Map(sender                          -> portfolio),
+                updatedAssets = Map(IssuedAsset(reissue.assetId) -> volumeInfo.rightIor)
               )
             )
           }
@@ -162,8 +162,8 @@ object DiffsCommon {
       val portfolio  = Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> -burn.quantity))
 
       Diff.stateOps(
-        portfolios = Map(sender    -> portfolio),
-        reissuedAssets = Map(asset -> volumeInfo)
+        portfolios = Map(sender   -> portfolio),
+        updatedAssets = Map(asset -> volumeInfo.rightIor)
       )
     }
   }
