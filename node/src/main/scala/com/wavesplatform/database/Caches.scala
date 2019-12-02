@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import java.util
 
+import cats.data.Ior
 import cats.syntax.monoid._
 import cats.syntax.option._
 import com.google.common.cache._
@@ -15,6 +16,7 @@ import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
@@ -197,25 +199,25 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   //noinspection ScalaStyle
   protected def doAppend(
-                          block: Block,
-                          carry: Long,
-                          newAddresses: Map[Address, BigInt],
-                          balances: Map[BigInt, Map[Asset, Long]],
-                          leaseBalances: Map[BigInt, LeaseBalance],
-                          addressTransactions: Map[AddressId, List[TransactionId]],
-                          leaseStates: Map[ByteStr, Boolean],
-                          issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
-                          updatedAssets: Map[IssuedAsset, AssetVolumeInfo],
-                          filledQuantity: Map[ByteStr, VolumeAndFee],
-                          scripts: Map[BigInt, Option[(Script, Long)]],
-                          assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
-                          data: Map[BigInt, AccountDataInfo],
-                          aliases: Map[Alias, BigInt],
-                          sponsorship: Map[IssuedAsset, Sponsorship],
-                          totalFee: Long,
-                          reward: Option[Long],
-                          hitSource: ByteStr,
-                          scriptResults: Map[ByteStr, InvokeScriptResult]
+      block: Block,
+      carry: Long,
+      newAddresses: Map[Address, BigInt],
+      balances: Map[BigInt, Map[Asset, Long]],
+      leaseBalances: Map[BigInt, LeaseBalance],
+      addressTransactions: Map[AddressId, List[TransactionId]],
+      leaseStates: Map[ByteStr, Boolean],
+      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+      reissuedAssets: Map[IssuedAsset, AssetVolumeInfo],
+      filledQuantity: Map[ByteStr, VolumeAndFee],
+      scripts: Map[BigInt, Option[(Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      data: Map[BigInt, AccountDataInfo],
+      aliases: Map[Alias, BigInt],
+      sponsorship: Map[IssuedAsset, Sponsorship],
+      totalFee: Long,
+      reward: Option[Long],
+      hitSource: ByteStr,
+      scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
@@ -312,7 +314,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
     for (address                 <- newPortfolios) discardPortfolio(address)
-    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for (id                      <- diff.issuedAssets.keySet ++ diff.reissuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)

@@ -363,7 +363,6 @@ class LevelDBWriter(
     for ((asset, (staticInfo, info, volumeInfo)) <- issuedAssets) {
       rw.put(Keys.assetStaticInfo(asset), staticInfo.some)
       rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
-      rw.put(Keys.assetDetailsHistory(asset), Seq(height))
     }
 
     for ((asset, volumeDiff) <- reissuedAssets) {
@@ -372,8 +371,11 @@ class LevelDBWriter(
         .foreach {
           case (info, volumeInfo) =>
             rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo |+| volumeDiff))
-            expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
         }
+    }
+
+    for (asset <- issuedAssets.keySet ++ reissuedAssets.keySet) {
+      expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
     }
 
     for ((leaseId, state) <- leaseStates) {
