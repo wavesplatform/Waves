@@ -778,7 +778,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce("Annotated function should not have generic parameter types")
+    compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
   property("@Callable V4 result type") {

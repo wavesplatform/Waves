@@ -13,3 +13,9 @@ object V1 extends MetaVersion {
   override type Data = List[List[FINAL]]
   override val strategy = MetaMapperStrategyV1
 }
+
+object V2 extends MetaVersion {
+  override type Self = V2.type
+  override type Data = List[List[FINAL]]
+  override val strategy = MetaMapperStrategyV2
+}

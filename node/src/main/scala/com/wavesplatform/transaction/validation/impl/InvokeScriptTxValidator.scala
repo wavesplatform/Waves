@@ -34,10 +34,6 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         }),
         GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
       ),
-      V.cond(
-        funcCallOpt.isEmpty || funcCallOpt.get.args.forall(x => x.isInstanceOf[EVALUATED] && !x.isInstanceOf[CaseObj] && !x.isInstanceOf[ARR]),
-        GenericError("All arguments of invokeScript must be one of the types: Int, ByteVector, String, Boolean")
-      ),
       checkAmounts(payments),
       V.fee(fee),
       V.cond(Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false), TooBigArray)
