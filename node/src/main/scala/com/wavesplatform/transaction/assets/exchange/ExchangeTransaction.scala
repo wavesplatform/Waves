@@ -61,7 +61,7 @@ object ExchangeTransaction extends TransactionParser {
 
   override def classTag: ClassTag[ExchangeTransaction] = ClassTag(classOf[ExchangeTransaction])
 
-  override def supportedVersions: Set[TxVersion] = Set(1, 2)
+  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val typeId: TxType = 7
 

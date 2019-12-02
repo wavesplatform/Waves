@@ -46,7 +46,7 @@ object ReissueTransaction extends TransactionParser {
   override type TransactionT = ReissueTransaction
 
   override val typeId: TxType                         = 5
-  override def supportedVersions: Set[TxVersion]      = Set(1, 2)
+  override def supportedVersions: Set[TxVersion]      = Set(1, 2, 3)
   override def classTag: ClassTag[ReissueTransaction] = ClassTag(classOf[ReissueTransaction])
 
   implicit val validator: TxValidator[ReissueTransaction] = ReissueTxValidator

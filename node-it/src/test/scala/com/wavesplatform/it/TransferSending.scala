@@ -152,14 +152,14 @@ trait TransferSending extends ScorexLogging {
       None,
       Some(Base58.encode(tx.sender)),
       recipient.stringRepr,
-      assetId.maybeBase58Repr,
+      Some(assetId),
       amount,
-      feeAssetId.maybeBase58Repr,
+      Some(feeAssetId),
       fee,
       attachment.headOption.map(_ => Base58.encode(attachment)),
       Some(timestamp),
       None,
-      Some(proofs.base58().toList)
+      Some(proofs)
     )
   }
 

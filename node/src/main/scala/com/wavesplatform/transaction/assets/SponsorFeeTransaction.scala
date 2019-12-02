@@ -41,7 +41,7 @@ object SponsorFeeTransaction extends TransactionParser {
   override type TransactionT = SponsorFeeTransaction
 
   override val typeId: TxType                    = 14
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override val supportedVersions: Set[TxVersion] = Set(1, 2)
   override val classTag                          = ClassTag(classOf[SponsorFeeTransaction])
 
   implicit val validator: TxValidator[SponsorFeeTransaction] = SponsorFeeTxValidator

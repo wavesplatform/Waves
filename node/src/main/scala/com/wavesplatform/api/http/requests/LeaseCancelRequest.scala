@@ -1,9 +1,12 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.lease.LeaseCancelTransaction
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json._
+import play.api.libs.functional.syntax._
 
 case class LeaseCancelRequest(
     version: Option[Byte],
@@ -12,12 +15,12 @@ case class LeaseCancelRequest(
     leaseId: String,
     fee: Long,
     timestamp: Option[Long],
-    signature: Option[String],
-    proofs: Option[List[String]]
+    signature: Option[ByteStr],
+    proofs: Option[Proofs]
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, LeaseCancelTransaction] =
     for {
-      validProofs  <- toProofs(version, signature, proofs)
+      validProofs  <- toProofs(signature, proofs)
       validLeaseId <- parseBase58(leaseId, "invalid.leaseTx", DigestStringLength)
       tx <- LeaseCancelTransaction.create(
         version.getOrElse(1.toByte),
@@ -31,19 +34,16 @@ case class LeaseCancelRequest(
 }
 
 object LeaseCancelRequest {
-  implicit val jsonFormat = Format(
-    {
-      import play.api.libs.functional.syntax._
-      import play.api.libs.json._
-      ((JsPath \ "version").readNullable[Byte] and
-        (JsPath \ "sender").readNullable[String] and
-        (JsPath \ "senderPublicKey").readNullable[String] and
-        (JsPath \ "leaseId").read[String].orElse((JsPath \ "txId").read[String]) and
-        (JsPath \ "fee").read[Long] and
-        (JsPath \ "timestamp").readNullable[Long] and
-        (JsPath \ "signature").readNullable[String] and
-        (JsPath \ "proofs").readNullable[List[String]])(LeaseCancelRequest.apply _)
-    },
+  import com.wavesplatform.utils.byteStrFormat
+  implicit val jsonFormat: Format[LeaseCancelRequest] = Format(
+    ((JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "sender").readNullable[String] and
+      (JsPath \ "senderPublicKey").readNullable[String] and
+      (JsPath \ "leaseId").read[String].orElse((JsPath \ "txId").read[String]) and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").readNullable[Long] and
+      (JsPath \ "signature").readNullable[ByteStr] and
+      (JsPath \ "proofs").readNullable[Proofs])(LeaseCancelRequest.apply _),
     Json.writes[LeaseCancelRequest]
   )
 }

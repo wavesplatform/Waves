@@ -2,13 +2,14 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.Alias
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._
@@ -20,7 +21,7 @@ import scala.util.Random
 
 class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private def fakeSignature = Base58.encode(Array.fill(64)(Random.nextInt.toByte))
+  private def fakeSignature = ByteStr(Array.fill(64)(Random.nextInt.toByte))
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
     val (balance1, eff1) = miner.accountBalances(firstAddress)
@@ -111,7 +112,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
         tx              <- MassTransferTransaction.selfSigned(1.toByte, sender.privateKey, Waves, parsedTransfers, fee, timestamp, attachment)
       } yield tx
 
-      val (signature, idOpt) = txEi.fold(_ => (List(fakeSignature), None), tx => (tx.proofs.base58().toList, Some(tx.id())))
+      val (signature, idOpt) = txEi.fold(_ => (Proofs(List(fakeSignature)), None), tx => (tx.proofs, Some(tx.id())))
 
       val req = SignedMassTransferRequest(
         Base58.encode(sender.publicKey),
@@ -125,6 +126,8 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
 
       (req, idOpt)
     }
+
+    import com.wavesplatform.api.http.requests.proofsWrites
 
     implicit val w =
       Json.writes[SignedMassTransferRequest].transform((jsobj: JsObject) => jsobj + ("type" -> JsNumber(MassTransferTransaction.typeId.toInt)))
@@ -185,7 +188,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", noProof), "failed to parse json message.*proofs.*missing")
     nodes.foreach(_.ensureTxDoesntExist(id(noProof)))
 
-    val badProof = signedMassTransfer ++ Json.obj("proofs" -> Seq(fakeSignature))
+    val badProof = signedMassTransfer ++ Json.obj("proofs" -> Seq(fakeSignature.toString))
     assertBadRequestAndResponse(sender.postJson("/transactions/broadcast", badProof), "Proof doesn't validate as signature")
     nodes.foreach(_.ensureTxDoesntExist(id(badProof)))
 

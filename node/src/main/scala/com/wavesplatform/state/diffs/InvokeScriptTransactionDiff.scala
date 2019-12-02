@@ -7,7 +7,6 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
@@ -52,18 +51,17 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
-    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
+    val accScriptEi   = dAppAddressEi.map(blockchain.accountScriptWithComplexity)
     val functionCall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
+      case Right(Some((ContractScriptImpl(version, contract), _, callableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
             val result = for {
               directives           <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               input                <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
-              invocationComplexity <- blockchain.invocationComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
               payments             <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
               _                    <- checkCall(functionCall, blockchain).leftMap((_, List.empty[LogItem[Id]]))
               invocation = ContractEvaluator.Invocation(
@@ -98,6 +96,9 @@ object InvokeScriptTransactionDiff {
                 invocation,
                 version
               )
+              dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
+              invocationComplexity <- callableComplexities.get(tx.funcCall.function.funcName)
+                .toRight((s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress", List.empty[LogItem[Id]]))
             } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
