@@ -129,7 +129,7 @@ object Bindings {
         assetId = ct.assetId,
         amount = ct.amount,
         recipient = ct.recipient,
-        attachment = TransferAttachment.bytesExact(ByteStr.empty, version)
+        attachment = ByteStrValue(ByteStr.empty)
       ),
       proofsEnabled = false,
       version

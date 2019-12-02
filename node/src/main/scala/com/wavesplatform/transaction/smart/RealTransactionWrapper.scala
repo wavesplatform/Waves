@@ -83,7 +83,7 @@ object RealTransactionWrapper {
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
             transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-            attachment = TransferAttachment.bytesExact(ms.attachment, stdLibVersion)
+            attachment = ByteStrValue(ms.attachment)
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
@@ -124,6 +124,6 @@ object RealTransactionWrapper {
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = TransferAttachment.bytesExact(t.attachment, version)
+      attachment = ByteStrValue(t.attachment)
     )
 }
