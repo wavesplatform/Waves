@@ -80,7 +80,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
           "amount"          -> 1,
           "assetId"         -> "W" * 524291
         )
-      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "base58Decode input exceeds")
+      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "failed to parse json message")
     }
   }
 

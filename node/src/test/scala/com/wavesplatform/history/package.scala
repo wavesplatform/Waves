@@ -9,7 +9,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
-import com.wavesplatform.transaction.{Transaction, TxVersion}
+import com.wavesplatform.transaction.Transaction
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10

@@ -261,8 +261,8 @@ class SignedRequestsTest extends FunSuite with Matchers {
         |}
       """.stripMargin
     val req = Json.parse(json).validate[SignedSetAssetScriptRequest].get
-    req.assetId shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
-    req.proofs shouldBe Seq("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7")
+    req.assetId.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    req.proofs shouldBe Proofs(Seq(ByteStr.decodeBase58("3QrF81WkwGhbNvKcwpAVyBPL1MLuAG5qmR6fmtK9PTYQoFKGsFg1Rtd2kbMBuX2ZfiFX58nR1XwC19LUXZUmkXE7").get))
     req.fee shouldBe 100000L
     req.timestamp shouldBe 1520945679531L
 

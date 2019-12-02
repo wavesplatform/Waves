@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock

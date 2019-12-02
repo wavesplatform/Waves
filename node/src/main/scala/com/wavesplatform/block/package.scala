@@ -2,14 +2,12 @@ package com.wavesplatform
 
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Transaction
-import scorex.crypto.authds.LeafData
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
 
 import scala.util.Try
 
@@ -39,23 +37,15 @@ package object block {
   }
 
   // Merkle
-  private[block] implicit object FastHash extends CryptographicHash32 { // todo: (NODE-1972) Replace with appropriate hash function
-    override def hash(input: Message): Digest32 = Digest32(com.wavesplatform.crypto.fastHash(input))
-  }
+  implicit class BlockMerkleOps(block: Block) {
 
-  private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
+    def transactionProof(transaction: Transaction): Option[TransactionProof] =
+      Merkle.calcTransactionProof(block, transaction)
 
-  private[block] implicit class BlockMerkleOps(block: Block) {
-    def transactionProof(transaction: Transaction): Option[MerkleProof[Digest32]] =
-      block.transactionsMerkleTree().proofByElement(transaction.mkMerkleLeaf())
-  }
-
-  private[block] implicit class TransactionMerkleOps(transaction: Transaction) {
-    def mkMerkleLeaf(): Leaf[Digest32] = Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
-  }
-
-  /** Creates transactions merkle root */
-  private[block] def mkMerkleTree(transactions: Seq[Transaction]): MerkleTree[Digest32] = {
-    if (transactions.isEmpty) EmptyMerkleTree else MerkleTree(transactions.map(_.mkMerkleLeaf().data))
+    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
+      block.transactionData
+        .lift(transactionProof.transactionIndex)
+        .filter(tx => tx.id() == transactionProof.id)
+        .exists(tx => Merkle.verifyTransactionProof(transactionProof, tx, block.transactionData.size, block.header.transactionsRoot.arr))
   }
 }

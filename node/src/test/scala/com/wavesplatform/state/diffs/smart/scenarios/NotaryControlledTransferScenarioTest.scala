@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2

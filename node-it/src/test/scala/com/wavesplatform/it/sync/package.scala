@@ -70,8 +70,8 @@ package object sync {
       tx.script.map(_.bytes().base64),
       fee,
       Some(timestamp),
-      proofs.headOption.map(_.toString),
-      Some(proofs.proofs.map(_.toString).toList)
+      proofs.headOption,
+      Some(proofs)
     )
   }
 

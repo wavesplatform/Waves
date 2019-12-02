@@ -17,7 +17,7 @@ import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, JsValue, Json, Writes}
+import play.api.libs.json.{JsObject, JsPath, JsValue, Json, JsonValidationError, Writes}
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
@@ -135,10 +135,10 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(CustomValidationError("requirement failed"), true)
+          posting(tr.copy(assetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(CustomValidationError("requirement failed"), true)
+          posting(tr.copy(feeAssetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
         }
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("requirement failed"), true)

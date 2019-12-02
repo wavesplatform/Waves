@@ -690,7 +690,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = readLock {
+  override def accountScriptWithComplexity(address: Address): Option[(Script, Long, Map[String, Long])] = readLock {
     ngState.fold(blockchain.accountScriptWithComplexity(address)) { ng =>
       ng.bestLiquidDiff.scripts.get(address) match {
         case None      => blockchain.accountScriptWithComplexity(address)
