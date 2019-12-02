@@ -5,7 +5,7 @@ import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
@@ -131,8 +131,14 @@ object ContractCompiler {
       callableFuncsTypeInfo = callableFuncsWithParams.map {
         case (f, typedParams) => typedParams.map(_._2)
       }
-      //todo
-      meta <- MetaMapper.toProto(V2)(callableFuncsTypeInfo)
+
+      mappedCallableTypes =
+        if (version <= V3)
+          MetaMapper.toProto(V1)(callableFuncsTypeInfo)
+        else
+          MetaMapper.toProto(V2)(callableFuncsTypeInfo)
+
+      meta <- mappedCallableTypes
         .leftMap(Generic(contract.position.start, contract.position.start, _))
         .toCompileM
 
