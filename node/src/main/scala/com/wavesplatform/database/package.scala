@@ -252,22 +252,67 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readAssetDetails(data: Array[Byte]): AssetDetails = {
+  def readAssetDetails(data: Array[Byte]): (AssetInfo, AssetVolumeInfo) = {
     val ndi     = newDataInput(data)
     val reissue = ndi.readBoolean()
     val volume  = ndi.readBigInt()
-    AssetDetails(reissue, volume)
+
+    val nameLen = ndi.readInt()
+    val name    = new String(ndi.readBytes(nameLen))
+
+    val descriptionLen = ndi.readInt()
+    val description    = new String(ndi.readBytes(descriptionLen))
+
+    val lastUpdatedAt = Height @@ ndi.readInt()
+
+    val info       = AssetInfo(name, description, lastUpdatedAt)
+    val volumeInfo = AssetVolumeInfo(reissue, volume)
+
+    (info, volumeInfo)
   }
 
-  def writeAssetDetails(ai: AssetDetails): Array[Byte] = {
+  def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
+    val (info, volumeInfo) = ai
+
     val ndo = newDataOutput()
-    ndo.writeBoolean(ai.isReissuable)
-    ndo.writeBigInt(ai.volume)
+
+    ndo.writeBoolean(volumeInfo.isReissuable)
+    ndo.writeBigInt(volumeInfo.volume)
+
+    val nameBytes        = info.name.getBytes()
+    val descriptionBytes = info.description.getBytes()
+
+    ndo.writeInt(nameBytes.length)
+    ndo.write(nameBytes)
+
+    ndo.writeInt(descriptionBytes.length)
+    ndo.write(descriptionBytes)
+
+    ndo.writeInt(info.lastUpdatedAt)
+
     ndo.toByteArray
   }
 
-  def writeAssetUpdateTxNum(ai: TxNum): Array[Byte] = Shorts.toByteArray(ai)
-  def readAssetUpdateTxNum(arr: Array[Byte]): TxNum = TxNum @@ Shorts.fromByteArray(arr)
+  def writeAssetStaticInfo(ai: AssetStaticInfo): Array[Byte] = {
+    val ndo = newDataOutput()
+
+    ndo.writeByteStr(ai.source)
+    ndo.writeByteStr(ai.issuer)
+    ndo.writeInt(ai.decimals)
+
+    ndo.toByteArray
+  }
+  def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
+    import com.wavesplatform.crypto._
+
+    val ndi = newDataInput(arr)
+
+    val source   = TransactionId @@ ndi.readByteStr(DigestLength)
+    val issuer   = ndi.readPublicKey
+    val decimals = ndi.readInt()
+
+    AssetStaticInfo(source, issuer, decimals)
+  }
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
     val BlockInfo(bh, size, transactionCount, signature) = data

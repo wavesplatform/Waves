@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.lang.v1.evaluator.ContractEvaluator.DEFAULT_FUNC_NAME
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
-import com.wavesplatform.state.{AssetDetails, Blockchain, Diff, LeaseBalance, Portfolio}
+import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -21,40 +21,43 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 
 object DiffsCommon {
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
+    Script
+      .complexityInfo(script, estimator)
       .map(calcVerifierComplexity(script, _))
 
   private def calcVerifierComplexity(
-    script:     Script,
-    complexity: (Long, Map[String, Long])
+      script: Script,
+      complexity: (Long, Map[String, Long])
   ): Long = {
     val (totalComplexity, cm) = complexity
     script match {
       case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
-      case _ => totalComplexity
+      case _                                                                        => totalComplexity
     }
   }
 
   def functionComplexity(
-    script:    Script,
-    estimator: ScriptEstimator,
-    maybeCall: Option[FUNCTION_CALL]
+      script: Script,
+      estimator: ScriptEstimator,
+      maybeCall: Option[FUNCTION_CALL]
   ): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
+    Script
+      .complexityInfo(script, estimator)
       .map(calcFunctionComplexity(script, maybeCall, _))
 
   def limitFreeComplexity(
-    script:    Script,
-    estimator: ScriptEstimator,
-    maybeCall: Option[FUNCTION_CALL]
+      script: Script,
+      estimator: ScriptEstimator,
+      maybeCall: Option[FUNCTION_CALL]
   ): Either[String, Long] =
-    Script.limitFreeComplexity(script, estimator)
+    Script
+      .limitFreeComplexity(script, estimator)
       .map(calcFunctionComplexity(script, maybeCall, _))
 
   private def calcFunctionComplexity(
-    script:     Script,
-    maybeCall:  Option[FUNCTION_CALL],
-    complexity: (Long, Map[String, Long])
+      script: Script,
+      maybeCall: Option[FUNCTION_CALL],
+      complexity: (Long, Map[String, Long])
   ): Long = {
     val (totalComplexity, cm) = complexity
     maybeCall match {
@@ -78,9 +81,7 @@ object DiffsCommon {
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasScript)
 
   def getScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
-    val assetsComplexity = tx
-      .checkedAssets
-      .toList
+    val assetsComplexity = tx.checkedAssets.toList
       .flatMap(blockchain.assetScriptWithComplexity)
       .map(_._2)
 
@@ -92,18 +93,18 @@ object DiffsCommon {
   }
 
   def countScriptComplexity(
-    script: Option[Script],
-    blockchain: Blockchain
+      script: Option[Script],
+      blockchain: Blockchain
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse(s => Script.verifierComplexity(s, blockchain.estimator).map((s, _)))
       .leftMap(GenericError(_))
 
   def validateAsset(
-    blockchain: Blockchain,
-    asset: IssuedAsset,
-    sender: Address,
-    issuerOnly: Boolean
+      blockchain: Blockchain,
+      asset: IssuedAsset,
+      sender: Address,
+      issuerOnly: Boolean
   ): Either[ValidationError, Unit] = {
     @inline
     def validIssuer(issuerOnly: Boolean, sender: Address, issuer: Address) =
@@ -120,11 +121,11 @@ object DiffsCommon {
   }
 
   def processReissue(
-    blockchain: Blockchain,
-    sender: Address,
-    blockTime: Long,
-    fee: Long,
-    reissue: Reissue
+      blockchain: Blockchain,
+      sender: Address,
+      blockTime: Long,
+      fee: Long,
+      reissue: Reissue
   ): Either[ValidationError, Diff] = {
     val asset = IssuedAsset(reissue.assetId)
     validateAsset(blockchain, asset, sender, issuerOnly = true)
@@ -136,10 +137,13 @@ object DiffsCommon {
           if ((Long.MaxValue - reissue.quantity) < oldInfo.totalVolume && isDataTxActivated) {
             Left(GenericError("Asset total value overflow"))
           } else {
+            val volumeInfo = AssetVolumeInfo(reissue.isReissuable, BigInt(reissue.quantity))
+            val portfolio  = Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> reissue.quantity))
+
             Right(
               Diff.stateOps(
-                portfolios = Map(sender -> Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> reissue.quantity))),
-                assetDetails = Map(IssuedAsset(reissue.assetId) -> AssetDetails(volume = reissue.quantity, isReissuable = reissue.isReissuable)),
+                portfolios = Map(sender                           -> portfolio),
+                reissuedAssets = Map(IssuedAsset(reissue.assetId) -> volumeInfo)
               )
             )
           }
@@ -151,12 +155,15 @@ object DiffsCommon {
 
   def processBurn(blockchain: Blockchain, sender: Address, fee: Long, burn: Burn): Either[ValidationError, Diff] = {
     val burnAnyTokensEnabled = blockchain.isFeatureActivated(BlockchainFeatures.BurnAnyTokens)
-    val asset = IssuedAsset(burn.assetId)
+    val asset                = IssuedAsset(burn.assetId)
 
     validateAsset(blockchain, asset, sender, !burnAnyTokensEnabled).map { _ =>
+      val volumeInfo = AssetVolumeInfo(isReissuable = true, volume = -burn.quantity)
+      val portfolio  = Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> -burn.quantity))
+
       Diff.stateOps(
-        portfolios = Map(sender -> Portfolio(balance = -fee, lease = LeaseBalance.empty, assets = Map(asset -> -burn.quantity))),
-        assetDetails = Map(asset -> AssetDetails(isReissuable = true, volume = -burn.quantity)),
+        portfolios = Map(sender    -> portfolio),
+        reissuedAssets = Map(asset -> volumeInfo)
       )
     }
   }

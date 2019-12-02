@@ -13,8 +13,12 @@ import com.wavesplatform.transaction.assets._
 
 object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val info  = AssetDetails(isReissuable = tx.reissuable, volume = tx.quantity)
+    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals)
+    val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
+    val info       = AssetInfo(new String(tx.name), new String(tx.description), Height @@ blockchain.height)
+
     val asset = IssuedAsset(tx.id())
+
     DiffsCommon
       .countScriptComplexity(tx.script, blockchain)
       .map(
@@ -22,7 +26,7 @@ object AssetTransactionsDiff {
           Diff(
             tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
-            assetDetails = Map(asset             -> info),
+            issuedAssets = Map(asset             -> (staticInfo, info, volumeInfo)),
             assetScripts = Map(asset             -> script),
             scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
           )
@@ -110,7 +114,7 @@ object AssetTransactionsDiff {
       } yield Diff(
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> portfolioUpdate),
-        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx),
+        scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
       )
     }
 }

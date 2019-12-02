@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import cats.Monoid
+import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
@@ -186,30 +186,22 @@ class LevelDBWriter(
   )
 
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] = readOnly { db =>
-    transactionInfo(asset.id, db) collect {
-      case (h, i: IssueTransaction) =>
-        lazy val defaultAssetInfo = AssetInfo(new String(i.name), new String(i.description))
-
-        val ad = db.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset)).getOrElse(AssetDetails(i.reissuable, i.quantity))
-
-        val (ai, lastUpdateHeight) =
-          (for {
-            lastUpdateHeight <- db.get(Keys.assetUpdateTxNumHistory(asset)).headOption
-            assetUpdateTxNum = db.get(Keys.assetUpdateTxNum(asset)(lastUpdateHeight))
-            assetInfo <- db
-              .get(Keys.transactionAt(Height @@ lastUpdateHeight, assetUpdateTxNum))
-              .collect {
-                case t: IssueTransaction           => AssetInfo(new String(t.name), new String(t.description))
-                case t: UpdateAssetInfoTransaction => AssetInfo(t.name, t.description)
-              }
-          } yield (assetInfo, Height @@ lastUpdateHeight))
-            .getOrElse((defaultAssetInfo, Height @@ h))
-
-        val sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
-        val script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
-
-        AssetDescription(i.sender, ai.name, ai.description, i.decimals, ad.isReissuable, ad.volume, lastUpdateHeight, script.map(_._1), sponsorship)
-    }
+    for {
+      staticInfo         <- db.get(Keys.assetStaticInfo(asset))
+      (info, volumeInfo) <- db.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+      sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
+      script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+    } yield AssetDescription(
+      staticInfo.issuer,
+      info.name,
+      info.description,
+      staticInfo.decimals,
+      volumeInfo.isReissuable,
+      volumeInfo.volume,
+      info.lastUpdatedAt,
+      script.map(_._1),
+      sponsorship
+    )
   }
 
   override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee = readOnly { db =>
@@ -244,13 +236,6 @@ class LevelDBWriter(
     c2.drop(1).map(kf(_).keyBytes)
   }
 
-  private def updateAsset(rw: RW)(assetId: IssuedAsset, height: Height, num: TxNum): Unit = {
-    val history = rw.get(Keys.assetUpdateTxNumHistory(assetId))
-
-    rw.put(Keys.assetUpdateTxNumHistory(assetId), height +: history)
-    rw.put(Keys.assetUpdateTxNum(assetId)(height), num)
-  }
-
   //noinspection ScalaStyle
   override protected def doAppend(
       block: Block,
@@ -260,7 +245,8 @@ class LevelDBWriter(
       leaseBalances: Map[BigInt, LeaseBalance],
       addressTransactions: Map[AddressId, List[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
-      reissuedAssets: Map[IssuedAsset, AssetDetails],
+      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+      reissuedAssets: Map[IssuedAsset, AssetVolumeInfo],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(Script, Long)]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
@@ -374,12 +360,20 @@ class LevelDBWriter(
       expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
     }
 
-    for ((asset, assetDetails) <- reissuedAssets) {
-      val combinedAssetInfo = rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset)).fold(assetDetails) { p =>
-        Monoid.combine(p, assetDetails)
-      }
-      rw.put(Keys.assetDetails(asset)(height), combinedAssetInfo)
-      expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
+    for ((asset, (staticInfo, info, volumeInfo)) <- issuedAssets) {
+      rw.put(Keys.assetStaticInfo(asset), staticInfo.some)
+      rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo))
+      rw.put(Keys.assetDetailsHistory(asset), Seq(height))
+    }
+
+    for ((asset, volumeDiff) <- reissuedAssets) {
+      rw.fromHistory(Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+        .orElse(issuedAssets.get(asset).map { case (_, i, vi) => (i, vi) })
+        .foreach {
+          case (info, volumeInfo) =>
+            rw.put(Keys.assetDetails(asset)(height), (info, volumeInfo |+| volumeDiff))
+            expiredKeys ++= updateHistory(rw, Keys.assetDetailsHistory(asset), threshold, Keys.assetDetails(asset))
+        }
     }
 
     for ((leaseId, state) <- leaseStates) {
@@ -437,8 +431,7 @@ class LevelDBWriter(
     for ((id, (tx, num)) <- transactions) {
 
       tx match {
-        case tx: UpdateAssetInfoTransaction => updateAsset(rw)(tx.assetId, Height @@ height, num)
-        case tx: IssueTransaction           => updateAsset(rw)(IssuedAsset(tx.assetId), Height @@ height, num)
+        case tx: UpdateAssetInfoTransaction => ???
         case _                              => ()
       }
 
@@ -586,13 +579,10 @@ class LevelDBWriter(
 
                 case tx: IssueTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
-                  rw.delete(Keys.assetUpdateTxNum(IssuedAsset(tx.assetId))(currentHeight))
-                  rw.filterHistory(Keys.assetUpdateTxNumHistory(IssuedAsset(tx.assetId)), currentHeight)
 
                 case tx: UpdateAssetInfoTransaction =>
                   assetDetailsToInvalidate += tx.assetId
-                  rw.delete(Keys.assetUpdateTxNum(tx.assetId)(currentHeight))
-                  rw.filterHistory(Keys.assetUpdateTxNumHistory(tx.assetId), currentHeight)
+                  rw.filterHistory(Keys.assetDetailsHistory(tx.assetId), currentHeight)
 
                 case tx: ReissueTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)

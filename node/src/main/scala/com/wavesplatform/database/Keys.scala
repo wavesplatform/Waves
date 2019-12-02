@@ -34,7 +34,7 @@ object Keys {
     Key("asset-balance", hBytes(9, height, addressId.toByteArray ++ asset.id.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetDetailsHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-details-history", 10, asset.id.arr)
-  def assetDetails(asset: IssuedAsset)(height: Int): Key[AssetDetails] =
+  def assetDetails(asset: IssuedAsset)(height: Int): Key[(AssetInfo, AssetVolumeInfo)] =
     Key("asset-details", hBytes(11, height, asset.id.arr), readAssetDetails, writeAssetDetails)
 
   def leaseBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("lease-balance-history", 12, addressId.toByteArray)
@@ -180,8 +180,7 @@ object Keys {
   val HitSourcePrefix: Short                   = 59
   def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
 
-  def assetUpdateTxNumHistory(asset: IssuedAsset): Key[Seq[Int]] =
-    historyKey("asset-update-tx-num-history", 60, asset.id.arr)
-  def assetUpdateTxNum(asset: IssuedAsset)(height: Int): Key[TxNum] =
-    Key("asset-update-tx-num", hBytes(61, height, asset.id.arr), readAssetUpdateTxNum, writeAssetUpdateTxNum)
+  val AssetStaticInfoPrefix: Short = 61
+  def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
+    Key.opt("asset-static-info", bytes(61, asset.id.arr), readAssetStaticInfo, writeAssetStaticInfo)
 }

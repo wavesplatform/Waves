@@ -340,20 +340,6 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  property(s"Can update after ${UpdateAssetInfoTransaction.MIN_UPDATE_INFO_INTERVAL}") {
-    forAll(genesisIssueUpdate) {
-      case (gen, issue, update) =>
-        val blocks = Seq.fill(UpdateAssetInfoTransaction.MIN_UPDATE_INFO_INTERVAL)(TestBlock.create(Seq.empty))
-        assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
-          ei should produce("Can't update asset info before 100002 block")
-        }
-    }
-  }
-
-  trait MySer[F[_, _]] {
-
-  }
-
   private val genesisIssueUpdate =
     for {
       timestamp          <- timestampGen

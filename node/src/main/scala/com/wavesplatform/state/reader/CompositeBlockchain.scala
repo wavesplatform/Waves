@@ -1,7 +1,6 @@
 package com.wavesplatform.state.reader
 
 import cats.implicits._
-import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -14,7 +13,7 @@ import com.wavesplatform.state.extensions.composite.{CompositeAddressTransaction
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -49,46 +48,59 @@ final case class CompositeBlockchain(
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
     val script: Option[Script] = assetScript(asset)
-    inner.assetDescription(asset) match {
-      case Some(ad) =>
-        diff.issuedAssets
-          .get(asset)
-          .map { newAssetInfo =>
-            val oldAssetInfo = AssetDetails(ad.reissuable, ad.totalVolume)
-            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
-            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
+
+    val fromDiff = diff.issuedAssets
+      .get(asset)
+      .map {
+        case (static, info, volume) =>
+          val sponsorship = diff.sponsorship.get(asset).fold(0L) {
+            case SponsorshipValue(sp) => sp
+            case SponsorshipNoInfo    => 0L
           }
-          .orElse(Some(ad.copy(script = script)))
-          .map { ad =>
-            diff.sponsorship.get(asset).fold(ad) {
-              case SponsorshipValue(sponsorship) =>
-                ad.copy(sponsorship = sponsorship)
-              case SponsorshipNoInfo =>
-                ad
+
+          AssetDescription(
+            static.issuer,
+            info.name,
+            info.description,
+            static.decimals,
+            volume.isReissuable,
+            volume.volume,
+            Height @@ this.height,
+            script,
+            sponsorship
+          )
+      }
+
+    val assetDescription =
+      inner
+        .assetDescription(asset)
+        .orElse(fromDiff)
+        .map { description =>
+          diff.reissuedAssets
+            .get(asset)
+            .fold(description) { updVolumeInfo =>
+              description
+                .copy(
+                  reissuable = description.reissuable && updVolumeInfo.isReissuable,
+                  totalVolume = description.totalVolume + updVolumeInfo.volume
+                )
             }
-          }
-      case None =>
-        val sponsorship = diff.sponsorship.get(asset).fold(0L) {
-          case SponsorshipValue(sp) => sp
-          case SponsorshipNoInfo    => 0L
         }
-        diff.transactions
-          .get(asset.id)
-          .collectFirst {
-            case (it: IssueTransaction, _) =>
-              AssetDescription(
-                it.sender,
-                new String(it.name),
-                new String(it.description),
-                it.decimals,
-                it.reissuable,
-                it.quantity,
-                Height @@ this.height,
-                script,
-                sponsorship
-              )
-          }
-          .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
+        .map { description =>
+          diff.sponsorship
+            .get(asset)
+            .fold(description) {
+              case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
+              case SponsorshipValue(v) => description.copy(sponsorship = v)
+            }
+        }
+
+    assetDescription map { z =>
+      diff.transactions
+        .foldLeft(z) {
+          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = ut.name, description = ut.description)
+          case (acc, _)                                        => acc
+        }
     }
   }
 
