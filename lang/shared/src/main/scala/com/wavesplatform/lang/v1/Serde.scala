@@ -213,7 +213,8 @@ object Serde {
         }
         elements.foldLeft(meta)((acc, element) => serAux(out, acc, element))
 
-      case x => println(x); ??? //TODO: FIx exhaustivness
+      case x =>
+        Coeval.raiseError(new Exception(s"Serialization of value $x is unsupported")) //TODO: FIx exhaustivness
     }
   }
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.validation.impl
 
+import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
@@ -36,7 +37,12 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
-      V.cond(Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false), TooBigArray)
+      Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes)
+        .toEither
+        .leftMap(err => GenericError(err.getMessage))
+        .filterOrElse(identity, TooBigArray)
+        .toValidatedNel
+        .map(_ => ())
     )
   }
 }

@@ -80,11 +80,11 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         "version" -> Single("1"),
         "callableFuncTypes" -> Chain(List(
           Dic(ListMap(
-            "a" -> Single("Boolean|Int|String"),
+            "a" -> Single("Boolean|ByteVector|Int|String"),
             "b" -> Single("Int"),
             "c" -> Single("Int|String"),
             "d" -> Single("Int|String"),
-            "e" -> Single("Boolean|String"),
+            "e" -> Single("Boolean|ByteVector|String"),
             "f" -> Single("ByteVector|Int")
           )),
           Dic(Map(
@@ -106,7 +106,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
         """
           |
           | @Callable(i)
-          | func foo(a: List[Int], b: List[String]) = []
+          | func foo(a: List[Int], b: List[String], c: ByteVector, d: Int|String|Boolean) = []
           |
           | @Callable(i)
           | func bar(a: List[ByteVector]) = []
@@ -117,7 +117,7 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
     val meta = DAppMeta(
       version = 2,
       List(
-        CallableFuncSignature(ByteString.copyFrom(Array[Byte](17, 24))),
+        CallableFuncSignature(ByteString.copyFrom(Array[Byte](17, 24, 2, 13))),
         CallableFuncSignature(ByteString.copyFrom(Array[Byte](18))),
       )
     )
@@ -134,6 +134,8 @@ class MetaTest extends PropSpec with PropertyChecks with Matchers with ScriptGen
           Dic(ListMap(
             "a" -> Single("List[Int]"),
             "b" -> Single("List[String]"),
+            "c" -> Single("ByteVector"),
+            "d" -> Single("Boolean|Int|String"),
           )),
           Dic(Map(
             "a" -> Single("List[ByteVector]")
