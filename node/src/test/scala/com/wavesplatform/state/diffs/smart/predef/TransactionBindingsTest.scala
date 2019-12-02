@@ -271,18 +271,23 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
   property("UpdateAssetInfoTransaction binding") {
     forAll(updateAssetInfoTxGen) { t =>
-      val result = runScript(
+
+
+      val scriptSource =
         s"""
            |match tx {
            | case t : UpdateAssetInfoTransaction =>
            |   ${provenPart(t)}
            |   let name        = t.name == ${t.name}
            |   let assetId     = t.assetId == base58'${t.assetId.id.toString}'
-           |   let description = t.description == ${t.description}
+           |   let description = t.description == "${t.description}"
            |   ${assertProvenPart("t")} && name && assetId && description
            | case other => throw()
            | }
-           |""".stripMargin,
+           |""".stripMargin
+      print(scriptSource)
+      val result = runScript(
+        scriptSource,
         Coproduct(t),
         T
       )

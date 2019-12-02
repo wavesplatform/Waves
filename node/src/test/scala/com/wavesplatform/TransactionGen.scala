@@ -434,15 +434,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
       fee         <- smallFeeGen
       timestamp   <- positiveLongGen
-      tx          <- createUpdateAssetInfo(chainId, account, assetId, new String(assetName), new String(description), fee, Waves, timestamp)
-    } yield tx
-
-  def createUpdateAssetInfo(chainId: Byte, account: KeyPair, assetId: ByteStr, name: String, description: String, feeAmount: Long, feeAsset: Asset, timestamp: Long): Gen[UpdateAssetInfoTransaction] =
-    for {
-      tx <- Gen.oneOf(
-        UpdateAssetInfoTransaction.selfSigned(1.toByte, chainId, account, assetId, name, description, timestamp, feeAmount, feeAsset).explicitGet(),
-        UpdateAssetInfoTransaction.selfSigned(2.toByte, chainId, account, assetId, name, description, timestamp, feeAmount, feeAsset).explicitGet()
-      )
+      tx = UpdateAssetInfoTransaction
+        .selfSigned(1.toByte, chainId, account, assetId, new String(assetName), new String(description), timestamp, fee, Waves)
+        .explicitGet()
     } yield tx
 
   def issueReissueBurnGeneratorP(
@@ -915,8 +909,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       feeParam: Option[Long] = None
   ): Gen[IssueTransaction] =
     for {
-      script <- _scriptGen
-      sender <- senderGen
+      script                                                                                                 <- _scriptGen
+      sender                                                                                                 <- senderGen
       (_, assetName, description, generatedQuantity, decimals, generatedReissuable, generatedFee, timestamp) <- issueParamGen
       reissuable = reissuableParam.getOrElse(generatedReissuable)
       quantity   = quantityParam.getOrElse(generatedQuantity)
