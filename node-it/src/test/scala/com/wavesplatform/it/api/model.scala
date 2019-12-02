@@ -252,6 +252,7 @@ case class Block(
     generator: String,
     transactionCount: Int,
     generationSignature: Option[String],
+    baseTarget: Option[Int],
     blocksize: Int,
     transactions: Seq[Transaction],
     fee: Long,
@@ -282,6 +283,10 @@ object Block {
           case Some(v) if v > 4 => (jsv \ "generationSignature").validateOpt[String]
           case _ => (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
         }
+        baseTarget <- version match {
+          case Some(v) if v > 4 => (jsv \ "baseTarget").validateOpt[Int]
+          case _ => (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
+        }
       } yield Block(
         signature,
         height,
@@ -289,6 +294,7 @@ object Block {
         generator,
         transactionCount,
         generationSignature,
+        baseTarget,
         blocksize,
         transactions,
         fee,
@@ -310,6 +316,7 @@ case class BlockHeaders(
     generator: String,
     transactionCount: Int,
     generationSignature: Option[String],
+    baseTarget: Option[Int],
     blocksize: Int,
     features: Option[Set[Short]],
     reward: Option[Long],
@@ -336,6 +343,10 @@ object BlockHeaders {
           case Some(v) if v > 4 => (jsv \ "generationSignature").validateOpt[String]
           case _ => (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
         }
+        baseTarget <- version match {
+          case Some(v) if v > 4 => (jsv \ "baseTarget").validateOpt[Int]
+          case _ => (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
+        }
       } yield BlockHeaders(
         signature,
         height,
@@ -343,6 +354,7 @@ object BlockHeaders {
         generator,
         transactionCount,
         generationSignature,
+        baseTarget,
         blocksize,
         features,
         reward,
