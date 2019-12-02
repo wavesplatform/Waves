@@ -216,6 +216,7 @@ object InvokeScriptTransactionDiff {
               .flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
               },
+            Nil,
             reissues,
             burns
           )

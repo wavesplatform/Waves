@@ -60,7 +60,8 @@ case class FullAssetInfo(
     reissuable: Boolean,
     minSponsoredAssetFee: Option[Long],
     sponsorBalance: Option[Long],
-    quantity: Long
+    quantity: Long,
+    issueTransaction: Option[Transaction]
 )
 object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
@@ -159,7 +160,7 @@ object AssetPairResponse {
 case class StateChangesDetails(
     data: Seq[DataResponse],
     transfers: Seq[TransfersInfoResponse],
-//    issues: Seq[IssueInfoResponse],
+    issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
     burns: Seq[BurnInfoResponse]
 )

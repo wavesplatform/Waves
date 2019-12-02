@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
 import com.wavesplatform.utils._
-import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
@@ -14,6 +14,7 @@ import play.api.libs.json.Json
 final case class InvokeScriptResult(
    data: Seq[DataEntry[_]] = Nil,
    transfers: Seq[InvokeScriptResult.Payment] = Nil,
+   issues: Seq[Issue] = Nil,
    reissues: Seq[Reissue] = Nil,
    burns: Seq[Burn] = Nil
 )
@@ -33,6 +34,7 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
+  implicit val issueFormat = Json.format[Issue]
   implicit val reissueFormat = Json.format[Reissue]
   implicit val burnFormat = Json.format[Burn]
   implicit val jsonFormat = Json.format[InvokeScriptResult]
@@ -90,6 +92,7 @@ object InvokeScriptResult {
         val (asset, amount) = PBAmounts.toAssetAndAmount(p.getAmount)
         InvokeScriptResult.Payment(Address.fromBytes(p.address.toByteArray).explicitGet(), asset, amount)
       },
+      Nil,
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn)
     )

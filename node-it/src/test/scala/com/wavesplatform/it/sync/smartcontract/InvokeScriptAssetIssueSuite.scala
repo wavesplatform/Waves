@@ -48,6 +48,10 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     assetInfo.reissuable shouldBe true
     assetInfo.decimals shouldBe 0
     assetInfo.quantity shouldBe 100
+
+    val balance = sender.assetsBalance(secondAddress).balances.find(_.assetId == issueTxAssetId)
+    balance shouldBe 'defined
+    balance.value.issueTransaction.value.id shouldBe issueTx.id
   }
 
   test("Correct data for assets issued by script") {
@@ -100,6 +104,10 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     stateChanges.stateChanges.value.issues.head.isReissuable shouldBe true
     stateChanges.stateChanges.value.issues.head.compiledScript shouldBe None
     stateChanges.stateChanges.value.issues.head.nonce shouldBe None
+
+    val balance = sender.assetsBalance(firstAddress).balances.find(_.assetId == invokeScriptAssetId)
+    balance shouldBe 'defined
+    balance.value.issueTransaction shouldBe None
      */
   }
 
