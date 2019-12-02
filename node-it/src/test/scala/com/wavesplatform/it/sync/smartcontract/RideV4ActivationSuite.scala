@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.StateCheckFailed
+import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -9,6 +9,8 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.{Assertion, CancelAfterFailure}
 
@@ -23,8 +25,9 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       .overrideBase(_.preactivatedFeatures((16, activationHeight - 1)))
       .buildNonConflicting()
 
-  private val smartAcc  = pkByAddress(firstAddress).stringRepr
+  private val smartAccV4  = pkByAddress(firstAddress).stringRepr
   private val callerAcc = pkByAddress(secondAddress).stringRepr
+  private val smartAccV3  = pkByAddress(thirdAddress).stringRepr
 
   private val dAppV4 =
     """{-# STDLIB_VERSION 4 #-}
@@ -36,8 +39,23 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |func default () = [BooleanEntry("0", true)]
       |
       |""".stripMargin
+
+  private val dAppV3 =
+    """{-# STDLIB_VERSION 3 #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |
+      |
+      |@Callable(i)
+      |func default () = WriteSet([DataEntry("0", true)])
+      |
+      |""".stripMargin
   private val accountV4 =
     """{-# STDLIB_VERSION 4 #-}
+      |{-# CONTENT_TYPE EXPRESSION #-}
+      |(tx.sender == this)""".stripMargin
+  private val accountV3 =
+    """{-# STDLIB_VERSION 3 #-}
       |{-# CONTENT_TYPE EXPRESSION #-}
       |(tx.sender == this)""".stripMargin
   private val assetV4 =
@@ -62,17 +80,17 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       e.message should include("Multiple payment attachment for Invoke Script Transaction feature has not been activated")
     }
 
-    assertFeatureNotActivated(sender.setScript(smartAcc, Some(dAppV4.compiled)))
-    assertFeatureNotActivated(sender.setScript(smartAcc, Some(accountV4.compiled)))
+    assertFeatureNotActivated(sender.setScript(smartAccV4, Some(dAppV4.compiled)))
+    assertFeatureNotActivated(sender.setScript(smartAccV4, Some(accountV4.compiled)))
     assertFeatureNotActivated(sender.issue(
-      smartAcc, "Asset", "", 1, 0, script = Some(assetV4.compiled)
+      smartAccV4, "Asset", "", 1, 0, script = Some(assetV4.compiled)
     ))
 
     val assetId = sender
-      .issue(smartAcc, "Asset", "", 1, 0, script = Some(assetV3.compiled))
+      .issue(smartAccV4, "Asset", "", 1, 0, script = Some(assetV3.compiled))
       .id
     assertFeatureNotActivated(sender.setAssetScript(
-      assetId, smartAcc, script = Some(accountV4.compiled), fee = setAssetScriptFee + smartFee
+      assetId, smartAccV4, script = Some(accountV4.compiled), fee = setAssetScriptFee + smartFee
     ))
   }
 
@@ -91,29 +109,65 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |(this.quantity > 0)""".stripMargin
   }
 
-  //TODO rejected invoke V3 with multiple payments
-
   test(s"wait height $activationHeight for the feature activation") {
     sender.waitForHeight(activationHeight, 5.minutes)
   }
 
   test("can set asset script V4 after the function activation") {
     val assetId = sender.issue(
-      smartAcc, "Test", "", 1000, 0, script = Some(assetV4.compiled), waitForTx = true
+      smartAccV4, "Test", "", 1000, 0, script = Some(assetV4.compiled), waitForTx = true
     ).id
 
-    sender
-      .setAssetScript(assetId, smartAcc, setAssetScriptFee + smartFee, Some(assetV4.compiled), waitForTx = true)
-      .id
+    sender.setAssetScript(assetId, smartAccV4, setAssetScriptFee + smartFee, Some(assetV4.compiled), waitForTx = true)
   }
 
-  test("can set account script V4 after the feature activation") {
-    sender.setScript(smartAcc, Some(accountV4.compiled), waitForTx = true)
-    sender.setScript(smartAcc, Some(dAppV4.compiled), fee = setScriptFee + smartFee, waitForTx = true)
+  test("can set and invoke account script V4 after the feature activation") {
+    sender.setScript(smartAccV4, Some(accountV4.compiled), waitForTx = true)
+    sender.setScript(smartAccV4, Some(dAppV4.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
-    //TODO rejected invoke V3 with multiple payments
-    //TODO accepted invoke V4 with multiple payments
-    sender.invokeScript(callerAcc, smartAcc, None, waitForTx = true)._1.id
+    sender.invokeScript(callerAcc, smartAccV4, waitForTx = true)
+  }
+
+  test("can invoke V4 contract from V3 scripted account with 0 or 1 payments") {
+    sender.setScript(smartAccV3, Some(accountV3.compiled), waitForTx = true)
+
+    sender.invokeScript(smartAccV3, smartAccV4, fee = smartMinFee + smartFee, waitForTx = true)._1.id
+    sender.invokeScript(
+      smartAccV3,
+      smartAccV4,
+      payment = Seq(Payment(1, Waves)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )._1.id
+  }
+
+  test("can't invoke V4 contract from V3 scripted account with 2 payments") {
+    sender.setScript(smartAccV3, Some(accountV3.compiled), fee = setScriptFee + smartFee, waitForTx = true)
+
+    assertApiError(
+      sender.invokeScript(
+        smartAccV3,
+        smartAccV4,
+        payment = Seq(Payment(1, Waves), Payment(1, Waves)),
+        fee = smartMinFee + smartFee,
+        waitForTx = true
+      )._1.id) { error =>
+      error.statusCode shouldBe 400
+      error.id shouldBe ScriptExecutionError.Id
+      error.message should include("Invoker script version 3 < 4 doesn't support multiple payment attachment")
+    }
+  }
+
+  test("can't invoke V3 DApp with multiple payments") {
+    sender.setScript(smartAccV3, Some(dAppV3.compiled), fee = setScriptFee + smartFee, waitForTx = true)
+
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, payment = Seq(Payment(1, Waves), Payment(1, Waves)), waitForTx = true)
+    ) { error =>
+      error.statusCode shouldBe 400
+      error.id shouldBe ScriptExecutionError.Id
+      error.message should include("DApp version 3 < 4 doesn't support multiple payment attachment")
+    }
   }
 
   test("can't use V4 features in V3 even after activation") {

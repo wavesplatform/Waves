@@ -120,7 +120,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       dApp,
       payment = Seq(Payment(wavesBalance - 1.waves, Waves), Payment(2.waves, Waves))
     )) { error =>
-      error.message should include("Accounts balance errors") //TODO детализировать ошибку
+      error.message should include("Transaction application leads to negative waves balance to (at least) temporary negative state")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
@@ -130,7 +130,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       dApp,
       payment = Seq(Payment(asset1Balance - 1000, asset1), Payment(1001, asset1))
     )) { error =>
-      error.message should include("Accounts balance errors")
+      error.message should include("Transaction application leads to negative asset")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
@@ -141,9 +141,9 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     sender.lease(caller, dApp, wavesBalance - 1.waves, waitForTx = true)
 
     assertApiError(
-      sender.invokeScript(caller, dApp, payment = Seq(Payment(0.5.waves, Waves), Payment(1.5.waves, Waves)))
+      sender.invokeScript(caller, dApp, payment = Seq(Payment(0.75.waves, Waves), Payment(0.75.waves, Waves)))
     ) { error =>
-        error.message should include("Accounts balance errors")
+        error.message should include("Transaction application leads to negative waves balance to (at least) temporary negative state")
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe 400
     }
