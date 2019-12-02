@@ -49,7 +49,7 @@ class UtxPoolImpl(
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged)
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
 
   // Init consume loop
   TxQueue.consume()
@@ -331,7 +331,7 @@ class UtxPoolImpl(
 
 object UtxPoolImpl {
 
-  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)]) {
+  private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
     private type Portfolios = Map[Address, Portfolio]
     private val transactionPortfolios = new ConcurrentHashMap[ByteStr, Portfolios]()
     private val transactions          = new ConcurrentHashMap[Address, Set[ByteStr]]()
@@ -358,6 +358,7 @@ object UtxPoolImpl {
     def getAggregated(accountAddr: Address): Portfolio = {
       val portfolios = for {
         txId <- transactions.getOrDefault(accountAddr, Set.empty).toSeq
+        if !isTxKnown(txId)
         txPortfolios = transactionPortfolios.getOrDefault(txId, Map.empty[Address, Portfolio])
         txAccountPortfolio <- txPortfolios.get(accountAddr).toSeq
       } yield txAccountPortfolio
