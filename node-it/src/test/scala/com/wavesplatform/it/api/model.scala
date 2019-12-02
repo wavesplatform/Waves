@@ -471,6 +471,11 @@ object OrderBookResponse {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
 }
 
+case class MerkleProofResponse(id: String, transactionIndex: Int, merkleProof: Seq[String])
+object  MerkleProofResponse {
+  implicit val merkleProofResponseFormat: Format[MerkleProofResponse] = Json.format
+}
+
 case class MarketStatusResponse(
     lastPrice: Option[Long],
     lastSide: Option[String],

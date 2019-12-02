@@ -11,6 +11,9 @@ import com.wavesplatform.it.api.{Block => ApiBlock, BlockHeaders => ApiBlockHead
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import scorex.crypto.authds.LeafData
+import scorex.crypto.authds.merkle.MerkleTree
+import scorex.crypto.hash.Blake2b256
 
 import scala.concurrent.duration._
 
@@ -25,6 +28,8 @@ class BlockV5TestSuite
   import BlockV5TestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
+
+  val emptyMerkleRoot = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))(Blake2b256).rootHash.toString
 
   "block v5 appears and blockchain grows" - {
     "when feature activation happened" in {
