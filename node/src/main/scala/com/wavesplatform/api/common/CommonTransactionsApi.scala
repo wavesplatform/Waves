@@ -1,7 +1,11 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.http.ApiError.InvalidSignature
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.{Block, BlockMerkleOps}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
 import com.wavesplatform.state.diffs.FeeValidation
@@ -12,6 +16,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.reactive.Observable
+import play.api.libs.json._
 
 private[api] class CommonTransactionsApi(
     blockchain: Blockchain,
@@ -38,6 +43,14 @@ private[api] class CommonTransactionsApi(
         case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
           (asset, feeInAsset, feeInWaves)
       }
+
+  def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
+    for {
+      transactionId         <- transactionIds
+      (height, transaction) <- transactionById(transactionId)
+      block                 <- blockchain.blockAt(height) if block.header.version >= Block.ProtoBlockVersion
+      transactionProof      <- block.transactionProof(transaction)
+    } yield transactionProof
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }

@@ -113,9 +113,9 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       }
   }
 
-  val MinIssueFee = 100000000
+  val MinIssueFee = 100000000L
 
-  val issueParamGen: Gen[(KeyPair, Array[Byte], Array[Byte], Long, Byte, Boolean, Int, TxTimestamp)] = for {
+  val issueParamGen: Gen[(KeyPair, Array[Byte], Array[Byte], Long, Byte, Boolean, Long, TxTimestamp)] = for {
     sender      <- accountGen
     assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
     description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
@@ -424,6 +424,26 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       )
     } yield tx
   }
+
+  val updateAssetInfoTxGen: Gen[UpdateAssetInfoTransaction] =
+    for {
+      chainId     <- Gen.chooseNum[Byte](Byte.MinValue, Byte.MaxValue)
+      account     <- accountGen
+      assetId     <- bytes32gen
+      assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
+      fee         <- smallFeeGen
+      timestamp   <- positiveLongGen
+      tx          <- createUpdateAssetInfo(chainId, account, assetId, new String(assetName), new String(description), fee, Waves, timestamp)
+    } yield tx
+
+  def createUpdateAssetInfo(chainId: Byte, account: KeyPair, assetId: ByteStr, name: String, description: String, feeAmount: Long, feeAsset: Asset, timestamp: Long): Gen[UpdateAssetInfoTransaction] =
+    for {
+      tx <- Gen.oneOf(
+        UpdateAssetInfoTransaction.selfSigned(1.toByte, chainId, account, assetId, name, description, timestamp, feeAmount, feeAsset).explicitGet(),
+        UpdateAssetInfoTransaction.selfSigned(2.toByte, chainId, account, assetId, name, description, timestamp, feeAmount, feeAsset).explicitGet()
+      )
+    } yield tx
 
   def issueReissueBurnGeneratorP(
       issueQuantity: Long,
@@ -891,14 +911,16 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       senderGen: Gen[KeyPair] = accountGen,
       _scriptGen: Gen[Option[Script]] = Gen.option(scriptGen),
       reissuableParam: Option[Boolean] = None,
-      quantityParam: Option[Long] = None
+      quantityParam: Option[Long] = None,
+      feeParam: Option[Long] = None
   ): Gen[IssueTransaction] =
     for {
-      script                                                                               <- _scriptGen
-      (_, assetName, description, generatedQuantity, decimals, generatedReissuable, fee, timestamp) <- issueParamGen
-      sender                                                                               <- senderGen
+      script <- _scriptGen
+      sender <- senderGen
+      (_, assetName, description, generatedQuantity, decimals, generatedReissuable, generatedFee, timestamp) <- issueParamGen
       reissuable = reissuableParam.getOrElse(generatedReissuable)
       quantity   = quantityParam.getOrElse(generatedQuantity)
+      fee        = feeParam.getOrElse(generatedFee)
     } yield IssueTransaction
       .selfSigned(TxVersion.V2, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .explicitGet()

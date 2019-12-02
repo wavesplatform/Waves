@@ -292,6 +292,18 @@ object Bindings {
             provenTxPart(p, proofsEnabled)
           )
         )
+      case UpdateAssetInfo(p, assetId, name, description) =>
+        CaseObj(
+          buildUpdateAssetInfoTransactionType(proofsEnabled),
+          combine(
+            Map(
+              "assetId" -> assetId,
+              "name" -> name,
+              "description" -> description
+            ),
+            provenTxPart(p, proofsEnabled)
+          )
+        )
     }
 
   private def reissueTransactionObject(
