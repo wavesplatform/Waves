@@ -1,9 +1,10 @@
 package com.wavesplatform.protobuf.transaction
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.traits.DataType.ByteArray
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Transaction.Data
@@ -13,6 +14,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
@@ -151,7 +153,7 @@ object PBTransactions {
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
         vt.assets.SetAssetScriptTransaction.create(
-          1.toByte,
+          version.toByte,
           sender,
           IssuedAsset(assetId),
           script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
@@ -162,7 +164,7 @@ object PBTransactions {
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
         vt.smart.SetScriptTransaction.create(
-          1.toByte,
+          version.toByte,
           sender,
           script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
           feeAmount,
@@ -181,7 +183,7 @@ object PBTransactions {
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
         vt.assets.exchange.ExchangeTransaction.create(
-          2.toByte,
+          version.toByte,
           PBOrders.vanilla(buyOrder),
           PBOrders.vanilla(sellOrder),
           amount,
@@ -194,11 +196,11 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction.create(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
+        vt.DataTransaction.create(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction.create(
-          1.toByte,
+          version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
@@ -209,7 +211,15 @@ object PBTransactions {
         )
 
       case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee)))) =>
-        vt.assets.SponsorFeeTransaction.create(1.toByte, sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
+        vt.assets.SponsorFeeTransaction.create(
+          version.toByte,
+          sender,
+          IssuedAsset(assetId),
+          Option(minFee).filter(_ > 0),
+          feeAmount,
+          timestamp,
+          proofs
+        )
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
         import com.wavesplatform.common.utils._
@@ -232,7 +242,7 @@ object PBTransactions {
           _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
 
           tx <- vt.smart.InvokeScriptTransaction.create(
-            1.toByte,
+            version.toByte,
             sender,
             dApp,
             fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
@@ -332,7 +342,7 @@ object PBTransactions {
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
         vt.assets.SetAssetScriptTransaction(
-          1.toByte,
+          version.toByte,
           sender,
           IssuedAsset(assetId),
           script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
@@ -343,7 +353,7 @@ object PBTransactions {
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
         vt.smart.SetScriptTransaction(
-          1.toByte,
+          version.toByte,
           sender,
           script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
           feeAmount,
@@ -372,11 +382,11 @@ object PBTransactions {
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction(1.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
+        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
 
       case Data.MassTransfer(mt) =>
         vt.transfer.MassTransferTransaction(
-          1.toByte,
+          version.toByte,
           sender,
           PBAmounts.toVanillaAssetId(mt.assetId),
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
@@ -387,14 +397,14 @@ object PBTransactions {
         )
 
       case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee)))) =>
-        vt.assets.SponsorFeeTransaction(1.toByte, sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
+        vt.assets.SponsorFeeTransaction(version.toByte, sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
         import com.wavesplatform.lang.v1.Serde
         import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 
         vt.smart.InvokeScriptTransaction(
-          1.toByte,
+          version.toByte,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser
@@ -503,16 +513,9 @@ object PBTransactions {
         val data = SponsorFeeTransactionData(Some(Amount(assetId.id, minSponsoredAssetFee.getOrElse(0L))))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.SponsorFee(data))
 
-      case vt.smart.InvokeScriptTransaction(_, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
-        import com.wavesplatform.lang.v1.Serde
-        import com.wavesplatform.serialization.Deser
-
-        val data = InvokeScriptTransactionData(
-          Some(PBRecipients.create(dappAddress)),
-          ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(fcOpt)(Serde.serialize(_))),
-          payment.map(p => (p.assetId, p.amount): Amount)
-        )
-        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, 1, proofs, Data.InvokeScript(data))
+      case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
+        val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
+        PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
 
       case tx @ vt.assets.UpdateAssetInfoTransaction(version, _, sender, assetId, name, description, timestamp, _, _, proofs) =>
         val (feeAsset, feeAmount) = tx.assetFee
@@ -523,10 +526,19 @@ object PBTransactions {
           .withDescription(description)
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
-
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }
+  }
+
+  def toPBInvokeScriptData(dappAddress: AddressOrAlias, fcOpt: Option[FUNCTION_CALL], payment: Seq[Payment]): InvokeScriptTransactionData = {
+    import com.wavesplatform.lang.v1.Serde
+
+    InvokeScriptTransactionData(
+      Some(PBRecipients.create(dappAddress)),
+      ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(fcOpt)(Serde.serialize(_))),
+      payment.map(p => (p.assetId, p.amount): Amount)
+    )
   }
 
   def toVanillaDataEntry(de: DataTransactionData.DataEntry): com.wavesplatform.state.DataEntry[_] = {
