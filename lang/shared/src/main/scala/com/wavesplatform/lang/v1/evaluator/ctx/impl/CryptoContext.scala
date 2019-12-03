@@ -3,8 +3,8 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION, LONG}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.zwaves.bls12.{Groth16, PedersenMerkleTree}
 
 object CryptoContext {
 
@@ -147,6 +148,37 @@ object CryptoContext {
         case xs                               => notImplemented[Id]("fromBase16String(str: String)", xs)
       }
 
+    def bls12Groth16VerifyF: BaseFunction[NoContext] =
+      NativeFunction(
+        "bls12Groth16Verify",
+        10,  // TODO: Replace gas cost 
+        BLS12_GROTH16_VERIFY,
+        BOOLEAN,
+        ("vk", BYTESTR),
+        ("proof", BYTESTR),
+        ("inputs", BYTESTR)
+      ) {
+        case CONST_BYTESTR(vk:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_BYTESTR(inputs:ByteStr) :: Nil =>
+          Right(CONST_BOOLEAN(Groth16.verify(vk, proof, inputs)))
+        case xs => notImplemented[Id]("bls12Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      }
+
+    def bls12PedersenMerkleTreeAddItemF: BaseFunction[NoContext] =
+      NativeFunction(
+        "bls12PedersenMerkleTreeAddItem",
+        10,  // TODO: Replace gas cost 
+        BLS12_PEDERSEN_MERKLE_TREE_ADD_ITEM,
+        BYTESTR,
+        ("root", BYTESTR),
+        ("proof", BYTESTR),
+        ("index", LONG),
+        ("leaf", BYTESTR)
+      ) {
+        case CONST_BYTESTR(root:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_LONG(index:Long) :: CONST_BYTESTR(leaf:ByteStr) :: Nil =>
+          Right(CONST_BYTESTR(PedersenMerkleTree.addItem(root, proof, index, leaf)))
+        case xs => notImplemented[Id]("bls12PedersenMerkleTreeAddItem(root:ByteVector, proof:ByteVector, index: Int, leaf:ByteVector)", xs)
+      }
+
     val v1Functions =
       Array(
         keccak256F,
@@ -194,7 +226,9 @@ object CryptoContext {
         rsaVerifyF,
         checkMerkleProofF,
         toBase16StringF,
-        fromBase16StringF
+        fromBase16StringF,
+        bls12Groth16VerifyF,
+        bls12PedersenMerkleTreeAddItemF
       )
 
     version match {
