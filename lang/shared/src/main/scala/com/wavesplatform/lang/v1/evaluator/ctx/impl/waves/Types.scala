@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, _}
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 
 object Types {
@@ -95,6 +95,7 @@ object Types {
   val stringDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.StringEntry, STRING)
   val binaryDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.BinaryEntry, BYTESTR)
   val intDataEntry: CASETYPEREF     = buildTypedEntry(FieldNames.IntEntry, LONG)
+  val deleteDataEntry: CASETYPEREF  = CASETYPEREF(FieldNames.DeleteEntry, List("key" -> STRING))
 
   private val typedDataEntries =
     List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry)
@@ -184,7 +185,7 @@ object Types {
     UNION(callableV3Results: _*)
 
   private val callableV4ReturnType =
-    LIST(UNION.create(commonDataEntryType(V4) :: scriptTransfer :: callableV4Actions))
+    LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
@@ -479,11 +480,10 @@ object Types {
       aliasType,
       transfer,
       assetPairType,
-      commonDataEntryType(v),
       buildOrderType(proofsEnabled),
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) blockHeader :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) blockHeader :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }
