@@ -104,7 +104,7 @@ class NarrowTransactionGenerator(
                       500,
                       Waves,
                       500000L,
-                      Attachment.fromBytes(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
+                      Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
                       timestamp
                     )
                 )
@@ -213,7 +213,7 @@ class NarrowTransactionGenerator(
                       transfers.toList,
                       100000L + 50000L * transferCount + 400000L,
                       timestamp,
-                      Attachment.fromBytes(Array.fill(random.nextInt(100))(random.nextInt().toByte))
+                      Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
                     )
                 )
               } yield tx
@@ -457,7 +457,7 @@ object NarrowTransactionGenerator {
               val account = GeneratorSettings.toKeyPair(s"${UUID.randomUUID().toString}")
 
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, richAccount, account, Waves, balance, Waves, fee, Attachment.Empty, time.correctedTime())
+                .selfSigned(2.toByte, richAccount, account, Waves, balance, Waves, fee, None, time.correctedTime())
                 .explicitGet()
 
               val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
@@ -526,7 +526,7 @@ object NarrowTransactionGenerator {
               tradeAsset.quantity / Universe.Accounts.size,
               Waves,
               900000,
-              Attachment.fromBytes(Array.fill(random.nextInt(100))(random.nextInt().toByte)),
+              Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
               System.currentTimeMillis()
             )
             .right

@@ -11,7 +11,7 @@ import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 
 import scala.concurrent.duration._
 
@@ -183,12 +183,12 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
     val blackTx = TransferTransaction
-      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, Attachment.Empty, System.currentTimeMillis + 1.minutes.toMillis)
+      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, None, System.currentTimeMillis + 1.minutes.toMillis)
       .right
       .get
 
     val incorrectTx = TransferTransaction
-      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, Attachment.Empty, System.currentTimeMillis + 10.minutes.toMillis)
+      .selfSigned(2.toByte, pkByAddress(secondAddress), pkByAddress(thirdAddress), IssuedAsset(ByteStr.decodeBase58(blackAsset).get), 1, Waves, smartMinFee, None, System.currentTimeMillis + 10.minutes.toMillis)
       .right
       .get
 

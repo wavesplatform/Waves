@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import org.scalacheck.Gen
 
@@ -29,7 +29,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, from, to, Waves, amount, Waves, FeeAmount, Attachment.Empty, timestamp).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, from, to, Waves, amount, Waves, FeeAmount, None, timestamp).explicitGet()
 
     def transferV2(
         from: KeyPair,
@@ -39,7 +39,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(2.toByte, from, to, Waves, amount, Waves, FeeAmount, Attachment.Empty, timestamp).explicitGet()
+      } yield TransferTransaction.selfSigned(2.toByte, from, to, Waves, amount, Waves, FeeAmount, None, timestamp).explicitGet()
 
     def transferAsset(
         asset: IssuedAsset,
@@ -50,7 +50,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, from, to, asset, amount, Waves, FeeAmount, Attachment.Empty, timestamp).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, from, to, asset, amount, Waves, FeeAmount, None, timestamp).explicitGet()
 
     def lease(
         from: KeyPair,

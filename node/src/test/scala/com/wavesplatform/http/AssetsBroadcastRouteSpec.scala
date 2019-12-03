@@ -141,7 +141,7 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(feeAssetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
         }
         forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("requirement failed"), true)
+          posting(tr.copy(attachment = Some(a))) should produce(TooBigArrayAllocation)
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())
@@ -167,7 +167,7 @@ class AssetsBroadcastRouteSpec
           1 * Waves,
           Asset.Waves,
           Waves / 3,
-          Attachment.Empty,
+          None,
           System.currentTimeMillis()
         )
         .right
@@ -183,7 +183,7 @@ class AssetsBroadcastRouteSpec
         amount = 1 * Waves,
         feeAssetId = Asset.Waves,
         fee = Waves / 3,
-        attachment = Attachment.Empty,
+        attachment = None,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty)
       )
@@ -218,7 +218,7 @@ class AssetsBroadcastRouteSpec
       fee,
       feeAssetId.maybeBase58Repr,
       timestamp,
-      Some(Base58.encode(attachment.toBytesExact)),
+      Some(Base58.encode(attachment.toBytesStrict)),
       proofs.toSignature.toString
     )
   }
@@ -233,7 +233,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
-      Some(Base58.encode(attachment.toBytesExact)),
+      Some(Base58.encode(attachment.toBytesStrict)),
       proofs.proofs.map(_.toString).toList
     )
   }

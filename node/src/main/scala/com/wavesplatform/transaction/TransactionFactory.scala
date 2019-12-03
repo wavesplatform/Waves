@@ -6,7 +6,6 @@ import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.api.http.versionReads
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -49,7 +48,6 @@ object TransactionFactory {
       sender    <- wallet.findPrivateKey(request.sender)
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
-      bytes = request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray)
       tx <- MassTransferTransaction.signed(
         1.toByte,
         sender,
@@ -57,7 +55,7 @@ object TransactionFactory {
         transfers,
         request.fee,
         request.timestamp.getOrElse(time.getTimestamp()),
-        Attachment.fromBytes(bytes),
+        request.attachment,
         signer
       )
     } yield tx
@@ -65,7 +63,6 @@ object TransactionFactory {
   def massTransferAsset(request: MassTransferRequest, sender: PublicKey): Either[ValidationError, MassTransferTransaction] =
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
-      bytes = request.attachment.filter(_.nonEmpty).map(Base58.tryDecodeWithLimit(_).get).getOrElse(Array.emptyByteArray)
       tx <- MassTransferTransaction.create(
         1.toByte,
         sender,
@@ -73,7 +70,7 @@ object TransactionFactory {
         transfers,
         request.fee,
         0,
-        Attachment.fromBytes(bytes),
+        request.attachment,
         Proofs.empty
       )
     } yield tx

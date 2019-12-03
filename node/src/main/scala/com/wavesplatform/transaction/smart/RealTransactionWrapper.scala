@@ -1,8 +1,6 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
-import com.google.common.base.Charsets
-import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
@@ -129,22 +127,14 @@ object RealTransactionWrapper {
       attachment = convertAttachment(t.attachment, version)
     )
 
-  private def convertAttachment(attachment: Attachment, version: StdLibVersion): TransferAttachment = version match {
-    case V1 | V2 | V3 =>
-      ByteStrValue(attachment match {
-        case Attachment.Num(value)  => Longs.toByteArray(value)
-        case Attachment.Bool(value) => if (value) Array(1.toByte) else Array(0.toByte)
-        case Attachment.Bin(value)  => value
-        case Attachment.Str(value)  => value.getBytes(Charsets.UTF_8)
-        case Attachment.Empty       => Array.emptyByteArray
-      })
+  private def convertAttachment(attachment: Option[Attachment], version: StdLibVersion): TransferAttachment = version match {
+    case V1 | V2 | V3 => ByteStrValue(attachment.toBytes)
     case V4 =>
-      attachment match {
+      attachment.fold[TransferAttachment](EmptyAttachment) {
         case Attachment.Num(value)  => IntValue(value)
         case Attachment.Bool(value) => BooleanValue(value)
         case Attachment.Bin(value)  => ByteStrValue(value)
         case Attachment.Str(value)  => StringValue(value)
-        case Attachment.Empty       => ByteStrValue(Array.emptyByteArray)
       }
   }
 }

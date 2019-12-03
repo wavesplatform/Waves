@@ -5,6 +5,6 @@ import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Transaction
 
 object PBTransactionSerializer {
-  def bodyBytes(tx: Transaction): Array[Byte] =
-    PBUtils.encodeDeterministic(PBTransactions.protobuf(tx).getTransaction)
+  def bodyBytes(tx: Transaction): Array[Byte] = PBUtils.encodeDeterministic(PBTransactions.protobuf(tx).getTransaction)
+  def bytes(tx: Transaction): Array[Byte]     = PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
 }

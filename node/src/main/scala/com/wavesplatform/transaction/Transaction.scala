@@ -4,7 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
 trait Transaction {
   val id: Coeval[ByteStr]
@@ -18,8 +18,8 @@ trait Transaction {
   def bytesSize: Int = bytes().length
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
+
   override def toString: String = json().toString
-  def toPrettyString: String = json.map(Json.prettyPrint).value
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()
@@ -45,5 +45,4 @@ object Transaction {
       case (Waves, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
     }
   }
-
 }

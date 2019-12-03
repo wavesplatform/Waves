@@ -11,7 +11,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.FreeSpec
 import play.api.libs.json._
 
@@ -86,7 +86,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
       val other = KeyPair("other".getBytes)
 
       val transfer = TransferTransaction
-        .selfSigned(1.toByte, issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, Attachment.Empty, System.currentTimeMillis())
+        .selfSigned(1.toByte, issuer, other, randomTokenToTransfer, 1, Waves, 0.001.waves, None, System.currentTimeMillis())
         .explicitGet()
 
       val assertion = for {

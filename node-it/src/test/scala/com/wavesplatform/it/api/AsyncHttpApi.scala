@@ -852,7 +852,7 @@ object AsyncHttpApi extends Assertions {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            PBTransactions.toPBAttachment(Attachment.fromBytes(attachment.toByteArray))
+            PBTransactions.toPBAttachment(Some(Attachment.Bin(attachment.toByteArray)))
           )
         )
       )

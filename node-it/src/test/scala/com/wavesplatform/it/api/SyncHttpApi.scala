@@ -28,7 +28,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
@@ -351,7 +351,7 @@ object SyncHttpApi extends Assertions {
           amount = amount,
           feeAsset = Asset.fromString(feeAssetId),
           fee = fee,
-          attachment = Attachment.Empty,
+          attachment = None,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()

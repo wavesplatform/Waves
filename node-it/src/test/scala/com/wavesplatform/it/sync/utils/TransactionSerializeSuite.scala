@@ -262,7 +262,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
       transfers,
       2.waves,
       ts,
-      Attachment.fromBytes(Base58.tryDecodeWithLimit("59QuUcqP6p").get),
+      Some(Attachment.Bin(Base58.tryDecodeWithLimit("59QuUcqP6p").get)),
       Proofs(Seq(ByteStr.decodeBase58("FXMNu3ecy5zBjn9b69VtpuYRwxjCbxdkZ3xZpLzB8ZeFDvcgTkmEDrD29wtGYRPtyLS3LPYrL2d5UM6TpFBMUGQ").get))
     )
     .right
@@ -336,7 +336,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     1900000,
     Waves,
     minFee,
-    Attachment.Empty,
+    None,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
   )
@@ -349,7 +349,7 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     100000000,
     Waves,
     minFee,
-    Attachment.Empty,
+    None,
     ts,
     Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
   )

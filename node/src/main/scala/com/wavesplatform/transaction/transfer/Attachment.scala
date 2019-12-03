@@ -3,55 +3,44 @@ package com.wavesplatform.transaction.transfer
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.{Base58, Base64}
 import play.api.libs.json._
 
-sealed trait Attachment {
-  def size: Int
-}
+sealed trait Attachment
 
 object Attachment {
-  final case class Num(value: Long) extends Attachment {
-    override def size: Int = 8
-  }
+  final case class Num(value: Long) extends Attachment
 
-  final case class Bool(value: Boolean) extends Attachment {
-    override def size: Int = 1
-  }
+  final case class Bool(value: Boolean) extends Attachment
 
-  final case class Bin(value: Array[Byte]) extends Attachment {
-    override def size: Int = value.length
-  }
+  final case class Bin(value: Array[Byte]) extends Attachment
 
-  final case class Str(value: String) extends Attachment {
-    override lazy val size: Int = value.getBytes(StandardCharsets.UTF_8).length
-  }
+  final case class Str(value: String) extends Attachment
 
-  final case object Empty extends Attachment {
-    override def size: Int = 0
-  }
-
-  def fromBytes(bs: Array[Byte]): Attachment =
-    if (bs.isEmpty) Empty else Bin(bs)
-
-  implicit class AttachmentExt(private val a: Attachment) extends AnyVal {
-    def toBytes: Array[Byte] = a match {
+  implicit class AttachmentExt(private val a: Option[Attachment]) extends AnyVal {
+    def toBytes: Array[Byte] = a.fold(Array.emptyByteArray) {
       case Bin(value)  => value
       case Num(value)  => Longs.toByteArray(value)
       case Bool(value) => if (value) Array(1: Byte) else Array(0: Byte)
       case Str(value)  => value.getBytes(StandardCharsets.UTF_8)
-      case Empty       => Array.emptyByteArray
     }
 
-    def toBytesExact: Array[Byte] = a match {
+    def toBytesStrict: Array[Byte] = a.fold(Array.emptyByteArray) {
       case Bin(value) => value
-      case Empty      => Array.emptyByteArray
-      case _          => throw new IllegalArgumentException(s"Not a bytes attachment: $a")
+      case other => throw new IllegalArgumentException(s"$other can not be strictly converted to bytes")
     }
+
+    def toJson(useTypedFormat: Boolean): JsValue =
+      if (useTypedFormat) Json.toJson(a)
+      else
+        a.fold(JsString("")) {
+          case Bin(value) => JsString(Base58.encode(value))
+          case other      => throw new IllegalArgumentException(s"$other is typed")
+        }
   }
 
   implicit val jsonFormat: Format[Attachment] = {
-    implicit val bytesFormat = Format[Array[Byte]](
+    implicit val bytesFormat: Format[Array[Byte]] = Format[Array[Byte]](
       Reads {
         case JsString(value) => JsSuccess(Base64.decode(value))
         case _               => JsError("Expected Base64 string")
@@ -71,8 +60,7 @@ object Attachment {
           }
           JsSuccess(result)
 
-        case JsNull =>
-          JsSuccess(Empty)
+        case JsString(v) => JsSuccess(Bin(Base58.decode(v)))
 
         case _ =>
           JsError("Expected object or null")
@@ -80,9 +68,8 @@ object Attachment {
       Writes {
         case Num(value)  => Json.obj("type" -> "integer", "value" -> value)
         case Bool(value) => Json.obj("type" -> "boolean", "value" -> value)
-        case Bin(value)  => Json.obj("type" -> "binary", "value" -> value)
-        case Str(value)  => Json.obj("type" -> "string", "value" -> value)
-        case Empty       => JsNull
+        case Bin(value)  => Json.obj("type" -> "binary", "value"  -> value)
+        case Str(value)  => Json.obj("type" -> "string", "value"  -> value)
       }
     )
   }

@@ -69,11 +69,14 @@ object TxConstraints {
   }
 
   // Transaction specific
-  def transferAttachment(allowTyped: Boolean, attachment: Attachment): ValidatedV[Attachment] = {
+  def transferAttachment(allowTyped: Boolean, attachment: Option[Attachment]): ValidatedV[Option[Attachment]] = {
+    import Attachment.AttachmentExt
     this.seq(attachment)(
-      cond(attachment.size <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray),
-      if (allowTyped) Valid(attachment)
-      else cond(attachment.isInstanceOf[Attachment.Bin] || attachment == Attachment.Empty, TxValidationError.TooBigArray)
+      cond(attachment.toBytes.length <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray),
+      cond(attachment match {
+        case Some(Attachment.Bin(_)) | None => true
+        case _                              => allowTyped
+      }, TxValidationError.TooBigArray)
     )
   }
 }

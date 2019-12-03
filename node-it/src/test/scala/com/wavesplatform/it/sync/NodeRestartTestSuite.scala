@@ -8,7 +8,7 @@ import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 with CancelAfterFailure with ReportingTestName with NodesFromDocker {
@@ -42,7 +42,7 @@ class NodeRestartTestSuite extends FreeSpec with Matchers with WaitForHeight2 wi
         1.waves,
         Waves,
         minFee,
-        Attachment.Empty,
+        None,
         System.currentTimeMillis()
       )
       .explicitGet()

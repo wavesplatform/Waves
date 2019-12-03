@@ -24,7 +24,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           125L,
-          Attachment.Empty,
+          None,
           1
         )
         .right
@@ -38,7 +38,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          Attachment.Empty,
+          None,
           2
         )
         .right
@@ -52,7 +52,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          Attachment.Empty,
+          None,
           1
         )
         .right
@@ -66,7 +66,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          Attachment.Empty,
+          None,
           2
         )
         .right
@@ -80,7 +80,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          Attachment.Empty,
+          None,
           1
         )
         .right
@@ -103,7 +103,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           124L,
-          Attachment.Empty,
+          None,
           1
         )
         .right
@@ -117,7 +117,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           123L,
-          Attachment.Empty,
+          None,
           1
         )
         .right
@@ -131,7 +131,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           123L,
-          Attachment.Empty,
+          None,
           2
         )
         .right
@@ -145,7 +145,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          Attachment.Empty,
+          None,
           1
         )
         .right
@@ -159,7 +159,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Asset.fromCompatId(Some(ByteStr.empty)),
           124L,
-          Attachment.Empty,
+          None,
           2
         )
         .right
@@ -182,7 +182,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          Attachment.Empty,
+          None,
           124L
         )
         .right
@@ -196,7 +196,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          Attachment.Empty,
+          None,
           123L
         )
         .right
@@ -217,7 +217,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          Attachment.Empty,
+          None,
           123L
         )
         .right
@@ -231,7 +231,7 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
           100000,
           Waves,
           1,
-          Attachment.Empty,
+          None,
           124L
         )
         .right

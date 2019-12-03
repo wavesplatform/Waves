@@ -21,7 +21,7 @@ object MassTransferTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"       -> assetId.maybeBase58Repr,
-      "attachment"    -> (if (isProtobufVersion) Json.toJson(attachment) else Base58.encode(attachment.toBytesExact)),
+      "attachment"    -> attachment.toJson(isProtobufVersion),
       "transferCount" -> transfers.size,
       "totalAmount"   -> transfers.map(_.amount).sum,
       "transfers"     -> transfersJson(transfers)
@@ -42,7 +42,7 @@ object MassTransferTxSerializer {
           Bytes.concat(transferBytes: _*),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(fee),
-          Deser.serializeArrayWithLength(attachment.toBytesExact)
+          Deser.serializeArrayWithLength(attachment.toBytesStrict)
         )
 
       case _ =>
@@ -78,6 +78,6 @@ object MassTransferTxSerializer {
     val fee        = buf.getLong
     val attachment = Deser.parseArrayWithLength(buf)
     val proofs     = buf.getProofs
-    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, Attachment.fromBytes(attachment), proofs)
+    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, Some(Attachment.Bin(attachment)), proofs)
   }
 }

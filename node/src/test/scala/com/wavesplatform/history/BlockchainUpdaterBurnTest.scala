@@ -8,7 +8,7 @@ import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -28,7 +28,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, Attachment.Empty, ts + 1)
+      .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, None, ts + 1)
       .explicitGet()
     issue: IssueTransaction = IssueTransaction
       .selfSigned(TxVersion.V1, alice, new String(assetName), new String(description), quantity, decimals, false, script = None, Waves, ts + 100)

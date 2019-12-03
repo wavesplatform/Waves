@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
+import play.api.libs.json.Json
 
 object TransactionDiffer {
 
@@ -20,7 +21,7 @@ object TransactionDiffer {
   import stats.TxTimerExt
 
   case class TransactionValidationError(cause: ValidationError, tx: Transaction) extends ValidationError {
-    override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${tx.toPrettyString})"
+    override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${Json.prettyPrint(tx.json())})"
   }
 
   def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(

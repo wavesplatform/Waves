@@ -49,7 +49,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         feeAsset.fee + sponsorTx.fee + transferAssetWavesFee + wavesFee,
         Waves,
         transferAssetWavesFee,
-        Attachment.Empty,
+        None,
         ts + 1
       )
       .right
@@ -63,7 +63,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         feeAsset.quantity / 2,
         Waves,
         transferAssetWavesFee,
-        Attachment.Empty,
+        None,
         ts + 2
       )
       .right
@@ -77,7 +77,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
-        Attachment.Empty,
+        None,
         ts + 3
       )
       .right
@@ -91,7 +91,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         amtTx,
         Asset.fromCompatId(Some(feeAsset.id())),
         sponsorTx.minSponsoredAssetFee.get,
-        Attachment.Empty,
+        None,
         ts + 4
       )
       .right

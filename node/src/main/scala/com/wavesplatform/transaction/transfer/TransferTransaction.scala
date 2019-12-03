@@ -23,7 +23,7 @@ case class TransferTransaction(
     amount: TxAmount,
     feeAssetId: Asset,
     fee: TxAmount,
-    attachment: Attachment,
+    attachment: Option[Attachment],
     timestamp: TxTimestamp,
     proofs: Proofs
 ) extends VersionedTransaction
@@ -45,9 +45,6 @@ case class TransferTransaction(
   }
 
   override def builder: TransactionParser = TransferTransaction
-
-  private[wavesplatform] lazy val attachmentBytes = attachment.toBytes
-  private[wavesplatform] lazy val attachmentBytesOpt = Some(attachment.toBytes).filter(_.nonEmpty)
 }
 
 object TransferTransaction extends TransactionParser {
@@ -77,7 +74,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: Attachment,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
@@ -91,7 +88,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: Attachment,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
@@ -105,7 +102,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: Attachment,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
     signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)

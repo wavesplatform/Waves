@@ -15,7 +15,7 @@ object SignedMassTransferRequest {
       (JsPath \ "transfers").read[List[Transfer]] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "attachment").readNullable[String] and
+      (JsPath \ "attachment").readNullable[Attachment] and
       (JsPath \ "proofs").read[Proofs]
   )(SignedMassTransferRequest.apply _)
 }
@@ -26,15 +26,14 @@ case class SignedMassTransferRequest(
     transfers: List[Transfer],
     fee: Long,
     timestamp: Long,
-    attachment: Option[String],
+    attachment: Option[Attachment],
     proofs: Proofs
 ) {
   def toTx: Either[ValidationError, MassTransferTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
       _assetId    <- parseBase58ToAsset(assetId.filter(_.length > 0), "invalid.assetId")
-      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
       _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
-      t           <- MassTransferTransaction.create(1.toByte, _sender, _assetId, _transfers, fee, timestamp, Attachment.fromBytes(_attachment), proofs)
+      t           <- MassTransferTransaction.create(1.toByte, _sender, _assetId, _transfers, fee, timestamp, attachment, proofs)
     } yield t
 }

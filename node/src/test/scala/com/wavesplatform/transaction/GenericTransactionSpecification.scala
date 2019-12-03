@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.{TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest._
@@ -25,10 +24,6 @@ abstract class GenericTransactionSpecification[T <: com.wavesplatform.transactio
     forAll(generator) { t =>
       val tx        = t._2
       val recovered = transactionParser.parseBytes(tx.bytes()).get
-      if (preserBytesJson.isEmpty) {
-        println(Base64.encode(tx.bytes()))
-        println(tx.toPrettyString)
-      }
       assertTxs(recovered, tx)
     }
   }

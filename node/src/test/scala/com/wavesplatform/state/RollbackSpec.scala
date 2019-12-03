@@ -35,7 +35,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
   )
 
   private def transfer(sender: KeyPair, recipient: Address, amount: Long) =
-    TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1, Attachment.Empty, nextTs).explicitGet()
+    TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1, None, nextTs).explicitGet()
 
   private def randomOp(sender: KeyPair, recipient: Address, amount: Long, op: Int, nextTs: => Long = nextTs) = {
     import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -53,11 +53,11 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)),
               10000,
               nextTs,
-              Attachment.Empty
+              None
             )
             .explicitGet()
         )
-      case _ => List(TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1000, Attachment.Empty, nextTs).right.get)
+      case _ => List(TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1000, None, nextTs).right.get)
     }
   }
 
@@ -229,7 +229,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
               d.lastBlockId,
               Seq(
                 TransferTransaction
-                  .selfSigned(1.toByte, sender, recipient, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, Attachment.Empty, nextTs)
+                  .selfSigned(1.toByte, sender, recipient, IssuedAsset(issueTransaction.id()), assetAmount, Waves, 1, None, nextTs)
                   .explicitGet()
               )
             )

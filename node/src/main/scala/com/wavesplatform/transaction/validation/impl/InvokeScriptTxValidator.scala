@@ -4,6 +4,7 @@ import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
@@ -13,6 +14,8 @@ import scala.util.Try
 
 object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
   override def validate(tx: InvokeScriptTransaction): ValidatedV[InvokeScriptTransaction] = {
+    import tx._
+
     def checkAmounts(payments: Seq[Payment]): ValidatedNV = {
       val invalid = payments.filter(_.amount <= 0)
       if (invalid.nonEmpty)
@@ -20,7 +23,14 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       else Valid(())
     }
 
-    import tx._
+    lazy val validLength =
+      if (tx.isProtobufVersion)
+        PBTransactions
+          .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
+          .toByteArray
+          .length <= ContractLimits.MaxInvokeScriptSizeInBytes
+      else Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false)
+
     V.seq(tx)(
       V.cond(
         funcCallOpt.isEmpty || funcCallOpt.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
@@ -40,7 +50,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
-      V.cond(Try(tx.bytesSize <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false), TooBigArray)
+      V.cond(validLength, TooBigArray)
     )
   }
 }

@@ -50,7 +50,7 @@ case class SignedTransferV1Request(
         amount,
         _feeAssetId,
         fee,
-        Attachment.fromBytes(_attachment.arr),
+        Some(Attachment.Bin(_attachment.arr)),
         timestamp,
         Proofs(_signature)
       )

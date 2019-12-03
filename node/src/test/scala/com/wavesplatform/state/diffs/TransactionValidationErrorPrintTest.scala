@@ -10,7 +10,7 @@ import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import org.scalatest.{Inside, PropSpec}
 
@@ -82,7 +82,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = Attachment.Empty,
+        attachment = None,
         timestamp = 0
       )
       .explicitGet()

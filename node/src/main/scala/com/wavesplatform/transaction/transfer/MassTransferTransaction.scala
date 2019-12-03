@@ -25,7 +25,7 @@ case class MassTransferTransaction(
     transfers: Seq[ParsedTransfer],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    attachment: Attachment,
+    attachment: Option[Attachment],
     proofs: Proofs
 ) extends ProvenTransaction
     with VersionedTransaction
@@ -87,7 +87,7 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Attachment,
+      attachment: Option[Attachment],
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
     MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs).validatedEither
@@ -99,7 +99,7 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Attachment,
+      attachment: Option[Attachment],
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
     create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
@@ -111,7 +111,7 @@ object MassTransferTransaction extends TransactionParser {
       transfers: Seq[ParsedTransfer],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      attachment: Attachment
+      attachment: Option[Attachment]
   ): Either[ValidationError, TransactionT] =
     signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
 

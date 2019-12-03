@@ -15,7 +15,7 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -76,9 +76,9 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       (ts, reference, account) => {
         val recipient1 = createAccount.toAddress
         val recipient2 = createAccount.toAddress
-        val tx1 = TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, Attachment.Empty, ts)
+        val tx1 = TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
           .explicitGet()
-        val tx2 = TransferTransaction.selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, Attachment.Empty, ts)
+        val tx2 = TransferTransaction.selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, None, ts)
           .explicitGet()
         TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
       }
@@ -87,7 +87,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     val txs: Seq[TransactionProducer] = Seq(
       (ts, account) => {
         val recipient1 = createAccount.toAddress
-        TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, Attachment.Empty, ts)
+        TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
           .explicitGet()
       }
     )

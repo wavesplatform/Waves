@@ -34,7 +34,7 @@ import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
@@ -916,7 +916,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (acc, amount, genesis, setScript, ci, asset, master, ts) =>
         val t =
           TransferTransaction
-            .selfSigned(2.toByte, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, Attachment.Empty, ts)
+            .selfSigned(2.toByte, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, None, ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi should produce("NegativeAmount")
@@ -1037,7 +1037,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
               sponsoredAsset.quantity / 10,
               Waves,
               enoughFee,
-              Attachment.Empty,
+              None,
               ts
             )
             .explicitGet()

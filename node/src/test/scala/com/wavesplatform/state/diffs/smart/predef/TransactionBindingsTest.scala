@@ -83,7 +83,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.toString).getOrElse("")}'
            |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
            |      }
-           |    let attachment = t.attachment == base58'${ByteStr(t.attachmentBytes).toString}'
+           |    let attachment = t.attachment == base58'${ByteStr(t.attachment.toBytes).toString}'
            |   ${assertProvenPart("t")} && amount && feeAssetId && assetId && recipient && attachment
            | case other => throw()
            | }

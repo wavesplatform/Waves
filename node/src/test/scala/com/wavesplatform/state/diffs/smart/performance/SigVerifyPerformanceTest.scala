@@ -4,6 +4,8 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.parser.Parser
@@ -12,9 +14,7 @@ import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.lang.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -28,13 +28,13 @@ class SigVerifyPerformanceTest extends PropSpec with PropertyChecks with Matcher
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.selfSigned(1.toByte, from, to.toAddress, Waves, amt, Waves, fee, Attachment.Empty, ts).explicitGet()
+    } yield TransferTransaction.selfSigned(1.toByte, from, to.toAddress, Waves, amt, Waves, fee, None, ts).explicitGet()
 
   private def scriptedSendGen(from: KeyPair, to: PublicKey, ts: Long): Gen[TransferTransaction] =
     for {
       amt <- smallFeeGen
       fee <- smallFeeGen
-    } yield TransferTransaction.selfSigned(2.toByte, from, to.toAddress, Waves, amt, Waves, fee, Attachment.Empty, ts).explicitGet()
+    } yield TransferTransaction.selfSigned(2.toByte, from, to.toAddress, Waves, amt, Waves, fee, None, ts).explicitGet()
 
   private def differentTransfers(typed: EXPR) =
     for {
