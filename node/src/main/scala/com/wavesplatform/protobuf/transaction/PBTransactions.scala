@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.v1.traits.DataType.ByteArray
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
@@ -116,7 +117,7 @@ object PBTransactions {
           amount.longAmount,
           feeAssetId,
           feeAmount,
-          attachment.toByteArray,
+          Array.emptyByteArray,
           timestamp,
           proofs
         )
@@ -131,8 +132,8 @@ object PBTransactions {
         vt.assets.IssueTransaction.create(
           version.toByte,
           sender,
-          name.toByteArray,
-          description.toByteArray,
+          name.getBytes(),
+          description.getBytes(),
           quantity,
           decimals.toByte,
           reissuable,
@@ -203,7 +204,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          mt.attachment.toByteArray,
+          Array.emptyByteArray,
           proofs
         )
 
@@ -293,7 +294,7 @@ object PBTransactions {
           amount.longAmount,
           feeAssetId,
           feeAmount,
-          attachment.toByteArray,
+          Array.emptyByteArray,
           timestamp,
           proofs
         )
@@ -312,8 +313,8 @@ object PBTransactions {
         vt.assets.IssueTransaction(
           version.toByte,
           sender,
-          name.toByteArray,
-          description.toByteArray,
+          name.getBytes(),
+          description.getBytes(),
           quantity,
           decimals.toByte,
           reissuable,
@@ -381,7 +382,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          mt.attachment.toByteArray,
+          Array.emptyByteArray,
           proofs
         )
 
@@ -417,7 +418,7 @@ object PBTransactions {
 
     tx match {
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>
-        val data = GenesisTransactionData(PBRecipients.create(recipient).getAddress, amount)
+        val data = GenesisTransactionData(PBRecipients.create(recipient).toByteString, amount)
         PBTransactions.create(
           sender = PublicKey(Array.emptyByteArray),
           chainId = 0: Byte,
@@ -428,12 +429,12 @@ object PBTransactions {
         )
 
       case vt.PaymentTransaction(sender, recipient, amount, fee, timestamp, signature) =>
-        val data = PaymentTransactionData(PBRecipients.create(recipient).getAddress, amount)
+        val data = PaymentTransactionData(PBRecipients.create(recipient).toByteString, amount)
         PBTransactions.create(sender, chainId, fee, Waves, timestamp, 1, Seq(signature), Data.Payment(data))
 
       case tx: vt.transfer.TransferTransaction =>
         import tx._
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), ByteString.copyFrom(attachment))
+        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), None)
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
@@ -454,7 +455,8 @@ object PBTransactions {
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
-        val data = IssueTransactionData(ByteStr(name), ByteStr(description), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
+        val data =
+          IssueTransactionData(new String(name), new String(description), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
@@ -489,7 +491,7 @@ object PBTransactions {
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
-          attachment: ByteStr
+          None
         )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
 

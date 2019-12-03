@@ -2,7 +2,6 @@ package com.wavesplatform.it.api
 
 import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 
@@ -384,11 +383,13 @@ object AsyncHttpApi extends Assertions {
     ): Future[(Transaction, JsValue)] = {
       signAndTraceBroadcast(
         Json.obj(
-          "type"       -> InvokeScriptTransaction.typeId,
-          "version"    -> version,
-          "sender"     -> caller,
-          "dApp"       -> dappAddress,
-          "call"       -> { if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull },
+          "type"    -> InvokeScriptTransaction.typeId,
+          "version" -> version,
+          "sender"  -> caller,
+          "dApp"    -> dappAddress,
+          "call" -> {
+            if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull
+          },
           "payment"    -> payment,
           "fee"        -> fee,
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
@@ -831,12 +832,12 @@ object AsyncHttpApi extends Assertions {
         version,
         PBTransaction.Data.Issue(
           IssueTransactionData.of(
-            ByteString.copyFrom(name.getBytes(StandardCharsets.UTF_8)),
-            description,
+            name,
+            new String(description.toByteArray),
             quantity,
             decimals,
             reissuable,
-            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes)))
+            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes), version))
             else None
           )
         )
@@ -866,7 +867,7 @@ object AsyncHttpApi extends Assertions {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            attachment
+            None
           )
         )
       )

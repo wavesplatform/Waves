@@ -77,12 +77,9 @@ object TransactionParsers {
       }
     }
 
-    def oldOrProtoParseBytes: Try[Transaction] =
-      oldParseBytes.orElse(PBTransactionSerializer.parseBytes(bytes))
-
     for {
       _  <- Either.cond(bytes.length > 4, (), BufferUnderflow).toTry
-      tx <- if (bytes(0) == 0) modernParseBytes else oldOrProtoParseBytes
+      tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes
     } yield tx
   }
 }

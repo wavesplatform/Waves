@@ -26,7 +26,7 @@ object AssetTransactionsDiff {
           Diff(
             tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
-            issuedAssets = Map(asset             -> (staticInfo, info, volumeInfo)),
+            issuedAssets = Map(asset             -> ((staticInfo, info, volumeInfo))),
             assetScripts = Map(asset             -> script),
             scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
           )
