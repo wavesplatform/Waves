@@ -100,12 +100,14 @@ object AssetTransactionsDiff {
         case Asset.Waves         => Portfolio(balance = -tx.feeAmount, LeaseBalance.empty, Map.empty)
       }
 
+      val minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval
+
       for {
         lastUpdateHeight <- blockchain
           .assetDescription(tx.assetId)
           .map(_.lastUpdatedAt)
           .toRight(GenericError("Asset doesn't exist"))
-        updateAllowedAt = lastUpdateHeight + UpdateAssetInfoTransaction.MIN_UPDATE_INFO_INTERVAL
+        updateAllowedAt = lastUpdateHeight + minUpdateInfoInterval
         _ <- Either.cond(
           updateAllowedAt < blockchain.height,
           (),

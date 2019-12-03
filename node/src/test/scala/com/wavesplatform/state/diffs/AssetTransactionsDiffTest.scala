@@ -319,7 +319,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   val assetInfoUpdateEnabled: FunctionalitySettings = TestFunctionalitySettings.Enabled
     .copy(
-      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
+      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0),
+      minAssetInfoUpdateInterval = 100
     )
 
   property("Can't update before activation") {
@@ -331,11 +332,34 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
-  property("Can't update right after issue") {
+  property(s"Can't update right before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval} blocks") {
+    forAll(genesisIssueUpdate, Gen.chooseNum(0, assetInfoUpdateEnabled.minAssetInfoUpdateInterval - 1)) {
+      case ((gen, issue, update), blocksCount) =>
+        val blocks = Seq.fill(blocksCount)(TestBlock.create(Seq.empty))
+
+        assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
+          ei should produce(s"Can't update asset info before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block")
+        }
+    }
+  }
+
+  property(s"Can update after ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval} blocks") {
     forAll(genesisIssueUpdate) {
       case (gen, issue, update) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, update)), assetInfoUpdateEnabled) { ei =>
-          ei should produce("Can't update asset info before 100002 block")
+        val blocks =
+          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(TestBlock.create(Seq.empty))
+
+        assertDiffEi(blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
+          ei shouldBe 'right
+
+          val info = ei
+            .explicitGet()
+            .updatedAssets(update.assetId)
+            .left
+            .get
+
+          info.name shouldEqual update.name
+          info.description shouldEqual update.description
         }
     }
   }

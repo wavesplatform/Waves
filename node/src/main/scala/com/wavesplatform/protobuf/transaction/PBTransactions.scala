@@ -5,7 +5,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.lang.v1.traits.DataType.ByteArray
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Transaction.Data
 import com.wavesplatform.protobuf.transaction.{Script => PBScript}
@@ -526,6 +525,7 @@ object PBTransactions {
           .withDescription(description)
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
+
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
     }

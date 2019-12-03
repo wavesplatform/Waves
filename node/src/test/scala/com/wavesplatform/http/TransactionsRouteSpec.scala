@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
@@ -191,7 +190,7 @@ class TransactionsRouteSpec
                   decimals = 8,
                   reissuable = false,
                   totalVolume = Long.MaxValue,
-                lastUpdatedAt = Height @@ 0,
+                  lastUpdatedAt = Height @@ 0,
                   script = None,
                   sponsorship = 5
                 )
@@ -230,7 +229,7 @@ class TransactionsRouteSpec
                   decimals = 8,
                   reissuable = false,
                   totalVolume = Long.MaxValue,
-                lastUpdatedAt = Height @@ 0,
+                  lastUpdatedAt = Height @@ 0,
                   script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
                   sponsorship = 5
                 )
