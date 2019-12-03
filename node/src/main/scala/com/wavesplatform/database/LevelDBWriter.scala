@@ -581,12 +581,10 @@ class LevelDBWriter(
                 // balances already restored
 
                 case tx: IssueTransaction =>
+                  rw.delete(Keys.assetStaticInfo(IssuedAsset(tx.id())))
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, IssuedAsset(tx.id()), currentHeight)
-
                 case tx: UpdateAssetInfoTransaction =>
-                  assetDetailsToInvalidate += tx.assetId
-                  rw.filterHistory(Keys.assetDetailsHistory(tx.assetId), currentHeight)
-
+                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
                 case tx: ReissueTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: BurnTransaction =>
