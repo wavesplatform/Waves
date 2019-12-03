@@ -383,7 +383,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(10, useForScript = true)) { t =>
+    forAll(dataTransactionGen(10, useForScript = true, withDeleteEntry = true)) { t =>
       def declareKey(i: Int): String =
         s"let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)} "
 
