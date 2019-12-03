@@ -1,24 +1,12 @@
 package com.wavesplatform.transaction.lease
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.LeaseCancelTxSerializer
 import com.wavesplatform.transaction.validation.impl.LeaseCancelTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  LegacyPBSwitch,
-  Proofs,
-  SigProofsSwitch,
-  TransactionParser,
-  TxAmount,
-  TxTimestamp,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
+import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, SigProofsSwitch, TransactionParser, TxAmount, TxTimestamp, TxType, TxVersion, TxWithFee, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -41,7 +29,6 @@ final case class LeaseCancelTransaction(
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTransaction.serializer.toJson(this))
-  override def chainByte: Option[TxType]           = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
 object LeaseCancelTransaction extends TransactionParser {

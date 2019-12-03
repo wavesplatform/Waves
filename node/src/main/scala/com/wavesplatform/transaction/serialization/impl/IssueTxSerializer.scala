@@ -44,7 +44,7 @@ object IssueTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           baseBytes,
           Deser.serializeOptionOfArrayWithLength(script)(_.bytes())
         )

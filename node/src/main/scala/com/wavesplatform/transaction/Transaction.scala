@@ -14,7 +14,7 @@ trait Transaction {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
-  def chainByte: Option[Byte] = Some(AddressScheme.current.chainId)
+  def chainByte: Byte = AddressScheme.current.chainId
 
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]

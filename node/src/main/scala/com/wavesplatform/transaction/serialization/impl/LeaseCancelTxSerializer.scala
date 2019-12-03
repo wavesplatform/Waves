@@ -22,7 +22,7 @@ object LeaseCancelTxSerializer {
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte.getOrElse(AddressScheme.current.chainId)), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }

@@ -23,9 +23,9 @@ private[impl] object BaseTxJson {
     }) ++ (tx match {
       case v: VersionedTransaction => Json.obj("version" -> v.version)
       case _                       => Json.obj()
-    }) ++ ((tx, tx.chainByte) match {
-      case (pbs: LegacyPBSwitch, Some(cb)) if pbs.isProtobufVersion => Json.obj("chainId" -> cb)
-      case _                                                        => Json.obj()
+    }) ++ (tx match {
+      case pbs: LegacyPBSwitch if pbs.isProtobufVersion => Json.obj("chainId" -> tx.chainByte)
+      case _                                            => Json.obj()
     })
   }
 }
