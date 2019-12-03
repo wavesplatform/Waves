@@ -851,8 +851,17 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       value <- Gen.listOfN(size, aliasAlphabetGen)
     } yield StringDataEntry(key, value.mkString)
 
+  def emptyEntryGen(keyGen: Gen[String] = dataKeyGen): Gen[EmptyDataEntry] =
+    for (key <- keyGen) yield EmptyDataEntry(key)
+
   def dataEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen): Gen[DataEntry[_]] =
-    Gen.oneOf(longEntryGen(keyGen), booleanEntryGen(keyGen), binaryEntryGen(maxSize, keyGen), stringEntryGen(maxSize, keyGen))
+    Gen.oneOf(
+      longEntryGen(keyGen),
+      booleanEntryGen(keyGen),
+      binaryEntryGen(maxSize, keyGen),
+      stringEntryGen(maxSize, keyGen),
+      emptyEntryGen(keyGen)
+    )
 
   val dataTransactionGen: Gen[DataTransaction] = dataTransactionGen(DataTransaction.MaxEntryCount)
 
