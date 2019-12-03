@@ -4,10 +4,10 @@ import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.repl.global
-import com.wavesplatform.lang.v1.repl.node.http.response.model.{AssetInfoResponse, BlockInfoResponse, ByteString, TransferTransaction, TransferTransactionV1, TransferTransactionV2}
+import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ByteStrValue, ScriptAssetInfo}
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -17,7 +17,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.assetId.map(_.byteStr),
       tx.amount,
       Address(tx.recipient.byteStr),
-      tx.attachment.byteStr
+      ByteStrValue(tx.attachment.byteStr)
     )
 
   private def proven(tx: TransferTransaction): Proven =

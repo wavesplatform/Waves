@@ -38,7 +38,7 @@ object Tx {
 
   case class Genesis(header: Header, amount: Long, recipient: Recipient) extends Tx
   case class Payment(p: Proven, amount: Long, recipient: Recipient)      extends Tx
-  case class Transfer(p: Proven, feeAssetId: Option[ByteStr], assetId: Option[ByteStr], amount: Long, recipient: Recipient, attachment: ByteStr)
+  case class Transfer(p: Proven, feeAssetId: Option[ByteStr], assetId: Option[ByteStr], amount: Long, recipient: Recipient, attachment: TransferAttachment)
       extends Tx
   case class Issue(p: Proven, quantity: Long, name: ByteStr, description: ByteStr, reissuable: Boolean, decimals: Long, script: Option[ByteStr])
       extends Tx
@@ -64,7 +64,7 @@ object Tx {
                           transferCount: Long,
                           totalAmount: Long,
                           transfers: IndexedSeq[TransferItem],
-                          attachment: ByteStr)
+                          attachment: TransferAttachment)
       extends Tx
   case class Sponsorship(p: Proven, assetId: ByteStr, minSponsoredAssetFee: Option[Long])                                             extends Tx
   case class Exchange(p: Proven, amount: Long, price: Long, buyMatcherFee: Long, sellMatcherFee: Long, buyOrder: Ord, sellOrder: Ord) extends Tx

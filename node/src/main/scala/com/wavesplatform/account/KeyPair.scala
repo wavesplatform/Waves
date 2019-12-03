@@ -27,7 +27,7 @@ object KeyPair {
   implicit def toAddress(keyPair: KeyPair): Address  = keyPair.toAddress
 
   implicit val jsonFormat: Format[KeyPair] = Format(
-    utils.byteStrWrites.map(KeyPair(_)),
+    utils.byteStrFormat.map(KeyPair(_)),
     Writes(v => Json.obj("seed" -> Base58.encode(v.seed), "publicKey" -> v.publicKey, "privateKey" -> v.privateKey))
   )
 }
