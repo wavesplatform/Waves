@@ -17,6 +17,7 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
+import com.wavesplatform.common.utils.EitherExt2
 
 object PBTransactions {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -98,7 +99,7 @@ object PBTransactions {
       case Data.Payment(PaymentTransactionData(recipient, amount)) =>
         for {
           addr <- PBRecipients.toAddress(recipient)
-          tx   <- vt.PaymentTransaction.create(sender, Address.fromBytes(recipient.toByteArray).right.get, amount, feeAmount, timestamp, signature)
+          tx   <- vt.PaymentTransaction.create(sender, Address.fromBytes(recipient.toByteArray).explicitGet(), amount, feeAmount, timestamp, signature)
         } yield tx
 
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
@@ -132,7 +133,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
           feeAmount,
           timestamp,
           proofs
@@ -149,7 +150,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId),
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
           feeAmount,
           timestamp,
           proofs
@@ -159,7 +160,7 @@ object PBTransactions {
         vt.smart.SetScriptTransaction.create(
           version.toByte,
           sender,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
           feeAmount,
           timestamp,
           proofs
@@ -299,7 +300,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
           feeAmount,
           timestamp,
           proofs
@@ -316,7 +317,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId),
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
           feeAmount,
           timestamp,
           proofs
@@ -326,7 +327,7 @@ object PBTransactions {
         vt.smart.SetScriptTransaction(
           version.toByte,
           sender,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).right.get),
+          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
           feeAmount,
           timestamp,
           proofs
@@ -438,7 +439,6 @@ object PBTransactions {
         import tx._
         val data = IssueTransactionData(ByteStr(name), ByteStr(description), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
-
       case tx: vt.assets.ReissueTransaction =>
         import tx._
         val data = ReissueTransactionData(Some(Amount(asset.id, quantity)), reissuable)

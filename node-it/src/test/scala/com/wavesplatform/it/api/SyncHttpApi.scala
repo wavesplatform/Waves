@@ -10,7 +10,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest}
+import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, DataRequest, ScriptData}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -22,7 +22,8 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -91,11 +92,11 @@ object SyncHttpApi extends Assertions {
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
-  def assertGrpcError[R](f: => R, errorMessage: String, expectedCode: Code): Assertion = Try(f) match {
+  def assertGrpcError[R](f: => R, errorRegex: String, expectedCode: Code): Assertion = Try(f) match {
     case Failure(GrpcStatusRuntimeException(status, _)) =>
       Assertions.assert(
         status.getCode == expectedCode
-          && status.getDescription.contains(errorMessage)
+          && status.getDescription.matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '${status.getDescription}'"
       )
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
@@ -665,7 +666,7 @@ object SyncHttpApi extends Assertions {
         source: KeyPair,
         name: String,
         quantity: Long,
-        decimals: Byte,
+        decimals: Int,
         reissuable: Boolean,
         fee: Long,
         description: ByteString = ByteString.EMPTY,
@@ -686,10 +687,48 @@ object SyncHttpApi extends Assertions {
         fee: Long,
         version: Int = 2,
         assetId: String = "WAVES",
-        attachment: ByteString = ByteString.EMPTY,
+        feeAssetId: String = "WAVES",
+                          attachment: ByteString = ByteString.EMPTY,
+                          timestamp: Long = System.currentTimeMillis(),
         waitForTx: Boolean = false
     ): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, feeAssetId, attachment, timestamp)), waitForTx)
+    }
+
+    def broadcastReissue(source: KeyPair,
+                         fee: Long,
+                         assetId: String,
+                         amount: Long,
+                         reissuable: Boolean = false,
+                         version: Int = 2,
+                         waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastReissue(source, fee, assetId, amount, reissuable, version)), waitForTx)
+    }
+
+    def broadcastCreateAlias(source: KeyPair,
+                             alias: String,
+                             fee: Long,
+                             version: Int = 2,
+                             waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastCreateAlias(source, alias, fee, version)), waitForTx)
+    }
+
+    def broadcastLease(source: KeyPair,
+                       recipient: Recipient,
+                       amount: Long,
+                       fee: Long,
+                       version: Int = 2,
+                       waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastLease(source, recipient, amount, fee, version)), waitForTx)
+    }
+
+    def putData(source: KeyPair,
+                data: Seq[DataTransactionData.DataEntry],
+                fee: Long,
+                version: Int = 1,
+                timestamp: Long = System.currentTimeMillis(),
+                waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.putData(source, data, fee, version, timestamp)), waitForTx)
     }
 
     def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
@@ -717,6 +756,38 @@ object SyncHttpApi extends Assertions {
     def height: Int = sync(async(n).grpc.height)
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
-  }
 
+    def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
+    }
+
+    def getData(address: ByteString): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest(address)).toList.map(res => res.getEntry)
+    }
+
+    def setScript(sender: KeyPair,
+                  script: Option[String],
+                  fee: Long,
+                  timestamp: Long = System.currentTimeMillis(),
+                  version: Int = 1,
+                  waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.setScript(sender, script, fee, timestamp, version)), waitForTx)
+    }
+
+    def scriptInfo(address: ByteString): ScriptData = {
+      accounts.getScript(AccountRequest.of(address))
+    }
+
+    def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcast(tx,proofs)), waitForTx)
+    }
+
+    def broadcastSponsorFee(sender: KeyPair,
+                            minFee: Option[Amount],
+                            fee: Long,
+                            version: Int = 1,
+                            waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastSponsorFee(sender, minFee, fee, version)), waitForTx)
+    }
+  }
 }

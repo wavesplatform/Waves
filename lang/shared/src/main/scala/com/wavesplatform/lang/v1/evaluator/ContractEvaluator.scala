@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
+
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -12,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
 
 object ContractEvaluator {

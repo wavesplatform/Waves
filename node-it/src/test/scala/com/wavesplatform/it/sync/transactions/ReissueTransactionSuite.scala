@@ -20,9 +20,9 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = issueFee).id
+    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueFee).id
     nodes.waitForHeightAriseAndTxPresent(reissueTxId)
-    miner.assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
+    miner.assertBalances(firstAddress, balance - issueFee - reissueFee, effectiveBalance - issueFee - reissueFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)
   }
 
@@ -35,7 +35,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
     assertBadRequestAndMessage(
-      sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = issueFee),
+      sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueFee),
       "Asset is not reissuable"
     )
     nodes.waitForHeightArise()
