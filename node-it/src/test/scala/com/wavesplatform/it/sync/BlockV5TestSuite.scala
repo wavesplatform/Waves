@@ -67,6 +67,8 @@ class BlockV5TestSuite
       blockAfterActivationHeight shouldBe blockBySignatureAfterActivation
       blockAfterActivationHeight shouldBe lastBlockAfterActivationHeight
       blockHeadersAfterActivationHeight shouldBe lastBlockHeadersAfterActivationHeight
+      blockAfterActivationHeight.transactionsRoot shouldBe 'defined
+      blockAfterActivationHeight.transactionsRoot shouldBe blockHeadersAfterActivationHeight.transactionsRoot
       blockAfterActivationHeight.signature shouldBe blockHeadersAfterActivationHeight.signature
       blockAfterActivationHeight.baseTarget shouldBe blockHeadersAfterActivationHeight.baseTarget
       blockAfterActivationHeight.generationSignature shouldBe blockHeadersAfterActivationHeight.generationSignature
