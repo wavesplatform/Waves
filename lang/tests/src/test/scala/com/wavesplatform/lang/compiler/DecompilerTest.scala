@@ -758,7 +758,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         | @Callable(i)
         | func foo() =
         |   [
-        |     IntEntry("key", 1),
+        |     IntegerEntry("key", 1),
         |     BooleanEntry("key", true),
         |     StringEntry("key", "str"),
         |     BinaryEntry("key", base58''),
@@ -783,7 +783,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     res shouldEq """
 
 @Callable(i)
-func foo () = [IntEntry("key", 1), BooleanEntry("key", true), StringEntry("key", "str"), BinaryEntry("key", base58''), DeleteEntry("key"), ScriptTransfer(i.caller, 1, base58''), Issue(unit, 4, "description", true, "name", 1000), Reissue(base58'', false, 1), Burn(base58'', 1)]
+func foo () = [IntegerEntry("key", 1), BooleanEntry("key", true), StringEntry("key", "str"), BinaryEntry("key", base58''), DeleteEntry("key"), ScriptTransfer(i.caller, 1, base58''), Issue(unit, 4, "description", true, "name", 1000), Reissue(base58'', false, 1), Burn(base58'', 1)]
 
 """
   }
