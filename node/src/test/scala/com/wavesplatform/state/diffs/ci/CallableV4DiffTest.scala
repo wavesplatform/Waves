@@ -155,7 +155,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  property("delete entry sketchy check") {
+  property("diff contains delete entries") {
     val deleteEntryDApp = dApp(
       """
         | [

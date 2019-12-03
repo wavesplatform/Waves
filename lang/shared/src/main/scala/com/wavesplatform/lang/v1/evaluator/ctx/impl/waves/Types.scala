@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1.evaluator.ctx.impl.waves
 
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, V4}
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, _}
+import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.traits.domain.AttachedPayments._
 
 object Types {
