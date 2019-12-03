@@ -1062,5 +1062,34 @@ object AsyncHttpApi extends Assertions {
       val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
       transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
     }
+
+    def setAssetScript(sender: KeyPair,
+                       assetId: String,
+                       script: Option[String],
+                       fee: Long,
+                       timestamp: Long = System.currentTimeMillis(),
+                       version: Int = 1): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(sender.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        timestamp,
+        version,
+        PBTransaction.Data.SetAssetScript(SetAssetScriptTransactionData.of(
+          ByteString.copyFrom(Base58.decode(assetId)),
+          script.map(s => PBScript.of(ByteString.copyFrom(Base64.decode(s)))))))
+
+      script match {
+        case Some(scr) if ScriptReader.fromBytes(Base64.decode(scr)).isLeft => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
+        case _ =>
+          val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+          transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+      }
+
+      val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+      val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
+
+      transactions.broadcast(transaction)
+    }
   }
 }
