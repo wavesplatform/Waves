@@ -119,9 +119,9 @@ case class InvokeScriptTrace(
 
   private def reissueJson(reissue: Reissue) =
     Json.obj(
-      "assetId"      -> reissue.assetId.toString,
-      "isReissuable" -> reissue.isReissuable,
-      "quantity"     -> reissue.quantity
+      "assetId"    -> reissue.assetId.toString,
+      "reissuable" -> reissue.isReissuable,
+      "quantity"   -> reissue.quantity
     )
 
   private def burnJson(burn: Burn) =
