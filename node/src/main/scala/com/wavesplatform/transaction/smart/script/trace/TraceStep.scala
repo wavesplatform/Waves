@@ -110,11 +110,11 @@ case class InvokeScriptTrace(
         case Some(script) => script.toString
         case None         => JsNull
       }),
-      "decimals"     -> issue.decimals,
-      "description"  -> issue.description,
-      "isReissuable" -> issue.isReissuable,
-      "quantity"     -> issue.quantity,
-      "name"         -> issue.name
+      "decimals"    -> issue.decimals,
+      "description" -> issue.description,
+      "reissuable"  -> issue.isReissuable,
+      "quantity"    -> issue.quantity,
+      "name"        -> issue.name
     )
 
   private def reissueJson(reissue: Reissue) =

@@ -19,7 +19,7 @@ object BlockchainFeatures {
   val ReduceNFTFee                    = BlockchainFeature(13, "Reduce NFT fee")
   val BlockReward                     = BlockchainFeature(14, "Block Reward and Community Driven Monetary Policy")
   val LeaseExpiration                 = BlockchainFeature(15, "Lease Expiration")
-  val MultiPaymentInvokeScript        = BlockchainFeature(16, "Multiple payment attachment for Invoke Script Transaction")
+  val MultiPaymentInvokeScript        = BlockchainFeature(16, "RIDE V4 and multiple payment attachment for Invoke Script Transaction")
   val BlockV5                         = BlockchainFeature(17, "VRF and Protobuf") // todo: (NODE-1927) relevant description
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.

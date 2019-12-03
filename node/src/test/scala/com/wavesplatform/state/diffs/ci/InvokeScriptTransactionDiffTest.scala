@@ -1231,7 +1231,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci) =>
         val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
-          _ should produce("DApp self-payment is forbidden")
+          _ should produce("DApp self-payment is forbidden since V4")
         }
     }
   }
@@ -1252,7 +1252,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       case (genesis, setScript, ci) =>
         val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
-          _ should produce("DApp self-payment is forbidden")
+          _ should produce("DApp self-transfer is forbidden since V4")
         }
     }
   }
