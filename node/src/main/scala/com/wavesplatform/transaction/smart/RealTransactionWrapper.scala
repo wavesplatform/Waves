@@ -1,10 +1,12 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
+import com.google.common.base.Charsets
+import com.google.common.primitives.Longs
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, _}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -68,7 +70,7 @@ object RealTransactionWrapper {
   ): Either[ExecutionError, Tx] =
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
-      case t: TransferTransaction => mapTransferTx(t).asRight
+      case t: TransferTransaction => mapTransferTx(t, stdLibVersion).asRight
       case i: IssueTransaction =>
         Tx.Issue(proven(i), i.quantity, ByteStr(i.nameBytes), ByteStr(i.descBytes), i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
@@ -83,7 +85,7 @@ object RealTransactionWrapper {
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
             transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-            attachment = ByteStr(ms.attachment.toBytes) // TODO: Support typed attachment
+            attachment = convertAttachment(ms.attachment, stdLibVersion)
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
@@ -117,13 +119,32 @@ object RealTransactionWrapper {
           }
     }
 
-  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
+  def mapTransferTx(t: TransferTransaction, version: StdLibVersion): Tx.Transfer =
     Tx.Transfer(
       proven(t),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = ByteStr(t.attachment.toBytes) // TODO: Support typed attachment
+      attachment = convertAttachment(t.attachment, version)
     )
+
+  private def convertAttachment(attachment: Attachment, version: StdLibVersion): TransferAttachment = version match {
+    case V1 | V2 | V3 =>
+      ByteStrValue(attachment match {
+        case Attachment.Num(value)  => Longs.toByteArray(value)
+        case Attachment.Bool(value) => if (value) Array(1.toByte) else Array(0.toByte)
+        case Attachment.Bin(value)  => value
+        case Attachment.Str(value)  => value.getBytes(Charsets.UTF_8)
+        case Attachment.Empty       => Array.emptyByteArray
+      })
+    case V4 =>
+      attachment match {
+        case Attachment.Num(value)  => IntValue(value)
+        case Attachment.Bool(value) => BooleanValue(value)
+        case Attachment.Bin(value)  => ByteStrValue(value)
+        case Attachment.Str(value)  => StringValue(value)
+        case Attachment.Empty       => ByteStrValue(Array.emptyByteArray)
+      }
+  }
 }

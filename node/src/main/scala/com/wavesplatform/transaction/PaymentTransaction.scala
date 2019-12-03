@@ -6,7 +6,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.PaymentTxSerializer
 import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
-import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
+import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 

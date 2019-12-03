@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
 import cats.Applicative
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
