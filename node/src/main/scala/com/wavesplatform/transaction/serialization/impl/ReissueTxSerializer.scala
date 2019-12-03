@@ -16,8 +16,7 @@ object ReissueTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"    -> asset.id.toString,
       "quantity"   -> quantity,
-      "reissuable" -> reissuable,
-      "chainId"    -> chainByte
+      "reissuable" -> reissuable
     )
   }
 

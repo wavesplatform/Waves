@@ -57,7 +57,6 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
                        "4DFEtUwJ9gjMQMuEXipv2qK7rnhhWEBqzpC3ZQesW1Kh8D822t62e3cRGWNU3N21r7huWnaty95wj2tZxYSvCfro"
                        ],
                        "version": 2,
-                       "chainId": 84,
                        "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
                        "quantity": 100000000,
                        "reissuable": true
@@ -94,7 +93,6 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
                  |  "reissuable" : false,
                  |  "sender" : "3N33A9YpVvk2eNCdUfABmUCTFAKDjvzhL23",
                  |  "feeAssetId" : null,
-                 |  "chainId" : 84,
                  |  "proofs" : [ "5Qmz5hWdaTD4jNSPvkF1dyZob3sesJp9ruHBNtGCp7fXgmUaXGtv6GWBt2Ed6Yf4gpMAF6PKXzfmKVhjUWq919Co" ],
                  |  "assetId" : "G5LzjMfuvAYNEX3kcS1tDyBiaTgE6ta1nNTq8HVnYryY",
                  |  "id" : "6G3Vne25wTUA9fC6H1tjXhXhYQkBvfPVgSZKn1a5mUPH",

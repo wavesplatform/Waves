@@ -22,7 +22,7 @@ object IssueTxSerializer {
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
       "description" -> new String(description, StandardCharsets.UTF_8)
-    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte, "script" -> script.map(_.bytes().base64)) else JsObject.empty)
+    ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {

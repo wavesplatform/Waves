@@ -15,7 +15,6 @@ object SetScriptTxSerializer {
   def toJson(tx: SetScriptTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "chainId" -> chainByte,
       "script"  -> script.map(_.bytes().base64)
     )
   }

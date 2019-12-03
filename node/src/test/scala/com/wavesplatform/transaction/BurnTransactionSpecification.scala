@@ -27,7 +27,6 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
         |  "amount" : 34639959482919,
         |  "sender" : "3N9MZbExso5wtm1sPXwhSHxFkzrC7svcEVv",
         |  "feeAssetId" : null,
-        |  "chainId" : 84,
         |  "proofs" : [ "3fbgfBuU4tyb9wbBVKnG3BQLG8tdYhfroyXzrqTtXFCKXpGTBVZahai3iWgxTKpkvrkUCysvtYuT1RNjSVyKSnWa" ],
         |  "assetId" : "CEVU6Ad1m3FhDMEGKJeeYZU4MzXRtuovCUMgKiLLcsKy",
         |  "fee" : 22502580,
@@ -92,7 +91,6 @@ class BurnTransactionSpecification extends PropSpec with PropertyChecks with Mat
                        "proofs": [
                        "3NcEv6tcVMuXkTJwiqW4J3GMCTe8iSLY7neEfNZonp59eTQEZXYPQWs565CRUctDrvcbtmsRgWvnN7BnFZ1AVZ1H"
                        ],
-                       "chainId": 84,
                        "version": 2,
                        "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
                        "feeAssetId": null,

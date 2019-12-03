@@ -16,7 +16,6 @@ object SetAssetScriptTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
-      "chainId" -> chainByte,
       "script"  -> script.map(_.bytes().base64)
     )
   }
