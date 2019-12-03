@@ -1,5 +1,8 @@
 package com.wavesplatform.state
 
+import java.nio.{ByteBuffer, CharBuffer}
+import java.nio.charset.{Charset, CharsetDecoder, CoderResult}
+
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2

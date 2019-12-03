@@ -305,7 +305,7 @@ object PBTransactions {
           amount.longAmount,
           feeAssetId,
           feeAmount,
-          Array.emptyByteArray,
+          attachment.get.getBinaryValue.toByteArray,
           timestamp,
           proofs
         )
@@ -393,7 +393,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          Array.emptyByteArray,
+          mt.attachment.get.getBinaryValue.toByteArray,
           proofs
         )
 
@@ -445,7 +445,7 @@ object PBTransactions {
 
       case tx: vt.transfer.TransferTransaction =>
         import tx._
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), None)
+        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), Some(Attachment.of(Attachment.Attachment.BinaryValue(ByteString.copyFrom(tx.attachment)))))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
@@ -502,7 +502,7 @@ object PBTransactions {
         val data = MassTransferTransactionData(
           PBAmounts.toPBAssetId(assetId),
           transfers.map(pt => MassTransferTransactionData.Transfer(Some(pt.address), pt.amount)),
-          None
+          Some(Attachment.of(Attachment.Attachment.BinaryValue(ByteString.copyFrom(tx.attachment))))
         )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.MassTransfer(data))
 
