@@ -6,26 +6,14 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  LegacyPBSwitch,
-  Proofs,
-  ProvenTransaction,
-  SigProofsSwitch,
-  TransactionParser,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
 import com.wavesplatform.utils.StrUtils
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class IssueTransaction(
@@ -70,7 +58,6 @@ object IssueTransaction extends TransactionParser {
 
   override val typeId: TxType                       = 3
   override val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
-  override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
 
   val serializer = IssueTxSerializer
 

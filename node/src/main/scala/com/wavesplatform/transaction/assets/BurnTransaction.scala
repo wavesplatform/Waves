@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.BurnTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 final case class BurnTransaction(
@@ -46,7 +45,6 @@ object BurnTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 6
   override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  override val classTag                          = ClassTag(classOf[BurnTransaction])
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
 

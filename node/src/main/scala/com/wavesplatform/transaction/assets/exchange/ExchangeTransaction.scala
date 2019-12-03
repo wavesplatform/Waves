@@ -11,7 +11,6 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class ExchangeTransaction(
@@ -58,8 +57,6 @@ object ExchangeTransaction extends TransactionParser {
     serializer.parseBytes(bytes)
 
   override type TransactionT = ExchangeTransaction
-
-  override def classTag: ClassTag[ExchangeTransaction] = ClassTag(classOf[ExchangeTransaction])
 
   override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 

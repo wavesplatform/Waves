@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class SponsorFeeTransaction(
@@ -42,7 +41,6 @@ object SponsorFeeTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 14
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[SponsorFeeTransaction])
 
   implicit val validator: TxValidator[SponsorFeeTransaction] = SponsorFeeTxValidator
 

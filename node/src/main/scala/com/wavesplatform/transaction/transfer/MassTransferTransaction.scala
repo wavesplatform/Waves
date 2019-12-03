@@ -16,7 +16,6 @@ import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.annotation.meta.field
-import scala.reflect.ClassTag
 import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
@@ -57,7 +56,6 @@ object MassTransferTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 11
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[MassTransferTransaction])
 
   implicit val validator: TxValidator[MassTransferTransaction] = MassTransferTxValidator
 

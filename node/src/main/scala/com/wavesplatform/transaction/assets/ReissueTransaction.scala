@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.ReissueTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util._
 
 case class ReissueTransaction(
@@ -47,7 +46,6 @@ object ReissueTransaction extends TransactionParser {
 
   override val typeId: TxType                         = 5
   override def supportedVersions: Set[TxVersion]      = Set(1, 2, 3)
-  override def classTag: ClassTag[ReissueTransaction] = ClassTag(classOf[ReissueTransaction])
 
   implicit val validator: TxValidator[ReissueTransaction] = ReissueTxValidator
   implicit def sign(tx: ReissueTransaction, privateKey: PrivateKey): ReissueTransaction =

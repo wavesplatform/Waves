@@ -13,9 +13,15 @@ import scala.concurrent.duration.{Duration, FiniteDuration}
 
 trait FicusImplicits {
 
+  private[this] val byName: Map[String, TransactionParser] = TransactionParsers.all.map {
+    case (_, builder) => builder.getClass.getSimpleName.replaceAll("\\$$", "") -> builder
+  }
+
+  private def by(name: String): Option[TransactionParser] = byName.get(name)
+
   implicit val distributionsReader: ValueReader[Map[TransactionParser, Double]] = {
-    val converter                                    = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
-    def toTxType(key: String): TransactionParser = TransactionParsers.by(converter.convert(key)).get
+    val converter                                = CaseFormat.LOWER_HYPHEN.converterTo(CaseFormat.UPPER_CAMEL)
+    def toTxType(key: String): TransactionParser = by(converter.convert(key)).get
 
     CollectionReaders.mapValueReader[Double].map { xs =>
       xs.map {

@@ -5,12 +5,11 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.PaymentTxSerializer
-import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.impl.PaymentTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class PaymentTransaction private (sender: PublicKey, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
@@ -30,7 +29,6 @@ object PaymentTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 2
   override val supportedVersions: Set[TxVersion] = Set(1)
-  override val classTag                          = ClassTag(classOf[PaymentTransaction])
 
   val serializer = PaymentTxSerializer
 

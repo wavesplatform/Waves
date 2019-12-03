@@ -795,7 +795,7 @@ object AsyncHttpApi extends Assertions {
     def blockAt(height: Int): Future[Block] = {
       blocks
         .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height)))
-        .map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
+        .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
     def broadcastIssue(

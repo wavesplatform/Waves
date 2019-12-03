@@ -42,7 +42,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     op match {
       case 1 =>
         val lease = LeaseTransaction.selfSigned(1.toByte, sender, recipient, amount, 100000, nextTs).explicitGet()
-        List(lease, LeaseCancelTransaction.selfSigned(1.toByte, sender, lease.id(), 1, nextTs).explicitGet())
+        List(lease, LeaseCancelTransaction.signed(1.toByte, sender.publicKey, lease.id(), 1, nextTs, sender.privateKey).explicitGet())
       case 2 =>
         List(
           MassTransferTransaction
@@ -181,7 +181,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             TestBlock.create(
               nextTs,
               blockWithLeaseId,
-              Seq(LeaseCancelTransaction.selfSigned(1.toByte, sender, lt.id(), 1, nextTs).explicitGet())
+              Seq(LeaseCancelTransaction.signed(1.toByte, sender.publicKey, lt.id(), 1, nextTs, sender.privateKey).explicitGet())
             )
           )
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, isActive = false))

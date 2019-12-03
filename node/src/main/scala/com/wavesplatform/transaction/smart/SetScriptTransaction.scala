@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.validation.impl.TxFeeValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class SetScriptTransaction(
@@ -43,7 +42,6 @@ object SetScriptTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 13
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[SetScriptTransaction])
 
   implicit val validator: TxValidator[SetScriptTransaction] =
     TxFeeValidator.asInstanceOf[TxValidator[SetScriptTransaction]]

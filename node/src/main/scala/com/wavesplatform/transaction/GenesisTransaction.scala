@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class GenesisTransaction private (recipient: Address, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
@@ -30,7 +29,6 @@ object GenesisTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 1
   override val supportedVersions: Set[TxVersion] = Set(1)
-  override val classTag                          = ClassTag(classOf[GenesisTransaction])
 
   val serializer = GenesisTxSerializer
 

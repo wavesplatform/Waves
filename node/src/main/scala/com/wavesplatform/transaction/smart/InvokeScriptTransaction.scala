@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class InvokeScriptTransaction(
@@ -51,7 +50,6 @@ object InvokeScriptTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 16
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[DataTransaction])
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
 

@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import play.api.libs.json._
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[DataEntry[_]], fee: TxTimestamp, timestamp: TxTimestamp, proofs: Proofs)
@@ -40,7 +39,6 @@ object DataTransaction extends TransactionParser {
 
   override val typeId: TxType                    = 12
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[DataTransaction])
 
   implicit val validator: TxValidator[DataTransaction] = DataTxValidator
 
