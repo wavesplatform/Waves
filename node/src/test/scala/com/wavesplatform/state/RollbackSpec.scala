@@ -61,6 +61,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     }
   }
 
+  def nonEmptyStringGen(lb: Int, ub: Int): Gen[String] = {
+    for {
+      len <- Gen.chooseNum(lb, ub)
+      arr <- Gen.containerOfN[Array, Char](len, Gen.alphaNumChar)
+    } yield String.copyValueOf(arr)
+  }
+
   "Rollback resets" - {
     "Rollback save dropped blocks order" in forAll(accountGen, positiveLongGen, Gen.choose(1, 10)) {
       case (sender, initialBalance, blocksCount) =>
@@ -245,20 +252,18 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
-    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, byteArrayGen(10), byteArrayGen(12)) {
-      case (sender, initialBalance, nameBytes, descriptionBytes) =>
-        val name        = new String(nameBytes)
-        val description = new String(descriptionBytes)
 
+    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, nonEmptyStringGen(4, 16), nonEmptyStringGen(0, 1000)) {
+      case (sender, initialBalance, name, description) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction.selfSigned(TxVersion.V1, sender, nameBytes, descriptionBytes, 2000, 8, true, script = None, 1, nextTs).explicitGet()
+            IssueTransaction
+              .selfSigned(TxVersion.V1, sender, name.getBytes("UTF-8"), description.getBytes("UTF-8"), 2000, 8, true, script = None, 1, nextTs)
+              .explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
-
-          println(issueTransaction.id())
 
           d.appendBlock(
             TestBlock.create(

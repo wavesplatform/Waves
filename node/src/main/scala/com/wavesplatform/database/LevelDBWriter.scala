@@ -438,7 +438,6 @@ class LevelDBWriter(
     }
 
     for ((id, (tx, num)) <- transactions) {
-      println(s"SAVING: $tx")
       rw.put(Keys.transactionAt(Height(height), num), Some(tx))
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
@@ -576,7 +575,6 @@ class LevelDBWriter(
           transactions.foreach {
             case (num, tx) =>
               forgetTransaction(tx.id())
-              println(s"DELETING: ${tx}")
               tx match {
                 case _: GenesisTransaction                                                       => // genesis transaction can not be rolled back
                 case _: PaymentTransaction | _: TransferTransaction | _: MassTransferTransaction =>

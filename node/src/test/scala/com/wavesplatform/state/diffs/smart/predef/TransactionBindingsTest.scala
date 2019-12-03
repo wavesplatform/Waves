@@ -269,7 +269,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
-  property("UpdateAssetInfoTransaction binding") {
+  ignore("UpdateAssetInfoTransaction binding") {
     forAll(updateAssetInfoTxGen) { t =>
 
       val scriptSource =
