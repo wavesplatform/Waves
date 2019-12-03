@@ -186,7 +186,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       dApp(
         s"""
            | [
-           |   IntEntry("int", 1),
+           |   IntegerEntry("int", 1),
            |   BooleanEntry("bool", true),
            |
            |   Reissue(base58'$assetId', true, $reissueAmount),
