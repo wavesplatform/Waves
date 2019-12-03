@@ -9,12 +9,12 @@ import com.wavesplatform.transaction.transfer._
 import scala.util.{Failure, Try}
 
 object TransactionParsers {
-  private[this] val old: Map[Byte, TransactionParserLite] = Seq[TransactionParserLite](
+  private[this] val old: Map[Byte, TransactionParser] = Seq[TransactionParser](
     GenesisTransaction,
     PaymentTransaction,
     IssueTransaction,
     ReissueTransaction,
-    BurnTransactionV1,
+    BurnTransaction,
     ExchangeTransaction,
     LeaseTransaction,
     LeaseCancelTransaction,
@@ -23,15 +23,15 @@ object TransactionParsers {
     TransferTransaction
   ).map { x =>
     x.typeId -> x
-  }(collection.breakOut)
+  }.toMap
 
-  private[this] val modern: Map[(Byte, Byte), TransactionParserLite] = Seq[TransactionParserLite](
+  private[this] val modern: Map[(Byte, Byte), TransactionParser] = Seq[TransactionParser](
     DataTransaction,
     SetScriptTransaction,
     IssueTransaction,
     CreateAliasTransaction,
     ReissueTransaction,
-    BurnTransactionV2,
+    BurnTransaction,
     ExchangeTransaction,
     LeaseTransaction,
     LeaseCancelTransaction,
@@ -43,21 +43,21 @@ object TransactionParsers {
     x.supportedVersions.map { version =>
       ((x.typeId, version), x)
     }
-  }(collection.breakOut)
+  }.toMap
 
-  val all: Map[(Byte, Byte), TransactionParserLite] = old.flatMap {
+  val all: Map[(Byte, Byte), TransactionParser] = old.flatMap {
     case (typeId, builder) =>
       builder.supportedVersions.map { version =>
         ((typeId, version), builder)
       }
   } ++ modern
 
-  private[this] val byName: Map[String, TransactionParserLite] = (old ++ modern).map {
+  private[this] val byName: Map[String, TransactionParser] = (old ++ modern).map {
     case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
   }
 
-  def by(name: String): Option[TransactionParserLite]                     = byName.get(name)
-  def by(typeId: Byte, version: TxVersion): Option[TransactionParserLite] = all.get((typeId, version))
+  def by(name: String): Option[TransactionParser]                     = byName.get(name)
+  def by(typeId: Byte, version: TxVersion): Option[TransactionParser] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
     def modernParseBytes: Try[Transaction] = {

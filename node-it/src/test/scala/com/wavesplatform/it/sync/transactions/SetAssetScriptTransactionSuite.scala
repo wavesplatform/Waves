@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed}
+import akka.http.scaladsl.model.StatusCodes
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -200,7 +200,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
     ): SetAssetScriptTransaction =
       SetAssetScriptTransaction
-        .signed(AddressScheme.current.chainId, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
+        .signed(1.toByte, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
         .right
         .get
 
@@ -217,7 +217,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       ),
       (
         sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz9ekQuYn92natMnMq8").get)),
-        CustomValidationError("invalid.assetId").assertive(true)
+        AssertiveApiError(WrongJson.Id, "failed to parse json", StatusCodes.BadRequest, true)
       ),
       (
         sastx(assetId = IssuedAsset(ByteStr.decodeBase58("9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz").get)),
@@ -310,9 +310,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val accountA = pkByAddress(firstAddress)
 
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(
-        accountA,
-        Some(
+      .selfSigned(1.toByte, accountA, Some(
           ScriptCompiler(
             s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
                 |match tx {
@@ -323,10 +321,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             isAssetScript = false,
             estimator
           ).explicitGet()._1
-        ),
-        setScriptFee,
-        System.currentTimeMillis()
-      )
+        ), setScriptFee, System.currentTimeMillis())
       .right
       .get
 
@@ -337,7 +332,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
     val nonIssuerUnsignedTx = SetAssetScriptTransaction(
-      AddressScheme.current.chainId,
+      1.toByte,
       accountA,
       IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
       Some(unchangeableScript),
@@ -349,7 +344,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
 
     val signedTxByB =
-      nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
+      nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)))
 
     val tx =
       sender.signedBroadcast(signedTxByB.json()).id
@@ -358,7 +353,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     //try to change unchangeable script
     val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
-      AddressScheme.current.chainId,
+      1.toByte,
       accountA,
       IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
       Some(script),
@@ -370,7 +365,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 
     val signedTxByB2 =
-      nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
+      nonIssuerUnsignedTx2.copy(1.toByte, proofs = Proofs(Seq(sigTxB2)))
 
     assertApiError(sender.signedBroadcast(signedTxByB2.json())) { error =>
       error.message shouldBe errNotAllowedByToken

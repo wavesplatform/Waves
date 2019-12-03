@@ -1,119 +1,79 @@
 package com.wavesplatform.transaction
 
-import cats.implicits._
-import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.description._
+import com.wavesplatform.transaction.serialization.impl.DataTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.impl.DataTxValidator
 import monix.eval.Coeval
 import play.api.libs.json._
 
+import scala.reflect.ClassTag
 import scala.util.Try
 
-case class DataTransaction private (sender: PublicKey, data: List[DataEntry[_]], fee: Long, timestamp: Long, proofs: Proofs)
+case class DataTransaction(version: TxVersion, sender: PublicKey, data: Seq[DataEntry[_]], fee: TxTimestamp, timestamp: TxTimestamp, proofs: Proofs)
     extends ProvenTransaction
     with VersionedTransaction
-    with FastHashId {
+    with TxWithFee.InWaves
+    with FastHashId
+    with LegacyPBSwitch.V2 {
 
-  override val builder: TransactionParser = DataTransaction
-  override val assetFee: (Asset, Long)    = (Waves, fee)
-  override val bodyBytes: Coeval[Array[Byte]] =
-    Coeval.evalOnce {
-      Bytes.concat(
-        Array(builder.typeId, version),
-        sender,
-        Shorts.toByteArray(data.size.toShort),
-        Bytes.concat(data.view.map(_.toBytes): _*),
-        Longs.toByteArray(timestamp),
-        Longs.toByteArray(fee)
-      )
-    }
+  //noinspection TypeAnnotation
+  override val builder = DataTransaction
 
-  implicit val dataItemFormat: Format[DataEntry[_]] = DataEntry.Format
-
-  override val json: Coeval[JsObject] = Coeval.evalOnce {
-    jsonBase() ++ Json.obj(
-      "version" -> version,
-      "data"    -> Json.toJson(data)
-    )
-  }
-
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-
-  override def version: TxVersion = TxVersion.V1
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
+  override val json: Coeval[JsObject]         = Coeval.eval(builder.serializer.toJson(this))
 }
 
-object DataTransaction extends TransactionParserFor[DataTransaction] with TransactionParser.MultipleVersions {
+object DataTransaction extends TransactionParser {
+  val MaxBytes: Int      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
+  val MaxEntryCount: Int = 100
 
-  override val typeId: TxType                 = 12
-  override val supportedVersions: Set[TxVersion] = Set(1)
+  override type TransactionT = DataTransaction
 
-  val MaxBytes      = 150 * 1024 // implicitly used for RIDE CONST_STRING and CONST_BYTESTR
-  val MaxEntryCount = 100
+  override val typeId: TxType                    = 12
+  override val supportedVersions: Set[TxVersion] = Set(1, 2)
+  override val classTag                          = ClassTag(classOf[DataTransaction])
 
-  override protected def parseTail(bytes: Array[Byte]): Try[TransactionT] = {
-    byteTailDescription
-      .deserializeFromByteArray(bytes)
-      .flatMap(
-        validateTxContent(_, Some(bytes.length)).foldToTry
-      )
-  }
+  implicit val validator: TxValidator[DataTransaction] = DataTxValidator
 
-  def create(sender: PublicKey, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long, proofs: Proofs): Either[ValidationError, TransactionT] = {
+  implicit def sign(tx: DataTransaction, privateKey: PrivateKey): DataTransaction =
+    tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-    val tx = DataTransaction(sender, data, feeAmount, timestamp, proofs)
-    validateTxContent(tx)
-  }
+  val serializer = DataTxSerializer
 
-  private def validateTxContent(tx: DataTransaction, txByteCountOpt: Option[Int] = None): Either[ValidationError, TransactionT] = {
-    if (tx.data.lengthCompare(MaxEntryCount) > 0 || tx.data.exists(!_.valid)) {
-      Left(TxValidationError.TooBigArray)
-    } else if (tx.data.exists(_.key.isEmpty)) {
-      Left(TxValidationError.EmptyDataKey)
-    } else if (tx.data.map(_.key).distinct.lengthCompare(tx.data.size) < 0) {
-      Left(TxValidationError.DuplicatedDataKeys)
-    } else if (tx.fee <= 0) {
-      Left(TxValidationError.InsufficientFee())
-    } else {
-      Either.cond(txByteCountOpt.getOrElse(tx.bytes().length) <= MaxBytes, tx, TxValidationError.TooBigArray)
-    }
-  }
+  override def parseBytes(bytes: Array[TxVersion]): Try[DataTransaction] =
+    serializer.parseBytes(bytes)
 
-  def signed(sender: PublicKey,
-             data: List[DataEntry[_]],
-             feeAmount: Long,
-             timestamp: Long,
-             signer: PrivateKey): Either[ValidationError, TransactionT] = {
-    create(sender, data, feeAmount, timestamp, Proofs.empty).right.map { unsigned =>
-      unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
-    }
-  }
+  def create(
+      version: TxVersion,
+      sender: PublicKey,
+      data: Seq[DataEntry[_]],
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] =
+    DataTransaction(version, sender, data, fee, timestamp, proofs).validatedEither
 
-  def selfSigned(sender: KeyPair, data: List[DataEntry[_]], feeAmount: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
-    signed(sender, data, feeAmount, timestamp, sender)
-  }
+  def signed(
+      version: TxVersion,
+      sender: PublicKey,
+      data: Seq[DataEntry[_]],
+      fee: TxAmount,
+      timestamp: TxTimestamp,
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] =
+    create(version, sender, data, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
-  val byteTailDescription: ByteEntity[DataTransaction] = {
-    (
-      PublicKeyBytes(tailIndex(1), "Sender's public key"),
-      ListDataEntryBytes(tailIndex(2)),
-      LongBytes(tailIndex(3), "Timestamp"),
-      LongBytes(tailIndex(4), "Fee"),
-      ProofsBytes(tailIndex(5))
-    ) mapN {
-      case (senderPublicKey, data, timestamp, fee, proofs) =>
-        DataTransaction(
-          sender = senderPublicKey,
-          data = data,
-          fee = fee,
-          timestamp = timestamp,
-          proofs = proofs
-        )
-    }
-  }
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      data: Seq[DataEntry[_]],
+      fee: TxAmount,
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, data, fee, timestamp, sender)
 }

@@ -10,7 +10,7 @@ import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class ReissueV1TransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class ReissueTransactionV1Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
   property("Reissue serialization roundtrip") {
     forAll(reissueGen) { tx: ReissueTransaction =>

@@ -29,9 +29,10 @@ case class ExchangeTransaction(
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with SigProofsSwitch {
+    with SigProofsSwitch
+    with LegacyPBSwitch.V3 {
 
-  override def builder: TransactionParserLite = ExchangeTransaction
+  override def builder: TransactionParser = ExchangeTransaction
 
   @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
@@ -46,7 +47,7 @@ case class ExchangeTransaction(
   }
 }
 
-object ExchangeTransaction extends TransactionParserLite {
+object ExchangeTransaction extends TransactionParser {
   implicit val validator = ExchangeTxValidator
   val serializer         = ExchangeTxSerializer
 
@@ -60,7 +61,7 @@ object ExchangeTransaction extends TransactionParserLite {
 
   override def classTag: ClassTag[ExchangeTransaction] = ClassTag(classOf[ExchangeTransaction])
 
-  override def supportedVersions: Set[TxVersion] = Set(1, 2)
+  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val typeId: TxType = 7
 

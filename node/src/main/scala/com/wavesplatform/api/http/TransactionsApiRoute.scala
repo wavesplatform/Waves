@@ -1,10 +1,17 @@
 package com.wavesplatform.api.http
 
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import cats.instances.list._
+import cats.instances.try_._
+import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -34,12 +41,13 @@ case class TransactionsApiRoute(
 ) extends ApiRoute
     with BroadcastRoute
     with AuthRoute {
+  import TransactionsApiRoute._
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast
+      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   @Path("/address/{address}/limit/{limit}")
@@ -212,6 +220,56 @@ case class TransactionsApiRoute(
   )
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
+  def merkleProof: Route = path("merkleProof")(getMerkleProof ~ postMerkleProof)
+
+  @Path("/merkleProof")
+  @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "id",
+        required = true,
+        paramType = "query",
+        dataType = "string",
+        value = "Transaction IDs"
+      )
+    )
+  )
+  def getMerkleProof: Route = (get & parameters('id.*))(ids => complete(merkleProof(ids.toList)))
+
+  @Path("/merkleProof")
+  @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "json",
+        required = true,
+        paramType = "body",
+        dataType = "string",
+        value = "Transaction IDs",
+        example = """{"ids": ["some1", "some2"]}"""
+      )
+    )
+  )
+  def postMerkleProof: Route =
+    jsonPost[JsObject](
+      jsv =>
+        (jsv \ "ids").validate[List[String]] match {
+          case JsSuccess(ids, _) => merkleProof(ids)
+          case JsError(err)      => WrongJson(errors = err)
+        }
+    )
+
+  private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
+    encodedIds.traverse(ByteStr.decodeBase58) match {
+      case Success(txIds) =>
+        commonApi.transactionProofs(txIds) match {
+          case Nil    => CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+          case proofs => proofs
+        }
+      case _ => InvalidSignature
+    }
+
   private def txToExtendedJson(tx: Transaction): JsObject = {
     import com.wavesplatform.transaction.lease.LeaseTransaction
     tx match {
@@ -273,5 +331,25 @@ object TransactionsApiRoute {
   object LeaseStatus {
     val Active   = "active"
     val Canceled = "canceled"
+  }
+
+  implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
+    def proofBytes(levels: Seq[Array[Byte]]): List[String] =
+      (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
+
+    Json.obj(
+      "id"               -> mi.id.toString,
+      "transactionIndex" -> mi.transactionIndex,
+      "merkleProof"      -> proofBytes(mi.digests)
+    )
+  }
+
+  implicit val transactionProofReads: Reads[TransactionProof] = Reads { jsv =>
+    for {
+      encoded          <- (jsv \ "id").validate[String]
+      id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
+      transactionIndex <- (jsv \ "transactionIndex").validate[Int]
+      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base64.decode))
+    } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 }

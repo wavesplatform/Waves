@@ -1,37 +1,29 @@
 package com.wavesplatform.api.http.requests
 
 import cats.implicits._
-import com.wavesplatform.account.{AddressScheme, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
-import com.wavesplatform.transaction.assets.BurnTransactionV2
-import io.swagger.annotations.ApiModelProperty
+import com.wavesplatform.transaction.assets.BurnTransaction
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 case class SignedBurnV2Request(
-    @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
     senderPublicKey: String,
-    @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
     assetId: String,
-    @ApiModelProperty(required = true, example = "1000000")
     quantity: Long,
-    @ApiModelProperty(required = true)
     fee: Long,
-    @ApiModelProperty(required = true)
     timestamp: Long,
-    @ApiModelProperty(required = true)
     proofs: List[String]
 ) {
 
-  def toTx: Either[ValidationError, BurnTransactionV2] =
+  def toTx: Either[ValidationError, BurnTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58ToAsset(assetId)
+      _assetId    <- parseBase58ToIssuedAsset(assetId)
       _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
       _proofs     <- Proofs.create(_proofBytes)
-      chainId = AddressScheme.current.chainId
-      _t <- BurnTransactionV2.create(chainId, _sender, _assetId, quantity, fee, timestamp, _proofs)
+      _t          <- BurnTransaction.create(2.toByte, _sender, _assetId, quantity, fee, timestamp, _proofs)
     } yield _t
 }
 

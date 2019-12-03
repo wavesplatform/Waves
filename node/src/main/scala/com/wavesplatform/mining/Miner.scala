@@ -21,6 +21,7 @@ import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
+import kamon.metric.TimerMetric
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.{CanBlock, SchedulerService}
@@ -180,16 +181,16 @@ class MinerImpl(
     Either.cond(chanCount >= minerSettings.quorum, (), s"Quorum not available ($chanCount/${minerSettings.quorum}), not forging block.")
   }
 
-  private def blockFeatures(version: TxVersion): Set[Short] = {
-    if (version <= PlainBlockVersion) Set.empty[Short]
+  private def blockFeatures(version: Byte): Seq[Short] = {
+    if (version <= PlainBlockVersion) Seq.empty[Short]
     else
       settings.featuresSettings.supported
         .filterNot(blockchainUpdater.approvedFeatures.keySet)
         .filter(BlockchainFeatures.implemented)
-        .toSet
+        .sorted
   }
 
-  private def blockRewardVote(version: TxVersion): Long =
+  private def blockRewardVote(version: Byte): Long =
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
@@ -290,8 +291,8 @@ class MinerImpl(
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
   private[this] object metrics {
-    val blockBuildTimeStats      = Kamon.timer("miner.pack-and-forge-block-time")
-    val microBlockBuildTimeStats = Kamon.timer("miner.forge-microblock-time")
+    val blockBuildTimeStats: TimerMetric = Kamon.timer("miner.pack-and-forge-block-time")
+    val microBlockBuildTimeStats: TimerMetric = Kamon.timer("miner.forge-microblock-time")
   }
 }
 

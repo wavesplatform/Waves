@@ -27,10 +27,10 @@ object IssueTxSerializer {
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(
+    lazy val baseBytes = Bytes.concat(
       sender,
-      Deser.serializeArray(name),
-      Deser.serializeArray(description),
+      Deser.serializeArrayWithLength(name),
+      Deser.serializeArrayWithLength(description),
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
@@ -48,11 +48,15 @@ object IssueTxSerializer {
           baseBytes,
           Deser.serializeOptionOfArrayWithLength(script)(_.bytes())
         )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
+    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
       case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())

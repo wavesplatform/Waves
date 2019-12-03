@@ -1,12 +1,14 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
+import com.wavesplatform.block.Block
+import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
@@ -26,9 +28,11 @@ import monix.execution.Scheduler
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.Matchers
+import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
+
+import scala.util.Random
 
 class TransactionsRouteSpec
     extends RouteSpec("/transactions")
@@ -38,9 +42,10 @@ class TransactionsRouteSpec
     with TransactionGen
     with BlockGen
     with PropertyChecks
+    with OptionValues
     with NoShrink {
 
-  implicit def scheduler = Scheduler.global
+  implicit def scheduler: Scheduler = Scheduler.global
 
   private val wallet              = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain          = mock[Blockchain]
@@ -343,7 +348,7 @@ class TransactionsRouteSpec
           val resp = responseAs[Seq[JsValue]]
           for ((r, t) <- resp.zip(txs)) {
             if ((r \ "version").as[Int] == 1) {
-              (r \ "signature").as[String] shouldEqual t.proofs.proofs(0).toString
+              (r \ "signature").as[String] shouldEqual t.proofs.proofs.head.toString
             } else {
               (r \ "proofs").as[Seq[String]] shouldEqual t.proofs.proofs.map(_.toString)
             }
@@ -393,13 +398,13 @@ class TransactionsRouteSpec
 
   routePath("/sign") - {
     "function call without args" in {
-      val acc1       = wallet.generateNewAccount().get
-      val acc2       = wallet.generateNewAccount().get
+      val acc1 = wallet.generateNewAccount().get
+      val acc2 = wallet.generateNewAccount().get
 
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)
       val funcWithEmptyArgs = Json.obj("function" -> funcName, "args" -> JsArray.empty)
-      val funcWithArgs = InvokeScriptTransaction.functionCallToJson(
+      val funcWithArgs = InvokeScriptTransaction.serializer.functionCallToJson(
         FUNCTION_CALL(
           FunctionHeader.User(funcName),
           List(CONST_LONG(1), CONST_BOOLEAN(true))
@@ -429,6 +434,163 @@ class TransactionsRouteSpec
       invoke(funcWithoutArgs, 0)
       invoke(funcWithEmptyArgs, 0)
       invoke(funcWithArgs, 2)
+    }
+  }
+
+  routePath("/merkleProof") - {
+    import com.wavesplatform.block.BlockMerkleOps
+
+    val transactionsGen = for {
+      txsSize <- Gen.choose(1, 10)
+      txs     <- Gen.listOfN(txsSize, randomTransactionGen)
+    } yield txs
+
+    val validBlockGen = for {
+      txs    <- transactionsGen
+      signer <- accountGen
+      block  <- versionedBlockGen(txs, signer, Block.ProtoBlockVersion)
+    } yield block
+
+    val invalidBlockGen = for {
+      txs     <- transactionsGen
+      signer  <- accountGen
+      version <- Gen.choose(Block.GenesisBlockVersion, Block.RewardBlockVersion)
+      block   <- versionedBlockGen(txs, signer, version)
+    } yield block
+
+    val validBlocksGen =
+      for {
+        blockchainHeight <- Gen.choose(1, 20)
+        blocks           <- Gen.listOfN(blockchainHeight, validBlockGen)
+      } yield blocks
+
+    val invalidBlocksGen =
+      for {
+        blockchainHeight <- Gen.choose(1, 10)
+        blocks           <- Gen.listOfN(blockchainHeight, invalidBlockGen)
+      } yield blocks
+
+    def prepareBlockchain(blocks: List[Block]): Blockchain = { // resetting blockchain for each property check iteration
+      val blockchain        = mock[Blockchain]
+      val heightToBlock     = blocks.zipWithIndex.map { case (b, h) => (h + 1, b) }.toMap
+      val txIdToHeightAndTx = heightToBlock.flatMap { case (h, b) => b.transactionData.map(tx => (tx.id(), (h, tx))) }
+      (blockchain.transactionInfo _).expects(*).onCall((x: ByteStr) => txIdToHeightAndTx.get(x)).anyNumberOfTimes()
+      (blockchain.blockBytes(_: Int)).expects(*).onCall((h: Int) => heightToBlock.get(h).map(_.bytes())).anyNumberOfTimes()
+      blockchain
+    }
+
+    def validateSuccess(txIdsToBlock: Map[String, Block], response: HttpResponse): Unit = {
+      response.status shouldBe StatusCodes.OK
+
+      val proofs = responseAs[List[JsObject]]
+
+      proofs.size shouldBe txIdsToBlock.size
+
+      proofs.foreach { p =>
+        val transactionId    = (p \ "id").as[String]
+        val transactionIndex = (p \ "transactionIndex").as[Int]
+        val digests          = (p \ "merkleProof").as[List[String]].map(Base64.decode)
+
+        val block       = txIdsToBlock(transactionId)
+        val transaction = block.transactionData.find(_.id().toString == transactionId)
+
+        transaction shouldBe 'defined
+        txIdsToBlock.keySet should contain(transactionId)
+        transactionIndex shouldBe block.transactionData.indexOf(transaction.value)
+
+        block.verifyTransactionProof(TransactionProof(transaction.value.id(), transactionIndex, digests)) shouldBe true
+      }
+    }
+
+    def validateFailure(response: HttpResponse): Unit = {
+      response.status shouldEqual StatusCodes.BadRequest
+      (responseAs[JsObject] \ "message").as[String] shouldEqual s"transactions do not exists or block version < ${Block.ProtoBlockVersion}"
+    }
+
+    "returns merkle proofs" in {
+      forAll(validBlocksGen) { blocks =>
+        val blockchain = prepareBlockchain(blocks)
+        val route      = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+
+        val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
+
+        val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
+        val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
+
+        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
+          validateSuccess(txIdsToBlock, response)
+        }
+
+        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
+          validateSuccess(txIdsToBlock, response)
+        }
+      }
+    }
+
+    "filters non-existing and 'old'-block transactions" in {
+      val gen = validBlocksGen.flatMap(bs => invalidBlocksGen.flatMap(ibs => transactionsGen.map(txs => (bs, ibs, txs))))
+      forAll(gen) {
+        case (validBlocks, invalidBlocks, unknownTransactions) =>
+          val blockchain = prepareBlockchain(validBlocks ++ invalidBlocks)
+          val route      = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+
+          val txIdsToBlock = validBlocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
+
+          val requestedIds = ((validBlocks ++ invalidBlocks).flatMap(_.transactionData) ++ unknownTransactions).map(_.id().toString)
+
+          val queryParams = requestedIds.map(id => s"id=$id").mkString("?", "&", "")
+          val requestBody = Json.obj("ids" -> requestedIds)
+
+          def validate(response: HttpResponse): Unit = {
+            val proofsSize = responseAs[List[JsObject]].size
+            proofsSize shouldBe (requestedIds.size - invalidBlocks.map(_.transactionData.size).sum - unknownTransactions.size)
+            validateSuccess(txIdsToBlock, response)
+          }
+
+          Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
+            validate(response)
+          }
+
+          Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
+            validate(response)
+          }
+      }
+    }
+
+    "returns error in case of all transactions are filtered" in {
+      forAll(invalidBlocksGen) { blocks =>
+        val blockchain = prepareBlockchain(blocks)
+        val route      = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
+
+        val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
+
+        val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")
+        val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
+
+        Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
+          validateFailure(response)
+        }
+
+        Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
+          validateFailure(response)
+        }
+      }
+    }
+
+    "handles invalid signatures" in {
+      val invalidIdsGen = for {
+        ids       <- Gen.nonEmptyListOf(randomTransactionGen.map(_.id().toString))
+        invalidId <- Gen.nonEmptyListOf(invalidBase58Gen)
+      } yield Random.shuffle(ids ++ invalidId)
+
+      forAll(invalidIdsGen) { invalidIds =>
+        val queryParams = invalidIds.map(id => s"id=$id").mkString("?", "&", "")
+        val requestBody = Json.obj("ids" -> invalidIds)
+
+        Get(routePath(s"/merkleProof$queryParams")) ~> route should produce(InvalidSignature)
+
+        Post(routePath("/merkleProof"), requestBody) ~> route should produce(InvalidSignature)
+      }
     }
   }
 }

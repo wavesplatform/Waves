@@ -45,7 +45,11 @@ object Script {
   type DirectiveMeta = List[(String, Any)]
 
   def decompile(s: Script): (String, DirectiveMeta) = {
-    val ctx = defaultDecompilerContext
+    val cType: ContentType = s match {
+      case _: ExprScript => Expression
+      case _ => DAppType
+    }
+    val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = s match {
       case e: ExprScript                   => (Decompiler(e.expr, ctx), List(s.stdLibVersion, Expression))
       case ContractScriptImpl(_, contract) => (Decompiler(contract, ctx), List(s.stdLibVersion, Account, DAppType))
@@ -67,14 +71,6 @@ object Script {
         ExprScript.estimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
       case ContractScriptImpl(version, contract) =>
         ContractScript.estimateComplexity(version, contract, estimator)
-    }
-
-  def limitFreeComplexity(s: Script, estimator: ScriptEstimator): Either[String, (Long, Map[String, Long])] =
-    s match {
-      case script: ExprScript =>
-        ExprScript.limitFreeEstimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
-      case ContractScriptImpl(version, contract) =>
-        ContractScript.limitFreeComplexity(version, contract, estimator)
     }
 
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =

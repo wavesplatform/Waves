@@ -7,9 +7,10 @@ import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
 import com.wavesplatform.transaction.validation.impl.LeaseTxValidator
 import com.wavesplatform.transaction.{
   FastHashId,
+  LegacyPBSwitch,
   Proofs,
   SigProofsSwitch,
-  TransactionParserLite,
+  TransactionParser,
   TxAmount,
   TxTimestamp,
   TxType,
@@ -34,17 +35,18 @@ final case class LeaseTransaction(
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
-    with FastHashId {
-  override def builder: TransactionParserLite      = LeaseTransaction
+    with FastHashId
+    with LegacyPBSwitch.V3 {
+  override def builder: TransactionParser          = LeaseTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTransaction.serializer.toJson(this))
 }
 
-object LeaseTransaction extends TransactionParserLite {
+object LeaseTransaction extends TransactionParser {
   type TransactionT = LeaseTransaction
   val classTag: ClassTag[LeaseTransaction] = ClassTag(classOf[LeaseTransaction])
-  val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
   val typeId: TxType                       = 8
 
   implicit val validator = LeaseTxValidator

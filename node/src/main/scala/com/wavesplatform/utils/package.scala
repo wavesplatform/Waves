@@ -63,7 +63,7 @@ package object utils extends ScorexLogging {
     r
   }
 
-  implicit val byteStrWrites: Format[ByteStr] = new Format[ByteStr] {
+  implicit val byteStrFormat: Format[ByteStr] = new Format[ByteStr] {
     override def writes(o: ByteStr): JsValue = JsString(o.toString)
 
     override def reads(json: JsValue): JsResult[ByteStr] = json match {

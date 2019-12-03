@@ -34,7 +34,7 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
   val blockheaderGen: Gen[(BlockHeader, ByteStr, Int)] = {
     for {
       timestamp  <- Gen.posNum[Long]
-      version    <- Gen.posNum[Byte]
+      version    <- Gen.choose(Block.GenesisBlockVersion, Block.RewardBlockVersion)
       reference  <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
       generator  <- Gen.containerOfN[Array, Byte](KeyLength, Arbitrary.arbByte.arbitrary)
       signature  <- Gen.containerOfN[Array, Byte](SignatureLength, Arbitrary.arbByte.arbitrary)
@@ -54,8 +54,9 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
         baseTarget,
         genSignature,
         PublicKey(ByteStr(generator)),
-        featureVotes.toSet,
-        reward
+        featureVotes,
+        reward,
+        ByteStr.empty
       ),
       signature,
       transactionCount

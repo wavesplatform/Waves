@@ -48,7 +48,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val tx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json())
+        SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiled), setScriptFee, System.currentTimeMillis()).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
     assertBadRequestAndResponse(
@@ -87,7 +87,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     val updTx =
       sender.signedBroadcast(
-        SetScriptTransaction.selfSigned(pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis()).explicitGet().json())
+        SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(updated), setScriptFee + smartFee, System.currentTimeMillis()).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(updTx.id)
 
     assertBadRequestAndResponse(
@@ -139,12 +139,7 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
     val pkNewAddress = pkByAddress(newAddress)
     sender.transfer(acc0.stringRepr, newAddress, 10.waves, minFee, waitForTx = true)
 
-    val scriptSet = SetScriptTransaction.selfSigned(
-      pkNewAddress,
-      Some(compiledScript),
-      setScriptFee,
-      System.currentTimeMillis()
-    )
+    val scriptSet = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 

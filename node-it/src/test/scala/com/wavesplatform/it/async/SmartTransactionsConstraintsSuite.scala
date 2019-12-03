@@ -89,12 +89,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
 
   private def setScriptTx(sender: KeyPair) =
     SetScriptTransaction
-      .selfSigned(
-        sender = sender,
-        script = Some(ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()),
-        fee = 1000000,
-        timestamp = System.currentTimeMillis() - 5.minutes.toMillis
-      )
+      .selfSigned(1.toByte, sender = sender, script = Some(ExprScript(V1, Terms.TRUE, checkSize = false).explicitGet()), fee = 1000000, timestamp = System.currentTimeMillis() - 5.minutes.toMillis)
       .explicitGet()
 
   private def toRequest(tx: SetScriptTransaction): SignedSetScriptRequest = SignedSetScriptRequest(
@@ -102,7 +97,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
     script = tx.script.map(_.bytes().base64),
     fee = tx.fee,
     timestamp = tx.timestamp,
-    proofs = tx.proofs.proofs.map(_.toString)(collection.breakOut)
+    proofs = tx.proofs
   )
 
 }

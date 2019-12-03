@@ -9,17 +9,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  Proofs,
-  ProvenTransaction,
-  SigProofsSwitch,
-  TransactionParserLite,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
+import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, ProvenTransaction, SigProofsSwitch, TransactionParser, TxType, TxVersion, TxWithFee, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -42,7 +32,8 @@ case class IssueTransaction(
     with ProvenTransaction
     with FastHashId
     with SigProofsSwitch
-    with TxWithFee.InWaves {
+    with TxWithFee.InWaves
+with LegacyPBSwitch.V3 {
 
   override def builder = IssueTransaction
 
@@ -53,7 +44,7 @@ case class IssueTransaction(
   override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
-object IssueTransaction extends TransactionParserLite {
+object IssueTransaction extends TransactionParser {
   val MinAssetNameLength        = 4
   val MaxAssetNameLength        = 16
   val MaxAssetDescriptionLength = 1000
@@ -62,7 +53,7 @@ object IssueTransaction extends TransactionParserLite {
   override type TransactionT = IssueTransaction
 
   override val typeId: TxType                       = 3
-  override val supportedVersions: Set[TxVersion]    = Set(1, 2)
+  override val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
   override def classTag: ClassTag[IssueTransaction] = ClassTag(classOf[IssueTransaction])
 
   val serializer = IssueTxSerializer

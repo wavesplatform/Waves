@@ -4,12 +4,9 @@ import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.EstimatorProvider._
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.lang._
@@ -21,10 +18,10 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResult, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{AssetTransfer, AttachedPayments, Burn, CallableAction, DataItem, Issue, Recipient, Reissue}
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
@@ -33,11 +30,10 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -52,18 +48,17 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
-    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
+    val accScriptEi   = dAppAddressEi.map(blockchain.accountScriptWithComplexity)
     val functioncall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some(sc @ ContractScriptImpl(version, contract))) =>
+      case Right(Some((ContractScriptImpl(version, contract), _, callableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
             val result = for {
               directives           <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               input                <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
-              invocationComplexity <- blockchain.invocationComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
               payments             <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
               invocation = ContractEvaluator.Invocation(
                 functioncall,
@@ -97,6 +92,9 @@ object InvokeScriptTransactionDiff {
                 invocation,
                 version
               )
+              dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
+              invocationComplexity <- callableComplexities.get(tx.funcCall.function.funcName)
+                .toRight((s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress", List.empty[LogItem[Id]]))
             } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
@@ -112,22 +110,30 @@ object InvokeScriptTransactionDiff {
             case ScriptResultV4(actions)              => actions
           }
 
-          dataEntries = actions
-            .filter(_.isInstanceOf[DataItem[_]])
-            .map(_.asInstanceOf[DataItem[_]])
-            .map(dataItemToEntry)
+          dAppAddress <- TracedResult(dAppAddressEi)
+
+          actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
+          transfers = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+          reissues  = actionsByType(classOf[Reissue])      .asInstanceOf[List[Reissue]]
+          burns     = actionsByType(classOf[Burn])         .asInstanceOf[List[Burn]]
+
+          dataItems = actionsByType
+            .filterKeys(classOf[DataItem[_]].isAssignableFrom)
+            .values
+            .flatten
+            .toList
+            .asInstanceOf[List[DataItem[_]]]
+
+          dataEntries = dataItems.map(dataItemToEntry)
 
           _ <- TracedResult(checkDataEntries(dataEntries)).leftMap(GenericError(_))
-          _ <- TracedResult(Either.cond(
-            actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
-            (),
-            GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
-          ))
-
-          dAppAddress <- TracedResult(dAppAddressEi)
-          transfers = actions
-            .filter(_.isInstanceOf[AssetTransfer])
-            .map(_.asInstanceOf[AssetTransfer])
+          _ <- TracedResult(
+            Either.cond(
+              actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
+              (),
+              GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+            )
+          )
 
           _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, transfers))
           _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
@@ -172,16 +178,16 @@ object InvokeScriptTransactionDiff {
           wavesFee = feeInfo._1
           paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
+            val smartAssetInvocations =
+              tx.checkedAssets                              ++
+              transfers.flatMap(_.assetId).map(IssuedAsset) ++
+              reissues.map(r => IssuedAsset(r.assetId))     ++
+              burns.map(b => IssuedAsset(b.assetId))
+
             val totalScriptsInvoked =
-              tx.checkedAssets
-                .collect { case asset @ IssuedAsset(_) => asset }
-                .count(blockchain.hasAssetScript) +
-                transfers.count(_.assetId.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) {
-                   1
-                 } else {
-                   0
-                 })
+              smartAssetInvocations.count(blockchain.hasAssetScript) +
+              (if (blockchain.hasScript(tx.sender)) 1 else 0)
+
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
@@ -204,13 +210,14 @@ object InvokeScriptTransactionDiff {
           val updatedTxDiff         = compositeDiff.transactions.updated(tx.id(), currentTxDiffWithKeys)
 
           val isr = InvokeScriptResult(
-            data = dataEntries,
-            transfers = transfers
-              .toSeq
+            dataEntries,
+            transfers.toSeq
               .filterNot { case (recipient, _) => recipient == dAppAddress }
               .flatMap {
                 case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
-              }
+              },
+            reissues,
+            burns
           )
 
           compositeDiff.copy(
@@ -250,21 +257,21 @@ object InvokeScriptTransactionDiff {
   }
 
   private def paymentsPart(
-    height: Int,
-    tx: InvokeScriptTransaction,
-    dAppAddress: Address,
-    feePart: Map[Address, Portfolio]
+      height: Int,
+      tx: InvokeScriptTransaction,
+      dAppAddress: Address,
+      feePart: Map[Address, Portfolio]
   ): Diff = {
     val payablePart = tx.payments
       .map {
         case InvokeScriptTransaction.Payment(amt, assetId) =>
           assetId match {
-            case asset@IssuedAsset(_) =>
+            case asset @ IssuedAsset(_) =>
               Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
-              Map(dAppAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+                Map(dAppAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
             case Waves =>
               Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
-              Map(dAppAddress         -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+                Map(dAppAddress       -> Portfolio(amt, LeaseBalance.empty, Map.empty))
           }
       }
       .foldLeft(Map[Address, Portfolio]())(_ |+| _)
@@ -286,14 +293,15 @@ object InvokeScriptTransactionDiff {
     }
 
   private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address)(
-    ps: List[CallableAction],
-    paymentsAndData: Diff
+      ps: List[CallableAction],
+      paymentsDiff: Diff
   ): TracedResult[ValidationError, Diff] =
-    ps.foldLeft(TracedResult(paymentsAndData.asRight[ValidationError])) { (diffAcc, action) =>
+    ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
 
+      val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
       def applyTransfer(transfer: AssetTransfer): TracedResult[ValidationError, Diff] = {
         val AssetTransfer(addressRepr, amount, asset) = transfer
-        val address = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+        val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
         Asset.fromCompatId(asset) match {
           case Waves =>
             val r = Diff.stateOps(
@@ -302,7 +310,7 @@ object InvokeScriptTransactionDiff {
                 Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
             )
             TracedResult.wrapValue(r)
-          case a@IssuedAsset(id) =>
+          case a @ IssuedAsset(id) =>
             val nextDiff = Diff.stateOps(
               portfolios =
                 Map(address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
@@ -313,14 +321,23 @@ object InvokeScriptTransactionDiff {
               case Some(script) =>
                 val assetVerifierDiff =
                   if (blockchain.disallowSelfPayment) nextDiff
-                  else nextDiff.copy(
-                    portfolios = Map(
-                      address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-                      dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                  else
+                    nextDiff.copy(
+                      portfolios = Map(
+                        address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
+                        dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                      )
                     )
-                  )
+                val pseudoTx = ScriptTransfer(
+                  asset,
+                  actionSender,
+                  Recipient.Address(addressRepr.bytes),
+                  amount,
+                  tx.timestamp,
+                  tx.id()
+                )
                 val assetValidationDiff = diffAcc.resultE.flatMap(
-                  d => validateScriptTransferWithSmartAssetScript(blockchain, tx)(d, addressRepr, amount, a.id, assetVerifierDiff, script)
+                  d => validatePseudoTxWithSmartAssetScript(blockchain, tx)(d, pseudoTx, a.id, assetVerifierDiff, script)
                 )
                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                 TracedResult(
@@ -336,11 +353,39 @@ object InvokeScriptTransactionDiff {
           Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
         )
 
-      def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] =
-        DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
+      def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
+        val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
+        val pseudoTx    = ReissuePseudoTx(reissue, actionSender, tx.id(), tx.timestamp)
+        validateActionAsPseudoTx(diffAcc, reissueDiff, reissue.assetId, pseudoTx)
+      }
 
-      def applyBurn(burn: Burn): TracedResult[ValidationError, Diff] =
-        DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
+      def applyBurn(burn: Burn): TracedResult[ValidationError, Diff] = {
+        val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
+        val pseudoTx = BurnPseudoTx(burn, actionSender, tx.id(), tx.timestamp)
+        validateActionAsPseudoTx(diffAcc, burnDiff, burn.assetId, pseudoTx)
+      }
+
+      def validateActionAsPseudoTx(
+        diffAcc: TracedResult[ValidationError, Diff],
+        actionDiff: Either[ValidationError, Diff],
+        assetId: ByteStr,
+        pseudoTx: PseudoTx
+      ): TracedResult[ValidationError, Diff] =
+        blockchain.assetScript(IssuedAsset(assetId)) match {
+          case None => actionDiff
+          case Some(script) =>
+            val assetValidationDiff =
+              for {
+                acc             <- diffAcc.resultE
+                result          <- actionDiff
+                validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(acc, pseudoTx, assetId, result, script)
+              } yield validatedResult
+            val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+            TracedResult(
+              assetValidationDiff,
+              List(AssetVerifierTrace(assetId, errorOpt))
+            )
+        }
 
       val diff = action match {
         case t: AssetTransfer => applyTransfer(t)
@@ -350,28 +395,18 @@ object InvokeScriptTransactionDiff {
         case b: Burn          => applyBurn(b)
       }
       diffAcc |+| diff
-  }
+    }
 
-  private def validateScriptTransferWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
-      totalDiff: Diff,
-      addressRepr: Recipient.Address,
-      amount: Long,
-      assetId: ByteStr,
-      nextDiff: Diff,
-      script: Script
-  ): Either[ValidationError, Diff] = {
+  private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
+    totalDiff: Diff,
+    pseudoTx: PseudoTx,
+    assetId: ByteStr,
+    nextDiff: Diff,
+    script: Script
+  ): Either[ValidationError, Diff] =
     Try {
       ScriptRunner(
-        Coproduct[TxOrd](
-          ScriptTransfer(
-            Some(assetId),
-            Recipient.Address(tx.dAppAddressOrAlias.bytes),
-            Recipient.Address(addressRepr.bytes),
-            amount,
-            tx.timestamp,
-            tx.id()
-          )
-        ),
+        Coproduct[TxOrd](pseudoTx),
         CompositeBlockchain(blockchain, Some(totalDiff)),
         script,
         isAssetScript = true,
@@ -387,5 +422,4 @@ object InvokeScriptTransactionDiff {
         Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAssetScript = true))
       case Success(s) => s
     }
-  }
 }

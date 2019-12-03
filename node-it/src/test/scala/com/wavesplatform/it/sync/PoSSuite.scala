@@ -255,7 +255,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         generationSignature = genSig,
         txs = Nil,
         signer = signerPK,
-        featureVotes = Set.empty,
+        featureVotes = Seq.empty,
         rewardVote = -1L
       )
       .explicitGet()

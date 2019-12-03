@@ -2,8 +2,8 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.assets.BurnTransactionV1
-import io.swagger.annotations.ApiModelProperty
+import com.wavesplatform.transaction.Proofs
+import com.wavesplatform.transaction.assets.BurnTransaction
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -21,25 +21,19 @@ object SignedBurnV1Request {
 }
 
 case class SignedBurnV1Request(
-    @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
     senderPublicKey: String,
-    @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
     assetId: String,
-    @ApiModelProperty(required = true, example = "1000000")
     quantity: Long,
-    @ApiModelProperty(required = true)
     fee: Long,
-    @ApiModelProperty(required = true)
     timestamp: Long,
-    @ApiModelProperty(required = true)
     signature: String
 ) {
 
-  def toTx: Either[ValidationError, BurnTransactionV1] =
+  def toTx: Either[ValidationError, BurnTransaction] =
     for {
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId   <- parseBase58ToAsset(assetId)
+      _assetId   <- parseBase58ToIssuedAsset(assetId)
       _signature <- parseBase58(signature, "invalid.signature", SignatureStringLength)
-      _t         <- BurnTransactionV1.create(_sender, _assetId, quantity, fee, timestamp, _signature)
+      _t         <- BurnTransaction.create(1.toByte, _sender, _assetId, quantity, fee, timestamp, Proofs(_signature))
     } yield _t
 }

@@ -6,7 +6,7 @@ import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.{Signed, Transaction}
+import com.wavesplatform.transaction.{LegacyPBSwitch, Signed, Transaction}
 import monix.eval.Coeval
 
 sealed trait Message
@@ -30,8 +30,10 @@ case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message
 
 object RawBytes {
-  def from(tx: Transaction): RawBytes = // todo: (NODE-1935) Protobuf spec
-    RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
+  def from(tx: Transaction): RawBytes = tx match {
+    case p: LegacyPBSwitch if p.isProtobufVersion => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
+    case tx                                       => RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
+  }
 
   def from(b: Block): RawBytes =
     if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))

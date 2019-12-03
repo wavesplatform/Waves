@@ -181,7 +181,8 @@ object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
         totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
         prevBlockSig = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
         signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)
-      ))
+      )
+    )
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {
     inv.sender ++ inv.totalBlockSig.arr ++ inv.prevBlockSig.arr ++ inv.signature.arr
@@ -236,7 +237,8 @@ object PBTransactionSpec extends MessageSpec[Transaction] {
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
     PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
 
-  override def serializeData(data: Transaction): Array[MessageCode] = PBTransactions.protobuf(data).toByteArray
+  override def serializeData(data: Transaction): Array[MessageCode] =
+    PBTransactions.protobuf(data).toByteArray
 }
 
 // Virtual, only for logs

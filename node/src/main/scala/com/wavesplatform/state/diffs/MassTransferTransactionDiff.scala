@@ -21,7 +21,7 @@ object MassTransferTransactionDiff {
           }
       } yield (portfolio, xfer.amount)
     }
-    val portfoliosEi = tx.transfers.traverse(parseTransfer)
+    val portfoliosEi = tx.transfers.toList.traverse(parseTransfer)
 
     portfoliosEi.flatMap { list: List[(Map[Address, Portfolio], Long)] =>
       val sender   = Address.fromPublicKey(tx.sender)
