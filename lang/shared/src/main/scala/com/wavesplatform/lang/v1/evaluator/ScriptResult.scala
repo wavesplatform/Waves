@@ -161,7 +161,7 @@ object ScriptResult {
   private val v4ActionHandlers: Map[String, Map[String, EVALUATED] => Either[ExecutionError, CallableAction]] =
     Map(
       FieldNames.ScriptTransfer -> (processScriptTransfer(_, V4)),
-      FieldNames.IntEntry       -> (processDataEntryV4(_, FieldNames.IntEntry,     processIntEntry)),
+      FieldNames.IntegerEntry   -> (processDataEntryV4(_, FieldNames.IntegerEntry, processIntEntry)),
       FieldNames.BooleanEntry   -> (processDataEntryV4(_, FieldNames.BooleanEntry, processBoolEntry)),
       FieldNames.StringEntry    -> (processDataEntryV4(_, FieldNames.StringEntry,  processStringEntry)),
       FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBinaryEntry)),
