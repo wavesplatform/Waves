@@ -1,4 +1,6 @@
 package com.wavesplatform.protobuf.transaction
+import java.nio.charset.StandardCharsets
+
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -322,8 +324,8 @@ object PBTransactions {
         vt.assets.IssueTransaction(
           version.toByte,
           sender,
-          name.getBytes(),
-          description.getBytes(),
+          name.getBytes(StandardCharsets.UTF_8),
+          description.getBytes(StandardCharsets.UTF_8),
           quantity,
           decimals.toByte,
           reissuable,
@@ -465,7 +467,7 @@ object PBTransactions {
       case tx: vt.assets.IssueTransaction =>
         import tx._
         val data =
-          IssueTransactionData(new String(name), new String(description), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
+          IssueTransactionData(new String(name, StandardCharsets.UTF_8), new String(description, StandardCharsets.UTF_8), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>

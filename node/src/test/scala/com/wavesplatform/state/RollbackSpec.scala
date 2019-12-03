@@ -258,6 +258,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             IssueTransaction.selfSigned(TxVersion.V1, sender, nameBytes, descriptionBytes, 2000, 8, true, script = None, 1, nextTs).explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
+          println(issueTransaction.id())
+
           d.appendBlock(
             TestBlock.create(
               nextTs,
