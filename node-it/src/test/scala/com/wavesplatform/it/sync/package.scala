@@ -16,6 +16,7 @@ package object sync {
   val minFee: Long                     = 0.001.waves
   val leasingFee: Long                 = 0.002.waves
   val issueFee: Long                   = 1.waves
+  val reissueFee: Long                 = 1.waves
   val burnFee: Long                    = 1.waves
   val sponsorFee: Long                 = 1.waves
   val setAssetScriptFee: Long          = 1.waves

@@ -10,7 +10,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, DataEntryResponse, DataRequest, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.assets._
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
@@ -896,6 +896,26 @@ object AsyncHttpApi extends Assertions {
       )
       val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
       transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+    }
+
+    def putData(source: KeyPair,
+                data: Seq[DataTransactionData.DataEntry],
+                fee: Long,
+                version: Int = 1,
+                timestamp: Long = System.currentTimeMillis()): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(source.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        timestamp,
+        version,
+        PBTransaction.Data.DataTransaction(DataTransactionData.of(data)))
+      if (PBTransactions.vanilla(SignedTransaction(Some(unsigned))).isLeft) {
+        transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
+      } else {
+        val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+        transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+      }
     }
 
     def exchange(matcher: KeyPair,
