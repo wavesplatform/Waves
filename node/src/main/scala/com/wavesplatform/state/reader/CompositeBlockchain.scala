@@ -106,7 +106,7 @@ final case class CompositeBlockchain(
 
     assetDescription map { z =>
       diff.transactions
-        .foldLeft(z) {
+        .foldLeft(z.copy(script = script)) {
           case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = ut.name, description = ut.description)
           case (acc, _)                                        => acc
         }
