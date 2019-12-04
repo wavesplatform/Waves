@@ -1,6 +1,6 @@
 package com.wavesplatform.http
 
-import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.TransactionsApiRoute
@@ -32,7 +32,6 @@ import play.api.libs.json.JsObject
 
 class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with TransactionGen with Matchers {
   import com.wavesplatform.http.ApiMarshallers._
-  import com.wavesplatform.transaction.TransactionSignOps
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   private val DataTxFee: Long         = 15000000
@@ -58,12 +57,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias, MinFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), aliasTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), aliasTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val aliasTx  = aliasTxUnsigned.signWith(account.privateKey)
+      val aliasTx  = aliasTxUnsigned.copy(proofs = proofs)
       val base64Tx = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(aliasTx)))
 
       decode(base64Tx) shouldBe aliasTx
@@ -80,35 +78,32 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         .create(TxVersion.V3, account, name, description, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty)
         .explicitGet()
 
-      Post(routePath("/sign"), issueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val issueProofs = Post(routePath("/sign"), issueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val issueTx        = issueTxUnsigned.signWith(account.privateKey)
+      val issueTx        = issueTxUnsigned.copy(proofs = issueProofs)
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
       val reissueTxUnsigned = ReissueTransaction
         .create(TxVersion.V3, account, IssuedAsset(issueTx.assetId), quantity, reissuable, MinIssueFee, Now, Proofs.empty)
         .explicitGet()
 
-      Post(routePath("/sign"), reissueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val reissueProofs = Post(routePath("/sign"), reissueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val reissueTx        = reissueTxUnsigned.signWith(account.privateKey)
+      val reissueTx        = reissueTxUnsigned.copy(proofs = reissueProofs)
       val base64reissueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(reissueTx)))
 
       val burnTxUnsigned =
         BurnTransaction.create(TxVersion.V3, account, IssuedAsset(issueTx.assetId), quantity, MinIssueFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), burnTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val burnProofs = Post(routePath("/sign"), burnTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val burnTx        = burnTxUnsigned.signWith(account.privateKey)
+      val burnTx        = burnTxUnsigned.copy(proofs = burnProofs)
       val base64BurnStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(burnTx)))
 
       decode(base64IssueStr) shouldBe issueTx
@@ -121,12 +116,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       val dataTxUnsigned = DataTransaction.create(TxVersion.V2, account, Seq(data), DataTxFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), dataTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), dataTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val dataTx    = dataTxUnsigned.signWith(account.privateKey)
+      val dataTx    = dataTxUnsigned.copy(proofs = proofs)
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(dataTx)))
 
       decode(base64Str) shouldBe dataTx
@@ -140,11 +134,9 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val buyOrder  = Order.buy(Order.V3, buyer, account, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
       val sellOrder = Order.sell(Order.V3, seller, account, assetPair, Order.MaxAmount / 2, 100, Now, Now + Order.MaxLiveTime, MinFee * 3)
 
-      val exchangeTxUnsigned =
-        ExchangeTransaction.create(TxVersion.V3, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now).explicitGet()
-
-      val exchangeTx = exchangeTxUnsigned.signWith(account)
-      val base64Str  = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
+      val exchangeTx =
+        ExchangeTransaction.signed(TxVersion.V3, account, buyOrder, sellOrder, 100, 100, MinFee * 3, MinFee * 3, MinFee * 3, Now).explicitGet()
+      val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       decode(base64Str) shouldBe exchangeTx
     }
@@ -167,12 +159,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         )
         .explicitGet()
 
-      Post(routePath("/sign"), invokeScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), invokeScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val invokeScriptTx = invokeScriptTxUnsigned.signWith(account.privateKey)
+      val invokeScriptTx = invokeScriptTxUnsigned.copy(proofs = proofs)
       val base64Str      = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(invokeScriptTx)))
 
       decode(base64Str) shouldBe invokeScriptTx
@@ -183,21 +174,19 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       val leaseTxUnsigned = LeaseTransaction.create(TxVersion.V3, account, recipient, 100, MinFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), leaseTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val leaseProofs = Post(routePath("/sign"), leaseTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val leaseTx = leaseTxUnsigned.signWith(account.privateKey)
+      val leaseTx = leaseTxUnsigned.copy(proofs = leaseProofs)
 
       val leaseCancelTxUnsigned = LeaseCancelTransaction.create(TxVersion.V3, account, leaseTx.id(), MinFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), leaseCancelTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val leaseCancelProofs = Post(routePath("/sign"), leaseCancelTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val leaseCancelTx = leaseCancelTxUnsigned.signWith(account.privateKey)
+      val leaseCancelTx = leaseCancelTxUnsigned.copy(proofs = leaseCancelProofs)
 
       val base64LeaseStr       = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseTx)))
       val base64CancelLeaseStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseCancelTx)))
@@ -214,12 +203,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val transferTxUnsigned =
         TransferTransaction.create(TxVersion.V3, account, recipient, asset, 100, Asset.Waves, MinFee, attachment, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), transferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), transferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val transferTx = transferTxUnsigned.signWith(account.privateKey)
+      val transferTx = transferTxUnsigned.copy(proofs = proofs)
       val base64Str  = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(transferTx)))
 
       decode(base64Str) shouldBe transferTx
@@ -232,12 +220,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val massTransferTxUnsigned =
         MassTransferTransaction.create(TxVersion.V2, account, Asset.Waves, transfers, MassTransferTxFee, Now, attachment, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), massTransferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), massTransferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val massTransferTx = massTransferTxUnsigned.signWith(account.privateKey)
+      val massTransferTx = massTransferTxUnsigned.copy(proofs = proofs)
       val base64Str      = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(massTransferTx)))
 
       decode(base64Str) shouldBe massTransferTx
@@ -248,12 +235,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       val setScriptTxUnsigned = SetScriptTransaction.create(TxVersion.V2, account, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), setScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), setScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val setScriptTx = setScriptTxUnsigned.signWith(account.privateKey)
+      val setScriptTx = setScriptTxUnsigned.copy(proofs = proofs)
       val base64Str   = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(setScriptTx)))
 
       decode(base64Str) shouldBe setScriptTx
@@ -266,12 +252,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val setAssetScriptTxUnsigned =
         SetAssetScriptTransaction.create(TxVersion.V2, account, asset, Some(script), SetAssetScriptFee, Now, Proofs.empty).explicitGet()
 
-      Post(routePath("/sign"), setAssetScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), setAssetScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val setAssetScriptTx = setAssetScriptTxUnsigned.signWith(account.privateKey)
+      val setAssetScriptTx = setAssetScriptTxUnsigned.copy(proofs = proofs)
       val base64Str        = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(setAssetScriptTx)))
 
       decode(base64Str) shouldBe setAssetScriptTx
@@ -282,15 +267,21 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       val sponsorshipTxUnsigned = SponsorFeeTransaction.selfSigned(TxVersion.V2, account, asset, Some(100), MinFee, Now).explicitGet()
 
-      Post(routePath("/sign"), sponsorshipTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        response.status shouldBe StatusCodes.OK
-        (responseAs[JsObject] \ "proofs").as[List[String]].size shouldBe 1
+      val proofs = Post(routePath("/sign"), sponsorshipTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
+        checkProofs(response)
       }
 
-      val sponsorshipTx = sponsorshipTxUnsigned.signWith(account.privateKey)
+      val sponsorshipTx = sponsorshipTxUnsigned.copy(proofs = proofs)
       val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
 
       decode(base64Str) shouldBe sponsorshipTx
+    }
+
+    def checkProofs(response: HttpResponse): Proofs = {
+      response.status shouldBe StatusCodes.OK
+      val r = (responseAs[JsObject] \ "proofs").as[Proofs]
+      r.size shouldBe 1
+      r
     }
 
     def decode(base64Str: String): Transaction = {
