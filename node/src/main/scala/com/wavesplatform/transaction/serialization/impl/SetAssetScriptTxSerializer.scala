@@ -17,7 +17,7 @@ object SetAssetScriptTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
       "script"  -> script.map(_.bytes().base64)
-    )
+    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> tx.chainByte) else Json.obj())
   }
 
   def bodyBytes(tx: SetAssetScriptTransaction): Array[Byte] = {

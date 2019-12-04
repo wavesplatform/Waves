@@ -42,6 +42,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
                        "tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY"
                        ],
                        "version": 1,
+                       "chainId": 84,
                        "script": null
                        }
     """),
@@ -73,6 +74,7 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
           |  "senderPublicKey" : "EoXtNDWGV5XsjiEAZXufddF57a1FdWhypJnps92CAdp8",
           |  "sender" : "3NBy87bQasxRkFTfMM8sq6MDbVUiPGS95g8",
           |  "feeAssetId" : null,
+          |  "chainId" : 84,
           |  "proofs" : [ "3kNEbDaUaCZudgk5V5iJtTEY5Tm6NPLjbE2Jh8cF3ruSRtyRcSdnKqCtUWC8qQnwfpVttio3CftsTC7mbNsBsLo8" ],
           |  "fee" : 37238062,
           |  "id" : "HkZwtM5u9H5FAV8ihaKJo5nBj3rj9yYL9mJoLcuecK29",

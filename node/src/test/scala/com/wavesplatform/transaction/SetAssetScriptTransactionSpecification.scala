@@ -49,7 +49,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
     Seq(
       (
         Json.parse(
-          s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"feeAssetId":null,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""
+          s"""{"type":15,"id":"3GdaFxG3JDdUnGDoFNs2MoGwZYivYkkAHFcZe3T2yu72","sender":"3NBKqNonmitNjGJNS3HRKxAhJVRKiFw4PLu","senderPublicKey":"5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr","fee":78311891,"feeAssetId":null,"timestamp":1868142423132802425,"proofs":["5sRtXKcdDa","9Zfe5aw9D7rRR3nvU3QuAjCNT7pdwRXwvBFxHmdt2WtWwiEwffn","","3C","24jboCkAEFrsBKNh6z8FFyJP8YhejsrBwt7JdHVhiCk7DCc3Zxsc4g6PYG8tsLXmK",""],"version":1,"chainId":${AddressScheme.current.chainId},"assetId":"DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n","script":"base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg=="}"""
         ),
         SetAssetScriptTransaction
           .create(1.toByte, PublicKey.fromBase58String("5k3gXC486CCFCwzUAgavH9JfPwmq9CbBZvTARnFujvgr").explicitGet(), IssuedAsset(ByteStr.decodeBase58("DUyJyszsWcmZG7q2Ctk1hisDeGBPB8dEzyU8Gs5V2j3n").get), Some(Script.fromBase64String("base64:AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()), 78311891L, 1868142423132802425L, Proofs(
@@ -79,6 +79,7 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
           |  "senderPublicKey" : "FnHJjy1pBYrUY3KFdNH6uTJBscSAF5UwzrUJzqasEGEg",
           |  "sender" : "3N7wSJNF2JzHRTURTTnDpGC3k862354135G",
           |  "feeAssetId" : null,
+          |  "chainId" : 84,
           |  "proofs" : [ "3jiSeBNS2Ggc98F4W9BoPJGaiKXCXNskKqhNtQy4EEGdHGnkBJMTGUzTHzukusR9guiaK7KTBd7MLFva4J95TjCN" ],
           |  "assetId" : "2WVVbDwzjg4bSBJq3ykcKu2L1TmpChzygECpqUy6fFKT",
           |  "fee" : 100400000,

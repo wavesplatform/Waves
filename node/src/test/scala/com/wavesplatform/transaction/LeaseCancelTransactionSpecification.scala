@@ -100,7 +100,8 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
                         "3h5SQLbCzaLoTHUeoCjXUHB6qhNUfHZjQQVsWTRAgTGMEdK5aeULMVUfDq63J56kkHJiviYTDT92bLGc8ELrUgvi"
                         ],
                         "version": 2,
-                        "leaseId": "DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6"
+                        "leaseId": "DJWkQxRyJNqWhq9qSQpK2D4tsrct6eZbjSv3AH4PSha6",
+                        "chainId": 84
                        }
     """)
 
