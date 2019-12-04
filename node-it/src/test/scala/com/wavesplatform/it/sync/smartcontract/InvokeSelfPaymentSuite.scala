@@ -81,7 +81,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
     ) { error =>
       error.statusCode shouldBe 400
       error.id shouldBe StateCheckFailed.Id
-      error.message should include("DApp self-payment is forbidden")
+      error.message should include("DApp self-payment is forbidden since V4")
     }
   }
 
@@ -98,7 +98,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
     ) { error =>
       error.statusCode shouldBe 400
       error.id shouldBe StateCheckFailed.Id
-      error.message should include("DApp self-payment is forbidden")
+      error.message should include("DApp self-transfer is forbidden since V4")
     }
   }
 
