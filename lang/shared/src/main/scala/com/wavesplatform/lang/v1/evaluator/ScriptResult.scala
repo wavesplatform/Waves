@@ -68,6 +68,12 @@ object ScriptResult {
       constructor(key, valueExtractor(value))
   }
 
+  private def processDeleteEntry(fields: Map[String, EVALUATED]): Either[String, DataItem.Delete] =
+    fields.get(FieldNames.Key) match {
+      case Some(CONST_STRING(key)) => Right(DataItem.Delete(key))
+      case other                   => err(other, V4, FieldNames.DeleteEntry)
+    }
+
   private def processScriptTransfer(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, AssetTransfer] =
     (fields(FieldNames.Recipient), fields(FieldNames.Amount), fields(FieldNames.Asset)) match {
       case (CaseObj(at, fields2), CONST_LONG(b), maybeToken) if at.name == Types.addressType.name =>
@@ -121,7 +127,33 @@ object ScriptResult {
     } yield ScriptResultV3(w, p)
   }
 
-  private def processIssue(fields: Map[String, EVALUATED]): Either[String, Issue] = ???
+  private def processIssue(fields: Map[String, EVALUATED]): Either[String, Issue] = {
+    (
+      fields.get(FieldNames.IssueQuantity),
+      fields.get(FieldNames.IssueDecimals),
+      fields.get(FieldNames.IssueName),
+      fields.get(FieldNames.IssueDescription),
+      fields.get(FieldNames.IssueScript),
+      fields.get(FieldNames.IssueIsReissuable)
+    ) match {
+      case (
+        Some(CONST_LONG(quantity)),
+        Some(CONST_LONG(decimals)),
+        Some(CONST_STRING(name)),
+        Some(CONST_STRING(description)),
+        Some(script),
+        Some(CONST_BOOLEAN(isReissuable))
+      ) => if (script == unit) {
+        if (0 <= decimals && decimals <= 8) {
+          Right(Issue(None, decimals.toInt, description, isReissuable, name, quantity))
+        } else {
+          Left(s"Invalid decimals $decimals")
+        }
+      } else {
+        Left("Issuing scripted asset isn't supported")
+      }
+    }
+  }
 
   private def processReissue(fields: Map[String, EVALUATED]): Either[String, Reissue] =
     (
@@ -165,6 +197,7 @@ object ScriptResult {
       FieldNames.BooleanEntry   -> (processDataEntryV4(_, FieldNames.BooleanEntry, processBoolEntry)),
       FieldNames.StringEntry    -> (processDataEntryV4(_, FieldNames.StringEntry,  processStringEntry)),
       FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBinaryEntry)),
+      FieldNames.DeleteEntry    -> processDeleteEntry,
       FieldNames.Issue          -> processIssue,
       FieldNames.Reissue        -> processReissue,
       FieldNames.Burn           -> processBurn
