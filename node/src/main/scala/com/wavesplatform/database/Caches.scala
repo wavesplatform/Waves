@@ -2,6 +2,7 @@ package com.wavesplatform.database
 
 import java.util
 
+import cats.data.Ior
 import cats.syntax.monoid._
 import cats.syntax.option._
 import com.google.common.cache._
@@ -15,6 +16,7 @@ import com.wavesplatform.settings.DBSettings
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
 import monix.reactive.Observer
@@ -204,7 +206,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       leaseBalances: Map[BigInt, LeaseBalance],
       addressTransactions: Map[AddressId, List[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
-      reissuedAssets: Map[IssuedAsset, AssetInfo],
+      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+      reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
       scripts: Map[BigInt, Option[(PublicKey, Script, Long, Map[String, Long])]],
       assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
@@ -281,6 +284,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       addressTransactions,
       diff.leaseState,
       diff.issuedAssets,
+      diff.updatedAssets,
       newFills,
       diff.scripts.map { case (address, s) => addressId(address) -> s },
       diff.assetScripts,
@@ -306,11 +310,16 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
           updData
       }
 
+    val assetsToInvalidate =
+      diff.issuedAssets.keySet ++
+        diff.updatedAssets.keySet ++
+        diff.sponsorship.keySet
+
     for ((address, id)           <- newAddressIds) addressIdCache.put(address, Some(id))
     for ((orderId, volumeAndFee) <- newFills) volumeAndFeeCache.put(orderId, volumeAndFee)
     for ((address, assetMap)     <- updatedBalances; (asset, balance) <- assetMap) balancesCache.put((address, asset), balance)
     for (address                 <- newPortfolios) discardPortfolio(address)
-    for (id                      <- diff.issuedAssets.keySet ++ diff.sponsorship.keySet) assetDescriptionCache.invalidate(id)
+    for (id                      <- assetsToInvalidate) assetDescriptionCache.invalidate(id)
     leaseBalanceCache.putAll(updatedLeaseBalances.asJava)
     scriptCache.putAll(diff.scripts.asJava)
     assetScriptCache.putAll(diff.assetScripts.asJava)

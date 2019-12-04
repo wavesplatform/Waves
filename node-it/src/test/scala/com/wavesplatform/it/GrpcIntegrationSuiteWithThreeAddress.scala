@@ -51,7 +51,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
       })
     }
 
-    def waitForTxsToReachAllNodes(txIds: Seq[String]) = {
+    def waitForTxsToReachAllNodes(txIds: Seq[String]): Unit = {
       val txNodePairs = for {
         txId <- txIds
         node <- nodes
@@ -62,7 +62,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
 
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>
       PBTransactions.vanilla(
-        sender.grpc.broadcastTransfer(sender.privateKey, Recipient().withAddress(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
+        sender.grpc.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
       ).explicitGet().id().toString
     }
 

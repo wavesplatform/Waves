@@ -6,7 +6,7 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import org.scalamock.scalatest.PathMockFactory
@@ -30,11 +30,12 @@ class AssetsApiRouteSpec
   private val smartAssetTx = issueV2TransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
     issuer = smartAssetTx.sender,
-    name = smartAssetTx.name,
-    description = smartAssetTx.description,
+    name = new String(smartAssetTx.name),
+    description = new String(smartAssetTx.description),
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
+    lastUpdatedAt = Height @@ 0,
     script = smartAssetTx.script,
     sponsorship = 0
   )
@@ -60,11 +61,12 @@ class AssetsApiRouteSpec
   private val sillyAssetTx = issueGen.sample.get
   private val sillyAssetDesc = AssetDescription(
     issuer = sillyAssetTx.sender,
-    name = sillyAssetTx.name,
-    description = sillyAssetTx.description,
+    name = new String(sillyAssetTx.name),
+    description = new String(sillyAssetTx.description),
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
+    lastUpdatedAt = Height @@ 0,
     script = sillyAssetTx.script,
     sponsorship = 0
   )

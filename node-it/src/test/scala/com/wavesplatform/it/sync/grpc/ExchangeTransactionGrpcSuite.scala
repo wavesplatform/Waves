@@ -68,7 +68,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
            (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
          )) {
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        sender.grpc.broadcastTransfer(buyer, Recipient().withAddress(sellerAddress), 100000, minFee, assetId = feeAssetId.toString, waitForTx = true)
+        sender.grpc.broadcastTransfer(buyer, Recipient().withPublicKeyHash(sellerAddress), 100000, minFee, assetId = feeAssetId.toString, waitForTx = true)
       }
 
       val buyerWavesBalanceBefore  = sender.grpc.wavesBalance(buyerAddress).available

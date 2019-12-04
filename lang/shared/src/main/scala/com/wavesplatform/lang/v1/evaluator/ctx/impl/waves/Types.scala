@@ -409,6 +409,18 @@ object Types {
     )
   )
 
+  def buildUpdateAssetInfoTransactionType(proofsEnabled: Boolean) =
+    CASETYPEREF(
+      "UpdateAssetInfoTransaction",
+      addProofsIfNeeded(
+        List(
+          "assetId"     -> BYTESTR,
+          "name"        -> STRING,
+          "description" -> STRING
+        ) ++ header ++ proven,
+        proofsEnabled
+      )
+    )
 
   def buildDataTransactionType(proofsEnabled: Boolean, v: StdLibVersion) =
     CASETYPEREF(
@@ -453,7 +465,8 @@ object Types {
       buildExchangeTransactionType(proofsEnabled),
       buildTransferTransactionType(proofsEnabled, v),
       buildSetAssetScriptTransactionType(proofsEnabled)
-    ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty)
+    ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty) ++
+         (if (v >= V4) List(buildUpdateAssetInfoTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++

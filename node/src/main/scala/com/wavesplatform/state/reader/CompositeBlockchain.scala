@@ -1,5 +1,6 @@
 package com.wavesplatform.state.reader
 
+import cats.data.Ior
 import cats.implicits._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, Alias, PublicKey}
@@ -14,7 +15,7 @@ import com.wavesplatform.state.extensions.composite.{CompositeAddressTransaction
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -49,36 +50,67 @@ final case class CompositeBlockchain(
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
     val script: Option[Script] = assetScript(asset)
-    inner.assetDescription(asset) match {
-      case Some(ad) =>
-        diff.issuedAssets
-          .get(asset)
-          .map { newAssetInfo =>
-            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume)
-            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
-            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
+
+    val fromDiff = diff.issuedAssets
+      .get(asset)
+      .map {
+        case (static, info, volume) =>
+          val sponsorship = diff.sponsorship.get(asset).fold(0L) {
+            case SponsorshipValue(sp) => sp
+            case SponsorshipNoInfo    => 0L
           }
-          .orElse(Some(ad.copy(script = script)))
-          .map { ad =>
-            diff.sponsorship.get(asset).fold(ad) {
-              case SponsorshipValue(sponsorship) =>
-                ad.copy(sponsorship = sponsorship)
-              case SponsorshipNoInfo =>
-                ad
+
+          AssetDescription(
+            static.issuer,
+            info.name,
+            info.description,
+            static.decimals,
+            volume.isReissuable,
+            volume.volume,
+            Height @@ this.height,
+            script,
+            sponsorship
+          )
+      }
+
+    val assetDescription =
+      inner
+        .assetDescription(asset)
+        .orElse(fromDiff)
+        .map { description =>
+          diff.updatedAssets
+            .get(asset)
+            .fold(description) {
+              case Ior.Left(info) =>
+                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
+              case Ior.Right(vol) =>
+                description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
+              case Ior.Both(info, vol) =>
+                description
+                  .copy(
+                    reissuable = description.reissuable && vol.isReissuable,
+                    totalVolume = description.totalVolume + vol.volume,
+                    name = info.name,
+                    description = info.description,
+                    lastUpdatedAt = info.lastUpdatedAt
+                  )
             }
-          }
-      case None =>
-        val sponsorship = diff.sponsorship.get(asset).fold(0L) {
-          case SponsorshipValue(sp) => sp
-          case SponsorshipNoInfo    => 0L
         }
-        diff.transactions
-          .get(asset.id)
-          .collectFirst {
-            case (it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
-          }
-          .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
+        .map { description =>
+          diff.sponsorship
+            .get(asset)
+            .fold(description) {
+              case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
+              case SponsorshipValue(v) => description.copy(sponsorship = v)
+            }
+        }
+
+    assetDescription map { z =>
+      diff.transactions
+        .foldLeft(z) {
+          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = ut.name, description = ut.description)
+          case (acc, _)                                        => acc
+        }
     }
   }
 
@@ -250,7 +282,9 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
 
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {
       case Some(ng) if to == height =>

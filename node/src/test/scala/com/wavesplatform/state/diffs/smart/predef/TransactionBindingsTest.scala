@@ -3,7 +3,7 @@ package com.wavesplatform.state.diffs.smart.predef
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError._
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.Testing.evaluated
@@ -266,6 +266,26 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         T
       )
       result shouldBe evaluated(true)
+    }
+  }
+
+  property("UpdateAssetInfoTransaction binding") {
+    forAll(updateAssetInfoTxGen) { t =>
+
+      val scriptSource =
+        s"""
+           |match tx {
+           | case t : UpdateAssetInfoTransaction =>
+           |   ${provenPart(t)}
+           |   let name        = t.name.toBytes()        == base58'${ByteStr(t.name.getBytes)}'
+           |   let description = t.description.toBytes() == base58'${ByteStr(t.description.getBytes())}'
+           |   let assetId     = t.assetId               == base58'${t.assetId.id}'
+           |   ${assertProvenPart("t")} && description && name && assetId
+           | case other => throw()
+           | }
+           |""".stripMargin
+
+      runScript(scriptSource, Coproduct(t), V4, T) shouldBe evaluated(true)
     }
   }
 
