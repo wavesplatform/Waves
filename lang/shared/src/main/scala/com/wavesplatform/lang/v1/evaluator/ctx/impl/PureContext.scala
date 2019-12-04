@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
+import java.math.{BigInteger, RoundingMode}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.{MalformedInputException, StandardCharsets}
 import java.nio.{BufferUnderflowException, ByteBuffer}
@@ -7,6 +8,8 @@ import java.nio.{BufferUnderflowException, ByteBuffer}
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
+import ch.obermuhlner.math.big.BigDecimalMath
+import com.google.common.math.BigIntegerMath
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
@@ -590,7 +593,7 @@ object PureContext {
     }
 
   lazy val getListMedian: BaseFunction[NoContext] =
-    NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')))) {
+    NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
       case ARR(arr) :: Nil => {
 
         def getMedian(seq: Seq[Long]): Long = {
@@ -601,7 +604,7 @@ object PureContext {
           if (size % 2 == 1) {
             targetArr(halfSize)
           } else {
-            ((BigInt(targetArr(halfSize - 1)) + BigInt(targetArr(halfSize))) / 2).toLong
+            Math.floorDiv(targetArr(halfSize - 1) + targetArr(halfSize), 2)
           }
         }
 
