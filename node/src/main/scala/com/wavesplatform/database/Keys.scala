@@ -180,7 +180,7 @@ object Keys {
   val HitSourcePrefix: Short                   = 59
   def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
 
-  val AssetStaticInfoPrefix: Short = 61
+  val AssetStaticInfoPrefix: Short = 60
   def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
-    Key.opt("asset-static-info", bytes(61, asset.id.arr), readAssetStaticInfo, writeAssetStaticInfo)
+    Key.opt("asset-static-info", bytes(AssetStaticInfoPrefix, asset.id.arr), readAssetStaticInfo, writeAssetStaticInfo)
 }

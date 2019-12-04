@@ -443,4 +443,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     )
 
   }
+
+  test("asset info can be updated by issuer") {
+
+  }
 }
