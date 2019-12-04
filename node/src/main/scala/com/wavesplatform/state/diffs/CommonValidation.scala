@@ -47,7 +47,7 @@ object CommonValidation {
         }
 
         val spendings       = Monoid.combine(amountDiff, feeDiff)
-        val oldWavesBalance = blockchain.balance(sender, Waves)
+        val oldWavesBalance = blockchain.balance(sender, Waves) - blockchain.leaseBalance(sender).out
 
         val newWavesBalance     = oldWavesBalance + spendings.balance
         val feeUncheckedBalance = oldWavesBalance + amountDiff.balance
