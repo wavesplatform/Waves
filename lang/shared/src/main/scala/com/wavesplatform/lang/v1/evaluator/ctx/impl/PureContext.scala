@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
-import java.math.{BigInteger, RoundingMode}
 import java.nio.charset.StandardCharsets.UTF_8
 import java.nio.charset.{MalformedInputException, StandardCharsets}
 import java.nio.{BufferUnderflowException, ByteBuffer}
@@ -8,8 +7,6 @@ import java.nio.{BufferUnderflowException, ByteBuffer}
 import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
-import ch.obermuhlner.math.big.BigDecimalMath
-import com.google.common.math.BigIntegerMath
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
