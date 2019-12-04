@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -120,7 +121,7 @@ object PBTransactions {
           amount.longAmount,
           feeAssetId,
           feeAmount,
-          Array.emptyByteArray,
+          attachment.get.getBinaryValue.toByteArray,
           timestamp,
           proofs
         )
@@ -207,7 +208,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          Array.emptyByteArray,
+          mt.attachment.get.getBinaryValue.toByteArray,
           proofs
         )
 
