@@ -17,7 +17,7 @@ import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, JsPath, JsValue, Json, JsonValidationError, Writes}
+import play.api.libs.json._
 
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
@@ -135,13 +135,19 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
+          posting(tr.copy(assetId = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError("invalid.feeAssetId"))))
+          )
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
+          posting(tr.copy(feeAssetId = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId"))))
+          )
         }
         forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(TooBigArrayAllocation)
+          posting(tr.copy(attachment = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"attachment length ${a.length} exceeds maximum length of 192"))))
+          )
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())

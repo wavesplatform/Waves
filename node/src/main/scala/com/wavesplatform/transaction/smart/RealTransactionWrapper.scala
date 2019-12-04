@@ -99,6 +99,7 @@ object RealTransactionWrapper {
               case StringDataEntry(key, value)  => DataItem.Str(key, value)
               case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
               case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
+              case EmptyDataEntry(key)          => DataItem.Delete(key)
             }.toIndexedSeq
           )
           .asRight

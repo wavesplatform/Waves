@@ -461,7 +461,6 @@ object PBTransactions {
 
       case tx @ vt.assets.SetAssetScriptTransaction(_, sender, assetId, script, fee, timestamp, proofs) =>
         val data = SetAssetScriptTransactionData(assetId.id, script.map(toPBScript))
-        println(s"WRITE: ${data.script}")
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetAssetScript(data))
 
       case tx @ vt.smart.SetScriptTransaction(_, sender, script, fee, timestamp, proofs) =>
