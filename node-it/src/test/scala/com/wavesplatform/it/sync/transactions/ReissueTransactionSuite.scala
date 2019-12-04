@@ -85,6 +85,16 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(reissueTxId)
   }
 
+  test("not able to reissue if cannot pay reissueReducedFee - less than required") {
+    val issuedAssetId = sender.issue(firstAddress, "name6", "description6", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
+    nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
+
+    assertApiError(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee - 1)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message should include(s"Fee for ReissueTransaction (${reissueReducedFee - 1} in WAVES) does not exceed minimal value of $reissueReducedFee WAVES.")
+    }
+  }
+
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
