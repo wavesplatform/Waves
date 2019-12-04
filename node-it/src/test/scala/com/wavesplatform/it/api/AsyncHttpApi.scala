@@ -1024,8 +1024,28 @@ object AsyncHttpApi extends Assertions {
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis,
         version,
-        PBTransaction.Data.SponsorFee(SponsorFeeTransactionData.of(minFee))
-      )
+        PBTransaction.Data.SponsorFee(SponsorFeeTransactionData.of(minFee)))
+      val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+    }
+
+    def broadcastMassTransfer(sender: KeyPair,
+                              assetId: Option[String] = None,
+                              transfers: Seq[MassTransferTransactionData.Transfer],
+                              attachment: ByteString = ByteString.EMPTY,
+                              fee: Long,
+                              version: Int = 1): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(sender.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis(),
+        version,
+        PBTransaction.Data.MassTransfer(MassTransferTransactionData.of(
+          if (assetId.isDefined) ByteString.copyFrom(Base58.decode(assetId.get)) else ByteString.EMPTY,
+          transfers,
+          attachment
+        )))
       val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
       transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
     }
@@ -1085,11 +1105,6 @@ object AsyncHttpApi extends Assertions {
           val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
       }
-
-      val proofs = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
-      val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
-
-      transactions.broadcast(transaction)
     }
   }
 }

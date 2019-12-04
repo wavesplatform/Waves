@@ -727,6 +727,16 @@ object SyncHttpApi extends Assertions {
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
 
+    def broadcastMassTransfer(sender: KeyPair,
+                              assetId: Option[String] = None,
+                              transfers: Seq[MassTransferTransactionData.Transfer],
+                              attachment: ByteString = ByteString.EMPTY,
+                              fee: Long,
+                              version: Int = 1,
+                              waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastMassTransfer(sender, assetId, transfers, attachment, fee, version)), waitForTx)
+    }
+
     def setAssetScript(sender: KeyPair,
                        assetId: String,
                        script: Option[String],
