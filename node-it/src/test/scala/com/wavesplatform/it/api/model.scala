@@ -92,7 +92,7 @@ case class AssetInfo(
     decimals: Int,
     reissuable: Boolean,
     quantity: Long,
-    issueTransactionId: String,
+    originTransactionId: String,
     minSponsoredAssetFee: Option[Long],
     scriptDetails: Option[ScriptAssetInfo]
 )

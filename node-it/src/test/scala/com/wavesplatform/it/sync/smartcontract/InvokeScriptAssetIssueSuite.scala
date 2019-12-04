@@ -40,7 +40,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val assetInfo = sender.assetsDetails(issueTx.id)
     assetInfo.assetId shouldBe issueTx.id
-    assetInfo.issueTransactionId shouldBe issueTx.id
+    assetInfo.originTransactionId shouldBe issueTx.id
     assetInfo.issueTimestamp shouldBe issueTx.timestamp
     assetInfo.issuer shouldBe issueTx.sender.get
     assetInfo.name shouldBe "TxAsset"
@@ -85,7 +85,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val assetInfo = sender.assetsDetails(invokeScriptAssetId)
     assetInfo.assetId shouldBe invokeScriptAssetId
-    assetInfo.issueTransactionId shouldBe invokeScriptTx.id
+    assetInfo.originTransactionId shouldBe invokeScriptTx.id
     assetInfo.issueTimestamp shouldBe invokeScriptTx.timestamp
     assetInfo.issuer shouldBe smartAcc.stringRepr
     assetInfo.name shouldBe "InvokeAsset"
@@ -116,7 +116,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val assetInfo = sender.assetsDetails(issueTxAssetId)
     assetInfo.assetId shouldBe issueTxAssetId
-    assetInfo.issueTransactionId shouldBe issueTx.id
+    assetInfo.originTransactionId shouldBe issueTx.id
     assetInfo.issueTimestamp shouldBe issueTx.timestamp
     assetInfo.issuer shouldBe issueTx.sender.get
     assetInfo.name shouldBe "TxAsset"
@@ -140,7 +140,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val assetInfo = sender.assetsDetails(invokeScriptAssetId)
     assetInfo.assetId shouldBe invokeScriptAssetId
-    assetInfo.issueTransactionId shouldBe invokeScriptTx.id
+    assetInfo.originTransactionId shouldBe invokeScriptTx.id
     assetInfo.issueTimestamp shouldBe invokeScriptTx.timestamp
     assetInfo.issuer shouldBe smartAcc.stringRepr
     assetInfo.name shouldBe "InvokeAsset"
@@ -160,7 +160,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val assetInfo = sender.assetsDetails(issueTxAssetId)
     assetInfo.assetId shouldBe issueTx.id
-    assetInfo.issueTransactionId shouldBe issueTx.id
+    assetInfo.originTransactionId shouldBe issueTx.id
     assetInfo.issueTimestamp shouldBe issueTx.timestamp
     assetInfo.issuer shouldBe issueTx.sender.get
     assetInfo.name shouldBe "TxAsset"
@@ -184,7 +184,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val assetInfo = sender.assetsDetails(invokeScriptAssetId)
     assetInfo.assetId shouldBe invokeScriptAssetId
-    assetInfo.issueTransactionId shouldBe invokeScriptTx.id
+    assetInfo.originTransactionId shouldBe invokeScriptTx.id
     assetInfo.issueTimestamp shouldBe invokeScriptTx.timestamp
     assetInfo.issuer shouldBe smartAcc.stringRepr
     assetInfo.name shouldBe "InvokeAsset"

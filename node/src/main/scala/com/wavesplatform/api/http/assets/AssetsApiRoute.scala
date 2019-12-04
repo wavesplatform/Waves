@@ -367,7 +367,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           }),
-          "issueTransactionId" -> JsString(txId.toString)
+          "originTransactionId" -> JsString(txId.toString)
         ) ++ script.toSeq.map { script =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),

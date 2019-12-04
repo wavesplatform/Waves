@@ -96,6 +96,6 @@ class AssetsApiRouteSpec
     (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
-    (response \ "issueTransactionId").as[String] shouldBe tx.id().toString
+    (response \ "originTransactionId").as[String] shouldBe tx.id().toString
   }
 }
