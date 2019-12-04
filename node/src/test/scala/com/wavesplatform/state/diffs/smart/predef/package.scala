@@ -41,7 +41,7 @@ package object predef {
     } yield r
   }
 
-  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1): Either[String, T] =
+  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1, chainId: Byte = chainId): Either[String, T] =
     runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, chainId: Byte): Either[String, T] =

@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
+import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -49,7 +49,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         0,
         reissuable = false,
         issueFee,
-        version = 2
+        version = 2.toByte
       )
       .id
 
@@ -62,7 +62,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         0,
         reissuable = false,
         issueFee,
-        2,
+        2.toByte,
         Some(scriptBase64)
       )
       .id
@@ -101,7 +101,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         0,
         reissuable = false,
         issueFee,
-        2,
+        2.toByte,
         script = Some(
           ScriptCompiler(
             s"""match tx {
@@ -294,7 +294,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         0,
         reissuable = false,
         issueFee,
-        2,
+        2.toByte,
         script = Some(unchangeableScript.bytes.value.base64)
       )
       .id
@@ -310,7 +310,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val accountA = pkByAddress(firstAddress)
 
     val setScriptTransaction = SetScriptTransaction
-      .selfSigned(1.toByte, accountA, Some(
+      .selfSigned(
+        1.toByte,
+        accountA,
+        Some(
           ScriptCompiler(
             s"""|let pkB = base58'${ByteStr(accountB.publicKey)}'
                 |match tx {
@@ -321,7 +324,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             isAssetScript = false,
             estimator
           ).explicitGet()._1
-        ), setScriptFee, System.currentTimeMillis())
+        ),
+        setScriptFee,
+        System.currentTimeMillis()
+      )
       .right
       .get
 

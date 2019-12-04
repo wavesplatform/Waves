@@ -10,7 +10,7 @@ import org.iq80.leveldb.DB
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG, BlockchainUpdated}
 
 object StorageFactory extends ScorexLogging {
-  private val StorageVersion = 4
+  private val StorageVersion = 5
 
   def apply(settings: WavesSettings,
             db: DB,

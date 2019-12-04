@@ -1,6 +1,5 @@
 package com.wavesplatform.api.grpc
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.api.common.CommonAssetsApi
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.utils.EitherExt2
@@ -16,12 +15,12 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
   private[this] val commonApi = new CommonAssetsApi(blockchain)
 
   override def getInfo(request: AssetRequest): Future[AssetInfoResponse] = Future {
-    val result = for (info <- commonApi.fullInfo(IssuedAsset(request.assetId)))
-      yield
-        AssetInfoResponse(
+    val result =
+      for (info <- commonApi.fullInfo(IssuedAsset(request.assetId)))
+        yield AssetInfoResponse(
           info.description.issuer,
-          ByteString.copyFrom(info.description.name),
-          ByteString.copyFrom(info.description.description),
+          info.description.name,
+          info.description.description,
           info.description.decimals,
           info.description.reissuable,
           info.description.totalVolume.longValue(),

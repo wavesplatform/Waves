@@ -1,7 +1,8 @@
 package com.wavesplatform.state
 
+import cats.data.Ior
 import cats.implicits._
-import cats.kernel.Monoid
+import cats.kernel.{Monoid, Semigroup}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -40,30 +41,39 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(isReissuable: Boolean, volume: BigInt)
+case class AssetInfo(name: String, description: String, lastUpdatedAt: Height)
+
 object AssetInfo {
-  implicit val assetInfoMonoid: Monoid[AssetInfo] = new Monoid[AssetInfo] {
-    override def empty: AssetInfo = AssetInfo(isReissuable = true, 0)
-    override def combine(x: AssetInfo, y: AssetInfo): AssetInfo =
-      AssetInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
+  implicit val sg: Semigroup[AssetInfo] = (x, y) => y
+}
+
+case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int)
+case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
+
+object AssetVolumeInfo {
+  implicit val assetInfoMonoid: Monoid[AssetVolumeInfo] = new Monoid[AssetVolumeInfo] {
+    override def empty: AssetVolumeInfo = AssetVolumeInfo(isReissuable = true, 0)
+    override def combine(x: AssetVolumeInfo, y: AssetVolumeInfo): AssetVolumeInfo =
+      AssetVolumeInfo(x.isReissuable && y.isReissuable, x.volume + y.volume)
   }
 }
 
 case class AssetDescription(
     issuer: PublicKey,
-    name: Array[Byte],
-    description: Array[Byte],
+    name: String,
+    description: String,
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
+    lastUpdatedAt: Height,
     script: Option[Script],
     sponsorship: Long
 ) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
       o.issuer == this.issuer &&
-        java.util.Arrays.equals(o.name, name) &&
-        java.util.Arrays.equals(o.description, description) &&
+        o.name.equals(name) &&
+        o.description.equals(description) &&
         o.decimals == decimals &&
         o.reissuable == reissuable &&
         o.totalVolume == totalVolume &&
@@ -128,7 +138,8 @@ object Sponsorship {
 case class Diff(
     transactions: Map[ByteStr, (Transaction, Set[Address])],
     portfolios: Map[Address, Portfolio],
-    issuedAssets: Map[IssuedAsset, AssetInfo],
+    issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
+    updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
@@ -144,7 +155,8 @@ case class Diff(
 object Diff {
   def stateOps(
       portfolios: Map[Address, Portfolio] = Map.empty,
-      assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
+      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
@@ -157,7 +169,8 @@ object Diff {
     Diff(
       transactions = Map(),
       portfolios = portfolios,
-      issuedAssets = assetInfos,
+      issuedAssets = issuedAssets,
+      updatedAssets = updatedAssets,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -173,7 +186,8 @@ object Diff {
   def apply(
       tx: Transaction,
       portfolios: Map[Address, Portfolio] = Map.empty,
-      assetInfos: Map[IssuedAsset, AssetInfo] = Map.empty,
+      issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
+      updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]] = Map.empty,
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
@@ -188,7 +202,8 @@ object Diff {
     Diff(
       transactions = Map((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
-      issuedAssets = assetInfos,
+      issuedAssets = issuedAssets,
+      updatedAssets = updatedAssets,
       aliases = aliases,
       orderFills = orderFills,
       leaseState = leaseState,
@@ -201,16 +216,18 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+  val empty =
+    new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
-  implicit val diffMonoid = new Monoid[Diff] {
+  implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
 
     override def combine(older: Diff, newer: Diff): Diff =
       Diff(
         transactions = older.transactions ++ newer.transactions,
         portfolios = older.portfolios.combine(newer.portfolios),
-        issuedAssets = older.issuedAssets.combine(newer.issuedAssets),
+        issuedAssets = older.issuedAssets ++ newer.issuedAssets,
+        updatedAssets = older.updatedAssets |+| newer.updatedAssets,
         aliases = older.aliases ++ newer.aliases,
         orderFills = older.orderFills.combine(newer.orderFills),
         leaseState = older.leaseState ++ newer.leaseState,

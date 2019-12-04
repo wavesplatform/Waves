@@ -4,9 +4,9 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, TxValidationError}
 
 import scala.util.Try
 
@@ -76,6 +76,17 @@ object TxConstraints {
         name,
         TxValidationError.InvalidName
       )
+  }
+
+  def asset[A <: Asset](asset: A): ValidatedV[A] = {
+    asset.fold(Validated.validNel[ValidationError, A](asset)) { ia =>
+      Validated
+        .condNel(
+          ia.id.length == com.wavesplatform.crypto.DigestLength,
+          asset,
+          TxValidationError.InvalidAssetId
+        )
+    }
   }
 
   def assetDescription(description: Array[Byte]): ValidatedV[Array[Byte]] = {

@@ -1,5 +1,8 @@
 package com.wavesplatform.state
 
+import java.nio.{ByteBuffer, CharBuffer}
+import java.nio.charset.{Charset, CharsetDecoder, CoderResult}
+
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -46,11 +49,26 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
       case 2 =>
         List(
           MassTransferTransaction
-            .selfSigned(1.toByte, sender, Waves, List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)), 10000, nextTs, Array.empty[Byte])
+            .selfSigned(
+              1.toByte,
+              sender,
+              Waves,
+              List(ParsedTransfer(recipient, amount), ParsedTransfer(recipient, amount)),
+              10000,
+              nextTs,
+              Array.empty[Byte]
+            )
             .explicitGet()
         )
       case _ => List(TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, 1000, Array.empty[Byte], nextTs).right.get)
     }
+  }
+
+  def nonEmptyStringGen(lb: Int, ub: Int): Gen[String] = {
+    for {
+      len <- Gen.chooseNum(lb, ub)
+      arr <- Gen.containerOfN[Array, Char](len, Gen.alphaNumChar)
+    } yield String.copyValueOf(arr)
   }
 
   "Rollback resets" - {
@@ -237,14 +255,17 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
-    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, byteArrayGen(10), byteArrayGen(12)) {
+
+    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, nonEmptyStringGen(4, 16), nonEmptyStringGen(0, 1000)) {
       case (sender, initialBalance, name, description) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction.selfSigned(TxVersion.V1, sender, name, description, 2000, 8, true, script = None, 1, nextTs).explicitGet()
+            IssueTransaction
+              .selfSigned(TxVersion.V1, sender, name.getBytes("UTF-8"), description.getBytes("UTF-8"), 2000, 8, true, script = None, 1, nextTs)
+              .explicitGet()
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
           d.appendBlock(
@@ -258,7 +279,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0)
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), Height @@ 0, None, 0)
           )
 
           d.appendBlock(
@@ -272,12 +293,12 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, false, BigInt(4000), None, 0)
+            AssetDescription(sender, name, description, 8, false, BigInt(4000), Height @@ 0, None, 0)
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), None, 0)
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), Height @@ 0, None, 0)
           )
 
           d.removeAfter(genesisBlockId)
