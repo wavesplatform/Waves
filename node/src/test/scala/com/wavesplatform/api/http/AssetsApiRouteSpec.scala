@@ -30,6 +30,7 @@ class AssetsApiRouteSpec
 
   private val smartAssetTx = issueV2TransactionGen().retryUntil(_.script.nonEmpty).sample.get
   private val smartAssetDesc = AssetDescription(
+    source = smartAssetTx.id(),
     issuer = smartAssetTx.sender,
     name = new String(smartAssetTx.name),
     description = new String(smartAssetTx.description),
@@ -60,6 +61,7 @@ class AssetsApiRouteSpec
 
   private val sillyAssetTx = issueGen.sample.get
   private val sillyAssetDesc = AssetDescription(
+    source = sillyAssetTx.id(),
     issuer = sillyAssetTx.sender,
     name = new String(sillyAssetTx.name),
     description = new String(sillyAssetTx.description),

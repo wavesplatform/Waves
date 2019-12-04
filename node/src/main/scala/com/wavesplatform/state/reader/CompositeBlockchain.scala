@@ -60,6 +60,7 @@ final case class CompositeBlockchain(
           }
 
           AssetDescription(
+            static.source,
             static.issuer,
             info.name,
             info.description,

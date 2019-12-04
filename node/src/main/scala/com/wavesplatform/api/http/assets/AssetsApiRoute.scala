@@ -8,7 +8,6 @@ import cats.instances.either.catsStdInstancesForEither
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
@@ -330,35 +329,34 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     }).left.map(ApiError.fromValidationError)
 
   private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] = {
-    // (transactionId, timestamp, height)
-    def additionalInfo(id: ByteStr): Either[String, (ByteStr, Long, Int)] =
+    // (timestamp, height)
+    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
       for {
-        // todo: (NODE-1966) InvokeScript tx which generated this asset
         tt <- blockchain.transactionInfo(id).toRight("Failed to find issue/invokeScript transaction by ID")
         (h, mtx) = tt
-        tx <- (mtx match {
-          case t: IssueTransaction        => Some(t)
-          case t: InvokeScriptTransaction => Some(t)
-          case _                          => None
-        }).toRight("No issue/invokeScript transaction found with given asset ID")
-      } yield (tx.id(), tx.timestamp, h)
+        ts <- (mtx match {
+          case tx: IssueTransaction        => Some(tx.timestamp)
+          case tx: InvokeScriptTransaction => Some(tx.timestamp)
+          case _                           => None
+        }).toRight("No issue/invokeScript transaction found with the given asset ID")
+      } yield (ts, h)
 
     (for {
-      id  <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
-      tsh <- additionalInfo(id)
-      (txId, ts, h) = tsh
+      id          <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
       description <- blockchain.assetDescription(IssuedAsset(id)).toRight("Failed to get description of the asset")
-      script = description.script.filter(_ => full)
+      tsh         <- additionalInfo(description.source)
+      (timestamp, height) = tsh
+      script              = description.script.filter(_ => full)
       complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
     } yield {
       JsObject(
         Seq(
           "assetId"        -> JsString(id.toString),
-          "issueHeight"    -> JsNumber(h),
-          "issueTimestamp" -> JsNumber(ts),
+          "issueHeight"    -> JsNumber(height),
+          "issueTimestamp" -> JsNumber(timestamp),
           "issuer"         -> JsString(description.issuer.stringRepr),
-          "name"           -> JsString(new String(description.name, Charsets.UTF_8)),
-          "description"    -> JsString(new String(description.description, Charsets.UTF_8)),
+          "name"           -> JsString(description.name),
+          "description"    -> JsString(description.description),
           "decimals"       -> JsNumber(description.decimals),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
@@ -367,7 +365,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
             case 0           => JsNull
             case sponsorship => JsNumber(sponsorship)
           }),
-          "originTransactionId" -> JsString(txId.toString)
+          "originTransactionId" -> JsString(description.source.toString)
         ) ++ script.toSeq.map { script =>
           "scriptDetails" -> Json.obj(
             "scriptComplexity" -> JsNumber(BigDecimal(complexity)),

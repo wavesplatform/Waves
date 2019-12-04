@@ -59,6 +59,7 @@ object AssetVolumeInfo {
 }
 
 case class AssetDescription(
+    source: ByteStr,
     issuer: PublicKey,
     name: String,
     description: String,
@@ -71,7 +72,8 @@ case class AssetDescription(
 ) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>
-      o.issuer == this.issuer &&
+      o.source == this.source &&
+        o.issuer == this.issuer &&
         o.name.equals(name) &&
         o.description.equals(description) &&
         o.decimals == decimals &&

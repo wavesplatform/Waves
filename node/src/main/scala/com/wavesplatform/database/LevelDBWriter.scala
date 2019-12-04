@@ -193,6 +193,7 @@ class LevelDBWriter(
       sponsorship = db.fromHistory(Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
       script      = db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
     } yield AssetDescription(
+      staticInfo.source,
       staticInfo.issuer,
       info.name,
       info.description,

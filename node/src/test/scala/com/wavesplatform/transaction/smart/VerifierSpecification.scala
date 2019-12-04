@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.script.Script
@@ -29,7 +30,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       Seq(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset)
         .collect { case asset: IssuedAsset => asset }
         .foreach { asset =>
-          (bc.assetDescription _).when(asset).returns(mkAssetDescription(tx.sender, 8))
+          (bc.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8))
           (bc.assetScript _).when(asset).returns(None)
           (bc.activatedFeatures _).when().returns(Map())
         }
@@ -62,8 +63,8 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
     }
   }
 
-  private def mkAssetDescription(matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(matcherAccount, "", "", decimals, reissuable = false, BigInt(0), Height @@ 0, None, 0))
+  private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
+    Some(AssetDescription(assetId, matcherAccount, "", "", decimals, reissuable = false, BigInt(0), Height @@ 0, None, 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
@@ -85,7 +86,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
 
     def prepareAssets(assetsAndScripts: (Asset, Option[Script])*): Unit = assetsAndScripts foreach {
       case (asset: IssuedAsset, scriptOption) =>
-        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(tx.sender, 8))
+        (blockchain.assetDescription _).when(asset).returns(mkAssetDescription(asset.id, tx.sender, 8))
         (blockchain.assetScript _).when(asset).returns(scriptOption)
         (blockchain.hasAssetScript _).when(asset).returns(scriptOption.isDefined)
       case _ =>

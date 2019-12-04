@@ -15,10 +15,7 @@ class CommonAssetsApi(blockchain: Blockchain) {
     for {
       assetInfo <- blockchain.assetDescription(assetId)
       issueTransaction = blockchain.transactionInfo(assetId.id).collect { case (_, tx: IssueTransaction) => tx }
-      sponsorBalance = issueTransaction match {
-        case Some(tx) if assetInfo.sponsorship != 0 => Some(blockchain.wavesPortfolio(tx.sender).spendableBalance)
-        case _                                      => None
-      }
+      sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(assetInfo.issuer).spendableBalance) else None
     } yield AssetInfo(assetInfo, issueTransaction, sponsorBalance)
 }
 
