@@ -81,7 +81,8 @@ case class Block(
   private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(Merkle.mkMerkleTree(transactionData))
 
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr)
+    require(header.version >= Block.ProtoBlockVersion, "Block's version should be >= 5 to retrieve transactionsRoot")
+    (transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr
   }
 
   override def toString: String =

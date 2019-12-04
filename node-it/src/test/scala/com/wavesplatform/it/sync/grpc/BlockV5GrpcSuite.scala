@@ -24,25 +24,27 @@ class BlockV5GrpcSuite
 
   "block v5 appears and blockchain grows" - {
     "when feature activation happened" in {
-      sender.grpc.waitForHeight(ActivationHeight)
+      sender.grpc.waitForHeight(ActivationHeight - 1)
 
-      val blockAtActivationHeight = sender.grpc.blockAt(ActivationHeight)
+      val blockAtActivationHeight = sender.grpc.blockAt(ActivationHeight - 1)
       val blockAtActivationHeightById = sender.grpc.blockById(ByteString.copyFrom(blockAtActivationHeight.signature))
 
-      blockAtActivationHeight.header.version should not be Block.ProtoBlockVersion
+      blockAtActivationHeight.header.version shouldBe Block.RewardBlockVersion
       blockAtActivationHeight.header.generationSignature.length shouldBe Block.GenerationSignatureLength
-      blockAtActivationHeightById.header.version should not be Block.ProtoBlockVersion
+      blockAtActivationHeightById.header.version shouldBe Block.RewardBlockVersion
       blockAtActivationHeightById.header.generationSignature.length shouldBe Block.GenerationSignatureLength
 
-      sender.grpc.waitForHeight(ActivationHeight + 1)
+      sender.grpc.waitForHeight(ActivationHeight)
 
-      val blockAfterActivationHeight = sender.grpc.blockAt(ActivationHeight + 1)
+      val blockAfterActivationHeight = sender.grpc.blockAt(ActivationHeight)
       val blockAfterActivationHeightById = sender.grpc.blockById(ByteString.copyFrom(blockAfterActivationHeight.signature))
 
       blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
       blockAfterActivationHeight.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
+      assert(blockAfterActivationHeight.transactionsRootValid(), "transactionsRoot is not valid")
       blockAfterActivationHeightById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterActivationHeightById.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
+      assert(blockAfterActivationHeightById.transactionsRootValid(), "transactionsRoot is not valid")
 
       sender.grpc.waitForHeight(ActivationHeight + 2)
 
