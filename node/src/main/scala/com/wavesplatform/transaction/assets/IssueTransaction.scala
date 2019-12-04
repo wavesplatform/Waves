@@ -54,8 +54,6 @@ object IssueTransaction extends TransactionParser {
   val MaxAssetDescriptionLength = 1000
   val MaxAssetDecimals          = 8
 
-  override type TransactionT = IssueTransaction
-
   override val typeId: TxType                       = 3
   override val supportedVersions: Set[TxVersion]    = Set(1, 2, 3)
 
@@ -77,7 +75,7 @@ object IssueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, IssueTransaction] =
     IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -92,7 +90,7 @@ object IssueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, IssueTransaction] =
     create(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -106,7 +104,7 @@ object IssueTransaction extends TransactionParser {
       script: Option[Script],
       fee: Long,
       timestamp: Long
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, IssueTransaction] =
     signed(version, sender, name, description, quantity, decimals, reissuable, script, fee, timestamp, sender)
 
   override def parseBytes(bytes: Array[TxType]): Try[IssueTransaction] = serializer.parseBytes(bytes)

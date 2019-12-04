@@ -50,10 +50,9 @@ object MassTransferTxSerializer {
     }
   }
 
-  def toBytes(tx: MassTransferTransaction): Array[Byte] = {
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
-  }
+  def toBytes(tx: MassTransferTransaction): Array[Byte] =
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
 
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     def parseTransfers(buf: ByteBuffer): Seq[MassTransferTransaction.ParsedTransfer] = {

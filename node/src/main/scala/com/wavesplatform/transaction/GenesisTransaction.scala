@@ -25,8 +25,6 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
 }
 
 object GenesisTransaction extends TransactionParser {
-  override type TransactionT = GenesisTransaction
-
   override val typeId: TxType                    = 1
   override val supportedVersions: Set[TxVersion] = Set(1)
 

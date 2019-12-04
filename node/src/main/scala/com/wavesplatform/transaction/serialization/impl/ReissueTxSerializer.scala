@@ -48,11 +48,10 @@ object ReissueTxSerializer {
   }
 
   def toBytes(tx: ReissueTransaction): Array[Byte] = {
-    import tx._
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
   }
 

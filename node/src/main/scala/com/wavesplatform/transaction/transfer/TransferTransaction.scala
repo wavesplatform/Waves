@@ -34,7 +34,6 @@ case class TransferTransaction(
 
   override val typeId: TxType = TransferTransaction.typeId
 
-  // TODO: Rework caching
   val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
@@ -48,8 +47,6 @@ case class TransferTransaction(
 }
 
 object TransferTransaction extends TransactionParser {
-  override type TransactionT = TransferTransaction
-
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 

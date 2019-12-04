@@ -50,8 +50,6 @@ case class MassTransferTransaction(
 }
 
 object MassTransferTransaction extends TransactionParser {
-  override type TransactionT = MassTransferTransaction
-
   val MaxTransferCount = 100
 
   override val typeId: TxType                    = 11
@@ -89,7 +87,7 @@ object MassTransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       attachment: Option[Attachment],
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, MassTransferTransaction] =
     MassTransferTransaction(version, sender, assetId, transfers, fee, timestamp, attachment, proofs).validatedEither
 
   def signed(
@@ -101,7 +99,7 @@ object MassTransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       attachment: Option[Attachment],
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, MassTransferTransaction] =
     create(version, sender, assetId, transfers, fee, timestamp, attachment, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -112,7 +110,7 @@ object MassTransferTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       attachment: Option[Attachment]
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, MassTransferTransaction] =
     signed(version, sender, assetId, transfers, fee, timestamp, attachment, sender)
 
   def parseTransfersList(transfers: List[Transfer]): Validation[List[ParsedTransfer]] = {

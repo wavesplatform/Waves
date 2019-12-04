@@ -43,12 +43,11 @@ object TransferTxSerializer {
     }
   }
 
-  def toBytes(tx: TransferTransaction): Array[Byte] =
-    tx.version match {
-      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx))
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
-      case _            => PBTransactionSerializer.bytes(tx)
-    }
+  def toBytes(tx: TransferTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx))
+    case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    case _            => PBTransactionSerializer.bytes(tx)
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): TransferTransaction = {

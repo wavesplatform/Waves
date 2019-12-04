@@ -38,8 +38,8 @@ object SetScriptTxSerializer {
   }
 
   def toBytes(tx: SetScriptTransaction): Array[Byte] = {
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {

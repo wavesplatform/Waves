@@ -25,8 +25,6 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
 }
 
 object PaymentTransaction extends TransactionParser {
-  override type TransactionT = PaymentTransaction
-
   override val typeId: TxType                    = 2
   override val supportedVersions: Set[TxVersion] = Set(1)
 
@@ -38,7 +36,7 @@ object PaymentTransaction extends TransactionParser {
 
   implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
 
-  def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, TransactionT] = {
+  def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
     create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
@@ -51,6 +49,6 @@ object PaymentTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       signature: ByteStr
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, PaymentTransaction] =
     PaymentTransaction(sender, recipient, amount, fee, timestamp, signature).validatedEither
 }

@@ -60,8 +60,9 @@ object Attachment {
           }
           JsSuccess(result)
 
-        case JsString(v) => JsSuccess(Bin(Base58.decode(v)))
-
+        case JsString(v) =>
+          if (v.length <= TransferTransaction.MaxAttachmentStringSize) JsSuccess(Bin(Base58.decode(v)))
+          else JsError(s"attachment length ${v.length} exceeds maximum length of ${TransferTransaction.MaxAttachmentStringSize}")
         case _ =>
           JsError("Expected object or null")
       },

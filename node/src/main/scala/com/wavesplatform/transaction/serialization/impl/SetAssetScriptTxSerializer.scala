@@ -39,10 +39,9 @@ object SetAssetScriptTxSerializer {
     }
   }
 
-  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
-  }
+  def toBytes(tx: SetAssetScriptTransaction): Array[Byte] =
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[SetAssetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")

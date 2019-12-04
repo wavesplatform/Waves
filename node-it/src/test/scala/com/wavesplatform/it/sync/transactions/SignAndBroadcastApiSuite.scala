@@ -66,7 +66,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
                "amount"     -> 1,
                "fee"        -> 100000,
                "attachment" -> "W" * 524291)
-    assertSignBadJson(bigBaseTx, "base58Decode input exceeds")
+    assertSignBadJson(bigBaseTx, "failed to parse json message")
   }
 
   test("/transaction/calculateFee should handle coding size limit") {

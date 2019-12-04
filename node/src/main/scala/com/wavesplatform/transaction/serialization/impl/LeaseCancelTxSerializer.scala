@@ -28,11 +28,10 @@ object LeaseCancelTxSerializer {
   }
 
   def toBytes(tx: LeaseCancelTransaction): Array[Byte] = {
-    import tx._
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
   }
 

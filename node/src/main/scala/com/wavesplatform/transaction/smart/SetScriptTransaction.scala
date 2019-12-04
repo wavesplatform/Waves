@@ -38,8 +38,6 @@ case class SetScriptTransaction(
 }
 
 object SetScriptTransaction extends TransactionParser {
-  override type TransactionT = SetScriptTransaction
-
   override val typeId: TxType                    = 13
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
@@ -61,7 +59,7 @@ object SetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetScriptTransaction] =
     SetScriptTransaction(version, sender, script, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -71,7 +69,7 @@ object SetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetScriptTransaction] =
     create(version, sender, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -80,6 +78,6 @@ object SetScriptTransaction extends TransactionParser {
       script: Option[Script],
       fee: TxAmount,
       timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetScriptTransaction] =
     signed(version, sender, script, fee, timestamp, sender)
 }

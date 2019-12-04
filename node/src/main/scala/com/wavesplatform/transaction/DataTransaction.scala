@@ -35,8 +35,6 @@ object DataTransaction extends TransactionParser {
   val MaxProtoBytes: Int = 165890
   val MaxEntryCount: Int = 100
 
-  override type TransactionT = DataTransaction
-
   override val typeId: TxType                    = 12
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
@@ -57,7 +55,7 @@ object DataTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, DataTransaction] =
     DataTransaction(version, sender, data, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -67,7 +65,7 @@ object DataTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, DataTransaction] =
     create(version, sender, data, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -76,6 +74,6 @@ object DataTransaction extends TransactionParser {
       data: Seq[DataEntry[_]],
       fee: TxAmount,
       timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, DataTransaction] =
     signed(version, sender, data, fee, timestamp, sender)
 }
