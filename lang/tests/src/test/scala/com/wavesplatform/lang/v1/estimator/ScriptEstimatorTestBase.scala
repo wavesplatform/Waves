@@ -38,7 +38,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
   private val v3FunctionCosts = utils.functionCosts(V3)
 
   private val ctx = {
-    val transactionType = Types.buildTransferTransactionType(true)
+    val transactionType = Types.buildTransferTransactionType(true, V3)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(Seq(

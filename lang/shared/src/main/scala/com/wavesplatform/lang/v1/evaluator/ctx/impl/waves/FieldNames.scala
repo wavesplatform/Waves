@@ -14,7 +14,7 @@ object FieldNames {
   val BooleanEntry = "BooleanEntry"
   val StringEntry  = "StringEntry"
   val BinaryEntry  = "BinaryEntry"
-  val IntEntry     = "IntEntry"
+  val IntegerEntry = "IntegerEntry"
 
   val Recipient      = "recipient"
   val Amount         = "amount"
