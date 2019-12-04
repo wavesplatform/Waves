@@ -1226,6 +1226,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(src, version = V4) shouldBe Right(CONST_LONG(arr.head))
   }
 
+  property("List[Int] median - negative rounding down") {
+    val arr = Seq(3, -8)
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(-3))
+  }
+
   property("List[Int] median - 101 elements - error") {
     val arr = (1 to 101).map(_ => Long.MaxValue)
     val src =
@@ -1248,7 +1255,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("List[Int] median - list with non int elements - error") {
     val src =
-      s"""["foo", "bar"].median()"""
+      s"""["1", "2"].median()"""
     eval(src, version = V4) should produce("Can't apply")
   }
 }
