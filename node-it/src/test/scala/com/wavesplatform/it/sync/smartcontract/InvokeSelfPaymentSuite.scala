@@ -20,7 +20,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
 
   private val caller = pkByAddress(firstAddress).stringRepr
   private val dAppV4 = pkByAddress(secondAddress).stringRepr
-  private val dAppV3 = pkByAddress(secondAddress).stringRepr
+  private val dAppV3 = pkByAddress(thirdAddress).stringRepr
 
   private var asset1: IssuedAsset = _
   private def asset1Id = asset1.id.toString
