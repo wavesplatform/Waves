@@ -24,6 +24,8 @@ trait Script {
 
   val containsBlockV2: Coeval[Boolean]
 
+  val containsArray: Boolean
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
