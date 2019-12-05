@@ -374,7 +374,7 @@ object InvokeScriptTransactionDiff {
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
         // It is clone of AssetTransactionsDiff.issue. Need to unificate.
-         val staticInfo = AssetStaticInfo(TransactionId @@ issue.id(), pk, issue.decimals)
+         val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals)
          val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
          val info       = AssetInfo(new String(issue.name), new String(issue.description), Height @@ blockchain.height)
 
