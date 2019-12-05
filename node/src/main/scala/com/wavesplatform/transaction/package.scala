@@ -24,7 +24,6 @@ package object transaction {
     val V1: TxVersion = 1.toByte
     val V2: TxVersion = 2.toByte
     val V3: TxVersion = 3.toByte
-    val Pseudo: TxVersion = 127.toByte
   }
   type TxAmount    = Long
   type TxTimestamp = Long

@@ -48,9 +48,6 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def prepareIssue(tx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): Either[ValidationError, IssueTransaction] =
-    IssueTransaction.create(TxVersion.Pseudo, pk, issue.name.getBytes, issue.description.getBytes, issue.quantity, issue.decimals.toByte, issue.isReissuable, None /*issue.script*/, 0, tx.timestamp, List())
-
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
@@ -376,27 +373,25 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-        prepareIssue(tx, pk, issue).flatMap { pseudo =>
-          // It is clone of AssetTransactionsDiff.issue. Need to unificate.
-          val staticInfo = AssetStaticInfo(TransactionId @@ pseudo.id(), pk, pseudo.decimals)
-          val volumeInfo = AssetVolumeInfo(pseudo.reissuable, BigInt(pseudo.quantity))
-          val info       = AssetInfo(new String(pseudo.name), new String(pseudo.description), Height @@ blockchain.height)
+        // It is clone of AssetTransactionsDiff.issue. Need to unificate.
+         val staticInfo = AssetStaticInfo(TransactionId @@ issue.id(), pk, issue.decimals)
+         val volumeInfo = AssetVolumeInfo(issue.reissuable, BigInt(issue.quantity))
+         val info       = AssetInfo(new String(issue.name), new String(issue.description), Height @@ blockchain.height)
 
-          val asset = IssuedAsset(pseudo.id())
+         val asset = IssuedAsset(issue.id())
 
-          DiffsCommon
-            .countScriptComplexity(pseudo.script, blockchain)
-            .map(
-              script =>
-                Diff(
-                  tx = itx,
-                  portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> pseudo.quantity))),
-                  issuedAssets = Map(asset -> ((staticInfo, info, volumeInfo))),
-                  assetScripts = Map(asset -> script.map(script => ((pk, script._1, script._2)))),
-                  scriptsRun = 0
-                )
-            )
-        }
+         DiffsCommon
+           .countScriptComplexity(issue.script, blockchain)
+           .map(
+             script =>
+               Diff(
+                 tx = itx,
+                 portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                 issuedAssets = Map(asset -> ((staticInfo, info, volumeInfo))),
+                 assetScripts = Map(asset -> script.map(script => ((pk, script._1, script._2)))),
+                 scriptsRun = 0
+               )
+           )
       }
 
 
