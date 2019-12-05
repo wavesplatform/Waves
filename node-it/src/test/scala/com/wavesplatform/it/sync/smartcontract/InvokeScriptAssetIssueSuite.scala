@@ -71,7 +71,12 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
         waitForTx = true
       )
       ._1
-    invokeScriptAssetId = ???
+
+    val stateChanges = sender.debugStateChanges(invokeScriptTx.id).stateChanges
+    stateChanges shouldBe 'defined
+    stateChanges.value.issues.size shouldBe 1
+
+    invokeScriptAssetId = stateChanges.value.issues.head.assetId
      */
     invokeScriptTx = sender.issue(smartAcc.stringRepr, "InvokeAsset", "InvokeDesc", 100L, 0, fee = issueFee + smartFee, waitForTx = true)
     invokeScriptAssetId = invokeScriptTx.id
@@ -94,16 +99,13 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     assetInfo.decimals shouldBe 0
     assetInfo.quantity shouldBe 100L
     /*
-    val stateChanges = sender.debugStateChanges(invokeScriptTx.id)
-    stateChanges.stateChanges.value.issues.size shouldBe 1
-    stateChanges.stateChanges.value.issues.head.assetId shouldBe invokeScriptAssetId
-    stateChanges.stateChanges.value.issues.head.name shouldBe "InvokeAsset"
-    stateChanges.stateChanges.value.issues.head.description shouldBe "InvokeDesc"
-    stateChanges.stateChanges.value.issues.head.quantity shouldBe 100L
-    stateChanges.stateChanges.value.issues.head.decimals shouldBe 0
-    stateChanges.stateChanges.value.issues.head.isReissuable shouldBe true
-    stateChanges.stateChanges.value.issues.head.compiledScript shouldBe None
-    stateChanges.stateChanges.value.issues.head.nonce shouldBe None
+    stateChanges.value.issues.head.name shouldBe "InvokeAsset"
+    stateChanges.value.issues.head.description shouldBe "InvokeDesc"
+    stateChanges.value.issues.head.quantity shouldBe 100L
+    stateChanges.value.issues.head.decimals shouldBe 0
+    stateChanges.value.issues.head.isReissuable shouldBe true
+    stateChanges.value.issues.head.compiledScript shouldBe None
+    stateChanges.value.issues.head.nonce shouldBe None
 
     val balance = sender.assetsBalance(firstAddress).balances.find(_.assetId == invokeScriptAssetId)
     balance shouldBe 'defined
@@ -149,10 +151,10 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     assetInfo.decimals shouldBe 0
     assetInfo.quantity shouldBe 200L
 
-    val stateChanges = sender.debugStateChanges(txId)
-    stateChanges.stateChanges.value.reissues.size shouldBe 1
-    stateChanges.stateChanges.value.reissues.head.assetId shouldBe invokeScriptAssetId
-    stateChanges.stateChanges.value.reissues.head.quantity shouldBe 100L
+    val stateChanges = sender.debugStateChanges(txId).stateChanges
+    stateChanges.value.reissues.size shouldBe 1
+    stateChanges.value.reissues.head.assetId shouldBe invokeScriptAssetId
+    stateChanges.value.reissues.head.quantity shouldBe 100L
   }
 
   test("Correct data for assets burnt by transaction") {
@@ -193,10 +195,10 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     assetInfo.decimals shouldBe 0
     assetInfo.quantity shouldBe 100L
 
-    val stateChanges = sender.debugStateChanges(txId)
-    stateChanges.stateChanges.value.burns.size shouldBe 1
-    stateChanges.stateChanges.value.burns.head.assetId shouldBe invokeScriptAssetId
-    stateChanges.stateChanges.value.burns.head.quantity shouldBe 100L
+    val stateChanges = sender.debugStateChanges(txId).stateChanges
+    stateChanges.value.burns.size shouldBe 1
+    stateChanges.value.burns.head.assetId shouldBe invokeScriptAssetId
+    stateChanges.value.burns.head.quantity shouldBe 100L
   }
 
   test("correct data for NFT issued by transaction") {
@@ -221,7 +223,12 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
         waitForTx = true
       )
       ._1
-    val nftInvokeScriptAssetId = ???*/
+
+    val stateChanges = sender.debugStateChanges(nftInvokeScriptTx.id).stateChanges
+    stateChanges shouldBe 'defined
+    stateChanges.value.issues.size shouldBe 1
+
+    val nftInvokeScriptAssetId = stateChanges.value.issues.head.assetId*/
 
     val nftInvokeScriptTx =
       sender.issue(smartAcc.stringRepr, "TxNft", "TxNftDesc", 1, 0, fee = issueFee + smartFee, reissuable = false, waitForTx = true)

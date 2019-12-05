@@ -212,7 +212,7 @@ object NFTBalanceSuite {
     Await.ready(transactions, 30.seconds)
   }
 
-  // returns first page of issue transactions ids from addresses portfolio
+  // returns first page of asset ids from addresses portfolio
   // obtained via paged api
   def getNFTPage(node: Node, issuer: String, limit: Int, maybeAfter: Option[String]): Future[List[String]] = {
     val afterParam = maybeAfter.fold("")(id => s"?after=$id")
@@ -222,12 +222,12 @@ object NFTBalanceSuite {
       .as[JsArray]
       .map { arr =>
         arr.value.map { json =>
-          (json \ "id").as[String]
+          (json \ "assetId").as[String]
         }.toList
       }
   }
 
-  // returns issue transactions ids from addresses portfolio
+  // returns asset ids from addresses portfolio
   // obtained via paged api
   def getNFTPaged(node: Node, address: String, limit: Int): Future[List[String]] = {
     def loop(lastId: Option[String], acc: List[String]): Future[List[String]] = {
