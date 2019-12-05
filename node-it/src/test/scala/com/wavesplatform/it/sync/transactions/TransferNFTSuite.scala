@@ -39,51 +39,41 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
     val nftAsset = sender.issue(caller, assetName, assetDescription, 1, 0, reissuable = false, 1.waves / 1000, waitForTx = true).id
     val scriptText =
       s"""
-         |{-# STDLIB_VERSION 3 #-}
+         |{-# STDLIB_VERSION 4 #-}
          |{-# CONTENT_TYPE DAPP #-}
          |{-# SCRIPT_TYPE ACCOUNT #-}
          |
          |@Callable(i)
          |func nftTransferToDapp() = {
-         |    let pmt = i.payment.extract()
-         |    TransferSet([
-         |            ScriptTransfer(this, pmt.amount, pmt.assetId)
-         |        ])
+         |    let pmt = i.payments[0];
+         |    [ ScriptTransfer(this, pmt.amount, pmt.assetId) ]
          |}
          |
          |@Callable(i)
          |func nftPaymentTransferToThirdAddress(address: String) = {
          |    let thirdAddress = Address(fromBase58String(address))
-         |    let pmt = i.payment.extract()
-         |    TransferSet([
-         |            ScriptTransfer(thirdAddress, pmt.amount, pmt.assetId)
-         |        ])
+         |    let pmt = i.payments[0];
+         |    [ ScriptTransfer(thirdAddress, pmt.amount, pmt.assetId) ]
          |}
          |
          |@Callable(i)
-         |func transferAsPayment() = {
-         |    TransferSet([])
-         |    }
+         |func transferAsPayment() = []
          |
          |@Callable(i)
          |func nftTransferToSelf() = {
-         |    let pmt = i.payment.extract()
-         |    TransferSet([
-         |            ScriptTransfer(i.caller, pmt.amount, pmt.assetId)
-         |        ])
+         |    let pmt = i.payments[0];
+         |    [ ScriptTransfer(i.caller, pmt.amount, pmt.assetId) ]
          |}
+         |
          |@Callable(i)
          |func transferFromDappToAddress(address: String) = {
          |    let recipient = Address(fromBase58String(address))
-         |    TransferSet([
-         |            ScriptTransfer(recipient, 1, base58'$nftAsset')
-         |        ])
+         |    [ ScriptTransfer(recipient, 1, base58'$nftAsset') ]
          |}
+         |
          |@Verifier(t)
-         |func verify() = {
-         | true
-         |}
-        """.stripMargin
+         |func verify() = true
+         |""".stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
     def invokeTransfer(
@@ -97,7 +87,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
     val nftPayment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset))))
 
     assertApiError(invokeTransfer(caller, "nftTransferToDapp", payment = nftPayment)) { error =>
-      error.message should include("DApp self-payment is forbidden")
+      error.message should include("DApp self-transfer is forbidden")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }

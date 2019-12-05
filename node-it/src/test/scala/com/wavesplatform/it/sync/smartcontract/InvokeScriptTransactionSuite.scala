@@ -98,8 +98,6 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("contract caller invokes a default function on a contract") {
-
-
     val _ = sender.invokeScript(
       caller.stringRepr,
       contract.stringRepr,
@@ -113,7 +111,6 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("verifier works") {
-
     val tx =
       DataTransaction
         .create(1.toByte, sender = contract, data = List(StringDataEntry("a", "OOO")), fee = 1.waves, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
