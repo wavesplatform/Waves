@@ -97,7 +97,7 @@ object CustomFeeTransactionSuite {
                                                          | waves.blockchain.custom.functionality {
                                                          |   feature-check-blocks-period = $featureCheckBlocksPeriod
                                                          |   blocks-for-feature-activation = $featureCheckBlocksPeriod
-                                                         |   pre-activated-features = { 7 = 0 }
+                                                         |   pre-activated-features = { 7 = 0, 14 = 1000000 }
                                                          |}""".stripMargin)
 
   private val notMinerConfig = ConfigFactory.parseString("waves.miner.enable=no").withFallback(minerConfig)
