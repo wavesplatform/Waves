@@ -340,7 +340,7 @@ package object database extends ScorexLogging {
 
     ndo.write(bh.generator)
 
-    if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) Don't write length in case of using standard digest
+    if (bh.version > Block.RewardBlockVersion) {
       ndo.writeInt(bh.transactionsRoot.arr.length)
       ndo.writeByteStr(bh.transactionsRoot)
     }
