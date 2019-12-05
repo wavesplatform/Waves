@@ -383,7 +383,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   private def issuePreconditions(
     assetScript: Option[Script] = None,
     feeMultiplier: Int
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, Long)] =
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
@@ -397,7 +397,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
         ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, master, amount)
+      } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
     }.explicitGet()
 
   private def issueDApp(issueAmount: Long, name: String = "ScriptAsset", description: String = "Issued by InvokeScript", decimals: Int = 0, reissuable: Boolean = false): Script =
@@ -410,16 +410,27 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     )
 
   property("issue action results state") {
-    forAll(issuePreconditions(feeMultiplier = 0)) {
-      case (genesis, setScript, invoke, master, amount) =>
+    forAll(issuePreconditions(feeMultiplier = 7)) {
+      case (genesis, setScript, invoke, master, invoker, amount) =>
         assertDiffAndState(
           Seq(TestBlock.create(genesis :+ setScript)),
           TestBlock.create(Seq(invoke)),
           features
         ) { case (_, blockchain) =>
 
-          //blockchain.portfolio(master).assets foreach println
-          blockchain.portfolio(master).assets.values.toSeq shouldBe Seq(amount)
+          //Thread.sleep(10000)
+
+          val assets = blockchain.portfolio(master).assets
+          println("Master:")
+          assets foreach println
+          println(assets.values.toList)
+          println(List(amount))
+          assets.values.toList shouldBe List(amount)
+
+          val assetsi = blockchain.portfolio(invoker).assets
+          println("Invoker:")
+          assetsi foreach println
+          assetsi.values.toList shouldBe List()
         }
     }
   }
