@@ -67,7 +67,8 @@ case class AssetDescription(
     totalVolume: BigInt,
     lastUpdatedAt: Height,
     script: Option[Script],
-    sponsorship: Long
+    sponsorship: Long,
+    nft: Boolean
 ) {
   override def equals(obj: scala.Any) = obj match {
     case o: AssetDescription =>

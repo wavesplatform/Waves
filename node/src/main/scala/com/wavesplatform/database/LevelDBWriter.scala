@@ -201,7 +201,8 @@ class LevelDBWriter(
       volumeInfo.volume,
       info.lastUpdatedAt,
       script.map(_._2),
-      sponsorship
+      sponsorship,
+      staticInfo.nft
     )
   }
 

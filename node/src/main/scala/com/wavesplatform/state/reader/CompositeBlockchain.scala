@@ -68,7 +68,8 @@ final case class CompositeBlockchain(
             volume.volume,
             Height @@ this.height,
             script,
-            sponsorship
+            sponsorship,
+            static.nft
           )
       }
 
