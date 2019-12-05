@@ -418,8 +418,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           features
         ) { case (_, blockchain) =>
 
-          blockchain.portfolio(master).assets foreach println
-          //blockchain.balance(master, asset) shouldBe resultAmount
+          //blockchain.portfolio(master).assets foreach println
+          blockchain.portfolio(master).assets.values shouldBe Seq(amount)
         }
     }
   }
