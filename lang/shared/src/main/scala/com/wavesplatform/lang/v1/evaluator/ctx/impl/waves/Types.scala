@@ -94,7 +94,8 @@ object Types {
   val booleanDataEntry: CASETYPEREF = buildTypedEntry(FieldNames.BooleanEntry, BOOLEAN)
   val stringDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.StringEntry, STRING)
   val binaryDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.BinaryEntry, BYTESTR)
-  val intDataEntry: CASETYPEREF     = buildTypedEntry(FieldNames.IntEntry, LONG)
+  val intDataEntry: CASETYPEREF     = buildTypedEntry(FieldNames.IntegerEntry, LONG)
+  val deleteDataEntry: CASETYPEREF  = CASETYPEREF(FieldNames.DeleteEntry, List("key" -> STRING))
 
   private val typedDataEntries =
     List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry)
@@ -184,7 +185,7 @@ object Types {
     UNION(callableV3Results: _*)
 
   private val callableV4ReturnType =
-    LIST(UNION.create(commonDataEntryType(V4) :: scriptTransfer :: callableV4Actions))
+    LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
@@ -239,7 +240,7 @@ object Types {
     )
 
   val genericAttachmentType: UNION =
-    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR)
+    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR, UNIT)
 
   private def buildAttachmentType(version: StdLibVersion) =
     "attachment" -> (if (version >= V4) genericAttachmentType else BYTESTR)
@@ -479,11 +480,10 @@ object Types {
       aliasType,
       transfer,
       assetPairType,
-      commonDataEntryType(v),
       buildOrderType(proofsEnabled),
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) blockHeader :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) blockHeader :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }

@@ -7,6 +7,7 @@ import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry._
+import com.wavesplatform.transaction.TxVersion
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 
@@ -165,4 +166,9 @@ case class StringDataEntry(override val key: String, override val value: String)
   override def toJson: JsObject = super.toJson + ("value" -> JsString(value))
 
   override def valid: Boolean = super.valid && value.getBytes(UTF_8).length <= MaxValueSize
+}
+
+case class EmptyDataEntry(override val key: String)(implicit dataBytesOpt: DataBytesOpt = None) extends DataEntry[Unit]("empty", key, ()) {
+  override def valueBytes: Array[TxVersion] = Array(0xff.toByte)
+  override def toJson: JsObject             = Json.obj("key" -> key, "value" -> JsNull)
 }

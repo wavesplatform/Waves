@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Implicits._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -53,6 +53,7 @@ object Gen {
         case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
+        case EmptyDataEntry(_)            => ???
       } reduce [String] { case (l, r) => s"$l && $r " }
 
     val src =

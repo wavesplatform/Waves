@@ -383,22 +383,29 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(10, useForScript = true)) { t =>
-      def pg(i: Int) = {
-        val v = t.data(i) match {
-          case e: IntegerDataEntry => e.value.toString
-          case e: BooleanDataEntry => e.value.toString
-          case e: BinaryDataEntry  => s"base64'${e.value.base64}'"
-          case e: StringDataEntry  => Json.toJson(e.value)
-        }
+    forAll(dataTransactionGen(10, useForScript = true, withDeleteEntry = true)) { t =>
+      def declareKey(i: Int): String =
+        s"let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)} "
 
-        s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}
+      def declareKV(i: Int, v: Object): String =
+        s"""${declareKey(i)}
            |let value$i = t.data[$i].value == $v
          """.stripMargin
-      }
+
+      def pg(i: Int): String =
+        t.data(i) match {
+          case e: IntegerDataEntry => declareKV(i, e.value.toString)
+          case e: BooleanDataEntry => declareKV(i, e.value.toString)
+          case e: BinaryDataEntry  => declareKV(i, s"base64'${e.value.base64}'")
+          case e: StringDataEntry  => declareKV(i, Json.toJson(e.value))
+          case _: EmptyDataEntry   => declareKey(i)
+        }
 
       val resString =
-        if (t.data.isEmpty) assertProvenPart("t") else assertProvenPart("t") + s" && ${t.data.indices.map(i => s"key$i && value$i").mkString(" && ")}"
+        if (t.data.isEmpty) assertProvenPart("t") else assertProvenPart("t") + s" && " +
+          t.data.indices
+            .map(i => s"key$i" + (if (t.data(i).isInstanceOf[EmptyDataEntry]) "" else s" && value$i"))
+            .mkString(" && ")
 
       val s = s"""
                  |match tx {
