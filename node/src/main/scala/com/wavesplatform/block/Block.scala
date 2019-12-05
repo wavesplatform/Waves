@@ -198,5 +198,5 @@ object Block extends ScorexLogging {
   val PlainBlockVersion: Byte   = 2
   val NgBlockVersion: Byte      = 3
   val RewardBlockVersion: Byte  = 4
-  val ProtoBlockVersion: Byte   = 5 // todo: (NODE-1927) relevant name
+  val ProtoBlockVersion: Byte   = 5
 }
