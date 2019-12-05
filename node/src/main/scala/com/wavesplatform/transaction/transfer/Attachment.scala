@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction.transfer
 
-import java.nio.charset.StandardCharsets
-
 import com.google.common.primitives.Longs
 import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.utils._
 import play.api.libs.json._
 
 sealed trait Attachment
@@ -22,7 +21,7 @@ object Attachment {
       case Bin(value)  => value
       case Num(value)  => Longs.toByteArray(value)
       case Bool(value) => if (value) Array(1: Byte) else Array(0: Byte)
-      case Str(value)  => value.getBytes(StandardCharsets.UTF_8)
+      case Str(value)  => value.utf8Bytes
     }
 
     def toBytesStrict: Array[Byte] = a.fold(Array.emptyByteArray) {

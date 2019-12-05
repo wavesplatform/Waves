@@ -9,24 +9,6 @@ import com.wavesplatform.transaction.{TxValidationError, TxVersion}
 
 object IssueTxValidator extends TxValidator[IssueTransaction] {
   override def validate(tx: IssueTransaction): ValidatedV[IssueTransaction] = {
-    def assetName(name: Array[Byte]): ValidatedV[Array[Byte]] = {
-      Validated
-        .condNel(
-          name.length >= IssueTransaction.MinAssetNameLength && name.length <= IssueTransaction.MaxAssetNameLength,
-          name,
-          TxValidationError.InvalidName
-        )
-    }
-
-    def assetDescription(description: Array[Byte]): ValidatedV[Array[Byte]] = {
-      Validated
-        .condNel(
-          description.length <= IssueTransaction.MaxAssetDescriptionLength,
-          description,
-          TxValidationError.TooBigArray
-        )
-    }
-
     def assetDecimals(decimals: Byte): ValidatedV[Byte] = {
       Validated
         .condNel(
@@ -39,8 +21,8 @@ object IssueTxValidator extends TxValidator[IssueTransaction] {
     import tx._
     V.seq(tx)(
       V.positiveAmount(quantity, "assets"),
-      assetName(tx.nameBytes),
-      assetDescription(tx.descriptionBytes),
+      V.assetName(tx.nameBytes.arr),
+      V.assetDescription(tx.descriptionBytes.arr),
       assetDecimals(decimals),
       V.fee(fee),
       V.cond(version > TxVersion.V1 || script.isEmpty, GenericError("Script not supported")),

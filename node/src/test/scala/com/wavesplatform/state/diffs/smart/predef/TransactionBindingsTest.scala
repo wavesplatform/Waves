@@ -267,6 +267,26 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
+  property("UpdateAssetInfoTransaction binding") {
+    forAll(updateAssetInfoTxGen) { t =>
+
+      val scriptSource =
+        s"""
+           |match tx {
+           | case t : UpdateAssetInfoTransaction =>
+           |   ${provenPart(t)}
+           |   let name        = t.name.toBytes()        == base58'${ByteStr(t.name.getBytes)}'
+           |   let description = t.description.toBytes() == base58'${ByteStr(t.description.getBytes())}'
+           |   let assetId     = t.assetId               == base58'${t.assetId.id}'
+           |   ${assertProvenPart("t")} && description && name && assetId
+           | case other => throw()
+           | }
+           |""".stripMargin
+
+      runScript(scriptSource, Coproduct(t), V4, T) shouldBe evaluated(true)
+    }
+  }
+
   property("InvokeScriptTransaction binding") {
     forAll(invokeScriptGen(paymentOptionGen)) { t =>
       val checkArgsScript = if (t.funcCallOpt.get.args.nonEmpty) {

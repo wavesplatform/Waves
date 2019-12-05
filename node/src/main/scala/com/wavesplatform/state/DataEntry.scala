@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.utils._
 import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 
@@ -23,7 +24,7 @@ sealed abstract class DataEntry[T](
 
   def toBytes: Array[Byte] = {
     dataBytesOpt.getOrElse {
-      val keyBytes = key.getBytes(UTF_8)
+      val keyBytes = key.utf8Bytes
       Bytes.concat(Shorts.toByteArray(keyBytes.length.toShort), keyBytes, valueBytes)
     }
   }
@@ -33,7 +34,7 @@ sealed abstract class DataEntry[T](
 
   def isValid(version: TxVersion): Boolean = version match {
     case TxVersion.V1 => key.length <= MaxKeySize
-    case _            => key.getBytes(UTF_8).length <= MaxPBKeySize
+    case _            => key.utf8Bytes.length <= MaxPBKeySize
   }
 }
 
@@ -76,7 +77,7 @@ object DataEntry {
 
       case t if t == Type.String.id =>
         val (blob, p1)                          = Deser.parseArrayWithLength(bytes, p + 1)
-        implicit val dataBytesOpt: DataBytesOpt = Some(bytes.slice(p - 2 - key.getBytes("UTF-8").length, p1)) //all bytes of this data entry
+        implicit val dataBytesOpt: DataBytesOpt = Some(bytes.slice(p - 2 - key.utf8Bytes.length, p1)) //all bytes of this data entry
         (StringDataEntry(key, new String(blob, UTF_8)), p1)
       case t => throw new Exception(s"Unknown type $t")
     }
@@ -95,7 +96,7 @@ object DataEntry {
 
         implicit val dataBytesOpt: DataBytesOpt = { // TODO: Is this really needed?
           val currentPos = buf.position()
-          buf.position(p - 3 - key.getBytes("UTF-8").length)
+          buf.position(p - 3 - key.utf8Bytes.length)
           val bytes = new Array[Byte](currentPos - buf.position())
           buf.get(bytes)
           Some(bytes) //all bytes of this data entry
@@ -172,9 +173,9 @@ case class BinaryDataEntry(override val key: String, override val value: ByteStr
 
 case class StringDataEntry(override val key: String, override val value: String)(implicit dataBytesOpt: DataBytesOpt = None)
     extends DataEntry[String]("string", key, value) {
-  override def valueBytes: Array[Byte]              = Bytes.concat(Array(Type.String.id.toByte), Deser.serializeArrayWithLength(value.getBytes(UTF_8)))
+  override def valueBytes: Array[Byte]              = Bytes.concat(Array(Type.String.id.toByte), Deser.serializeArrayWithLength(value.utf8Bytes))
   override def toJson: JsObject                     = super.toJson + ("value" -> JsString(value))
-  override def isValid(version: TxVersion): Boolean = super.isValid(version) && value.getBytes(UTF_8).length <= MaxValueSize
+  override def isValid(version: TxVersion): Boolean = super.isValid(version) && value.utf8Bytes.length <= MaxValueSize
 }
 
 case class EmptyDataEntry(override val key: String)(implicit dataBytesOpt: DataBytesOpt = None) extends DataEntry[Unit]("empty", key, ()) {

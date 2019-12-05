@@ -6,6 +6,7 @@ import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -74,7 +75,6 @@ object IssueTxSerializer {
         None,
         fee,
         timestamp,
-        Nil
       )
     }
 

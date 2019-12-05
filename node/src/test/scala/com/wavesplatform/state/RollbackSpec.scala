@@ -62,6 +62,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
     }
   }
 
+  def nonEmptyStringGen(lb: Int, ub: Int): Gen[String] = {
+    for {
+      len <- Gen.chooseNum(lb, ub)
+      arr <- Gen.containerOfN[Array, Char](len, Gen.alphaNumChar)
+    } yield String.copyValueOf(arr)
+  }
+
   "Rollback resets" - {
     "Rollback save dropped blocks order" in forAll(accountGen, positiveLongGen, Gen.choose(1, 10)) {
       case (sender, initialBalance, blocksCount) =>
@@ -245,14 +252,15 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
-    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, byteArrayGen(10), byteArrayGen(12)) {
+
+    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, nonEmptyStringGen(4, 16), nonEmptyStringGen(0, 1000)) {
       case (sender, initialBalance, name, description) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction(TxVersion.V1, sender.publicKey, name, description, 2000, 8, reissuable = true, script = None, 1, nextTs)
+            IssueTransaction(TxVersion.V1, sender.publicKey, name.utf8Bytes, description.utf8Bytes, 2000, 8.toByte, reissuable = true, script = None, 1, nextTs)
               .signWith(sender.privateKey)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
@@ -267,7 +275,9 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
-          val desc1 = AssetDescription(sender, Left(name), Left(description), 8, reissuable = true, BigInt(2000), None, 0)
+          val nameBytes = Left(ByteStr(name.utf8Bytes))
+          val descriptionBytes = Left(ByteStr(description.utf8Bytes))
+          val desc1 = AssetDescription(sender, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0)
           actualDesc shouldBe Some(desc1)
 
           d.appendBlock(
@@ -281,12 +291,12 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, Left(name), Left(description), 8, reissuable = false, BigInt(4000), None, 0)
+            AssetDescription(sender, nameBytes, descriptionBytes, 8, reissuable = false, BigInt(4000), Height @@ 2, None, 0)
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, Left(name), Left(description), 8, reissuable = true, BigInt(2000), None, 0)
+            AssetDescription(sender, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0)
           )
 
           d.removeAfter(genesisBlockId)

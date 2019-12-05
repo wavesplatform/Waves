@@ -4,7 +4,7 @@ import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.{AssetDescription, AssetInfo, Blockchain}
+import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
 import org.scalamock.scalatest.PathMockFactory
@@ -26,9 +26,15 @@ class AssetsApiRouteSpec
     AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime).route
 
   private val smartAssetTx = issueV2TransactionGen().retryUntil(_.script.nonEmpty).sample.get
-  private val smartAssetDesc = AssetDescription(smartAssetTx,
-    AssetInfo(smartAssetTx.reissuable, smartAssetTx.quantity),
-    smartAssetTx.script,
+  private val smartAssetDesc = AssetDescription(
+    issuer = smartAssetTx.sender,
+    name = Left(smartAssetTx.nameBytes),
+    description = Left(smartAssetTx.descriptionBytes),
+    decimals = smartAssetTx.decimals,
+    reissuable = smartAssetTx.reissuable,
+    totalVolume = smartAssetTx.quantity,
+    lastUpdatedAt = Height @@ 0,
+    script = smartAssetTx.script,
     sponsorship = 0
   )
 
@@ -52,9 +58,14 @@ class AssetsApiRouteSpec
 
   private val sillyAssetTx = issueGen.sample.get
   private val sillyAssetDesc = AssetDescription(
-    sillyAssetTx,
-    AssetInfo(sillyAssetTx.reissuable, sillyAssetTx.quantity),
-    sillyAssetTx.script,
+    issuer = sillyAssetTx.sender,
+    name = Left(sillyAssetTx.nameBytes),
+    description = Left(sillyAssetTx.descriptionBytes),
+    decimals = sillyAssetTx.decimals,
+    reissuable = sillyAssetTx.reissuable,
+    totalVolume = sillyAssetTx.quantity,
+    lastUpdatedAt = Height @@ 0,
+    script = sillyAssetTx.script,
     sponsorship = 0
   )
   (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))

@@ -44,6 +44,9 @@ case class IssueTransaction(
   override val json: Coeval[JsObject]           = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
+
+  def safeName: Either[ByteStr, String] = if (isProtobufVersion) Right(name) else Left(this.nameBytes)
+  def safeDescription: Either[ByteStr, String] = if (isProtobufVersion) Right(description) else Left(this.descriptionBytes)
 }
 
 object IssueTransaction extends TransactionParser {

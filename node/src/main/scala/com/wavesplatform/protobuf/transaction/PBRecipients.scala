@@ -32,7 +32,7 @@ object PBRecipients {
 
   def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {
     case Recipient.Recipient.PublicKeyHash(bytes) => toAddress(bytes.toByteArray)
-    case _                                  => Left(GenericError(s"Not an address: $r"))
+    case _                                        => Left(GenericError(s"Not an address: $r"))
   }
 
   def toAlias(r: Recipient): Either[ValidationError, Alias] = r.recipient match {

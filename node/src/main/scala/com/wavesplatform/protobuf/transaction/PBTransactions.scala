@@ -1,4 +1,5 @@
 package com.wavesplatform.protobuf.transaction
+
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
@@ -13,12 +14,15 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
 import com.wavesplatform.common.utils.EitherExt2
+
+import scala.util.Try
 
 object PBTransactions {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -43,6 +47,9 @@ object PBTransactions {
     import com.wavesplatform.common.utils._
     vanilla(signedTx, unsafe = true).explicitGet()
   }
+
+  def tryToVanilla(signedTx: PBSignedTransaction): Try[VanillaTransaction] =
+    vanilla(signedTx).left.map(err => new Exception(err.toString)).toTry
 
   def vanilla(signedTx: PBSignedTransaction, unsafe: Boolean = false): Either[ValidationError, VanillaTransaction] = {
     for {
@@ -248,6 +255,20 @@ object PBTransactions {
             proofs
           )
         } yield tx
+
+      case Data.UpdateAssetInfo(UpdateAssetInfoTransactionData(assetId, name, description)) =>
+        UpdateAssetInfoTransaction.create(
+          version.toByte,
+          chainId,
+          sender,
+          assetId,
+          name,
+          description,
+          timestamp,
+          feeAmount,
+          feeAssetId,
+          proofs
+        )
 
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
@@ -496,6 +517,16 @@ object PBTransactions {
       case vt.smart.InvokeScriptTransaction(version, sender, dappAddress, fcOpt, payment, fee, feeAssetId, timestamp, proofs) =>
         val data = Data.InvokeScript(toPBInvokeScriptData(dappAddress, fcOpt, payment))
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, data)
+
+      case tx @ vt.assets.UpdateAssetInfoTransaction(version, _, sender, assetId, name, description, timestamp, _, _, proofs) =>
+        val (feeAsset, feeAmount) = tx.assetFee
+
+        val data = UpdateAssetInfoTransactionData()
+          .withAssetId(assetId.id)
+          .withName(name)
+          .withDescription(description)
+
+        PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
