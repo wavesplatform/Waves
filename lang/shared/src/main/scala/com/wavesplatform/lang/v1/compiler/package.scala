@@ -45,7 +45,7 @@ package object compiler {
       queue.headOption match {
         case Some(expr) =>
           expr match {
-            case ARR(_)                     => false
+            case ARR(_)                     => true
             case BLOCK(let: LET, body)      => horTraversal(queue.tail ++ MutableList(let.value, body))
             case BLOCK(func: FUNC, body)    => horTraversal(queue.tail ++ MutableList(func.body, body))
             case LET_BLOCK(let, body)       => horTraversal(queue.tail ++ MutableList(let.value, body))

@@ -47,7 +47,7 @@ object ContractScript {
       val verifierExpr  = expr.verifierFuncOpt.map(_.u.body).toList
 
       (verifierExpr ::: declExprs ::: callableExprs)
-        .forall(com.wavesplatform.lang.v1.compiler.containsArray)
+        .exists(com.wavesplatform.lang.v1.compiler.containsArray)
     }
   }
 
