@@ -245,16 +245,16 @@ object InvokeScriptTransactionDiff {
       blockchain: Blockchain,
       tx: InvokeScriptTransaction,
       transfers: List[AssetTransfer]
-  ): Either[GenericError, Unit] =
-    if (blockchain.disallowSelfPayment)
-      if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
-        GenericError("DApp self-payment is forbidden since V4").asLeft[Unit]
-      else if (transfers.exists(_.recipient.bytes == dAppAddress.bytes))
-        GenericError("DApp self-transfer is forbidden since V4").asLeft[Unit]
-      else
-        ().asRight[GenericError]
-    else
-      ().asRight[GenericError]
+  ): Either[GenericError, Unit] = {
+    val ifReject =
+      blockchain.disallowSelfPayment &&
+        (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress || transfers.exists(_.recipient.bytes == dAppAddress.bytes))
+    Either.cond(
+      !ifReject,
+      (),
+      GenericError("DApp self-payment is forbidden")
+    )
+  }
 
   private def paymentsPart(
       height: Int,
