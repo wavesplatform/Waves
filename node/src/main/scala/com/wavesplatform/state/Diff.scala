@@ -85,6 +85,17 @@ case class AssetDescription(
   }
 }
 
+object AssetDescription {
+  implicit class AssetDescriptionExt(private val ad: AssetDescription) {
+    def isNFT: Boolean   = ad.totalVolume == BigInt(1) && ad.decimals == 0 && !ad.reissuable
+    def isNFT(blockchain: Blockchain): Boolean = {
+      import com.wavesplatform.features.BlockchainFeatures
+      import com.wavesplatform.features.FeatureProvider._
+      blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
+    }
+  }
+}
+
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 
 object AccountDataInfo {

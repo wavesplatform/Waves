@@ -108,7 +108,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     val balance = sender.assetsBalance(firstAddress).balances.find(_.assetId == invokeScriptAssetId)
     balance shouldBe 'defined
     balance.value.issueTransaction shouldBe None
-     */
+   */
   }
 
   test("Correct data for assets reissued by transaction") {
@@ -198,6 +198,42 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     stateChanges.stateChanges.value.burns.head.assetId shouldBe invokeScriptAssetId
     stateChanges.stateChanges.value.burns.head.quantity shouldBe 100L
   }
+
+  test("correct data for NFT issued by transaction") {
+    val nftIssueTx        = sender.issue(callerAcc.stringRepr, "TxNft", "TxNftDesc", 1, 0, fee = issueFee + smartFee, reissuable = false, waitForTx = true)
+    val nftIssueTxAssetId = nftIssueTx.id
+
+    val info = sender.nftAssetsBalance(secondAddress, 100)
+    info.size shouldBe 1
+    info.head.assetId shouldBe nftIssueTxAssetId
+
+    val afterInfo = sender.nftAssetsBalance(secondAddress, 100, nftIssueTxAssetId)
+    afterInfo.size shouldBe 0
+  }
+
+  test("correct data for NFT issued by script") {
+    /*val nftInvokeScriptTx = sender
+      .invokeScript(
+        callerAcc.stringRepr,
+        smartAcc.stringRepr,
+        Some("n"),
+        args = List.empty,
+        waitForTx = true
+      )
+      ._1
+    val nftInvokeScriptAssetId = ???*/
+
+    val nftInvokeScriptTx =
+      sender.issue(smartAcc.stringRepr, "TxNft", "TxNftDesc", 1, 0, fee = issueFee + smartFee, reissuable = false, waitForTx = true)
+    val nftInvokeScriptAssetId = nftInvokeScriptTx.id
+
+    val info = sender.nftAssetsBalance(firstAddress, 100)
+    info.size shouldBe 1
+    info.head.assetId shouldBe nftInvokeScriptAssetId
+
+    val afterInfo = sender.nftAssetsBalance(firstAddress, 100, nftInvokeScriptAssetId)
+    afterInfo.size shouldBe 0
+  }
 }
 
 object InvokeScriptAssetIssueSuite {
@@ -206,13 +242,16 @@ object InvokeScriptAssetIssueSuite {
       |{-# CONTENT_TYPE DAPP #-}
       |
       |@Callable(i)
-      |func i() = [BooleanEntry("0", true)]
+      |func i() = [Issue(unit, 0, "InvokeDesc", true, "InvokeAsset", 100)]
       |
       |@Callable(i)
       |func r(id: ByteVector) = [Reissue(id, true, 100)]
       |
       |@Callable(i)
       |func b(id: ByteVector) = [Burn(id, 100)]
+      |
+      |@Callable(i)
+      |func n() = [Issue(unit, 0, "NFT", false, "NFT", 1)]
       |
       |""".stripMargin
 }

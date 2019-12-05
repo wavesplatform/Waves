@@ -20,7 +20,7 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -35,6 +35,7 @@ import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.Task
 import monix.execution.Scheduler
+import monix.reactive.Observable
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -253,8 +254,15 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
           } yield {
             commonAccountApi
               .portfolioNFT(addr, maybeAfter)
+              .flatMap {
+                case (assetId, assetDesc) =>
+                  Observable.fromEither(
+                    AssetsApiRoute
+                      .jsonDetails(blockchain)(assetId, assetDesc, true)
+                      .leftMap(err => new IllegalArgumentException(err))
+                  )
+              }
               .take(limit)
-              .map(_.json())
               .toListL
               .map(lst => JsArray(lst))
               .runAsyncLogErr
@@ -329,52 +337,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     }).left.map(ApiError.fromValidationError)
 
   private def assetDetails(assetId: String, full: Boolean): Either[ApiError, JsObject] = {
-    // (timestamp, height)
-    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
-      for {
-        tt <- blockchain.transactionInfo(id).toRight("Failed to find issue/invokeScript transaction by ID")
-        (h, mtx) = tt
-        ts <- (mtx match {
-          case tx: IssueTransaction        => Some(tx.timestamp)
-          case tx: InvokeScriptTransaction => Some(tx.timestamp)
-          case _                           => None
-        }).toRight("No issue/invokeScript transaction found with the given asset ID")
-      } yield (ts, h)
-
     (for {
       id          <- ByteStr.decodeBase58(assetId).toOption.toRight("Incorrect asset ID")
       description <- blockchain.assetDescription(IssuedAsset(id)).toRight("Failed to get description of the asset")
-      tsh         <- additionalInfo(description.source)
-      (timestamp, height) = tsh
-      script              = description.script.filter(_ => full)
-      complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
-    } yield {
-      JsObject(
-        Seq(
-          "assetId"        -> JsString(id.toString),
-          "issueHeight"    -> JsNumber(height),
-          "issueTimestamp" -> JsNumber(timestamp),
-          "issuer"         -> JsString(description.issuer.stringRepr),
-          "name"           -> JsString(description.name),
-          "description"    -> JsString(description.description),
-          "decimals"       -> JsNumber(description.decimals),
-          "reissuable"     -> JsBoolean(description.reissuable),
-          "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "scripted"       -> JsBoolean(description.script.nonEmpty),
-          "minSponsoredAssetFee" -> (description.sponsorship match {
-            case 0           => JsNull
-            case sponsorship => JsNumber(sponsorship)
-          }),
-          "originTransactionId" -> JsString(description.source.toString)
-        ) ++ script.toSeq.map { script =>
-          "scriptDetails" -> Json.obj(
-            "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
-            "script"           -> JsString(script.bytes().base64),
-            "scriptText"       -> JsString(script.expr.toString) // [WAIT] JsString(Script.decompile(script))
-          )
-        }
-      )
-    }).left.map(m => CustomValidationError(m))
+      result      <- AssetsApiRoute.jsonDetails(blockchain)(id, description, full)
+    } yield result).left.map(m => CustomValidationError(m))
   }
 }
 
@@ -430,5 +397,50 @@ object AssetsApiRoute {
       _ <- Either
         .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
     } yield limit
+  }
+
+  def jsonDetails(blockchain: Blockchain)(id: ByteStr, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
+    // (timestamp, height)
+    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
+      for {
+        tt <- blockchain.transactionInfo(id).toRight("Failed to find issue/invokeScript transaction by ID")
+        (h, mtx) = tt
+        ts <- (mtx match {
+          case tx: IssueTransaction        => Some(tx.timestamp)
+          case tx: InvokeScriptTransaction => Some(tx.timestamp)
+          case _                           => None
+        }).toRight("No issue/invokeScript transaction found with the given asset ID")
+      } yield (ts, h)
+
+    for {
+      tsh <- additionalInfo(description.source)
+      (timestamp, height) = tsh
+      script              = description.script.filter(_ => full)
+      complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
+    } yield JsObject(
+      Seq(
+        "assetId"        -> JsString(id.toString),
+        "issueHeight"    -> JsNumber(height),
+        "issueTimestamp" -> JsNumber(timestamp),
+        "issuer"         -> JsString(description.issuer.stringRepr),
+        "name"           -> JsString(description.name),
+        "description"    -> JsString(description.description),
+        "decimals"       -> JsNumber(description.decimals),
+        "reissuable"     -> JsBoolean(description.reissuable),
+        "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
+        "scripted"       -> JsBoolean(description.script.nonEmpty),
+        "minSponsoredAssetFee" -> (description.sponsorship match {
+          case 0           => JsNull
+          case sponsorship => JsNumber(sponsorship)
+        }),
+        "originTransactionId" -> JsString(description.source.toString)
+      ) ++ script.toSeq.map { script =>
+        "scriptDetails" -> Json.obj(
+          "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
+          "script"           -> JsString(script.bytes().base64),
+          "scriptText"       -> JsString(script.expr.toString) // [WAIT] JsString(Script.decompile(script))
+        )
+      }
+    )
   }
 }

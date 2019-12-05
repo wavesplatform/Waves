@@ -2,9 +2,10 @@ package com.wavesplatform.state.extensions.composite
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{AssetDescription, AssetDistribution, AssetDistributionPage, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
@@ -24,7 +25,7 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
     Monoid.combine(baseProvider.portfolio(a), diffPf)
   }
 
-  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] =
     com.wavesplatform.state.nftListFromDiff(blockchain, baseProvider, getDiff())(address, from)
 
   override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {
