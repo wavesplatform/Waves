@@ -7,6 +7,7 @@ import com.google.common.base.Throwables
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
 import com.wavesplatform.features.FunctionCallPolicyProvider._
@@ -14,7 +15,7 @@ import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -55,7 +56,7 @@ object InvokeScriptTransactionDiff {
     val functionCall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some((ContractScriptImpl(version, contract), _, callableComplexities))) =>
+      case Right(Some((ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -97,8 +98,20 @@ object InvokeScriptTransactionDiff {
                 version
               )
               dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
-              invocationComplexity <- callableComplexities.get(tx.funcCall.function.funcName)
-                .toRight((s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress", List.empty[LogItem[Id]]))
+              invocationComplexity <- {
+                val complexities =
+                  if (blockchain.useStoredCallableComplexities)
+                    storedCallableComplexities.asRight[String]
+                  else
+                    ContractScript.estimateComplexity(version, contract, blockchain.estimator).map(_._2)
+
+                complexities
+                  .flatMap(
+                    _.get(tx.funcCall.function.funcName)
+                     .toRight(s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress")
+                  )
+                  .leftMap((_, List.empty[LogItem[Id]]))
+              }
             } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
@@ -261,6 +274,7 @@ object InvokeScriptTransactionDiff {
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
       case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
+      case DataItem.Delete(k)  => EmptyDataEntry(k)
     }
 
   private def checkSelfPayments(

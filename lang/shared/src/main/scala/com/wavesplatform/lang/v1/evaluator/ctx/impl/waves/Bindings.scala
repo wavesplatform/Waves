@@ -262,14 +262,18 @@ object Bindings {
             case _          => ???
          }
 
-        def mapDataEntry(d: DataItem[_]): EVALUATED = {
-          val (entryValue, entryType) = mapValue(d.value)
-          val fields = Map("key" -> CONST_STRING(d.key).explicitGet(), "value" -> entryValue)
-          if (version >= V4)
-            CaseObj(entryType, fields)
-          else
-            CaseObj(genericDataEntry, fields)
-        }
+        def mapDataEntry(d: DataItem[_]): EVALUATED =
+          d match {
+            case DataItem.Delete(key) =>
+              CaseObj(deleteDataEntry, Map("key" -> CONST_STRING(key).explicitGet()))
+            case writeItem =>
+              val (entryValue, entryType) = mapValue(writeItem.value)
+              val fields = Map("key" -> CONST_STRING(writeItem.key).explicitGet(), "value" -> entryValue)
+              if (version >= V4)
+                CaseObj(entryType, fields)
+              else
+                CaseObj(genericDataEntry, fields)
+          }
 
         CaseObj(
           buildDataTransactionType(proofsEnabled, version),
