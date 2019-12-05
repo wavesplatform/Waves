@@ -143,7 +143,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     assertApiError(
       sender.invokeScript(caller, dApp, payment = Seq(Payment(0.75.waves, Waves), Payment(0.75.waves, Waves)))
     ) { error =>
-        error.message should include("Transaction application leads to negative waves balance to (at least) temporary negative state")
+        error.message should include("Accounts balance errors")
         error.id shouldBe StateCheckFailed.Id
         error.statusCode shouldBe 400
     }
