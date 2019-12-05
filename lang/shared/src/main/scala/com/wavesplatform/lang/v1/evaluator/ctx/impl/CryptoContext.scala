@@ -175,7 +175,7 @@ object CryptoContext {
         ("leaf", BYTESTR)
       ) {
         case CONST_BYTESTR(root:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_LONG(index:Long) :: CONST_BYTESTR(leaf:ByteStr) :: Nil =>
-          Right(CONST_BYTESTR(PedersenMerkleTree.addItem(root, proof, index, leaf)))
+          CONST_BYTESTR(PedersenMerkleTree.addItem(root, proof, index, leaf))
         case xs => notImplemented[Id]("bls12PedersenMerkleTreeAddItem(root:ByteVector, proof:ByteVector, index: Int, leaf:ByteVector)", xs)
       }
 
