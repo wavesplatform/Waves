@@ -299,6 +299,7 @@ package object database extends ScorexLogging {
     ndo.writeByteStr(ai.source)
     ndo.writeByteStr(ai.issuer)
     ndo.writeInt(ai.decimals)
+    ndo.writeBoolean(ai.nft)
 
     ndo.toByteArray
   }
@@ -311,8 +312,9 @@ package object database extends ScorexLogging {
     val source   = TransactionId @@ ndi.readByteStr(DigestLength)
     val issuer   = ndi.readPublicKey
     val decimals = ndi.readInt()
+    val nft = ndi.readBoolean()
 
-    AssetStaticInfo(source, issuer, decimals)
+    AssetStaticInfo(source, issuer, decimals, nft)
   }
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {

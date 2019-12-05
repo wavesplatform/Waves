@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets._
 
 object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals)
+    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, tx.quantity == 1 && tx.reissuable == false && tx.decimals == 0)
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
     val info       = AssetInfo(new String(tx.name), new String(tx.description), Height @@ blockchain.height)
 

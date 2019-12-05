@@ -47,7 +47,7 @@ object AssetInfo {
   implicit val sg: Semigroup[AssetInfo] = (x, y) => y
 }
 
-case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int)
+case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
 case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 
 object AssetVolumeInfo {
