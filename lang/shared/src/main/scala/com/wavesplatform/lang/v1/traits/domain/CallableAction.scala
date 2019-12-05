@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.crypto
 
 import monix.eval.Coeval
 
@@ -32,7 +33,7 @@ case class Issue(
     out.writeLong(quantity)
     out.writeShort((if(isReissuable) { 1 } else { 0 }))
     out.writeLong(0l) // Nonce
-    ByteStr(out.toByteArray)
+    ByteStr(crypto.fastHash(out.toByteArray))
   }
 }
 
