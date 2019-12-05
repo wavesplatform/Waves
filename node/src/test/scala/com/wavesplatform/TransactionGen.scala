@@ -851,18 +851,28 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       value <- Gen.listOfN(size, aliasAlphabetGen)
     } yield StringDataEntry(key, value.mkString)
 
-  def dataEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen): Gen[DataEntry[_]] =
-    Gen.oneOf(longEntryGen(keyGen), booleanEntryGen(keyGen), binaryEntryGen(maxSize, keyGen), stringEntryGen(maxSize, keyGen))
+  def emptyEntryGen(keyGen: Gen[String] = dataKeyGen): Gen[EmptyDataEntry] =
+    for (key <- keyGen) yield EmptyDataEntry(key)
+
+  def dataEntryGen(maxSize: Int, keyGen: Gen[String] = dataKeyGen, withDeleteEntry: Boolean = false): Gen[DataEntry[_]] =
+    Gen.oneOf(
+      longEntryGen(keyGen),
+      booleanEntryGen(keyGen),
+      Seq(
+        binaryEntryGen(maxSize, keyGen),
+        stringEntryGen(maxSize, keyGen)
+      ) ++ (if (withDeleteEntry) Seq(emptyEntryGen(keyGen)) else Seq()): _*
+    )
 
   val dataTransactionGen: Gen[DataTransaction] = dataTransactionGen(DataTransaction.MaxEntryCount)
 
-  def dataTransactionGen(maxEntryCount: Int, useForScript: Boolean = false): Gen[DataTransaction] =
+  def dataTransactionGen(maxEntryCount: Int, useForScript: Boolean = false, withDeleteEntry: Boolean = false): Gen[DataTransaction] =
     (for {
       sender    <- accountGen
       timestamp <- timestampGen
       size      <- Gen.choose(0, maxEntryCount)
       maxEntrySize = if (useForScript) 200 else (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
-      data <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen)) else Gen.listOfN(size, dataEntryGen(maxEntrySize))
+      data <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen, withDeleteEntry)) else Gen.listOfN(size, dataEntryGen(maxEntrySize))
       uniq = data.foldRight(List.empty[DataEntry[_]]) { (e, es) =>
         if (es.exists(_.key == e.key)) es else e :: es
       }
