@@ -229,8 +229,8 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       burnAmount: Long,
       transferAmount: Long
   ): Script =
-      dApp(
-        s"""
+    dApp(
+      s"""
            | [
            |   IntegerEntry("int", 1),
            |   BooleanEntry("bool", true),
@@ -419,7 +419,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         ) { case (_, blockchain) =>
 
           //blockchain.portfolio(master).assets foreach println
-          blockchain.portfolio(master).assets.values shouldBe Seq(amount)
+          blockchain.portfolio(master).assets.values.toSeq shouldBe Seq(amount)
         }
     }
   }

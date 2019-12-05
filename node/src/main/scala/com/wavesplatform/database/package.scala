@@ -314,6 +314,27 @@ package object database extends ScorexLogging {
     AssetStaticInfo(source, issuer, decimals)
   }
 
+  def writeAssetStaticInfo(ai: AssetStaticInfo): Array[Byte] = {
+    val ndo = newDataOutput()
+
+    ndo.writeByteStr(ai.source)
+    ndo.writeByteStr(ai.issuer)
+    ndo.writeInt(ai.decimals)
+
+    ndo.toByteArray
+  }
+  def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
+    import com.wavesplatform.crypto._
+
+    val ndi = newDataInput(arr)
+
+    val source   = TransactionId @@ ndi.readByteStr(DigestLength)
+    val issuer   = ndi.readPublicKey
+    val decimals = ndi.readInt()
+
+    AssetStaticInfo(source, issuer, decimals)
+  }
+
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
     val BlockInfo(bh, size, transactionCount, signature) = data
 
@@ -340,7 +361,7 @@ package object database extends ScorexLogging {
 
     ndo.write(bh.generator)
 
-    if (bh.version > Block.RewardBlockVersion) { // todo: (NODE-1972) Don't write length in case of using standard digest
+    if (bh.version > Block.RewardBlockVersion) {
       ndo.writeInt(bh.transactionsRoot.arr.length)
       ndo.writeByteStr(bh.transactionsRoot)
     }

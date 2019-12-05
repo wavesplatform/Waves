@@ -2,8 +2,7 @@ package com.wavesplatform.state.reader
 
 import cats.data.Ior
 import cats.implicits._
-import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias, PublicKey}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -107,7 +106,7 @@ final case class CompositeBlockchain(
 
     assetDescription map { z =>
       diff.transactions
-        .foldLeft(z) {
+        .foldLeft(z.copy(script = script)) {
           case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = ut.name, description = ut.description)
           case (acc, _)                                        => acc
         }

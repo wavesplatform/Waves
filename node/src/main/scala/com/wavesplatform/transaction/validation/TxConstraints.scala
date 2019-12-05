@@ -8,8 +8,6 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxValidationError}
 
-import com.wavesplatform.transaction.TxVersion // XXX to remove
-
 import scala.util.Try
 
 object TxConstraints {
@@ -32,15 +30,6 @@ object TxConstraints {
         fee > 0,
         fee,
         TxValidationError.InsufficientFee()
-      )
-  }
-
-  def zeroFee(fee: Long): ValidatedV[Long] = { // XXX to remove
-    Validated
-      .condNel(
-        fee == 0,
-        fee,
-        TxValidationError.UnsupportedVersion(TxVersion.Pseudo)
       )
   }
 

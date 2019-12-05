@@ -121,7 +121,7 @@ object PBTransactions {
           amount.longAmount,
           feeAssetId,
           feeAmount,
-          attachment.get.getBinaryValue.toByteArray,
+          attachment.fold(Array.emptyByteArray)(_.getBinaryValue.toByteArray),
           timestamp,
           proofs
         )
@@ -208,7 +208,7 @@ object PBTransactions {
           mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias.toOption.map(ParsedTransfer(_, t.amount))).toList,
           feeAmount,
           timestamp,
-          mt.attachment.get.getBinaryValue.toByteArray,
+          mt.attachment.fold(Array.emptyByteArray)(_.getBinaryValue.toByteArray),
           proofs
         )
 
@@ -446,7 +446,11 @@ object PBTransactions {
 
       case tx: vt.transfer.TransferTransaction =>
         import tx._
-        val data = TransferTransactionData(Some(recipient), Some((assetId, amount)), Some(Attachment.of(Attachment.Attachment.BinaryValue(ByteString.copyFrom(tx.attachment)))))
+        val data = TransferTransactionData(
+          Some(recipient),
+          Some((assetId, amount)),
+          Some(Attachment.of(Attachment.Attachment.BinaryValue(ByteString.copyFrom(tx.attachment))))
+        )
         PBTransactions.create(sender, chainId, fee, feeAssetId, timestamp, version, proofs, Data.Transfer(data))
 
       case tx: vt.CreateAliasTransaction =>
@@ -468,7 +472,14 @@ object PBTransactions {
       case tx: vt.assets.IssueTransaction =>
         import tx._
         val data =
-          IssueTransactionData(new String(name, StandardCharsets.UTF_8), new String(description, StandardCharsets.UTF_8), quantity, decimals, reissuable, script.map(s => PBScript(s.bytes())))
+          IssueTransactionData(
+            new String(name, StandardCharsets.UTF_8),
+            new String(description, StandardCharsets.UTF_8),
+            quantity,
+            decimals,
+            reissuable,
+            script.map(s => PBScript(s.bytes()))
+          )
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
