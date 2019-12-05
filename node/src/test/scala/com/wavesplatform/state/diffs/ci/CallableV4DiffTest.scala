@@ -190,12 +190,13 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript)),
           TestBlock.create(Seq(invoke)),
           features
-        ) { case (diff, _) =>
-          diff.accountData(master).data shouldBe
-            Map(
-              "key1" -> EmptyDataEntry("key1"),
-              "key2" -> EmptyDataEntry("key2")
-            )
+        ) {
+          case (diff, _) =>
+            diff.accountData(master).data shouldBe
+              Map(
+                "key1" -> EmptyDataEntry("key1"),
+                "key2" -> EmptyDataEntry("key2")
+              )
         }
     }
   }
