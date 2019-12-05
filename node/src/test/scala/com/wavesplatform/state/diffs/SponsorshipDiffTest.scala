@@ -11,6 +11,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransac
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.utils._
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -277,20 +278,18 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with Matchers wit
       recipient <- accountGen
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).explicitGet()
-      issue = IssueTransaction
-        .selfSigned(
+      issue = IssueTransaction(
           TxVersion.V1,
-          master,
-          "Asset",
-          "",
+          master.publicKey,
+          "Asset".utf8Bytes,
+          Array.emptyByteArray,
           100,
           2,
           reissuable = false,
           script = None,
           100000000,
           ts + 1
-        )
-        .explicitGet()
+        ).signWith(master.privateKey)
       assetId = IssuedAsset(issue.id())
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransaction

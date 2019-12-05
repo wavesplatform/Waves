@@ -39,8 +39,8 @@ object IssueTxValidator extends TxValidator[IssueTransaction] {
     import tx._
     V.seq(tx)(
       V.positiveAmount(quantity, "assets"),
-      assetName(nameBytes),
-      assetDescription(descBytes),
+      assetName(tx.nameBytes),
+      assetDescription(tx.descriptionBytes),
       assetDecimals(decimals),
       V.fee(fee),
       V.cond(version > TxVersion.V1 || script.isEmpty, GenericError("Script not supported")),

@@ -129,12 +129,12 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issuer    <- accountGen
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
-      assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
+      assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue       <- createIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
+      issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       reissue = ReissueTransaction.selfSigned(1.toByte, issuer, assetId, Long.MaxValue, reissuable = true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
@@ -158,12 +158,12 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issuer    <- accountGen
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
-      assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
+      assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue       <- createIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
+      issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       reissue = ReissueTransaction.selfSigned(1.toByte, issuer, assetId, Long.MaxValue, reissuable = true, 1, timestamp).explicitGet()
     } yield (issuer, assetId, genesis, issue, reissue)
@@ -185,12 +185,12 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       holder    <- accountGen.suchThat(_ != issuer)
       timestamp <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(issuer, ENOUGH_AMT, timestamp).explicitGet()
-      assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
+      assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
       quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
       fee         <- Gen.choose(MinIssueFee, 2 * MinIssueFee)
       decimals    <- Gen.choose(1: Byte, 8: Byte)
-      issue       <- createIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
+      issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
       transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp).explicitGet()
@@ -238,9 +238,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      issue = IssueTransaction
-        .selfSigned(TxVersion.V2, accountA, new String(assetName), new String(description), quantity, decimals, reissuable, Some(createScript(code)), smallFee, timestamp + 1)
-        .explicitGet()
+      issue = IssueTransaction(TxVersion.V2, accountA, assetName, description, quantity, decimals, reissuable, Some(createScript(code)), smallFee, timestamp + 1)
+        .signWith(accountA)
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
         .selfSigned(TxVersion.V1, accountA, accountB, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
@@ -260,8 +259,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
             newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
               AssetDescription(
                 issue.sender,
-                issue.name,
-                issue.description,
+                Left(issue.nameBytes),
+                Left(issue.descriptionBytes),
                 issue.decimals,
                 issue.reissuable,
                 BigInt(issue.quantity),

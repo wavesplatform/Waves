@@ -1,9 +1,11 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.utils._
 import play.api.libs.json.{Format, Json}
 
 object SignedIssueV1Request {
@@ -28,8 +30,8 @@ case class SignedIssueV1Request(
       _t <- IssueTransaction.create(
         TxVersion.V1,
         _sender,
-        name,
-        description,
+        Base64.encode(name.utf8Bytes),
+        Base64.encode(description.utf8Bytes),
         quantity,
         decimals,
         reissuable,

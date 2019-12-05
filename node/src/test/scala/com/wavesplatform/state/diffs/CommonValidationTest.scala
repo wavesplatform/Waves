@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Assertion, Matchers, PropSpec}
@@ -96,35 +97,31 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
       val issueTx =
         if (smartToken)
-          IssueTransaction
-            .selfSigned(
+          IssueTransaction(
               TxVersion.V2,
               richAcc,
-              "test",
-              "desc",
+              "test".utf8Bytes,
+              "desc".utf8Bytes,
               Long.MaxValue,
               2,
               reissuable = false,
               Some(script),
               Constants.UnitsInWave,
               ts
-            )
-            .explicitGet()
+            ).signWith(richAcc)
         else
-          IssueTransaction
-            .selfSigned(
+          IssueTransaction(
               TxVersion.V1,
               richAcc,
-              "test",
-              "desc",
+              "test".utf8Bytes,
+              "desc".utf8Bytes,
               Long.MaxValue,
               2,
               reissuable = false,
               script = None,
               Constants.UnitsInWave,
               ts
-            )
-            .explicitGet()
+            ).signWith(richAcc)
 
       val transferWavesTx = TransferTransaction
         .selfSigned(1.toByte, richAcc, recipientAcc, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, None, ts)

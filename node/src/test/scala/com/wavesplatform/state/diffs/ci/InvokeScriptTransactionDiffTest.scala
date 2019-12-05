@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs.ci
 
+import com.wavesplatform.utils._
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
@@ -681,9 +682,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       contractGen = paymentContractGen(a, am) _
       invoker <- accountGen
       ts      <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#1", "", 1000000, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, invoker, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(invoker)
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
@@ -710,13 +710,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       master <- accountGen
       ts     <- timestampGen
 
-      transferringAsset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#1", "", quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      transferringAsset = IssueTransaction(TxVersion.V2, invoker, "Asset#1".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(invoker)
 
-      attachedAsset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#2", "", quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      attachedAsset = IssueTransaction(TxVersion.V2, invoker, "Asset#2".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(invoker)
 
       contractGen = paymentContractGen(master, am, List(IssuedAsset(transferringAsset.id()))) _
 
@@ -757,9 +755,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       contractGen = paymentContractGen(a, am) _
       invoker <- accountGen
       ts      <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#1", "", 1000000, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, invoker, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
+        .signWith(invoker)
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
@@ -786,9 +783,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       am     <- Gen.choose[Long](1L, quantity)
       master <- accountGen
       ts     <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#1", "", quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, master, "Asset#1".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(master)
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
@@ -809,9 +805,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       am     <- Gen.choose[Long](1L, quantity)
       master <- accountGen
       ts     <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#1", "", quantity, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, master, "Asset#1".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
+        .signWith(master)
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
@@ -829,12 +824,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       am     <- Gen.choose[Long](1L, quantity)
       master <- accountGen
       ts     <- timestampGen
-      asset1 = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#1", "", quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
-      asset2 = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#2", "", quantity, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
-        .explicitGet()
+      asset1 = IssueTransaction(TxVersion.V2, master, "Asset#1".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(master)
+      asset2 = IssueTransaction(TxVersion.V2, master, "Asset#2".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
+        .signWith(master)
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset1.id()), IssuedAsset(asset2.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(2))
     } yield (a, am, r._1, r._2, r._3, asset1, asset2, master)) {
@@ -866,13 +859,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       invoker <- accountGen
       ts      <- timestampGen
 
-      attachedAsset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#1", "", 1000000, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      attachedAsset = IssueTransaction(TxVersion.V2, invoker, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(invoker)
 
-      transferringAsset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#2", "", 1000000, 8, reissuable = false, Some(throwingAsset), enoughFee, ts)
-        .explicitGet()
+      transferringAsset = IssueTransaction(TxVersion.V2, invoker, "Asset#2".utf8Bytes, Array.emptyByteArray, 1000000, 8, reissuable = false, Some(throwingAsset), enoughFee, ts)
+        .signWith(invoker)
 
       r <- preconditionsAndSetContract(
         paymentContractGen(a, am, List(IssuedAsset(transferringAsset.id()))),
@@ -907,9 +898,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       am     <- Gen.choose[Long](1L, quantity)
       master <- accountGen
       ts     <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#1", "", quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, master, "Asset#1"utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(master)
       contractGen = paymentContractGen(a, -1, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master, ts)) {
@@ -944,9 +934,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       am     <- Gen.choose[Long](1L, quantity)
       master <- accountGen
       ts     <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#1", "", quantity, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, master, "Asset#1".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetBanned), enoughFee, ts)
+        .signWith(master)
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(0))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
@@ -964,9 +953,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       contractGen = paymentContractGen(a, am) _
       invoker <- accountGen
       ts      <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, invoker, "Asset#1", "", 1000000, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, invoker, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, reissuable = false, Some(assetAllowed), enoughFee, ts)
+        .signWith(invoker)
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.oneOf(Seq(invoker)),
@@ -1264,9 +1252,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       am     <- Gen.choose[Long](1L, quantity)
       master <- accountGen
       ts     <- timestampGen
-      asset = IssueTransaction
-        .selfSigned(TxVersion.V2, master, "Asset#1", "", quantity, 8, reissuable = false, Some(assetUsingThis), enoughFee, ts)
-        .explicitGet()
+      asset = IssueTransaction(TxVersion.V2, master, "Asset#1".utf8Bytes, Array.emptyByteArray, quantity, 8, reissuable = false, Some(assetUsingThis), enoughFee, ts)
+        .signWith(master)
       contractGen = paymentContractGen(a, am, List(IssuedAsset(asset.id()))) _
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {

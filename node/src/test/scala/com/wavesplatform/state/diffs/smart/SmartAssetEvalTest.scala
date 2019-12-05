@@ -11,6 +11,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -38,20 +39,18 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with
       emptyExprScript = ExprScript(V3, ExpressionCompiler(compilerContext(V3, Expression, isAssetScript = true), parsedEmptyScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransaction
-        .selfSigned(
+      issueTransaction = IssueTransaction(
           TxVersion.V2,
           firstAcc,
-          "name",
-          "description",
+          "name".utf8Bytes,
+          "description".utf8Bytes,
           100,
           0,
           false,
           Some(emptyExprScript),
           1000000,
           ts
-        )
-        .explicitGet()
+        ).signWith(firstAcc)
 
       asset = IssuedAsset(issueTransaction.id())
 

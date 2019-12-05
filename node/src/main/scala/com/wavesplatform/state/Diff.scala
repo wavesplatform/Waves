@@ -9,8 +9,8 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.utils.StrUtils
 import play.api.libs.json._
 
 case class LeaseBalance(in: Long, out: Long)
@@ -52,16 +52,22 @@ object AssetInfo {
 
 case class AssetDescription(
     issuer: PublicKey,
-    name: String,
-    description: String,
+    name: Either[ByteStr, String],
+    description: Either[ByteStr, String],
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
     script: Option[Script],
     sponsorship: Long
-) {
-  def nameBytes: ByteStr = StrUtils.toBytesExact(name)
-  def descBytes: ByteStr = StrUtils.toBytesExact(description)
+)
+
+object AssetDescription {
+  def apply(i: IssueTransaction, ai: AssetInfo, script: Option[Script], sponsorship: Long): AssetDescription = {
+    val (name, description) = if (i.isProtobufVersion) Right(i.name) -> Right(i.description)
+    else Left(ByteStr.decodeBase64(i.name).get) -> Left(ByteStr.decodeBase64(i.description).get)
+
+    AssetDescription(i.sender, name, description, i.decimals, ai.isReissuable, ai.volume, script, sponsorship)
+  }
 }
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])

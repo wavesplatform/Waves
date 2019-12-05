@@ -1,13 +1,6 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.api.http.requests.{
-  SignedBurnV1Request,
-  SignedIssueV1Request,
-  SignedReissueV1Request,
-  SignedSetAssetScriptRequest,
-  SignedSponsorFeeRequest,
-  SignedTransferV1Request
-}
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.script.Script
@@ -41,8 +34,8 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    Base58.encode(tx.nameBytes) shouldBe "zVbyBrMk"
-    Base58.encode(tx.descBytes) shouldBe "zVbyBrMk"
+    tx.nameBytes.toString shouldBe "zVbyBrMk"
+    tx.descriptionBytes.toString shouldBe "zVbyBrMk"
     tx.reissuable shouldBe true
     tx.decimals shouldBe 2
     tx.fee shouldBe 100000L

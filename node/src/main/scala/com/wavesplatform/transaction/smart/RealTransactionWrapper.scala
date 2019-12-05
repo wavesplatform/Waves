@@ -70,7 +70,7 @@ object RealTransactionWrapper {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
       case t: TransferTransaction => mapTransferTx(t, stdLibVersion).asRight
       case i: IssueTransaction =>
-        Tx.Issue(proven(i), i.quantity, ByteStr(i.nameBytes), ByteStr(i.descBytes), i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
+        Tx.Issue(proven(i), i.quantity, i.nameBytes, i.descriptionBytes, i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight

@@ -19,6 +19,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
@@ -206,9 +207,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
           val issueTransaction =
-            IssueTransaction
-              .selfSigned(TxVersion.V1, sender, "test", "", assetAmount, 8, reissuable = true, script = None, 1, nextTs)
-              .explicitGet()
+            IssueTransaction(TxVersion.V1, sender, "test".utf8Bytes, Array.emptyByteArray, assetAmount, 8, reissuable = true, script = None, 1, nextTs)
+              .signWith(sender)
 
           d.appendBlock(
             TestBlock.create(
@@ -245,16 +245,15 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
         }
     }
 
-    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, stringGen(10), stringGen(12)) {
+    "asset quantity and reissuability" in forAll(accountGen, positiveLongGen, byteArrayGen(10), byteArrayGen(12)) {
       case (sender, initialBalance, name, description) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
           val genesisBlockId = d.lastBlockId
 
           val issueTransaction =
-            IssueTransaction
-              .selfSigned(TxVersion.V1, sender, name, description, 2000, 8, reissuable = true, script = None, 1, nextTs)
-              .explicitGet()
+            IssueTransaction(TxVersion.V1, sender.publicKey, name, description, 2000, 8, reissuable = true, script = None, 1, nextTs)
+              .signWith(sender.privateKey)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) shouldBe 'empty
 
           d.appendBlock(
@@ -268,7 +267,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
-          val desc1 = AssetDescription(sender, name, description, 8, reissuable = true, BigInt(2000), None, 0)
+          val desc1 = AssetDescription(sender, Left(name), Left(description), 8, reissuable = true, BigInt(2000), None, 0)
           actualDesc shouldBe Some(desc1)
 
           d.appendBlock(
@@ -282,12 +281,12 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, reissuable = false, BigInt(4000), None, 0)
+            AssetDescription(sender, Left(name), Left(description), 8, reissuable = false, BigInt(4000), None, 0)
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, reissuable = true, BigInt(2000), None, 0)
+            AssetDescription(sender, Left(name), Left(description), 8, reissuable = true, BigInt(2000), None, 0)
           )
 
           d.removeAfter(genesisBlockId)

@@ -1,5 +1,4 @@
 package com.wavesplatform.state.diffs.smart.scenarios
-
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -23,7 +22,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
-import com.wavesplatform.utils.EmptyBlockchain
+import com.wavesplatform.utils.{EmptyBlockchain, _}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -71,20 +70,19 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransaction
-        .selfSigned(
+      issueTransaction = IssueTransaction(
           TxVersion.V2,
-          company,
-          "name",
-          "description",
+          company.publicKey,
+          "name".utf8Bytes,
+          "description".utf8Bytes,
           100,
           0,
           false,
           Some(typedScript),
           1000000,
           ts
-        )
-        .explicitGet()
+        ).signWith(company.privateKey)
+
 
       assetId = IssuedAsset(issueTransaction.id())
 

@@ -30,9 +30,8 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     masterToAlice: TransferTransaction = TransferTransaction
       .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, None, ts + 1)
       .explicitGet()
-    issue: IssueTransaction = IssueTransaction
-      .selfSigned(TxVersion.V1, alice, new String(assetName), new String(description), quantity, decimals, false, script = None, Waves, ts + 100)
-      .explicitGet()
+    issue: IssueTransaction = IssueTransaction(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
+      .signWith(alice)
     burn: BurnTransaction = BurnTransaction.selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
     reissue: ReissueTransaction = ReissueTransaction
       .selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
