@@ -59,7 +59,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
       e.statusCode shouldBe 400
       e.id shouldBe StateCheckFailed.Id
-      e.message should include("Multiple payment attachment for Invoke Script Transaction feature has not been activated")
+      e.message should include("Ride V4 and multiple attached payments for Invoke Script Transaction feature has not been activated")
     }
 
     assertFeatureNotActivated(sender.setScript(smartAcc.stringRepr, Some(dAppV4.compiled)))
