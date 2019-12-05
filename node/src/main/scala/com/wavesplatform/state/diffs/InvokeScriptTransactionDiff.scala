@@ -381,7 +381,7 @@ object InvokeScriptTransactionDiff {
          val asset = IssuedAsset(issue.id())
 
          DiffsCommon
-           .countScriptComplexity(issue.compiledScript, blockchain)
+           .countScriptComplexity(None /*issue.compiledScript*/, blockchain)
            .map(
              script =>
                Diff(
