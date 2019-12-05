@@ -38,4 +38,4 @@ package
 !src/package
 native
 
-!lib/*.jar
+!lang/jvm/lib/*.jar
