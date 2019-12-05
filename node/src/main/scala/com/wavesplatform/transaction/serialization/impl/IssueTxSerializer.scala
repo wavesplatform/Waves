@@ -23,7 +23,8 @@ object IssueTxSerializer {
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
       "description" -> (if (isProtobufVersion) description else new String(Base64.decode(description), Charsets.UTF_8))
-    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte, "script" -> script.map(_.bytes().base64)) else JsObject.empty)
+    ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
+      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
@@ -42,7 +43,7 @@ object IssueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 =>
-        Bytes.concat(Array(builder.typeId, version, chainByte.get), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
+        Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
       case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }

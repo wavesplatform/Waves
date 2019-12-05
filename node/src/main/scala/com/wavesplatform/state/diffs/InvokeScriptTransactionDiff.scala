@@ -84,8 +84,8 @@ object InvokeScriptTransactionDiff {
                 Monoid
                   .combineAll(
                     Seq(
-                      PureContext.build(Global, V3).withEnvironment[Environment],
-                      CryptoContext.build(Global, V3).withEnvironment[Environment],
+                      PureContext.build(Global, version).withEnvironment[Environment],
+                      CryptoContext.build(Global, version).withEnvironment[Environment],
                       WavesContext.build(directives)
                     )
                   )

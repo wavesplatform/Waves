@@ -32,8 +32,6 @@ case class UpdateAssetInfoTransaction(
 
   override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
 
-  override def chainByte: Option[TxType] = Some(chainId)
-
   override def builder: UpdateAssetInfoTransaction.type = UpdateAssetInfoTransaction
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(self))

@@ -64,15 +64,18 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
     } yield {
 
       balancesBeforeActivation(blockBeforeActivation.generator) shouldBe {
-        initialBalances(blockBeforeActivation.generator) + blockBeforeActivation.fee
+        nodes.head.settings.blockchainSettings.rewardsSettings.initial +
+          initialBalances(blockBeforeActivation.generator) + blockBeforeActivation.fee
       }
 
       balancesOnActivation(blockOnActivation.generator) shouldBe {
-        balancesBeforeActivation(blockOnActivation.generator) + blockOnActivation.fee * 4 / 10
+        nodes.head.settings.blockchainSettings.rewardsSettings.initial +
+          balancesBeforeActivation(blockOnActivation.generator) + blockOnActivation.fee * 4 / 10
       }
 
       balancesAfterActivation(blockAfterActivation.generator) shouldBe {
-        balancesOnActivation(blockAfterActivation.generator) + blockOnActivation.fee * 6 / 10 +
+        nodes.head.settings.blockchainSettings.rewardsSettings.initial +
+          balancesOnActivation(blockAfterActivation.generator) + blockOnActivation.fee * 6 / 10 +
           blockAfterActivation.fee * 4 / 10
       }
     }

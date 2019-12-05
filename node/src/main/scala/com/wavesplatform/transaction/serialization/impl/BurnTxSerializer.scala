@@ -16,7 +16,7 @@ object BurnTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++
       Json.obj("assetId" -> asset.id.toString, (if (version < TxVersion.V3) "amount" else "quantity") -> quantity) ++
-      (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
+      (if (version == TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
   }
 
   def bodyBytes(tx: BurnTransaction): Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -31,7 +31,7 @@ object BurnTxSerializer {
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version, chainByte.get), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }

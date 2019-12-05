@@ -64,6 +64,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val aliasTx  = aliasTxUnsigned.copy(proofs = proofs)
       val base64Tx = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(aliasTx)))
 
+      (aliasTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
       decode(base64Tx) shouldBe aliasTx
     }
 
@@ -119,6 +120,10 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64IssueStr) shouldBe issueTx
       decode(base64reissueStr) shouldBe reissueTx
       decode(base64BurnStr) shouldBe burnTx
+
+      (issueTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (reissueTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (burnTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "DataTransaction" in {
@@ -134,6 +139,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(dataTx)))
 
       decode(base64Str) shouldBe dataTx
+
+      (dataTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "ExchangeTransaction" in {
@@ -149,6 +156,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       decode(base64Str) shouldBe exchangeTx
+
+      (exchangeTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "InvokeScriptTransaction" in {
@@ -177,6 +186,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str      = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(invokeScriptTx)))
 
       decode(base64Str) shouldBe invokeScriptTx
+
+      (invokeScriptTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "LeaseTransaction/LeaseCancelTransaction" in {
@@ -203,6 +214,9 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       decode(base64LeaseStr) shouldBe leaseTx
       decode(base64CancelLeaseStr) shouldBe leaseCancelTx
+
+      (leaseTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (leaseCancelTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "TransferTransaction" in {
@@ -221,6 +235,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str  = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(transferTx)))
 
       decode(base64Str) shouldBe transferTx
+
+      (transferTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "MassTransferTransaction" in {
@@ -238,6 +254,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str      = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(massTransferTx)))
 
       decode(base64Str) shouldBe massTransferTx
+
+      (massTransferTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "SetScriptTransaction" in {
@@ -253,6 +271,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str   = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(setScriptTx)))
 
       decode(base64Str) shouldBe setScriptTx
+
+      (setScriptTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     "SetAssetScriptTransaction" in {
@@ -285,6 +305,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
 
       decode(base64Str) shouldBe sponsorshipTx
+
+      (sponsorshipTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
     def checkProofs(response: HttpResponse): Proofs = {

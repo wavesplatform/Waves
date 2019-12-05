@@ -36,7 +36,6 @@ case class SetAssetScriptTransaction(
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
-  override val chainByte: Option[Byte]         = Some(AddressScheme.current.chainId)
 }
 
 object SetAssetScriptTransaction extends TransactionParser {

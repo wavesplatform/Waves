@@ -19,6 +19,7 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures((14, 1000000)))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
       .withDefault(1)

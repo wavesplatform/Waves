@@ -263,10 +263,10 @@ object SyncHttpApi extends Assertions {
 
     def issue(
         sourceAddress: String,
-        name: String,
-        description: String,
-        quantity: Long,
-        decimals: Byte,
+        name: String = "Asset",
+        description: String = "",
+        quantity: Long = 1000000000,
+        decimals: Byte = 2,
         reissuable: Boolean = true,
         fee: Long = issueFee,
         version: TxVersion = TxVersion.V2,
@@ -561,7 +561,7 @@ object SyncHttpApi extends Assertions {
     def invokeScript(
         caller: String,
         dappAddress: String,
-        func: Option[String],
+        func: Option[String] = None,
         args: List[Terms.EXPR] = List.empty,
         payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
         fee: Long = smartMinFee,

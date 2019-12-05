@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base64.encode
 import com.wavesplatform.crypto
@@ -42,8 +42,6 @@ case class IssueTransaction(
   override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]           = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 
   def safeName: Either[ByteStr, String] = if (isProtobufVersion) Right(name) else Left(this.nameBytes)
   def safeDescription: Either[ByteStr, String] = if (isProtobufVersion) Right(description) else Left(this.descriptionBytes)
