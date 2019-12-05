@@ -15,6 +15,7 @@ object FieldNames {
   val StringEntry  = "StringEntry"
   val BinaryEntry  = "BinaryEntry"
   val IntegerEntry = "IntegerEntry"
+  val DeleteEntry  = "DeleteEntry"
 
   val Recipient      = "recipient"
   val Amount         = "amount"
