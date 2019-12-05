@@ -119,7 +119,7 @@ object InvokeScriptTransactionDiff {
 
           actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
           transfers = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-          issues   <- actionsByType(classOf[Issue])        .asInstanceOf[List[Issue]].map(i => TracedResult.wrapE(prepareIssue(tx, pk, i))).sequence
+          issues    = actionsByType(classOf[Issue])        .asInstanceOf[List[Issue]]
           reissues  = actionsByType(classOf[Reissue])      .asInstanceOf[List[Reissue]]
           burns     = actionsByType(classOf[Burn])         .asInstanceOf[List[Burn]]
 
@@ -245,6 +245,7 @@ object InvokeScriptTransactionDiff {
       case DataItem.Str(k, b)  => StringDataEntry(k, b)
       case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
       case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
+      case DataItem.Delete(k)  => EmptyDataEntry(k)
     }
 
   private def checkSelfPayments(
@@ -361,8 +362,30 @@ object InvokeScriptTransactionDiff {
           Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
         )
 
-      def applyIssue(pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] =
-        prepareIssue(tx, pk, issue).flatMap(AssetTransactionsDiff.issue(blockchain))
+      def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
+        prepareIssue(tx, pk, issue).flatMap { pseudo =>
+          // It is clone of AssetTransactionsDiff.issue. Need to unificate.
+          val staticInfo = AssetStaticInfo(TransactionId @@ pseudo.id(), pk, pseudo.decimals)
+          val volumeInfo = AssetVolumeInfo(pseudo.reissuable, BigInt(pseudo.quantity))
+          val info       = AssetInfo(new String(pseudo.name), new String(pseudo.description), Height @@ blockchain.height)
+
+          val asset = IssuedAsset(pseudo.id())
+
+          DiffsCommon
+            .countScriptComplexity(pseudo.script, blockchain)
+            .map(
+              script =>
+                Diff(
+                  tx = itx,
+                  portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> pseudo.quantity))),
+                  issuedAssets = Map(asset -> ((staticInfo, info, volumeInfo))),
+                  assetScripts = Map(asset -> script.map(script => ((pk, script._1, script._2)))),
+                  scriptsRun = 0
+                )
+            )
+        }
+      }
+
 
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
         val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
@@ -401,7 +424,7 @@ object InvokeScriptTransactionDiff {
       val diff = action match {
         case t: AssetTransfer => applyTransfer(t)
         case d: DataItem[_]   => applyDataItem(d)
-        case i: Issue         => applyIssue(pk, i)
+        case i: Issue         => applyIssue(tx, pk, i)
         case r: Reissue       => applyReissue(r)
         case b: Burn          => applyBurn(b)
       }

@@ -260,8 +260,6 @@ class LevelDBWriter(
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
 
-    val generatedIssues: List[IssueTransaction] = scriptResults.toList.flatMap { case (id, r) => r.issues }
-
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -617,7 +615,6 @@ class LevelDBWriter(
 
                 case _: InvokeScriptTransaction =>
                   val k = Keys.invokeScriptResult(h, num)
-                  val r = rw.get(k)
                   rw.delete(k)
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
