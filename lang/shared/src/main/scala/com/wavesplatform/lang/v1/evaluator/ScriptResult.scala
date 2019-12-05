@@ -152,6 +152,7 @@ object ScriptResult {
       } else {
         Left("Issuing scripted asset isn't supported")
       }
+      case _ => Left(s"Invalid arguments")
     }
   }
 
