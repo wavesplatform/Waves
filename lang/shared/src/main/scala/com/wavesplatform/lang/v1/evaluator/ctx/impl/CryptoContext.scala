@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
+import cats.implicits._
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
@@ -148,7 +149,7 @@ object CryptoContext {
         case xs                               => notImplemented[Id]("fromBase16String(str: String)", xs)
       }
 
-    def bls12Groth16VerifyF: BaseFunction[NoContext] =
+    val bls12Groth16VerifyF: BaseFunction[NoContext] =
       NativeFunction(
         "bls12Groth16Verify",
         10,  // TODO: Replace gas cost 
@@ -163,7 +164,7 @@ object CryptoContext {
         case xs => notImplemented[Id]("bls12Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
       }
 
-    def bls12PedersenMerkleTreeAddItemF: BaseFunction[NoContext] =
+    val bls12PedersenMerkleTreeAddItemF: BaseFunction[NoContext] =
       NativeFunction(
         "bls12PedersenMerkleTreeAddItem",
         10,  // TODO: Replace gas cost 
@@ -231,9 +232,17 @@ object CryptoContext {
         bls12PedersenMerkleTreeAddItemF
       )
 
+    val v4Functions =
+      Array(bls12Groth16VerifyF, bls12PedersenMerkleTreeAddItemF)
+
+    val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
+    val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
+    val fromV4Ctx = fromV3Ctx |+| CTX[NoContext](Seq(), Map(), v4Functions)
+
     version match {
-      case V1 | V2 => CTX[NoContext](Seq.empty, Map.empty, v1Functions)
-      case V3 | V4 => CTX[NoContext](v3Types, v3Vars, v1Functions ++ v3Functions)
+      case V1 | V2      => fromV1Ctx
+      case V3           => fromV3Ctx
+      case v if v >= V4 => fromV4Ctx
     }
   }
 
