@@ -68,6 +68,12 @@ object ScriptResult {
       constructor(key, valueExtractor(value))
   }
 
+  private def processDeleteEntry(fields: Map[String, EVALUATED]): Either[String, DataItem.Delete] =
+    fields.get(FieldNames.Key) match {
+      case Some(CONST_STRING(key)) => Right(DataItem.Delete(key))
+      case other                   => err(other, V4, FieldNames.DeleteEntry)
+    }
+
   private def processScriptTransfer(fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, AssetTransfer] =
     (fields(FieldNames.Recipient), fields(FieldNames.Amount), fields(FieldNames.Asset)) match {
       case (CaseObj(at, fields2), CONST_LONG(b), maybeToken) if at.name == Types.addressType.name =>
@@ -165,6 +171,7 @@ object ScriptResult {
       FieldNames.BooleanEntry   -> (processDataEntryV4(_, FieldNames.BooleanEntry, processBoolEntry)),
       FieldNames.StringEntry    -> (processDataEntryV4(_, FieldNames.StringEntry,  processStringEntry)),
       FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBinaryEntry)),
+      FieldNames.DeleteEntry    -> processDeleteEntry,
       FieldNames.Issue          -> processIssue,
       FieldNames.Reissue        -> processReissue,
       FieldNames.Burn           -> processBurn

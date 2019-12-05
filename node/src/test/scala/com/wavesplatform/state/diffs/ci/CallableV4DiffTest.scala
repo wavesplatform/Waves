@@ -10,6 +10,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs._
@@ -24,7 +25,7 @@ import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
-  property("reissue and burn actions results state") {
+  property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
         assertDiffAndState(
@@ -152,6 +153,49 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           val assetTrace = r.trace.tail.asInstanceOf[List[AssetVerifierTrace]]
           assetTrace.take(2).foreach(_.errorO shouldBe None)
           assetTrace.last.errorO.get shouldBe r.resultE.left.get.asInstanceOf[TransactionValidationError].cause
+        }
+    }
+  }
+
+  property("diff contains delete entries") {
+    val deleteEntryDApp = dApp(
+      """
+        | [
+        |   DeleteEntry("key1"),
+        |   DeleteEntry("key2")
+        | ]
+        |
+        |""".stripMargin
+    )
+
+    val deleteEntryPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair)] =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee()
+      } yield {
+        val dApp = Some(deleteEntryDApp)
+        for {
+          genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+          genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+          setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
+        } yield (List(genesis, genesis2), setDApp, ci, master)
+      }.explicitGet()
+
+    forAll(deleteEntryPreconditions) {
+      case (genesis, setScript, invoke, master) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ setScript)),
+          TestBlock.create(Seq(invoke)),
+          features
+        ) { case (diff, _) =>
+          diff.accountData(master).data shouldBe
+            Map(
+              "key1" -> EmptyDataEntry("key1"),
+              "key2" -> EmptyDataEntry("key2")
+            )
         }
     }
   }
