@@ -15,7 +15,7 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
     val expr = (1 to 100000).foldLeft[EXPR](CONST_LONG(0)) { (acc, _) =>
       FUNCTION_CALL(Plus, List(CONST_LONG(1), acc))
     }
-    estimate(customFunctionCosts, expr) shouldBe 'right
+    estimate(customFunctionCosts, expr).explicitGet() shouldBe 1 + (100 + 1) * 100000
   }
 
   property("handles const expression correctly") {
@@ -45,7 +45,7 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
   property("recursive let statement") {
     // let v = v; v
     val expr = BLOCK(LET("v", REF("v")), REF("v"))
-    estimate(Map.empty, expr) shouldBe 'right
+    estimate(Map.empty, expr).explicitGet() shouldBe 5 + 2 + 2
   }
 
   property("evaluates if statement lazily") {
@@ -71,7 +71,7 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
       LET("x", REF("y")),
       BLOCK(LET("y", REF("x")), IF(TRUE, REF("x"), REF("y")))
     )
-    estimate(customFunctionCosts, expr).explicitGet() shouldBe 18
+    estimate(customFunctionCosts, expr).explicitGet() shouldBe 5 + 5 + 2 + 2 + 2 + 2
   }
 
   property("evaluates simple expression - let + func_call + ref") {
@@ -81,7 +81,7 @@ class ScriptEstimatorV1V2Test extends ScriptEstimatorTestBase(ScriptEstimatorV1,
       LET("x", FUNCTION_CALL(sumLong.header, List(CONST_LONG(1), CONST_LONG(2)))),
       REF("x")
     )
-    estimate(functionCosts, expr).explicitGet() shouldBe 10
+    estimate(functionCosts, expr).explicitGet() shouldBe 5 + 1 + 1 + 1 + 2
   }
 
   property("estimate script with func statement") {
