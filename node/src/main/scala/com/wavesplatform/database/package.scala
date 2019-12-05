@@ -302,27 +302,7 @@ package object database extends ScorexLogging {
 
     ndo.toByteArray
   }
-  def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
-    import com.wavesplatform.crypto._
 
-    val ndi = newDataInput(arr)
-
-    val source   = TransactionId @@ ndi.readByteStr(DigestLength)
-    val issuer   = ndi.readPublicKey
-    val decimals = ndi.readInt()
-
-    AssetStaticInfo(source, issuer, decimals)
-  }
-
-  def writeAssetStaticInfo(ai: AssetStaticInfo): Array[Byte] = {
-    val ndo = newDataOutput()
-
-    ndo.writeByteStr(ai.source)
-    ndo.writeByteStr(ai.issuer)
-    ndo.writeInt(ai.decimals)
-
-    ndo.toByteArray
-  }
   def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
     import com.wavesplatform.crypto._
 
