@@ -16,9 +16,8 @@ object SetAssetScriptTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
-      "chainId" -> chainByte,
       "script"  -> script.map(_.bytes().base64)
-    )
+    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> tx.chainByte) else Json.obj())
   }
 
   def bodyBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
@@ -26,7 +25,7 @@ object SetAssetScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           sender,
           asset.id.arr,
           Longs.toByteArray(fee),

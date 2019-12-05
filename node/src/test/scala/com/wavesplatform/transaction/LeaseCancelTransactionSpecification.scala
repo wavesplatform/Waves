@@ -29,7 +29,6 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
         |  "sender" : "3N6Jpv3nXAcbYvziaK3bGDjGsfo5XtJ4ti5",
         |  "feeAssetId" : null,
         |  "signature" : "4cZVxhxZCGgwi2AqWScZ3vft6DPKsRyXBMAr4M6sjj2hUJH5DSfDnC1aQYBv5kvqeQfWt3NggdB6wAvfARK85zy2",
-        |  "chainId" : null,
         |  "proofs" : [ "4cZVxhxZCGgwi2AqWScZ3vft6DPKsRyXBMAr4M6sjj2hUJH5DSfDnC1aQYBv5kvqeQfWt3NggdB6wAvfARK85zy2" ],
         |  "fee" : 66288378,
         |  "id" : "DYPzB2aupCtHMrP2YLJXnEr74XpJii5SVMmwPH5Cz3dE",
@@ -69,8 +68,7 @@ class LeaseCancelTransactionSpecification extends PropSpec with PropertyChecks w
                        "signature": "4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3",
                        "proofs": ["4T76AXcksn2ixhyMNu4m9UyY54M3HDTw5E2HqUsGV4phogs2vpgBcN5oncu4sbW4U3KU197yfHMxrc3kZ7e6zHG3"],
                        "version": 1,
-                       "leaseId": "EXhjYjy8a1dURbttrGzfcft7cddDnPnoa3vqaBLCTFVY",
-                       "chainId": null
+                       "leaseId": "EXhjYjy8a1dURbttrGzfcft7cddDnPnoa3vqaBLCTFVY"
                        }
     """)
 

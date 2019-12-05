@@ -32,7 +32,6 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
                             |  "reissuable" : false,
                             |  "sender" : "3MyU5WaaGs3zyyWyVG447Ra3GBY96ddVG6q",
                             |  "feeAssetId" : null,
-                            |  "chainId" : null,
                             |  "signature" : "2Qn9wyJdgCpTFGkXH7Y5jY9HDTQ3ixe7khzAmm7sp5CCUbax4gwjahHdHGrfFxSoWZNTMStvbfXjp9HHCjeFKWMR",
                             |  "proofs" : [ "2Qn9wyJdgCpTFGkXH7Y5jY9HDTQ3ixe7khzAmm7sp5CCUbax4gwjahHdHGrfFxSoWZNTMStvbfXjp9HHCjeFKWMR" ],
                             |  "assetId" : "7RNELbxQa7ihqewsUGQzZdEscZfHJhZPYkUefAsEcvnw",
@@ -64,7 +63,6 @@ class ReissueTransactionV1Specification extends PropSpec with PropertyChecks wit
                     "signature": "3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA",
                     "proofs": ["3LnRMrjkk7RoV35PTwcdB4yW2rqUqXaKAh8DnPk5tNWABvhVQ9oqdTk3zM8b9AbGtry7WEcQZtevfK92DCFaa6hA"],
                     "version": 1,
-                    "chainId": null,
                     "assetId": "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz",
                     "quantity": 100000000,
                     "reissuable": true

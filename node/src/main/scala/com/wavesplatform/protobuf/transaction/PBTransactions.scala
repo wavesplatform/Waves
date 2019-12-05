@@ -425,7 +425,7 @@ object PBTransactions {
   }
 
   def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
-    val chainId = tx.chainByte.getOrElse(AddressScheme.current.chainId)
+    val chainId = tx.chainByte
 
     tx match {
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>

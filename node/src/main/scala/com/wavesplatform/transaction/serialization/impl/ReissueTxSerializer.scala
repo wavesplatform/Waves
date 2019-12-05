@@ -16,9 +16,8 @@ object ReissueTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"    -> asset.id.toString,
       "quantity"   -> quantity,
-      "reissuable" -> reissuable,
-      "chainId"    -> chainByte
-    )
+      "reissuable" -> reissuable
+    ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainByte) else Json.obj())
   }
 
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
@@ -38,7 +37,7 @@ object ReissueTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           baseBytes
         )
 
