@@ -743,10 +743,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("V4 - median") {
-    val script           = """[1, 2, 3].median()"""
+    val script           = """median([1, 2, 3]) + [1, 2, 3].median()"""
     val Right((expr, _)) = compileExpr(script, V4)
     val res              = Decompiler(expr, decompilerContextV4)
-    res shouldEq """median([1, 2, 3])"""
+    res shouldEq """(median([1, 2, 3]) + median([1, 2, 3]))"""
   }
 
   property("V4 - new contract result format") {
