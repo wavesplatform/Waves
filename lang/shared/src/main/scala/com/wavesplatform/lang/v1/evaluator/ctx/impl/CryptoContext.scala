@@ -151,23 +151,30 @@ object CryptoContext {
 
     val bls12Groth16VerifyF: BaseFunction[NoContext] =
       NativeFunction(
-        "bls12Groth16Verify",
-        10,  // TODO: Replace gas cost 
+        "groth16Verify",
+        10,  // TODO: Replace gas cost
         BLS12_GROTH16_VERIFY,
         BOOLEAN,
-        ("vk", BYTESTR),
+        ("verifying key", BYTESTR),
         ("proof", BYTESTR),
         ("inputs", BYTESTR)
       ) {
         case CONST_BYTESTR(vk:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_BYTESTR(inputs:ByteStr) :: Nil =>
-          Right(CONST_BOOLEAN(Groth16.verify(vk, proof, inputs)))
-        case xs => notImplemented[Id]("bls12Groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+          if (vk.size > 1024)
+            Left(s"Groth16Verify verifying key size should not exceed 1 Kbyte, but ${vk.size} found")
+          else if (proof.size != 192)
+            Left(s"Groth16Verify proof size should be exactly 192 bytes, but ${proof.size} found")
+          else if (inputs.size > 384)
+            Left(s"Groth16Verify inputs size should not exceed 384 bytes, but ${inputs.size} found")
+          else
+            Right(CONST_BOOLEAN(Groth16.verify(vk, proof, inputs)))
+        case xs => notImplemented[Id]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
       }
 
     val bls12PedersenMerkleTreeAddItemF: BaseFunction[NoContext] =
       NativeFunction(
-        "bls12PedersenMerkleTreeAddItem",
-        10,  // TODO: Replace gas cost 
+        "pedersenMerkleTreeAddItem",
+        10,  // TODO: Replace gas cost
         BLS12_PEDERSEN_MERKLE_TREE_ADD_ITEM,
         BYTESTR,
         ("root", BYTESTR),
@@ -176,8 +183,17 @@ object CryptoContext {
         ("leaf", BYTESTR)
       ) {
         case CONST_BYTESTR(root:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_LONG(index:Long) :: CONST_BYTESTR(leaf:ByteStr) :: Nil =>
-          CONST_BYTESTR(PedersenMerkleTree.addItem(root, proof, index, leaf))
-        case xs => notImplemented[Id]("bls12PedersenMerkleTreeAddItem(root:ByteVector, proof:ByteVector, index: Int, leaf:ByteVector)", xs)
+          if (root.size != 32)
+            Left(s"PedersenMerkleTreeAddItem root size should be exactly 32 bytes, but ${root.size} found")
+          else if (proof.size > 2048)
+            Left(s"PedersenMerkleTreeAddItem proof size should not exceed 2 Kbytes, but ${proof.size} found")
+          else if (index < 0)
+            Left(s"PedersenMerkleTreeAddItem index should be non-negative, but $index found")
+          else if (leaf.size > 1024)
+            Left(s"PedersenMerkleTreeAddItem leaf size should not exceed 1 Kbyte, but ${leaf.size} found")
+          else
+            CONST_BYTESTR(PedersenMerkleTree.addItem(root, proof, index, leaf))
+        case xs => notImplemented[Id]("pedersenMerkleTreeAddItem(root:ByteVector, proof:ByteVector, index: Int, leaf:ByteVector)", xs)
       }
 
     val v1Functions =
@@ -227,9 +243,7 @@ object CryptoContext {
         rsaVerifyF,
         checkMerkleProofF,
         toBase16StringF,
-        fromBase16StringF,
-        bls12Groth16VerifyF,
-        bls12PedersenMerkleTreeAddItemF
+        fromBase16StringF
       )
 
     val v4Functions =
