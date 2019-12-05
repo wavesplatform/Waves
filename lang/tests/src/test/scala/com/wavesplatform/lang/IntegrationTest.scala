@@ -1261,7 +1261,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | let input = base64'LcMT3OOlkHLzJBKCKjjzzVMg+r+FVgd52LlhZPB4RFg='
          | groth16Verify(key, proof, input)
        """.stripMargin
-    eval(src, version = V4) should produce("Can't apply")
+    eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 
   property("pedersenMerkleTreeAddItem") {
@@ -1274,6 +1274,6 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | let result = pedersenMerkleTreeAddItem(root, proof, index, leaf)
          | result == base64'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'
        """.stripMargin
-    eval(src, version = V4) shouldBe CONST_BOOLEAN(true)
+    eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
   }
 }

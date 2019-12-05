@@ -167,7 +167,7 @@ object CryptoContext {
           else if (inputs.size > 384)
             Left(s"Groth16Verify inputs size should not exceed 384 bytes, but ${inputs.size} found")
           else
-            Right(CONST_BOOLEAN(Groth16.verify(vk, proof, inputs)))
+            Right(CONST_BOOLEAN(Groth16.verify(vk.arr, proof.arr, inputs.arr)))
         case xs => notImplemented[Id]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
       }
 
@@ -192,7 +192,7 @@ object CryptoContext {
           else if (leaf.size > 1024)
             Left(s"PedersenMerkleTreeAddItem leaf size should not exceed 1 Kbyte, but ${leaf.size} found")
           else
-            CONST_BYTESTR(PedersenMerkleTree.addItem(root, proof, index, leaf))
+            CONST_BYTESTR(PedersenMerkleTree.addItem(root.arr, proof.arr, index, leaf.arr))
         case xs => notImplemented[Id]("pedersenMerkleTreeAddItem(root:ByteVector, proof:ByteVector, index: Int, leaf:ByteVector)", xs)
       }
 

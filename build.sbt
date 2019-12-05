@@ -27,7 +27,6 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Full)
     .settings(
-      unmanagedBase := file("./lib"),
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
