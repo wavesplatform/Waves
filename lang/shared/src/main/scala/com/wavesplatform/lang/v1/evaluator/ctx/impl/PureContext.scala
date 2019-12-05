@@ -590,7 +590,7 @@ object PureContext {
     }
 
   lazy val getListMedian: BaseFunction[NoContext] =
-    NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(TYPEPARAM('T')))) {
+    NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
       case ARR(arr) :: Nil => {
 
         def getMedian(seq: Seq[Long]): Long = {
@@ -601,7 +601,7 @@ object PureContext {
           if (size % 2 == 1) {
             targetArr(halfSize)
           } else {
-            ((BigInt(targetArr(halfSize - 1)) + BigInt(targetArr(halfSize))) / 2).toLong
+            Math.floorDiv(targetArr(halfSize - 1) + targetArr(halfSize), 2)
           }
         }
 

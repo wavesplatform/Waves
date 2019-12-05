@@ -18,13 +18,16 @@ object FeatureProvider {
       else if (blockchain.approvedFeatures.get(feature).exists(_ <= height)) BlockchainFeatureStatus.Approved
       else BlockchainFeatureStatus.Undefined
 
-    def currentBlockVersion: Byte =
-      if (isFeatureActivated(BlockchainFeatures.BlockV5)) ProtoBlockVersion
-      else if (isFeatureActivated(BlockchainFeatures.BlockReward)) RewardBlockVersion
-      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight < blockchain.height) NgBlockVersion
-      else PlainBlockVersion
+    def currentBlockVersion: Byte = blockVersionAt(blockchain.height)
+    def nextBlockVersion: Byte    = blockVersionAt(blockchain.height + 1)
 
     def featureActivationHeight(feature: Short): Option[Int] = blockchain.activatedFeatures.get(feature)
     def featureApprovalHeight(feature: Short): Option[Int]   = blockchain.approvedFeatures.get(feature)
+
+    def blockVersionAt(height: Int): Byte =
+      if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
+      else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) RewardBlockVersion
+      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight < height) NgBlockVersion
+      else PlainBlockVersion
   }
 }

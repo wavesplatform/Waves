@@ -1208,7 +1208,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val arrSorted = arr.sorted
     val src =
       s"[${arr.mkString(",")}].median()"
-    eval(src, version = V4) shouldBe Right(CONST_LONG(((BigInt(arrSorted(49)) + BigInt(arrSorted(50))) / 2).toLong))
+    eval(src, version = V4) shouldBe Right(CONST_LONG(Math.floorDiv(arrSorted(49) + arrSorted(50), 2)))
   }
 
   property("List[Int] median - 99 elements") {
@@ -1224,6 +1224,13 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       s"[${arr.mkString(",")}].median()"
     eval(src, version = V4) shouldBe Right(CONST_LONG(arr.head))
+  }
+
+  property("List[Int] median - negative rounding down") {
+    val arr = Seq(3, -8)
+    val src =
+      s"[${arr.mkString(",")}].median()"
+    eval(src, version = V4) shouldBe Right(CONST_LONG(-3))
   }
 
   property("List[Int] median - 101 elements - error") {
@@ -1248,7 +1255,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("List[Int] median - list with non int elements - error") {
     val src =
-      s"""["foo", "bar"].median()"""
-    eval(src, version = V4) should produce("Can't apply")
+      s"""["1", "2"].median()"""
+    eval(src, version = V4) should produce("Compilation failed: Non-matching types: expected: Int, actual: String")
   }
 }

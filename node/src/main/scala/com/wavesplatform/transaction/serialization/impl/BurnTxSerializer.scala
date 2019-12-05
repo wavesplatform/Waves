@@ -16,7 +16,7 @@ object BurnTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
       "amount"  -> quantity
-    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
+    ) ++ (if (version == TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
   }
 
   def bodyBytes(tx: BurnTransaction): Array[Byte] = {
@@ -35,7 +35,7 @@ object BurnTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           baseBytes
         )
 
