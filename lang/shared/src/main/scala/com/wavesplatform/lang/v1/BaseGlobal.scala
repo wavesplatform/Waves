@@ -193,6 +193,10 @@ trait BaseGlobal {
     }
 
   def requestNode(url: String): Future[NodeResponse]
+
+  def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
+
+  def pedersenMerkleTreeAddItem(root: Array[Byte], proof: Array[Byte], index: Long, leaf: Array[Byte]): Array[Byte]
 }
 
 object BaseGlobal {
