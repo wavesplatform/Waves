@@ -37,7 +37,8 @@ class AssetsApiRouteSpec
     totalVolume = smartAssetTx.quantity,
     lastUpdatedAt = Height @@ 0,
     script = smartAssetTx.script,
-    sponsorship = 0
+    sponsorship = 0,
+    nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && smartAssetTx.reissuable == false
   )
 
   (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
@@ -68,7 +69,8 @@ class AssetsApiRouteSpec
     totalVolume = sillyAssetTx.quantity,
     lastUpdatedAt = Height @@ 0,
     script = sillyAssetTx.script,
-    sponsorship = 0
+    sponsorship = 0,
+    nft = sillyAssetTx.decimals == 0 && sillyAssetTx.quantity == 1 && sillyAssetTx.reissuable == false
   )
   (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
