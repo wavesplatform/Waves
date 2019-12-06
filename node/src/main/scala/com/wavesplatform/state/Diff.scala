@@ -69,20 +69,7 @@ case class AssetDescription(
     script: Option[Script],
     sponsorship: Long,
     nft: Boolean
-) {
-  override def equals(obj: scala.Any) = obj match {
-    case o: AssetDescription =>
-      o.issuer == this.issuer &&
-        o.name.equals(name) &&
-        o.description.equals(description) &&
-        o.decimals == decimals &&
-        o.reissuable == reissuable &&
-        o.totalVolume == totalVolume &&
-        o.script == script &&
-        o.sponsorship == sponsorship
-    case _ => false
-  }
-}
+)
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 

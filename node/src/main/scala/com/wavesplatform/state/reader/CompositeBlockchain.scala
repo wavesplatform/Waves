@@ -66,7 +66,7 @@ final case class CompositeBlockchain(
             static.decimals,
             volume.isReissuable,
             volume.volume,
-            Height @@ this.height,
+            info.lastUpdatedAt,
             script,
             sponsorship,
             static.nft

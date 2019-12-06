@@ -1,8 +1,5 @@
 package com.wavesplatform.state
 
-import java.nio.{ByteBuffer, CharBuffer}
-import java.nio.charset.{Charset, CharsetDecoder, CoderResult}
-
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -279,7 +276,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), Height @@ 0, None, 0, false)
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), Height @@ 2, None, 0, false)
           )
 
           d.appendBlock(
@@ -293,12 +290,12 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, false, BigInt(4000), Height @@ 0, None, 0, false)
+            AssetDescription(sender, name, description, 8, false, BigInt(4000), Height @@ 2, None, 0, false)
           )
 
           d.removeAfter(blockIdWithIssue)
           d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id())) should contain(
-            AssetDescription(sender, name, description, 8, true, BigInt(2000), Height @@ 0, None, 0, false)
+            AssetDescription(sender, name, description, 8, true, BigInt(2000), Height @@ 2, None, 0, false)
           )
 
           d.removeAfter(genesisBlockId)

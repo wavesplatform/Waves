@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.{Asset, ScriptType, StdLibVersion, V4}
+import com.wavesplatform.lang.directives.values.{Asset, V4}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
@@ -190,12 +190,13 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript)),
           TestBlock.create(Seq(invoke)),
           features
-        ) { case (diff, _) =>
-          diff.accountData(master).data shouldBe
-            Map(
-              "key1" -> EmptyDataEntry("key1"),
-              "key2" -> EmptyDataEntry("key2")
-            )
+        ) {
+          case (diff, _) =>
+            diff.accountData(master).data shouldBe
+              Map(
+                "key1" -> EmptyDataEntry("key1"),
+                "key2" -> EmptyDataEntry("key2")
+              )
         }
     }
   }
@@ -381,15 +382,15 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   )
 
   private def issuePreconditions(
-    assetScript: Option[Script] = None,
-    feeMultiplier: Int
+      assetScript: Option[Script] = None,
+      feeMultiplier: Int
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
       fee     <- ciFee(feeMultiplier)
-      amount <- Gen.choose(1L, 100000000L)
+      amount  <- Gen.choose(1L, 100000000L)
     } yield {
       val dApp = Some(issueDApp(amount))
       for {
@@ -400,7 +401,13 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
     }.explicitGet()
 
-  private def issueDApp(issueAmount: Long, name: String = "ScriptAsset", description: String = "Issued by InvokeScript", decimals: Int = 0, reissuable: Boolean = false): Script =
+  private def issueDApp(
+      issueAmount: Long,
+      name: String = "ScriptAsset",
+      description: String = "Issued by InvokeScript",
+      decimals: Int = 0,
+      reissuable: Boolean = false
+  ): Script =
     dApp(
       s"""
          | [
@@ -416,21 +423,13 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript)),
           TestBlock.create(Seq(invoke)),
           features
-        ) { case (_, blockchain) =>
+        ) {
+          case (_, blockchain) =>
+            val assets = blockchain.portfolio(master).assets
+            assets.values.toList shouldBe List(amount)
 
-          //Thread.sleep(10000)
-
-          val assets = blockchain.portfolio(master).assets
-          println("Master:")
-          assets foreach println
-          println(assets.values.toList)
-          println(List(amount))
-          assets.values.toList shouldBe List(amount)
-
-          val assetsi = blockchain.portfolio(invoker).assets
-          println("Invoker:")
-          assetsi foreach println
-          assetsi.values.toList shouldBe List()
+            val assetsi = blockchain.portfolio(invoker).assets
+            assetsi.values.toList shouldBe List()
         }
     }
   }
