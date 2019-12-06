@@ -8,7 +8,6 @@ import cats.instances.either.catsStdInstancesForEither
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.either._
 import cats.syntax.traverse._
-import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
@@ -313,8 +312,8 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
           "issueHeight"    -> JsNumber(h),
           "issueTimestamp" -> JsNumber(tx.timestamp),
           "issuer"         -> JsString(tx.sender.stringRepr),
-          "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
-          "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
+          "name"           -> JsString(tx.name),
+          "description"    -> JsString(tx.description),
           "decimals"       -> JsNumber(tx.decimals.toInt),
           "reissuable"     -> JsBoolean(description.reissuable),
           "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),

@@ -1,8 +1,6 @@
 package com.wavesplatform.settings
 
 import com.wavesplatform.Version
-import com.wavesplatform.transaction.TransactionParsers
-import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.utils.ScorexLogging
 
 /**
@@ -35,16 +33,4 @@ object Constants extends ScorexLogging {
       (15: Byte) -> "SetAssetScriptTransaction",
       (17: Byte) -> "UpdateAssetInfoTransaction"
     )
-
-  //    TransactionParsers.all.map {
-//      case ((typeId, _), builder) =>
-//        val txName =
-//          builder.getClass.getSimpleName.init
-//            .replace("V1", "")
-//            .replace("V2", "")
-//
-//        typeId -> txName
-//    }
-
-//  println(TransactionNames)
 }

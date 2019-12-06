@@ -15,7 +15,7 @@ sealed trait TransferAttachment {
       case EmptyAttachment     => impl.unit
     }
 }
-case class IntValue(value: Int)         extends TransferAttachment
+case class IntValue(value: Long)         extends TransferAttachment
 case class BooleanValue(value: Boolean) extends TransferAttachment
 case class StringValue(value: String)   extends TransferAttachment
 case class ByteStrValue(value: ByteStr) extends TransferAttachment

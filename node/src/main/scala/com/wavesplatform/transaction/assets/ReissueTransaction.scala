@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.ReissueTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util._
 
 case class ReissueTransaction(
@@ -41,11 +40,8 @@ case class ReissueTransaction(
 }
 
 object ReissueTransaction extends TransactionParser {
-  override type TransactionT = ReissueTransaction
-
-  override val typeId: TxType                         = 5
-  override def supportedVersions: Set[TxVersion]      = Set(1, 2, 3)
-  override def classTag: ClassTag[ReissueTransaction] = ClassTag(classOf[ReissueTransaction])
+  override val typeId: TxType                    = 5
+  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   implicit val validator: TxValidator[ReissueTransaction] = ReissueTxValidator
   implicit def sign(tx: ReissueTransaction, privateKey: PrivateKey): ReissueTransaction =
@@ -65,7 +61,7 @@ object ReissueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, ReissueTransaction] =
     ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -77,7 +73,7 @@ object ReissueTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, ReissueTransaction] =
     create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil).map(_.signWith(signer))
 
   def selfSigned(
@@ -88,6 +84,6 @@ object ReissueTransaction extends TransactionParser {
       reissuable: Boolean,
       fee: Long,
       timestamp: Long
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, ReissueTransaction] =
     signed(version, sender, asset, quantity, reissuable, fee, timestamp, sender)
 }

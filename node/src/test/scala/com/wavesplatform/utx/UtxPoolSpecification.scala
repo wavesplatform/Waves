@@ -107,7 +107,7 @@ class UtxPoolSpecification
       recipient <- accountGen
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
-      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, Array.empty[Byte], time.getTimestamp())
+      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, None, time.getTimestamp())
       .explicitGet())
       .label("transferTransaction")
 
@@ -116,7 +116,7 @@ class UtxPoolSpecification
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransaction
-      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, Array.empty[Byte], time.getTimestamp())
+      .selfSigned(1.toByte, sender, recipient, Waves, amount, Waves, fee, None, time.getTimestamp())
       .explicitGet())
       .label("transferWithRecipient")
 
@@ -125,7 +125,7 @@ class UtxPoolSpecification
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
     val minFee    = FeeValidation.FeeConstants(TransferTransaction.typeId) + FeeValidation.FeeConstants(MassTransferTransaction.typeId) * transfers.size
     val txs = for { fee <- chooseNum(minFee, amount) } yield MassTransferTransaction
-      .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), Array.empty[Byte])
+      .selfSigned(1.toByte, sender, Waves, transfers, fee, time.getTimestamp(), None)
       .explicitGet()
     txs.label("transferWithRecipient")
   }
@@ -334,11 +334,11 @@ class UtxPoolSpecification
     }
 
   private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, Array.emptyByteArray, ts).explicitGet()
+    TransferTransaction.selfSigned(1.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, None, ts).explicitGet()
   }
 
   private def transactionV2Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
-    TransferTransaction.selfSigned(2.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, Array.emptyByteArray, ts).explicitGet()
+    TransferTransaction.selfSigned(2.toByte, sender, recipient, Waves, waves(1), Waves, feeAmount, None, ts).explicitGet()
   }
 
   "UTX Pool" - {

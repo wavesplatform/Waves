@@ -1,53 +1,34 @@
 package com.wavesplatform.protobuf.block
-import cats.instances.all._
-import cats.syntax.traverse._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.transaction.{PBTransactions, VanillaTransaction}
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.protobuf.transaction.PBTransactions
+
+import scala.util.Try
 
 object PBBlocks {
-  def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] = {
-    def create(version: Int,
-               timestamp: Long,
-               reference: ByteStr,
-               baseTarget: Long,
-               generationSignature: ByteStr,
-               transactionData: Seq[VanillaTransaction],
-               featureVotes: Seq[Short],
-               rewardVote: Long,
-               generator: PublicKey,
-               signature: ByteStr,
-               merkle: ByteStr): VanillaBlock = {
-      VanillaBlock(
-        BlockHeader(
-          version.toByte, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, merkle
-        ),
-        signature,
-        transactionData
-      )
-    }
+  def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
+    require(block.header.isDefined, "block header is missing")
+    val header       = block.getHeader
+    val transactions = block.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
 
-    for {
-      header       <- block.header.toRight(GenericError("No block header"))
-      transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
-      result = create(
-        header.version,
+    VanillaBlock(
+      BlockHeader(
+        header.version.toByte,
         header.timestamp,
         ByteStr(header.reference.toByteArray),
         header.baseTarget,
         ByteStr(header.generationSignature.toByteArray),
-        transactions,
+        PublicKey(header.generator.toByteArray),
         header.featureVotes.map(intToShort),
         header.rewardVote,
-        PublicKey(header.generator.toByteArray),
-        ByteStr(block.signature.toByteArray),
         ByteStr(header.transactionsRoot.toByteArray)
-      )
-    } yield result
+      ),
+      ByteStr(block.signature.toByteArray),
+      transactions
+    )
   }
 
   def protobuf(block: VanillaBlock): PBBlock = {
@@ -67,7 +48,8 @@ object PBBlocks {
           ByteString.copyFrom(generator),
           header.rewardVote,
           ByteString.copyFrom(header.transactionsRoot)
-        )),
+        )
+      ),
       ByteString.copyFrom(block.signature),
       transactionData.map(PBTransactions.protobuf)
     )

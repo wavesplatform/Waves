@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_LONG, CONST_STRING}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import org.scalactic.source.Position
 import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -100,6 +101,9 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     nodes.waitForHeightAriseAndTxPresent(id)
 
     val txInfo             = sender.transactionInfo(id)
+
+    sender.waitForHeight(txInfo.height + 1)
+
     val callerTxs          = sender.transactionsByAddress(caller, 100)
     val dAppTxs            = sender.transactionsByAddress(contract, 100)
     val txStateChanges     = sender.debugStateChanges(id)
@@ -224,7 +228,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     )
   }
 
-  def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges) {
+  def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges)(implicit pos: Position) {
     info.`type` shouldBe stateChanges.`type`
     info.id shouldBe stateChanges.id
     info.fee shouldBe stateChanges.fee

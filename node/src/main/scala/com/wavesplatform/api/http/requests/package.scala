@@ -1,10 +1,7 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
 import cats.Applicative
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -44,12 +41,6 @@ package object requests {
         case Some(str) => IssuedAsset(str)
         case None      => Waves
       }
-
-  def toAttachment(maybeAttachment: Option[String]): Validation[Array[Byte]] =
-    maybeAttachment match {
-      case Some(v) if v.nonEmpty => Base58.tryDecodeWithLimit(v).toEither.leftMap(e => GenericError(e.getMessage))
-      case _                     => Array.emptyByteArray.asRight
-    }
 
   def toProofs(maybeSignature: Option[ByteStr], maybeProofs: Option[Proofs]): Validation[Proofs] =
     (maybeSignature, maybeProofs) match {
@@ -100,10 +91,6 @@ package object requests {
       case JsString(s) => JsSuccess(ProofStr(s))
       case _           => JsError(Seq(JsPath -> Seq(JsonValidationError("error.expected.jsstring"))))
     }
-  }
-
-  private[requests] implicit class RequestStrExt(private val str: String) extends AnyVal {
-    def utf8Bytes: Array[Byte] = str.getBytes(StandardCharsets.UTF_8)
   }
 
   private[requests] def defaultVersion   = TxVersion.V1

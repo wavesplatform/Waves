@@ -1,10 +1,10 @@
 package com.wavesplatform.protobuf.utils
-import com.google.protobuf.CodedOutputStream
-import scalapb.GeneratedMessageCompanion
-import com.wavesplatform.common.state.ByteStr
-import scalapb.GeneratedMessage
+
 import cats.implicits._
-import scala.util.Try
+import com.google.protobuf.CodedOutputStream
+import com.wavesplatform.common.state.ByteStr
+import scalapb.{GeneratedMessage, GeneratedMessageCompanion}
+
 import scala.util.control.NonFatal
 
 object PBUtils {

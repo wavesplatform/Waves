@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
@@ -286,21 +287,19 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val reissuable  = true
           val assetScript = None
           val sponsored   = false
-          val issueTx = IssueTransaction
-            .selfSigned(
+          val issueTx = IssueTransaction(
               TxVersion.V2,
               masterAcc,
-              "testAsset".getBytes("UTF-8"),
-              "Test asset".getBytes("UTF-8"),
+              "testAsset".utf8Bytes,
+              "Test asset".utf8Bytes,
               quantity,
               decimals,
               reissuable,
               assetScript,
               MinIssueFee * 2,
               dataTransaction.timestamp + 5
-            )
-            .right
-            .get
+            ).signWith(masterAcc)
+
 
           append(Seq(transferTx, issueTx)).explicitGet()
 
@@ -517,7 +516,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | }
                  |
                  | let checkAmount     = transfer.amount == ${transferTx.amount}
-                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment)}'
+                 | let checkAttachment = transfer.attachment == base64'${Base64.encode(transferTx.attachment.toBytes)}'
                  |
                  | let checkAssetId = match transfer.assetId {
                  |    case _: Unit => true

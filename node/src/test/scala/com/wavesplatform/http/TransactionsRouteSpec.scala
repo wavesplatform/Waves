@@ -185,8 +185,8 @@ class TransactionsRouteSpec
               Some(
                 AssetDescription(
                   issuer = accountGen.sample.get,
-                  name = "foo",
-                  description = "bar",
+                  name = Right("foo"),
+                  description = Right("bar"),
                   decimals = 8,
                   reissuable = false,
                   totalVolume = Long.MaxValue,
@@ -225,8 +225,8 @@ class TransactionsRouteSpec
               Some(
                 AssetDescription(
                   issuer = accountGen.sample.get,
-                  name = "foo",
-                  description = "bar",
+                  name = Right("foo"),
+                  description = Right("bar"),
                   decimals = 8,
                   reissuable = false,
                   totalVolume = Long.MaxValue,

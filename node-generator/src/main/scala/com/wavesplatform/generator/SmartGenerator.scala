@@ -43,7 +43,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, bank, bank, Waves, 1.waves - 2 * fee, Waves, fee, Array.emptyByteArray, now + i)
+        .selfSigned(2.toByte, bank, bank, Waves, 1.waves - 2 * fee, Waves, fee, None, now + i)
         .explicitGet()
     }
 

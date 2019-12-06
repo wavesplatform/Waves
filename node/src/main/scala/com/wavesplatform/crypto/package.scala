@@ -10,6 +10,7 @@ import com.wavesplatform.utils.ScorexLogging
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
+import com.wavesplatform.utils._
 
 import scala.util.Try
 
@@ -29,9 +30,9 @@ package object crypto extends ScorexLogging {
 
   // Digests
   def fastHash(m: Array[Byte]): Array[Byte]   = Blake2b256.hash(m)
-  def fastHash(s: String): Array[Byte]        = fastHash(s.getBytes("UTF-8"))
+  def fastHash(s: String): Array[Byte]        = fastHash(s.utf8Bytes)
   def secureHash(m: Array[Byte]): Array[Byte] = Keccak256.hash(Blake2b256.hash(m))
-  def secureHash(s: String): Array[Byte]      = secureHash(s.getBytes("UTF-8"))
+  def secureHash(s: String): Array[Byte]      = secureHash(s.utf8Bytes)
 
   // Signatures
   def sign(account: PrivateKey, message: ByteStr): ByteStr =

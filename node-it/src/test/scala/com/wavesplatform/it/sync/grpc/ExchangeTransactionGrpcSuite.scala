@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{matcherFee, minFee, someAssetAmount}
@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.utils._
 import io.grpc.Status.Code
 
 class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime {
@@ -27,7 +28,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   val versions = transactionV1versions +: transactionV2versions
 
   test("exchange tx with orders v1,v2") {
-    val exchAsset          = sender.grpc.broadcastIssue(buyer, "exchAsset", someAssetAmount, 8, true, 1.waves, waitForTx = true)
+    val exchAsset          = sender.grpc.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, true, 1.waves, waitForTx = true)
     val exchAssetId        = PBTransactions.vanilla(exchAsset).explicitGet().id().toString
     val price              = 500000L
     val amount             = 40000000L
@@ -68,7 +69,14 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
            (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
          )) {
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        sender.grpc.broadcastTransfer(buyer, Recipient().withPublicKeyHash(sellerAddress), 100000, minFee, assetId = feeAssetId.toString, waitForTx = true)
+        sender.grpc.broadcastTransfer(
+          buyer,
+          Recipient().withPublicKeyHash(sellerAddress),
+          100000,
+          minFee,
+          assetId = feeAssetId.toString,
+          waitForTx = true
+        )
       }
 
       val buyerWavesBalanceBefore  = sender.grpc.wavesBalance(buyerAddress).available
@@ -92,21 +100,18 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("cannot exchange non-issued assets") {
-    val exchAsset: IssueTransaction = IssueTransaction
-      .selfSigned(
-        TxVersion.V1,
-        sender = sender.privateKey,
-        name = "myasset".getBytes("UTF-8"),
-        description = "my asset description".getBytes("UTF-8"),
-        quantity = someAssetAmount,
-        decimals = 2,
-        reissuable = true,
-        script = None,
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
-      .get
+    val exchAsset: IssueTransaction = IssueTransaction(
+      TxVersion.V1,
+      sender.privateKey,
+      "myasset".utf8Bytes,
+      "my asset description".utf8Bytes,
+      quantity = someAssetAmount,
+      decimals = 2,
+      reissuable = true,
+      script = None,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    ).signWith(sender.privateKey)
     for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId             = exchAsset.id().toString

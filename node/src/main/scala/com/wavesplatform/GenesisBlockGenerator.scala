@@ -1,7 +1,6 @@
 package com.wavesplatform
 
 import java.io.{File, FileNotFoundException}
-import java.nio.charset.StandardCharsets
 import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
@@ -12,6 +11,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
 import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
@@ -50,7 +50,7 @@ object GenesisBlockGenerator extends App {
                              accountAddress: Address)
 
   private def toFullAddressInfo(item: DistributionItem): FullAddressInfo = {
-    val seedHash = item.seedText.getBytes("UTF-8")
+    val seedHash = item.seedText.utf8Bytes
     val acc      = Wallet.generateNewAccount(seedHash, item.nonce)
 
     FullAddressInfo(
@@ -162,6 +162,6 @@ object GenesisBlockGenerator extends App {
     output.append("Settings:\n")
     output.append(confBody)
     System.out.print(output.result())
-    outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.getBytes(StandardCharsets.UTF_8)))
+    outputConfFile.foreach(ocf => Files.write(ocf.toPath, confBody.utf8Bytes))
   }
 }
