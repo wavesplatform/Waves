@@ -295,9 +295,11 @@ package object database extends ScorexLogging {
     ndo.writeByteStr(ai.source)
     ndo.writeByteStr(ai.issuer)
     ndo.writeInt(ai.decimals)
+    ndo.writeBoolean(ai.nft)
 
     ndo.toByteArray
   }
+
   def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
     import com.wavesplatform.crypto._
 
@@ -306,8 +308,9 @@ package object database extends ScorexLogging {
     val source   = TransactionId @@ ndi.readByteStr(DigestLength)
     val issuer   = ndi.readPublicKey
     val decimals = ndi.readInt()
+    val nft = ndi.readBoolean()
 
-    AssetStaticInfo(source, issuer, decimals)
+    AssetStaticInfo(source, issuer, decimals, nft)
   }
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
@@ -495,18 +498,32 @@ package object database extends ScorexLogging {
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeAssetScript(script: (Script, Long)): Array[Byte] =
-    script._1.bytes().arr ++ Longs.toByteArray(script._2)
+  def writeAssetScript(script: (PublicKey, Script, Long)): Array[Byte] = {
+    script match {
+      case (pk, script, c) =>
+        val pkb = pk.arr
+        assert(pkb.size == KeyLength)
+        pkb ++ script.bytes().arr ++ Longs.toByteArray(c)
+    }
+  }
 
-  def readAssetScript(b: Array[Byte]): (Script, Long) =
+  def readAssetScript(b: Array[Byte]): (PublicKey, Script, Long) = {
+    val pkb = b.take(KeyLength)
+    val script = b.slice(KeyLength, b.length - 8)
     (
-      ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
+      PublicKey(pkb),
+      ScriptReader.fromBytes(script).explicitGet(),
       ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
+  }
 
-  def writeScript(script: (Script, Long, Map[String, Long])): Array[Byte] = {
-    val (expr, complexity, callableComplexities) = script
+  def writeScript(script: (PublicKey, Script, Long, Map[String, Long])): Array[Byte] = {
+    val (pk, expr, complexity, callableComplexities) = script
+    val pkb = pk.arr
+    assert(pkb.size == KeyLength)
     val output                                   = newDataOutput()
+
+    output.writeByteStr(pkb)
 
     output.writeInt(expr.bytes().size)
     output.writeByteStr(expr.bytes())
@@ -522,8 +539,9 @@ package object database extends ScorexLogging {
     output.toByteArray
   }
 
-  def readScript(b: Array[Byte]): (Script, Long, Map[String, Long]) = {
+  def readScript(b: Array[Byte]): (PublicKey, Script, Long, Map[String, Long]) = {
     val input                     = newDataInput(b)
+    val pk = PublicKey(input.readByteStr(KeyLength))
     val scriptSize                = input.readInt()
     val script                    = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
     val complexity                = input.readLong()
@@ -533,6 +551,6 @@ package object database extends ScorexLogging {
         .map(_ => (input.readUTF(), input.readLong()))
         .toMap
 
-    (script, complexity, callableComplexities)
+    (pk, script, complexity, callableComplexities)
   }
 }

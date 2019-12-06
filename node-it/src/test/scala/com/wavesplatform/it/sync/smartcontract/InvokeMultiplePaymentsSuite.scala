@@ -37,11 +37,11 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       |  let pmt = inv.payments
       |  nil
       |  ++ (if pmt.size() > 0 then [
-      |    IntEntry("amount_0", pmt[0].amount),
+      |    IntegerEntry("amount_0", pmt[0].amount),
       |    BinaryEntry("asset_0", pmt[0].assetId.parse())
       |  ] else nil)
       |  ++ (if pmt.size() > 1 then [
-      |    IntEntry("amount_1", pmt[1].amount),
+      |    IntegerEntry("amount_1", pmt[1].amount),
       |    BinaryEntry("asset_1", pmt[1].assetId.parse())
       |  ] else nil)
       |}

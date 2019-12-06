@@ -130,12 +130,7 @@ object IssueTransaction extends TransactionParser {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()
-    def isNFT: Boolean   = tx.quantity == 1 && tx.decimals == 0 && !tx.reissuable
-    def isNFT(blockchain: Blockchain): Boolean = {
-      import com.wavesplatform.features.BlockchainFeatures
-      import com.wavesplatform.features.FeatureProvider._
-      blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
-    }
+
     def nameBytes: ByteStr        = decode(tx)(_.name)
     def descriptionBytes: ByteStr = decode(tx)(_.description)
   }

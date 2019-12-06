@@ -55,10 +55,8 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
         "Test Asset #1",
         someAssetAmount,
         0,
-        reissuable = true,
-        issueFee + 400000,
-        2,
-        Some(scriptBase64),
+        fee = issueFee + 400000,
+        script = Some(scriptBase64),
         waitForTx = true
       )
       .id

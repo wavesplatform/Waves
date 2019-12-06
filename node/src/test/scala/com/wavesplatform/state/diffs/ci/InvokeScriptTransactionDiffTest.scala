@@ -125,7 +125,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       funcName: String,
       recipientAddress: Address,
       recipientAmount: Long,
-      assets: List[Asset] = List(Waves)
+      assets: List[Asset] = List(Waves),
+      version: StdLibVersion = V3
   ): DApp = {
 
     val transfers: immutable.Seq[FUNCTION_CALL] = assets.map(
@@ -153,10 +154,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           Terms.FUNC(
             funcName,
             List(argName),
-            FUNCTION_CALL(
-              User(FieldNames.TransferSet),
-              List(payments)
-            )
+            if (version >= V4) payments
+            else FUNCTION_CALL(User(FieldNames.TransferSet), List(payments))
           )
         )
       ),
@@ -360,11 +359,11 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield dataContract(senderBinging, argBinding, func, bigData)
 
-  def paymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(func: String) =
+  def paymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves), version: StdLibVersion = V3)(func: String) =
     for {
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
-    } yield paymentContract(senderBinging, argBinding, func, address, amount, assets)
+    } yield paymentContract(senderBinging, argBinding, func, address, amount, assets, version)
 
   def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(someName: String) =
     for {
@@ -379,7 +378,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       payment: Option[Payment] = None,
       feeGen: Gen[Long] = ciFee(0),
       sponsored: Boolean = false,
-      isCIDefaultFunc: Boolean = false
+      isCIDefaultFunc: Boolean = false,
+      version: StdLibVersion = V3
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
@@ -391,7 +391,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       arg         <- genBoundedStringBytes(1, 32)
       funcBinding <- funcNameGen
       contract    <- senderBindingToContract(funcBinding)
-      script      = ContractScript(V3, contract)
+      script      = ContractScript(version, contract)
       setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
       (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
       fc = if (!isCIDefaultFunc)
@@ -1197,7 +1197,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), fs) {
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ shouldBe 'right
         }
     }
@@ -1207,19 +1208,20 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(for {
       acc <- accountGen
       am  <- smallFeeGen
-      contractGen = paymentContractGen(acc, am, assets = Nil) _
+      contractGen = paymentContractGen(acc, am, assets = Nil, version = V4) _
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.const(acc),
         masterGen = Gen.const(acc),
         payment = Some(Payment(1, Waves)),
-        feeGen = ciFee(1)
+        feeGen = ciFee(1),
+        version = V4
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
-          _ should produce("DApp self-payment is forbidden")
+          _ should produce("DApp self-payment is forbidden since V4")
         }
     }
   }
@@ -1228,19 +1230,20 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     forAll(for {
       acc <- accountGen
       am  <- smallFeeGen
-      contractGen = paymentContractGen(acc, am, assets = List(Waves)) _
+      contractGen = paymentContractGen(acc, am, assets = List(Waves), version = V4) _
       r <- preconditionsAndSetContract(
         contractGen,
         invokerGen = Gen.const(acc),
         masterGen = Gen.const(acc),
         payment = None,
-        feeGen = ciFee(1)
+        feeGen = ciFee(1),
+        version = V4
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
-          _ should produce("DApp self-payment is forbidden")
+          _ should produce("DApp self-transfer is forbidden since V4")
         }
     }
   }

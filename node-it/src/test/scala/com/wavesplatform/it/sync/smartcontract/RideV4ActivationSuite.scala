@@ -77,7 +77,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
       e.statusCode shouldBe 400
       e.id shouldBe StateCheckFailed.Id
-      e.message should include("Multiple payment attachment for Invoke Script Transaction feature has not been activated")
+      e.message should include("Ride V4 and multiple attached payments for Invoke Script Transaction feature has not been activated")
     }
 
     assertFeatureNotActivated(sender.setScript(smartAccV4, Some(dAppV4.compiled)))
@@ -261,7 +261,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       error.message should include("Can't find a function 'DataEntry'(String, Boolean)") }
 
     assertApiError(sender.scriptCompile(
-      asDappV4(s"""[ IntEntry("x", inv.payment.extract().amount) ]"""))) { error =>
+      asDappV4(s"""[ IntegerEntry("x", inv.payment.extract().amount) ]"""))) { error =>
       error.message should include("Undefined field `payment` of variable of type `Invocation`") }
     assertApiError(sender.scriptCompile(
       asAssetV4(

@@ -34,7 +34,7 @@ class BlockV5TestSuite
 
       val blockAtActivationHeight = nodes.head.blockAt(ActivationHeight)
       blockAtActivationHeight.version shouldBe 'defined
-      blockAtActivationHeight.version.value should not be Block.ProtoBlockVersion
+      blockAtActivationHeight.version.value shouldBe Block.ProtoBlockVersion
 
       nodes.waitForHeightArise()
 

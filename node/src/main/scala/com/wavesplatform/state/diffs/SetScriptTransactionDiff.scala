@@ -21,7 +21,7 @@ object SetScriptTransactionDiff {
           Right((0L, Map[String, Long]()))
       }
       verifierWithComplexity <- DiffsCommon.countScriptComplexity(tx.script, blockchain)
-      scriptWithComplexities = verifierWithComplexity.map(_ :+ callableComplexities._2)
+      scriptWithComplexities = verifierWithComplexity.map(s => tx.sender +: s :+ callableComplexities._2)
     } yield Diff(
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),

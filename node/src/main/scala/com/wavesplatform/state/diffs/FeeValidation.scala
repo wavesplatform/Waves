@@ -87,8 +87,7 @@ object FeeValidation {
 
             baseFee + (payload.length - 1) / 1024
           case itx: IssueTransaction =>
-            lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
-            val multiplier        = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+            val multiplier = if (blockchain.isNFT(itx)) NFTMultiplier else 1
 
             (baseFee * multiplier).toLong
           case _: ReissueTransaction =>
