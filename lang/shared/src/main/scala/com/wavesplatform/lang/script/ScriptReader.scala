@@ -4,7 +4,6 @@ import com.wavesplatform.lang.contract.ContractSerDe
 import com.wavesplatform.lang.directives.DirectiveDictionary
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.{BaseGlobal, Serde}
 
 object ScriptReader {
@@ -13,19 +12,12 @@ object ScriptReader {
 
   val checksumLength = 4
 
-  def fromBytes(inBytes: Array[Byte]): Either[ScriptParseError, Script] = {
+  def fromBytes(bytes: Array[Byte]): Either[ScriptParseError, Script] = {
+    val checkSum         = bytes.takeRight(checksumLength)
+    val computedCheckSum = Global.secureHash(bytes.dropRight(checksumLength)).take(checksumLength)
+
     for {
-      serVersionByte <- inBytes.headOption.toRight(ScriptParseError("Can't parse empty script bytes"))
-      (versionByte, bytes) <- if (serVersionByte < 4) {
-        Right((serVersionByte, inBytes))
-      } else {
-        Serde.deserialize(inBytes.drop(1), all=false).flatMap({
-          case (CONST_LONG(len), rest) =>
-              val bytes = inBytes.takeRight(rest).take(len.toInt)
-              Right((bytes.head, bytes))
-          case _ => Left("Can't parse V4 stript length.")
-              }).left.map({e => ScriptParseError(e.toString)})
-      }
+      versionByte <- bytes.headOption.toRight(ScriptParseError("Can't parse empty script bytes"))
       a <- {
         val contentTypes   = DirectiveDictionary[ContentType].idMap
         val stdLibVersions = DirectiveDictionary[StdLibVersion].idMap
@@ -44,13 +36,9 @@ object ScriptReader {
         }
       }
       (scriptType, stdLibVersion, offset) = a
-      checkedBytes                        = bytes.dropRight(checksumLength)
+      scriptBytes                         = bytes.drop(offset).dropRight(checksumLength)
 
-      checkSum         = bytes.takeRight(checksumLength)
-      computedCheckSum = Global.secureHash(checkedBytes).take(checksumLength)
       _ <- Either.cond(java.util.Arrays.equals(checkSum, computedCheckSum), (), ScriptParseError("Invalid checksum"))
-
-      scriptBytes                         = checkedBytes.drop(offset)
       s <- (scriptType match {
         case Expression | Library =>
           for {
