@@ -3,21 +3,28 @@ package com.wavesplatform.common
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.ZkSnarkBenchmark.{Groth16St, MerkleSt}
+import com.wavesplatform.common.ZkSnarkBenchmark.{CurveSt, Groth16St, MerkleSt}
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.zwaves.bls12.{Groth16, PedersenMerkleTree}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
+import scorex.crypto.signatures.{Curve25519, Signature}
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
-@Threads(4)
+@Threads(1)
 @Fork(1)
 @Warmup(iterations = 10)
-@Measurement(iterations = 10)
+@Measurement(iterations = 20)
 class ZkSnarkBenchmark {
   @Benchmark
   def groth16(st: Groth16St, bh: Blackhole): Unit =
     bh.consume(Groth16.verify(st.vk, st.proof, st.inputs))
+
+  // for comparison
+  @Benchmark
+  def sigVerify(st: CurveSt, bh: Blackhole): Unit =
+    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 
   @Benchmark
   def merkleTest(st: MerkleSt, bh: Blackhole): Unit =
@@ -41,6 +48,12 @@ object ZkSnarkBenchmark {
     val elements1: Array[Byte] = Base64.getDecoder.decode("GrfbyxFPhfTsam3aY8yqeY072ZrT3DTO8SrSRg4nJZ9nF1OpFPuvXQlcbsqFrGUkgUlokbCealGEw0J8G/H2oWFOY3CHDDhqBQGzUzk+/R3uYljv0YS/Wnb41IKeDSzfDcrJ41FdxBXgptFlh+TM3OKlgJ2jSAF9mqE3v7dUD/1n6conMUMPB+yeP5fapHBGu2OtlDmiHjzuGG6xrrW7tW45mNToh8yTb+POgZP+IvCmf7b8Tzzs0Z9fv998Q5HdXwrH6ts1cC9GBn9GwlWiDxfbKHKE+XS86tNoGPje5MFE7fWtv5XKzkGirbKRuKsBrLDrwl4UwaruqMwk1jJ4jTnsYzLpaGW7nZ46g+Mx5THu8481Kl7zWTFyRXVLIlvCc3eI3oqsjglbnCZ/7xgG4mnlDWqKYBuWzkmm6pCXB0JV7p+/1G7KcT7SIYoWUdf/XPedxh3N3Qgp3xhyh2VpcAMiK9JrMi8j4EQEsxE9Qm58z8aZ+fGBDkEJPaX0TJ1mDQvC4jQH6Sw96KjRLwezomn2Y5rtXcsxqX5UEhuYk39cxPBUX1tC5ap9qn0IPJaQ1Aj7tZvKhm4H1z3zAdwILTzjXYFOE2NyGZub0DY0g16XZKzhOCrtyeSauxm2pRzjNOFKLyEnk8/8a4bAXfODxGA4tCoBlv8ixFGa1agonvVPMc9FP6/S/26YEL491LGZsnqQ5AvvPt1oe/TmcfK/P1AxgsO2chZPqwddisQNRinb8x5NE8ptEWh9He7uutE/LeAGQVN5BYNpEMijP1RDj1FQkDFgglvvh6rgqm7sZr4lh/8wInwzJMMVTN9Dw1uvRHI5Igir1gcvs0vbuqhAf1NRcY5tnD6PxSTl79M1SkTpg1MSmpYJcISdoFNmfq0LVRUyp47f6gjWt+qVkyJAe3xp0GaEmaMKvvj2xVxLdxRRlRRTYABMFjU63LBttYjn0e1qkAvv1JveIrreATBq5Q==")
   }
 
+  @State(Scope.Benchmark)
+  class CurveSt {
+    val (privateKey, publicKey) = curve25519.generateKeypair
+    val message                 = randomBytes(150 * 1024)
+    val signature               = curve25519.sign(privateKey, message)
+  }
 }
 
 
