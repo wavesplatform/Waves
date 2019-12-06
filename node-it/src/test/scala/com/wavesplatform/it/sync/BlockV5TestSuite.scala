@@ -3,11 +3,9 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{Block => ApiBlock, BlockHeaders => ApiBlockHeaders}
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
@@ -36,25 +34,23 @@ class BlockV5TestSuite
 
       nodes.head.featureActivationStatus(BlockchainFeatures.BlockV5.id).blockchainStatus should not be BlockchainFeatureStatus.Activated
 
-      //Activation height
-      nodes.head.waitForHeight(ActivationHeight, 5.minutes)
+      //Activation height - 1
+      nodes.head.waitForHeight(ActivationHeight - 1, 5.minutes)
 
-      nodes.head.featureActivationStatus(BlockchainFeatures.BlockV5.id).blockchainStatus shouldBe BlockchainFeatureStatus.Activated
-
-      val blockAtActivationHeight = nodes.head.blockAt(ActivationHeight)
-      val blockHeadersAtActivationHeight = nodes.head.blockHeadersAt(ActivationHeight)
+      val blockAtActivationHeight = nodes.head.blockAt(ActivationHeight - 1)
+      val blockHeadersAtActivationHeight = nodes.head.blockHeadersAt(ActivationHeight - 1)
       blockAtActivationHeight.version.value shouldBe Block.RewardBlockVersion
       ByteStr.decodeBase58(blockAtActivationHeight.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
       ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtActivationHeight.signature).generationSignature).get.length shouldBe Block.GenerationSignatureLength
       blockAtActivationHeight.baseTarget shouldBe blockHeadersAtActivationHeight.baseTarget
 
-      //Activation height + 1
-      nodes.head.waitForHeight(ActivationHeight + 1)
+      //Activation height
+      nodes.head.waitForHeight(ActivationHeight)
 
       val lastBlockAfterActivationHeight = nodes.head.lastBlock
       val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders
-      val blockAfterActivationHeight = nodes.head.blockAt(ActivationHeight + 1)
-      val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(ActivationHeight + 1)
+      val blockAfterActivationHeight = nodes.head.blockAt(ActivationHeight)
+      val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(ActivationHeight)
       val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAfterActivationHeight.signature)
       val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAfterActivationHeight.signature).generationSignature).get
       val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAfterActivationHeight.generationSignature.get).get
@@ -76,18 +72,18 @@ class BlockV5TestSuite
       nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee, waitForTx = true)
 
       //Activation height + 2
-      nodes.head.waitForHeight(ActivationHeight + 2)
+      nodes.head.waitForHeight(ActivationHeight + 1)
 
       nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee, waitForTx = true)
 
-      val blockAfterVRFUsing = nodes.head.blockAt(ActivationHeight + 2)
+      val blockAfterVRFUsing = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterVRFUsing.version.value shouldBe Block.ProtoBlockVersion
       ByteStr.decodeBase58(blockAfterVRFUsing.generationSignature.get).get.length shouldBe Block.GenerationVRFSignatureLength
 
-      val blockSeq = nodes.head.blockSeq(ActivationHeight - 1, ActivationHeight + 2)
+      val blockSeq = nodes.head.blockSeq(ActivationHeight - 1, ActivationHeight + 1)
       for (block <- blockSeq) {
-        if (block.height < ActivationHeight + 1) {
-          block.version.value should not be Block.ProtoBlockVersion
+        if (block.height < ActivationHeight) {
+          block.version.value shouldBe Block.RewardBlockVersion
           ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
         } else {
           block.version.value shouldBe Block.ProtoBlockVersion
@@ -95,10 +91,10 @@ class BlockV5TestSuite
         }
       }
 
-      val blockHeadersSeq = nodes.head.blockHeadersSeq(ActivationHeight - 1, ActivationHeight + 2)
+      val blockHeadersSeq = nodes.head.blockHeadersSeq(ActivationHeight - 1, ActivationHeight + 1)
       for (block <- blockHeadersSeq) {
-        if (block.height < ActivationHeight + 1) {
-          block.version.value should not be Block.ProtoBlockVersion
+        if (block.height < ActivationHeight) {
+          block.version.value shouldBe Block.RewardBlockVersion
           ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
         } else {
           block.version.value shouldBe Block.ProtoBlockVersion
@@ -106,13 +102,12 @@ class BlockV5TestSuite
         }
       }
 
-      val blockSeqByAddress = nodes.head.blockSeqByAddress(nodes.head.address, ActivationHeight - 1, ActivationHeight + 2)
+      val blockSeqByAddress = nodes.head.blockSeqByAddress(nodes.head.address, ActivationHeight - 1, ActivationHeight + 1)
       for (block <- blockSeqByAddress) {
-        if (block.height < ActivationHeight + 1) {
-          block.version.value should not be Block.ProtoBlockVersion
+        if (block.height < ActivationHeight) {
+          block.version.value shouldBe Block.RewardBlockVersion
           ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
         } else {
-          block.version shouldBe 'defined
           block.version.value shouldBe Block.ProtoBlockVersion
           ByteStr.decodeBase58(block.generationSignature.get).get.length shouldBe Block.GenerationVRFSignatureLength
         }
@@ -120,7 +115,7 @@ class BlockV5TestSuite
 
       nodes.head.transfer(nodes.head.address, nodes.last.address, transferAmount, minFee, waitForTx = true)
 
-      nodes.waitForSameBlockHeadersAt(nodes.head.height + 2, conditionAwaitTime = 5.minutes)
+      nodes.waitForSameBlockHeadersAt(nodes.head.height + 1, conditionAwaitTime = 5.minutes)
     }
 
     "rollback to height before activation/at activation/after activation height" in {
@@ -133,7 +128,7 @@ class BlockV5TestSuite
 
       nodes.head.waitForHeight(ActivationHeight, 2.minutes)
       val blockAtActivationHeight1 = nodes.head.blockAt(ActivationHeight)
-      blockAtActivationHeight1.version.value should not be Block.ProtoBlockVersion
+      blockAtActivationHeight1.version.value shouldBe Block.ProtoBlockVersion
 
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight1 = nodes.head.blockAt(ActivationHeight + 1)
@@ -145,12 +140,12 @@ class BlockV5TestSuite
       nodes.rollback(ActivationHeight, returnToUTX = false)
 
       val blockAtActivationHeight2 = nodes.head.blockAt(ActivationHeight)
-      blockAtActivationHeight2.version.value should not be Block.ProtoBlockVersion
+      blockAtActivationHeight2.version.value shouldBe Block.ProtoBlockVersion
 
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight2 = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterActivationHeight2.version.value shouldBe Block.ProtoBlockVersion
-      nodes.foreach(n => n.waitForHeight(ActivationHeight + 3, 2.minutes))
+      nodes.waitForHeightArise()
 
       //rollback to height after activation height using rollback to block with signature method
       nodes.rollbackToBlockWithSignature(nodes.head.blockAt(ActivationHeight + 1).signature)
