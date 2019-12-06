@@ -68,7 +68,6 @@ object FunctionIds {
   val CHECK_MERKLE_PROOF: Short = 700
 
   val BLS12_GROTH16_VERIFY: Short = 800
-  val BLS12_PEDERSEN_MERKLE_TREE_ADD_ITEM: Short = 850
 
   // Waves
   val GETTRANSACTIONBYID: Short      = 1000
