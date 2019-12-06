@@ -12,6 +12,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.{CancelAfterFailure, Matchers, OptionValues}
 
@@ -22,7 +23,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.MultiPaymentInvokeScript.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.MultiPaymentInvokeScript.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
       .buildNonConflicting()
 
   private val smartAcc  = pkByAddress(firstAddress)
@@ -35,7 +36,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
   private var invokeScriptAssetId: String = _
 
   test("Correct data for assets issued by transaction") {
-    issueTx = sender.issue(callerAcc.stringRepr, "TxAsset", "TxDesc", 100, 0, fee = issueFee + smartFee, waitForTx = true)
+    issueTx = sender.issue(callerAcc.stringRepr, "TxAsset", "TxDesc", 100, 0, fee = issueFee + smartFee, version = TxVersion.V3, waitForTx = true)
     issueTxAssetId = issueTx.id
 
     val assetInfo = sender.assetsDetails(issueTx.id)

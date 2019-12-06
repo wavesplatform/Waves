@@ -84,7 +84,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
         amount = transferAmount,
         feeAssetId = Waves,
         fee = minFee + 0.004.waves,
-        attachment = Array.emptyByteArray,
+        attachment = None,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )

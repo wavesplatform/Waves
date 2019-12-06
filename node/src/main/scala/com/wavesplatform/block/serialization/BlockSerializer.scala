@@ -56,6 +56,7 @@ object BlockSerializer {
   def toBytes(block: Block): Array[Byte] = {
     import block._
 
+    // TODO: "Proto"block serialized manually??
     val consensusBytes        = writeConsensusBytes(header.baseTarget, header.generationSignature)
     val transactionsDataBytes = writeTransactionData(header.version, transactionData)
 
@@ -65,7 +66,7 @@ object BlockSerializer {
         val featuresBuf = ByteBuffer.allocate(Ints.BYTES + header.featureVotes.size * Shorts.BYTES)
         featuresBuf.putInt(header.featureVotes.size).asShortBuffer().put(header.featureVotes.toArray)
         featuresBuf.array
-    }
+     }
 
     val rewardVoteBytes = header.version match {
       case v if v < RewardBlockVersion => Array.empty[Byte]

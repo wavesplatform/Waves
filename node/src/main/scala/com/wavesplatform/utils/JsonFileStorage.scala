@@ -11,7 +11,6 @@ import scala.io.Source
 import scala.util.control.NonFatal
 
 object JsonFileStorage {
-  private[this] val Encoding          = "UTF-8"
   private[this] val KeySalt           = "0495c728-1614-41f6-8ac3-966c22b4a62d"
   private[this] val AES               = "AES"
   private[this] val Algorithm         = AES + "/ECB/PKCS5Padding"
@@ -37,7 +36,7 @@ object JsonFileStorage {
           throw new RuntimeException("Password hashing error", e)
       }
 
-    new SecretKeySpec(hashPassword(key.toCharArray, KeySalt.getBytes(Encoding), HashingIterations, KeySizeBits), AES)
+    new SecretKeySpec(hashPassword(key.toCharArray, KeySalt.utf8Bytes, HashingIterations, KeySizeBits), AES)
   }
 
   def save[T](value: T, path: String, key: Option[SecretKeySpec])(implicit w: Writes[T]): Unit = {
@@ -70,7 +69,7 @@ object JsonFileStorage {
     try {
       val cipher: Cipher = Cipher.getInstance(Algorithm)
       cipher.init(Cipher.ENCRYPT_MODE, key)
-      ScorexBase64.encode(cipher.doFinal(value.getBytes(Encoding)))
+      ScorexBase64.encode(cipher.doFinal(value.utf8Bytes))
     } catch {
       case NonFatal(e) =>
         throw new RuntimeException("File storage encrypt error", e)

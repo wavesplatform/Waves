@@ -73,8 +73,8 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
   override def encode(ctx: ChannelHandlerContext, msg1: Any, out: ByteBuf): Unit = {
     val msg = msg1 match {
       case rb: RawBytes => rb
-      case tx: Transaction => RawBytes.from(tx)
-      case block: Block => RawBytes.from(block)
+      case tx: Transaction => RawBytes.fromTransaction(tx)
+      case block: Block => RawBytes.fromBlock(block)
     }
 
     out.writeInt(Magic)

@@ -38,9 +38,8 @@ object SponsorFeeTxSerializer {
   }
 
   def toBytes(tx: SponsorFeeTransaction): Array[Byte] = {
-    import tx._
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    Bytes.concat(Array(0: Byte, builder.typeId, version), this.bodyBytes(tx), proofs.bytes()) // [typeId, version] appears twice
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte, tx.typeId, tx.version), this.bodyBytes(tx), tx.proofs.bytes()) // [typeId, version] appears twice
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SponsorFeeTransaction] = Try {

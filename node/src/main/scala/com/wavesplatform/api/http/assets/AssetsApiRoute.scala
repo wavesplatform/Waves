@@ -15,7 +15,7 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -417,14 +417,16 @@ object AssetsApiRoute {
       (timestamp, height) = tsh
       script              = description.script.filter(_ => full)
       complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
+      name = description.name.fold(bs => Base64.encode(bs.arr), identity)
+      desc = description.description.fold(bs => Base64.encode(bs.arr), identity)
     } yield JsObject(
       Seq(
         "assetId"        -> JsString(id.toString),
         "issueHeight"    -> JsNumber(height),
         "issueTimestamp" -> JsNumber(timestamp),
         "issuer"         -> JsString(description.issuer.stringRepr),
-        "name"           -> JsString(description.name),
-        "description"    -> JsString(description.description),
+        "name"           -> JsString(name),
+        "description"    -> JsString(desc),
         "decimals"       -> JsNumber(description.decimals),
         "reissuable"     -> JsBoolean(description.reissuable),
         "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),

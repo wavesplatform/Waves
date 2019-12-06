@@ -37,7 +37,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val now = System.currentTimeMillis()
     val transactions: List[Transaction] = (1 to settings.transactions).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, scriptedAccount, oracle, Waves, 1.waves, Waves, enoughFee, Array.emptyByteArray, now + i)
+        .selfSigned(2.toByte, scriptedAccount, oracle, Waves, 1.waves, Waves, enoughFee, None, now + i)
         .explicitGet()
     }.toList
 

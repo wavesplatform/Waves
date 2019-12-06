@@ -109,7 +109,7 @@ final case class CompositeBlockchain(
     assetDescription map { z =>
       diff.transactions
         .foldLeft(z.copy(script = script)) {
-          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = ut.name, description = ut.description)
+          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = Right(ut.name), description = Right(ut.description), lastUpdatedAt = Height(height))
           case (acc, _)                                        => acc
         }
     }
@@ -212,12 +212,12 @@ final case class CompositeBlockchain(
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
     val fromDiff  = diff.accountData.get(acc).orEmpty
-    fromInner.combine(fromDiff)
+    fromInner.combine(fromDiff).filterEmpty
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = diff.accountData.get(acc).orEmpty
-    diffData.data.get(key).orElse(inner.accountData(acc, key))
+    diffData.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
   }
 
   override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)

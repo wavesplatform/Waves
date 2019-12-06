@@ -20,7 +20,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
@@ -69,14 +69,24 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     }
 
     "IssueTransaction/ReissueTransaction/BurnTransaction" in {
-      val name        = "Test asset".getBytes("utf-8")
-      val description = "Test description".getBytes("utf-8")
-      val quantity    = 1000
-      val decimals    = 2.toByte
-      val reissuable  = true
+      val quantity   = 1000
+      val decimals   = 2.toByte
+      val reissuable = true
 
       val issueTxUnsigned = IssueTransaction
-        .create(TxVersion.V3, account, name, description, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty)
+        .create(
+          TxVersion.V3,
+          account,
+          "Test asset",
+          "Test description",
+          quantity,
+          decimals,
+          reissuable,
+          script = None,
+          MinIssueFee,
+          Now,
+          Proofs.empty
+        )
         .explicitGet()
 
       val issueProofs = Post(routePath("/sign"), issueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
@@ -212,7 +222,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     "TransferTransaction" in {
       val recipient  = accountOrAliasGen.sample.get
       val asset      = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
-      val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
+      val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
 
       val transferTxUnsigned =
         TransferTransaction.create(TxVersion.V3, account, recipient, asset, 100, Asset.Waves, MinFee, attachment, Now, Proofs.empty).explicitGet()
@@ -231,7 +241,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
     "MassTransferTransaction" in {
       val transfers  = Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, 100))).sample.get
-      val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
+      val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
 
       val massTransferTxUnsigned =
         MassTransferTransaction.create(TxVersion.V2, account, Asset.Waves, transfers, MassTransferTxFee, Now, attachment, Proofs.empty).explicitGet()

@@ -11,7 +11,7 @@ object TransferTxValidator extends TxValidator[TransferTransaction] {
     V.seq(transaction)(
       V.fee(fee),
       V.positiveAmount(amount, assetId.maybeBase58Repr.getOrElse("waves")),
-      V.transferAttachment(attachment)
+      V.transferAttachment(isProtobufVersion, attachment)
     )
   }
 }

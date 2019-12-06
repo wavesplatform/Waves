@@ -53,7 +53,7 @@ object Gen {
         case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
-        case EmptyDataEntry(_)            => ???
+        case EmptyDataEntry(_) => ???
       } reduce [String] { case (l, r) => s"$l && $r " }
 
     val src =
@@ -124,7 +124,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, Array.emptyByteArray, now + i)
+          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, None, now + i)
       }
       .collect { case Right(x) => x }
   }
@@ -139,7 +139,7 @@ object Gen {
         case ((sender, count), i) =>
           val transfers = List.tabulate(count)(_ => ParsedTransfer(recipientGen.next(), amountGen.next()))
           val fee       = 100000 + count * 50000
-          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, Array.emptyByteArray)
+          MassTransferTransaction.selfSigned(1.toByte, sender, Waves, transfers, fee, now + i, None)
       }
       .collect { case Right(tx) => tx }
   }

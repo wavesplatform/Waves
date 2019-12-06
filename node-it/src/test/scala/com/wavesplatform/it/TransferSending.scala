@@ -122,9 +122,9 @@ trait TransferSending extends ScorexLogging {
                 amount = x.amount,
                 feeAsset = Waves,
                 fee = x.fee,
-                attachment = if (includeAttachment) {
-                  Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)
-                } else Array.emptyByteArray,
+                attachment =
+                  if (includeAttachment) Some(Attachment.Bin(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)))
+                  else None,
                 timestamp = start + i
               )
               .right
@@ -156,7 +156,7 @@ trait TransferSending extends ScorexLogging {
       amount,
       Some(feeAssetId),
       fee,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
+      attachment,
       Some(timestamp),
       None,
       Some(proofs)

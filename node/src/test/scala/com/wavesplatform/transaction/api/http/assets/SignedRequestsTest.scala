@@ -1,13 +1,6 @@
 package com.wavesplatform.transaction.api.http.assets
 
-import com.wavesplatform.api.http.requests.{
-  SignedBurnV1Request,
-  SignedIssueV1Request,
-  SignedReissueV1Request,
-  SignedSetAssetScriptRequest,
-  SignedSponsorFeeRequest,
-  SignedTransferV1Request
-}
+import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.lang.script.Script
@@ -41,8 +34,8 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    Base58.encode(tx.name) shouldBe "zVbyBrMk"
-    Base58.encode(tx.description) shouldBe "zVbyBrMk"
+    tx.nameBytes.toString shouldBe "zVbyBrMk"
+    tx.descriptionBytes.toString shouldBe "zVbyBrMk"
     tx.reissuable shouldBe true
     tx.decimals shouldBe 2
     tx.fee shouldBe 100000L
@@ -108,7 +101,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     val tx = req.toTx.explicitGet()
     Base58.encode(tx.sender) shouldBe "D6HmGZqpXCyAqpz8mCAfWijYDWsPKncKe5v3jq1nTpf5"
     tx.timestamp shouldBe 1479462208828L
-    tx.attachment shouldBe Base58.tryDecodeWithLimit("A").get
+    tx.attachment.toBytes shouldBe Base58.tryDecodeWithLimit("A").get
     tx.assetId.maybeBase58Repr.get shouldBe "GAXAj8T4pSjunDqpz6Q3bit4fJJN9PD4t8AK8JZVSa5u"
     tx.amount shouldBe 100000
     tx.fee shouldBe 100000
@@ -144,7 +137,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     val tx = req.toTx.explicitGet()
     Base58.encode(tx.sender) shouldBe "FJuErRxhV9JaFUwcYLabFK5ENvDRfyJbRz8FeVfYpBLn"
     tx.timestamp shouldBe 1489054107569L
-    tx.attachment shouldBe Base58.tryDecodeWithLimit("2Kk7Zsr1e9jsqSBM5hpF").get
+    tx.attachment.toBytes shouldBe Base58.tryDecodeWithLimit("2Kk7Zsr1e9jsqSBM5hpF").get
     tx.assetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.feeAssetId.maybeBase58Repr.get shouldBe "6MPKrD5B7GrfbciHECg1MwdvRUhRETApgNZspreBJ8JL"
     tx.amount shouldBe 1000
