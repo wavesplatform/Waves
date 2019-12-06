@@ -211,6 +211,8 @@ object CommonValidation {
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
 
+      case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
+
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
   }

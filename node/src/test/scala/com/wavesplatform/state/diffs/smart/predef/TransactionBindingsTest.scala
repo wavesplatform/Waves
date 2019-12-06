@@ -16,14 +16,12 @@ import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{Order, OrderType}
 import com.wavesplatform.transaction.smart.BlockchainContext.In
-import com.wavesplatform.transaction.smart.WavesEnvironment
-import com.wavesplatform.transaction.smart.buildThisValue
+import com.wavesplatform.transaction.smart.{WavesEnvironment, buildThisValue}
 import com.wavesplatform.transaction.{Proofs, ProvenTransaction, VersionedTransaction}
 import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
@@ -266,6 +264,26 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         T
       )
       result shouldBe evaluated(true)
+    }
+  }
+
+  property("UpdateAssetInfoTransaction binding") {
+    forAll(updateAssetInfoTxGen) { t =>
+
+      val scriptSource =
+        s"""
+           |match tx {
+           | case t : UpdateAssetInfoTransaction =>
+           |   ${provenPart(t)}
+           |   let name        = t.name.toBytes()        == base58'${ByteStr(t.name.getBytes)}'
+           |   let description = t.description.toBytes() == base58'${ByteStr(t.description.getBytes())}'
+           |   let assetId     = t.assetId               == base58'${t.assetId.id}'
+           |   ${assertProvenPart("t")} && description && name && assetId
+           | case other => throw()
+           | }
+           |""".stripMargin
+
+      runScript(scriptSource, Coproduct(t), V4, T) shouldBe evaluated(true)
     }
   }
 

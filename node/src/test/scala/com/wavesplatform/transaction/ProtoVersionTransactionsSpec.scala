@@ -132,6 +132,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
 
       val transferTx =
         TransferTransaction.selfSigned(TxVersion.V3, Account, recipient, asset, 100, Asset.Waves, MinFee, attachment, Now).explicitGet()
+
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(transferTx)))
 
       decode(base64Str) shouldBe transferTx

@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.primitives.{Ints, Longs}
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -33,9 +33,9 @@ object Keys {
   def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =
     Key("asset-balance", hBytes(9, height, addressId.toByteArray ++ asset.id.arr), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetInfoHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-info-history", 10, asset.id.arr)
-  def assetInfo(asset: IssuedAsset)(height: Int): Key[AssetInfo] =
-    Key("asset-info", hBytes(11, height, asset.id.arr), readAssetInfo, writeAssetInfo)
+  def assetDetailsHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-details-history", 10, asset.id.arr)
+  def assetDetails(asset: IssuedAsset)(height: Int): Key[(AssetInfo, AssetVolumeInfo)] =
+    Key("asset-details", hBytes(11, height, asset.id.arr), readAssetDetails, writeAssetDetails)
 
   def leaseBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("lease-balance-history", 12, addressId.toByteArray)
   def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
@@ -61,7 +61,7 @@ object Keys {
   def idToAddress(id: BigInt): Key[Address]            = Key("id-to-address", bytes(26, id.toByteArray), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("address-script-history", 27, addressId.toByteArray)
-  def addressScript(addressId: BigInt)(height: Int): Key[Option[(Script, Long, Map[String, Long])]] =
+  def addressScript(addressId: BigInt)(height: Int): Key[Option[(PublicKey, Script, Long, Map[String, Long])]] =
     Key.opt("address-script", hAddr(28, height, addressId), readScript, writeScript)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
@@ -95,7 +95,7 @@ object Keys {
   def carryFee(height: Int): Key[Long] = Key("carry-fee", h(45, height), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
   def assetScriptHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("asset-script-history", 46, asset.id.arr)
-  def assetScript(asset: IssuedAsset)(height: Int): Key[Option[(Script, Long)]] =
+  def assetScript(asset: IssuedAsset)(height: Int): Key[Option[(PublicKey, Script, Long)]] =
     Key.opt("asset-script", hBytes(47, height, asset.id.arr), readAssetScript, writeAssetScript)
   def assetScriptPresent(asset: IssuedAsset)(height: Int): Key[Option[Unit]] =
     Key.opt("asset-script", hBytes(47, height, asset.id.arr), _ => (), _ => Array[Byte]())
@@ -179,4 +179,8 @@ object Keys {
 
   val HitSourcePrefix: Short                   = 59
   def hitSource(height: Int): Key[Array[Byte]] = Key("hit-source", h(HitSourcePrefix, height), identity, identity)
+
+  val AssetStaticInfoPrefix: Short = 60
+  def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
+    Key.opt("asset-static-info", bytes(AssetStaticInfoPrefix, asset.id.arr), readAssetStaticInfo, writeAssetStaticInfo)
 }

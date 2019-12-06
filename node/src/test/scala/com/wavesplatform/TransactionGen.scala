@@ -425,6 +425,20 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield tx
   }
 
+  val updateAssetInfoTxGen: Gen[UpdateAssetInfoTransaction] =
+    for {
+      chainId     <- Gen.chooseNum[Byte](Byte.MinValue, Byte.MaxValue)
+      account     <- accountGen
+      assetId     <- bytes32gen
+      assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      description <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
+      fee         <- smallFeeGen
+      timestamp   <- positiveLongGen
+      tx = UpdateAssetInfoTransaction
+        .selfSigned(1.toByte, chainId, account, assetId, new String(assetName), new String(description), timestamp, fee, Waves)
+        .explicitGet()
+    } yield tx
+
   def issueReissueBurnGeneratorP(
       issueQuantity: Long,
       reissueQuantity: Long,
@@ -905,14 +919,28 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       feeParam: Option[Long] = None
   ): Gen[IssueTransaction] =
     for {
-      script <- _scriptGen
-      sender <- senderGen
+      script                                                                                                 <- _scriptGen
+      sender                                                                                                 <- senderGen
       (_, assetName, description, generatedQuantity, decimals, generatedReissuable, generatedFee, timestamp) <- issueParamGen
       reissuable = reissuableParam.getOrElse(generatedReissuable)
       quantity   = quantityParam.getOrElse(generatedQuantity)
       fee        = feeParam.getOrElse(generatedFee)
     } yield IssueTransaction
       .selfSigned(TxVersion.V2, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
+      .explicitGet()
+
+  def smartIssueTransactionGen(
+    senderGen: Gen[KeyPair] = accountGen,
+    sGen: Gen[Option[Script]] = Gen.option(scriptGen),
+    forceReissuable: Boolean = false
+  ): Gen[IssueTransaction] =
+    for {
+      script                                                                               <- sGen
+      (_, assetName, description, quantity, decimals, generatedReissuable, fee, timestamp) <- issueParamGen
+      sender                                                                               <- senderGen
+      reissuable = if (forceReissuable) true else generatedReissuable
+    } yield IssueTransaction
+      .selfSigned(2.toByte, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .explicitGet()
 }
 

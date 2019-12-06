@@ -43,7 +43,6 @@ case class InvokeScriptTransaction(
   val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
-  override def chainByte: Option[TxVersion]    = Some(AddressScheme.current.chainId)
 }
 
 object InvokeScriptTransaction extends TransactionParser {

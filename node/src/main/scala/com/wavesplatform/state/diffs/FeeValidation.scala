@@ -26,22 +26,23 @@ object FeeValidation {
   val DAppV4Multiplier = 0.001
 
   val FeeConstants: Map[Byte, Long] = Map(
-    GenesisTransaction.typeId        -> 0,
-    PaymentTransaction.typeId        -> 1,
-    IssueTransaction.typeId          -> 1000,
-    ReissueTransaction.typeId        -> 1000,
-    BurnTransaction.typeId           -> 1,
-    TransferTransaction.typeId       -> 1,
-    MassTransferTransaction.typeId   -> 1,
-    LeaseTransaction.typeId          -> 1,
-    LeaseCancelTransaction.typeId    -> 1,
-    ExchangeTransaction.typeId       -> 3,
-    CreateAliasTransaction.typeId    -> 1,
-    DataTransaction.typeId           -> 1,
-    SetScriptTransaction.typeId      -> 10,
-    SponsorFeeTransaction.typeId     -> 1000,
-    SetAssetScriptTransaction.typeId -> (1000 - 4),
-    InvokeScriptTransaction.typeId   -> 5
+    GenesisTransaction.typeId         -> 0,
+    PaymentTransaction.typeId         -> 1,
+    IssueTransaction.typeId           -> 1000,
+    ReissueTransaction.typeId         -> 1000,
+    BurnTransaction.typeId            -> 1,
+    TransferTransaction.typeId        -> 1,
+    MassTransferTransaction.typeId    -> 1,
+    LeaseTransaction.typeId           -> 1,
+    LeaseCancelTransaction.typeId     -> 1,
+    ExchangeTransaction.typeId        -> 3,
+    CreateAliasTransaction.typeId     -> 1,
+    DataTransaction.typeId            -> 1,
+    SetScriptTransaction.typeId       -> 10,
+    SponsorFeeTransaction.typeId      -> 1000,
+    SetAssetScriptTransaction.typeId  -> (1000 - 4),
+    InvokeScriptTransaction.typeId    -> 5,
+    UpdateAssetInfoTransaction.typeId -> 1
   )
 
   def apply(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] = {
@@ -82,8 +83,7 @@ object FeeValidation {
             val base = if (blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)) tx.bodyBytes() else tx.bytes()
             baseFee + (base.length - 1) / 1024
           case itx: IssueTransaction =>
-            lazy val nftActivated = blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee)
-            val multiplier        = if (itx.isNFT && nftActivated) NFTMultiplier else 1
+            val multiplier = if (blockchain.isNFT(itx)) NFTMultiplier else 1
 
             (baseFee * multiplier).toLong
           case _: ReissueTransaction =>

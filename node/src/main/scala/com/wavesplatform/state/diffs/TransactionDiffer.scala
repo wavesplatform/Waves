@@ -86,18 +86,19 @@ object TransactionDiffer {
       currentBlockTimestamp: Long
   )(blockchain: Blockchain, tx: ProvenTransaction): TracedResult[ValidationError, Diff] =
     tx match {
-      case itx: IssueTransaction           => AssetTransactionsDiff.issue(blockchain)(itx)
-      case rtx: ReissueTransaction         => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
-      case btx: BurnTransaction            => AssetTransactionsDiff.burn(blockchain)(btx)
-      case ttx: TransferTransaction        => TransferTransactionDiff(blockchain, currentBlockTimestamp)(ttx)
-      case mtx: MassTransferTransaction    => MassTransferTransactionDiff(blockchain, currentBlockTimestamp)(mtx)
-      case ltx: LeaseTransaction           => LeaseTransactionsDiff.lease(blockchain)(ltx)
-      case ltx: LeaseCancelTransaction     => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp)(ltx)
-      case atx: CreateAliasTransaction     => CreateAliasTransactionDiff(blockchain)(atx)
-      case dtx: DataTransaction            => DataTransactionDiff(blockchain)(dtx)
-      case sstx: SetScriptTransaction      => SetScriptTransactionDiff(blockchain)(sstx)
-      case sstx: SetAssetScriptTransaction => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTimestamp)(sstx)
-      case stx: SponsorFeeTransaction      => AssetTransactionsDiff.sponsor(blockchain, currentBlockTimestamp)(stx)
-      case _                               => Left(UnsupportedTransactionType)
+      case itx: IssueTransaction             => AssetTransactionsDiff.issue(blockchain)(itx)
+      case rtx: ReissueTransaction           => AssetTransactionsDiff.reissue(blockchain, currentBlockTimestamp)(rtx)
+      case btx: BurnTransaction              => AssetTransactionsDiff.burn(blockchain)(btx)
+      case uaitx: UpdateAssetInfoTransaction => AssetTransactionsDiff.updateInfo(blockchain)(uaitx)
+      case ttx: TransferTransaction          => TransferTransactionDiff(blockchain, currentBlockTimestamp)(ttx)
+      case mtx: MassTransferTransaction      => MassTransferTransactionDiff(blockchain, currentBlockTimestamp)(mtx)
+      case ltx: LeaseTransaction             => LeaseTransactionsDiff.lease(blockchain)(ltx)
+      case ltx: LeaseCancelTransaction       => LeaseTransactionsDiff.leaseCancel(blockchain, currentBlockTimestamp)(ltx)
+      case atx: CreateAliasTransaction       => CreateAliasTransactionDiff(blockchain)(atx)
+      case dtx: DataTransaction              => DataTransactionDiff(blockchain)(dtx)
+      case sstx: SetScriptTransaction        => SetScriptTransactionDiff(blockchain)(sstx)
+      case sstx: SetAssetScriptTransaction   => AssetTransactionsDiff.setAssetScript(blockchain, currentBlockTimestamp)(sstx)
+      case stx: SponsorFeeTransaction        => AssetTransactionsDiff.sponsor(blockchain, currentBlockTimestamp)(stx)
+      case _                                 => Left(UnsupportedTransactionType)
     }
 }

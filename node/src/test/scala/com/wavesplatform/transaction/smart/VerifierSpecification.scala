@@ -6,7 +6,7 @@ import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.state.diffs.produce
-import com.wavesplatform.state.{AssetDescription, Blockchain}
+import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier.ValidationResult
@@ -63,7 +63,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   }
 
   private def mkAssetDescription(matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(matcherAccount, Array.emptyByteArray, Array.emptyByteArray, decimals, reissuable = false, BigInt(0), None, 0))
+    Some(AssetDescription(matcherAccount, "", "", decimals, reissuable = false, BigInt(0), Height @@ 0, None, 0, decimals == 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen

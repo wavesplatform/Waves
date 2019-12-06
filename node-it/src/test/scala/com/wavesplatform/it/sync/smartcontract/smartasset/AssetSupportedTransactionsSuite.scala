@@ -17,7 +17,7 @@ import scala.concurrent.duration._
 
 class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   private val estimator = ScriptEstimatorV2
-  var asset             = ""
+  var asset = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -38,9 +38,9 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   }
 
   test("transfer verification with asset script") {
-    val firstAssetBalance  = sender.assetBalance(firstAddress, asset).balance
+    val firstAssetBalance = sender.assetBalance(firstAddress, asset).balance
     val secondAssetBalance = sender.assetBalance(secondAddress, asset).balance
-    val thirdAssetBalance  = sender.assetBalance(thirdAddress, asset).balance
+    val thirdAssetBalance = sender.assetBalance(thirdAddress, asset).balance
 
     sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(asset), waitForTx = true)
 
@@ -76,13 +76,14 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   test("transfer goes only to addresses from list (white or black)") {
     val scr = ScriptCompiler(
       s"""
-                                        |match tx {
-                                        |  case s : SetAssetScriptTransaction => true
-                                        |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${ByteStr(
-        pkByAddress(secondAddress).publicKey).toString
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case t:  TransferTransaction => t.recipient == addressFromPublicKey(base58'${
+        ByteStr(
+          pkByAddress(secondAddress).publicKey).toString
       }')
-                                        |  case _ => false
-                                        |}
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true,
       estimator
@@ -97,16 +98,17 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val scr1 = ScriptCompiler(
       s"""
-                                |match tx {
-                                |  case s : SetAssetScriptTransaction => true
-                                |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${ByteStr(
-        pkByAddress(secondAddress).publicKey).toString
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case t:  TransferTransaction => t.recipient != addressFromPublicKey(base58'${
+        ByteStr(
+          pkByAddress(secondAddress).publicKey).toString
       }') && t.recipient != addressFromPublicKey(base58'${
         ByteStr(
           pkByAddress(firstAddress).publicKey).toString
       }')
-                                |  case _ => false
-                                |}
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true,
       estimator
@@ -228,9 +230,10 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       s"""
          |match tx {
          |  case s : SetAssetScriptTransaction => true
-         |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${ByteStr(
-        pkByAddress(secondAddress).publicKey
-         ).toString
+         |  case b:  BurnTransaction => b.sender != addressFromPublicKey(base58'${
+        ByteStr(
+          pkByAddress(secondAddress).publicKey
+        ).toString
       }')
          |  case _ => false
          |}
@@ -250,11 +253,11 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   ignore("burn by some height") {
     val scr = ScriptCompiler(
       s"""
-          |match tx {
-          |  case s : SetAssetScriptTransaction => true
-          |  case b:  BurnTransaction => height % 2 == 0
-          |  case _ => false
-          |}
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case b:  BurnTransaction => height % 2 == 0
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true,
       estimator
@@ -305,22 +308,22 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   test("masstransfer - taxation") {
     val scr = ScriptCompiler(
       s"""
-          |match tx {
-          |  case s : SetAssetScriptTransaction => true
-          |  case m:  MassTransferTransaction =>
-          |  let twoTransfers = size(m.transfers) == 2
-          |  let issuerIsRecipient = m.transfers[0].recipient == addressFromString("${firstAddress}")
-          |  let taxesPaid = m.transfers[0].amount >= m.transfers[1].amount / 10
-          |  twoTransfers && issuerIsRecipient && taxesPaid
-          |  case _ => false
-          |}
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case m:  MassTransferTransaction =>
+         |  let twoTransfers = size(m.transfers) == 2
+         |  let issuerIsRecipient = m.transfers[0].recipient == addressFromString("${firstAddress}")
+         |  let taxesPaid = m.transfers[0].amount >= m.transfers[1].amount / 10
+         |  twoTransfers && issuerIsRecipient && taxesPaid
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val transfers       = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
+    val transfers = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
     val massTransferFee = calcMassTransferFee(transfers.size)
     sender.massTransfer(firstAddress, transfers, massTransferFee + smartFee, Some(asset), waitForTx = true)
 
@@ -331,19 +334,19 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
   test("masstransfer - transferCount <=2") {
     val scr = ScriptCompiler(
       s"""
-          |match tx {
-          |  case s : SetAssetScriptTransaction => true
-          |  case m:  MassTransferTransaction =>
-          |  m.transferCount <= 2
-          |  case _ => false
-          |}
+         |match tx {
+         |  case s : SetAssetScriptTransaction => true
+         |  case m:  MassTransferTransaction =>
+         |  m.transferCount <= 2
+         |  case _ => false
+         |}
          """.stripMargin,
       isAssetScript = true,
       estimator
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(asset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val transfers                  = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
+    val transfers = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
     assertApiError(sender.massTransfer(firstAddress, transfers, massTransferTransactionFee + smartFee, Some(asset)), errNotAllowedByTokenApiError)
   }
@@ -443,4 +446,5 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     )
 
   }
+
 }

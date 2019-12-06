@@ -5,11 +5,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -116,7 +116,7 @@ package object appender extends ScorexLogging {
           parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
           effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
-          _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
+          _                <- validateBlockVersion(height, block, blockchain)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
           hitSource        <- pos.validateGenerationSignature(block)
@@ -138,15 +138,23 @@ package object appender extends ScorexLogging {
       )
   }
 
-  private def validateBlockVersion(height: Int, block: Block, fs: FunctionalitySettings): Either[ValidationError, Unit] = {
-    val version3Height = fs.blockVersion3AfterHeight
-    Either.cond(
-      height > version3Height
-        || block.header.version == Block.GenesisBlockVersion
-        || block.header.version == Block.PlainBlockVersion,
-      (),
-      GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
-    )
+  private def validateBlockVersion(height: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
+    val version3Height  = blockchain.settings.functionalitySettings.blockVersion3AfterHeight
+    val versionAtHeight = blockchain.blockVersionAt(height)
+    for {
+      _ <- Either.cond(
+        height > version3Height
+          || block.header.version == Block.GenesisBlockVersion
+          || block.header.version == Block.PlainBlockVersion,
+        (),
+        GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
+      )
+      _ <- Either.cond(
+        versionAtHeight <= block.header.version,
+        (),
+        GenericError(s"Block Version ${block.header.version} is lower than $versionAtHeight")
+      )
+    } yield ()
   }
 
   private[this] object metrics {

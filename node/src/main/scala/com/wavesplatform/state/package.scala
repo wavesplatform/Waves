@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -64,7 +65,7 @@ package object state {
             .orElse(blockchain.transactionInfo(asset.id).map(_._2))
         }
         .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT(blockchain) => itx
+          case Some(itx: IssueTransaction) if blockchain.isNFT(itx) => itx
         }
     }
 

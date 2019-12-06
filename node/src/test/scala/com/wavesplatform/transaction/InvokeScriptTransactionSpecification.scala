@@ -45,7 +45,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("protobuf roundtrip") {
     forAll(invokeScriptGen(paymentListGen), accountGen) { (tx, caller) =>
       val unsigned = transaction.PBTransaction(
-        tx.chainByte.get,
+        tx.chainByte,
         ByteString.copyFrom(caller.publicKey),
         Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
         tx.timestamp,

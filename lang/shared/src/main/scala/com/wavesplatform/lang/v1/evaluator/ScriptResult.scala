@@ -127,7 +127,34 @@ object ScriptResult {
     } yield ScriptResultV3(w, p)
   }
 
-  private def processIssue(fields: Map[String, EVALUATED]): Either[String, Issue] = ???
+  private def processIssue(fields: Map[String, EVALUATED]): Either[String, Issue] = {
+    (
+      fields.get(FieldNames.IssueQuantity),
+      fields.get(FieldNames.IssueDecimals),
+      fields.get(FieldNames.IssueName),
+      fields.get(FieldNames.IssueDescription),
+      fields.get(FieldNames.IssueScript),
+      fields.get(FieldNames.IssueIsReissuable)
+    ) match {
+      case (
+        Some(CONST_LONG(quantity)),
+        Some(CONST_LONG(decimals)),
+        Some(CONST_STRING(name)),
+        Some(CONST_STRING(description)),
+        Some(script),
+        Some(CONST_BOOLEAN(isReissuable))
+      ) => if (script == unit) {
+        if (0 <= decimals && decimals <= 8) {
+          Right(Issue(None, decimals.toInt, description, isReissuable, name, quantity))
+        } else {
+          Left(s"Invalid decimals $decimals")
+        }
+      } else {
+        Left("Issuing scripted asset isn't supported")
+      }
+      case _ => Left(s"Invalid arguments")
+    }
+  }
 
   private def processReissue(fields: Map[String, EVALUATED]): Either[String, Reissue] =
     (

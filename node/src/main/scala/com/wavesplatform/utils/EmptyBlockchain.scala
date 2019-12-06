@@ -2,7 +2,7 @@ package com.wavesplatform.utils
 
 import cats.kernel.Monoid
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -83,11 +83,11 @@ case object EmptyBlockchain extends Blockchain {
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long, Map[String, Long])] = None
+  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = None
 
   override def hasScript(address: Address): Boolean = false
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = None
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = None
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = false
 

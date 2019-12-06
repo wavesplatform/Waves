@@ -116,6 +116,9 @@ object RealTransactionWrapper {
               ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
             )
           }
+
+      case u: UpdateAssetInfoTransaction =>
+        Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
     }
 
   def mapTransferTx(t: TransferTransaction, version: StdLibVersion): Tx.Transfer =
