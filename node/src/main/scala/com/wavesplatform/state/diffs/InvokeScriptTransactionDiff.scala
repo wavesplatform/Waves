@@ -148,7 +148,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, transfers))
+          _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transfers))
           _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _ <- TracedResult(validateOverflow(transfers.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
           _ <- TracedResult(
@@ -258,17 +258,18 @@ object InvokeScriptTransactionDiff {
       dAppAddress: Address,
       blockchain: Blockchain,
       tx: InvokeScriptTransaction,
+      version: StdLibVersion,
       transfers: List[AssetTransfer]
-  ): Either[GenericError, Unit] = {
-    val ifReject =
-      blockchain.disallowSelfPayment &&
-        (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress || transfers.exists(_.recipient.bytes == dAppAddress.bytes))
-    Either.cond(
-      !ifReject,
-      (),
-      GenericError("DApp self-payment is forbidden")
-    )
-  }
+  ): Either[GenericError, Unit] =
+    if (blockchain.disallowSelfPayment && version >= V4)
+      if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
+        GenericError("DApp self-payment is forbidden since V4").asLeft[Unit]
+      else if (transfers.exists(_.recipient.bytes == dAppAddress.bytes))
+        GenericError("DApp self-transfer is forbidden since V4").asLeft[Unit]
+      else
+        ().asRight[GenericError]
+    else
+      ().asRight[GenericError]
 
   private def paymentsPart(
       height: Int,
