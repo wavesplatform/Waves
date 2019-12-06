@@ -237,7 +237,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         s"""WriteSet([])}
            |@Callable(inv)
            |func withArg(a: List[Int]) = { WriteSet([ DataEntry("a", a[0]) ])""".stripMargin))) { error =>
-      error.message should include("Annotated function should not have generic parameter types") }
+      error.message should include("Unexpected callable func arg type: List[Int] ") }
   }
 
   test("can't use deprecated V3 features in V4 script") {
