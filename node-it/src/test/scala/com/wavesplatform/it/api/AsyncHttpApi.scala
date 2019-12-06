@@ -503,11 +503,11 @@ object AsyncHttpApi extends Assertions {
     def getDataList(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
       get(s"/addresses/data/$address?${keys.map("key=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[DataEntry[_]]]
 
-    def getMerkleProof(ids: String*): Future[MerkleProofResponse] =
-      get(s"/transactions/merkleProof?${ids.map("id=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[MerkleProofResponse]
+    def getMerkleProof(ids: String*): Future[Seq[MerkleProofResponse]] =
+      get(s"/transactions/merkleProof?${ids.map("id=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[MerkleProofResponse]]
 
-    def getMerkleProofPost(ids: String*): Future[MerkleProofResponse] =
-      postJson(s"/transactions/merkleProof", Json.obj("ids" -> ids)).as[MerkleProofResponse]
+    def getMerkleProofPost(ids: String*): Future[Seq[MerkleProofResponse]] =
+      postJson(s"/transactions/merkleProof", Json.obj("ids" -> ids)).as[Seq[MerkleProofResponse]]
 
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 

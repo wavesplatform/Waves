@@ -448,9 +448,9 @@ object SyncHttpApi extends Assertions {
     def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
       sync(async(n).getDataListPost(sourceAddress, keys: _*))
 
-    def getMerkleProof(ids: String*): MerkleProofResponse = sync(async(n).getMerkleProof(ids: _*))
+    def getMerkleProof(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProof(ids: _*))
 
-    def getMerkleProofPost(ids: String*): MerkleProofResponse = sync(async(n).getMerkleProofPost(ids: _*))
+    def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids: _*))
 
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
