@@ -40,11 +40,11 @@ object DiffsCommon {
   def getScriptsComplexity(blockchain: Blockchain, tx: ProvenTransaction): Long = {
     val assetsComplexity = tx.checkedAssets.toList
       .flatMap(blockchain.assetScriptWithComplexity)
-      .map(_._2)
+      .map(_._3)
 
     val accountComplexity = blockchain
       .accountScriptWithComplexity(tx.sender.toAddress)
-      .map(_._2)
+      .map(_._3)
 
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }

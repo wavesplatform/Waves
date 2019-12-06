@@ -72,11 +72,11 @@ object ExchangeTransactionDiff {
 
       assetsComplexity = assetIds
         .flatMap(blockchain.assetScriptWithComplexity)
-        .map(_._2)
+        .map(_._3)
 
       accountsComplexity = List(tx.sender.toAddress, buyer, seller)
         .flatMap(blockchain.accountScriptWithComplexity)
-        .map(_._2)
+        .map(_._3)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
     } yield {

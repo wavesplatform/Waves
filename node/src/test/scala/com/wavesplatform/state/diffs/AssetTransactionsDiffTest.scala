@@ -266,9 +266,10 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
                 issue.decimals,
                 issue.reissuable,
                 BigInt(issue.quantity),
-                Height @@ 0,
+                Height @@ 2,
                 issue.script,
-                0L
+                0L,
+                issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )
             )
             blockDiff.transactions.get(issue.id()).isDefined shouldBe true

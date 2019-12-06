@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.assets._
 
 object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
-    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals)
+    val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
     val info       = AssetInfo(new String(tx.name), new String(tx.description), Height @@ blockchain.height)
 
@@ -27,7 +27,7 @@ object AssetTransactionsDiff {
             tx = tx,
             portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
             issuedAssets = Map(asset             -> ((staticInfo, info, volumeInfo))),
-            assetScripts = Map(asset             -> script),
+            assetScripts = Map(asset             -> script.map(script => (tx.sender, script._1, script._2))),
             scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
           )
       )
@@ -43,7 +43,7 @@ object AssetTransactionsDiff {
               Diff(
                 tx = tx,
                 portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-                assetScripts = Map(tx.asset          -> script),
+                assetScripts = Map(tx.asset          -> script.map(script => (tx.sender, script._1, script._2))),
                 scriptsRun =
                   // Asset script doesn't count before Ride4DApps activation
                   if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {

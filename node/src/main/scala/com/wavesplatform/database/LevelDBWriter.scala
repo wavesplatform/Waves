@@ -6,7 +6,7 @@ import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Longs, Shorts}
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -114,8 +114,8 @@ class LevelDBWriter(
     loadBlock(height, db)
   }
 
-  override protected def loadScript(address: Address): Option[(Script, Long, Map[String, Long])] = readOnly { db =>
-    addressId(address).fold(Option.empty[(Script, Long, Map[String, Long])]) { addressId =>
+  override protected def loadScript(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = readOnly { db =>
+    addressId(address).fold(Option.empty[(PublicKey, Script, Long, Map[String, Long])]) { addressId =>
       db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
     }
   }
@@ -126,7 +126,7 @@ class LevelDBWriter(
     }
   }
 
-  override protected def loadAssetScript(asset: IssuedAsset): Option[(Script, Long)] = readOnly { db =>
+  override protected def loadAssetScript(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = readOnly { db =>
     db.fromHistory(Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
   }
 
@@ -200,8 +200,9 @@ class LevelDBWriter(
       volumeInfo.isReissuable,
       volumeInfo.volume,
       info.lastUpdatedAt,
-      script.map(_._1),
-      sponsorship
+      script.map(_._2),
+      sponsorship,
+      staticInfo.nft
     )
   }
 
@@ -249,8 +250,8 @@ class LevelDBWriter(
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
-      scripts: Map[BigInt, Option[(Script, Long, Map[String, Long])]],
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      scripts: Map[BigInt, Option[(PublicKey, Script, Long, Map[String, Long])]],
+      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],
       sponsorship: Map[IssuedAsset, Sponsorship],
@@ -259,6 +260,7 @@ class LevelDBWriter(
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
+
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -613,7 +615,8 @@ class LevelDBWriter(
                 case _: DataTransaction => // see changed data keys removal
 
                 case _: InvokeScriptTransaction =>
-                  rw.delete(Keys.invokeScriptResult(h, num))
+                  val k = Keys.invokeScriptResult(h, num)
+                  rw.delete(k)
 
                 case tx: CreateAliasTransaction => rw.delete(Keys.addressIdOfAlias(tx.alias))
                 case tx: ExchangeTransaction =>
