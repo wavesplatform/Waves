@@ -121,7 +121,4 @@ object Global extends BaseGlobal {
 
   override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
     ???
-
-  override def pedersenMerkleTreeAddItem(root: Array[Byte], proof: Array[Byte], index: Long, leaf: Array[Byte]): Array[Byte] =
-    ???
 }
