@@ -261,7 +261,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       error.message should include("Can't find a function 'DataEntry'(String, Boolean)") }
 
     assertApiError(sender.scriptCompile(
-      asDappV4(s"""[ IntEntry("x", inv.payment.extract().amount) ]"""))) { error =>
+      asDappV4(s"""[ IntegerEntry("x", inv.payment.extract().amount) ]"""))) { error =>
       error.message should include("Undefined field `payment` of variable of type `Invocation`") }
     assertApiError(sender.scriptCompile(
       asAssetV4(
