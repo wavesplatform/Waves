@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{matcherFee, minFee, someAssetAmount}
@@ -28,7 +28,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   val versions = transactionV1versions +: transactionV2versions
 
   test("exchange tx with orders v1,v2") {
-    val exchAsset          = sender.grpc.broadcastIssue(buyer, "exchAsset", someAssetAmount, 8, true, 1.waves, waitForTx = true)
+    val exchAsset          = sender.grpc.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, true, 1.waves, waitForTx = true)
     val exchAssetId        = PBTransactions.vanilla(exchAsset).explicitGet().id().toString
     val price              = 500000L
     val amount             = 40000000L

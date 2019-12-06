@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync
 
+import com.typesafe.config.Config
 import com.wavesplatform.api.http.requests.{
   CreateAliasRequest,
   DataRequest,
@@ -10,6 +11,8 @@ import com.wavesplatform.api.http.requests.{
   TransferRequest
 }
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -21,6 +24,14 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json.{Json, Writes}
 
 class ObsoleteHandlersSuite extends BaseTransactionSuite {
+
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> 0))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 
   test("alias create") {
     val json =
