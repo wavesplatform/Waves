@@ -6,6 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -51,8 +52,9 @@ package object state {
             volumeInfo.isReissuable,
             volumeInfo.volume,
             info.lastUpdatedAt,
-            diff.assetScripts(id).map(_._1),
-            0
+            diff.assetScripts(id).map(_._2),
+            0,
+            blockchain.isNFT(volumeInfo.volume.intValue(), staticInfo.decimals, volumeInfo.isReissuable)
           )
       }
 
@@ -78,7 +80,7 @@ package object state {
             .orElse(blockchain.assetDescription(asset).map((asset.id, _)))
         }
         .collect {
-          case Some((assetId, assetDescr)) if assetDescr.isNFT(blockchain) => (assetId, assetDescr)
+          case Some((assetId, assetDescr)) if assetDescr.nft => (assetId, assetDescr)
         }
     }
 

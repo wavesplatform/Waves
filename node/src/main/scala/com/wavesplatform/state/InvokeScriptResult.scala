@@ -9,7 +9,7 @@ import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, Invoke
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
-import play.api.libs.json.Json
+import play.api.libs.json._
 
 final case class InvokeScriptResult(
    data: Seq[DataEntry[_]] = Nil,
@@ -25,7 +25,7 @@ object InvokeScriptResult {
 
   final case class Payment(address: Address, asset: Asset, amount: Long)
   object Payment {
-    implicit val jsonFormat = Json.format[Payment]
+    implicit val jsonWrites = Json.writes[Payment]
   }
 
   def paymentsFromPortfolio(addr: Address, portfolio: Portfolio): Seq[Payment] = {
@@ -34,10 +34,21 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
-  implicit val issueFormat = Json.format[Issue]
-  implicit val reissueFormat = Json.format[Reissue]
-  implicit val burnFormat = Json.format[Burn]
-  implicit val jsonFormat = Json.format[InvokeScriptResult]
+  implicit val issueFormat = Writes[Issue] { iss =>
+    Json.obj(
+      "assetId" -> iss.id(),
+    "name" -> iss.name,
+    "description" -> iss.description,
+    "quantity" -> iss.quantity,
+    "decimals" -> iss.decimals,
+    "isReissuable" -> iss.isReissuable,
+    "compiledScript" -> iss.compiledScript,
+//    "nonce" ->
+    )
+  }
+  implicit val reissueFormat = Json.writes[Reissue]
+  implicit val burnFormat = Json.writes[Burn]
+  implicit val jsonFormat = Json.writes[InvokeScriptResult]
 
   implicit val monoid = new Monoid[InvokeScriptResult] {
     override val empty: InvokeScriptResult =
@@ -67,10 +78,15 @@ object InvokeScriptResult {
             Some(PBAmounts.fromAssetAndAmount(payment.asset, payment.amount))
           )
       ),
-      issues = Nil,
+      isr.issues.map(toPbIssue),
       isr.reissues.map(toPbReissue),
       isr.burns.map(toPbBurn)
     )
+  }
+
+  private def toPbIssue(r: Issue) = {
+    assert(r.compiledScript.isEmpty)
+    PBInvokeScriptResult.Issue(ByteString.copyFrom(r.id().arr), r.name, r.description, r.quantity, r.decimals, r.isReissuable, None)
   }
 
   private def toPbReissue(r: Reissue) =
@@ -78,6 +94,11 @@ object InvokeScriptResult {
 
   private def toPbBurn(b: Burn) =
     PBInvokeScriptResult.Burn(ByteString.copyFrom(b.assetId.arr), b.quantity)
+
+  private def toVanillaIssue(r: PBInvokeScriptResult.Issue): Issue = {
+    assert(r.script.isEmpty)
+    Issue(None, r.decimals, r.description, r.reissuable, r.name, r.amount)
+  }
 
   private def toVanillaReissue(r: PBInvokeScriptResult.Reissue) =
     Reissue(r.assetId.toByteArray, r.isReissuable, r.amount)
@@ -92,7 +113,7 @@ object InvokeScriptResult {
         val (asset, amount) = PBAmounts.toAssetAndAmount(p.getAmount)
         InvokeScriptResult.Payment(Address.fromBytes(p.address.toByteArray).explicitGet(), asset, amount)
       },
-      Nil,
+      pbValue.issues.map(toVanillaIssue),
       pbValue.reissues.map(toVanillaReissue),
       pbValue.burns.map(toVanillaBurn)
     )

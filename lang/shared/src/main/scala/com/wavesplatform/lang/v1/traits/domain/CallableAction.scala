@@ -2,6 +2,9 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import scorex.crypto.hash.Blake2b256
+
+import monix.eval.Coeval
 
 sealed trait CallableAction
 
@@ -18,7 +21,21 @@ case class Issue(
     isReissuable: Boolean,
     name: String,
     quantity: Long
-) extends CallableAction
+) extends CallableAction {
+  import com.wavesplatform.lang.utils.Serialize._
+  import java.io.ByteArrayOutputStream
+
+  def id : Coeval[ByteStr] = Coeval.evalOnce {
+    val out = new ByteArrayOutputStream()
+    out.writeString(name)
+    out.writeString(description)
+    out.writeInt(decimals)
+    out.writeLong(quantity)
+    out.writeShort((if(isReissuable) { 1 } else { 0 }))
+    out.writeLong(0L) // Nonce
+    ByteStr(Blake2b256.hash(out.toByteArray))
+  }
+}
 
 case class Reissue(
     assetId: ByteStr,

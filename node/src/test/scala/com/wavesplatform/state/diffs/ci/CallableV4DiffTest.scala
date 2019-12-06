@@ -380,4 +380,58 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       BlockchainFeatures.MultiPaymentInvokeScript
     ).map(_.id -> 0).toMap
   )
+
+  private def issuePreconditions(
+      assetScript: Option[Script] = None,
+      feeMultiplier: Int
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      fee     <- ciFee(feeMultiplier)
+      amount  <- Gen.choose(1L, 100000000L)
+    } yield {
+      val dApp = Some(issueDApp(amount))
+      for {
+        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
+    }.explicitGet()
+
+  private def issueDApp(
+      issueAmount: Long,
+      name: String = "ScriptAsset",
+      description: String = "Issued by InvokeScript",
+      decimals: Int = 0,
+      reissuable: Boolean = false
+  ): Script =
+    dApp(
+      s"""
+         | [
+         |   Issue(unit, $decimals, "$description", $reissuable, "$name", $issueAmount)
+         | ]
+       """.stripMargin
+    )
+
+  property("issue action results state") {
+    forAll(issuePreconditions(feeMultiplier = 7)) {
+      case (genesis, setScript, invoke, master, invoker, amount) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ setScript)),
+          TestBlock.create(Seq(invoke)),
+          features
+        ) {
+          case (_, blockchain) =>
+            val assets = blockchain.portfolio(master).assets
+            assets.values.toList shouldBe List(amount)
+
+            val assetsi = blockchain.portfolio(invoker).assets
+            assetsi.values.toList shouldBe List()
+        }
+    }
+  }
+
 }

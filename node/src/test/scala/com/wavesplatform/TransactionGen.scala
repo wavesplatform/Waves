@@ -928,6 +928,20 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield IssueTransaction
       .selfSigned(TxVersion.V2, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .explicitGet()
+
+  def smartIssueTransactionGen(
+    senderGen: Gen[KeyPair] = accountGen,
+    sGen: Gen[Option[Script]] = Gen.option(scriptGen),
+    forceReissuable: Boolean = false
+  ): Gen[IssueTransaction] =
+    for {
+      script                                                                               <- sGen
+      (_, assetName, description, quantity, decimals, generatedReissuable, fee, timestamp) <- issueParamGen
+      sender                                                                               <- senderGen
+      reissuable = if (forceReissuable) true else generatedReissuable
+    } yield IssueTransaction
+      .selfSigned(2.toByte, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
+      .explicitGet()
 }
 
 trait TransactionGen extends TransactionGenBase { _: Suite =>

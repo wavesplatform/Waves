@@ -34,8 +34,6 @@ case class SetScriptTransaction(
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
   override val json: Coeval[JsObject]     = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override val chainByte: Option[TxVersion] = Some(AddressScheme.current.chainId)
 }
 
 object SetScriptTransaction extends TransactionParser {

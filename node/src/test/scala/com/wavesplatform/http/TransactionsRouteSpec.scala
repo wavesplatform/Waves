@@ -193,7 +193,8 @@ class TransactionsRouteSpec
                   totalVolume = Long.MaxValue,
                   lastUpdatedAt = Height @@ 0,
                   script = None,
-                  sponsorship = 5
+                  sponsorship = 5,
+                  nft = false
                 )
               )
             )
@@ -233,7 +234,8 @@ class TransactionsRouteSpec
                   totalVolume = Long.MaxValue,
                   lastUpdatedAt = Height @@ 0,
                   script = Some(ExprScript(V1, TRUE, checkSize = false).explicitGet()),
-                  sponsorship = 5
+                  sponsorship = 5,
+                  nft = false
                 )
               )
             )

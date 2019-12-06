@@ -4,6 +4,7 @@ import java.nio.charset.StandardCharsets
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -425,7 +426,7 @@ object PBTransactions {
   }
 
   def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
-    val chainId = tx.chainByte.getOrElse(AddressScheme.current.chainId)
+    val chainId = tx.chainByte
 
     tx match {
       case vt.GenesisTransaction(recipient, amount, timestamp, signature) =>

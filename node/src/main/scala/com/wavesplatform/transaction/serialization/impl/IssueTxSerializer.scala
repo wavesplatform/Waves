@@ -21,7 +21,8 @@ object IssueTxSerializer {
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
       "description" -> new String(description, StandardCharsets.UTF_8)
-    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte, "script" -> script.map(_.bytes().base64)) else JsObject.empty)
+    ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
+      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
@@ -43,7 +44,7 @@ object IssueTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           baseBytes,
           Deser.serializeOptionOfArrayWithLength(script)(_.bytes())
         )

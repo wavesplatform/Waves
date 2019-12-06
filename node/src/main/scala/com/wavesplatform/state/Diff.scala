@@ -47,7 +47,7 @@ object AssetInfo {
   implicit val sg: Semigroup[AssetInfo] = (x, y) => y
 }
 
-case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int)
+case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
 case class AssetVolumeInfo(isReissuable: Boolean, volume: BigInt)
 
 object AssetVolumeInfo {
@@ -68,33 +68,9 @@ case class AssetDescription(
     totalVolume: BigInt,
     lastUpdatedAt: Height,
     script: Option[Script],
-    sponsorship: Long
-) {
-  override def equals(obj: scala.Any) = obj match {
-    case o: AssetDescription =>
-      o.source == this.source &&
-        o.issuer == this.issuer &&
-        o.name.equals(name) &&
-        o.description.equals(description) &&
-        o.decimals == decimals &&
-        o.reissuable == reissuable &&
-        o.totalVolume == totalVolume &&
-        o.script == script &&
-        o.sponsorship == sponsorship
-    case _ => false
-  }
-}
-
-object AssetDescription {
-  implicit class AssetDescriptionExt(private val ad: AssetDescription) {
-    def isNFT: Boolean   = ad.totalVolume == BigInt(1) && ad.decimals == 0 && !ad.reissuable
-    def isNFT(blockchain: Blockchain): Boolean = {
-      import com.wavesplatform.features.BlockchainFeatures
-      import com.wavesplatform.features.FeatureProvider._
-      blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
-    }
-  }
-}
+    sponsorship: Long,
+    nft: Boolean
+)
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 
@@ -156,8 +132,8 @@ case class Diff(
     aliases: Map[Alias, Address],
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
-    scripts: Map[Address, Option[(Script, Long, Map[String, Long])]],
-    assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+    scripts: Map[Address, Option[(PublicKey, Script, Long, Map[String, Long])]],
+    assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
     accountData: Map[Address, AccountDataInfo],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
@@ -173,8 +149,8 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(Script, Long, Map[String, Long])]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
+      scripts: Map[Address, Option[(PublicKey, Script, Long, Map[String, Long])]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
@@ -204,8 +180,8 @@ object Diff {
       aliases: Map[Alias, Address] = Map.empty,
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
-      scripts: Map[Address, Option[(Script, Long, Map[String, Long])]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
+      scripts: Map[Address, Option[(PublicKey, Script, Long, Map[String, Long])]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,

@@ -1,15 +1,14 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.IssueTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.IssueTxValidator
-import com.wavesplatform.transaction.{FastHashId, LegacyPBSwitch, Proofs, ProvenTransaction, SigProofsSwitch, TransactionParser, TxType, TxVersion, TxWithFee, VersionedTransaction}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -33,15 +32,13 @@ case class IssueTransaction(
     with FastHashId
     with SigProofsSwitch
     with TxWithFee.InWaves
-with LegacyPBSwitch.V3 {
+    with LegacyPBSwitch.V3 {
 
   override def builder = IssueTransaction
 
   override val bodyBytes: Coeval[Array[TxType]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxType]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]           = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override def chainByte: Option[Byte] = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
 }
 
 object IssueTransaction extends TransactionParser {
@@ -110,11 +107,5 @@ object IssueTransaction extends TransactionParser {
 
   implicit class IssueTransactionExt(private val tx: IssueTransaction) extends AnyVal {
     def assetId: ByteStr = tx.id()
-    def isNFT: Boolean   = tx.quantity == 1 && tx.decimals == 0 && !tx.reissuable
-    def isNFT(blockchain: Blockchain): Boolean = {
-      import com.wavesplatform.features.BlockchainFeatures
-      import com.wavesplatform.features.FeatureProvider._
-      blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && this.isNFT
-    }
   }
 }

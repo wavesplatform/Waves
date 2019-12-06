@@ -30,6 +30,6 @@ object DirectiveSet {
   private def errorMsg(wrongSet: (StdLibVersion, ScriptType, ContentType, Imports)) = {
     val (ver, sType, cType, _) = wrongSet
     s"Inconsistent set of directives ${(ver, sType, cType)} " +
-    s"could be (V3 or V4, ACCOUNT, DAPP), (<any>, <any>, LIBRARY) or (<any>, <any>, EXPRESSION)"
+    s"could be (V3 or newer, ACCOUNT, DAPP), (<any>, <any>, LIBRARY) or (<any>, <any>, EXPRESSION)"
   }
 }

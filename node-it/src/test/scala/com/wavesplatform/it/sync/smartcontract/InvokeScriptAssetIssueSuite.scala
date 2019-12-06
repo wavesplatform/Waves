@@ -55,7 +55,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
   }
 
   test("Correct data for assets issued by script") {
-    /*
+
     sender.setScript(
       smartAcc.stringRepr,
       Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64),
@@ -77,16 +77,6 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     stateChanges.value.issues.size shouldBe 1
 
     invokeScriptAssetId = stateChanges.value.issues.head.assetId
-     */
-    invokeScriptTx = sender.issue(smartAcc.stringRepr, "InvokeAsset", "InvokeDesc", 100L, 0, fee = issueFee + smartFee, waitForTx = true)
-    invokeScriptAssetId = invokeScriptTx.id
-
-    sender.setScript(
-      smartAcc.stringRepr,
-      Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64),
-      fee = setScriptFee + smartFee,
-      waitForTx = true
-    )
 
     val assetInfo = sender.assetsDetails(invokeScriptAssetId)
     assetInfo.assetId shouldBe invokeScriptAssetId
@@ -98,7 +88,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     assetInfo.reissuable shouldBe true
     assetInfo.decimals shouldBe 0
     assetInfo.quantity shouldBe 100L
-    /*
+
     stateChanges.value.issues.head.name shouldBe "InvokeAsset"
     stateChanges.value.issues.head.description shouldBe "InvokeDesc"
     stateChanges.value.issues.head.quantity shouldBe 100L
@@ -110,7 +100,6 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     val balance = sender.assetsBalance(firstAddress).balances.find(_.assetId == invokeScriptAssetId)
     balance shouldBe 'defined
     balance.value.issueTransaction shouldBe None
-   */
   }
 
   test("Correct data for assets reissued by transaction") {
@@ -134,7 +123,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
         callerAcc.stringRepr,
         smartAcc.stringRepr,
         Some("r"),
-        args = List(CONST_BYTESTR(ByteStr.decodeBase58(invokeScriptTx.id).get).explicitGet()),
+        args = List(CONST_BYTESTR(ByteStr.decodeBase58(invokeScriptAssetId).get).explicitGet()),
         waitForTx = true
       )
       ._1
@@ -178,7 +167,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
         callerAcc.stringRepr,
         smartAcc.stringRepr,
         Some("b"),
-        args = List(CONST_BYTESTR(ByteStr.decodeBase58(invokeScriptTx.id).get).explicitGet()),
+        args = List(CONST_BYTESTR(ByteStr.decodeBase58(invokeScriptAssetId).get).explicitGet()),
         waitForTx = true
       )
       ._1
@@ -214,7 +203,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
   }
 
   test("correct data for NFT issued by script") {
-    /*val nftInvokeScriptTx = sender
+    val nftInvokeScriptTx = sender
       .invokeScript(
         callerAcc.stringRepr,
         smartAcc.stringRepr,
@@ -228,11 +217,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     stateChanges shouldBe 'defined
     stateChanges.value.issues.size shouldBe 1
 
-    val nftInvokeScriptAssetId = stateChanges.value.issues.head.assetId*/
-
-    val nftInvokeScriptTx =
-      sender.issue(smartAcc.stringRepr, "TxNft", "TxNftDesc", 1, 0, fee = issueFee + smartFee, reissuable = false, waitForTx = true)
-    val nftInvokeScriptAssetId = nftInvokeScriptTx.id
+    val nftInvokeScriptAssetId = stateChanges.value.issues.head.assetId
 
     val info = sender.nftAssetsBalance(firstAddress, 100)
     info.size shouldBe 1

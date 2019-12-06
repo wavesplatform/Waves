@@ -64,7 +64,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   }
 
   private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, "", "", decimals, reissuable = false, BigInt(0), Height @@ 0, None, 0))
+    Some(AssetDescription(assetId, matcherAccount, "", "", decimals, reissuable = false, BigInt(0), Height @@ 0, None, 0, decimals == 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen
