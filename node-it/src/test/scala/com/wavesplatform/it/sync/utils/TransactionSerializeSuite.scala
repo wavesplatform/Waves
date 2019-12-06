@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransacti
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
 import org.scalatest.prop.TableDrivenPropertyChecks
 import scorex.crypto.encode.Base64
+import com.wavesplatform.utils._
 
 class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {
   private val publicKey         = PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get
@@ -165,39 +166,33 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
-  private val issueV1 = IssueTransaction
-    .create(
+  private val issueV1 = IssueTransaction(
       TxVersion.V1,
       publicKey,
-      "Gigacoin",
-      "Gigacoin",
+      "Gigacoin".utf8Bytes,
+      "Gigacoin".utf8Bytes,
       someAssetAmount,
-      8,
+      8.toByte,
       true,
       script = None,
       issueFee,
       ts,
       Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
     )
-    .right
-    .get
 
-  private val issueV2 = IssueTransaction
-    .create(
+  private val issueV2 = IssueTransaction(
       TxVersion.V2,
       publicKey,
-      "Gigacoin",
-      "Gigacoin",
+      "Gigacoin".utf8Bytes,
+      "Gigacoin".utf8Bytes,
       someAssetAmount,
-      8,
+      8.toByte,
       true,
       None,
       issueFee,
       ts,
       Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
     )
-    .right
-    .get
 
   private val leasecancelV1 = LeaseCancelTransaction
     .create(

@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.utils._
 import io.grpc.Status.Code
 
 class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime {
@@ -68,7 +69,14 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
            (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
          )) {
       if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        sender.grpc.broadcastTransfer(buyer, Recipient().withPublicKeyHash(sellerAddress), 100000, minFee, assetId = feeAssetId.toString, waitForTx = true)
+        sender.grpc.broadcastTransfer(
+          buyer,
+          Recipient().withPublicKeyHash(sellerAddress),
+          100000,
+          minFee,
+          assetId = feeAssetId.toString,
+          waitForTx = true
+        )
       }
 
       val buyerWavesBalanceBefore  = sender.grpc.wavesBalance(buyerAddress).available
@@ -92,21 +100,18 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("cannot exchange non-issued assets") {
-    val exchAsset: IssueTransaction = IssueTransaction
-      .selfSigned(
-        TxVersion.V1,
-        sender = sender.privateKey,
-        name = "myasset",
-        description = "my asset description",
-        quantity = someAssetAmount,
-        decimals = 2,
-        reissuable = true,
-        script = None,
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
-      .get
+    val exchAsset: IssueTransaction = IssueTransaction(
+      TxVersion.V1,
+      sender.privateKey,
+      "myasset".utf8Bytes,
+      "my asset description".utf8Bytes,
+      quantity = someAssetAmount,
+      decimals = 2,
+      reissuable = true,
+      script = None,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    ).signWith(sender.privateKey)
     for ((o1ver, o2ver, tver) <- versions) {
 
       val assetId             = exchAsset.id().toString

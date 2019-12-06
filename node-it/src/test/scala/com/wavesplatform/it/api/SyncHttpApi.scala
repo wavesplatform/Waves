@@ -30,6 +30,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.utils._
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import org.asynchttpclient.Response
@@ -243,20 +244,18 @@ object SyncHttpApi extends Assertions {
         script: Option[String],
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = IssueTransaction
-        .selfSigned(
-          TxVersion.V2,
-          sender = source,
-          name = name,
-          description = description,
-          quantity = quantity,
-          decimals = decimals,
-          reissuable = reissuable,
-          script = script.map(x => Script.fromBase64String(x).explicitGet()),
-          fee = fee,
-          timestamp = System.currentTimeMillis()
-        )
-        .explicitGet()
+      val tx = IssueTransaction(
+        TxVersion.V2,
+        sender = source,
+        name.utf8Bytes,
+        description.utf8Bytes,
+        quantity = quantity,
+        decimals = decimals,
+        reissuable = reissuable,
+        script = script.map(x => Script.fromBase64String(x).explicitGet()),
+        fee = fee,
+        timestamp = System.currentTimeMillis()
+      ).signWith(source)
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }

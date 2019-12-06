@@ -22,7 +22,14 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest with NoShrink {
+class IssueTransactionV2Specification
+    extends PropSpec
+    with PropertyChecks
+    with Matchers
+    with TransactionGen
+    with WithDB
+    with HistoryTest
+    with NoShrink {
 
   property("IssueV2 serialization roundtrip") {
     forAll(issueV2TransactionGen()) { tx: IssueTransaction =>
@@ -99,19 +106,18 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     """)
 
     val tx = IssueTransaction(
-        TxVersion.V2,
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        "Gigacoin".utf8Bytes,
-        "Gigacoin".utf8Bytes,
-        10000000000L,
-        8.toByte,
-        reissuable = true,
-        None,
-        100000000,
-        1526287561757L,
-        Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
-      )
-
+      TxVersion.V2,
+      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+      "Gigacoin".utf8Bytes,
+      "Gigacoin".utf8Bytes,
+      10000000000L,
+      8.toByte,
+      reissuable = true,
+      None,
+      100000000,
+      1526287561757L,
+      Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
+    )
 
     tx.json() shouldEqual js
   }
@@ -166,20 +172,18 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
 
   property("parses invalid UTF-8 string") {
     forAll(byteArrayGen(16), accountGen) { (bytes, sender) =>
-      val tx = IssueTransaction
-        .selfSigned(
-          2.toByte,
-          sender,
-          Base64.encode(bytes),
-          Base64.encode(bytes),
-          1,
-          1,
-          reissuable = false,
-          None,
-          1000000,
-          System.currentTimeMillis()
-        )
-        .explicitGet()
+      val tx = IssueTransaction(
+        2.toByte,
+        sender,
+        bytes,
+        bytes,
+        1,
+        1,
+        reissuable = false,
+        None,
+        1000000,
+        System.currentTimeMillis()
+      ).signWith(sender)
 
       tx.nameBytes.arr shouldBe bytes
       tx.descriptionBytes.arr shouldBe bytes
