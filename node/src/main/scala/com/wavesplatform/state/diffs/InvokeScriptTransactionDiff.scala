@@ -378,7 +378,7 @@ object InvokeScriptTransactionDiff {
         val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
         val info       = AssetInfo(Right(issue.name), Right(issue.description), Height @@ blockchain.height)
 
-        val asset = IssuedAsset(issue.id())
+        val asset = IssuedAsset(issue.id)
 
         DiffsCommon
           .countScriptComplexity(None /*issue.compiledScript*/, blockchain)

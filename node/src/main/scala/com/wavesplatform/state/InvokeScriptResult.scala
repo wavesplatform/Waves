@@ -6,10 +6,8 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Burn, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
-//import com.wavesplatform.protobuf.transaction.assets.IssueTransaction
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.{Asset, Transaction}
-//import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.Asset.Waves
 import play.api.libs.json._
 
@@ -77,7 +75,7 @@ object InvokeScriptResult {
 
   private def toPbIssue(r: Issue) = {
     assert(r.compiledScript.isEmpty)
-    PBInvokeScriptResult.Issue(ByteString.copyFrom(r.id().arr), r.name, r.description, r.quantity, r.decimals, r.isReissuable, None)
+    PBInvokeScriptResult.Issue(ByteString.copyFrom(r.id.arr), r.name, r.description, r.quantity, r.decimals, r.isReissuable, None, r.nonce)
   }
 
   private def toPbReissue(r: Reissue) =
@@ -88,7 +86,7 @@ object InvokeScriptResult {
 
   private def toVanillaIssue(r: PBInvokeScriptResult.Issue): Issue = {
     assert(r.script.isEmpty)
-    Issue(None, r.decimals, r.description, r.reissuable, r.name, r.amount)
+    Issue(r.assetId.toByteArray, None, r.decimals, r.description, r.reissuable, r.name, r.amount, r.nonce)
   }
 
   private def toVanillaReissue(r: PBInvokeScriptResult.Reissue) =
