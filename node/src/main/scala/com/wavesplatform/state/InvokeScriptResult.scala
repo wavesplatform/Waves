@@ -7,7 +7,7 @@ import com.wavesplatform.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Issue, Burn, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
 import play.api.libs.json._
 
