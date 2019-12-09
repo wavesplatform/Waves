@@ -97,7 +97,7 @@ object Dependencies {
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
       ("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.whispersystems", "curve25519-java"),
-      "com.wavesplatform" % "curve25519-java" % "0.6.0",
+      "com.wavesplatform" % "curve25519-java" % "0.6.1",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
