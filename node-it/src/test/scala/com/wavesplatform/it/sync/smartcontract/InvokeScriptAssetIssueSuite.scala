@@ -244,7 +244,7 @@ object InvokeScriptAssetIssueSuite {
       |func b(id: ByteVector) = [Burn(id, 100)]
       |
       |@Callable(i)
-      |func n() = [Issue(unit, 0, "NFT", false, "NFT", 1, 0)]
+      |func n() = [Issue(unit, 0, "_NFT", false, "NFT", 1, 0)]
       |
       |""".stripMargin
 }
