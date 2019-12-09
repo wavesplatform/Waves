@@ -127,7 +127,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |(this.quantity > 0)""".stripMargin
   }
 
-  test("can attach unavailable payment if V3 DApp returns its enough amount") {
+  test("can't attach unavailable payment if V3 DApp returns its enough amount") {
     val amount = 20
     assertApiError(
       sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(amount, asset)), waitForTx = true)
@@ -327,10 +327,15 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     }
   }
 
-  test("still can attach unavailable payment if V3 DApp returns its enough amount") {
+  test("still can't attach unavailable payment if V3 DApp returns its enough amount") {
     val balance = sender.accountBalances(callerAcc)._1
-    sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(40, asset)), waitForTx = true)
-    sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(balance, Waves)), waitForTx = true)
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(40, asset)), waitForTx = true)
+    )(_.statusCode shouldBe 400)
+
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(balance, Waves)), waitForTx = true)
+    )(_.statusCode shouldBe 400)
   }
 
 }
