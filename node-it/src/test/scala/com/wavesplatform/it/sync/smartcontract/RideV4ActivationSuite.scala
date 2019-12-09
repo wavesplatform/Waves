@@ -163,7 +163,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("can invoke V4 contract from V3 scripted account with 0 or 1 payments") {
-    sender.setScript(smartAccV3, Some(accountV3.compiled), waitForTx = true)
+    sender.setScript(smartAccV3, Some(accountV3.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
     sender.invokeScript(smartAccV3, smartAccV4, fee = smartMinFee + smartFee, waitForTx = true)._1.id
     sender.invokeScript(
