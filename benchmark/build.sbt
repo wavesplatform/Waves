@@ -2,6 +2,8 @@ enablePlugins(JmhPlugin)
 
 libraryDependencies += "org.scodec" %% "scodec-core" % "1.10.3"
 
+resolvers += Resolver.sonatypeRepo("snapshots")
+
 inTask(Compile / run)(
   Seq(
     fork := true,
