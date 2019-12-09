@@ -117,7 +117,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
-    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq())
+    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq())
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -162,7 +162,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
     txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
-    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)))
+    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq())
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -206,7 +206,10 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     val expected = StateChangesDetails(
       Seq(DataResponse("integer", 7, "result")),
-      Seq(TransfersInfoResponse(caller, None, 10))
+      Seq(TransfersInfoResponse(caller, None, 10)),
+      Seq(),
+      Seq(),
+      Seq()
     )
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected

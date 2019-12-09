@@ -59,6 +59,7 @@ object AssetVolumeInfo {
 }
 
 case class AssetDescription(
+    source: ByteStr,
     issuer: PublicKey,
     name: Either[ByteStr, String],
     description: Either[ByteStr, String],

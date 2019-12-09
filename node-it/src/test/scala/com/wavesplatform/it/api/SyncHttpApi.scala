@@ -275,8 +275,15 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).issue(sourceAddress, name, description, quantity, decimals, reissuable, fee, version, script)), waitForTx)
     }
 
-    def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = reissueFee): Transaction =
-      sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee))
+    def reissue(
+        sourceAddress: String,
+        assetId: String,
+        quantity: Long,
+        reissuable: Boolean,
+        fee: Long = reissueFee,
+        waitForTx: Boolean = false
+    ): Transaction =
+      maybeWaitForTransaction(sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee)), waitForTx)
 
     def debugStateChanges(transactionId: String): DebugStateChanges = {
       sync(async(n).debugStateChanges(transactionId))
