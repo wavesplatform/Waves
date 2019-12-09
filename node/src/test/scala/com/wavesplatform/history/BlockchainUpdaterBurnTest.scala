@@ -3,13 +3,13 @@ package com.wavesplatform.history
 import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxVersion}
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -28,13 +28,13 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
     (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
     masterToAlice: TransferTransaction = TransferTransaction
-      .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, Array.emptyByteArray, ts + 1)
+      .selfSigned(1.toByte, master, alice, Asset.Waves, 3 * Waves, Asset.Waves, transferAssetWavesFee, None, ts + 1)
       .explicitGet()
-    issue: IssueTransaction = IssueTransaction
-      .selfSigned(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
-      .explicitGet()
+    issue: IssueTransaction = IssueTransaction(TxVersion.V1, alice, assetName, description, quantity, decimals, false, script = None, Waves, ts + 100)
+      .signWith(alice)
     burn: BurnTransaction = BurnTransaction.selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), quantity / 2, Waves, ts + 200).explicitGet()
-    reissue: ReissueTransaction = ReissueTransaction.selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
+    reissue: ReissueTransaction = ReissueTransaction
+      .selfSigned(1.toByte, alice, IssuedAsset(issue.assetId), burn.quantity, true, Waves, ts + 300)
       .explicitGet()
   } yield (ts, genesis, masterToAlice, issue, burn, reissue)
 

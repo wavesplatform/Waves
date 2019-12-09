@@ -190,8 +190,8 @@ object Importer extends ScorexLogging {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
-            val Right(block) =
-              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer).toEither
+            val Success(block) =
+              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer)
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
             if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {

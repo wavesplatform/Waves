@@ -16,9 +16,8 @@ object ReissueTxSerializer {
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"    -> asset.id.toString,
       "quantity"   -> quantity,
-      "reissuable" -> reissuable,
-      "chainId"    -> chainByte
-    )
+      "reissuable" -> reissuable
+    ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainByte) else Json.obj())
   }
 
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
@@ -38,7 +37,7 @@ object ReissueTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           baseBytes
         )
 
@@ -48,11 +47,10 @@ object ReissueTxSerializer {
   }
 
   def toBytes(tx: ReissueTransaction): Array[Byte] = {
-    import tx._
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
   }
 

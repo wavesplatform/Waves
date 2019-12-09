@@ -22,6 +22,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, PropSpec}
@@ -31,7 +32,7 @@ import scala.util.Random
 
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with Inside with NoShrink {
 
-  def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
+  private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
   val MATCHER: KeyPair = KeyPair(Base58.decode("matcher"))
 
@@ -814,12 +815,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       genesis = GenesisTransaction.create(MATCHER, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransaction
-        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
-        .explicitGet()
-      asset2 = IssueTransaction
-        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
-        .explicitGet()
+      asset1 = IssueTransaction(TxVersion.V2, buyer, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 3)
+        .signWith(buyer)
+      asset2 = IssueTransaction(TxVersion.V2, seller, "Asset#2".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 4)
+        .signWith(seller)
       setMatcherScript = SetScriptTransaction
         .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
@@ -905,12 +904,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       genesis = GenesisTransaction.create(MATCHER, Long.MaxValue, ts).explicitGet()
       tr1     = createWavesTransfer(MATCHER, buyer.toAddress, Long.MaxValue / 3, enoughFee, ts + 1).explicitGet()
       tr2     = createWavesTransfer(MATCHER, seller.toAddress, Long.MaxValue / 3, enoughFee, ts + 2).explicitGet()
-      asset1 = IssueTransaction
-        .selfSigned(TxVersion.V2, buyer, "Asset#1".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 3)
-        .explicitGet()
-      asset2 = IssueTransaction
-        .selfSigned(TxVersion.V2, seller, "Asset#2".getBytes("UTF-8"), "".getBytes("UTF-8"), 1000000, 8, false, None, enoughFee, ts + 4)
-        .explicitGet()
+      asset1 = IssueTransaction(TxVersion.V2, buyer, "Asset#1".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 3)
+        .signWith(buyer)
+      asset2 = IssueTransaction(TxVersion.V2, seller, "Asset#2".utf8Bytes, Array.emptyByteArray, 1000000, 8, false, None, enoughFee, ts + 4)
+        .signWith(seller)
       setMatcherScript = SetScriptTransaction
         .selfSigned(1.toByte, MATCHER, Some(txScriptCompiled), enoughFee, ts + 5)
         .explicitGet()
@@ -1089,7 +1086,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
             transfers = sellers.map(seller => ParsedTransfer(seller, issueTx2.quantity / sellOrdersCount)),
             fee = 1000L,
             genesisTimestamp + 1000L,
-            Array.empty[Byte]
+            None
           )
           .explicitGet()
 

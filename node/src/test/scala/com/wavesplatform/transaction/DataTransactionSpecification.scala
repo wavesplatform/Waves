@@ -6,12 +6,13 @@ import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.Json
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -100,8 +101,6 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("JSON roundtrip") {
-    implicit val signedFormat: Format[SignedDataRequest] = Json.format[SignedDataRequest]
-
     forAll(dataTransactionGen) { tx =>
       val json = tx.json()
       json.toString shouldEqual tx.toString
@@ -179,38 +178,37 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     }
   }
 
-  property(testName = "JSON format validation") {
+  property("JSON format validation") {
     val js = Json.parse("""{
-                       "type": 12,
-                       "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
-                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
-                       "fee": 100000,
-                       "feeAssetId": null,
-                       "timestamp": 1526911531530,
-                       "proofs": [
-                       "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
-                       ],
-                       "version": 1,
-                       "data": [
-                       {
-                       "key": "int",
-                       "type": "integer",
-                       "value": 24
-                       },
-                       {
-                       "key": "bool",
-                       "type": "boolean",
-                       "value": true
-                       },
-                       {
-                       "key": "blob",
-                       "type": "binary",
-                       "value": "base64:YWxpY2U="
-                       }
-                       ]
-                       }
-  """)
+                          |  "type": 12,
+                          |  "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
+                          |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                          |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                          |  "fee": 100000,
+                          |  "feeAssetId": null,
+                          |  "timestamp": 1526911531530,
+                          |  "proofs": [
+                          |    "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
+                          |  ],
+                          |  "version": 1,
+                          |  "data": [
+                          |    {
+                          |      "key": "int",
+                          |      "type": "integer",
+                          |      "value": 24
+                          |    },
+                          |    {
+                          |      "key": "bool",
+                          |      "type": "boolean",
+                          |      "value": true
+                          |    },
+                          |    {
+                          |      "key": "blob",
+                          |      "type": "binary",
+                          |      "value": "base64:YWxpY2U="
+                          |    }
+                          |  ]
+                          |}""".stripMargin)
 
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", value = true)
@@ -230,4 +228,14 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     js shouldEqual tx.json()
   }
 
+  property("handle null keys") {
+    val emptyDataEntry = EmptyDataEntry("123")
+
+    forAll(accountGen, dataTransactionGen) { (sender, tx) =>
+      val tx1 = DataTransaction.selfSigned(TxVersion.V1, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      tx1 shouldBe Left(GenericError("Empty data is not allowed in V1"))
+      val tx2 = DataTransaction.selfSigned(TxVersion.V2, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      tx2 shouldBe 'right
+    }
+  }
 }

@@ -58,7 +58,7 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with 
     timestamp <- timestampGen
   } yield {
     val unsigned =
-      TransferTransaction(2.toByte, master, recepient, Waves, amount, Waves, fee, Array.emptyByteArray, timestamp, proofs = Proofs.empty)
+      TransferTransaction(2.toByte, master, recepient, Waves, amount, Waves, fee, None, timestamp, proofs = Proofs.empty)
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(s2, unsigned.bodyBytes()))

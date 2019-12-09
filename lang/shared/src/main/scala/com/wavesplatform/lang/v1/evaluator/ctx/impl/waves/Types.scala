@@ -94,7 +94,8 @@ object Types {
   val booleanDataEntry: CASETYPEREF = buildTypedEntry(FieldNames.BooleanEntry, BOOLEAN)
   val stringDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.StringEntry, STRING)
   val binaryDataEntry: CASETYPEREF  = buildTypedEntry(FieldNames.BinaryEntry, BYTESTR)
-  val intDataEntry: CASETYPEREF     = buildTypedEntry(FieldNames.IntEntry, LONG)
+  val intDataEntry: CASETYPEREF     = buildTypedEntry(FieldNames.IntegerEntry, LONG)
+  val deleteDataEntry: CASETYPEREF  = CASETYPEREF(FieldNames.DeleteEntry, List("key" -> STRING))
 
   private val typedDataEntries =
     List(booleanDataEntry, stringDataEntry, binaryDataEntry, intDataEntry)
@@ -184,7 +185,7 @@ object Types {
     UNION(callableV3Results: _*)
 
   private val callableV4ReturnType =
-    LIST(UNION.create(commonDataEntryType(V4) :: scriptTransfer :: callableV4Actions))
+    LIST(UNION.create(commonDataEntryType(V4) :: deleteDataEntry :: scriptTransfer :: callableV4Actions))
 
   def callableReturnType(v: StdLibVersion): Either[ExecutionError, FINAL] =
     v match {
@@ -224,7 +225,7 @@ object Types {
   def txByIdReturnType(proofsEnabled: Boolean, version: StdLibVersion): UNION =
     UNION.create(UNIT +: anyTransactionType(proofsEnabled, version).typeList)
 
-  def buildTransferTransactionType(proofsEnabled: Boolean) = {
+  def buildTransferTransactionType(proofsEnabled: Boolean, version: StdLibVersion) =
     CASETYPEREF(
       "TransferTransaction",
       addProofsIfNeeded(
@@ -233,12 +234,16 @@ object Types {
           "amount"     -> LONG,
           "assetId"    -> optionByteVector,
           "recipient"  -> addressOrAliasType,
-          "attachment" -> BYTESTR
-        ) ++ header ++ proven,
+        ) ++ header ++ proven :+ buildAttachmentType(version),
         proofsEnabled
       )
     )
-  }
+
+  val genericAttachmentType: UNION =
+    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR, UNIT)
+
+  private def buildAttachmentType(version: StdLibVersion) =
+    "attachment" -> (if (version >= V4) genericAttachmentType else BYTESTR)
 
   def addProofsIfNeeded(commonFields: List[(String, FINAL)], proofsEnabled: Boolean): List[(String, FINAL)] = {
     if (proofsEnabled) commonFields :+ proofs
@@ -405,6 +410,18 @@ object Types {
     )
   )
 
+  def buildUpdateAssetInfoTransactionType(proofsEnabled: Boolean) =
+    CASETYPEREF(
+      "UpdateAssetInfoTransaction",
+      addProofsIfNeeded(
+        List(
+          "assetId"     -> BYTESTR,
+          "name"        -> STRING,
+          "description" -> STRING
+        ) ++ header ++ proven,
+        proofsEnabled
+      )
+    )
 
   def buildDataTransactionType(proofsEnabled: Boolean, v: StdLibVersion) =
     CASETYPEREF(
@@ -412,7 +429,7 @@ object Types {
       addProofsIfNeeded(List("data" -> LIST(commonDataEntryType(v))) ++ header ++ proven, proofsEnabled)
     )
 
-  def buildMassTransferTransactionType(proofsEnabled: Boolean) =
+  def buildMassTransferTransactionType(proofsEnabled: Boolean, version: StdLibVersion) =
     CASETYPEREF(
       "MassTransferTransaction",
       addProofsIfNeeded(
@@ -422,8 +439,7 @@ object Types {
           "totalAmount"   -> LONG,
           "transfers"     -> listTransfers,
           "transferCount" -> LONG,
-          "attachment"    -> BYTESTR
-        ) ++ header ++ proven,
+        ) ++ header ++ proven :+ buildAttachmentType(version),
         proofsEnabled
       )
     )
@@ -442,15 +458,16 @@ object Types {
     List(genesisTransactionType, buildPaymentTransactionType(proofsEnabled))
   }
 
-  def buildAssetSupportedTransactions(proofsEnabled: Boolean, v: StdLibVersion) =
+  def buildAssetSupportedTransactions(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] =
     List(
       buildReissueTransactionType(proofsEnabled),
       buildBurnTransactionType(proofsEnabled),
-      buildMassTransferTransactionType(proofsEnabled),
+      buildMassTransferTransactionType(proofsEnabled, v),
       buildExchangeTransactionType(proofsEnabled),
-      buildTransferTransactionType(proofsEnabled),
+      buildTransferTransactionType(proofsEnabled, v),
       buildSetAssetScriptTransactionType(proofsEnabled)
-    ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty)
+    ) ++ (if (v >= V3) List(buildInvokeScriptTransactionType(proofsEnabled, v)) else List.empty) ++
+         (if (v >= V4) List(buildUpdateAssetInfoTransactionType(proofsEnabled)) else List.empty)
 
   def buildActiveTransactionTypes(proofsEnabled: Boolean, v: StdLibVersion): List[CASETYPEREF] = {
     buildAssetSupportedTransactions(proofsEnabled, v) ++
@@ -476,11 +493,10 @@ object Types {
       aliasType,
       transfer,
       assetPairType,
-      commonDataEntryType(v),
       buildOrderType(proofsEnabled),
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) blockHeader :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) blockHeader :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }

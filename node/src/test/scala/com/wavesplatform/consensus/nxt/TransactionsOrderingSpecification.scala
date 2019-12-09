@@ -16,23 +16,73 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
   property("TransactionsOrdering.InBlock should sort correctly") {
     val correctSeq = Seq(
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 125L, Array.empty, 1)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          125L,
+          None,
+          1
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 124L, Array.empty, 2)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          124L,
+          None,
+          2
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 124L, Array.empty, 1)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          124L,
+          None,
+          1
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Asset.fromCompatId(Some(ByteStr.empty)), 124L, Array.empty, 2)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Asset.fromCompatId(Some(ByteStr.empty)),
+          124L,
+          None,
+          2
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Asset.fromCompatId(Some(ByteStr.empty)), 124L, Array.empty, 1)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Asset.fromCompatId(Some(ByteStr.empty)),
+          124L,
+          None,
+          1
+        )
         .right
         .get
     )
@@ -45,23 +95,73 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
   property("TransactionsOrdering.InUTXPool should sort correctly") {
     val correctSeq = Seq(
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 124L, Array.empty, 1)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          124L,
+          None,
+          1
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 123L, Array.empty, 1)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          123L,
+          None,
+          1
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 123L, Array.empty, 2)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          123L,
+          None,
+          2
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Asset.fromCompatId(Some(ByteStr.empty)), 124L, Array.empty, 1)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Asset.fromCompatId(Some(ByteStr.empty)),
+          124L,
+          None,
+          1
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Asset.fromCompatId(Some(ByteStr.empty)), 124L, Array.empty, 2)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Asset.fromCompatId(Some(ByteStr.empty)),
+          124L,
+          None,
+          2
+        )
         .right
         .get
     )
@@ -74,11 +174,31 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
   property("TransactionsOrdering.InBlock should sort txs by decreasing block timestamp") {
     val correctSeq = Seq(
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 1, Array(), 124L)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          1,
+          None,
+          124L
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 1, Array(), 123L)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          1,
+          None,
+          123L
+        )
         .right
         .get
     )
@@ -89,11 +209,31 @@ class TransactionsOrderingSpecification extends PropSpec with Assertions with Ma
   property("TransactionsOrdering.InUTXPool should sort txs by ascending block timestamp") {
     val correctSeq = Seq(
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 1, Array(), 123L)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          1,
+          None,
+          123L
+        )
         .right
         .get,
       TransferTransaction
-        .selfSigned(1.toByte, KeyPair(Array.fill(32)(0: Byte)), Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(), Waves, 100000, Waves, 1, Array(), 124L)
+        .selfSigned(
+          1.toByte,
+          KeyPair(Array.fill(32)(0: Byte)),
+          Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet(),
+          Waves,
+          100000,
+          Waves,
+          1,
+          None,
+          124L
+        )
         .right
         .get
     )

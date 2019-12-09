@@ -1,7 +1,5 @@
 package com.wavesplatform
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -86,10 +84,23 @@ package object http {
       (JsPath \ "timestamp").read[Long] and
       (JsPath \ "feeAssetId").read[Asset] and
       (JsPath \ "fee").read[Long] and
-      (JsPath \ "attachment").read[String].map[Array[Byte]](_.getBytes(StandardCharsets.UTF_8)) and
+      (JsPath \ "attachment").readNullable[Attachment] and
       (JsPath \ "proofs").readNullable[Proofs] and
       (JsPath \ "signature").readNullable[ByteStr]
   ) { (version, sender, recipient, asset, amount, timestamp, feeAsset, fee, attachment, proofs, signature) =>
-    TransferTransaction.create(version.getOrElse(1.toByte), sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs.orElse(signature.map(s => Proofs(Seq(s)))).get).explicitGet()
+    TransferTransaction
+      .create(
+        version.getOrElse(1.toByte),
+        sender,
+        recipient,
+        asset,
+        amount,
+        feeAsset,
+        fee,
+        attachment,
+        timestamp,
+        proofs.orElse(signature.map(s => Proofs(Seq(s)))).get
+      )
+      .explicitGet()
   }
 }

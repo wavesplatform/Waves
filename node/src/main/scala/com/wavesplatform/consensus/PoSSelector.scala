@@ -39,7 +39,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       blockchain
         .hitSource(height)
         .toRight(GenericError(s"Couldn't find hit source at height: $height"))
-        .map(parentHitSource => NxtLikeConsensusBlockData(bt, headerGenerationSignature(height, parentHitSource, account)))
+        .map(parentHitSource => NxtLikeConsensusBlockData(bt, headerGenerationSignature(height + 1, parentHitSource, account)))
     }
   }
 
@@ -64,7 +64,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     val genSig        = block.header.generationSignature
     val generator     = block.header.generator
 
-    if (vrfActivated(h))
+    if (vrfActivated(h + 1))
       prevHitSource.flatMap(crypto.verifyVRF(genSig, _, generator))
     else
       prevHitSource

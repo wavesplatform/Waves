@@ -1,7 +1,7 @@
 package com.wavesplatform.utils
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError

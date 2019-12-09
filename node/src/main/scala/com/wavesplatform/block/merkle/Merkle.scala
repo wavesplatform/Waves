@@ -11,7 +11,7 @@ import scala.annotation.tailrec
 
 object Merkle {
 
-  private[block] implicit object FastHash extends CryptographicHash32 { // todo: (NODE-1972) Replace with appropriate hash function
+  private[block] implicit object FastHash extends CryptographicHash32 {
     override def hash(input: Message): Digest32 = Digest32 @@ com.wavesplatform.crypto.fastHash(input)
   }
 

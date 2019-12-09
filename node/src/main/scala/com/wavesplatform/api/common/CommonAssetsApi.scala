@@ -1,4 +1,5 @@
 package com.wavesplatform.api.common
+
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo

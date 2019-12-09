@@ -96,7 +96,7 @@ object CommonValidation {
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
-              case Some(AccountScriptInfo(ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
+              case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _ => false
             }
             check <- foldPayments(citx.payments)
@@ -158,11 +158,8 @@ object CommonValidation {
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 
-      case v: VersionedTransaction if v.version < 1 =>
-        throw new IllegalArgumentException(s"Invalid tx version: $v")
-
-      case p: VersionedTransaction with LegacyPBSwitch if p.version > p.lastVersion =>
-        throw new IllegalArgumentException(s"Invalid tx version: $p")
+      case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
+        Left(GenericError(s"Invalid tx version: $v"))
 
       case p: LegacyPBSwitch if p.isProtobufVersion =>
         activationBarrier(BlockchainFeatures.BlockV5)
@@ -208,6 +205,8 @@ object CommonValidation {
 
       case _: SponsorFeeTransaction   => activationBarrier(BlockchainFeatures.FeeSponsorship)
       case _: InvokeScriptTransaction => activationBarrier(BlockchainFeatures.Ride4DApps)
+
+      case _: UpdateAssetInfoTransaction => activationBarrier(BlockchainFeatures.BlockV5)
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }

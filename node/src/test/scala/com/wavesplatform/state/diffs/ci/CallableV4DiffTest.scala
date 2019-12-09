@@ -11,6 +11,7 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
@@ -25,19 +26,20 @@ import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
-  property("reissue and burn actions results state") {
+  property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
         assertDiffAndState(
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        ) { case (_, blockchain) =>
-          val asset = IssuedAsset(issue.id.value)
-          val resultAmount = issue.quantity + reissueAmount - burnAmount
+        ) {
+          case (_, blockchain) =>
+            val asset        = IssuedAsset(issue.id.value)
+            val resultAmount = issue.quantity + reissueAmount - burnAmount
 
-          blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
-          blockchain.balance(master, asset) shouldBe resultAmount
+            blockchain.assetDescription(asset).get.totalVolume shouldBe resultAmount
+            blockchain.balance(master, asset) shouldBe resultAmount
         }
     }
   }
@@ -112,15 +114,16 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        ) { case (_, blockchain) =>
-          val asset = IssuedAsset(issue.id.value)
-          val totalResultAmount     = issue.quantity + (reissueAmount - burnAmount) * 2
-          val issuerResultAmount    = issue.quantity + (reissueAmount - burnAmount - transferAmount) * 2
-          val recipientResultAmount = transferAmount * 2
+        ) {
+          case (_, blockchain) =>
+            val asset                 = IssuedAsset(issue.id.value)
+            val totalResultAmount     = issue.quantity + (reissueAmount - burnAmount) * 2
+            val issuerResultAmount    = issue.quantity + (reissueAmount - burnAmount - transferAmount) * 2
+            val recipientResultAmount = transferAmount * 2
 
-          blockchain.assetDescription(asset).get.totalVolume shouldBe totalResultAmount
-          blockchain.balance(master, asset) shouldBe issuerResultAmount
-          blockchain.balance(invoker, asset) shouldBe recipientResultAmount
+            blockchain.assetDescription(asset).get.totalVolume shouldBe totalResultAmount
+            blockchain.balance(master, asset) shouldBe issuerResultAmount
+            blockchain.balance(invoker, asset) shouldBe recipientResultAmount
         }
     }
   }
@@ -155,16 +158,60 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
+  property("diff contains delete entries") {
+    val deleteEntryDApp = dApp(
+      """
+        | [
+        |   DeleteEntry("key1"),
+        |   DeleteEntry("key2")
+        | ]
+        |
+        |""".stripMargin
+    )
+
+    val deleteEntryPreconditions: Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair)] =
+      for {
+        master  <- accountGen
+        invoker <- accountGen
+        ts      <- timestampGen
+        fee     <- ciFee()
+      } yield {
+        val dApp = Some(deleteEntryDApp)
+        for {
+          genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+          genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+          setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+          ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
+        } yield (List(genesis, genesis2), setDApp, ci, master)
+      }.explicitGet()
+
+    forAll(deleteEntryPreconditions) {
+      case (genesis, setScript, invoke, master) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ setScript)),
+          TestBlock.create(Seq(invoke)),
+          features
+        ) {
+          case (diff, _) =>
+            diff.accountData(master).data shouldBe
+              Map(
+                "key1" -> EmptyDataEntry("key1"),
+                "key2" -> EmptyDataEntry("key2")
+              )
+        }
+    }
+  }
+
   private def paymentPreconditions(
-    assetScript: Option[Script] = None,
-    feeMultiplier: Int
+      assetScript: Option[Script] = None,
+      feeMultiplier: Int
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, Long, Long)] =
     for {
-      master  <- accountGen
-      invoker <- accountGen
-      ts      <- timestampGen
-      fee     <- ciFee(feeMultiplier)
-      issue   <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true))
+      master        <- accountGen
+      invoker       <- accountGen
+      ts            <- timestampGen
+      fee           <- ciFee(feeMultiplier)
+      issue         <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true))
       reissueAmount <- positiveLongGen
       burnAmount    <- Gen.choose(0, reissueAmount)
     } yield {
@@ -177,17 +224,17 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       } yield (List(genesis, genesis2), setDApp, ci, issue, master, reissueAmount, burnAmount)
     }.explicitGet()
 
-      def multiActionDApp(
+  def multiActionDApp(
       assetId: ByteStr,
       recipient: Address,
       reissueAmount: Long,
       burnAmount: Long,
       transferAmount: Long
-    ): Script =
-      dApp(
-        s"""
+  ): Script =
+    dApp(
+      s"""
            | [
-           |   IntEntry("int", 1),
+           |   IntegerEntry("int", 1),
            |   BooleanEntry("bool", true),
            |
            |   Reissue(base58'$assetId', true, $reissueAmount),
@@ -202,25 +249,25 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
            |   ScriptTransfer(Address(base58'${recipient.bytes}'), $transferAmount, base58'$assetId')
            | ]
        """.stripMargin
-      )
+    )
 
-    def checkStateAsset(
+  def checkStateAsset(
       startAmount: Long,
       reissueAmount: Long,
       burnAmount: Long,
       transferAmount: Long,
       recipient: Address
-    ): Script = {
-      val reissueCheckAmount1  = startAmount
-      val burnCheckAmount1     = reissueCheckAmount1 + reissueAmount
-      val transferCheckAmount1 = burnCheckAmount1 - burnAmount
+  ): Script = {
+    val reissueCheckAmount1  = startAmount
+    val burnCheckAmount1     = reissueCheckAmount1 + reissueAmount
+    val transferCheckAmount1 = burnCheckAmount1 - burnAmount
 
-      val reissueCheckAmount2  = transferCheckAmount1
-      val burnCheckAmount2     = reissueCheckAmount2 + reissueAmount
-      val transferCheckAmount2 = burnCheckAmount2 - burnAmount
+    val reissueCheckAmount2  = transferCheckAmount1
+    val burnCheckAmount2     = reissueCheckAmount2 + reissueAmount
+    val transferCheckAmount2 = burnCheckAmount2 - burnAmount
 
-      assetVerifier(
-        s"""
+    assetVerifier(
+      s"""
            | let recipient = Address(base58'${recipient.bytes}')
            |
            | func checkState(expectedAmount1: Int, expectedAmount2: Int) =
@@ -254,31 +301,34 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
            |   case _ => throw("unexpected")
            | }
       """.stripMargin
-      )
-    }
+    )
+  }
 
-    private def multiActionPreconditions(feeMultiplier: Int, withScriptError: Boolean): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, KeyPair, Long, Long, Long)] =
+  private def multiActionPreconditions(
+      feeMultiplier: Int,
+      withScriptError: Boolean
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, IssueTransaction, KeyPair, KeyPair, Long, Long, Long)] =
+    for {
+      master         <- accountGen
+      invoker        <- accountGen
+      ts             <- timestampGen
+      fee            <- ciFee(feeMultiplier)
+      startAmount    <- positiveLongGen
+      reissueAmount  <- positiveLongGen
+      burnAmount     <- Gen.choose(0, reissueAmount)
+      transferAmount <- Gen.choose(0, reissueAmount - burnAmount)
+      assetCheckTransferAmount = if (withScriptError) transferAmount + 1 else transferAmount
+      assetScript              = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress))
+      issue <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true), quantityParam = Some(startAmount))
+    } yield {
+      val dApp = Some(multiActionDApp(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
       for {
-        master          <- accountGen
-        invoker         <- accountGen
-        ts              <- timestampGen
-        fee             <- ciFee(feeMultiplier)
-        startAmount     <- positiveLongGen
-        reissueAmount   <- positiveLongGen
-        burnAmount      <- Gen.choose(0, reissueAmount)
-        transferAmount  <- Gen.choose(0, reissueAmount - burnAmount)
-        assetCheckTransferAmount = if (withScriptError) transferAmount + 1 else transferAmount
-        assetScript = Some(checkStateAsset(startAmount, reissueAmount, burnAmount, assetCheckTransferAmount, invoker.toAddress))
-        issue   <- issueV2TransactionGen(master, Gen.const(assetScript), reissuableParam = Some(true), quantityParam = Some(startAmount))
-      } yield {
-        val dApp = Some(multiActionDApp(issue.id.value, invoker.publicKey.toAddress, reissueAmount, burnAmount, transferAmount))
-        for {
-          genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
-          genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
-          setDApp  <- SetScriptTransaction.selfSigned(TxVersion.V1, master, dApp, fee, ts + 2)
-          ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master, None, Nil, fee, Waves, ts + 3)
-        } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
-      }.explicitGet()
+        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(TxVersion.V1, master, dApp, fee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(TxVersion.V1, invoker, master, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, issue, master, invoker, reissueAmount, burnAmount, transferAmount)
+    }.explicitGet()
 
   private def assetVerifier(body: String): Script = {
     val script =
@@ -291,7 +341,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          |
        """.stripMargin
 
-    val expr = Parser.parseExpr(script).get.value
+    val expr     = Parser.parseExpr(script).get.value
     val compiled = compileExpr(expr, V4, Asset)
     ExprScript(V4, compiled).explicitGet()
   }
@@ -318,7 +368,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
          |
        """.stripMargin
 
-    val expr = Parser.parseContract(script).get.value
+    val expr     = Parser.parseContract(script).get.value
     val contract = compileContractFromExpr(expr, V4)
     ContractScript(V4, contract).explicitGet()
   }
@@ -328,7 +378,61 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.MultiPaymentInvokeScript,
+      BlockchainFeatures.MultiPaymentInvokeScript
     ).map(_.id -> 0).toMap
   )
+
+  private def issuePreconditions(
+      assetScript: Option[Script] = None,
+      feeMultiplier: Int
+  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      fee     <- ciFee(feeMultiplier)
+      amount  <- Gen.choose(1L, 100000000L)
+    } yield {
+      val dApp = Some(issueDApp(amount))
+      for {
+        genesis  <- GenesisTransaction.create(master, ENOUGH_AMT, ts)
+        genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
+        setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
+        ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
+      } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
+    }.explicitGet()
+
+  private def issueDApp(
+      issueAmount: Long,
+      name: String = "ScriptAsset",
+      description: String = "Issued by InvokeScript",
+      decimals: Int = 0,
+      reissuable: Boolean = false
+  ): Script =
+    dApp(
+      s"""
+         | [
+         |   Issue(unit, $decimals, "$description", $reissuable, "$name", $issueAmount)
+         | ]
+       """.stripMargin
+    )
+
+  property("issue action results state") {
+    forAll(issuePreconditions(feeMultiplier = 7)) {
+      case (genesis, setScript, invoke, master, invoker, amount) =>
+        assertDiffAndState(
+          Seq(TestBlock.create(genesis :+ setScript)),
+          TestBlock.create(Seq(invoke)),
+          features
+        ) {
+          case (_, blockchain) =>
+            val assets = blockchain.portfolio(master).assets
+            assets.values.toList shouldBe List(amount)
+
+            val assetsi = blockchain.portfolio(invoker).assets
+            assetsi.values.toList shouldBe List()
+        }
+    }
+  }
+
 }

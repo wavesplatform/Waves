@@ -98,7 +98,11 @@ class MinerImpl(
       )
 
   private def checkScript(account: KeyPair): Either[String, Unit] = {
-    Either.cond(!blockchainUpdater.hasAccountScript(account), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
+    Either.cond(
+      !blockchainUpdater.hasAccountScript(account),
+      (),
+      s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks"
+    )
   }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
@@ -134,7 +138,7 @@ class MinerImpl(
   private def forgeBlock(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] = {
     // should take last block right at the time of mining since microblocks might have been added
     val height              = blockchainUpdater.height
-    val version             = blockchainUpdater.currentBlockVersion
+    val version             = blockchainUpdater.nextBlockVersion
     val lastBlock           = blockchainUpdater.lastBlockHeader.get
     val referencedBlockInfo = blockchainUpdater.bestLastBlockInfo(System.currentTimeMillis() - minMicroBlockDurationMills).get
     val refBlockBT          = referencedBlockInfo.baseTarget
@@ -195,15 +199,20 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: BlockHeader, blockUniqueId: ByteStr, account: PublicKey): Either[String, Long] = {
+  private def nextBlockGenerationTime(
+      fs: FunctionalitySettings,
+      height: Int,
+      block: BlockHeader,
+      blockUniqueId: ByteStr,
+      account: PublicKey
+  ): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, blockUniqueId)
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
+      val blockDelayE = pos.getValidBlockDelay(height, account, block.baseTarget, balance)
       for {
-        expectedTS <- pos
-          .getValidBlockDelay(height, account, block.baseTarget, balance)
-          .map(_ + block.timestamp)
-          .leftMap(_.toString)
+        delay <- blockDelayE.leftMap(_.toString)
+        expectedTS = delay + block.timestamp
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,
           expectedTS,
@@ -214,7 +223,7 @@ class MinerImpl(
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
-    val height    = blockchainUpdater.height
+    val height                                 = blockchainUpdater.height
     val SignedBlockHeader(lastBlock, uniqueId) = blockchainUpdater.blockHeader(height).get
     for {
       _  <- checkAge(height, lastBlock.timestamp)
@@ -237,7 +246,7 @@ class MinerImpl(
       }
     } match {
       case Right(offset) =>
-        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f")
+        log.debug(f"Next attempt for acc=${account.toAddress} in ${offset.toUnit(SECONDS)}%.3f seconds")
         generateOneBlockTask(account)(offset).flatMap {
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
@@ -292,7 +301,7 @@ class MinerImpl(
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
 
   private[this] object metrics {
-    val blockBuildTimeStats: TimerMetric = Kamon.timer("miner.pack-and-forge-block-time")
+    val blockBuildTimeStats: TimerMetric      = Kamon.timer("miner.pack-and-forge-block-time")
     val microBlockBuildTimeStats: TimerMetric = Kamon.timer("miner.forge-microblock-time")
   }
 }

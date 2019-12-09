@@ -651,7 +651,7 @@ class BlockchainUpdaterImpl(
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
     ngState.fold(leveldb.accountData(acc, key)) { ng =>
       val diffData = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      diffData.data.get(key).orElse(leveldb.accountData(acc, key))
+      diffData.data.get(key).orElse(leveldb.accountData(acc, key)).filterNot(_.isEmpty)
     }
   }
 

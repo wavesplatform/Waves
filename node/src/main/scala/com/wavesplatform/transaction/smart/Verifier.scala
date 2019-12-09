@@ -171,13 +171,12 @@ object Verifier extends ScorexLogging {
     def orderVerification(order: Order): TracedResult[ValidationError, Order] = {
       val verificationResult = blockchain
         .accountScript(order.sender.toAddress)
-        .map {
-          case AccountScriptInfo(script, _, _) =>
-            if (order.version != 1) {
-              stats.orderValidation.measure(verifyOrder(blockchain, script, order))
-            } else {
-              Left(GenericError("Can't process order with signature from scripted account"))
-            }
+        .map { asi =>
+          if (order.version != 1) {
+            stats.orderValidation.measure(verifyOrder(blockchain, asi.script, order))
+          } else {
+            Left(GenericError("Can't process order with signature from scripted account"))
+          }
         }
         .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)))
 

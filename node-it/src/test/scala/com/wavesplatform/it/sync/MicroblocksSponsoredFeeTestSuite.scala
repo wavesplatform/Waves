@@ -71,6 +71,7 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
       .overrideBase(_.quorum(0))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation=1"))
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period=1"))
+      .overrideBase(_.preactivatedFeatures((14, 1000000)))
       .withDefault(1)
       .withSpecial(2, _.nonMiner)
       .buildNonConflicting()

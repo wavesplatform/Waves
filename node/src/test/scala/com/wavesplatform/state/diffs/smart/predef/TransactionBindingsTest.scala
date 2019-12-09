@@ -83,7 +83,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |       case a: Address => a.bytes == base58'${t.recipient.cast[Address].map(_.bytes.toString).getOrElse("")}'
            |       case a: Alias => a.alias == ${Json.toJson(t.recipient.cast[Alias].map(_.name).getOrElse(""))}
            |      }
-           |    let attachment = t.attachment == base58'${ByteStr(t.attachment).toString}'
+           |    let attachment = t.attachment == base58'${ByteStr(t.attachment.toBytes).toString}'
            |   ${assertProvenPart("t")} && amount && feeAssetId && assetId && recipient && attachment
            | case other => throw()
            | }
@@ -104,8 +104,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let quantity = t.quantity == ${t.quantity}
                  |   let decimals = t.decimals == ${t.decimals}
                  |   let reissuable = t.reissuable == ${t.reissuable}
-                 |   let name = t.name == base58'${ByteStr(t.name).toString}'
-                 |   let description = t.description == base58'${ByteStr(t.description).toString}'
+                 |   let name = t.name == base58'${ByteStr(t.nameBytes).toString}'
+                 |   let description = t.description == base58'${ByteStr(t.descriptionBytes).toString}'
                  |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
                    .map(_.bytes().base64)
                    .getOrElse("")}' else isDefined(t.script) == false
@@ -267,19 +267,39 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     }
   }
 
+  property("UpdateAssetInfoTransaction binding") {
+    forAll(updateAssetInfoTxGen) { t =>
+
+      val scriptSource =
+        s"""
+           |match tx {
+           | case t : UpdateAssetInfoTransaction =>
+           |   ${provenPart(t)}
+           |   let name        = t.name.toBytes()        == base58'${ByteStr(t.name.getBytes)}'
+           |   let description = t.description.toBytes() == base58'${ByteStr(t.description.getBytes())}'
+           |   let assetId     = t.assetId               == base58'${t.assetId.id}'
+           |   ${assertProvenPart("t")} && description && name && assetId
+           | case other => throw()
+           | }
+           |""".stripMargin
+
+      runScript(scriptSource, Coproduct(t), V4, T) shouldBe evaluated(true)
+    }
+  }
+
   property("InvokeScriptTransaction binding") {
     forAll(invokeScriptGen(paymentOptionGen)) { t =>
       val checkArgsScript = if (t.funcCallOpt.get.args.nonEmpty) {
         t.funcCallOpt.get.args
-      .collect {
-        case CONST_LONG(i)    => i.toString
-        case CONST_STRING(s)  => s""""$s""""
-        case CONST_BOOLEAN(b) => b.toString
-        case CONST_BYTESTR(b) => s"base64'${b.base64}'"
-      }
-      .zipWithIndex
-      .map { case (str, i) => s"t.args[$i] == $str" }
-      .mkString("let checkArgs = ", " && ", "\n")
+          .collect {
+            case CONST_LONG(i)    => i.toString
+            case CONST_STRING(s)  => s""""$s""""
+            case CONST_BOOLEAN(b) => b.toString
+            case CONST_BYTESTR(b) => s"base64'${b.base64}'"
+          }
+          .zipWithIndex
+          .map { case (str, i) => s"t.args[$i] == $str" }
+          .mkString("let checkArgs = ", " && ", "\n")
       } else {
         "let checkArgs = true"
       }
@@ -350,7 +370,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | }
            |""".stripMargin
 
-      val blockchain  = stub[Blockchain]
+      val blockchain = stub[Blockchain]
       (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
 
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
@@ -381,22 +401,29 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
   }
 
   property("DataTransaction binding") {
-    forAll(dataTransactionGen(10, useForScript = true)) { t =>
-      def pg(i: Int) = {
-        val v = t.data(i) match {
-          case e: IntegerDataEntry => e.value.toString
-          case e: BooleanDataEntry => e.value.toString
-          case e: BinaryDataEntry  => s"base64'${e.value.base64}'"
-          case e: StringDataEntry  => Json.toJson(e.value)
-        }
+    forAll(dataTransactionGen(10, useForScript = true, withDeleteEntry = true)) { t =>
+      def declareKey(i: Int): String =
+        s"let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)} "
 
-        s"""let key$i = t.data[$i].key == ${Json.toJson(t.data(i).key)}
+      def declareKV(i: Int, v: Object): String =
+        s"""${declareKey(i)}
            |let value$i = t.data[$i].value == $v
          """.stripMargin
-      }
+
+      def pg(i: Int): String =
+        t.data(i) match {
+          case e: IntegerDataEntry => declareKV(i, e.value.toString)
+          case e: BooleanDataEntry => declareKV(i, e.value.toString)
+          case e: BinaryDataEntry  => declareKV(i, s"base64'${e.value.base64}'")
+          case e: StringDataEntry  => declareKV(i, Json.toJson(e.value))
+          case _: EmptyDataEntry   => declareKey(i)
+        }
 
       val resString =
-        if (t.data.isEmpty) assertProvenPart("t") else assertProvenPart("t") + s" && ${t.data.indices.map(i => s"key$i && value$i").mkString(" && ")}"
+        if (t.data.isEmpty) assertProvenPart("t") else assertProvenPart("t") + s" && " +
+          t.data.indices
+            .map(i => s"key$i" + (if (t.data(i).isInstanceOf[EmptyDataEntry]) "" else s" && value$i"))
+            .mkString(" && ")
 
       val s = s"""
                  |match tx {
@@ -444,7 +471,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                       |      else isDefined(t.assetId) == false
                       |     let transferCount = t.transferCount == ${t.transfers.length}
                       |     let totalAmount = t.totalAmount == ${t.transfers.map(_.amount).sum}
-                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment).toString}'
+                      |     let attachment = t.attachment == base58'${ByteStr(t.attachment.toBytes).toString}'
                       |     ${t.transfers.indices.map(pg).mkString("\n")}
                       |   ${provenPart(t)}
                       |   $resString && assetId && transferCount && totalAmount && attachment
@@ -559,7 +586,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                    .getOrElse("")}'
                  |   else isDefined(t.matcherFeeAssetId) == false
                  |   id && sender && senderPublicKey && matcherPublicKey && timestamp && price && amount && expiration && matcherFee && bodyBytes && ${assertProofs(
-                   "t")} && assetPairAmount && assetPairPrice && matcherFeeAssetId
+                   "t"
+                 )} && assetPairAmount && assetPairPrice && matcherFeeAssetId
                  | case other => throw()
                  | }
                  |""".stripMargin
@@ -635,11 +663,11 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     import com.wavesplatform.lang.v1.CTX._
 
     val Success(expr, _) = Parser.parseExpr(script)
-    val directives = DirectiveSet(V2, Asset, Expression).explicitGet()
+    val directives       = DirectiveSet(V2, Asset, Expression).explicitGet()
     val ctx =
       PureContext.build(Global, V2).withEnvironment[Environment] |+|
-      CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-      WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
+        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+        WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
 
     val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(???), directives)
     for {
@@ -656,13 +684,13 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
     val Success(expr, _) = Parser.parseExpr(script)
 
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
-    val blockchain  = stub[Blockchain]
+    val blockchain = stub[Blockchain]
     (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
 
     val ctx =
       PureContext.build(Global, V2).withEnvironment[Environment] |+|
-      CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
-      WavesContext.build(directives)
+        CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
+        WavesContext.build(directives)
 
     val env = new WavesEnvironment(
       chainId,

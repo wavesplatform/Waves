@@ -44,7 +44,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         totalAmountOnNewAccount - 2 * enoughFee - i,
         Waves,
         enoughFee,
-        Array.emptyByteArray,
+        None,
         now + i,
         Proofs.empty
       )

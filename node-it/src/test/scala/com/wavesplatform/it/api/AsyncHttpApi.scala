@@ -2,7 +2,6 @@ package com.wavesplatform.it.api
 
 import java.io.IOException
 import java.net.{InetSocketAddress, URLEncoder}
-import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 import java.util.{NoSuchElementException, UUID}
 
@@ -10,16 +9,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{
-  AccountsApiGrpc,
-  BalanceResponse,
-  BalancesRequest,
-  BlockRequest,
-  BlocksApiGrpc,
-  TransactionResponse,
-  TransactionsApiGrpc,
-  TransactionsRequest
-}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.ConnectReq
@@ -36,18 +26,8 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{
-  ExchangeTransactionData,
-  IssueTransactionData,
-  PBOrders,
-  PBSignedTransaction,
-  PBTransactions,
-  Recipient,
-  Script,
-  SignedTransaction,
-  TransferTransactionData
-}
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -384,11 +364,13 @@ object AsyncHttpApi extends Assertions {
     ): Future[(Transaction, JsValue)] = {
       signAndTraceBroadcast(
         Json.obj(
-          "type"       -> InvokeScriptTransaction.typeId,
-          "version"    -> version,
-          "sender"     -> caller,
-          "dApp"       -> dappAddress,
-          "call"       -> { if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull },
+          "type"    -> InvokeScriptTransaction.typeId,
+          "version" -> version,
+          "sender"  -> caller,
+          "dApp"    -> dappAddress,
+          "call" -> {
+            if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull
+          },
           "payment"    -> payment,
           "fee"        -> fee,
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
@@ -491,6 +473,10 @@ object AsyncHttpApi extends Assertions {
 
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
       signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 1, "data" -> data))
+    }
+
+    def removeData(sourceAddress: String, data: Seq[String], fee: Long): Future[Transaction] = {
+      signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 2, "data" -> data.map(EmptyDataEntry(_))))
     }
 
     def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
@@ -809,7 +795,7 @@ object AsyncHttpApi extends Assertions {
     def blockAt(height: Int): Future[Block] = {
       blocks
         .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height)))
-        .map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
+        .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
     def broadcastIssue(
@@ -819,7 +805,7 @@ object AsyncHttpApi extends Assertions {
         decimals: Byte,
         reissuable: Boolean,
         fee: Long,
-        description: ByteString = ByteString.EMPTY,
+        description: String = "",
         script: Option[String] = None,
         version: Int = 2
     ): Future[PBSignedTransaction] = {
@@ -831,12 +817,12 @@ object AsyncHttpApi extends Assertions {
         version,
         PBTransaction.Data.Issue(
           IssueTransactionData.of(
-            ByteString.copyFrom(name.getBytes(StandardCharsets.UTF_8)),
+            name,
             description,
             quantity,
             decimals,
             reissuable,
-            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes)))
+            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes.drop(1)), script.get.getBytes.head))
             else None
           )
         )
@@ -866,7 +852,7 @@ object AsyncHttpApi extends Assertions {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            attachment
+            PBTransactions.toPBAttachment(Some(Attachment.Bin(attachment.toByteArray)))
           )
         )
       )

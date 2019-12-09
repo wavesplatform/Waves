@@ -78,7 +78,7 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with With
       issue: IssueTransaction <- issueReissueBurnGeneratorP(Long.MaxValue, master).map(_._1)
       asset = IssuedAsset(issue.id())
       transfer = TransferTransaction
-        .selfSigned(1.toByte, master, recepient, asset, Long.MaxValue, Waves, 100000, Array.emptyByteArray, ts)
+        .selfSigned(1.toByte, master, recepient, asset, Long.MaxValue, Waves, 100000, None, ts)
         .explicitGet()
     } yield (genesis, issue, transfer)
 

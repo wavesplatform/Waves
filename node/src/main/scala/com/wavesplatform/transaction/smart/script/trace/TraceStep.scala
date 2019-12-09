@@ -110,18 +110,18 @@ case class InvokeScriptTrace(
         case Some(script) => script.toString
         case None         => JsNull
       }),
-      "decimals"     -> issue.decimals,
-      "description"  -> issue.description,
-      "isReissuable" -> issue.isReissuable,
-      "quantity"     -> issue.quantity,
-      "name"         -> issue.name
+      "decimals"    -> issue.decimals,
+      "description" -> issue.description,
+      "reissuable"  -> issue.isReissuable,
+      "quantity"    -> issue.quantity,
+      "name"        -> issue.name
     )
 
   private def reissueJson(reissue: Reissue) =
     Json.obj(
-      "assetId"      -> reissue.assetId.toString,
-      "isReissuable" -> reissue.isReissuable,
-      "quantity"     -> reissue.quantity
+      "assetId"    -> reissue.assetId.toString,
+      "reissuable" -> reissue.isReissuable,
+      "quantity"   -> reissue.quantity
     )
 
   private def burnJson(burn: Burn) =

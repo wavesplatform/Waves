@@ -1,14 +1,14 @@
 package com.wavesplatform.protobuf.block
-import cats.instances.all._
-import cats.syntax.traverse._
+
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.block.Block.{Header => PBHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.transaction.TxValidationError.GenericError
+
+import scala.util.Try
 
 object PBBlocks {
   def vanilla(header: PBBlock.Header): BlockHeader =
@@ -24,11 +24,13 @@ object PBBlocks {
       ByteStr(header.transactionsRoot.toByteArray)
     )
 
-  def vanilla(block: PBBlock, unsafe: Boolean = false): Either[ValidationError, VanillaBlock] =
-    for {
-      header       <- block.header.toRight(GenericError("No block header"))
-      transactions <- block.transactions.map(PBTransactions.vanilla(_, unsafe)).toVector.sequence
-    } yield VanillaBlock(vanilla(header), ByteStr(block.signature.toByteArray), transactions)
+  def vanilla(block: PBBlock, unsafe: Boolean = false): Try[VanillaBlock] = Try {
+    require(block.header.isDefined, "block header is missing")
+    val header       = block.getHeader
+    val transactions = block.transactions.map(PBTransactions.vanilla(_, unsafe).explicitGet())
+
+    VanillaBlock(vanilla(header), ByteStr(block.signature.toByteArray), transactions)
+  }
 
   def protobuf(header: BlockHeader): PBHeader = PBBlock.Header(
     AddressScheme.current.chainId,

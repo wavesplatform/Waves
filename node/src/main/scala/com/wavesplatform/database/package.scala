@@ -16,12 +16,14 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.proto.{AccountScriptInfo => PBAccountScriptInfo, BlockMeta => PBBlockMeta}
+import com.wavesplatform.database.protobuf.AssetDetails.BytesOrString.Value
+import com.wavesplatform.database.protobuf.{AccountScriptInfo => PBAccountScriptInfo, AssetDetails => PBAssetDetails, BlockMeta => PBBlockMeta}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
@@ -148,9 +150,9 @@ package object database extends ScorexLogging {
 
   def writeStrings(strings: Seq[String]): Array[Byte] =
     strings
-      .foldLeft(ByteBuffer.allocate(strings.map(_.getBytes(UTF_8).length + 2).sum)) {
+      .foldLeft(ByteBuffer.allocate(strings.map(_.utf8Bytes.length + 2).sum)) {
         case (b, s) =>
-          val bytes = s.getBytes(UTF_8)
+          val bytes = s.utf8Bytes
           b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
@@ -257,19 +259,42 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readAssetInfo(data: Array[Byte]): AssetInfo = {
-    val ndi     = newDataInput(data)
-    val reissue = ndi.readBoolean()
-    val volume  = ndi.readBigInt()
-    AssetInfo(reissue, volume)
+  def readAssetDetails(data: Array[Byte]): (AssetInfo, AssetVolumeInfo) = {
+
+    val pbad = PBAssetDetails.parseFrom(data)
+
+    def extract(value: PBAssetDetails.BytesOrString.Value): Either[ByteStr, String] = value match {
+      case Value.Bytes(value)  => Left(ByteStr(value.toByteArray))
+      case Value.String(value) => Right(value)
+      case _                   => throw new IllegalArgumentException("value is missing")
+    }
+
+    (
+      AssetInfo(extract(pbad.getName.value), extract(pbad.getDescription.value), Height(pbad.lastRenamedAt)),
+      AssetVolumeInfo(pbad.reissuable, BigInt(pbad.totalVolume.toByteArray))
+    )
   }
 
-  def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
-    val ndo = newDataOutput()
-    ndo.writeBoolean(ai.isReissuable)
-    ndo.writeBigInt(ai.volume)
-    ndo.toByteArray
+  def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
+    val (info, volumeInfo) = ai
+
+    def encode(v: Either[ByteStr, String]): PBAssetDetails.BytesOrString =
+      PBAssetDetails.BytesOrString(v match {
+        case Left(bs) => PBAssetDetails.BytesOrString.Value.Bytes(ByteString.copyFrom(bs.arr))
+        case Right(s) => PBAssetDetails.BytesOrString.Value.String(s)
+      })
+
+    PBAssetDetails(
+      Some(encode(info.name)),
+      Some(encode(info.description)),
+      info.lastUpdatedAt,
+      volumeInfo.isReissuable,
+      ByteString.copyFrom(volumeInfo.volume.toByteArray)
+    ).toByteArray
   }
+
+  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] = ???
+  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo   = ???
 
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     PBBlockMeta(
@@ -406,17 +431,15 @@ package object database extends ScorexLogging {
     Validators.validateBlock(Block(header, signature, txs))
 
   def writeAssetScript(script: (Script, Long)): Array[Byte] =
-    script._1.bytes().arr ++ Longs.toByteArray(script._2)
+    Longs.toByteArray(script._2) ++ script._1.bytes().arr
 
   def readAssetScript(b: Array[Byte]): (Script, Long) =
-    (
-      ScriptReader.fromBytes(b.dropRight(8)).explicitGet(),
-      ByteBuffer.wrap(b, b.length - 8, 8).getLong
-    )
+    ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
 
   def writeScript(scriptInfo: AccountScriptInfo): Array[Byte] = {
     PBAccountScriptInfo.toByteArray(
       PBAccountScriptInfo(
+        ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes()),
         scriptInfo.verifierComplexity,
         scriptInfo.callableComplexity
@@ -426,7 +449,12 @@ package object database extends ScorexLogging {
 
   def readScript(b: Array[Byte]): AccountScriptInfo = {
     val asi = PBAccountScriptInfo.parseFrom(b)
-    AccountScriptInfo(ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(), asi.verifierComplexity, asi.callableComplexity)
+    AccountScriptInfo(
+      PublicKey(asi.publicKey.toByteArray),
+      ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),
+      asi.verifierComplexity,
+      asi.callableComplexity
+    )
   }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
@@ -438,4 +466,28 @@ package object database extends ScorexLogging {
       block <- createBlock(meta.header, meta.signature, txs).toOption
     } yield block
 
+  def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+    for {
+      h <- resource.get(historyKey).headOption
+    } yield resource.get(valueKey(h))
+
+  def loadAssetDescription(resource: DBResource, asset: IssuedAsset): Option[AssetDescription] =
+    for {
+      staticInfo         <- resource.get(Keys.assetStaticInfo(asset))
+      (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+      sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
+      script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+    } yield AssetDescription(
+      staticInfo.source,
+      staticInfo.issuer,
+      info.name,
+      info.description,
+      staticInfo.decimals,
+      volumeInfo.isReissuable,
+      volumeInfo.volume,
+      info.lastUpdatedAt,
+      script,
+      sponsorship,
+      staticInfo.nft
+    )
 }

@@ -6,7 +6,7 @@ import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
-import com.google.common.base.Charsets
+import cats.syntax.either._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
@@ -14,17 +14,19 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{AssetDescription, Blockchain}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.exchange.OrderJson._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -85,8 +87,12 @@ case class AssetsApiRoute(
             pathEndOrSingleSlash(balances(address)) ~
               path(AssetId)(balance(address, _))
           }
-        } ~ (path("details" / AssetId) & parameter('full.as[Boolean] ? false)) { (assetId, full) =>
-          details(assetId, full)
+        } ~ pathPrefix("details") {
+          (pathEndOrSingleSlash & parameters('id.*, 'full.as[Boolean] ? false)) { (ids, full) =>
+            multipleDetailsGet(ids, full)
+          } ~ (path(AssetId) & parameter('full.as[Boolean] ? false)) { (assetId, full) =>
+            singleDetails(assetId, full)
+          }
         } ~ (path("nft" / AddrSegment / "limit" / IntNumber) & parameter('after.as[String].?)) { (address, limit, maybeAfter) =>
           nft(address, limit, maybeAfter)
         } ~ pathPrefix(AssetId / "distribution") { assetId =>
@@ -200,6 +206,8 @@ case class AssetsApiRoute(
     }
   }
 
+  def details: Route = pathPrefix("details")(singleDetails ~ multipleDetails)
+
   @Path("/details/{assetId}")
   @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
   @ApiImplicitParams(
@@ -208,7 +216,43 @@ case class AssetsApiRoute(
       new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
     )
   )
-  def details(id: IssuedAsset, full: Boolean): Route = complete(assetDetails(id, full))
+  def singleDetails(assetId: IssuedAsset, full: Boolean): Route = complete(assetDetails(assetId, full))
+
+  def multipleDetails: Route = pathEndOrSingleSlash(multipleDetailsGet ~ multipleDetailsPost)
+
+  @Path("/details")
+  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "id", value = "IDs of the asset", required = true, dataType = "string", paramType = "query"),
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
+    )
+  )
+  def multipleDetailsGet(ids: Seq[ByteStr], full: Boolean): Route =
+    complete(ids.toList.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity)))
+
+  @Path("/details")
+  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "json",
+        value = "IDs of the asset",
+        required = true,
+        dataType = "string",
+        paramType = "body",
+        example = """{"ids": ["some1", "some2"]}"""
+      ),
+      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
+    )
+  )
+  def multipleDetailsPost(full: Boolean): Route =
+      complete(entity(as[JsObject]) { jsv =>
+        (jsv \ "ids").validate[List[ByteStr]] match {
+          case JsSuccess(ids, _) => ids.map(id => assetDetails(IssuedAsset(id), full.getOrElse(false)).fold(_.json, identity))
+          case JsError(err)      => WrongJson(errors = err)
+        }
+      })
 
   @Path("/nft/{address}/limit/{limit}")
   @ApiOperation(value = "NFTs", notes = "Account's NFTs balance", httpMethod = "GET")
@@ -229,8 +273,15 @@ case class AssetsApiRoute(
           Source.fromPublisher(
             commonAccountApi
               .nftPortfolio(address, after)
+              .flatMap {
+                case (assetId, assetDesc) =>
+                  Observable.fromEither(
+                    AssetsApiRoute
+                      .jsonDetails(blockchain)(assetId, assetDesc, true)
+                      .leftMap(err => new IllegalArgumentException(err))
+                  )
+              }
               .take(limit)
-              .map(_.json())
               .toReactivePublisher
           )
         }
@@ -244,43 +295,12 @@ case class AssetsApiRoute(
       "balance" -> JsNumber(BigDecimal(blockchain.balance(address, assetId)))
     )
 
-  private def assetDetails(id: IssuedAsset, full: Boolean): Either[ApiError, JsObject] =
+  private def assetDetails(assetId: IssuedAsset, full: Boolean): Either[ApiError, JsObject] = {
     (for {
-      tt <- blockchain.transactionInfo(id.id).toRight("Failed to find issue transaction by ID")
-      (h, mtx) = tt
-      tx <- (mtx match {
-        case t: IssueTransaction => Some(t)
-        case _                   => None
-      }).toRight("No issue transaction found with given asset ID")
-      description <- blockchain.assetDescription(id).toRight("Failed to get description of the asset")
-      maybeScript = description.script.filter(_ => full)
-    } yield {
-      JsObject(
-        Seq(
-          "assetId"        -> JsString(id.id.toString),
-          "issueHeight"    -> JsNumber(h),
-          "issueTimestamp" -> JsNumber(tx.timestamp),
-          "issuer"         -> JsString(tx.sender.stringRepr),
-          "name"           -> JsString(new String(tx.name, Charsets.UTF_8)),
-          "description"    -> JsString(new String(tx.description, Charsets.UTF_8)),
-          "decimals"       -> JsNumber(tx.decimals.toInt),
-          "reissuable"     -> JsBoolean(description.reissuable),
-          "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
-          "scripted"       -> JsBoolean(description.script.nonEmpty),
-          "minSponsoredAssetFee" -> (description.sponsorship match {
-            case 0           => JsNull
-            case sponsorship => JsNumber(sponsorship)
-          })
-        ) ++ maybeScript.toSeq.map {
-          case (script, complexity) =>
-            "scriptDetails" -> Json.obj(
-              "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
-              "script"           -> JsString(script.bytes().base64),
-              "scriptText"       -> JsString(script.expr.toString) // [WAIT] JsString(Script.decompile(script))
-            )
-        }
-      )
-    }).left.map(m => CustomValidationError(m))
+      description <- blockchain.assetDescription(assetId).toRight("Failed to get description of the asset")
+      result      <- AssetsApiRoute.jsonDetails(blockchain)(assetId, description, full)
+    } yield result).left.map(m => CustomValidationError(m))
+  }
 }
 
 object AssetsApiRoute {
@@ -322,5 +342,52 @@ object AssetsApiRoute {
       _ <- Either
         .cond(limit < maxLimit, (), GenericError(s"Limit should be less than $maxLimit"))
     } yield limit
+  }
+
+  def jsonDetails(blockchain: Blockchain)(id: ByteStr, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
+    // (timestamp, height)
+    def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
+      for {
+        tt <- blockchain.transactionInfo(id).toRight("Failed to find issue/invokeScript transaction by ID")
+        (h, mtx) = tt
+        ts <- (mtx match {
+          case tx: IssueTransaction        => Some(tx.timestamp)
+          case tx: InvokeScriptTransaction => Some(tx.timestamp)
+          case _                           => None
+        }).toRight("No issue/invokeScript transaction found with the given asset ID")
+      } yield (ts, h)
+
+    for {
+      tsh <- additionalInfo(description.source)
+      (timestamp, height) = tsh
+      script              = description.script.filter(_ => full)
+      name                = description.name.fold(bs => Base64.encode(bs.arr), identity)
+      desc                = description.description.fold(bs => Base64.encode(bs.arr), identity)
+    } yield JsObject(
+      Seq(
+        "assetId"        -> JsString(id.toString),
+        "issueHeight"    -> JsNumber(height),
+        "issueTimestamp" -> JsNumber(timestamp),
+        "issuer"         -> JsString(description.issuer.stringRepr),
+        "name"           -> JsString(name),
+        "description"    -> JsString(desc),
+        "decimals"       -> JsNumber(description.decimals),
+        "reissuable"     -> JsBoolean(description.reissuable),
+        "quantity"       -> JsNumber(BigDecimal(description.totalVolume)),
+        "scripted"       -> JsBoolean(description.script.nonEmpty),
+        "minSponsoredAssetFee" -> (description.sponsorship match {
+          case 0           => JsNull
+          case sponsorship => JsNumber(sponsorship)
+        }),
+        "originTransactionId" -> JsString(description.source.toString)
+      ) ++ script.toSeq.map {
+        case (script, complexity) =>
+          "scriptDetails" -> Json.obj(
+            "scriptComplexity" -> JsNumber(BigDecimal(complexity)),
+            "script"           -> JsString(script.bytes().base64),
+            "scriptText"       -> JsString(script.expr.toString) // [WAIT] JsString(Script.decompile(script))
+          )
+      }
+    )
   }
 }

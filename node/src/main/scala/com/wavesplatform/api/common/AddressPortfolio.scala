@@ -9,9 +9,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.crypto
 import com.wavesplatform.database.{DBExt, DBResource, Keys, readIntSeq}
 import com.wavesplatform.state.Portfolio.longSemigroup
-import com.wavesplatform.state.{Diff, TransactionId}
+import com.wavesplatform.state.{AssetDescription, Diff}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
@@ -27,7 +26,7 @@ trait AddressPortfolio {
       diff: Diff,
       isNFT: IssuedAsset => Boolean,
       from: Option[IssuedAsset]
-  ): Observable[IssueTransaction] =
+  ): Observable[(IssuedAsset, AssetDescription)] =
     db.resourceObservable.flatMap { resource =>
       Observable.fromIterator(Task(loadNftList(resource, address, diff, isNFT, from)))
     }
@@ -52,7 +51,7 @@ object AddressPortfolio {
       diff: Diff,
       isNFT: IssuedAsset => Boolean,
       from: Option[IssuedAsset]
-  ): Iterator[IssueTransaction] = {
+  ): Iterator[(IssuedAsset, AssetDescription)] = {
     val maybeAddressId = resource.get(Keys.addressId(address))
 
     maybeAddressId.foreach { addressId =>
@@ -68,16 +67,7 @@ object AddressPortfolio {
       .flatMap { case (assetId, _) => loadIssueTransaction(diff, resource, assetId).iterator }
   }
 
-  private def loadIssueTransaction(diff: Diff, resource: DBResource, assetId: IssuedAsset): Option[IssueTransaction] =
-    diff
-      .transactionMap()
-      .get(assetId.id)
-      .map(_._1)
-      .orElse(for {
-        (h, n) <- resource.get(Keys.transactionHNById(TransactionId(assetId.id)))
-        tx     <- resource.get(Keys.transactionAt(h, n))
-      } yield tx)
-      .collect { case it: IssueTransaction => it }
+  private def loadIssueTransaction(diff: Diff, resource: DBResource, assetId: IssuedAsset): Option[(IssuedAsset, AssetDescription)] = ???
 
   class BalanceIterator(
       addressId: Option[BigInt],

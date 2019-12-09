@@ -23,7 +23,7 @@ case class TransferTransaction(
     amount: TxAmount,
     feeAssetId: Asset,
     fee: TxAmount,
-    attachment: TxByteArray,
+    attachment: Option[Attachment],
     timestamp: TxTimestamp,
     proofs: Proofs
 ) extends VersionedTransaction
@@ -34,7 +34,6 @@ case class TransferTransaction(
 
   override val typeId: TxType = TransferTransaction.typeId
 
-  // TODO: Rework caching
   val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
@@ -48,12 +47,10 @@ case class TransferTransaction(
 }
 
 object TransferTransaction extends TransactionParser {
-  override type TransactionT = TransferTransaction
-
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  val typeId: TxType                    = 4.toByte
+  val typeId: TxType                    = 4
   val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
   val classTag                          = ClassTag(classOf[TransferTransaction])
 
@@ -74,7 +71,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: TxByteArray,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
@@ -88,7 +85,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: TxByteArray,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
@@ -102,7 +99,7 @@ object TransferTransaction extends TransactionParser {
       amount: TxAmount,
       feeAsset: Asset,
       fee: TxAmount,
-      attachment: TxByteArray,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
     signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)

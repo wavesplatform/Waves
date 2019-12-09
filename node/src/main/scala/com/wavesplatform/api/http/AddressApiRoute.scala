@@ -1,7 +1,5 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
@@ -20,7 +18,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TransactionFactory
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
 import javax.ws.rs.Path
@@ -420,7 +418,7 @@ case class AddressApiRoute(
       val res = wallet
         .privateKeyAccount(address)
         .map(pk => {
-          val messageBytes = message.getBytes(StandardCharsets.UTF_8)
+          val messageBytes = message.utf8Bytes
           val signature    = crypto.sign(pk, messageBytes)
           val msg          = if (encode) Base58.encode(messageBytes) else message
           Signed(msg, Base58.encode(pk.publicKey), Base58.encode(signature))
@@ -433,7 +431,7 @@ case class AddressApiRoute(
     jsonPost[SignedMessage] { m =>
       val msg: Try[Array[Byte]] =
         if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
-        else Success(m.message.getBytes("UTF-8"))
+        else Success(m.message.utf8Bytes)
       verifySigned(msg, m.signature, m.publickey, address)
     }
   }

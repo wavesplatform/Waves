@@ -60,7 +60,8 @@ case class FullAssetInfo(
     reissuable: Boolean,
     minSponsoredAssetFee: Option[Long],
     sponsorBalance: Option[Long],
-    quantity: Long
+    quantity: Long,
+    issueTransaction: Option[Transaction]
 )
 object FullAssetInfo {
   implicit val fullAssetInfoFormat: Format[FullAssetInfo] = Json.format
@@ -91,6 +92,7 @@ case class AssetInfo(
     decimals: Int,
     reissuable: Boolean,
     quantity: Long,
+    originTransactionId: String,
     minSponsoredAssetFee: Option[Long],
     scriptDetails: Option[ScriptAssetInfo]
 )
@@ -155,7 +157,13 @@ object AssetPairResponse {
   implicit val pairResponseFormat: Format[AssetPairResponse] = Json.format
 }
 
-case class StateChangesDetails(data: Seq[DataResponse], transfers: Seq[TransfersInfoResponse])
+case class StateChangesDetails(
+    data: Seq[DataResponse],
+    transfers: Seq[TransfersInfoResponse],
+    issues: Seq[IssueInfoResponse],
+    reissues: Seq[ReissueInfoResponse],
+    burns: Seq[BurnInfoResponse]
+)
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
 }
@@ -190,6 +198,30 @@ object TransfersInfoResponse {
   }
 
   implicit val transfersInfoResponseFormat: Format[TransfersInfoResponse] = Json.format
+}
+
+case class IssueInfoResponse(
+    assetId: String,
+    name: String,
+    description: String,
+    quantity: Long,
+    decimals: Int,
+    isReissuable: Boolean,
+    compiledScript: Option[String],
+    nonce: Option[Int]
+)
+object IssueInfoResponse {
+  implicit val IssueInfoFormat: Format[IssueInfoResponse] = Json.format
+}
+
+case class ReissueInfoResponse(assetId: String, isReissuable: Boolean, quantity: Long)
+object ReissueInfoResponse {
+  implicit val reissueInfoFormat: Format[ReissueInfoResponse] = Json.format
+}
+
+case class BurnInfoResponse(assetId: String, quantity: Long)
+object BurnInfoResponse {
+  implicit val burnInfoFormat: Format[BurnInfoResponse] = Json.format
 }
 
 case class ExchangeTransaction(

@@ -27,17 +27,14 @@ object LeaseTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 => Bytes.concat(Array(typeId, version), Waves.byteRepr, baseBytes)
-      case _ => PBTransactionSerializer.bodyBytes(tx)
+      case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: LeaseTransaction): Array[Byte] = {
-    import tx._
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-    }
+  def toBytes(tx: LeaseTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+    case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    case _            => PBTransactionSerializer.bytes(tx)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[LeaseTransaction] = Try {

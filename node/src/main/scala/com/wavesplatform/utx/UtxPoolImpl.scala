@@ -139,7 +139,7 @@ class UtxPoolImpl(
       for {
         _ <- Either.cond(transactions.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
         _ <- Either.cond(
-          skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
+          skipSizeCheck || (transactionsBytes + tx.bytesSize) <= utxSettings.maxBytesSize,
           (),
           GenericError("Transaction pool bytes size limit is reached")
         )
@@ -318,12 +318,12 @@ class UtxPoolImpl(
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()
-      bytesStats.increment(tx.bytes().length)
+      bytesStats.increment(tx.bytesSize)
     }
 
     def removeTransaction(tx: Transaction): Unit = {
       sizeStats.decrement()
-      bytesStats.decrement(tx.bytes().length)
+      bytesStats.decrement(tx.bytesSize)
     }
   }
 }

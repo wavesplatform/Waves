@@ -1,6 +1,5 @@
 package com.wavesplatform.api.grpc
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.api.common.CommonAssetsApi
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -14,8 +13,8 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi)(implicit sc: Scheduler) exte
       for (info <- assetsApi.fullInfo(IssuedAsset(request.assetId)))
         yield AssetInfoResponse(
           info.description.issuer,
-          ByteString.copyFrom(info.description.name),
-          ByteString.copyFrom(info.description.description),
+          info.description.name.fold(bs => new String(bs.arr), identity),
+          info.description.description.fold(bs => new String(bs.arr), identity),
           info.description.decimals,
           info.description.reissuable,
           info.description.totalVolume.longValue(),
@@ -28,7 +27,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi)(implicit sc: Scheduler) exte
               )
           },
           info.description.sponsorship,
-          Some(info.issueTransaction.toPB),
+          info.issueTransaction.map(_.toPB),
           info.sponsorBalance.getOrElse(0)
         )
     result.explicitGetErr(TransactionDoesNotExist)

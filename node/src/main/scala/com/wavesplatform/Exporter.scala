@@ -1,20 +1,19 @@
 package com.wavesplatform
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
-import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.openDB
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
+import kamon.Kamon
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 import scopt.OParser
-import kamon.Kamon
-import com.wavesplatform.metrics.Metrics
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -104,11 +103,11 @@ object Exporter extends ScorexLogging {
       maybeBlock
         .map { block =>
           val len = if (height != 2) {
-            val bytes = ",\n".getBytes(StandardCharsets.UTF_8)
+            val bytes = ",\n".utf8Bytes
             stream.write(bytes)
             bytes.length
           } else 0
-          val bytes = block.json().toString().getBytes(StandardCharsets.UTF_8)
+          val bytes = block.json().toString().utf8Bytes
           stream.write(bytes)
           len + bytes.length
         }
@@ -122,7 +121,7 @@ object Exporter extends ScorexLogging {
       if (format == "JSON") writeString(stream, "]\n") else 0
 
     def writeString(stream: OutputStream, str: String): Int = {
-      val bytes = str.getBytes(StandardCharsets.UTF_8)
+      val bytes = str.utf8Bytes
       stream.write(bytes)
       bytes.length
     }

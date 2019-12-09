@@ -447,7 +447,7 @@ object Functions {
       "transferTransactionById",
       100,
       TRANSFERTRANSACTIONBYID,
-      UNION(buildTransferTransactionType(proofsEnabled), UNIT),
+      UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("id", BYTESTR)
     ) {
       new ContextfulNativeFunction[Environment] {

@@ -52,11 +52,6 @@ object TransactionParsers {
       }
   } ++ modern
 
-  private[this] val byName: Map[String, TransactionParser] = (old ++ modern).map {
-    case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
-  }
-
-  def by(name: String): Option[TransactionParser]                     = byName.get(name)
   def by(typeId: Byte, version: TxVersion): Option[TransactionParser] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
@@ -66,18 +61,18 @@ object TransactionParsers {
       modern.get((typeId, version)) match {
         case Some(parser) => parser.parseBytes(bytes)
         case None =>
-          Failure[Transaction](new IllegalArgumentException(s"Unknown transaction type ($typeId) and version ($version) (modern encoding)"))
+          Failure[Transaction](UnknownTypeAndVersion(typeId, version))
       }
     }
     def oldParseBytes: Try[Transaction] = {
       old.get(bytes(0)) match {
         case Some(parser) => parser.parseBytes(bytes)
-        case None         => Failure[Transaction](new IllegalArgumentException(s"Unknown transaction type (old encoding): '${bytes(0)}'"))
+        case None         => Failure[Transaction](UnknownType(bytes(0)))
       }
     }
 
     for {
-      _  <- Either.cond(bytes.length > 2, (), new IllegalArgumentException("Buffer underflow while parsing transaction")).toTry
+      _  <- Either.cond(bytes.length > 2, (), BufferUnderflow).toTry
       tx <- if (bytes(0) == 0) modernParseBytes else oldParseBytes
     } yield tx
   }

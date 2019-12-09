@@ -46,7 +46,7 @@ class WavesEnvironment(
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transferById(id)
-      .map(t => RealTransactionWrapper.mapTransferTx(t._2))
+      .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {

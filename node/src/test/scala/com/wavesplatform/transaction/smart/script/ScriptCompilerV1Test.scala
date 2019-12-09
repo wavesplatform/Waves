@@ -244,7 +244,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("transactionByID complexity") {
-    def transactionByIdComplexity(version: Int) = {
+    def transactionByIdComplexity(version: Int): Long = {
       val scriptWithoutTransactionById =
         s"""
           | {-# STDLIB_VERSION $version #-}

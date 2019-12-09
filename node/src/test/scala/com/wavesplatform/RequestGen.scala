@@ -112,7 +112,7 @@ trait RequestGen extends TransactionGen { _: Suite =>
     amount         <- positiveLongGen
     assetId        <- assetIdStringGen
     feeAssetId     <- assetIdStringGen
-    attachment     <- genBoundedString(1, 20).map(b => Some(Base58.encode(b)))
+    attachment     <- genBoundedStringBytes(1, 20).map(b => Some(Base58.encode(b)))
   } yield TransferV1Request(assetId, feeAssetId, amount, fee, account, attachment, recipient)
 
   val broadcastTransferReq: G[SignedTransferV1Request] = for {

@@ -1,13 +1,15 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.typesafe.config.Config
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.UnexpectedStatusCodeException
 import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
@@ -15,8 +17,34 @@ import play.api.libs.json._
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
-//noinspection NameBooleanParameters
 class DataTransactionSuite extends BaseTransactionSuite {
+  override def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.blocks-for-feature-activation = 1"))
+      .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period = 1"))
+      .overrideBase(_.preactivatedFeatures(15 -> 0))
+      .withDefault(1)
+      .withSpecial(3, _.nonMiner)
+      .buildNonConflicting()
+
+  test("remove keys") {
+    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
+    val boolData    = List(BooleanDataEntry(nonLatinKey, true))
+    val boolDataFee = calcDataFee(boolData)
+    val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(firstTx)
+    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
+
+    val removeData = List(EmptyDataEntry(nonLatinKey))
+    val removeDataFee = calcDataFee(removeData)
+    val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(secondTx)
+    assertApiError(sender.getDataByKey(firstAddress, nonLatinKey)) { error =>
+      error.statusCode shouldBe 404
+    }
+    sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
+  }
 
   test("sender's waves balance is decreased by fee.") {
     val (balance1, eff1) = miner.accountBalances(firstAddress)

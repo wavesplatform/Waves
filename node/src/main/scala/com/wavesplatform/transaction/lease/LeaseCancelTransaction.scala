@@ -1,24 +1,13 @@
 package com.wavesplatform.transaction.lease
 
-import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.LeaseCancelTxSerializer
+import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.LeaseCancelTxValidator
-import com.wavesplatform.transaction.{
-  FastHashId,
-  LegacyPBSwitch,
-  Proofs,
-  SigProofsSwitch,
-  TransactionParser,
-  TxAmount,
-  TxTimestamp,
-  TxType,
-  TxVersion,
-  TxWithFee,
-  VersionedTransaction
-}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -38,10 +27,9 @@ final case class LeaseCancelTransaction(
     with FastHashId
     with LegacyPBSwitch.V3 {
   override def builder: TransactionParser          = LeaseCancelTransaction
-  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTransaction.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTransaction.serializer.toBytes(this))
-  override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTransaction.serializer.toJson(this))
-  override def chainByte: Option[TxType]           = if (version == TxVersion.V1) None else Some(AddressScheme.current.chainId)
+  override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseCancelTxSerializer.bodyBytes(this))
+  override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseCancelTxSerializer.toBytes(this))
+  override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseCancelTxSerializer.toJson(this))
 }
 
 object LeaseCancelTransaction extends TransactionParser {
@@ -50,14 +38,13 @@ object LeaseCancelTransaction extends TransactionParser {
   val supportedVersions: Set[TxVersion]          = Set(1, 2, 3)
   val typeId: TxType                             = 9
 
-  implicit val validator = LeaseCancelTxValidator
-  val serializer         = LeaseCancelTxSerializer
+  implicit val validator: TxValidator[LeaseCancelTransaction] = LeaseCancelTxValidator
 
   implicit def sign(tx: LeaseCancelTransaction, privateKey: PrivateKey): LeaseCancelTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
 
-  override def parseBytes(bytes: Array[TxVersion]): Try[LeaseCancelTransaction] =
-    serializer.parseBytes(bytes)
+  override def parseBytes(bytes: Array[Byte]): Try[LeaseCancelTransaction] =
+    LeaseCancelTxSerializer.parseBytes(bytes)
 
   def create(
       version: TxVersion,
@@ -78,13 +65,4 @@ object LeaseCancelTransaction extends TransactionParser {
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
     create(version, sender, leaseId, fee, timestamp, Nil).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      leaseId: ByteStr,
-      fee: TxAmount,
-      timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
-    signed(version, sender, leaseId, fee, timestamp, sender)
 }

@@ -3,6 +3,7 @@ package com.wavesplatform.history
 import com.wavesplatform._
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
@@ -16,6 +17,7 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import monix.execution.Scheduler.Implicits.global
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -37,16 +39,16 @@ class BlockchainUpdaterNFTTest
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          d.nftList(db, firstAccount) shouldBe Seq(issue)
+          d.nftList(db, firstAccount) shouldBe Seq(issue.id())
           d.nftList(db, secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
           d.nftList(db, firstAccount) shouldBe Nil
-          d.nftList(db, secondAccount) shouldBe Seq(issue)
+          d.nftList(db, secondAccount) shouldBe Seq(issue.id())
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
           d.nftList(db, firstAccount) shouldBe Nil
-          d.nftList(db, secondAccount) shouldBe Seq(issue)
+          d.nftList(db, secondAccount) shouldBe Seq(issue.id())
         }
     }
   }
@@ -66,16 +68,16 @@ class BlockchainUpdaterNFTTest
           d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
           d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
 
-          d.nftList(db, firstAccount) shouldBe Seq(issue)
+          d.nftList(db, firstAccount) shouldBe Seq(issue.id())
           d.nftList(db, secondAccount) shouldBe Nil
 
           d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
           d.nftList(db, firstAccount) shouldBe Nil
-          d.nftList(db, secondAccount) shouldBe Seq(issue)
+          d.nftList(db, secondAccount) shouldBe Seq(issue.id())
 
           d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
           d.nftList(db, firstAccount) shouldBe Nil
-          d.nftList(db, secondAccount) shouldBe Seq(issue)
+          d.nftList(db, secondAccount) shouldBe Seq(issue.id())
         }
     }
   }

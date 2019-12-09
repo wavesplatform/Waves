@@ -1,30 +1,32 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.BurnTransaction
-import play.api.libs.json.{Format, Json}
+import play.api.libs.functional.syntax._
+import play.api.libs.json._
 
 case class BurnRequest(
     version: Option[Byte],
     sender: Option[String],
     senderPublicKey: Option[String],
-    assetId: String,
+    asset: IssuedAsset,
     quantity: Long,
     fee: Long,
     timestamp: Option[Long],
-    signature: Option[String],
-    proofs: Option[List[String]]
+    signature: Option[ByteStr],
+    proofs: Option[Proofs]
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, BurnTransaction] =
     for {
-      validProofs <- toProofs(version, signature, proofs)
-      validAsset  <- toAsset(Some(assetId))
+      validProofs <- toProofs(signature, proofs)
       tx <- BurnTransaction.create(
         version.getOrElse(defaultVersion),
         sender,
-        validAsset.asInstanceOf[IssuedAsset],
+        asset,
         quantity,
         fee,
         timestamp.getOrElse(defaultTimestamp),
@@ -34,20 +36,17 @@ case class BurnRequest(
 }
 
 object BurnRequest {
-  implicit val jsonFormat = Format(
-    {
-      import play.api.libs.functional.syntax._
-      import play.api.libs.json._
-      ((JsPath \ "version").readNullable[Byte] and
-        (JsPath \ "sender").readNullable[String] and
-        (JsPath \ "senderPublicKey").readNullable[String] and
-        (JsPath \ "assetId").read[String] and
-        (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
-        (JsPath \ "fee").read[Long] and
-        (JsPath \ "timestamp").readNullable[Long] and
-        (JsPath \ "signature").readNullable[String] and
-        (JsPath \ "proofs").readNullable[List[String]])(BurnRequest.apply _)
-    },
+  import com.wavesplatform.utils.byteStrFormat
+  implicit val jsonFormat: Format[BurnRequest] = Format(
+    ((JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "sender").readNullable[String] and
+      (JsPath \ "senderPublicKey").readNullable[String] and
+      (JsPath \ "assetId").read[IssuedAsset] and
+      (JsPath \ "quantity").read[Long].orElse((JsPath \ "amount").read[Long]) and
+      (JsPath \ "fee").read[Long] and
+      (JsPath \ "timestamp").readNullable[Long] and
+      (JsPath \ "signature").readNullable[ByteStr] and
+      (JsPath \ "proofs").readNullable[Proofs])(BurnRequest.apply _),
     Json.writes[BurnRequest]
   )
 }

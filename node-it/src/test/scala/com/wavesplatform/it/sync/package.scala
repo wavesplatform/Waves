@@ -62,16 +62,16 @@ package object sync {
       Some(tx.version),
       None,
       Some(Base58.encode(tx.sender)),
-      new String(name),
-      new String(description),
+      new String(tx.nameBytes.arr),
+      new String(tx.descriptionBytes.arr),
       quantity,
       decimals,
       reissuable,
       tx.script.map(_.bytes().base64),
       fee,
       Some(timestamp),
-      proofs.headOption.map(_.toString),
-      Some(proofs.proofs.map(_.toString).toList)
+      proofs.headOption,
+      Some(proofs)
     )
   }
 

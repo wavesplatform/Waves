@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.validation.impl.TxFeeValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class SetScriptTransaction(
@@ -34,16 +33,11 @@ case class SetScriptTransaction(
   val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
   override val json: Coeval[JsObject]     = Coeval.evalOnce(builder.serializer.toJson(this))
-
-  override val chainByte: Option[TxVersion] = Some(AddressScheme.current.chainId)
 }
 
 object SetScriptTransaction extends TransactionParser {
-  override type TransactionT = SetScriptTransaction
-
   override val typeId: TxType                    = 13
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[SetScriptTransaction])
 
   implicit val validator: TxValidator[SetScriptTransaction] =
     TxFeeValidator.asInstanceOf[TxValidator[SetScriptTransaction]]
@@ -63,7 +57,7 @@ object SetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetScriptTransaction] =
     SetScriptTransaction(version, sender, script, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -73,7 +67,7 @@ object SetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetScriptTransaction] =
     create(version, sender, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -82,6 +76,6 @@ object SetScriptTransaction extends TransactionParser {
       script: Option[Script],
       fee: TxAmount,
       timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetScriptTransaction] =
     signed(version, sender, script, fee, timestamp, sender)
 }

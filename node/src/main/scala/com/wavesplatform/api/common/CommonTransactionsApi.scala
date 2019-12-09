@@ -4,6 +4,7 @@ import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.{BlockMeta, common}
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError

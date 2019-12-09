@@ -1,8 +1,23 @@
 syntax = "proto3";
-package waves.database;
-option java_package = "com.wavesplatform.database.proto";
+package waves.api;
+option java_package = "com.wavesplatform.database.protobuf";
 
 import "waves/block.proto";
+
+message AssetDetails {
+    message BytesOrString {
+        oneof value {
+            bytes bytes = 1;
+            string string = 2;
+        }
+    }
+
+    BytesOrString name = 1;
+    BytesOrString description = 2;
+    int32 last_renamed_at = 3;
+    bool reissuable = 4;
+    bytes total_volume = 5;
+}
 
 message BlockMeta {
     Block.Header header = 1;
@@ -15,7 +30,15 @@ message BlockMeta {
 }
 
 message AccountScriptInfo {
-    bytes script_bytes = 1;
-    int64 verifier_complexity = 2;
-    map<string, int64> callable_complexity = 3;
+    bytes public_key = 1;
+    bytes script_bytes = 2;
+    int64 verifier_complexity = 3;
+    map<string, int64> callable_complexity = 4;
+}
+
+message StaticAssetInfo {
+    bytes source_id = 1;
+    bytes issuer_public_key = 2;
+    int32 decimals = 3;
+    bool is_nft = 4;
 }

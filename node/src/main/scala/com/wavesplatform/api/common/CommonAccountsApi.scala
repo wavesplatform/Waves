@@ -9,9 +9,8 @@ import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, DataEntry, Diff, Height}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.ScorexLogging
 import monix.reactive.Observable
@@ -32,7 +31,7 @@ trait CommonAccountsApi {
 
   def portfolio(address: Address): Observable[(IssuedAsset, Long)]
 
-  def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction]
+  def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)]
 
   def script(address: Address): Option[AccountScriptInfo]
 
@@ -77,16 +76,16 @@ object CommonAccountsApi extends ScorexLogging {
         db,
         address,
         diff.portfolios.get(address).fold(Map.empty[IssuedAsset, Long])(_.assets),
-        assetId => !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.isNFT)
+        assetId => !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
       )
 
-    override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
+    override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
       log.info(s"Diff: $diff")
       nftList(
         db,
         address,
         diff,
-        id => blockchain.assetDescription(id).exists(_.isNFT),
+        id => blockchain.assetDescription(id).exists(_.nft),
         from
       )
     }
