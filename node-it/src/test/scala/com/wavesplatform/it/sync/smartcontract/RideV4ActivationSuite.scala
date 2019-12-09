@@ -109,6 +109,15 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |(this.quantity > 0)""".stripMargin
   }
 
+  test("declines reduced fee for reissue transaction before activation") {
+    val issuedAssetId = sender.issue(callerAcc, "name5", "description5", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true).id
+
+    assertApiError(sender.reissue(callerAcc, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message should include(s"Fee for ReissueTransaction ($reissueReducedFee in WAVES) does not exceed minimal value of $reissueFee WAVES.")
+    }
+  }
+
   test(s"wait height $activationHeight for the feature activation") {
     sender.waitForHeight(activationHeight, 5.minutes)
   }
@@ -271,6 +280,13 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
            |    true
            |  case _ => true }""".stripMargin))) { error =>
       error.message should include("Undefined field `payment` of variable of type `InvokeScriptTransaction`") }
+  }
+
+  test("accepts reduced fee for reissue transaction after activation") {
+    val issuedAssetId = sender.issue(callerAcc, "name5", "description5", someAssetAmount, decimals = 2, reissuable = true, issueFee, waitForTx = true).id
+
+    val reissueTxId = sender.reissue(callerAcc, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee).id
+    nodes.waitForHeightAriseAndTxPresent(reissueTxId)
   }
 
 }

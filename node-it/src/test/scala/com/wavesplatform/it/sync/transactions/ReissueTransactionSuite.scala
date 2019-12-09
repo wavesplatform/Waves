@@ -9,7 +9,6 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 
 class ReissueTransactionSuite extends BaseTransactionSuite {
-  import ReissueTransactionSuite._
 
   test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
 
@@ -20,9 +19,9 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = issueFee).id
+    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee).id
     nodes.waitForHeightAriseAndTxPresent(reissueTxId)
-    miner.assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
+    miner.assertBalances(firstAddress, balance - issueFee - reissueReducedFee, effectiveBalance - issueFee - reissueReducedFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)
   }
 
@@ -35,7 +34,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
     assertBadRequestAndMessage(
-      sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = issueFee),
+      sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee),
       "Asset is not reissuable"
     )
     nodes.waitForHeightArise()
@@ -49,10 +48,9 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
-    assertApiError(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee)) { error =>
+    assertApiError(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee - 1)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include(s"Fee for ReissueTransaction ($reissueReducedFee in WAVES) does not exceed minimal value of $reissueFee WAVES.")
-
+      error.message should include(s"Fee for ReissueTransaction (${reissueReducedFee - 1} in WAVES) does not exceed minimal value of $reissueReducedFee WAVES.")
     }
   }
 
@@ -75,35 +73,10 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
   }
 
-  test("accepts reduced fee after feature #16 activation") {
-    nodes.waitForHeight(ActivationHeight)
-
-    val issuedAssetId = sender.issue(firstAddress, "name5", "description5", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
-    nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
-
-    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee).id
-    nodes.waitForHeightAriseAndTxPresent(reissueTxId)
-  }
-
-  test("not able to reissue if cannot pay reissueReducedFee - less than required") {
-    val issuedAssetId = sender.issue(firstAddress, "name6", "description6", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
-    nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
-
-    assertApiError(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee - 1)) { error =>
-      error.id shouldBe StateCheckFailed.Id
-      error.message should include(s"Fee for ReissueTransaction (${reissueReducedFee - 1} in WAVES) does not exceed minimal value of $reissueReducedFee WAVES.")
-    }
-  }
-
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((16, ActivationHeight)))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
-}
-
-object ReissueTransactionSuite {
-  val ActivationHeight = 15
 }
