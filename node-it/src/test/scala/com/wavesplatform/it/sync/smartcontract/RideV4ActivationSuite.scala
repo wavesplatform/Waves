@@ -89,6 +89,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     asset = IssuedAsset(ByteStr(
       sender.issue(smartAccV3, quantity = 1000, waitForTx = true).id.getBytes)
     )
+    sender.setScript(smartAccV3, Some(dAppV3.compiled), waitForTx = true)
   }
 
   test("can't set V4 contracts before the feature activation") {
