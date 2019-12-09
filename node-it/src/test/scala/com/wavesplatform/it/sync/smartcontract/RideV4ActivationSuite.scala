@@ -313,7 +313,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     assertApiError(
       sender.invokeScript(callerAcc, smartAccV4, Some("payBack"), payment = Seq(Payment(40, asset)))
     ) { error =>
-      error.message should include("nizya!")
+      error.message should include("Transaction application leads to negative asset")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
@@ -321,7 +321,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     assertApiError(
       sender.invokeScript(callerAcc, smartAccV4, Some("payBack"), payment = Seq(Payment(balance + 1, Waves)))
     ) { error =>
-      error.message should include("nizya!")
+      error.message should include("Transaction application leads to negative waves balance")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
