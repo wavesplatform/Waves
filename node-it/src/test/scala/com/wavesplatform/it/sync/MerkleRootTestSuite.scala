@@ -9,6 +9,7 @@ import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+
 import scala.concurrent.duration._
 
 class MerkleRootTestSuite
@@ -54,8 +55,22 @@ class MerkleRootTestSuite
       nodes.head.getMerkleProofPost("FCymvrY43ddiKKTkznawWasoMbWd1LWyX8DUrwAAbcUA"),
       CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
     )
+
+    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 can not contain "0"
+    assertApiError(
+      nodes.head.getMerkleProof(invalidId),
+      CustomValidationError(s"invalid signature")
+    )
+    assertApiError(
+      nodes.head.getMerkleProofPost("FCymvrY43ddiKKTkznawWasoMbWd1LWyX8DUrwAAbcUA"),
+      CustomValidationError(s"invalid signature")
+    )
   }
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
+    /**
+      * In this case we check that when some of generated microblocks connected to one keyblock transfers to next keyblock
+      * due to miner setting "min-micro-block-age" it causes transactionsRoot and merkleProof recalculation
+    */
     nodes.waitForHeightArise()
     val currentHeight               = nodes.head.height
     val txsSeq                      = collection.mutable.ListBuffer[String]()
