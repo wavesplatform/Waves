@@ -96,7 +96,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     stateChanges.value.issues.head.decimals shouldBe 0
     stateChanges.value.issues.head.isReissuable shouldBe true
     stateChanges.value.issues.head.compiledScript shouldBe None
-    stateChanges.value.issues.head.nonce shouldBe None
+    stateChanges.value.issues.head.nonce shouldBe 0
 
     val balance = sender.assetsBalance(firstAddress).balances.find(_.assetId == invokeScriptAssetId)
     balance shouldBe 'defined
