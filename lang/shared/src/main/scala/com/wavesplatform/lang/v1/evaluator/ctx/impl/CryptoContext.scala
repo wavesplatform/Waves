@@ -1,10 +1,11 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
+import cats.implicits._
 import cats.{Id, Monad}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
-import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION}
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CONST_LONG, CaseObj}
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, CASETYPEREF, FINAL, STRING, UNION, LONG}
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ContextfulVal
@@ -147,6 +148,32 @@ object CryptoContext {
         case xs                               => notImplemented[Id]("fromBase16String(str: String)", xs)
       }
 
+    val bls12Groth16VerifyF: BaseFunction[NoContext] =
+      NativeFunction(
+        "groth16Verify",
+        1900,
+        BLS12_GROTH16_VERIFY,
+        BOOLEAN,
+        ("verifying key", BYTESTR),
+        ("proof", BYTESTR),
+        ("inputs", BYTESTR)
+      ) {
+        case CONST_BYTESTR(vk:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_BYTESTR(inputs:ByteStr) :: Nil =>
+          if (vk.size > 1152)
+            Left(s"Groth16Verify key size should not exceed 1 Kbyte, but ${vk.size} found")
+          else if (vk.size % 48 != 0)
+            Left(s"Groth16Verify key size should be multiple of 48, but ${vk.size} found")
+          else if (proof.size != 192)
+            Left(s"Groth16Verify proof size should be exactly 192 bytes, but ${proof.size} found")
+          else if (inputs.size > 512)
+            Left(s"Groth16Verify inputs size should not exceed 384 bytes, but ${inputs.size} found")
+          else if (inputs.size % 32 != 0)
+            Left(s"Groth16Verify inputs size should be multiple of 32, but ${inputs.size} found")
+          else
+            Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
+        case xs => notImplemented[Id]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      }
+
     val v1Functions =
       Array(
         keccak256F,
@@ -197,9 +224,17 @@ object CryptoContext {
         fromBase16StringF
       )
 
+    val v4Functions =
+      Array(bls12Groth16VerifyF)
+
+    val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
+    val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
+    val fromV4Ctx = fromV3Ctx |+| CTX[NoContext](Seq(), Map(), v4Functions)
+
     version match {
-      case V1 | V2 => CTX[NoContext](Seq.empty, Map.empty, v1Functions)
-      case V3 | V4 => CTX[NoContext](v3Types, v3Vars, v1Functions ++ v3Functions)
+      case V1 | V2      => fromV1Ctx
+      case V3           => fromV3Ctx
+      case v if v >= V4 => fromV4Ctx
     }
   }
 

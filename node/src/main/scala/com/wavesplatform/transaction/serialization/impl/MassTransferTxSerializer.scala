@@ -7,8 +7,8 @@ import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.utils._
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
+import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
 import play.api.libs.json.{JsObject, JsValue, Json}
 
 import scala.util.Try
@@ -21,7 +21,7 @@ object MassTransferTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"       -> assetId.maybeBase58Repr,
-      "attachment"    -> Base58.encode(attachment),
+      "attachment"    -> attachment.toJson(isProtobufVersion),
       "transferCount" -> transfers.size,
       "totalAmount"   -> transfers.map(_.amount).sum,
       "transfers"     -> transfersJson(transfers)
@@ -42,7 +42,7 @@ object MassTransferTxSerializer {
           Bytes.concat(transferBytes: _*),
           Longs.toByteArray(timestamp),
           Longs.toByteArray(fee),
-          Deser.serializeArrayWithLength(attachment)
+          Deser.serializeArrayWithLength(attachment.toBytesStrict)
         )
 
       case _ =>
@@ -50,10 +50,9 @@ object MassTransferTxSerializer {
     }
   }
 
-  def toBytes(tx: MassTransferTransaction): Array[Byte] = {
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
-  }
+  def toBytes(tx: MassTransferTransaction): Array[Byte] =
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes()) // No zero mark
 
   def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] = Try {
     def parseTransfers(buf: ByteBuffer): Seq[MassTransferTransaction.ParsedTransfer] = {
@@ -78,6 +77,6 @@ object MassTransferTxSerializer {
     val fee        = buf.getLong
     val attachment = Deser.parseArrayWithLength(buf)
     val proofs     = buf.getProofs
-    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, attachment, proofs)
+    MassTransferTransaction(TxVersion.V1, sender, assetId, transfers, fee, timestamp, Some(Attachment.Bin(attachment)), proofs)
   }
 }

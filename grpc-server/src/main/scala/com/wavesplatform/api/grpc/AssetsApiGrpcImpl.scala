@@ -19,8 +19,8 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
       for (info <- commonApi.fullInfo(IssuedAsset(request.assetId)))
         yield AssetInfoResponse(
           info.description.issuer,
-          info.description.name,
-          info.description.description,
+          info.description.name.fold(bs => new String(bs.arr), identity),
+          info.description.description.fold(bs => new String(bs.arr), identity),
           info.description.decimals,
           info.description.reissuable,
           info.description.totalVolume.longValue(),
@@ -33,7 +33,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
               )
           ),
           info.description.sponsorship,
-          Some(info.issueTransaction.toPB),
+          info.issueTransaction.map(_.toPB),
           info.sponsorBalance.getOrElse(0)
         )
     result.explicitGetErr(TransactionDoesNotExist)

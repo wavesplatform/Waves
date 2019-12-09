@@ -28,7 +28,7 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
         genesis2: GenesisTransaction = GenesisTransaction.create(otherAccount, ENOUGH_AMT, ts).explicitGet()
         (lease, _) <- leaseAndCancelGeneratorP(master, recipient, ts)
         fee2       <- smallFeeGen
-        unleaseOther = LeaseCancelTransaction.selfSigned(1.toByte, otherAccount, lease.id(), fee2, ts + 1).explicitGet()
+        unleaseOther = LeaseCancelTransaction.signed(1.toByte, otherAccount.publicKey, lease.id(), fee2, ts + 1, otherAccount.privateKey).explicitGet()
         (lease2, _) <- leaseAndCancelGeneratorP(master, otherAccount2, ts)
       } yield (genesis, genesis2, lease, unleaseOther, lease2, ts)
 
@@ -46,7 +46,6 @@ class CancelAllLeasesTest extends PropSpec with PropertyChecks with Matchers wit
         ) {
           case (_, newState) =>
             newState.allActiveLeases shouldBe empty
-//          newState.accountPortfolios.map(_._2.leaseInfo).foreach(_ shouldBe LeaseInfo.empty)
         }
     }
   }

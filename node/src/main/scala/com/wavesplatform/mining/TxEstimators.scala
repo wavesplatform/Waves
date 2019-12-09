@@ -12,7 +12,7 @@ object TxEstimators extends ScorexLogging {
   }
 
   case object sizeInBytes extends Fn {
-    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = tx.bytes().length // + headers
+    override def apply(blockchain: Blockchain, tx: Transaction, diff: Diff): Long = tx.bytesSize // + headers
     override val minEstimate                                                      = 109L
   }
 

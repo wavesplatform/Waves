@@ -11,7 +11,7 @@ object PBTransactionSerializer {
   def bodyBytes(tx: Transaction): Array[Byte] =
     PBUtils.encodeDeterministic(PBTransactions.protobuf(tx).getTransaction)
 
-  def toBytes(tx: Transaction): Array[Byte] =
+  def bytes(tx: Transaction): Array[Byte] =
     PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] =
@@ -19,5 +19,4 @@ object PBTransactionSerializer {
       .validate(bytes)
       .adaptErr { case err => PBParsingError(err) }
       .flatMap(PBTransactions.tryToVanilla)
-
 }

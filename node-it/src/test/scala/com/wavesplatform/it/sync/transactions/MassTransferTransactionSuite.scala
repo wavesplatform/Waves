@@ -9,10 +9,10 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Proofs, TxVersion}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{MaxTransferCount, Transfer}
 import com.wavesplatform.transaction.transfer.TransferTransaction.MaxAttachmentSize
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{Proofs, TxVersion}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json._
 
@@ -109,7 +109,15 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
     ) = {
       val txEi = for {
         parsedTransfers <- MassTransferTransaction.parseTransfersList(transfers)
-        tx              <- MassTransferTransaction.selfSigned(1.toByte, sender.privateKey, Waves, parsedTransfers, fee, timestamp, attachment)
+        tx <- MassTransferTransaction.selfSigned(
+          1.toByte,
+          sender.privateKey,
+          Waves,
+          parsedTransfers,
+          fee,
+          timestamp,
+          Some(Attachment.Bin(attachment))
+        )
       } yield tx
 
       val (signature, idOpt) = txEi.fold(_ => (Proofs(List(fakeSignature)), None), tx => (tx.proofs, Some(tx.id())))
@@ -120,7 +128,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
         transfers,
         fee,
         timestamp,
-        attachment.headOption.map(_ => Base58.encode(attachment)),
+        Some(Attachment.Bin(attachment)),
         signature
       )
 
@@ -142,7 +150,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       (request(transfers = List(Transfer(secondAddress, -1))), "One of the transfers has negative amount"),
       (request(fee = 0), "insufficient fee"),
       (request(fee = 99999), "Fee .* does not exceed minimal value"),
-      (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "invalid.attachment")
+      (request(attachment = ("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8")), "Too big sequences requested")
     )
 
     for (((req, idOpt), diag) <- invalidTransfers) {

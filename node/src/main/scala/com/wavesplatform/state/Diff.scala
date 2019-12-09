@@ -41,7 +41,7 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(name: String, description: String, lastUpdatedAt: Height)
+case class AssetInfo(name: Either[ByteStr, String], description: Either[ByteStr, String], lastUpdatedAt: Height)
 
 object AssetInfo {
   implicit val sg: Semigroup[AssetInfo] = (x, y) => y
@@ -59,9 +59,10 @@ object AssetVolumeInfo {
 }
 
 case class AssetDescription(
+    source: ByteStr,
     issuer: PublicKey,
-    name: String,
-    description: String,
+    name: Either[ByteStr, String],
+    description: Either[ByteStr, String],
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
@@ -78,6 +79,11 @@ object AccountDataInfo {
     override def empty: AccountDataInfo = AccountDataInfo(Map.empty)
 
     override def combine(x: AccountDataInfo, y: AccountDataInfo): AccountDataInfo = AccountDataInfo(x.data ++ y.data)
+  }
+
+  implicit class AccountDataInfoExt(private val ad: AccountDataInfo) extends AnyVal {
+    def filterEmpty: AccountDataInfo =
+      ad.copy(ad.data.filterNot(_._2.isEmpty))
   }
 }
 

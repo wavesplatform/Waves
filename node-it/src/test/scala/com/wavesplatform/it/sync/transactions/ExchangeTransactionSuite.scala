@@ -10,20 +10,22 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.utils._
 import play.api.libs.json.{JsNumber, JsString, Json}
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
-  var exchAsset: IssueTransaction = IssueTransaction.selfSigned(TxVersion.V1, sender = sender.privateKey,
-      name = "myasset".getBytes("UTF-8"),
-      description = "my asset description".getBytes("UTF-8"),
-      quantity = someAssetAmount,
-      decimals = 2,
-      reissuable = true, script = None,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    )
-    .right
-    .get
+  var exchAsset: IssueTransaction = IssueTransaction(
+    TxVersion.V1,
+    sender = sender.privateKey,
+    "myasset".utf8Bytes,
+    "my asset description".utf8Bytes,
+    quantity = someAssetAmount,
+    decimals = 2,
+    reissuable = true,
+    script = None,
+    fee = 1.waves,
+    timestamp = System.currentTimeMillis()
+  ).signWith(sender.privateKey)
 
   private val acc0 = pkByAddress(firstAddress)
   private val acc1 = pkByAddress(secondAddress)
@@ -127,17 +129,18 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val assetDescription = "my asset description"
 
-    val IssueTx: IssueTransaction = IssueTransaction.selfSigned(TxVersion.V1, sender = buyer,
-        name = "myasset".getBytes("UTF-8"),
-        description = assetDescription.getBytes("UTF-8"),
-        quantity = someAssetAmount,
-        decimals = 8,
-        reissuable = true, script = None,
-        fee = 1.waves,
-        timestamp = System.currentTimeMillis()
-      )
-      .right
-      .get
+    val IssueTx: IssueTransaction = IssueTransaction(
+      TxVersion.V1,
+      buyer,
+      "myasset".utf8Bytes,
+      assetDescription.utf8Bytes,
+      quantity = someAssetAmount,
+      decimals = 8,
+      reissuable = true,
+      script = None,
+      fee = 1.waves,
+      timestamp = System.currentTimeMillis()
+    ).signWith(buyer)
 
     val assetId = IssueTx.id()
 

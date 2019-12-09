@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.BurnTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 final case class BurnTransaction(
@@ -29,22 +28,18 @@ final case class BurnTransaction(
     with FastHashId
     with LegacyPBSwitch.V3 {
 
-  //noinspection TypeAnnotation,ScalaStyle
-  override def builder = BurnTransaction
+  override def builder: TransactionParser = BurnTransaction
 
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
-  override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = BurnTxSerializer.bodyBytes(this)
+  override val bytes: Coeval[Array[Byte]]     = BurnTxSerializer.toBytes(this)
+  override val json: Coeval[JsObject]         = BurnTxSerializer.toJson(this)
 
   override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
 }
 
 object BurnTransaction extends TransactionParser {
-  override type TransactionT = BurnTransaction
-
   override val typeId: TxType                    = 6
   override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  override val classTag                          = ClassTag(classOf[BurnTransaction])
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
 
@@ -75,7 +70,7 @@ object BurnTransaction extends TransactionParser {
       fee: Long,
       timestamp: Long,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, BurnTransaction] =
     create(version, sender, asset, quantity, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -85,7 +80,7 @@ object BurnTransaction extends TransactionParser {
       quantity: Long,
       fee: Long,
       timestamp: Long
-  ): Either[ValidationError, TransactionT] = {
+  ): Either[ValidationError, BurnTransaction] = {
     signed(version, sender, asset, quantity, fee, timestamp, sender)
   }
 }

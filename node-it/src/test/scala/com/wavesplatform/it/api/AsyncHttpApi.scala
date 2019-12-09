@@ -9,16 +9,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{
-  AccountsApiGrpc,
-  BalanceResponse,
-  BalancesRequest,
-  BlockRequest,
-  BlocksApiGrpc,
-  TransactionResponse,
-  TransactionsApiGrpc,
-  TransactionsRequest
-}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
@@ -35,18 +26,8 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{
-  ExchangeTransactionData,
-  IssueTransactionData,
-  PBOrders,
-  PBSignedTransaction,
-  PBTransactions,
-  Recipient,
-  Script,
-  SignedTransaction,
-  TransferTransactionData
-}
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
+import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -494,6 +475,10 @@ object AsyncHttpApi extends Assertions {
       signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 1, "data" -> data))
     }
 
+    def removeData(sourceAddress: String, data: Seq[String], fee: Long): Future[Transaction] = {
+      signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 2, "data" -> data.map(EmptyDataEntry(_))))
+    }
+
     def getData(address: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address").as[List[DataEntry[_]]]
 
     def getData(address: String, regexp: String): Future[List[DataEntry[_]]] = get(s"/addresses/data/$address?matches=$regexp").as[List[DataEntry[_]]]
@@ -810,7 +795,7 @@ object AsyncHttpApi extends Assertions {
     def blockAt(height: Int): Future[Block] = {
       blocks
         .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height)))
-        .map(r => PBBlocks.vanilla(r.getBlock).explicitGet().json().as[Block])
+        .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
     def broadcastIssue(
@@ -820,7 +805,7 @@ object AsyncHttpApi extends Assertions {
         decimals: Byte,
         reissuable: Boolean,
         fee: Long,
-        description: ByteString = ByteString.EMPTY,
+        description: String = "",
         script: Option[String] = None,
         version: Int = 2
     ): Future[PBSignedTransaction] = {
@@ -833,11 +818,11 @@ object AsyncHttpApi extends Assertions {
         PBTransaction.Data.Issue(
           IssueTransactionData.of(
             name,
-            new String(description.toByteArray),
+            description,
             quantity,
             decimals,
             reissuable,
-            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes), version))
+            if (script.isDefined) Some(Script.of(ByteString.copyFrom(script.get.getBytes.drop(1)), script.get.getBytes.head))
             else None
           )
         )
@@ -867,7 +852,7 @@ object AsyncHttpApi extends Assertions {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            None
+            PBTransactions.toPBAttachment(Some(Attachment.Bin(attachment.toByteArray)))
           )
         )
       )

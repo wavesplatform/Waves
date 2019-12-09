@@ -3,8 +3,11 @@ package com.wavesplatform.block
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints, Longs}
-import com.wavesplatform.block.Block.{GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, RewardBlockVersion, ProtoBlockVersion}
+import com.wavesplatform.block.Block.{GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils._
+import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction}
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
@@ -15,9 +18,10 @@ package object serialization {
       case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => Ints.toByteArray(txs.size)
     }
 
-    val txsBytesSize = txs.map(_.bytes().length + Ints.BYTES).sum
+    val txsBytes = txs.map(tx => if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx)) else tx.bytes())
+    val txsBytesSize = txsBytes.map(_.length + Ints.BYTES).sum
     val txsBuf       = ByteBuffer.allocate(txsBytesSize)
-    txs.foreach(tx => txsBuf.put(Ints.toByteArray(tx.bytes().length)).put(tx.bytes()))
+    txsBytes.foreach(tx => txsBuf.putInt(tx.length).put(tx))
 
     Bytes.concat(txsCount, txsBuf.array())
   }
@@ -31,7 +35,12 @@ package object serialization {
     val txs = (1 to txCount).foldLeft(List.empty[Transaction]) {
       case (txs, _) =>
         val size = buf.getInt
-        TransactionParsers.parseBytes(buf.getByteArray(size)).get :: txs
+        val txBytes = buf.getByteArray(size)
+        val tx = version match {
+          case ProtoBlockVersion => PBTransactions.vanilla(SignedTransaction.parseFrom(txBytes)).explicitGet()
+          case _ => TransactionParsers.parseBytes(txBytes).get
+        }
+        tx :: txs
     }
     txs.reverse
   }

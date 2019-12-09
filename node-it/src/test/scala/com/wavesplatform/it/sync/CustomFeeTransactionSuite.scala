@@ -11,6 +11,7 @@ import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import org.scalatest.CancelAfterFailure
+import com.wavesplatform.utils._
 
 class CustomFeeTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
@@ -75,12 +76,11 @@ object CustomFeeTransactionSuite {
 
   private val seed = Default(2).getString("account-seed")
   private val pk   = KeyPair.fromSeed(seed).explicitGet()
-  val assetTx = IssueTransaction
-    .selfSigned(
+  val assetTx = IssueTransaction(
       TxVersion.V1,
       sender = pk,
-      name = "asset".getBytes("UTF-8"),
-      description = "asset description".getBytes("UTF-8"),
+      "asset".utf8Bytes,
+      "asset description".utf8Bytes,
       quantity = defaultAssetQuantity,
       decimals = 2,
       reissuable = false,
@@ -88,7 +88,7 @@ object CustomFeeTransactionSuite {
       fee = 1.waves,
       timestamp = System.currentTimeMillis()
     )
-    .explicitGet()
+    .signWith(pk)
 
   val assetId = assetTx.id()
 
