@@ -86,9 +86,8 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |""".stripMargin
 
   test("prerequisite: issue asset") {
-    asset = IssuedAsset(ByteStr(
-      sender.issue(smartAccV3, quantity = 1000, waitForTx = true).id.getBytes)
-    )
+    val assetId = sender.issue(smartAccV3, quantity = 1000, waitForTx = true).id
+    asset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
     sender.setScript(smartAccV3, Some(dAppV3.compiled), waitForTx = true)
   }
 
@@ -129,7 +128,19 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("can attach unavailable payment if V3 DApp returns its enough amount") {
-    sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(20, asset)), waitForTx = true)
+    val amount = 20
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(amount, asset)), waitForTx = true)
+    ) { error =>
+      error.statusCode shouldBe 400
+      error.message shouldBe
+        "State check failed. Reason: "                     +
+        "Attempt to transfer unavailable funds: "          +
+        "Transaction application leads to negative asset " +
+       s"'IssuedAsset(${asset.compatId.get})' balance to " +
+        "(at least) temporary negative state, "            +
+       s"current balance is 0, spends equals -$amount, result is -$amount"
+    }
   }
 
   test("wait for the feature activation") {
