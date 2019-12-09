@@ -37,6 +37,7 @@ import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
 import monix.eval.Coeval
@@ -374,23 +375,29 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-        val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
-        val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
-        val info       = AssetInfo(Right(issue.name), Right(issue.description), Height @@ blockchain.height)
+        if (issue.name.length < IssueTransaction.MinAssetNameLength || issue.name.length > IssueTransaction.MaxAssetNameLength) {
+          TracedResult(Left(InvalidName), List())
+        } else if(issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+          TracedResult(Left(TooBigArray), List())
+        } else {
+          val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
+          val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
+          val info       = AssetInfo(Right(issue.name), Right(issue.description), Height @@ blockchain.height)
 
-        val asset = IssuedAsset(issue.id())
+          val asset = IssuedAsset(issue.id)
 
-        DiffsCommon
-          .countScriptComplexity(None /*issue.compiledScript*/, blockchain)
-          .map(
-            script =>
-              Diff(
-                tx = itx,
-                portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
-                issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2))),
-              )
-          )
+          DiffsCommon
+            .countScriptComplexity(None /*issue.compiledScript*/, blockchain)
+            .map(
+              script =>
+                Diff(
+                  tx = itx,
+                  portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                  issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
+                  assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2))),
+                )
+            )
+        }
       }
 
       def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
