@@ -62,19 +62,19 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
   val transferResult = List(AssetTransfer(Address(address1), 41L, Some(asset)), AssetTransfer(Address(address2), 42L, None))
 
   property("ScriptResult from WriteSet") {
-    ScriptResult.fromObj(writeSetObj, V3) shouldBe Right(ScriptResultV3(writeResult, List.empty))
+    ScriptResult.fromObj(asset, writeSetObj, V3) shouldBe Right(ScriptResultV3(writeResult, List.empty))
   }
 
   property("ScriptResult from TransferSet") {
-    ScriptResult.fromObj(transferSetObj, V3) shouldBe Right(ScriptResultV3(List.empty, transferResult))
+    ScriptResult.fromObj(asset, transferSetObj, V3) shouldBe Right(ScriptResultV3(List.empty, transferResult))
   }
 
   property("ScriptResult from ScriptResult") {
-    ScriptResult.fromObj(scriptResultObj, V3) shouldBe
+    ScriptResult.fromObj(asset, scriptResultObj, V3) shouldBe
       Right(ScriptResultV3(writeResult, transferResult))
   }
 
   property("ScriptResult from bad object") {
-    ScriptResult.fromObj(CaseObj(CASETYPEREF("Foo", el), Map.empty), V3) should produce("CallableFunction needs to return")
+    ScriptResult.fromObj(asset, CaseObj(CASETYPEREF("Foo", el), Map.empty), V3) should produce("CallableFunction needs to return")
   }
 }

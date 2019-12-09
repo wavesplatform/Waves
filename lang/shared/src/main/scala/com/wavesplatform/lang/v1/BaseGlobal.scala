@@ -193,6 +193,8 @@ trait BaseGlobal {
     }
 
   def requestNode(url: String): Future[NodeResponse]
+
+  def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 }
 
 object BaseGlobal {

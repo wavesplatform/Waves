@@ -31,6 +31,7 @@ object FieldNames {
   val IssueDescription  = "description"
   val IssueScriptField  = "compiledScript"
   val IssueIsReissuable = "isReissuable"
+  val IssueNonce        = "nonce"
 
   val Reissue = "Reissue"
   val ReissueAssetId      = "assetId"
