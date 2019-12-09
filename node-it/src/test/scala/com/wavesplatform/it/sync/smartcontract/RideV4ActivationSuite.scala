@@ -318,7 +318,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   test("still can attach unavailable payment if V3 DApp returns its enough amount") {
     val balance = sender.accountBalances(callerAcc)._1
     sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(40, asset)), waitForTx = true)
-    sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(balance + 1, Waves)), waitForTx = true)
+    sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(balance, Waves)), waitForTx = true)
   }
 
 }
