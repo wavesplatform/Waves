@@ -593,6 +593,21 @@ object SyncHttpApi extends Assertions {
       }
     }
 
+    def updateAssetInfo(
+        caller: String,
+        assetId: String,
+        name: String,
+        description: String,
+        fee: Long = issueFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1,
+        waitForTx: Boolean = false
+    ): (Transaction, JsValue) = {
+      sync(async(n).updateAssetInfo(caller, assetId, name, description, fee, feeAssetId, version)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
+    }
+
     def waitForUtxIncreased(fromSize: Int): Int = sync(async(n).waitForUtxIncreased(fromSize))
 
     def featureActivationStatus(featureNum: Short): FeatureActivationStatus =

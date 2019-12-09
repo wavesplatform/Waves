@@ -29,7 +29,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -383,6 +383,29 @@ object AsyncHttpApi extends Assertions {
           "payment"    -> payment,
           "fee"        -> fee,
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
+        )
+      )
+    }
+
+    def updateAssetInfo(
+                      caller: String,
+                      assetId: String,
+                      name: String,
+                      description: String,
+                      fee: Long,
+                      feeAssetId: Option[String] = None,
+                      version: TxVersion = TxVersion.V1
+                    ): Future[(Transaction, JsValue)] = {
+      signAndTraceBroadcast(
+        Json.obj(
+          "type"    -> UpdateAssetInfoTransaction.typeId,
+          "version"     -> version,
+          "sender"      -> caller,
+          "assetId"     -> assetId,
+          "name"        -> name,
+          "description" -> description,
+          "fee"         -> fee,
+          "feeAssetId"  -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
         )
       )
     }
