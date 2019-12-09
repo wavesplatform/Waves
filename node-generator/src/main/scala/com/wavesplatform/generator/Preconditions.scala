@@ -65,8 +65,8 @@ object Preconditions {
                 .selfSigned(
                   TxVersion.V2,
                   issuer,
-                  assetName.getBytes("UTF-8"),
-                  assetDescription.getBytes("UTF-8"),
+                  assetName,
+                  assetDescription,
                   amount,
                   decimals.toByte,
                   reissuable,
@@ -80,7 +80,7 @@ object Preconditions {
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, "Generator".getBytes("UTF-8"), time.correctedTime())
+                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, None, time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
@@ -106,7 +106,7 @@ object Preconditions {
             balance,
             Waves,
             Fee,
-            "Generator".getBytes("UTF-8"),
+            None,
             time.correctedTime()
           )
           .explicitGet()

@@ -12,7 +12,6 @@ import com.wavesplatform.transaction.validation.impl.SetAssetScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class SetAssetScriptTransaction(
@@ -40,13 +39,9 @@ case class SetAssetScriptTransaction(
 }
 
 object SetAssetScriptTransaction extends TransactionParser {
-  override type TransactionT = SetAssetScriptTransaction
-
   val typeId: TxType = 15
 
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-
-  override val classTag = ClassTag(classOf[SetAssetScriptTransaction])
 
   implicit val validator: TxValidator[SetAssetScriptTransaction] = SetAssetScriptTxValidator
 
@@ -66,7 +61,7 @@ object SetAssetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetAssetScriptTransaction] =
     SetAssetScriptTransaction(1.toByte, sender, assetId, script, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -77,7 +72,7 @@ object SetAssetScriptTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SetAssetScriptTransaction] =
     create(version, sender, asset, script, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(

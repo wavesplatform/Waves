@@ -10,6 +10,7 @@ import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiv
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedNV, ValidatedV}
+import com.wavesplatform.utils._
 
 import scala.util.Try
 
@@ -40,7 +41,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       V.cond(
         funcCallOpt.isEmpty || (funcCallOpt.get.function match {
           case FunctionHeader.User(internalName, _) =>
-            internalName.getBytes("UTF-8").length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
+            internalName.utf8Bytes.length <= ContractLimits.MaxAnnotatedFunctionNameInBytes
           case _ => true
         }),
         GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")

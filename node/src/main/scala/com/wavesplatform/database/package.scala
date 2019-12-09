@@ -8,6 +8,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.validation.Validators
@@ -15,10 +16,12 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.database.protobuf.AssetDetails.BytesOrString.Value
+import com.wavesplatform.database.protobuf.{AssetDetails => PBAssetDetails}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, _}
 import org.iq80.leveldb.{DB, Options, ReadOptions}
 
 package object database extends ScorexLogging {
@@ -143,9 +146,9 @@ package object database extends ScorexLogging {
 
   def writeStrings(strings: Seq[String]): Array[Byte] =
     strings
-      .foldLeft(ByteBuffer.allocate(strings.map(_.getBytes(UTF_8).length + 2).sum)) {
+      .foldLeft(ByteBuffer.allocate(strings.map(_.utf8Bytes.length + 2).sum)) {
         case (b, s) =>
-          val bytes = s.getBytes(UTF_8)
+          val bytes = s.utf8Bytes
           b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
@@ -253,44 +256,37 @@ package object database extends ScorexLogging {
   }
 
   def readAssetDetails(data: Array[Byte]): (AssetInfo, AssetVolumeInfo) = {
-    val ndi     = newDataInput(data)
-    val reissue = ndi.readBoolean()
-    val volume  = ndi.readBigInt()
 
-    val nameLen = ndi.readInt()
-    val name    = new String(ndi.readBytes(nameLen))
+    val pbad = PBAssetDetails.parseFrom(data)
 
-    val descriptionLen = ndi.readInt()
-    val description    = new String(ndi.readBytes(descriptionLen))
+    def extract(value: PBAssetDetails.BytesOrString.Value): Either[ByteStr, String] = value match {
+      case Value.Bytes(value)  => Left(ByteStr(value.toByteArray))
+      case Value.String(value) => Right(value)
+      case _ => throw new IllegalArgumentException("value is missing")
+    }
 
-    val lastUpdatedAt = Height @@ ndi.readInt()
-
-    val info       = AssetInfo(name, description, lastUpdatedAt)
-    val volumeInfo = AssetVolumeInfo(reissue, volume)
-
-    (info, volumeInfo)
+    (
+      AssetInfo(extract(pbad.getName.value), extract(pbad.getDescription.value), Height(pbad.lastRenamedAt)),
+      AssetVolumeInfo(pbad.reissuable, BigInt(pbad.totalVolume.toByteArray))
+    )
   }
 
   def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
     val (info, volumeInfo) = ai
 
-    val ndo = newDataOutput()
+    def encode(v: Either[ByteStr, String]): PBAssetDetails.BytesOrString =
+      PBAssetDetails.BytesOrString(v match {
+        case Left(bs) => PBAssetDetails.BytesOrString.Value.Bytes(ByteString.copyFrom(bs.arr))
+        case Right(s) => PBAssetDetails.BytesOrString.Value.String(s)
+      })
 
-    ndo.writeBoolean(volumeInfo.isReissuable)
-    ndo.writeBigInt(volumeInfo.volume)
-
-    val nameBytes        = info.name.getBytes()
-    val descriptionBytes = info.description.getBytes()
-
-    ndo.writeInt(nameBytes.length)
-    ndo.write(nameBytes)
-
-    ndo.writeInt(descriptionBytes.length)
-    ndo.write(descriptionBytes)
-
-    ndo.writeInt(info.lastUpdatedAt)
-
-    ndo.toByteArray
+    PBAssetDetails(
+      Some(encode(info.name)),
+      Some(encode(info.description)),
+      info.lastUpdatedAt,
+      volumeInfo.isReissuable,
+      ByteString.copyFrom(volumeInfo.volume.toByteArray)
+    ).toByteArray
   }
 
   def writeAssetStaticInfo(ai: AssetStaticInfo): Array[Byte] = {
@@ -504,7 +500,7 @@ package object database extends ScorexLogging {
 
   def writeAssetScript(script: (PublicKey, Script, Long)): Array[Byte] = {
     script match {
-      case (pk, script, c) => 
+      case (pk, script, c) =>
         val pkb = pk.arr
         assert(pkb.size == KeyLength)
         pkb ++ script.bytes().arr ++ Longs.toByteArray(c)
@@ -513,7 +509,7 @@ package object database extends ScorexLogging {
 
   def readAssetScript(b: Array[Byte]): (PublicKey, Script, Long) = {
     val pkb = b.take(KeyLength)
-    val script = b.slice(KeyLength, b.length - 8) 
+    val script = b.slice(KeyLength, b.length - 8)
     (
       PublicKey(pkb),
       ScriptReader.fromBytes(script).explicitGet(),
@@ -525,7 +521,7 @@ package object database extends ScorexLogging {
     val (pk, expr, complexity, callableComplexities) = script
     val pkb = pk.arr
     assert(pkb.size == KeyLength)
-    val output = newDataOutput()
+    val output                                   = newDataOutput()
 
     output.writeByteStr(pkb)
 
@@ -544,11 +540,11 @@ package object database extends ScorexLogging {
   }
 
   def readScript(b: Array[Byte]): (PublicKey, Script, Long, Map[String, Long]) = {
-    val input = newDataInput(b)
+    val input                     = newDataInput(b)
     val pk = PublicKey(input.readByteStr(KeyLength))
-    val scriptSize = input.readInt()
-    val script = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
-    val complexity = input.readLong()
+    val scriptSize                = input.readInt()
+    val script                    = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
+    val complexity                = input.readLong()
     val callableComplexitiesCount = input.readInt()
     val callableComplexities =
       (1 to callableComplexitiesCount)

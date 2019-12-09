@@ -6,29 +6,12 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
-import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
-import com.wavesplatform.transaction.{
-  Asset,
-  ChainSpecific,
-  FastHashId,
-  Proofs,
-  ProvenTransaction,
-  Transaction,
-  TransactionParser,
-  TxAmount,
-  TxTimestamp,
-  TxType,
-  TxVersion,
-  UnexpectedTransaction,
-  VersionedTransaction,
-  _
-}
+import com.wavesplatform.transaction.{Asset, ChainSpecific, FastHashId, Proofs, ProvenTransaction, Transaction, TransactionParser, TxAmount, TxTimestamp, TxType, TxVersion, UnexpectedTransaction, VersionedTransaction, _}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.reflect.ClassTag
 import scala.util.{Failure, Success, Try}
 
 case class UpdateAssetInfoTransaction(
@@ -52,7 +35,7 @@ case class UpdateAssetInfoTransaction(
   override def builder: UpdateAssetInfoTransaction.type = UpdateAssetInfoTransaction
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(PBTransactionSerializer.bodyBytes(self))
-  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.toBytes(self))
+  override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(PBTransactionSerializer.bytes(self))
 
   override val json: Coeval[JsObject] =
     Coeval.evalOnce(
@@ -66,11 +49,8 @@ case class UpdateAssetInfoTransaction(
 }
 
 object UpdateAssetInfoTransaction extends TransactionParser {
-  override type TransactionT = UpdateAssetInfoTransaction
-
   override val typeId: TxType                                 = 17: Byte
   override val supportedVersions: Set[TxVersion]              = Set(1)
-  override def classTag: ClassTag[UpdateAssetInfoTransaction] = ClassTag(classOf[UpdateAssetInfoTransaction])
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))

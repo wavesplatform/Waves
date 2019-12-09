@@ -52,11 +52,6 @@ object TransactionParsers {
       }
   } ++ modern
 
-  private[this] val byName: Map[String, TransactionParser] = (old ++ modern).map {
-    case (_, builder) => builder.classTag.runtimeClass.getSimpleName -> builder
-  }
-
-  def by(name: String): Option[TransactionParser]                     = byName.get(name)
   def by(typeId: Byte, version: TxVersion): Option[TransactionParser] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {

@@ -102,7 +102,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount + setScriptFee + smartFee,
           feeAsset = Waves,
           fee = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray,
+          attachment = None,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -124,7 +124,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           feeAsset = Waves,
           fee = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray,
+          attachment = None,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -148,7 +148,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         feeAssetId = Waves,
         fee = setScriptFee + smartFee,
-        attachment = Array.emptyByteArray,
+        attachment = None,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )
@@ -185,7 +185,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         feeAsset = Waves,
         fee = setScriptFee + smartFee,
-        attachment = Array.emptyByteArray,
+        attachment = None,
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()

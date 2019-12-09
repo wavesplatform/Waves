@@ -27,7 +27,7 @@ class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with Prop
     val codec = new SpiedMessageCodec
     val ch    = new EmbeddedChannel(codec)
 
-    ch.writeInbound(RawBytes.from(origTx))
+    ch.writeInbound(RawBytes.fromTransaction(origTx))
     val decodedTx = ch.readInbound[Transaction]()
 
     decodedTx shouldBe origTx

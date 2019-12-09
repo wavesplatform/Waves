@@ -65,7 +65,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     assertBadRequestAndResponse(
       sender.signedBroadcast(
         TransferTransaction
-          .selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee, Array(), ts)
+          .selfSigned(2.toByte, acc0, acc1.toAddress, Waves, 1000, Waves, minFee, None, ts)
           .explicitGet()
           .json()
       ),

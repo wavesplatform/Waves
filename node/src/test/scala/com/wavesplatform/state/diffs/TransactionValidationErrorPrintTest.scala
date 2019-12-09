@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -14,6 +12,7 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.utils._
 import org.scalatest.{Inside, PropSpec}
 
 class TransactionValidationErrorPrintTest extends PropSpec with Inside {
@@ -60,20 +59,19 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
     val master  = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
     val genesis = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
 
-    val issueTransaction = IssueTransaction
-      .selfSigned(
+    val issueTransaction = IssueTransaction(
         TxVersion.V2,
-        sender = KeyPair(seed.bytes),
-        name = "name".getBytes(StandardCharsets.UTF_8),
-        description = "description".getBytes(StandardCharsets.UTF_8),
-        quantity = 100,
-        decimals = 0,
-        reissuable = false,
-        script = Some(typedScript),
-        fee = 10000000,
-        timestamp = 0
+        KeyPair(seed.bytes),
+        "name".utf8Bytes,
+        "description".utf8Bytes,
+        100,
+        0.toByte,
+        false,
+        Some(typedScript),
+        10000000,
+        0
       )
-      .explicitGet()
+      .signWith(KeyPair(seed.bytes))
 
     val transferTransaction = TransferTransaction
       .selfSigned(
@@ -84,7 +82,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside {
         amount = 1,
         feeAsset = Waves,
         fee = 10000000,
-        attachment = Array[Byte](),
+        attachment = None,
         timestamp = 0
       )
       .explicitGet()

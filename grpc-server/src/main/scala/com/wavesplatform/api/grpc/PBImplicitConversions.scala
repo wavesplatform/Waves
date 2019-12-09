@@ -37,7 +37,7 @@ trait PBImplicitConversions {
   }
 
   implicit class PBBlockConversions(block: PBBlock) {
-    def toVanilla = PBBlocks.vanilla(block).explicitGet()
+    def toVanilla = PBBlocks.vanilla(block).get
   }
 
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {

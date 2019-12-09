@@ -9,16 +9,16 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Proofs, Transaction}
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Time, _}
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{NoShrink, RequestGen}
 import org.scalacheck.{Gen => G}
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{JsObject, JsPath, JsValue, Json, JsonValidationError, Writes}
-
+import play.api.libs.json._
 class AssetsBroadcastRouteSpec
     extends RouteSpec("/assets/broadcast/")
     with RequestGen
@@ -35,10 +35,18 @@ class AssetsBroadcastRouteSpec
     stub[Time]
   ).route
 
+  private[this] val fixedIssueGen = for {
+    (sender, _, _, quantity, decimals, reissuable, fee, timestamp) <- issueParamGen
+    nameLength                                                     <- G.choose(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    name                                                           <- G.listOfN(nameLength, G.alphaNumChar)
+    description                                                    <- G.listOfN(IssueTransaction.MaxAssetDescriptionLength, G.alphaNumChar)
+    tx                                                             <- createLegacyIssue(sender, name.mkString.utf8Bytes, description.mkString.utf8Bytes, quantity, decimals, reissuable, fee, timestamp)
+  } yield tx
+
   "returns StateCheckFailed" - {
     val vt = Table[String, G[_ <: Transaction], JsValue => JsValue](
       ("url", "generator", "transform"),
-      ("issue", issueGen.retryUntil(_.version == 1), identity),
+      ("issue", fixedIssueGen, identity),
       ("reissue", reissueGen.retryUntil(_.version == 1), identity),
       ("burn", burnGen.retryUntil(_.version == 1), {
         case o: JsObject => o ++ Json.obj("quantity" -> o.value("amount"))
@@ -135,13 +143,19 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
+          posting(tr.copy(assetId = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError("invalid.feeAssetId"))))
+          )
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
+          posting(tr.copy(feeAssetId = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId"))))
+          )
         }
         forAll(longAttachment) { a =>
-          posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("requirement failed"), true)
+          posting(tr.copy(attachment = Some(a))) should produce(
+            WrongJson(errors = Seq(JsPath \ "attachment" -> Seq(JsonValidationError(s"attachment length ${a.length} exceeds maximum length of 192"))))
+          )
         }
         forAll(nonPositiveLong) { fee =>
           posting(tr.copy(fee = fee)) should produce(InsufficientFee())
@@ -167,7 +181,7 @@ class AssetsBroadcastRouteSpec
           1 * Waves,
           Asset.Waves,
           Waves / 3,
-          Array.emptyByteArray,
+          None,
           System.currentTimeMillis()
         )
         .right
@@ -183,7 +197,7 @@ class AssetsBroadcastRouteSpec
         amount = 1 * Waves,
         feeAssetId = Asset.Waves,
         fee = Waves / 3,
-        attachment = Array.emptyByteArray,
+        attachment = None,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs(Seq.empty)
       )
@@ -218,7 +232,7 @@ class AssetsBroadcastRouteSpec
       fee,
       feeAssetId.maybeBase58Repr,
       timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
+      Some(Base58.encode(attachment.toBytesStrict)),
       proofs.toSignature.toString
     )
   }
@@ -233,7 +247,7 @@ class AssetsBroadcastRouteSpec
       feeAssetId.maybeBase58Repr,
       fee,
       timestamp,
-      attachment.headOption.map(_ => Base58.encode(attachment)),
+      Some(Base58.encode(attachment.toBytesStrict)),
       proofs.proofs.map(_.toString).toList
     )
   }

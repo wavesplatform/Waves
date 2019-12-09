@@ -15,7 +15,7 @@ object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
-    val info       = AssetInfo(new String(tx.name), new String(tx.description), Height @@ blockchain.height)
+    val info       = AssetInfo(tx.safeName, tx.safeDescription, Height @@ blockchain.height)
 
     val asset = IssuedAsset(tx.id())
 
@@ -113,7 +113,7 @@ object AssetTransactionsDiff {
           (),
           GenericError(s"Can't update asset info before $updateAllowedAt block")
         )
-        updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
+        updatedInfo = AssetInfo(Right(tx.name), Right(tx.description), Height @@ blockchain.height)
       } yield Diff(
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> portfolioUpdate),

@@ -1,29 +1,28 @@
 package com.wavesplatform.it
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.util._
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
 
 trait GrpcIntegrationSuiteWithThreeAddress
-  extends BeforeAndAfterAll
-  with Matchers
-  with ScalaFutures
-  with IntegrationPatience
-  with RecoverMethods
-  with IntegrationTestsScheme
-  with Nodes
-  with ScorexLogging {
+    extends BeforeAndAfterAll
+    with Matchers
+    with ScalaFutures
+    with IntegrationPatience
+    with RecoverMethods
+    with IntegrationTestsScheme
+    with Nodes
+    with ScorexLogging {
   this: Suite =>
 
-  def miner: Node    = nodes.head
+  def miner: Node    = nodes.init.last
   def notMiner: Node = nodes.last
 
   protected def sender: Node = miner
@@ -32,9 +31,9 @@ trait GrpcIntegrationSuiteWithThreeAddress
   protected lazy val secondAcc: KeyPair = KeyPair("second_acc".getBytes("UTF-8"))
   protected lazy val thirdAcc: KeyPair  = KeyPair("third_acc".getBytes("UTF-8"))
 
-  protected lazy val firstAddress: ByteString  = ByteString.copyFrom(Base58.decode(firstAcc.stringRepr))
-  protected lazy val secondAddress: ByteString = ByteString.copyFrom(Base58.decode(secondAcc.stringRepr))
-  protected lazy val thirdAddress: ByteString  = ByteString.copyFrom(Base58.decode(thirdAcc.stringRepr))
+  protected lazy val firstAddress: ByteString  = PBRecipients.create(Address.fromPublicKey(firstAcc.publicKey)).getPublicKeyHash
+  protected lazy val secondAddress: ByteString = PBRecipients.create(Address.fromPublicKey(secondAcc.publicKey)).getPublicKeyHash
+  protected lazy val thirdAddress: ByteString  = PBRecipients.create(Address.fromPublicKey(thirdAcc.publicKey)).getPublicKeyHash
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -44,7 +43,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
     def dumpBalances(node: Node, accounts: Seq[ByteString], label: String): Unit = {
       accounts.foreach(acc => {
         val balance = miner.grpc.wavesBalance(acc).available
-        val eff = miner.grpc.wavesBalance(acc).effective
+        val eff     = miner.grpc.wavesBalance(acc).effective
 
         val formatted = s"$acc: balance = $balance, effective = $eff"
         log.debug(s"$label account balance:\n$formatted")
@@ -61,9 +60,13 @@ trait GrpcIntegrationSuiteWithThreeAddress
     }
 
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>
-      PBTransactions.vanilla(
-        sender.grpc.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
-      ).explicitGet().id().toString
+      PBTransactions
+        .vanilla(
+          sender.grpc.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
+        )
+        .explicitGet()
+        .id()
+        .toString
     }
 
     def correctStartBalancesFuture(): Unit = {
@@ -73,10 +76,9 @@ trait GrpcIntegrationSuiteWithThreeAddress
       dumpBalances(sender, accounts, "initial")
       val txs = makeTransfers(accounts)
 
-
       val height = nodes.map(_.grpc.height).max
 
-      withClue(s"waitForHeight(${height + 2})") {
+      withClue(s"waitForHeight(${height + 1})") {
         nodes.foreach(n => n.grpc.waitForHeight(height + 2))
       }
 

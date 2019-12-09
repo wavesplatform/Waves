@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress}
 
 import com.google.common.base.Charsets
 import io.netty.buffer.ByteBuf
+import com.wavesplatform.utils._
 
 case class Handshake(applicationName: String,
                      applicationVersion: (Int, Int, Int),
@@ -11,7 +12,7 @@ case class Handshake(applicationName: String,
                      nodeNonce: Long,
                      declaredAddress: Option[InetSocketAddress]) {
   def encode(out: ByteBuf): out.type = {
-    val applicationNameBytes = applicationName.getBytes(Charsets.UTF_8)
+    val applicationNameBytes = applicationName.utf8Bytes
     require(applicationNameBytes.length <= Byte.MaxValue, "The application name is too long!")
     out.writeByte(applicationNameBytes.length)
     out.writeBytes(applicationNameBytes)
@@ -20,7 +21,7 @@ case class Handshake(applicationName: String,
     out.writeInt(applicationVersion._2)
     out.writeInt(applicationVersion._3)
 
-    val nodeNameBytes = nodeName.getBytes(Charsets.UTF_8)
+    val nodeNameBytes = nodeName.utf8Bytes
     require(nodeNameBytes.length <= Byte.MaxValue, "A node name is too long!")
     out.writeByte(nodeNameBytes.length)
     out.writeBytes(nodeNameBytes)

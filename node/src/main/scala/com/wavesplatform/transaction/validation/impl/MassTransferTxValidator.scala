@@ -1,8 +1,8 @@
 package com.wavesplatform.transaction.validation.impl
 
-import com.wavesplatform.transaction.TxValidationError.{GenericError, TooBigArray}
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.MaxTransferCount
-import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 
 object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
@@ -11,7 +11,7 @@ object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
     V.seq(tx)(
       V.noOverflow(fee +: transfers.map(_.amount): _*),
       V.cond(transfers.length <= MaxTransferCount, GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount")),
-      V.cond(attachment.length <= TransferTransaction.MaxAttachmentSize, TooBigArray),
+      V.transferAttachment(isProtobufVersion, attachment),
       V.cond(transfers.forall(_.amount >= 0), GenericError("One of the transfers has negative amount")),
       V.fee(fee)
     )

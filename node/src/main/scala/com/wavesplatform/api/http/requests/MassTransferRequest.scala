@@ -1,5 +1,6 @@
 package com.wavesplatform.api.http.requests
 
+import com.wavesplatform.transaction.transfer.Attachment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import play.api.libs.json.{Json, Reads}
 
@@ -8,7 +9,7 @@ case class MassTransferRequest(
     sender: String,
     transfers: List[Transfer],
     fee: Long,
-    attachment: Option[String],
+    attachment: Option[Attachment],
     timestamp: Option[Long] = None
 )
 
