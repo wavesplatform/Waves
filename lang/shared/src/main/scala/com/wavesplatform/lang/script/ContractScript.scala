@@ -37,6 +37,18 @@ object ContractScript {
         .toTry
     )
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
+
+    override val containsArray: Boolean = {
+      val declExprs = expr.decs.map {
+        case l: LET  => l.value
+        case f: FUNC => f.body
+      }
+      val callableExprs = expr.callableFuncs.map(_.u.body)
+      val verifierExpr  = expr.verifierFuncOpt.map(_.u.body).toList
+
+      (verifierExpr ::: declExprs ::: callableExprs)
+        .exists(com.wavesplatform.lang.v1.compiler.containsArray)
+    }
   }
 
   def estimateComplexityByFunction(
