@@ -135,10 +135,10 @@ class AssetsBroadcastRouteSpec
           posting(tr.copy(recipient = a)) should produce(InvalidAddress)
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(assetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
+          posting(tr.copy(assetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "assetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44")))))
         }
         forAll(invalidBase58) { a =>
-          posting(tr.copy(feeAssetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError("invalid.feeAssetId")))))
+          posting(tr.copy(feeAssetId = Some(a))) should produce(WrongJson(errors = Seq(JsPath \ "feeAssetId" -> Seq(JsonValidationError(s"Too long assetId: length of $a exceeds 44")))))
         }
         forAll(longAttachment) { a =>
           posting(tr.copy(attachment = Some(a))) should produce(CustomValidationError("requirement failed"), true)
