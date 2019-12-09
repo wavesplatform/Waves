@@ -29,6 +29,7 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
+import com.wavesplatform.crypto.{verify => sigVerify}
 
 class BlockchainUpdaterImpl(
     private val blockchain: LevelDBWriter,
@@ -390,6 +391,22 @@ class BlockchainUpdaterImpl(
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
+              totalSignatureValid <- ng
+                .totalDiffOf(microBlock.prevResBlockSig)
+                .toRight(GenericError(s"No referenced block exists: $microBlock"))
+                .map { case (accumulatedBlock, _, _, _, _) =>
+                  val bytes = accumulatedBlock
+                    .copy(transactionData = accumulatedBlock.transactionData ++ microBlock.transactionData)
+                    .bytesWithoutSignature()
+
+                  sigVerify(microBlock.totalResBlockSig, bytes, microBlock.sender)
+                }
+              _ <- Either
+                .cond(
+                  totalSignatureValid,
+                  Unit,
+                  MicroBlockAppendError("Invalid total block signature", microBlock)
+                )
               blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
