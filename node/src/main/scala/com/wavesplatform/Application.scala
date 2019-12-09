@@ -120,7 +120,17 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings)
+    val utxStorage =
+      new UtxPoolImpl(
+        time,
+        blockchainUpdater,
+        spendableBalanceChanged,
+        settings.utxSettings,
+        acceptingLatch = () =>
+          blockchainUpdater.lastBlockTimestamp.fold(false) { ts =>
+            time.correctedTime() - ts <= settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis
+          }
+      )
     maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
@@ -200,7 +210,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     rxExtensionLoaderShutdown = Some(sh)
 
     val timer = new HashedWheelTimer()
-    val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val utxSynchronizerScheduler =
+      Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
         utxSynchronizerScheduler
