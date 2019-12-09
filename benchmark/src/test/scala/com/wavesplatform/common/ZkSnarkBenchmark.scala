@@ -5,7 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.ZkSnarkBenchmark.{CurveSt, Groth16St, MerkleSt}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
-import com.wavesplatform.zwaves.bls12.Groth16
+import com.wavesplatform.zwaves.bls12.{Groth16, PedersenMerkleTree}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scorex.crypto.signatures.{Curve25519, Signature}
@@ -25,6 +25,10 @@ class ZkSnarkBenchmark {
   @Benchmark
   def sigVerify(st: CurveSt, bh: Blackhole): Unit =
     bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
+
+  @Benchmark
+  def merkleTest(st: MerkleSt, bh: Blackhole): Unit =
+    bh.consume(PedersenMerkleTree.addItem(st.root0, st.proof0, st.index, st.elements1))
 }
 
 object ZkSnarkBenchmark {
