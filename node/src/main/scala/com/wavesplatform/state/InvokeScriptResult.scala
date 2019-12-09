@@ -36,14 +36,14 @@ object InvokeScriptResult {
 
   implicit val issueFormat = Writes[Issue] { iss =>
     Json.obj(
-      "assetId" -> iss.id(),
+    "assetId" -> iss.id,
     "name" -> iss.name,
     "description" -> iss.description,
     "quantity" -> iss.quantity,
     "decimals" -> iss.decimals,
     "isReissuable" -> iss.isReissuable,
     "compiledScript" -> iss.compiledScript,
-//    "nonce" ->
+    "nonce" -> iss.nonce
     )
   }
   implicit val reissueFormat = Json.writes[Reissue]
