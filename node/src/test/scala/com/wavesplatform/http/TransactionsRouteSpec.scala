@@ -184,6 +184,7 @@ class TransactionsRouteSpec
             .returning(
               Some(
                 AssetDescription(
+                  source = assetId.id,
                   issuer = accountGen.sample.get,
                   name = Right("foo"),
                   description = Right("bar"),
@@ -224,6 +225,7 @@ class TransactionsRouteSpec
             .returning(
               Some(
                 AssetDescription(
+                  source = assetId.id,
                   issuer = accountGen.sample.get,
                   name = Right("foo"),
                   description = Right("bar"),

@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
 import com.wavesplatform.utils._
-import com.wavesplatform.lang.v1.traits.domain.{Issue, Burn, Reissue}
+import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.transaction.Asset
@@ -34,7 +34,18 @@ object InvokeScriptResult {
     (assets.toVector ++ Some(waves)).filter(_.amount != 0)
   }
 
-  implicit val issueFormat = Json.writes[Issue]
+  implicit val issueFormat = Writes[Issue] { iss =>
+    Json.obj(
+      "assetId" -> iss.id(),
+    "name" -> iss.name,
+    "description" -> iss.description,
+    "quantity" -> iss.quantity,
+    "decimals" -> iss.decimals,
+    "isReissuable" -> iss.isReissuable,
+    "compiledScript" -> iss.compiledScript,
+//    "nonce" ->
+    )
+  }
   implicit val reissueFormat = Json.writes[Reissue]
   implicit val burnFormat = Json.writes[Burn]
   implicit val jsonFormat = Json.writes[InvokeScriptResult]

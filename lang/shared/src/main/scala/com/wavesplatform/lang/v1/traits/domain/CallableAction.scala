@@ -41,7 +41,7 @@ object Issue {
     out.writeInt(decimals)
     out.writeLong(quantity)
     out.writeShort((if(isReissuable) { 1 } else { 0 }))
-    out.writeLong(0l) // Nonce
+    out.writeLong(nonce)
     Issue(ByteStr(Blake2b256.hash(out.toByteArray)),
           compiledScript,
           decimals: Int,

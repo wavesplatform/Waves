@@ -259,6 +259,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
           case (blockDiff, newState) =>
             newState.assetDescription(IssuedAsset(issue.id())) shouldBe Some(
               AssetDescription(
+                issue.assetId,
                 issue.sender,
                 Left(issue.nameBytes),
                 Left(issue.descriptionBytes),

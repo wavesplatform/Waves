@@ -220,7 +220,7 @@ case class TransactionsApiRoute(
   )
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
-  def merkleProof: Route = path("merkleProof")(getMerkleProof ~ postMerkleProof)
+  def merkleProof: Route = path("merkleProof")(merkleProofGet ~ merkleProofPost)
 
   @Path("/merkleProof")
   @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "GET")
@@ -235,7 +235,7 @@ case class TransactionsApiRoute(
       )
     )
   )
-  def getMerkleProof: Route = (get & parameters('id.*))(ids => complete(merkleProof(ids.toList)))
+  def merkleProofGet: Route = (get & parameters('id.*))(ids => complete(merkleProof(ids.toList)))
 
   @Path("/merkleProof")
   @ApiOperation(value = "Transaction's merkle proof", notes = "Transaction's merkle proof", httpMethod = "POST")
@@ -251,7 +251,7 @@ case class TransactionsApiRoute(
       )
     )
   )
-  def postMerkleProof: Route =
+  def merkleProofPost: Route =
     jsonPost[JsObject](
       jsv =>
         (jsv \ "ids").validate[List[String]] match {
