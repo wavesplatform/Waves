@@ -98,7 +98,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val reissue = Json.parse(reissueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(reissue)
 
-    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(firstAddress, issue, Some(100L), sponsorFee))
+    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(Some(1.toByte), firstAddress, issue, Some(100L), sponsorFee))
     val sponsor     = Json.parse(sponsorJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(sponsor)
   }

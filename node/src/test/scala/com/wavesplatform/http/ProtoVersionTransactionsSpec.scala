@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion}
+import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TestTime, TransactionGen}
@@ -58,7 +58,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias, MinFee, Now, Proofs.empty).explicitGet()
 
       val proofs = Post(routePath("/sign"), aliasTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, aliasTxUnsigned)
       }
 
       val aliasTx  = aliasTxUnsigned.copy(proofs = proofs)
@@ -90,7 +90,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         .explicitGet()
 
       val issueProofs = Post(routePath("/sign"), issueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, issueTxUnsigned)
       }
 
       val issueTx        = issueTxUnsigned.copy(proofs = issueProofs)
@@ -101,7 +101,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         .explicitGet()
 
       val reissueProofs = Post(routePath("/sign"), reissueTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, reissueTxUnsigned)
       }
 
       val reissueTx        = reissueTxUnsigned.copy(proofs = reissueProofs)
@@ -111,7 +111,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         BurnTransaction.create(TxVersion.V3, account, IssuedAsset(issueTx.assetId), quantity, MinIssueFee, Now, Proofs.empty).explicitGet()
 
       val burnProofs = Post(routePath("/sign"), burnTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, burnTxUnsigned)
       }
 
       val burnTx        = burnTxUnsigned.copy(proofs = burnProofs)
@@ -132,7 +132,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val dataTxUnsigned = DataTransaction.create(TxVersion.V2, account, Seq(data), DataTxFee, Now, Proofs.empty).explicitGet()
 
       val proofs = Post(routePath("/sign"), dataTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, dataTxUnsigned)
       }
 
       val dataTx    = dataTxUnsigned.copy(proofs = proofs)
@@ -179,7 +179,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         .explicitGet()
 
       val proofs = Post(routePath("/sign"), invokeScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, invokeScriptTxUnsigned)
       }
 
       val invokeScriptTx = invokeScriptTxUnsigned.copy(proofs = proofs)
@@ -196,7 +196,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val leaseTxUnsigned = LeaseTransaction.create(TxVersion.V3, account, recipient, 100, MinFee, Now, Proofs.empty).explicitGet()
 
       val leaseProofs = Post(routePath("/sign"), leaseTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, leaseTxUnsigned)
       }
 
       val leaseTx = leaseTxUnsigned.copy(proofs = leaseProofs)
@@ -204,7 +204,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val leaseCancelTxUnsigned = LeaseCancelTransaction.create(TxVersion.V3, account, leaseTx.id(), MinFee, Now, Proofs.empty).explicitGet()
 
       val leaseCancelProofs = Post(routePath("/sign"), leaseCancelTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, leaseCancelTxUnsigned)
       }
 
       val leaseCancelTx = leaseCancelTxUnsigned.copy(proofs = leaseCancelProofs)
@@ -228,7 +228,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         TransferTransaction.create(TxVersion.V3, account, recipient, asset, 100, Asset.Waves, MinFee, attachment, Now, Proofs.empty).explicitGet()
 
       val proofs = Post(routePath("/sign"), transferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, transferTxUnsigned)
       }
 
       val transferTx = transferTxUnsigned.copy(proofs = proofs)
@@ -247,7 +247,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         MassTransferTransaction.create(TxVersion.V2, account, Asset.Waves, transfers, MassTransferTxFee, Now, attachment, Proofs.empty).explicitGet()
 
       val proofs = Post(routePath("/sign"), massTransferTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, massTransferTxUnsigned)
       }
 
       val massTransferTx = massTransferTxUnsigned.copy(proofs = proofs)
@@ -264,7 +264,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val setScriptTxUnsigned = SetScriptTransaction.create(TxVersion.V2, account, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
 
       val proofs = Post(routePath("/sign"), setScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, setScriptTxUnsigned)
       }
 
       val setScriptTx = setScriptTxUnsigned.copy(proofs = proofs)
@@ -283,7 +283,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
         SetAssetScriptTransaction.create(TxVersion.V2, account, asset, Some(script), SetAssetScriptFee, Now, Proofs.empty).explicitGet()
 
       val proofs = Post(routePath("/sign"), setAssetScriptTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, setAssetScriptTxUnsigned)
       }
 
       val setAssetScriptTx = setAssetScriptTxUnsigned.copy(proofs = proofs)
@@ -298,7 +298,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val sponsorshipTxUnsigned = SponsorFeeTransaction.selfSigned(TxVersion.V2, account, asset, Some(100), MinFee, Now).explicitGet()
 
       val proofs = Post(routePath("/sign"), sponsorshipTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
-        checkProofs(response)
+        checkProofs(response, sponsorshipTxUnsigned)
       }
 
       val sponsorshipTx = sponsorshipTxUnsigned.copy(proofs = proofs)
@@ -309,8 +309,11 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       (sponsorshipTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
-    def checkProofs(response: HttpResponse): Proofs = {
+    def checkProofs(response: HttpResponse, tx: VersionedTransaction): Proofs = {
       response.status shouldBe StatusCodes.OK
+
+      (responseAs[JsObject] \ "version").as[Byte] shouldBe tx.version
+
       val r = (responseAs[JsObject] \ "proofs").as[Proofs]
       r.size shouldBe 1
       r
