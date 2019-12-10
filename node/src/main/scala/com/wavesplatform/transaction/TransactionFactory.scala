@@ -49,7 +49,7 @@ object TransactionFactory {
       signer    <- if (request.sender == signerAddress) Right(sender) else wallet.findPrivateKey(signerAddress)
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.signed(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         transfers,
@@ -64,7 +64,7 @@ object TransactionFactory {
     for {
       transfers <- MassTransferTransaction.parseTransfersList(request.transfers)
       tx <- MassTransferTransaction.create(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         Asset.fromCompatId(request.assetId.map(s => ByteStr.decodeBase58(s).get)),
         transfers,
@@ -86,7 +86,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.signed(1.toByte, sender, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
+      tx <- SetScriptTransaction.signed(request.version.getOrElse(1.toByte), sender, script, request.fee, request.timestamp.getOrElse(time.getTimestamp()), signer)
     } yield tx
 
   def setScript(request: SetScriptRequest, sender: PublicKey): Either[ValidationError, SetScriptTransaction] =
@@ -95,7 +95,7 @@ object TransactionFactory {
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      tx <- SetScriptTransaction.create(1.toByte, sender, script, request.fee, 0, Proofs.empty)
+      tx <- SetScriptTransaction.create(request.version.getOrElse(1.toByte), sender, script, request.fee, 0, Proofs.empty)
     } yield tx
 
   def setAssetScript(
@@ -112,7 +112,7 @@ object TransactionFactory {
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetAssetScriptTransaction.signed(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         script,
@@ -129,7 +129,7 @@ object TransactionFactory {
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
       tx <- SetAssetScriptTransaction.create(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         IssuedAsset(ByteStr.decodeBase58(request.assetId).get),
         script,
@@ -272,7 +272,7 @@ object TransactionFactory {
       contract <- AddressOrAlias.fromString(request.dApp)
 
       tx <- InvokeScriptTransaction.signed(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         contract,
         request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),
@@ -289,7 +289,7 @@ object TransactionFactory {
       addressOrAlias <- AddressOrAlias.fromString(request.dApp)
       fcOpt = request.call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart))
       tx <- InvokeScriptTransaction.create(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         addressOrAlias,
         fcOpt,
@@ -317,7 +317,7 @@ object TransactionFactory {
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.signed(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         assetId,
         request.minSponsoredAssetFee,
@@ -337,7 +337,7 @@ object TransactionFactory {
         .left
         .map(_ => GenericError(s"Wrong Base58 string: ${request.assetId}"))
       tx <- SponsorFeeTransaction.create(
-        1.toByte,
+        request.version.getOrElse(1.toByte),
         sender,
         assetId,
         request.minSponsoredAssetFee,

@@ -8,6 +8,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types}
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.common.state.ByteStr
 
 sealed trait ScriptResult
 case class ScriptResultV3(ds: List[DataItem[_]], ts: List[AssetTransfer]) extends ScriptResult
@@ -127,14 +128,15 @@ object ScriptResult {
     } yield ScriptResultV3(w, p)
   }
 
-  private def processIssue(fields: Map[String, EVALUATED]): Either[String, Issue] = {
+  private def processIssue(parentId: ByteStr, fields: Map[String, EVALUATED]): Either[String, Issue] = {
     (
       fields.get(FieldNames.IssueQuantity),
       fields.get(FieldNames.IssueDecimals),
       fields.get(FieldNames.IssueName),
       fields.get(FieldNames.IssueDescription),
       fields.get(FieldNames.IssueScript),
-      fields.get(FieldNames.IssueIsReissuable)
+      fields.get(FieldNames.IssueIsReissuable),
+      fields.get(FieldNames.IssueNonce)
     ) match {
       case (
         Some(CONST_LONG(quantity)),
@@ -142,10 +144,11 @@ object ScriptResult {
         Some(CONST_STRING(name)),
         Some(CONST_STRING(description)),
         Some(script),
-        Some(CONST_BOOLEAN(isReissuable))
+        Some(CONST_BOOLEAN(isReissuable)),
+        Some(CONST_LONG(nonce)),
       ) => if (script == unit) {
         if (0 <= decimals && decimals <= 8) {
-          Right(Issue(None, decimals.toInt, description, isReissuable, name, quantity))
+          Right(Issue.create(None, decimals.toInt, description, isReissuable, name, quantity, nonce, parentId))
         } else {
           Left(s"Invalid decimals $decimals")
         }
@@ -179,33 +182,33 @@ object ScriptResult {
         err(other, V4, FieldNames.Burn)
     }
 
-  private def processScriptResultV4(actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
+  private def processScriptResultV4(txId: ByteStr, actions: Seq[EVALUATED]): Either[String, ScriptResultV4] =
     actions.toList
       .traverse {
          case obj@CaseObj(actionType, fields) =>
            v4ActionHandlers.get(actionType.name)
-             .map(_(fields))
+             .map(_(txId, fields))
              .getOrElse(err(obj, V4))
 
          case other => err(other, V4)
       }
       .map(ScriptResultV4)
 
-  private val v4ActionHandlers: Map[String, Map[String, EVALUATED] => Either[ExecutionError, CallableAction]] =
+  private val v4ActionHandlers: Map[String, (ByteStr, Map[String, EVALUATED]) => Either[ExecutionError, CallableAction]] =
     Map(
-      FieldNames.ScriptTransfer -> (processScriptTransfer(_, V4)),
-      FieldNames.IntegerEntry   -> (processDataEntryV4(_, FieldNames.IntegerEntry, processIntEntry)),
-      FieldNames.BooleanEntry   -> (processDataEntryV4(_, FieldNames.BooleanEntry, processBoolEntry)),
-      FieldNames.StringEntry    -> (processDataEntryV4(_, FieldNames.StringEntry,  processStringEntry)),
-      FieldNames.BinaryEntry    -> (processDataEntryV4(_, FieldNames.BinaryEntry,  processBinaryEntry)),
-      FieldNames.DeleteEntry    -> processDeleteEntry,
+      FieldNames.ScriptTransfer -> ((_, a) => (processScriptTransfer(a, V4))),
+      FieldNames.IntegerEntry   -> ((_, a) => (processDataEntryV4(a, FieldNames.IntegerEntry, processIntEntry))),
+      FieldNames.BooleanEntry   -> ((_, a) => (processDataEntryV4(a, FieldNames.BooleanEntry, processBoolEntry))),
+      FieldNames.StringEntry    -> ((_, a) => (processDataEntryV4(a, FieldNames.StringEntry,  processStringEntry))),
+      FieldNames.BinaryEntry    -> ((_, a) => (processDataEntryV4(a, FieldNames.BinaryEntry,  processBinaryEntry))),
+      FieldNames.DeleteEntry    -> ((_, a) => processDeleteEntry(a)),
       FieldNames.Issue          -> processIssue,
-      FieldNames.Reissue        -> processReissue,
-      FieldNames.Burn           -> processBurn
+      FieldNames.Reissue        -> ((_, a) => processReissue(a)),
+      FieldNames.Burn           -> ((_, a) => processBurn(a))
     )
 
 
-  def fromObj(e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =
+  def fromObj(txId: ByteStr, e: EVALUATED, version: StdLibVersion): Either[ExecutionError, ScriptResult] =
     (e, version) match {
       case (CaseObj(tpe, fields), V3) =>
         tpe.name match {
@@ -214,7 +217,7 @@ object ScriptResult {
           case FieldNames.ScriptResult => processScriptResultV3(fields)
           case f                       => err(f, version)
         }
-      case (ARR(actions), V4) => processScriptResultV4(actions)
+      case (ARR(actions), V4) => processScriptResultV4(txId, actions)
 
       case c => err(c.toString, version)
     }

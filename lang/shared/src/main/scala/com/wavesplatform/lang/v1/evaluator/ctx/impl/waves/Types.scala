@@ -139,6 +139,7 @@ object Types {
         FieldNames.IssueIsReissuable -> BOOLEAN,
         FieldNames.IssueName -> STRING,
         FieldNames.IssueQuantity -> LONG,
+        FieldNames.IssueNonce -> LONG,
       )
     )
 

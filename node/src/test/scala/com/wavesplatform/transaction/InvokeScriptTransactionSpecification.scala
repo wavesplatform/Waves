@@ -207,6 +207,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("Signed InvokeScriptTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
@@ -241,8 +242,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
     ) should produce("more than 22 arguments")
   }
 
-  property(s"can't call a func with non native(simple) args - ARR") {
-    import com.wavesplatform.common.state.diffs.ProduceError._
+  property(s"can call a func with ARR") {
     val pk = PublicKey.fromBase58String(publicKey).explicitGet()
     InvokeScriptTransaction.create(
       1.toByte,
@@ -259,7 +259,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Waves,
       1,
       Proofs.empty
-    ) should produce("All arguments of invokeScript must be one of the types")
+    ) shouldBe 'right
   }
 
   property(s"can't call a func with non native(simple) args - CaseObj") {
@@ -280,7 +280,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Waves,
       1,
       Proofs.empty
-    ) should produce("All arguments of invokeScript must be one of the types")
+    ) should produce("is unsupported")
   }
 
   property("can't be more 5kb") {
@@ -303,6 +303,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't have zero amount") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
@@ -324,6 +325,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't have negative amount") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,

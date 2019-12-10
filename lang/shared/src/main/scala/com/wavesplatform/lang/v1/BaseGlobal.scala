@@ -115,7 +115,7 @@ trait BaseGlobal {
   ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
     for {
       ex <- compiler(input, context)
-      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.сontainsBlockV2(ex)
+      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(ex)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
 
@@ -193,6 +193,8 @@ trait BaseGlobal {
     }
 
   def requestNode(url: String): Future[NodeResponse]
+
+  def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean
 }
 
 object BaseGlobal {
