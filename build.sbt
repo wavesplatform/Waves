@@ -27,7 +27,6 @@ lazy val lang =
     .withoutSuffixFor(JVMPlatform)
     .crossType(CrossType.Full)
     .settings(
-      resolvers += Resolver.sonatypeRepo("snapshots"),
       coverageExcludedPackages := ".*",
       test in assembly := {},
       libraryDependencies ++= Dependencies.lang.value ++ Dependencies.test,
@@ -61,7 +60,6 @@ lazy val `lang-testkit` = project
   .in(file("lang/testkit"))
   .settings(langPublishSettings)
   .settings(
-    resolvers += Resolver.sonatypeRepo("snapshots"),
     libraryDependencies ++= Dependencies.test.map(_.withConfigurations(Some("compile")))
   )
 
