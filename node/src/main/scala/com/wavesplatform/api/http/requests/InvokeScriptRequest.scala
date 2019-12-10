@@ -71,6 +71,7 @@ object InvokeScriptRequest {
 }
 
 case class InvokeScriptRequest(
+    version: Option[Byte],
     sender: String,
     fee: Long,
     feeAssetId: Option[String],
@@ -81,6 +82,7 @@ case class InvokeScriptRequest(
 )
 
 case class SignedInvokeScriptRequest(
+    version: Option[Byte],
     senderPublicKey: String,
     fee: Long,
     feeAssetId: Option[String],
@@ -96,7 +98,7 @@ case class SignedInvokeScriptRequest(
       _dappAddress <- AddressOrAlias.fromString(dApp)
       _feeAssetId  <- parseBase58ToAsset(feeAssetId.filter(_.length > 0), "invalid.feeAssetId")
       t <- InvokeScriptTransaction.create(
-        1.toByte,
+        version.getOrElse(2.toByte),
         _sender,
         _dappAddress,
         call.map(fCallPart => InvokeScriptRequest.buildFunctionCall(fCallPart)),

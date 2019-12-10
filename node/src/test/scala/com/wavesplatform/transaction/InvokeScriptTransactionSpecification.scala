@@ -207,6 +207,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("Signed InvokeScriptTransactionRequest parser") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
@@ -302,6 +303,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't have zero amount") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
@@ -323,6 +325,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("can't have negative amount") {
     AddressScheme.current = new AddressScheme { override val chainId: Byte = 'D' }
     val req = SignedInvokeScriptRequest(
+      Some(1.toByte),
       senderPublicKey = publicKey,
       fee = 1,
       feeAssetId = None,
