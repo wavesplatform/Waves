@@ -120,16 +120,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+
+    @volatile
+    var utxLatch: Boolean = false
     val utxStorage =
       new UtxPoolImpl(
         time,
         blockchainUpdater,
         spendableBalanceChanged,
         settings.utxSettings,
-        acceptingLatch = () =>
-          blockchainUpdater.lastBlockTimestamp.fold(false) { ts =>
+        acceptingLatch = () => {
+          lazy val initialized = blockchainUpdater.height > 1 && blockchainUpdater.lastBlockTimestamp.fold(false) { ts =>
             time.correctedTime() - ts <= settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis
           }
+          utxLatch || { utxLatch = initialized; utxLatch }
+        }
       )
     maybeUtx = Some(utxStorage)
 
