@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -9,10 +10,11 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{Assertion, CancelAfterFailure}
+import org.scalatest.{Assertion, CancelAfterFailure, Ignore}
 
 import scala.concurrent.duration._
 
@@ -29,6 +31,8 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   private val callerAcc = pkByAddress(secondAddress).stringRepr
   private val smartAccV3  = pkByAddress(thirdAddress).stringRepr
 
+  private var asset: Asset = _
+
   private val dAppV4 =
     """{-# STDLIB_VERSION 4 #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -38,6 +42,11 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |@Callable(i)
       |func default () = [BooleanEntry("0", true)]
       |
+      |
+      |
+      |@Callable(i)
+      |func payBack () = [ScriptTransfer(i.caller, i.payments[0].amount, value(i.payments[0].assetId))]
+      |
       |""".stripMargin
 
   private val dAppV3 =
@@ -45,11 +54,14 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |{-# SCRIPT_TYPE ACCOUNT #-}
       |{-# CONTENT_TYPE DAPP #-}
       |
+      |@Callable(i)
+      |func default() = WriteSet([DataEntry("0", true)])
       |
       |@Callable(i)
-      |func default () = WriteSet([DataEntry("0", true)])
-      |
-      |""".stripMargin
+      |func payBack() = {
+      |    let pmt = value(i.payment)
+      |    TransferSet([ ScriptTransfer(i.caller, pmt.amount, value(pmt.assetId)) ])
+      |}""".stripMargin
   private val accountV4 =
     """{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE EXPRESSION #-}
@@ -72,6 +84,12 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       |{-# SCRIPT_TYPE ASSET #-}
       |this.quantity > 0
       |""".stripMargin
+
+  test("prerequisite: issue asset") {
+    val assetId = sender.issue(smartAccV3, quantity = 1000, waitForTx = true).id
+    asset = IssuedAsset(ByteStr.decodeBase58(assetId).get)
+    sender.setScript(smartAccV3, Some(dAppV3.compiled), waitForTx = true)
+  }
 
   test("can't set V4 contracts before the feature activation") {
     def assertFeatureNotActivated[R](f: => R): Assertion = assertApiError(f) { e =>
@@ -109,7 +127,23 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
         |(this.quantity > 0)""".stripMargin
   }
 
-  test(s"wait height $activationHeight for the feature activation") {
+  test("can't attach unavailable payment if V3 DApp returns its enough amount") {
+    val amount = 20
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(amount, asset)), waitForTx = true)
+    ) { error =>
+      error.statusCode shouldBe 400
+      error.message shouldBe
+        "State check failed. Reason: "                     +
+        "Attempt to transfer unavailable funds: "          +
+        "Transaction application leads to negative asset " +
+       s"'IssuedAsset(${asset.compatId.get})' balance to " +
+        "(at least) temporary negative state, "            +
+       s"current balance is 0, spends equals -$amount, result is -$amount"
+    }
+  }
+
+  test("wait for the feature activation") {
     sender.waitForHeight(activationHeight, 5.minutes)
   }
 
@@ -129,7 +163,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
   }
 
   test("can invoke V4 contract from V3 scripted account with 0 or 1 payments") {
-    sender.setScript(smartAccV3, Some(accountV3.compiled), waitForTx = true)
+    sender.setScript(smartAccV3, Some(accountV3.compiled), fee = setScriptFee + smartFee, waitForTx = true)
 
     sender.invokeScript(smartAccV3, smartAccV4, fee = smartMinFee + smartFee, waitForTx = true)._1.id
     sender.invokeScript(
@@ -271,6 +305,37 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
            |    true
            |  case _ => true }""".stripMargin))) { error =>
       error.message should include("Undefined field `payment` of variable of type `InvokeScriptTransaction`") }
+  }
+
+  test("can't attach unavailable payment even if V4 DApp returns its enough amount") {
+    val balance = sender.accountBalances(callerAcc)._1
+
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV4, Some("payBack"), payment = Seq(Payment(40, asset)))
+    ) { error =>
+      error.message should include("Transaction application leads to negative asset")
+      error.id shouldBe StateCheckFailed.Id
+      error.statusCode shouldBe 400
+    }
+
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV4, Some("payBack"), payment = Seq(Payment(balance + 1, Waves)))
+    ) { error =>
+      error.message should include("Transaction application leads to negative waves balance")
+      error.id shouldBe StateCheckFailed.Id
+      error.statusCode shouldBe 400
+    }
+  }
+
+  test("still can't attach unavailable payment if V3 DApp returns its enough amount") {
+    val balance = sender.accountBalances(callerAcc)._1
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(40, asset)), waitForTx = true)
+    )(_.statusCode shouldBe 400)
+
+    assertApiError(
+      sender.invokeScript(callerAcc, smartAccV3, Some("payBack"), payment = Seq(Payment(balance, Waves)), waitForTx = true)
+    )(_.statusCode shouldBe 400)
   }
 
 }
