@@ -8,7 +8,7 @@ import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
 import javax.ws.rs.Path
-import play.api.libs.json.Json
+import play.api.libs.json._
 
 @Path("/consensus")
 @Api(value = "/consensus")
@@ -31,7 +31,8 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
     Address.fromString(address) match {
       case Left(_) => complete(ApiError.InvalidAddress)
       case Right(account) =>
-        complete(Json.obj("address" -> account.stringRepr, "balance" -> blockchain.generatingBalance(account)))
+        val balance = blockchain.generatingBalance(account).getOrElse(0L)
+        complete(Json.obj("address" -> account.stringRepr, "balance" -> balance))
     }
   }
 

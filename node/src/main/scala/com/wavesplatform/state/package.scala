@@ -193,7 +193,7 @@ package object state {
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
 
-    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
+    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Option[Long] =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
