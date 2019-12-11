@@ -4,18 +4,19 @@ import cats.implicits._
 import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
-import com.wavesplatform.lang.contract.meta.{MetaMapper, V1}
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
+import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Terms.DECLARATION
-import com.wavesplatform.lang.v1.compiler.Types.BOOLEAN
+import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
-import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos}
+import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Pos, Type}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
+import com.wavesplatform.lang.v1.task.TaskMT
 import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 
@@ -130,7 +131,14 @@ object ContractCompiler {
       callableFuncsTypeInfo = callableFuncsWithParams.map {
         case (f, typedParams) => typedParams.map(_._2)
       }
-      meta <- MetaMapper.toProto(V1)(callableFuncsTypeInfo)
+
+      mappedCallableTypes =
+        if (version <= V3)
+          MetaMapper.toProto(V1)(callableFuncsTypeInfo)
+        else
+          MetaMapper.toProto(V2)(callableFuncsTypeInfo)
+
+      meta <- mappedCallableTypes
         .leftMap(Generic(contract.position.start, contract.position.start, _))
         .toCompileM
 
@@ -155,31 +163,47 @@ object ContractCompiler {
     case PART.INVALID(p, message) => raiseError(Generic(p.start, p.end, message))
   }
 
-  private def validateAnnotatedFuncsArgTypes(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[Any] = {
+  private def validateAnnotatedFuncsArgTypes(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[Unit] =
+    contract.fs.traverse { func =>
+      for {
+        funcName <- handleValid(func.f.name)
+        funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
+        () <- funcArgs.map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
+            .find(!checkAnnotatedParamType(_))
+            .map(argTypesError(func, funcName, _))
+            .getOrElse(().pure[CompileM])
+      } yield ()
+    }.map(_ => ())
+
+  private def argTypesError(
+    func: Expressions.ANNOTATEDFUNC,
+    funcName: PART.VALID[String],
+    t: (String, Option[String])
+  ): CompileM[Unit] =
+    raiseError[Id, CompilerContext, CompilationError, Unit](
+      WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t), allowedCallableTypesV4)
+    )
+
+  private def typeStr(t: (String, Option[String])) =
+    t._2.fold(t._1)(typeParam => s"${t._1}[$typeParam]")
+
+  private def resolveGenericType(t: Type): CompileM[(PART.VALID[String], Option[PART.VALID[String]])] =
     for {
-      annotatedFuncsArgTypesCM <- contract.fs
-        .map { af =>
-          (af.f.position, af.f.name, af.f.args.flatMap(_._2))
-        }
-        .toVector
-        .traverse[CompileM, (Pos, String, List[String])] {
-          case (pos, funcNamePart, argTypesPart) =>
-            for {
-              argTypes <- argTypesPart.toList.pure[CompileM]
-                .ensure(Generic(contract.position.start, contract.position.start, "Annotated function should not have generic parameter types"))(_.forall(_._2.isEmpty))
-                .flatMap(_.traverse(t => handleValid(t._1)))
-              funcName <- handleValid(funcNamePart)
-            } yield (pos, funcName.v, argTypes.map(_.v))
-        }
-        .pure[CompileM]
-      _ <- annotatedFuncsArgTypesCM.flatMap { annotatedFuncs =>
-        annotatedFuncs.find(af => af._3.find(!Types.nativeTypeList.contains(_)).nonEmpty).fold(().pure[CompileM]) { af =>
-          val wrongArgType = af._3.find(!Types.nativeTypeList.contains(_)).getOrElse("")
-          raiseError[Id, CompilerContext, CompilationError, Unit](WrongArgumentType(af._1.start, af._1.end, af._2, wrongArgType, Types.nativeTypeList))
-        }
-      }
-    } yield ()
-  }
+      argType   <- handleValid(t._1)
+      typeParam <- t._2.traverse(handleValid)
+    } yield (argType, typeParam)
+
+  private def checkAnnotatedParamType(t: (String, Option[String])): Boolean =
+    t match {
+      case (singleType, None)             => primitiveCallableTypes.contains(singleType)
+      case (genericType, Some(typeParam)) => primitiveCallableTypes.contains(typeParam) && genericType == "List"
+    }
+
+  val primitiveCallableTypes: Set[String] =
+    Set(LONG, BYTESTR, BOOLEAN, STRING).map(_.name)
+
+  val allowedCallableTypesV4: Set[String] =
+    primitiveCallableTypes + "List[]"
 
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {

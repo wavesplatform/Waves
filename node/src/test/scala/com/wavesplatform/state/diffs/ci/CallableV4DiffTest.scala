@@ -224,11 +224,11 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }.explicitGet()
 
   def multiActionDApp(
-      assetId: ByteStr,
-      recipient: Address,
-      reissueAmount: Long,
-      burnAmount: Long,
-      transferAmount: Long
+    assetId: ByteStr,
+    recipient: Address,
+    reissueAmount: Long,
+    burnAmount: Long,
+    transferAmount: Long
   ): Script =
     dApp(
       s"""

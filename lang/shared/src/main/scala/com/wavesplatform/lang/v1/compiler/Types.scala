@@ -89,11 +89,4 @@ object Types {
   val optionLong           = UNION(LONG, UNIT)
   val listByteVector: LIST = LIST(BYTESTR)
   val listString: LIST     = LIST(STRING)
-
-  val nativeTypeList = List(
-    "Int",
-    "ByteVector",
-    "Boolean",
-    "String"
-  )
 }

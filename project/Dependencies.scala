@@ -106,7 +106,8 @@ object Dependencies {
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
-      "com.softwaremill.sttp" %%% "core" % "1.6.4"
+      "com.softwaremill.sttp" %%% "core" % "1.6.4",
+      "com.wavesplatform" % "zwaves" % "0.1.0-SNAPSHOT"
     ) ++ scalapbRuntime.value ++ circe.value
   )
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.validation.impl
 
+import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
 import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
@@ -24,13 +25,13 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       else Valid(())
     }
 
-    lazy val validLength =
+    def checkLength =
       if (tx.isProtobufVersion)
         PBTransactions
           .toPBInvokeScriptData(tx.dAppAddressOrAlias, tx.funcCallOpt, tx.payments)
           .toByteArray
           .length <= ContractLimits.MaxInvokeScriptSizeInBytes
-      else Try(tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes).getOrElse(false)
+      else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
 
     V.seq(tx)(
       V.cond(
@@ -45,13 +46,14 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
         }),
         GenericError(s"Callable function name size in bytes must be less than ${ContractLimits.MaxAnnotatedFunctionNameInBytes} bytes")
       ),
-      V.cond(
-        funcCallOpt.isEmpty || funcCallOpt.get.args.forall(x => x.isInstanceOf[EVALUATED] && !x.isInstanceOf[CaseObj] && !x.isInstanceOf[ARR]),
-        GenericError("All arguments of invokeScript must be one of the types: Int, ByteVector, String, Boolean")
-      ),
       checkAmounts(payments),
       V.fee(fee),
-      V.cond(validLength, TooBigArray)
+      Try(checkLength)
+        .toEither
+        .leftMap(err => GenericError(err.getMessage))
+        .filterOrElse(identity, TooBigArray)
+        .toValidatedNel
+        .map(_ => ())
     )
   }
 }
