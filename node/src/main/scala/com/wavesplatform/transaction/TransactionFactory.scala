@@ -354,20 +354,21 @@ object TransactionFactory {
     val version = (jsv \ "version").asOpt[Byte](versionReads).getOrElse(1.toByte)
 
     val pf: PartialFunction[TransactionParser, Either[ValidationError, Transaction]] = {
-      case TransferTransaction       => jsv.as[TransferRequest].toTx
-      case CreateAliasTransaction    => jsv.as[CreateAliasRequest].toTx
-      case LeaseTransaction          => jsv.as[LeaseRequest].toTx
-      case LeaseCancelTransaction    => jsv.as[LeaseCancelRequest].toTx
-      case IssueTransaction          => jsv.as[IssueRequest].toTx
-      case ReissueTransaction        => jsv.as[ReissueRequest].toTx
-      case BurnTransaction           => jsv.as[BurnRequest].toTx
-      case MassTransferTransaction   => jsv.as[SignedMassTransferRequest].toTx
-      case DataTransaction           => jsv.as[SignedDataRequest].toTx
-      case InvokeScriptTransaction   => jsv.as[SignedInvokeScriptRequest].toTx
-      case SetScriptTransaction      => jsv.as[SignedSetScriptRequest].toTx
-      case SetAssetScriptTransaction => jsv.as[SignedSetAssetScriptRequest].toTx
-      case SponsorFeeTransaction     => jsv.as[SignedSponsorFeeRequest].toTx
-      case ExchangeTransaction       => jsv.as[ExchangeRequest].toTx
+      case TransferTransaction        => jsv.as[TransferRequest].toTx
+      case CreateAliasTransaction     => jsv.as[CreateAliasRequest].toTx
+      case LeaseTransaction           => jsv.as[LeaseRequest].toTx
+      case LeaseCancelTransaction     => jsv.as[LeaseCancelRequest].toTx
+      case IssueTransaction           => jsv.as[IssueRequest].toTx
+      case ReissueTransaction         => jsv.as[ReissueRequest].toTx
+      case BurnTransaction            => jsv.as[BurnRequest].toTx
+      case MassTransferTransaction    => jsv.as[SignedMassTransferRequest].toTx
+      case DataTransaction            => jsv.as[SignedDataRequest].toTx
+      case InvokeScriptTransaction    => jsv.as[SignedInvokeScriptRequest].toTx
+      case SetScriptTransaction       => jsv.as[SignedSetScriptRequest].toTx
+      case SetAssetScriptTransaction  => jsv.as[SignedSetAssetScriptRequest].toTx
+      case SponsorFeeTransaction      => jsv.as[SignedSponsorFeeRequest].toTx
+      case ExchangeTransaction        => jsv.as[ExchangeRequest].toTx
+      case UpdateAssetInfoTransaction => jsv.as[SignedUpdateAssetInfoRequest].toTx
     }
 
     TransactionParsers.by(typeId, version) match {
