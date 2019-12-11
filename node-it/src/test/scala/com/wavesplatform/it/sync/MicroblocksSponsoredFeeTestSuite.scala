@@ -28,6 +28,8 @@ class MicroblocksSponsoredFeeTestSuite extends FreeSpec with Matchers with Cance
   }
 
   "fee distribution with sponsorship" - {
+    nodes.waitForHeightArise()
+
     val sponsorAssetId = sponsor
       .issue(sponsor.address, "SponsoredAsset", "Created by Sponsorship Suite", sponsorAssetTotal, decimals = 2, reissuable = false, fee = issueFee)
       .id

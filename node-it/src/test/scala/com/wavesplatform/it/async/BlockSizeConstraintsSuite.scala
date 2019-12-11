@@ -23,6 +23,7 @@ class BlockSizeConstraintsSuite extends FreeSpec with Matchers with TransferSend
   val transfers = generateTransfersToRandomAddresses(maxTxsGroup, nodeAddresses)
   s"Block is limited by size after activation" in result(
     for {
+      _                 <- nodes.waitForHeightArise()
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))
       _                 <- miner.waitForHeight(3)
       _                 <- Future.sequence((0 to maxGroups).map(_ => processRequests(transfers, includeAttachment = true)))

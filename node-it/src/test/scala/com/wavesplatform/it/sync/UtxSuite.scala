@@ -25,6 +25,8 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
   val AMOUNT     = ENOUGH_FEE * 10
 
   test("Invalid transaction should be removed from from utx") {
+    nodes.waitForHeightArise()
+
     val seed = Array.fill(32)(-1: Byte)
 
     Random.nextBytes(seed)

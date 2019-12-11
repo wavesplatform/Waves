@@ -14,6 +14,7 @@ class ForgeReturnedToUTXSuite extends FunSuite with CancelAfterFailure with Node
   private def last  = nodes.last
 
   test("dependent trasactions can be added to UTX if first mined and returned to UTX") {
+    nodes.waitForHeightArise()
 
     //asset tx should be mined in first microblock as as new keyblock mined, others microblocks should not be applied due to big microblockInterval
     val assetId                      = last.issue(last.address, "asset", "descr", issueAmount, 0, reissuable = false, issueFee, waitForTx = true).id

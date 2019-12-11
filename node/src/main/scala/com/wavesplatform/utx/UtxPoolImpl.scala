@@ -60,7 +60,7 @@ class UtxPoolImpl(
       log.trace(s"Transaction (${tx.id()}) has not been accepted by latch")
       TracedResult.wrapValue(false)
     } else if (transactions.containsKey(tx.id())) {
-      log.trace("Transaction (${tx.id()}) already accepted")
+      log.trace(s"Transaction (${tx.id()}) already accepted")
       TracedResult.wrapValue(false)
     } else putNewTx(tx, verify)
   }
