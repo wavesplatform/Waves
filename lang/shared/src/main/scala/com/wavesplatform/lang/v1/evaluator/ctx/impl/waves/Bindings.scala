@@ -378,10 +378,10 @@ object Bindings {
       )
     )
 
-  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
+  def buildAssetInfo(version: StdLibVersion)(sAInfo: ScriptAssetInfo) =
     CaseObj(
-      assetType,
-      Map(
+      assetType(version),
+      Map[String, EVALUATED](
         "id"              -> sAInfo.id,
         "quantity"        -> sAInfo.quantity,
         "decimals"        -> sAInfo.decimals.toLong,
@@ -389,8 +389,8 @@ object Bindings {
         "issuerPublicKey" -> sAInfo.issuerPk,
         "reissuable"      -> sAInfo.reissuable,
         "scripted"        -> sAInfo.scripted,
-        "sponsored"       -> sAInfo.sponsored
-      )
+        "sponsored"       -> (sAInfo.sponsored != 0)
+      ) ++ (if(version >= V4) { Map[String, EVALUATED]("minSponsoredAssetFee" -> (if(sAInfo.sponsored == 0) { unit } else { CONST_LONG(sAInfo.sponsored) })) } else { Map[String, EVALUATED]() })
     )
 
   def buildLastBlockInfo(blockInf: BlockInfo) =

@@ -11,5 +11,5 @@ case class ScriptAssetInfo(
     issuerPk:   ByteStr,
     reissuable: Boolean,
     scripted:   Boolean,
-    sponsored:  Boolean
+    sponsored:  Long
 )
