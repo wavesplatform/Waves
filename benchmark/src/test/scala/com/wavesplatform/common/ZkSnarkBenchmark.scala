@@ -25,7 +25,6 @@ class ZkSnarkBenchmark {
   @Benchmark
   def sigVerify(st: CurveSt, bh: Blackhole): Unit =
     bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
-
 }
 
 object ZkSnarkBenchmark {
