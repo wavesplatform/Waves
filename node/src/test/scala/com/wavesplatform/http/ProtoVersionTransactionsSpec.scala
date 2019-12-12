@@ -34,10 +34,6 @@ import play.api.libs.json._
 class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with TransactionGen with Matchers {
   import com.wavesplatform.http.ApiMarshallers._
 
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 68
-  }
-
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   private val DataTxFee: Long         = 15000000
   private val InvokeScriptTxFee: Long = 15000000
