@@ -44,7 +44,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val fee                                     = calcMassTransferFee(2)
     implicit val w: Writes[MassTransferRequest] = Json.writes[MassTransferRequest]
     val transfers                               = List(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))
-    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(None, firstAddress, transfers, fee, None))
+    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(None, None, firstAddress, transfers, fee, None))
     val tx                                      = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }
@@ -98,7 +98,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val reissue = Json.parse(reissueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(reissue)
 
-    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(firstAddress, issue, Some(100L), sponsorFee))
+    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(Some(1.toByte), firstAddress, issue, Some(100L), sponsorFee))
     val sponsor     = Json.parse(sponsorJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(sponsor)
   }

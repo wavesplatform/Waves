@@ -11,6 +11,7 @@ import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.mining.MiningConstraints.MaxScriptRunsInBlock
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import org.scalatest._
 import play.api.libs.json.{JsNumber, Json}
@@ -93,6 +94,7 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
       .explicitGet()
 
   private def toRequest(tx: SetScriptTransaction): SignedSetScriptRequest = SignedSetScriptRequest(
+    version = Some(TxVersion.V1),
     senderPublicKey = Base58.encode(tx.sender),
     script = tx.script.map(_.bytes().base64),
     fee = tx.fee,
