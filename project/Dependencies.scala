@@ -14,7 +14,7 @@ object Dependencies {
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
 
   private val kindProjector = compilerPlugin("org.spire-math" %% "kind-projector" % "0.9.6")
 
