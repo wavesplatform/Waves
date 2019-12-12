@@ -20,7 +20,7 @@ object PoSCalculator {
   private[consensus] val HitSize: Int        = 8
   private[consensus] val MinBaseTarget: Long = 9
 
-  def generationSignature(signature: Array[Byte], publicKey: PublicKey): Array[Byte] = {
+  private[consensus] def generationSignature(signature: Array[Byte], publicKey: PublicKey): Array[Byte] = {
     val s = new Array[Byte](crypto.DigestLength * 2)
     System.arraycopy(signature, 0, s, 0, crypto.DigestLength)
     System.arraycopy(publicKey.arr, 0, s, crypto.DigestLength, crypto.DigestLength)

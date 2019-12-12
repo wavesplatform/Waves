@@ -2,7 +2,6 @@ package com
 
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.PoSCalculator
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.NG
@@ -13,8 +12,7 @@ import com.wavesplatform.utils.ScorexLogging
 package object wavesplatform extends ScorexLogging {
   private def checkOrAppend(block: Block, blockchainUpdater: BlockchainUpdater with NG): Either[ValidationError, Unit] = {
     if (blockchainUpdater.isEmpty) {
-      val hitSource = PoSCalculator.generationSignature(block.header.generationSignature, block.header.generator)
-      blockchainUpdater.processBlock(block, hitSource).right.map { _ =>
+      blockchainUpdater.processBlock(block, block.header.generationSignature).right.map { _ =>
         log.info(s"Genesis block ${blockchainUpdater.blockInfo(1).get.header} has been added to the state")
       }
     } else {
