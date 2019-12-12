@@ -146,6 +146,10 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       (issueTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
       (reissueTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
       (burnTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      issueTx.isProtobufVersion shouldBe true
+      reissueTx.isProtobufVersion shouldBe true
+      burnTx.isProtobufVersion shouldBe true
     }
 
     "DataTransaction" in {
@@ -167,6 +171,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64Str) shouldBe dataTx
 
       (dataTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      dataTx.isProtobufVersion shouldBe true
     }
 
     "ExchangeTransaction" in {
@@ -188,6 +194,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64Str) shouldBe exchangeTx
 
       (exchangeTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      exchangeTx.isProtobufVersion shouldBe true
     }
 
     "InvokeScriptTransaction" in {
@@ -222,6 +230,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64Str) shouldBe invokeScriptTx
 
       (invokeScriptTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      invokeScriptTx.isProtobufVersion shouldBe true
     }
 
     "LeaseTransaction/LeaseCancelTransaction" in {
@@ -259,6 +269,9 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
       (leaseTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
       (leaseCancelTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      leaseTx.isProtobufVersion shouldBe true
+      leaseCancelTx.isProtobufVersion shouldBe true
     }
 
     "TransferTransaction" in {
@@ -283,6 +296,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64Str) shouldBe transferTx
 
       (transferTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      transferTx.isProtobufVersion shouldBe true
     }
 
     "MassTransferTransaction" in {
@@ -306,6 +321,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64Str) shouldBe massTransferTx
 
       (massTransferTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      massTransferTx.isProtobufVersion shouldBe true
     }
 
     "SetScriptTransaction" in {
@@ -348,6 +365,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       }
 
       decode(base64Str) shouldBe setAssetScriptTx
+
+      setAssetScriptTx.isProtobufVersion shouldBe true
     }
 
     "SponsorshipTransaction" in {
@@ -369,6 +388,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       decode(base64Str) shouldBe sponsorshipTx
 
       (sponsorshipTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+
+      sponsorshipTx.isProtobufVersion shouldBe true
     }
 
     def checkProofs(response: HttpResponse, tx: VersionedTransaction): (Proofs, JsObject) = {
