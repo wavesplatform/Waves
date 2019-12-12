@@ -37,6 +37,18 @@ object ContractScript {
         .toTry
     )
     override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(true)
+
+    override val containsArray: Boolean = {
+      val declExprs = expr.decs.map {
+        case l: LET  => l.value
+        case f: FUNC => f.body
+      }
+      val callableExprs = expr.callableFuncs.map(_.u.body)
+      val verifierExpr  = expr.verifierFuncOpt.map(_.u.body).toList
+
+      (verifierExpr ::: declExprs ::: callableExprs)
+        .exists(com.wavesplatform.lang.v1.compiler.containsArray)
+    }
   }
 
   def estimateComplexityByFunction(
@@ -70,16 +82,6 @@ object ContractScript {
           s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
         )
       )
-    } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
-
-  def limitFreeComplexity(
-    version:   StdLibVersion,
-    contract:  DApp,
-    estimator: ScriptEstimator
-  ): Either[String, (Long, Map[String, Long])] =
-    for {
-      cbf <- estimateComplexityByFunction(version, contract, estimator)
-      max = cbf.maximumOption(_._2 compareTo _._2)
     } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {

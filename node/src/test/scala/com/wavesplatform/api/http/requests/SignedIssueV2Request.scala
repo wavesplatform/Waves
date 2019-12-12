@@ -1,13 +1,11 @@
 package com.wavesplatform.api.http.requests
 
 import cats.implicits._
-import com.google.common.base.Charsets
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -36,27 +34,16 @@ object SignedIssueV2Request {
       )
 }
 
-@ApiModel(value = "Signed Smart issue transaction")
 case class SignedIssueV2Request(
-    @ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
     senderPublicKey: String,
-    @ApiModelProperty(required = true)
     name: String,
-    @ApiModelProperty(required = true)
     description: String,
-    @ApiModelProperty(required = true, example = "1000000")
     quantity: Long,
-    @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
     decimals: Byte,
-    @ApiModelProperty(required = true)
     reissuable: Boolean,
-    @ApiModelProperty(required = true)
     fee: Long,
-    @ApiModelProperty(required = true)
     timestamp: Long,
-    @ApiModelProperty(required = true)
     proofs: List[String],
-    @ApiModelProperty(value = "Base58 encoded compiled asset script")
     script: Option[String]
 ) {
   def toTx: Either[ValidationError, IssueTransaction] =
@@ -71,8 +58,8 @@ case class SignedIssueV2Request(
       t <- IssueTransaction.create(
         TxVersion.V2,
         _sender,
-        name.getBytes(Charsets.UTF_8),
-        description.getBytes(Charsets.UTF_8),
+        name,
+        description,
         quantity,
         decimals,
         reissuable,

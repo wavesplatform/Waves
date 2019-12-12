@@ -4,7 +4,7 @@ import java.util.concurrent.locks.{Lock, ReentrantReadWriteLock}
 
 import cats.implicits._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -690,7 +690,7 @@ class BlockchainUpdaterImpl(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = readLock {
+  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = readLock {
     ngState.fold(blockchain.accountScriptWithComplexity(address)) { ng =>
       ng.bestLiquidDiff.scripts.get(address) match {
         case None      => blockchain.accountScriptWithComplexity(address)
@@ -709,7 +709,7 @@ class BlockchainUpdaterImpl(
       .getOrElse(blockchain.hasScript(address))
   }
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] = readLock {
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = readLock {
     ngState.fold(blockchain.assetScriptWithComplexity(asset)) { ng =>
       ng.bestLiquidDiff.assetScripts.get(asset) match {
         case None      => blockchain.assetScriptWithComplexity(asset)
@@ -733,9 +733,8 @@ class BlockchainUpdaterImpl(
       val fromDiff = ng.bestLiquidDiff.accountData
         .getOrElse(address, AccountDataInfo.accountDataInfoMonoid.empty)
         .data
-        .keySet
 
-      fromInner ++ fromDiff
+      (fromInner ++ fromDiff.keySet).filterNot(key => fromDiff.get(key).exists(_.isEmpty))
     }
   }
 
@@ -743,14 +742,14 @@ class BlockchainUpdaterImpl(
     ngState.fold(blockchain.accountData(acc)) { ng =>
       val fromInner = blockchain.accountData(acc)
       val fromDiff  = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      fromInner.combine(fromDiff)
+      fromInner.combine(fromDiff).filterEmpty
     }
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
     ngState.fold(blockchain.accountData(acc, key)) { ng =>
       val diffData = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      diffData.data.get(key).orElse(blockchain.accountData(acc, key))
+      diffData.data.get(key).orElse(blockchain.accountData(acc, key)).filterNot(_.isEmpty)
     }
   }
 

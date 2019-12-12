@@ -55,7 +55,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     waitForBlockTime(block)
 
     nodes.head.printDebugMessage(DebugMessage(s"Send block for $height"))
-    nodes.head.sendByNetwork(RawBytes.from(block))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
 
     nodes.head.waitForHeight(height + 1)
 
@@ -70,7 +70,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     waitForBlockTime(block)
 
-    nodes.head.sendByNetwork(RawBytes.from(block))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
     nodes.head.waitForHeight(height + 1)
 
     val newBlockSig = blockSignature(height + 1)
@@ -84,7 +84,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     waitForBlockTime(block)
 
-    nodes.head.sendByNetwork(RawBytes.from(block))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
 
     nodes.head.waitForHeight(height + 1)
 
@@ -105,7 +105,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     waitForBlockTime(block)
 
     nodes.head.printDebugMessage(DebugMessage(s"Send invalid block for $height"))
-    nodes.head.sendByNetwork(RawBytes.from(block))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
 
     nodes.head.waitForHeight(height + 1)
 
@@ -127,7 +127,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     waitForBlockTime(resignedBlock)
 
-    nodes.head.sendByNetwork(RawBytes.from(resignedBlock))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(resignedBlock))
 
     nodes.head.waitForHeight(height + 1)
 
@@ -255,7 +255,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         generationSignature = genSig,
         txs = Nil,
         signer = signerPK,
-        featureVotes = Set.empty,
+        featureVotes = Seq.empty,
         rewardVote = -1L
       )
       .explicitGet()

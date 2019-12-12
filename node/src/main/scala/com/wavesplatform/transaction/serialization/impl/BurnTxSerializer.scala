@@ -6,22 +6,22 @@ import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.BurnTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
+import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
 
 object BurnTxSerializer {
-  def toJson(tx: BurnTransaction): JsObject = {
+  def toJson(tx: BurnTransaction): Coeval[JsObject] = Coeval.evalOnce {
     import tx._
-    BaseTxJson.toJson(tx) ++ Json.obj(
-      "assetId" -> asset.id.toString,
-      "amount"  -> quantity
-    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
+    BaseTxJson.toJson(tx) ++
+      Json.obj("assetId" -> asset.id.toString, (if (version < TxVersion.V3) "amount" else "quantity") -> quantity) ++
+      (if (version == TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
   }
 
-  def bodyBytes(tx: BurnTransaction): Array[Byte] = {
+  def bodyBytes(tx: BurnTransaction): Coeval[Array[Byte]] = Coeval.evalOnce {
     import tx._
-    val baseBytes = Bytes.concat(
+    lazy val baseBytes = Bytes.concat(
       sender,
       asset.id.arr,
       Longs.toByteArray(quantity),
@@ -30,23 +30,16 @@ object BurnTxSerializer {
     )
 
     version match {
-      case TxVersion.V1 =>
-        Bytes.concat(Array(typeId), baseBytes)
-
-      case TxVersion.V2 =>
-        Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
-          baseBytes
-        )
+      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes)
+      case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: BurnTransaction): Array[Byte] = {
-    import tx._
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-    }
+  def toBytes(tx: BurnTransaction): Coeval[Array[Byte]] = tx.version match {
+    case TxVersion.V1 => tx.bodyBytes.map(bb => Bytes.concat(bb, tx.proofs.toSignature))
+    case TxVersion.V2 => tx.bodyBytes.map(bb => Bytes.concat(Array(0: Byte), bb, tx.proofs.bytes()))
+    case _            => Coeval.evalOnce(PBTransactionSerializer.bytes(tx))
   }
 
   def parseBytes(bytes: Array[Byte]): Try[BurnTransaction] = Try {

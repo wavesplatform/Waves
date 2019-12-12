@@ -39,7 +39,7 @@ object PublicKey extends TaggedType[ByteStr] {
   }
 
   implicit lazy val jsonFormat: Format[PublicKey] = Format[PublicKey](
-    com.wavesplatform.utils.byteStrWrites.map(this.apply),
-    Writes(pk => com.wavesplatform.utils.byteStrWrites.writes(pk))
+    com.wavesplatform.utils.byteStrFormat.map(this.apply),
+    Writes(pk => com.wavesplatform.utils.byteStrFormat.writes(pk))
   )
 }

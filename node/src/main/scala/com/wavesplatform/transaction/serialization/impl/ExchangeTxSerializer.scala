@@ -61,14 +61,17 @@ object ExchangeTxSerializer {
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)
         )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: ExchangeTransaction): Array[Byte] = {
-    import tx._
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
-      case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), proofs.bytes())
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
   }
 

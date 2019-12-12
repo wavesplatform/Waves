@@ -14,7 +14,8 @@ import scala.util.Try
 
 object LeaseCancelTxSerializer {
   def toJson(tx: LeaseCancelTransaction): JsObject =
-    BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString, "chainId" -> tx.chainByte)
+    BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString) ++
+      (if (tx.version == TxVersion.V2) Json.obj("chainId" -> tx.chainByte) else Json.obj())
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
@@ -22,15 +23,16 @@ object LeaseCancelTxSerializer {
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte.getOrElse(AddressScheme.current.chainId)), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte), baseBytes)
+      case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
   def toBytes(tx: LeaseCancelTransaction): Array[Byte] = {
-    import tx._
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
   }
 

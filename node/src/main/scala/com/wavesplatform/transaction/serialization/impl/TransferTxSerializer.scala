@@ -3,10 +3,8 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.serialization.Deser
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
@@ -20,13 +18,13 @@ object TransferTxSerializer {
       "assetId"    -> assetId.maybeBase58Repr,
       "feeAsset"   -> feeAssetId.maybeBase58Repr, // legacy v0.11.1 compat
       "amount"     -> amount,
-      "attachment" -> Base58.encode(attachment)
+      "attachment" -> attachment.toJson(isProtobufVersion)
     )
   }
 
   def bodyBytes(tx: TransferTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = {
+    lazy val baseBytes =
       Bytes.concat(
         sender,
         assetId.byteRepr,
@@ -35,22 +33,20 @@ object TransferTxSerializer {
         Longs.toByteArray(amount),
         Longs.toByteArray(fee),
         recipient.bytes.arr,
-        Deser.serializeArrayWithLength(attachment)
+        Deser.serializeArrayWithLength(attachment.toBytesStrict)
       )
-    }
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 => Bytes.concat(Array(typeId, version), baseBytes)
+      case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: TransferTransaction): Array[Byte] = {
-    import tx._
-    version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx))
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-    }
+  def toBytes(tx: TransferTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx))
+    case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    case _            => PBTransactionSerializer.bytes(tx)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[TransferTransaction] = Try {
@@ -64,7 +60,7 @@ object TransferTxSerializer {
       val recipient  = buf.getAddressOrAlias
       val attachment = buf.getByteArrayWithLength
 
-      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, attachment, ts, Proofs.empty)
+      TransferTransaction(version, sender, recipient, assetId, amount, feeAssetId, fee, Some(Attachment.Bin(attachment)), ts, Proofs.empty)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

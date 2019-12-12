@@ -1,7 +1,7 @@
 package com.wavesplatform
 
 import com.wavesplatform.account.{Address, AddressOrAlias, KeyPair}
-import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.history.DefaultBaseTarget
@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
+import com.wavesplatform.utils._
 import org.scalacheck.Gen
 
 trait BlocksTransactionsHelpers { self: TransactionGen =>
@@ -29,7 +30,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, from, to, Waves, amount, Waves, FeeAmount, Array.empty, timestamp).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, from, to, Waves, amount, Waves, FeeAmount, None, timestamp).explicitGet()
 
     def transferV2(
         from: KeyPair,
@@ -39,7 +40,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(2.toByte, from, to, Waves, amount, Waves, FeeAmount, Array.empty, timestamp).explicitGet()
+      } yield TransferTransaction.selfSigned(2.toByte, from, to, Waves, amount, Waves, FeeAmount, None, timestamp).explicitGet()
 
     def transferAsset(
         asset: IssuedAsset,
@@ -50,7 +51,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     ): Gen[Transaction] =
       for {
         timestamp <- timestamp
-      } yield TransferTransaction.selfSigned(1.toByte, from, to, asset, amount, Waves, FeeAmount, Array.empty, timestamp).explicitGet()
+      } yield TransferTransaction.selfSigned(1.toByte, from, to, asset, amount, Waves, FeeAmount, None, timestamp).explicitGet()
 
     def lease(
         from: KeyPair,
@@ -65,7 +66,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def leaseCancel(from: KeyPair, leaseId: ByteStr, timestamp: Gen[Long] = timestampGen): Gen[LeaseCancelTransaction] =
       for {
         timestamp <- timestamp
-      } yield LeaseCancelTransaction.selfSigned(1.toByte, from, leaseId, FeeAmount, timestamp).explicitGet()
+      } yield LeaseCancelTransaction.signed(1.toByte, from.publicKey, leaseId, FeeAmount, timestamp, from.privateKey).explicitGet()
 
     def data(from: KeyPair, dataKey: String, timestamp: Gen[Long] = timestampGen): Gen[DataTransaction] =
       for {
@@ -75,9 +76,8 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction
-        .selfSigned(TxVersion.V1, from, "test".getBytes(), "".getBytes(), 1, 0, reissuable = false, script = None, 100000000L, timestamp)
-        .explicitGet()
+      } yield IssueTransaction(TxVersion.V1, from, "test".utf8Bytes, Array.emptyByteArray, 1, 0, reissuable = false, script = None, 100000000L, timestamp)
+        .signWith(from)
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
@@ -139,24 +139,20 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         timestamp: Long,
         bTarget: Long = DefaultBaseTarget
     ): Block = {
-      val unsigned: Block = Block(
-        header = BlockHeader(
-          version = version,
-          timestamp = timestamp,
-          reference = reference,
-          baseTarget = bTarget,
-          generationSignature = com.wavesplatform.history.generationSignature,
-          generator = signer,
-          featureVotes = Set.empty,
-          rewardVote = -1L
-        ),
-        signature = ByteStr.empty,
+      val unsigned: Block = Block.create(
+        version = version,
+        timestamp = timestamp,
+        reference = reference,
+        baseTarget = bTarget,
+        generationSignature = com.wavesplatform.history.generationSignature,
+        generator = signer,
+        featureVotes = Seq.empty,
+        rewardVote = -1L,
         transactionData = txs
       )
       val toSign =
         if (version < Block.ProtoBlockVersion) unsigned.bytes()
-        else PBBlocks.protobuf(unsigned).toByteArray
-      // else PBBlocks.protobuf(unsigned).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
+        else PBBlocks.protobuf(unsigned).header.get.toByteArray
       unsigned.copy(signature = ByteStr(crypto.sign(signer, toSign)))
     }
   }

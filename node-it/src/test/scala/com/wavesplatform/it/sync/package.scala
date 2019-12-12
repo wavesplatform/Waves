@@ -14,9 +14,11 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 package object sync {
   val smartFee: Long                   = 0.004.waves
   val minFee: Long                     = 0.001.waves
-  val leasingFee: Long                 = 0.002.waves
+  val leasingFee: Long                 = 0.001.waves
   val issueFee: Long                   = 1.waves
-  val burnFee: Long                    = 1.waves
+  val reissueFee: Long                 = 1.waves
+  val reissueReducedFee: Long          = 0.001.waves
+  val burnFee: Long                    = 0.001.waves
   val sponsorFee: Long                 = 1.waves
   val setAssetScriptFee: Long          = 1.waves
   val setScriptFee: Long               = 0.01.waves
@@ -60,16 +62,16 @@ package object sync {
       Some(tx.version),
       None,
       Some(Base58.encode(tx.sender)),
-      new String(name),
-      new String(description),
+      new String(tx.nameBytes.arr),
+      new String(tx.descriptionBytes.arr),
       quantity,
       decimals,
       reissuable,
       tx.script.map(_.bytes().base64),
       fee,
       Some(timestamp),
-      proofs.headOption.map(_.toString),
-      Some(proofs.proofs.map(_.toString).toList)
+      proofs.headOption,
+      Some(proofs)
     )
   }
 

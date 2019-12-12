@@ -6,12 +6,12 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Paged
 import monix.reactive.Observable
@@ -28,7 +28,7 @@ package object state {
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
       address: Address,
       maybeAfter: Option[IssuedAsset]
-  ): Observable[IssueTransaction] = {
+  ): Observable[(ByteStr, AssetDescription)] = {
 
     def notWithdrawn(asset: IssuedAsset): Boolean = {
       val changeFromDiff = for {
@@ -40,8 +40,23 @@ package object state {
       changeFromDiff.forall(_ >= 0)
     }
 
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] =
-      diff.transactions.get(id).map(_._1)
+    def assetsFromDiff(diff: Diff, id: IssuedAsset): Option[AssetDescription] =
+      diff.issuedAssets.get(id).map {
+        case (staticInfo, info, volumeInfo) =>
+          AssetDescription(
+            staticInfo.source,
+            staticInfo.issuer,
+            info.name,
+            info.description,
+            staticInfo.decimals,
+            volumeInfo.isReissuable,
+            volumeInfo.volume,
+            info.lastUpdatedAt,
+            diff.assetScripts(id).map(_._2),
+            0,
+            blockchain.isNFT(volumeInfo.volume.intValue(), staticInfo.decimals, volumeInfo.isReissuable)
+          )
+      }
 
     def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
       for {
@@ -51,7 +66,7 @@ package object state {
         (asset, balance) <- portfolio.assets if balance > 0
       } yield asset
 
-    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
+    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] = Observable.fromIterable {
       maybeAfter
         .fold(assetStreamFromDiff(diff)) { after =>
           assetStreamFromDiff(diff)
@@ -60,20 +75,22 @@ package object state {
         }
         .filter(notWithdrawn)
         .map { asset =>
-          transactionFromDiff(diff, asset.id)
-            .orElse(blockchain.transactionInfo(asset.id).map(_._2))
+          assetsFromDiff(diff, asset)
+            .map((asset.id, _))
+            .orElse(blockchain.assetDescription(asset).map((asset.id, _)))
         }
         .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT(blockchain) => itx
+          case Some((assetId, assetDescr)) if assetDescr.nft => (assetId, assetDescr)
         }
     }
 
-    def nftFromBlockchain: Observable[IssueTransaction] =
+    def nftFromBlockchain: Observable[(ByteStr, AssetDescription)] =
       distr
         .nftObservable(address, maybeAfter)
-        .filter { itx =>
-          val asset = IssuedAsset(itx.assetId)
-          notWithdrawn(asset)
+        .filter {
+          case (assetId, _) =>
+            val asset = IssuedAsset(assetId)
+            notWithdrawn(asset)
         }
 
     maybeDiff.fold(nftFromBlockchain) { diff =>

@@ -39,7 +39,7 @@ object ExprScript {
     estimator: ScriptEstimator
   ): Either[String, Long] =
     for {
-      scriptComplexity <- limitFreeEstimate(expr, version, estimator)
+      scriptComplexity <- estimator(varNames(version, Expression), functionCosts(version), expr)
       _ <- Either.cond(
         scriptComplexity <= MaxComplexityByVersion(version),
         (),
@@ -47,17 +47,11 @@ object ExprScript {
       )
     } yield scriptComplexity
 
-  def limitFreeEstimate(
-    expr:      EXPR,
-    version:   StdLibVersion,
-    estimator: ScriptEstimator
-  ): Either[String, Long] =
-    estimator(varNames(version, Expression), functionCosts(version), expr)
-
   private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR) extends ExprScript {
     override type Expr = EXPR
     override val bytes: Coeval[ByteStr]           = Coeval.evalOnce(ByteStr(Global.serializeExpression(expr, stdLibVersion)))
-    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.сontainsBlockV2(expr))
+    override val containsBlockV2: Coeval[Boolean] = Coeval.evalOnce(com.wavesplatform.lang.v1.compiler.containsBlockV2(expr))
+    override val containsArray: Boolean           = com.wavesplatform.lang.v1.compiler.containsArray(expr)
   }
 
 }

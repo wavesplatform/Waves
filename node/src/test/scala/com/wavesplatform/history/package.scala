@@ -9,7 +9,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
-import com.wavesplatform.transaction.{Transaction, TxVersion}
+import com.wavesplatform.transaction.Transaction
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
@@ -43,6 +43,9 @@ package object history {
 
   val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
   val generationSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
+  val generationVRFSignature = ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte))
+
+  def correctGenerationSignature(version: Byte): ByteStr = if (version < Block.ProtoBlockVersion) generationSignature else generationVRFSignature
 
   def buildBlockOfTxs(refTo: ByteStr, txs: Seq[Transaction]): Block =
     buildBlockOfTxs(refTo, txs, txs.headOption.fold(0L)(_.timestamp))
@@ -54,7 +57,7 @@ package object history {
       refTo: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair,
-      version: TxVersion,
+      version: Byte,
       timestamp: Long,
       bTarget: Long = DefaultBaseTarget
   ): Block =
@@ -64,10 +67,10 @@ package object history {
         timestamp = timestamp,
         reference = refTo,
         baseTarget = bTarget,
-        generationSignature = generationSignature,
+        generationSignature = correctGenerationSignature(version),
         txs = txs,
         signer = signer,
-        Set.empty,
+        Seq.empty,
         -1L
       )
       .explicitGet()
@@ -77,17 +80,12 @@ package object history {
       prevTotal: Block,
       txs: Seq[Transaction],
       signer: KeyPair,
-      version: TxVersion,
+      version: Byte,
       ts: Long
   ): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val nonSigned = MicroBlock
-      .buildAndSign(
-        generator = signer,
-        transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
-      )
+      .buildAndSign(version, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
       .explicitGet()
     (newTotalBlock, nonSigned)
   }
@@ -95,12 +93,7 @@ package object history {
   def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val nonSigned = MicroBlock
-      .buildAndSign(
-        generator = signer,
-        transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
-      )
+      .buildAndSign(3.toByte, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
       .explicitGet()
     (newTotalBlock, nonSigned)
   }
@@ -126,7 +119,7 @@ package object history {
       base: Seq[Transaction],
       micros: Seq[Seq[Transaction]],
       signer: KeyPair,
-      version: TxVersion,
+      version: Byte,
       timestamp: Long
   ): (Block, Seq[MicroBlock]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)

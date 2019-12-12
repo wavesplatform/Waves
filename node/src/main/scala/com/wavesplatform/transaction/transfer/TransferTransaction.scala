@@ -23,17 +23,17 @@ case class TransferTransaction(
     amount: TxAmount,
     feeAssetId: Asset,
     fee: TxAmount,
-    attachment: TxByteArray,
+    attachment: Option[Attachment],
     timestamp: TxTimestamp,
     proofs: Proofs
 ) extends VersionedTransaction
     with SigProofsSwitch
     with FastHashId
-    with TxWithFee.InCustomAsset {
+    with TxWithFee.InCustomAsset
+    with LegacyPBSwitch.V3 {
 
   override val typeId: TxType = TransferTransaction.typeId
 
-  // TODO: Rework caching
   val bodyBytes: Coeval[TxByteArray] = Coeval.evalOnce(TransferTransaction.serializer.bodyBytes(this))
   val bytes: Coeval[TxByteArray]     = Coeval.evalOnce(TransferTransaction.serializer.toBytes(this))
   final val json: Coeval[JsObject]   = Coeval.evalOnce(TransferTransaction.serializer.toJson(this))
@@ -50,19 +50,16 @@ object TransferTransaction extends TransactionParser {
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
+  val typeId: TxType                    = 4
+  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  val classTag                          = ClassTag(classOf[TransferTransaction])
+
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
-  val serializer                                           = TransferTxSerializer
-
-  val typeId: TxType = 4.toByte
-
-  override def supportedVersions: Set[TxVersion] = Set(1.toByte, 2.toByte)
-
-  override type TransactionT = TransferTransaction
-
-  override def classTag: ClassTag[TransferTransaction] = ClassTag(classOf[TransferTransaction])
 
   implicit def sign(tx: TransferTransaction, privateKey: PrivateKey): TransferTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
+
+  val serializer = TransferTxSerializer
 
   override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
 
@@ -71,10 +68,10 @@ object TransferTransaction extends TransactionParser {
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxTimestamp,
+      amount: TxAmount,
       feeAsset: Asset,
-      fee: TxTimestamp,
-      attachment: TxByteArray,
+      fee: TxAmount,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
@@ -85,10 +82,10 @@ object TransferTransaction extends TransactionParser {
       sender: PublicKey,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxTimestamp,
+      amount: TxAmount,
       feeAsset: Asset,
-      fee: TxTimestamp,
-      attachment: TxByteArray,
+      fee: TxAmount,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, TransferTransaction] =
@@ -99,10 +96,10 @@ object TransferTransaction extends TransactionParser {
       sender: KeyPair,
       recipient: AddressOrAlias,
       asset: Asset,
-      amount: TxTimestamp,
+      amount: TxAmount,
       feeAsset: Asset,
-      fee: TxTimestamp,
-      attachment: TxByteArray,
+      fee: TxAmount,
+      attachment: Option[Attachment],
       timestamp: TxTimestamp
   ): Either[ValidationError, TransferTransaction] =
     signed(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender)

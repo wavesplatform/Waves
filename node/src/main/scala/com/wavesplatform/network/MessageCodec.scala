@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import java.util
 
-import com.wavesplatform.block.Block
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
@@ -17,10 +16,9 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
 
   override def encode(ctx: ChannelHandlerContext, msg: Message, out: util.List[AnyRef]): Unit = msg match {
     // Have no spec
-    case r: RawBytes                                                  => out.add(r)
-    case LocalScoreChanged(score)                                     => out.add(RawBytes(ScoreSpec.messageCode, ScoreSpec.serializeData(score)))
-    case BlockForged(b) if b.header.version < Block.ProtoBlockVersion => out.add(RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b)))
-    case BlockForged(b)                                               => out.add(RawBytes(PBBlockSpec.messageCode, PBBlockSpec.serializeData(b)))
+    case r: RawBytes              => out.add(r)
+    case LocalScoreChanged(score) => out.add(RawBytes(ScoreSpec.messageCode, ScoreSpec.serializeData(score)))
+    case BlockForged(b)           => out.add(RawBytes.fromBlock(b))
 
     // With a spec
     case GetPeers              => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))

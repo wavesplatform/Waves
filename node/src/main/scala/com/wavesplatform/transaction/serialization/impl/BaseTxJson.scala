@@ -1,10 +1,10 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.transaction.{ProvenTransaction, SigProofsSwitch, VersionedTransaction}
+import com.wavesplatform.transaction.{LegacyPBSwitch, ProvenTransaction, SigProofsSwitch, VersionedTransaction}
 import play.api.libs.json.{JsArray, JsObject, JsString, Json}
 
-private[impl] object BaseTxJson {
+object BaseTxJson {
   def toJson(tx: ProvenTransaction): JsObject = {
     import tx._
     Json.obj(
@@ -23,6 +23,9 @@ private[impl] object BaseTxJson {
     }) ++ (tx match {
       case v: VersionedTransaction => Json.obj("version" -> v.version)
       case _                       => Json.obj()
+    }) ++ (tx match {
+      case pbs: LegacyPBSwitch if pbs.isProtobufVersion => Json.obj("chainId" -> tx.chainByte)
+      case _                                            => Json.obj()
     })
   }
 }

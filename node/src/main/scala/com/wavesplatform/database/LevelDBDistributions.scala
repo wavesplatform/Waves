@@ -2,10 +2,11 @@ package com.wavesplatform.database
 
 import cats.effect.Resource
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{AddressId, AssetDistribution, AssetDistributionPage, Portfolio}
+import com.wavesplatform.state.{AddressId, AssetDescription, AssetDistribution, AssetDistributionPage, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -21,9 +22,9 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
   def portfolio(a: Address): Portfolio =
     portfolioCache.get(a, () => loadPortfolio(a))
 
-  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = {
+  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] = {
     def openIterator() = readOnlyNoClose { (snapshot, db) =>
-      def issueTxIterator = {
+      def assetDescriptionIterator: Iterator[(ByteStr, AssetDescription)] = {
         val assetIds = db
           .get(Keys.addressId(address))
           .fold(Seq.empty[IssuedAsset]) { id =>
@@ -33,18 +34,20 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
 
         assetIds.iterator
           .filter(balance(address, _) > 0)
-          .flatMap(ia => transactionInfo(ia.id).map(_._2))
+          .flatMap(ia => {
+            assetDescription(ia).map((ia.id, _))
+          })
           .collect {
-            case itx: IssueTransaction if itx.isNFT(ldb) => itx
+            case (id, ad) if ad.nft => (id, ad)
           }
       }
 
       val result = from
-        .flatMap(ia => transactionInfo(ia.id))
-        .fold(issueTxIterator) {
-          case (_, afterTx) =>
-            issueTxIterator
-              .dropWhile(_.id() != afterTx.id())
+        .flatMap(ia => assetDescription(ia).map(ad => (ia.id, ad)))
+        .fold(assetDescriptionIterator) {
+          case (afterTxId, _) =>
+            assetDescriptionIterator
+              .dropWhile { case (id, _) => id != afterTxId }
               .drop(1)
         }
 
@@ -160,7 +163,7 @@ private[database] final class LevelDBDistributions(ldb: LevelDBWriter) extends D
     assets = (for {
       issuedAsset <- db.get(Keys.assetList(addressId))
       asset <- transactionInfo(issuedAsset.id).collect {
-        case (_, it: IssueTransaction) if !it.isNFT(ldb) => issuedAsset
+        case (_, it: IssueTransaction) if !ldb.isNFT(it) => issuedAsset
       }
     } yield asset -> db.fromHistory(Keys.assetBalanceHistory(addressId, asset), Keys.assetBalance(addressId, asset)).getOrElse(0L)).toMap
   )

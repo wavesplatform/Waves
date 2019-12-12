@@ -118,4 +118,7 @@ object Global extends BaseGlobal {
     impl.Global.httpGet(js.Dynamic.literal(url = url))
      .toFuture
      .map(r => NodeResponse(r.status.asInstanceOf[Int], r.body.asInstanceOf[String]))
+
+  override def groth16Verify(verifyingKey: Array[Byte], proof: Array[Byte], inputs: Array[Byte]): Boolean =
+    ???
 }

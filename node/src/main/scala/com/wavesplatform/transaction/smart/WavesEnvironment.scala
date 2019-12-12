@@ -11,8 +11,7 @@ import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
@@ -23,16 +22,16 @@ import shapeless._
 import scala.util.Try
 
 object WavesEnvironment {
-  type In = Transaction :+: Order :+: ScriptTransfer :+: CNil
+  type In = Transaction :+: Order :+: PseudoTx :+: CNil
 }
 
 class WavesEnvironment(
-  nByte: Byte,
-  in: Coeval[Environment.InputEntity],
-  h: Coeval[Int],
-  blockchain: Blockchain,
-  address: Coeval[ByteStr],
-  ds: DirectiveSet
+    nByte: Byte,
+    in: Coeval[Environment.InputEntity],
+    h: Coeval[Int],
+    blockchain: Blockchain,
+    address: Coeval[ByteStr],
+    ds: DirectiveSet
 ) extends Environment[Id] {
 
   override def height: Long = h()
@@ -51,7 +50,7 @@ class WavesEnvironment(
   override def transferTransactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transferById(id)
-      .map(t => RealTransactionWrapper.mapTransferTx(t._2))
+      .map(t => RealTransactionWrapper.mapTransferTx(t._2, ds.stdLibVersion))
 
   override def data(recipient: Recipient, key: String, dataType: DataType): Option[Any] = {
     for {
@@ -150,7 +149,7 @@ class WavesEnvironment(
         header.baseTarget,
         header.generationSignature,
         transactionCount,
-        header.featureVotes.map(_.toLong).toSeq.sorted
+        header.featureVotes.map(_.toLong).sorted
       )
     }.toOption
 
@@ -166,7 +165,7 @@ class WavesEnvironment(
     val baseTarget = ndi.readLong()
 
     val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig = new Array[Byte](genSigLength)
+    val genSig       = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
@@ -174,25 +173,32 @@ class WavesEnvironment(
       else ndi.readInt()
     }
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
 
-    val rewardVote        = if (version > 3) ndi.readLong() else -1L
+    val rewardVote = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](crypto.KeyLength)
     ndi.readFully(generator)
 
+    val merkle = if (version > Block.RewardBlockVersion) {
+      val result = new Array[Byte](ndi.readInt())
+      ndi.readFully(result)
+      result
+    } else Array.emptyByteArray
+
     val signature = new Array[Byte](crypto.SignatureLength)
     ndi.readFully(signature)
 
-    val header = new BlockHeader(
+    val header = BlockHeader(
       version,
       timestamp,
-      referenceArr,
+      ByteStr(referenceArr),
       baseTarget,
-      genSig,
+      ByteStr(genSig),
       PublicKey(ByteStr(generator)),
       featureVotes,
-      rewardVote
+      rewardVote,
+      ByteStr(merkle)
     )
     (header, transactionCount, ByteStr(signature))
   }

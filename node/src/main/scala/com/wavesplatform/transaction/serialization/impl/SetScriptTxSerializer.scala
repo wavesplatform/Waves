@@ -15,24 +15,31 @@ object SetScriptTxSerializer {
   def toJson(tx: SetScriptTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "chainId" -> chainByte,
-      "script"  -> script.map(_.bytes().base64)
-    )
+      "script" -> script.map(_.bytes().base64)
+    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> chainByte) else Json.obj())
   }
 
   def bodyBytes(tx: SetScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte),
+          sender,
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
+          Longs.toByteArray(fee),
+          Longs.toByteArray(timestamp)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: SetScriptTransaction): Array[Byte] =
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  def toBytes(tx: SetScriptTransaction): Array[Byte] = {
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+  }
 
   def parseBytes(bytes: Array[Byte]): Try[SetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")

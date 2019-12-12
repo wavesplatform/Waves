@@ -9,7 +9,14 @@ object FieldNames {
   val ScriptTransferSet    = "transferSet"
   val Data           = "data"
   val ScriptWriteSet       = "writeSet"
-  val DataEntry      = "DataEntry"
+
+  val DataEntry    = "DataEntry"
+  val BooleanEntry = "BooleanEntry"
+  val StringEntry  = "StringEntry"
+  val BinaryEntry  = "BinaryEntry"
+  val IntegerEntry = "IntegerEntry"
+  val DeleteEntry  = "DeleteEntry"
+
   val Recipient      = "recipient"
   val Amount         = "amount"
   val Asset          = "asset"
@@ -24,6 +31,7 @@ object FieldNames {
   val IssueDescription  = "description"
   val IssueScriptField  = "compiledScript"
   val IssueIsReissuable = "isReissuable"
+  val IssueNonce        = "nonce"
 
   val Reissue = "Reissue"
   val ReissueAssetId      = "assetId"

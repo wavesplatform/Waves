@@ -11,7 +11,6 @@ import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class ExchangeTransaction(
@@ -29,7 +28,8 @@ case class ExchangeTransaction(
     with ProvenTransaction
     with TxWithFee.InWaves
     with FastHashId
-    with SigProofsSwitch {
+    with SigProofsSwitch
+    with LegacyPBSwitch.V3 {
 
   override def builder: TransactionParser = ExchangeTransaction
 
@@ -56,11 +56,7 @@ object ExchangeTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[TxVersion]): Try[ExchangeTransaction] =
     serializer.parseBytes(bytes)
 
-  override type TransactionT = ExchangeTransaction
-
-  override def classTag: ClassTag[ExchangeTransaction] = ClassTag(classOf[ExchangeTransaction])
-
-  override def supportedVersions: Set[TxVersion] = Set(1, 2)
+  override def supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val typeId: TxType = 7
 

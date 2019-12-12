@@ -9,20 +9,21 @@ import play.api.libs.json._
 
 class SetScriptTransactionSpecification extends GenericTransactionSpecification[SetScriptTransaction] {
 
-  def transactionParser = SetScriptTransaction
+  def transactionParser: TransactionParser = SetScriptTransaction
 
   def updateProofs(tx: SetScriptTransaction, p: Proofs): SetScriptTransaction = {
     tx.copy(1.toByte, proofs = p)
   }
 
-  def assertTxs(first: SetScriptTransaction, second: SetScriptTransaction): Unit = {
-    first.sender.stringRepr shouldEqual second.sender.stringRepr
-    first.timestamp shouldEqual second.timestamp
-    first.fee shouldEqual second.fee
-    first.version shouldEqual second.version
-    first.proofs shouldEqual second.proofs
-    first.bytes() shouldEqual second.bytes()
-    first.script shouldEqual second.script
+  def assertTxs(f: Transaction, second: SetScriptTransaction): Unit = f match {
+    case first: SetScriptTransaction =>
+      first.sender.stringRepr shouldEqual second.sender.stringRepr
+      first.timestamp shouldEqual second.timestamp
+      first.fee shouldEqual second.fee
+      first.version shouldEqual second.version
+      first.proofs shouldEqual second.proofs
+      first.bytes() shouldEqual second.bytes()
+      first.script shouldEqual second.script
   }
 
   def generator: Gen[((Seq[com.wavesplatform.transaction.Transaction], SetScriptTransaction))] = setScriptTransactionGen.map(t => (Seq(), t))
@@ -47,7 +48,14 @@ class SetScriptTransactionSpecification extends GenericTransactionSpecification[
                        }
     """),
         SetScriptTransaction
-          .create(1.toByte, PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(), None, 100000, 1526983936610L, Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get)))
+          .create(
+            1.toByte,
+            PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+            None,
+            100000,
+            1526983936610L,
+            Proofs(Seq(ByteStr.decodeBase58("tcTr672rQ5gXvcA9xCGtQpkHC8sAY1TDYqDcQG7hQZAeHcvvHFo565VEv1iD1gVa3ZuGjYS7hDpuTnQBfY2dUhY").get))
+          )
           .right
           .get
       )

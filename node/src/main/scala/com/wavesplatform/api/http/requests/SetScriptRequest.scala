@@ -3,7 +3,7 @@ package com.wavesplatform.api.http.requests
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.{Format, JsNumber, JsObject, Json}
 
-case class SetScriptRequest(sender: String, script: Option[String], fee: Long, timestamp: Option[Long] = None) {}
+case class SetScriptRequest(version: Option[Byte], sender: String, script: Option[String], fee: Long, timestamp: Option[Long] = None) {}
 
 object SetScriptRequest {
   implicit val jsonFormat: Format[SetScriptRequest] = Json.format

@@ -16,25 +16,31 @@ object SetAssetScriptTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId" -> asset.id.toString,
-      "chainId" -> chainByte,
       "script"  -> script.map(_.bytes().base64)
-    )
+    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> tx.chainByte) else Json.obj())
   }
 
   def bodyBytes(tx: SetAssetScriptTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version, chainByte.get),
-      sender,
-      asset.id.arr,
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp),
-      Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version, chainByte),
+          sender,
+          asset.id.arr,
+          Longs.toByteArray(fee),
+          Longs.toByteArray(timestamp),
+          Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes().arr)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
   def toBytes(tx: SetAssetScriptTransaction): Array[Byte] =
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[SetAssetScriptTransaction] = Try {
     require(bytes.length > 2, "buffer underflow while parsing transaction")

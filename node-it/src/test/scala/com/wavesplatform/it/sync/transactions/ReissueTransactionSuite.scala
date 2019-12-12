@@ -1,9 +1,12 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.StateCheckFailed
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.sync._
 
 class ReissueTransactionSuite extends BaseTransactionSuite {
 
@@ -11,14 +14,14 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
 
     val (balance, effectiveBalance) = miner.accountBalances(firstAddress)
 
-    val issuedAssetId = sender.issue(firstAddress, "name2", "description2", someAssetAmount, decimals = 2, reissuable = true, fee = issueFee).id
+    val issuedAssetId = sender.issue(firstAddress, "name2", "description2", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = issueFee).id
+    val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee).id
     nodes.waitForHeightAriseAndTxPresent(reissueTxId)
-    miner.assertBalances(firstAddress, balance - 2 * issueFee, effectiveBalance - 2 * issueFee)
+    miner.assertBalances(firstAddress, balance - issueFee - reissueReducedFee, effectiveBalance - issueFee - reissueReducedFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)
   }
 
@@ -30,12 +33,25 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-    assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = issueFee),
-                               "Asset is not reissuable")
+    assertBadRequestAndMessage(
+      sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee),
+      "Asset is not reissuable"
+    )
     nodes.waitForHeightArise()
 
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
+  }
+
+  test("not able to reissue if cannot pay fee - less than required") {
+    val issuedAssetId = sender.issue(firstAddress, "name3", "description3", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
+
+    nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
+
+    assertApiError(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee - 1)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message should include(s"Fee for ReissueTransaction (${reissueReducedFee - 1} in WAVES) does not exceed minimal value of $reissueReducedFee WAVES.")
+    }
   }
 
   test("not able to reissue if cannot pay fee - insufficient funds") {
@@ -43,17 +59,24 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
     val (balance, effectiveBalance) = miner.accountBalances(firstAddress)
     val reissueFee                  = effectiveBalance + 1.waves
 
-    val issuedAssetId = sender.issue(firstAddress, "name3", "description3", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
+    val issuedAssetId = sender.issue(firstAddress, "name4", "description4", someAssetAmount, decimals = 2, reissuable = true, issueFee).id
 
     nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
 
-    assertBadRequestAndMessage(sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueFee),
-                               "Accounts balance errors")
+    assertBadRequestAndMessage(
+      sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueFee),
+      "Accounts balance errors"
+    )
     nodes.waitForHeightArise()
 
     miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
     miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
-
   }
 
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 }

@@ -2,10 +2,10 @@ package com.wavesplatform.state.extensions
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, Portfolio}
+import com.wavesplatform.state.{AssetDescription, AssetDistribution, AssetDistributionPage, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils.Paged
 import monix.reactive.Observable
 
@@ -20,7 +20,7 @@ trait Distributions {
 
   def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]]
 
-  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction]
+  def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)]
 }
 
 object Distributions {
@@ -40,6 +40,6 @@ object Distributions {
 
     override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = Right(Map.empty)
 
-    override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.empty
+    override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] = Observable.empty
   }
 }

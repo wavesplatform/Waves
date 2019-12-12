@@ -7,17 +7,21 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Ints, Shorts}
+import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.Block.BlockInfo
+import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
+import com.wavesplatform.database.protobuf.AssetDetails.BytesOrString.Value
+import com.wavesplatform.database.protobuf.{AssetDetails => PBAssetDetails}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, _}
 import org.iq80.leveldb.{DB, Options, ReadOptions}
 
 package object database extends ScorexLogging {
@@ -106,7 +110,7 @@ package object database extends ScorexLogging {
 
     while (b.remaining() > 0) {
       val buffer = b.get() match {
-        case crypto.DigestLength      => new Array[Byte](crypto.DigestLength)
+        case crypto.DigestLength    => new Array[Byte](crypto.DigestLength)
         case crypto.SignatureLength => new Array[Byte](crypto.SignatureLength)
       }
       b.get(buffer)
@@ -121,7 +125,7 @@ package object database extends ScorexLogging {
       .foldLeft(ByteBuffer.allocate(ids.map(_.arr.length + 1).sum)) {
         case (b, id) =>
           b.put(id.arr.length match {
-              case crypto.DigestLength      => crypto.DigestLength.toByte
+              case crypto.DigestLength    => crypto.DigestLength.toByte
               case crypto.SignatureLength => crypto.SignatureLength.toByte
             })
             .put(id.arr)
@@ -142,9 +146,9 @@ package object database extends ScorexLogging {
 
   def writeStrings(strings: Seq[String]): Array[Byte] =
     strings
-      .foldLeft(ByteBuffer.allocate(strings.map(_.getBytes(UTF_8).length + 2).sum)) {
+      .foldLeft(ByteBuffer.allocate(strings.map(_.utf8Bytes.length + 2).sum)) {
         case (b, s) =>
-          val bytes = s.getBytes(UTF_8)
+          val bytes = s.utf8Bytes
           b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
@@ -251,18 +255,62 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
-  def readAssetInfo(data: Array[Byte]): AssetInfo = {
-    val ndi     = newDataInput(data)
-    val reissue = ndi.readBoolean()
-    val volume  = ndi.readBigInt()
-    AssetInfo(reissue, volume)
+  def readAssetDetails(data: Array[Byte]): (AssetInfo, AssetVolumeInfo) = {
+
+    val pbad = PBAssetDetails.parseFrom(data)
+
+    def extract(value: PBAssetDetails.BytesOrString.Value): Either[ByteStr, String] = value match {
+      case Value.Bytes(value)  => Left(ByteStr(value.toByteArray))
+      case Value.String(value) => Right(value)
+      case _ => throw new IllegalArgumentException("value is missing")
+    }
+
+    (
+      AssetInfo(extract(pbad.getName.value), extract(pbad.getDescription.value), Height(pbad.lastRenamedAt)),
+      AssetVolumeInfo(pbad.reissuable, BigInt(pbad.totalVolume.toByteArray))
+    )
   }
 
-  def writeAssetInfo(ai: AssetInfo): Array[Byte] = {
+  def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
+    val (info, volumeInfo) = ai
+
+    def encode(v: Either[ByteStr, String]): PBAssetDetails.BytesOrString =
+      PBAssetDetails.BytesOrString(v match {
+        case Left(bs) => PBAssetDetails.BytesOrString.Value.Bytes(ByteString.copyFrom(bs.arr))
+        case Right(s) => PBAssetDetails.BytesOrString.Value.String(s)
+      })
+
+    PBAssetDetails(
+      Some(encode(info.name)),
+      Some(encode(info.description)),
+      info.lastUpdatedAt,
+      volumeInfo.isReissuable,
+      ByteString.copyFrom(volumeInfo.volume.toByteArray)
+    ).toByteArray
+  }
+
+  def writeAssetStaticInfo(ai: AssetStaticInfo): Array[Byte] = {
     val ndo = newDataOutput()
-    ndo.writeBoolean(ai.isReissuable)
-    ndo.writeBigInt(ai.volume)
+
+    ndo.writeByteStr(ai.source)
+    ndo.writeByteStr(ai.issuer)
+    ndo.writeInt(ai.decimals)
+    ndo.writeBoolean(ai.nft)
+
     ndo.toByteArray
+  }
+
+  def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
+    import com.wavesplatform.crypto._
+
+    val ndi = newDataInput(arr)
+
+    val source   = TransactionId @@ ndi.readByteStr(DigestLength)
+    val issuer   = ndi.readPublicKey
+    val decimals = ndi.readInt()
+    val nft = ndi.readBoolean()
+
+    AssetStaticInfo(source, issuer, decimals, nft)
   }
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
@@ -290,6 +338,12 @@ package object database extends ScorexLogging {
       ndo.writeLong(bh.rewardVote)
 
     ndo.write(bh.generator)
+
+    if (bh.version > Block.RewardBlockVersion) {
+      ndo.writeInt(bh.transactionsRoot.arr.length)
+      ndo.writeByteStr(bh.transactionsRoot)
+    }
+
     ndo.write(signature)
 
     ndo.toByteArray
@@ -298,7 +352,7 @@ package object database extends ScorexLogging {
   def readBlockInfo(bs: Array[Byte]): BlockInfo = {
     val ndi = newDataInput(bs)
 
-    val size   = ndi.readInt()
+    val size      = ndi.readInt()
     val version   = ndi.readByte()
     val timestamp = ndi.readLong()
 
@@ -308,7 +362,7 @@ package object database extends ScorexLogging {
     val baseTarget = ndi.readLong()
 
     val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig = new Array[Byte](genSigLength)
+    val genSig       = new Array[Byte](genSigLength)
     ndi.readFully(genSig)
 
     val transactionCount = {
@@ -317,16 +371,18 @@ package object database extends ScorexLogging {
     }
 
     val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort()).toSet
+    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
     val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
 
     val generator = new Array[Byte](KeyLength)
     ndi.readFully(generator)
 
+    val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ndi.readByteStr(ndi.readInt())
+
     val signature = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header =  BlockHeader(
+    val header = BlockHeader(
       version,
       timestamp,
       ByteStr(referenceArr),
@@ -334,7 +390,8 @@ package object database extends ScorexLogging {
       ByteStr(genSig),
       PublicKey(ByteStr(generator)),
       featureVotes,
-      rewardVote
+      rewardVote,
+      transactionsRoot
     )
 
     BlockInfo(header, size, transactionCount, ByteStr(signature))
@@ -439,16 +496,61 @@ package object database extends ScorexLogging {
   }
 
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
-    Block.build(
-      header.version,
-      header.timestamp,
-      header.reference,
-      header.baseTarget,
-      header.generationSignature,
-      txs,
-      header.generator,
-      signature,
-      header.featureVotes,
-      header.rewardVote
+    Validators.validateBlock(Block(header, signature, txs))
+
+  def writeAssetScript(script: (PublicKey, Script, Long)): Array[Byte] = {
+    script match {
+      case (pk, script, c) =>
+        val pkb = pk.arr
+        assert(pkb.size == KeyLength)
+        pkb ++ script.bytes().arr ++ Longs.toByteArray(c)
+    }
+  }
+
+  def readAssetScript(b: Array[Byte]): (PublicKey, Script, Long) = {
+    val pkb = b.take(KeyLength)
+    val script = b.slice(KeyLength, b.length - 8)
+    (
+      PublicKey(pkb),
+      ScriptReader.fromBytes(script).explicitGet(),
+      ByteBuffer.wrap(b, b.length - 8, 8).getLong
     )
+  }
+
+  def writeScript(script: (PublicKey, Script, Long, Map[String, Long])): Array[Byte] = {
+    val (pk, expr, complexity, callableComplexities) = script
+    val pkb = pk.arr
+    assert(pkb.size == KeyLength)
+    val output                                   = newDataOutput()
+
+    output.writeByteStr(pkb)
+
+    output.writeInt(expr.bytes().size)
+    output.writeByteStr(expr.bytes())
+
+    output.writeLong(complexity)
+
+    output.writeInt(callableComplexities.size)
+    callableComplexities.foreach {
+      case (name, cost) =>
+        output.writeUTF(name)
+        output.writeLong(cost)
+    }
+    output.toByteArray
+  }
+
+  def readScript(b: Array[Byte]): (PublicKey, Script, Long, Map[String, Long]) = {
+    val input                     = newDataInput(b)
+    val pk = PublicKey(input.readByteStr(KeyLength))
+    val scriptSize                = input.readInt()
+    val script                    = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
+    val complexity                = input.readLong()
+    val callableComplexitiesCount = input.readInt()
+    val callableComplexities =
+      (1 to callableComplexitiesCount)
+        .map(_ => (input.readUTF(), input.readLong()))
+        .toMap
+
+    (pk, script, complexity, callableComplexities)
+  }
 }

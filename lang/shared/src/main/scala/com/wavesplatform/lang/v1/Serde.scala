@@ -8,7 +8,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.utils.Serialize._
-import monix.eval.Coeval
+import monix.eval.{Coeval, CoevalLift}
 
 import scala.util.Try
 
@@ -28,6 +28,7 @@ object Serde {
   val FH_USER: Byte   = 1
 
   val E_BLOCK_V2 = 10
+  val E_ARR = 11
 
   val DEC_LET  = 0
   val DEC_FUNC = 1
@@ -107,10 +108,31 @@ object Serde {
                 val args: List[Coeval[EXPR]] = (1 to argc).map(_ => desAux(bb))(collection.breakOut)
                 args.sequence[Coeval, EXPR].map(FUNCTION_CALL(header, _))
               } else {
-                Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments too big."))
+                tooBigArray(bb)
               }
           }
+      case E_ARR =>
+        def evaluatedOnly(arg: Coeval[EXPR]): Coeval[EVALUATED] =
+          arg.flatMap {
+            case value: EVALUATED => Coeval.now(value)
+            case other            => Coeval.raiseError(new Exception(s"Unsupported array element: $other"))
+          }
+
+        Coeval.now(bb.getInt)
+          .flatMap(argsCount =>
+            if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
+              (1 to argsCount)
+                .toStream
+                .traverse(_ => evaluatedOnly(desAux(bb)))
+                .map(elements => ARR(elements.toIndexedSeq))
+            else
+              tooBigArray(bb)
+          )
     }
+  }
+
+  private def tooBigArray(bb: ByteBuffer) = {
+    Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments too big."))
   }
 
   def deserialize(bytes: Array[Byte], all: Boolean = true): Either[String, (EXPR, Int)] = {
@@ -183,7 +205,16 @@ object Serde {
           out.writeInt(args.size)
         }
         args.foldLeft(n)((acc, arg) => serAux(out, acc, arg))
-      case x => println(x); ??? //TODO: FIx exhaustivness
+
+      case ARR(elements) =>
+        val meta = Coeval.now[Unit] {
+          out.write(E_ARR)
+          out.writeInt(elements.size)
+        }
+        elements.foldLeft(meta)((acc, element) => serAux(out, acc, element))
+
+      case x =>
+        Coeval.raiseError(new Exception(s"Serialization of value $x is unsupported")) //TODO: FIx exhaustivness
     }
   }
 

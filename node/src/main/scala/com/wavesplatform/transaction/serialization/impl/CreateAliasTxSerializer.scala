@@ -3,8 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
@@ -19,7 +18,7 @@ object CreateAliasTxSerializer {
   def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
     import tx._
 
-    val base = Bytes.concat(
+    lazy val base = Bytes.concat(
       sender,
       Deser.serializeArrayWithLength(alias.bytes.arr),
       Longs.toByteArray(fee),
@@ -29,16 +28,14 @@ object CreateAliasTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(builder.typeId), base)
       case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version), base)
+      case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: CreateAliasTransaction): Array[Byte] = {
-    import tx._
-
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
-    }
+  def toBytes(tx: CreateAliasTransaction): Array[Byte] = tx.version match {
+    case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.signature)
+    case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+    case _            => PBTransactionSerializer.bytes(tx)
   }
 
   def parseBytes(bytes: Array[Byte]): Try[CreateAliasTransaction] = Try {

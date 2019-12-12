@@ -21,19 +21,25 @@ object SponsorFeeTxSerializer {
 
   def bodyBytes(tx: SponsorFeeTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender,
-      asset.id,
-      Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
-      Longs.toByteArray(fee),
-      Longs.toByteArray(timestamp)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version),
+          sender,
+          asset.id,
+          Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
+          Longs.toByteArray(fee),
+          Longs.toByteArray(timestamp)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
   def toBytes(tx: SponsorFeeTransaction): Array[Byte] = {
-    import tx._
-    Bytes.concat(Array(0: Byte, builder.typeId, version), this.bodyBytes(tx), proofs.bytes()) // [typeId, version] appears twice
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte, tx.typeId, tx.version), this.bodyBytes(tx), tx.proofs.bytes()) // [typeId, version] appears twice
   }
 
   def parseBytes(bytes: Array[Byte]): Try[SponsorFeeTransaction] = Try {

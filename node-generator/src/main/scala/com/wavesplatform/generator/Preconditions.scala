@@ -7,7 +7,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -23,9 +23,8 @@ import scala.collection.generic.CanBuildFrom
 object Preconditions {
   private[this] val Fee = 1500000L
 
-  final case class CreatedAccount(keyPair: KeyPair, balance: Long, script: Option[Script])
+  sealed abstract class PAction(val priority: Int) extends Product with Serializable
 
-  sealed abstract class PAction(val priority: Int)
   final case class LeaseP(from: KeyPair, to: Address, amount: Long, repeat: Option[Int]) extends PAction(3)
   final case class IssueP(name: String, issuer: KeyPair, desc: String, amount: Long, decimals: Int, reissuable: Boolean, scriptFile: String)
       extends PAction(2)
@@ -33,14 +32,16 @@ object Preconditions {
 
   final case class PGenSettings(faucet: KeyPair, actions: List[PAction])
 
+  final case class CreatedAccount(keyPair: KeyPair, balance: Long, script: Option[Script])
+
   final case class UniverseHolder(
       accounts: List[CreatedAccount] = Nil,
       issuedAssets: List[IssueTransaction] = Nil,
       leases: List[LeaseTransaction] = Nil
   )
 
-  def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction]) = {
-    settings.actions
+  def mk(settings: PGenSettings, time: Time, estimator: ScriptEstimator): (UniverseHolder, List[Transaction], List[Transaction]) = {
+    val (holder, headTransactions) = settings.actions
       .sortBy(_.priority)(Ordering[Int].reverse)
       .foldLeft((UniverseHolder(), List.empty[Transaction])) {
         case ((uni, txs), action) =>
@@ -64,8 +65,8 @@ object Preconditions {
                 .selfSigned(
                   TxVersion.V2,
                   issuer,
-                  assetName.getBytes("UTF-8"),
-                  assetDescription.getBytes("UTF-8"),
+                  assetName,
+                  assetDescription,
                   amount,
                   decimals.toByte,
                   reissuable,
@@ -79,7 +80,7 @@ object Preconditions {
             case CreateAccountP(seed, balance, scriptOption) =>
               val acc = GeneratorSettings.toKeyPair(seed)
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, "Generator".getBytes("UTF-8"), time.correctedTime())
+                .selfSigned(2.toByte, settings.faucet, acc, Waves, balance, Waves, Fee, None, time.correctedTime())
                 .explicitGet()
               val scriptAndTx = scriptOption.map { file =>
                 val scriptText         = new String(Files.readAllBytes(Paths.get(file)))
@@ -92,6 +93,27 @@ object Preconditions {
               (uni.copy(accounts = CreatedAccount(acc, balance, scriptAndTx.map(_._1)) :: uni.accounts), addTxs ::: txs)
           }
       }
+
+    val tailTransactions = holder.issuedAssets.flatMap { issuedAsset =>
+      val balance = issuedAsset.quantity / holder.accounts.size
+      holder.accounts.map { acc =>
+        TransferTransaction
+          .selfSigned(
+            2.toByte,
+            settings.faucet,
+            acc.keyPair,
+            IssuedAsset(issuedAsset.assetId),
+            balance,
+            Waves,
+            Fee,
+            None,
+            time.correctedTime()
+          )
+          .explicitGet()
+      }
+    }
+
+    (holder, headTransactions, tailTransactions)
   }
 
   private val accountSectionReader = new ValueReader[CreateAccountP] {

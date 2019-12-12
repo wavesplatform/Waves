@@ -2,6 +2,7 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.block.merkle.Merkle
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -16,6 +17,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
+import scorex.crypto.authds.merkle.MerkleTree
+import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
 
@@ -26,11 +29,12 @@ case class BlockHeader(
     baseTarget: Long,
     generationSignature: ByteStr,
     generator: PublicKey,
-    featureVotes: Set[Short],
-    rewardVote: Long
+    featureVotes: Seq[Short],
+    rewardVote: Long,
+    transactionsRoot: ByteStr
 )
 
-case class Block private[block] (
+case class Block(
     header: BlockHeader,
     signature: ByteStr,
     transactionData: Seq[Transaction]
@@ -63,17 +67,22 @@ case class Block private[block] (
     Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
   private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
-    if (header.version < ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
-    else PBBlocks.protobuf(copy(signature = ByteStr.empty)).toByteArray
-    // else PBBlocks.protobuf(this).header.get.toByteArray // todo: (NODE-1927) only header when merkle proofs will be added
+    if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
+    else PBBlocks.protobuf(this).header.get.toByteArray
   }
 
   override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
-    !crypto.isWeakPublicKey(publicKey) && crypto.verify(signature.arr, bytesWithoutSignature(), publicKey)
+    !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
   }
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
+
+  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(Merkle.mkMerkleTree(transactionData))
+
+  val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
+    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr)
+  }
 
   override def toString: String =
     s"Block($signature -> ${header.reference.trim}, " +
@@ -82,19 +91,31 @@ case class Block private[block] (
 
 object Block extends ScorexLogging {
 
-  def build(
+  def create(
       version: Byte,
       timestamp: Long,
       reference: ByteStr,
       baseTarget: Long,
       generationSignature: ByteStr,
-      txs: Seq[Transaction],
       generator: PublicKey,
-      signature: ByteStr,
-      featureVotes: Set[Short],
-      rewardVote: Long
-  ): Either[GenericError, Block] =
-    Block(BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote), signature, txs).validate
+      featureVotes: Seq[Short],
+      rewardVote: Long,
+      transactionData: Seq[Transaction]
+  ): Block = {
+    val transactionsRoot = mkTransactionsRoot(version, transactionData)
+    Block(
+      BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot),
+      ByteStr.empty,
+      transactionData
+    )
+  }
+
+  def create(base: Block, transactionData: Seq[Transaction], signature: ByteStr): Block =
+    base.copy(
+      signature = signature,
+      transactionData = transactionData,
+      header = base.header.copy(transactionsRoot = mkTransactionsRoot(base.header.version, transactionData))
+    )
 
   def buildAndSign(
       version: Byte,
@@ -104,10 +125,10 @@ object Block extends ScorexLogging {
       generationSignature: ByteStr,
       txs: Seq[Transaction],
       signer: KeyPair,
-      featureVotes: Set[Short],
+      featureVotes: Seq[Short],
       rewardVote: Long
   ): Either[GenericError, Block] =
-    build(version, timestamp, reference, baseTarget, generationSignature, txs, signer, ByteStr.empty, featureVotes, rewardVote).map(_.sign(signer))
+    create(version, timestamp, reference, baseTarget, generationSignature, signer, featureVotes, rewardVote, txs).validate.map(_.sign(signer))
 
   def parseBytes(bytes: Array[Byte]): Try[Block] =
     BlockSerializer
@@ -136,7 +157,7 @@ object Block extends ScorexLogging {
       genSig     = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
       reference  = Array.fill(SignatureLength)(-1: Byte)
       timestamp  = genesisSettings.blockTimestamp
-      block <- build(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, txs, generator, ByteStr.empty, Set(), -1L)
+      block      = create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Seq(), -1L, txs)
       signedBlock = genesisSettings.signature match {
         case None             => block.sign(generator)
         case Some(predefined) => block.copy(signature = predefined)
@@ -144,6 +165,9 @@ object Block extends ScorexLogging {
       validBlock <- signedBlock.validateGenesis(genesisSettings)
     } yield validBlock
   }
+
+  private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(Merkle.calcTransactionRoot(transactionData))
 
   case class BlockInfo(
       header: BlockHeader,
@@ -174,5 +198,5 @@ object Block extends ScorexLogging {
   val PlainBlockVersion: Byte   = 2
   val NgBlockVersion: Byte      = 3
   val RewardBlockVersion: Byte  = 4
-  val ProtoBlockVersion: Byte   = 5 // todo: (NODE-1927) relevant name
+  val ProtoBlockVersion: Byte   = 5
 }

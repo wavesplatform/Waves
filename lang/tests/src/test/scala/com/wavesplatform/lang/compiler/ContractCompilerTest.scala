@@ -763,7 +763,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
     compiler.ContractCompiler(ctx, expr, V3) shouldBe 'right
   }
 
-  property("list as @Callable argument") {
+  property("list as @Callable argument forbidden in V3") {
     val ctx = Monoid.combine(compilerContext, cmpCtx)
     val expr = {
       val script =
@@ -778,7 +778,25 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
         """.stripMargin
       Parser.parseContract(script).get.value
     }
-    compiler.ContractCompiler(ctx, expr, V3) should produce("Annotated function should not have generic parameter types")
+    compiler.ContractCompiler(ctx, expr, V3) should produce("Unexpected callable func arg type: List[Int]")
+  }
+
+  property("list as @Callable argument allowed in V4") {
+    val ctx = Monoid.combine(compilerContext, cmpCtx)
+    val expr = {
+      val script =
+        """
+          |
+          | {-# STDLIB_VERSION 4#-}
+          | {-#CONTENT_TYPE DAPP#-}
+          |
+          | @Callable(i)
+          | func f(a:List[Int]) = []
+          |
+        """.stripMargin
+      Parser.parseContract(script).get.value
+    }
+    compiler.ContractCompiler(ctx, expr, V4) shouldBe 'right
   }
 
   property("@Callable V4 result type") {
@@ -791,12 +809,13 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           | @Callable(i)
           | func foo(a:ByteVector) =
           |   [
-          |     IntEntry("key", 1),
+          |     IntegerEntry("key", 1),
           |     BooleanEntry("key", true),
           |     StringEntry("key", "str"),
           |     BinaryEntry("key", base58''),
+          |     DeleteEntry("key"),
           |     ScriptTransfer(i.caller, 1, base58''),
-          |     Issue(unit, 4, "description", true, "name", 1000),
+          |     Issue(unit, 4, "description", true, "name", 1000, 0),
           |     Reissue(base58'', false, 1),
           |     Burn(base58'', 1)
           |   ]

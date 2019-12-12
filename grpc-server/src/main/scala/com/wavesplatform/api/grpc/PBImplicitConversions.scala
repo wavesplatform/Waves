@@ -37,7 +37,7 @@ trait PBImplicitConversions {
   }
 
   implicit class PBBlockConversions(block: PBBlock) {
-    def toVanilla = PBBlocks.vanilla(block).explicitGet()
+    def toVanilla = PBBlocks.vanilla(block).get
   }
 
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
@@ -49,8 +49,9 @@ trait PBImplicitConversions {
         header.baseTarget,
         header.generationSignature.toByteStr,
         header.generator.toPublicKey,
-        header.featureVotes.map(intToShort).toSet,
-        header.rewardVote
+        header.featureVotes.map(intToShort),
+        header.rewardVote,
+        header.transactionsRoot.toByteStr
       )
     }
   }
@@ -61,7 +62,7 @@ trait PBImplicitConversions {
       header.reference.toPBByteString,
       header.baseTarget,
       header.generationSignature.toPBByteString,
-      header.featureVotes.map(shortToInt).toSeq,
+      header.featureVotes.map(shortToInt),
       header.timestamp,
       header.version,
       ByteString.copyFrom(header.generator)

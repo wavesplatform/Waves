@@ -4,9 +4,9 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.transaction.TxValidationError
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
 
 import scala.util.Try
 
@@ -23,6 +23,16 @@ object TxConstraints {
 
   def cond(cond: => Boolean, err: => ValidationError): ValidatedNV =
     if (cond) Valid(()) else Invalid(err).toValidatedNel
+
+  def byVersionSet[T <: VersionedTransaction](tx: T)(f: (Set[TxVersion], () => ValidatedV[Any])*): ValidatedV[T] = {
+    seq(tx)(f.collect {
+      case (v, func) if v.contains(tx.version) =>
+        func()
+    }: _*)
+  }
+
+  def byVersion[T <: VersionedTransaction](tx: T)(f: (TxVersion, () => ValidatedV[Any])*): ValidatedV[T] =
+    byVersionSet(tx)(f.map { case (v, f) => (Set(v), f) }: _*)
 
   def fee(fee: Long): ValidatedV[Long] = {
     Validated
@@ -60,39 +70,41 @@ object TxConstraints {
   }
 
   // Transaction specific
-  def transferAttachment(attachment: Array[Byte]): ValidatedV[Array[Byte]] = {
-    Validated
-      .condNel(
-        attachment.length <= TransferTransaction.MaxAttachmentSize,
-        attachment,
-        TxValidationError.TooBigArray
-      )
+  def transferAttachment(allowTyped: Boolean, attachment: Option[Attachment]): ValidatedV[Option[Attachment]] = {
+    import Attachment.AttachmentExt
+    this.seq(attachment)(
+      cond(attachment.toBytes.length <= TransferTransaction.MaxAttachmentSize, TxValidationError.TooBigArray),
+      cond(attachment match {
+        case Some(Attachment.Bin(_)) | None => true
+        case _                              => allowTyped
+      }, TxValidationError.TooBigArray)
+    )
   }
 
-  def assetName(name: Array[Byte]): ValidatedV[Array[Byte]] = {
+  def asset[A <: Asset](asset: A): ValidatedV[A] = {
+    asset.fold(Validated.validNel[ValidationError, A](asset)) { ia =>
+      Validated
+        .condNel(
+          ia.id.length == com.wavesplatform.crypto.DigestLength,
+          asset,
+          TxValidationError.InvalidAssetId
+        )
+    }
+  }
+
+  def assetName(name: Array[Byte]): ValidatedV[Array[Byte]] =
     Validated
       .condNel(
         name.length >= IssueTransaction.MinAssetNameLength && name.length <= IssueTransaction.MaxAssetNameLength,
         name,
         TxValidationError.InvalidName
       )
-  }
 
-  def assetDescription(description: Array[Byte]): ValidatedV[Array[Byte]] = {
+  def assetDescription(description: Array[Byte]): ValidatedV[Array[Byte]] =
     Validated
       .condNel(
         description.length <= IssueTransaction.MaxAssetDescriptionLength,
         description,
         TxValidationError.TooBigArray
       )
-  }
-
-  def assetDecimals(decimals: Byte): ValidatedV[Byte] = {
-    Validated
-      .condNel(
-        decimals >= 0 && decimals <= IssueTransaction.MaxAssetDecimals,
-        decimals,
-        TxValidationError.TooBigArray
-      )
-  }
 }

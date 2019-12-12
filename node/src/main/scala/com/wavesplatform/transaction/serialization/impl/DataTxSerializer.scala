@@ -20,19 +20,25 @@ object DataTxSerializer {
 
   def bodyBytes(tx: DataTransaction): Array[Byte] = {
     import tx._
-    Bytes.concat(
-      Array(builder.typeId, version),
-      sender,
-      Shorts.toByteArray(data.size.toShort),
-      Bytes.concat(data.view.map(_.toBytes): _*),
-      Longs.toByteArray(timestamp),
-      Longs.toByteArray(fee)
-    )
+    version match {
+      case TxVersion.V1 =>
+        Bytes.concat(
+          Array(builder.typeId, version),
+          sender,
+          Shorts.toByteArray(data.size.toShort),
+          Bytes.concat(data.view.map(_.toBytes): _*),
+          Longs.toByteArray(timestamp),
+          Longs.toByteArray(fee)
+        )
+
+      case _ =>
+        PBTransactionSerializer.bodyBytes(tx)
+    }
   }
 
-  def toBytes(tx: DataTransaction): Array[Byte] = {
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
-  }
+  def toBytes(tx: DataTransaction): Array[Byte] =
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[DataTransaction] = Try {
     def parseDataEntries(buf: ByteBuffer): Seq[DataEntry[_]] = {

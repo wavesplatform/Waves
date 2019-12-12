@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.SponsorFeeTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class SponsorFeeTransaction(
@@ -25,7 +24,8 @@ case class SponsorFeeTransaction(
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
-    with FastHashId {
+    with FastHashId
+    with LegacyPBSwitch.V2 {
 
   override val builder: SponsorFeeTransaction.type = SponsorFeeTransaction
 
@@ -37,11 +37,8 @@ case class SponsorFeeTransaction(
 }
 
 object SponsorFeeTransaction extends TransactionParser {
-  override type TransactionT = SponsorFeeTransaction
-
   override val typeId: TxType                    = 14
-  override val supportedVersions: Set[TxVersion] = Set(1)
-  override val classTag                          = ClassTag(classOf[SponsorFeeTransaction])
+  override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[SponsorFeeTransaction] = SponsorFeeTxValidator
 
@@ -61,7 +58,7 @@ object SponsorFeeTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SponsorFeeTransaction] =
     SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs).validatedEither
 
   def signed(
@@ -72,7 +69,7 @@ object SponsorFeeTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SponsorFeeTransaction] =
     create(version, sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -82,6 +79,6 @@ object SponsorFeeTransaction extends TransactionParser {
       minSponsoredAssetFee: Option[TxTimestamp],
       fee: TxAmount,
       timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, SponsorFeeTransaction] =
     signed(version, sender, asset, minSponsoredAssetFee, fee, timestamp, sender)
 }

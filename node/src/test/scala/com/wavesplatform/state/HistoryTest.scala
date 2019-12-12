@@ -11,6 +11,6 @@ trait HistoryTest {
   def getNextTestBlock(blockchain: Blockchain): Block =
     TestBlock.withReference(blockchain.lastBlock.get.uniqueId)
 
-  def getNextTestBlockWithVotes(blockchain: Blockchain, votes: Set[Short]): Block =
+  def getNextTestBlockWithVotes(blockchain: Blockchain, votes: Seq[Short]): Block =
     TestBlock.withReferenceAndFeatures(blockchain.lastBlock.get.uniqueId, votes)
 }
