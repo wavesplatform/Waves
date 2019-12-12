@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
@@ -57,7 +57,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
 
   private def route: Route = TransactionsApiRoute(restAPISettings, wallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
-  "all txs" - {
+  "Proto transactions should be able to broadcast " - {
     "CreateAliasTransaction" in {
       val alias = aliasGen.sample.get
 
@@ -372,7 +372,8 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     "SponsorshipTransaction" in {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
-      val sponsorshipTxUnsigned = SponsorFeeTransaction.selfSigned(TxVersion.V2, account, asset, Some(100), MinFee, Now).explicitGet()
+      val sponsorshipTxUnsigned =
+        SponsorFeeTransaction.create(TxVersion.V2, account.publicKey, asset, Some(100), MinFee, Now, Proofs.empty).explicitGet()
 
       val (proofs, sponsorshipTxJson) = Post(routePath("/sign"), sponsorshipTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, sponsorshipTxUnsigned)
@@ -382,6 +383,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
 
       Post(routePath("/broadcast"), sponsorshipTx.json()) ~> ApiKeyHeader ~> route ~> check {
+        responseAs[JsObject] shouldBe sponsorshipTx.json()
         responseAs[JsObject] shouldBe sponsorshipTxJson
       }
 
@@ -390,6 +392,34 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       (sponsorshipTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
 
       sponsorshipTx.isProtobufVersion shouldBe true
+    }
+
+    "UpdateAssetInfoTransaction" in {
+      val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
+
+      val updateAssetInfoTx = UpdateAssetInfoTransaction
+        .selfSigned(
+          TxVersion.V1,
+          AddressScheme.current.chainId,
+          account,
+          asset.id,
+          "Test",
+          "Test",
+          ntpNow,
+          MinFee,
+          Asset.Waves
+        )
+        .explicitGet()
+      val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
+
+      Post(routePath("/broadcast"), updateAssetInfoTx.json()) ~> ApiKeyHeader ~> route ~> check {
+        (responseAs[JsObject] \ "version").as[Byte] shouldBe updateAssetInfoTx.version
+      }
+
+      decode(base64Str) shouldBe updateAssetInfoTx
+
+      (updateAssetInfoTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
+      (updateAssetInfoTx.json() \ "version").as[Byte] shouldBe TxVersion.V1
     }
 
     def checkProofs(response: HttpResponse, tx: VersionedTransaction): (Proofs, JsObject) = {
