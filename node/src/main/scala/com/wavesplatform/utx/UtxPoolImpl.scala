@@ -203,7 +203,7 @@ class UtxPoolImpl(
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.sender.toAddress).filter(blockchain.hasScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasScript)
     case a: Authorized if blockchain.hasScript(a.sender.toAddress) => Set(a.sender.toAddress)
@@ -274,10 +274,8 @@ class UtxPoolImpl(
 
       @tailrec
       def pack(seed: PackResult): PackResult =
-        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) {
-          log.info(s"Finished packing: ${if (transactions.isEmpty) "no more transactions, " else ""}${if (isTimeLimitReached) "time limit reached, " else ""}packed ${seed.transactions.fold(0)(_.size)} transactions")
-          seed
-        } else {
+        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) seed
+        else {
           val newSeed = packIteration(
             seed.copy(checkedAddresses = Set.empty),
             transactions.values.asScala.toSeq
