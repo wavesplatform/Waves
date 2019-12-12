@@ -223,9 +223,10 @@ class UtxPoolImpl(
 
       def packIteration(r: PackResult, sortedTransactions: Iterator[Transaction]): PackResult =
         sortedTransactions
+          .filterNot(tx => r.transactions.exists(_.contains(tx)))
           .foldLeft[PackResult](r) {
             case (r @ PackResult(packedTransactions, diff, currentConstraint, iterationCount, checkedAddresses), tx) =>
-              if (currentConstraint.isFull || (packedTransactions.exists(_.nonEmpty) && isTimeLimitReached) || packedTransactions.exists(_.contains(tx)))
+              if (currentConstraint.isFull || (packedTransactions.exists(_.nonEmpty) && isTimeLimitReached))
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
@@ -273,10 +274,19 @@ class UtxPoolImpl(
 
       @tailrec
       def pack(seed: PackResult): PackResult =
-        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) seed
-        else pack(packIteration(seed.copy(checkedAddresses = Set.empty), transactions.values.asScala.toSeq
-            .sorted(TransactionsOrdering.InUTXPool)
-            .iterator))
+        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) {
+          log.info(s"Finished packing: ${if (transactions.isEmpty) "no more transactions, " else ""}${if (isTimeLimitReached) "time limit reached, " else ""}packed ${seed.transactions.fold(0)(_.size)} transactions")
+          seed
+        } else {
+          val newSeed = packIteration(
+            seed.copy(checkedAddresses = Set.empty),
+            transactions.values.asScala.toSeq
+              .sorted(TransactionsOrdering.InUTXPool)
+              .iterator
+          )
+          if (newSeed.constraint.isFull || newSeed.transactions == seed.transactions) newSeed
+          else pack(newSeed)
+        }
 
       pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty))
     }
