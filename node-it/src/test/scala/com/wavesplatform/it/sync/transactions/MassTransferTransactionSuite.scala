@@ -123,6 +123,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite with CancelAfter
       val (signature, idOpt) = txEi.fold(_ => (Proofs(List(fakeSignature)), None), tx => (tx.proofs, Some(tx.id())))
 
       val req = SignedMassTransferRequest(
+        Some(TxVersion.V1),
         Base58.encode(sender.publicKey),
         None,
         transfers,
