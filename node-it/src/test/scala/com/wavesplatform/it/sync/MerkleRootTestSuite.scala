@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.api.http.ApiError.CustomValidationError
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidSignature}
 import com.wavesplatform.block.Block
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.ReportingTestName
@@ -59,12 +59,19 @@ class MerkleRootTestSuite
     val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 can not contain "0"
     assertApiError(
       nodes.head.getMerkleProof(invalidId),
-      CustomValidationError(s"invalid signature")
+      InvalidSignature
     )
     assertApiError(
-      nodes.head.getMerkleProofPost("FCymvrY43ddiKKTkznawWasoMbWd1LWyX8DUrwAAbcUA"),
-      CustomValidationError(s"invalid signature")
+      nodes.head.getMerkleProofPost(invalidId),
+      InvalidSignature
     )
+  }
+  "merkle proof api returns only existent txs when existent and inexistent ids passed" in {
+    val txId1 = nodes.head.broadcastTransfer(nodes.head.privateKey, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
+    val txId2 = nodes.head.broadcastTransfer(nodes.head.privateKey, nodes.head.address, transferAmount, minFee, None, None, waitForTx = true).id
+    val inexistentTx = "FCym43ddiKKT3d4kznawWasoMbWd1LWyX8DUrwAAbcUA"
+    nodes.head.getMerkleProof(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
+    nodes.head.getMerkleProofPost(txId1, txId2, inexistentTx).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2)
   }
   "merkle proof api can handle transactionsRoot changes caused by miner settings" in {
     /**
@@ -115,12 +122,12 @@ object MerkleRootTestSuite {
        |      }
        |   }
        |   miner {
-       |      quorum = 1
+       |      quorum = 0
        |      min-micro-block-age = 10s
-       |      minimal-block-generation-offset = 20s
+       |      minimal-block-generation-offset = 30s
        |   }
        |}""".stripMargin
   )
 
-  val Configs: Seq[Config] = Default.map(Config.withFallback(_)).take(2)
+  val Configs: Seq[Config] = Default.map(Config.withFallback(_)).take(1)
 }

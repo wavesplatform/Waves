@@ -56,11 +56,11 @@ class BlockV5GrpcSuite
       blockAfterVRFUsingById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsingById.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
 
-      val blockSeqOfBlocksV3 = sender.grpc.blockSeq(ActivationHeight - 1, ActivationHeight)
-      val blockSeqOfBlocksV5 = sender.grpc.blockSeq(ActivationHeight + 1, ActivationHeight + 2)
+      val blockSeqOfBlocksV4 = sender.grpc.blockSeq(ActivationHeight - 2, ActivationHeight - 1)
+      val blockSeqOfBlocksV5 = sender.grpc.blockSeq(ActivationHeight, ActivationHeight + 2)
 
-      for (blockV3 <- blockSeqOfBlocksV3) {
-        blockV3.header.version should not be Block.ProtoBlockVersion
+      for (blockV3 <- blockSeqOfBlocksV4) {
+        blockV3.header.version shouldBe Block.RewardBlockVersion
         blockV3.header.generationSignature.length shouldBe Block.GenerationSignatureLength
       }
 
@@ -69,8 +69,8 @@ class BlockV5GrpcSuite
         blockV5.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
       }
 
-      val blockSeqOfBlocksV3ByAddress = sender.grpc.blockSeqByAddress(miner.address, ActivationHeight - 1, ActivationHeight)
-      val blockSeqOfBlocksV5ByAddress = sender.grpc.blockSeqByAddress(miner.address, ActivationHeight + 1, ActivationHeight + 2)
+      val blockSeqOfBlocksV3ByAddress = sender.grpc.blockSeqByAddress(miner.address, ActivationHeight - 2, ActivationHeight - 1)
+      val blockSeqOfBlocksV5ByAddress = sender.grpc.blockSeqByAddress(miner.address, ActivationHeight, ActivationHeight + 2)
 
       for (blockV3 <- blockSeqOfBlocksV3ByAddress) {
         blockV3.header.version should not be Block.ProtoBlockVersion

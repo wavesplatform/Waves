@@ -768,23 +768,23 @@ object SyncHttpApi extends Assertions {
 
     def blockAt(height: Int): VanillaBlock = {
       val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height))).getBlock
-      PBBlocks.vanilla(block).explicitGet()
+      PBBlocks.vanilla(block).toEither.explicitGet()
     }
 
     def blockById(blockId: ByteString): VanillaBlock = {
       val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.BlockId.apply(blockId))).getBlock
-      PBBlocks.vanilla(block).explicitGet()
+      PBBlocks.vanilla(block).toEither.explicitGet()
     }
 
     def blockSeq(fromHeight: Int, toHeight: Int): Seq[VanillaBlock] = {
       val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = true, BlockRangeRequest.Filter.Empty))
-      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).explicitGet()).toSeq
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
     }
 
     def blockSeqByAddress(address: String, fromHeight: Int, toHeight: Int): Seq[VanillaBlock] = {
       val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = true,
         BlockRangeRequest.Filter.Generator.apply(ByteString.copyFrom(Base58.decode(address)))))
-      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).explicitGet()).toSeq
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
     }
   }
 

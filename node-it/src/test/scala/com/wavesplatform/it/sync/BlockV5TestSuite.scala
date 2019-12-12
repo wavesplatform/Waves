@@ -133,6 +133,7 @@ class BlockV5TestSuite
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight1 = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterActivationHeight1.version.value shouldBe Block.ProtoBlockVersion
+      nodes.waitForHeightArise()
 
       returnedTxIds.foreach(nodes.head.waitForTransaction(_))
 
@@ -162,7 +163,7 @@ object BlockV5TestSuite {
 
   val MicroblockActivationHeight = 0
   val FairPosActivationHeight    = 0
-  val ActivationHeight           = 3
+  val ActivationHeight           = 4
 
   val Config: Config = ConfigFactory.parseString(
     s"""
