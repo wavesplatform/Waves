@@ -5,11 +5,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.ZkSnarkBenchmark.{CurveSt, Groth16St, MerkleSt}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
-<<<<<<< HEAD
-import com.wavesplatform.zwaves.bls12.{Groth16, PedersenMerkleTree}
-=======
 import com.wavesplatform.zwaves.bls12.Groth16
->>>>>>> ece509ed9f82c6b4e191a426ff8939672bacb209
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 import scorex.crypto.signatures.{Curve25519, Signature}
