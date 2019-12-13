@@ -14,6 +14,7 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -24,12 +25,13 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{AsyncQueue, CancelableFuture}
 import monix.reactive.Observer
+import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -57,6 +59,8 @@ class UtxPoolImpl(
 
   // Init consume loop
   TxQueue.consume()
+
+
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
@@ -153,8 +157,10 @@ class UtxPoolImpl(
 
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
     tracedIsNew.resultE match {
-      case Left(err)    => log.debug(s"UTX putIfNew(${tx.id()}) failed with $err")
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Left(err) =>
+        log.debug(s"UTX putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
+        logValidationError(tx, err)
     }
     tracedIsNew
   }
@@ -261,7 +267,8 @@ class UtxPoolImpl(
                         )
                       }
                     case Left(error) =>
-                      log.debug(s"Transaction ${tx.id()} removed due to $error")
+                      log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
+                      logValidationError(tx, error)
                       remove(tx.id())
                       bumpIterations(r, newCheckedAddresses)
                   }
@@ -294,6 +301,20 @@ class UtxPoolImpl(
         if (txs.nonEmpty) log.trace(s"Packed ${txs.length} transactions of $totalIterations checked, final constraint: $finalConstraint")
         (Some(txs.reverse), finalConstraint)
     }
+  }
+
+  private[this] val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
+  traceLogger.trace("Validation trace reporting is enabled")
+
+  private def extractErrorMessage(error: ValidationError): String = error match {
+    case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.error})"
+    case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
+    case TransactionValidationError(cause, _)               => extractErrorMessage(cause)
+    case other                                              => other.toString
+  }
+
+  private def logValidationError(tx: Transaction, error: ValidationError): Unit = if (traceLogger.logger.isTraceEnabled) {
+    traceLogger.trace(error.toString)
   }
 
   //noinspection ScalaStyle
