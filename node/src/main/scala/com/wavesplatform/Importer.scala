@@ -12,13 +12,14 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPoolImpl
+import kamon.Kamon
 import monix.execution.{Scheduler, UncaughtExceptionReporter}
 import monix.reactive.Observer
 import monix.reactive.subjects.PublishSubject
 import scopt.OParser
 
 import scala.concurrent.Await
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
@@ -98,6 +99,7 @@ object Importer extends ScorexLogging {
             log.error(s"Failed to open file '$blockchainFile", error)
         }
 
+        Await.result(Kamon.stopAllReporters(), 10.seconds)
         time.close()
     }
   }

@@ -19,6 +19,8 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
@@ -28,6 +30,7 @@ import monix.execution.schedulers.SchedulerService
 import monix.execution.{AsyncQueue, CancelableFuture}
 import monix.reactive.Observer
 
+import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.concurrent.duration.{Duration => ScalaDuration}
 import scala.util.{Left, Right}
@@ -198,50 +201,92 @@ class UtxPoolImpl(
 
   override def transactionById(transactionId: ByteStr): Option[Transaction] = Option(transactions.get(transactionId))
 
+  private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
+    case i: InvokeScriptTransaction =>
+      Set(i.sender.toAddress).filter(blockchain.hasScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+    case e: ExchangeTransaction =>
+      Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasScript)
+    case a: Authorized if blockchain.hasScript(a.sender.toAddress) => Set(a.sender.toAddress)
+    case _                                                         => Set.empty
+  }
+
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
-    val (reversedValidTxs, _, finalConstraint, totalIterations) = PoolMetrics.packTimeStats.measure {
+    val PackResult(reversedValidTxs, _, finalConstraint, totalIterations, _) = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
-      type R = (Option[Seq[Transaction]], Diff, MultiDimensionalMiningConstraint, Int)
-      @inline def bumpIterations(r: R): R = r.copy(_4 = r._4 + 1)
+      @inline def bumpIterations(r: PackResult, newCheckedAddresses: Set[Address]): PackResult =
+        r.copy(iterations = r.iterations + 1, checkedAddresses = newCheckedAddresses)
 
-      transactions.values.asScala.toSeq
-        .sorted(TransactionsOrdering.InUTXPool)
-        .iterator
-        .foldLeft[R]((None, Monoid[Diff].empty, initialConstraint, 0)) {
-          case (r @ (packedTransactions, diff, currentConstraint, iterationCount), tx) =>
-            if (currentConstraint.isFull || (packedTransactions.exists(_.nonEmpty) && isTimeLimitReached))
-              r // don't run any checks here to speed up mining
-            else if (TxCheck.isExpired(tx)) {
-              log.debug(s"Transaction ${tx.id()} expired")
-              remove(tx.id())
-              bumpIterations(r)
-            } else {
-              val updatedBlockchain = CompositeBlockchain(blockchain, Some(diff))
-              differ(updatedBlockchain, tx).resultE match {
-                case Right(newDiff) =>
-                  val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
-                  if (updatedConstraint.isOverfilled) {
-                    log.trace(
-                      s"Transaction ${tx.id()} does not fit into the block: " +
-                        s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}"
-                    )
-                    (packedTransactions.orElse(Some(Seq.empty[Transaction])), diff, currentConstraint, iterationCount + 1)
-                  } else {
-                    log.trace(s"Packing transaction ${tx.id()}")
-                    (Some(packedTransactions.fold(Seq(tx))(tx +: _)), Monoid.combine(diff, newDiff), updatedConstraint, iterationCount + 1)
+      def packIteration(r: PackResult, sortedTransactions: Iterator[Transaction]): PackResult =
+        sortedTransactions
+          .filterNot(tx => r.transactions.exists(_.contains(tx)))
+          .foldLeft[PackResult](r) {
+            case (r @ PackResult(packedTransactions, diff, currentConstraint, iterationCount, checkedAddresses), tx) =>
+              if (currentConstraint.isFull || (packedTransactions.exists(_.nonEmpty) && isTimeLimitReached))
+                r // don't run any checks here to speed up mining
+              else if (TxCheck.isExpired(tx)) {
+                log.debug(s"Transaction ${tx.id()} expired")
+                remove(tx.id())
+                bumpIterations(r, checkedAddresses)
+              } else {
+                val newScriptedAddresses = scriptedAddresses(tx)
+                if (checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
+                else {
+                  val updatedBlockchain   = CompositeBlockchain(blockchain, Some(diff))
+                  val newCheckedAddresses = newScriptedAddresses ++ checkedAddresses
+                  differ(updatedBlockchain, tx).resultE match {
+                    case Right(newDiff) =>
+                      val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
+                      if (updatedConstraint.isOverfilled) {
+                        log.trace(
+                          s"Transaction ${tx.id()} does not fit into the block: " +
+                            s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}"
+                        )
+                        PackResult(
+                          packedTransactions.orElse(Some(Seq.empty[Transaction])),
+                          diff,
+                          currentConstraint,
+                          iterationCount + 1,
+                          newCheckedAddresses
+                        )
+                      } else {
+                        log.trace(s"Packing transaction ${tx.id()}")
+                        PackResult(
+                          Some(packedTransactions.fold(Seq(tx))(tx +: _)),
+                          Monoid.combine(diff, newDiff),
+                          updatedConstraint,
+                          iterationCount + 1,
+                          newCheckedAddresses
+                        )
+                      }
+                    case Left(error) =>
+                      log.debug(s"Transaction ${tx.id()} removed due to $error")
+                      remove(tx.id())
+                      bumpIterations(r, newCheckedAddresses)
                   }
-                case Left(error) =>
-                  log.debug(s"Transaction ${tx.id()} removed due to $error")
-                  remove(tx.id())
-                  bumpIterations(r)
+                }
               }
-            }
+          }
+
+      @tailrec
+      def pack(seed: PackResult): PackResult =
+        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) seed
+        else {
+          val newSeed = packIteration(
+            seed.copy(checkedAddresses = Set.empty),
+            transactions.values.asScala.toSeq
+              .sorted(TransactionsOrdering.InUTXPool)
+              .iterator
+          )
+          if (newSeed.constraint.isFull || newSeed.transactions == seed.transactions) newSeed
+          else pack(newSeed)
         }
+
+      pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty))
     }
 
     reversedValidTxs match {
@@ -330,6 +375,13 @@ class UtxPoolImpl(
 }
 
 object UtxPoolImpl {
+  private case class PackResult(
+      transactions: Option[Seq[Transaction]],
+      totalDiff: Diff,
+      constraint: MultiDimensionalMiningConstraint,
+      iterations: Int,
+      checkedAddresses: Set[Address]
+  )
 
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
     private type Portfolios = Map[Address, Portfolio]

@@ -10,10 +10,13 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
+import kamon.Kamon
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 import scopt.OParser
 
+import scala.concurrent.Await
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object Exporter extends ScorexLogging {
@@ -65,6 +68,7 @@ object Exporter extends ScorexLogging {
           case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
         }
 
+        Await.result(Kamon.stopAllReporters(), 10.seconds)
         time.close()
     }
   }
