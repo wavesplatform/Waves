@@ -4,7 +4,8 @@ import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
-import cats._
+import cats.Monoid
+import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -80,26 +81,22 @@ class UtxPoolImpl(
           })
 
         def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
-          PoolMetrics.checkScripted.measure(tx match {
-            case scripted if TxCheck.isScripted(scripted) =>
+          PoolMetrics.checkScripted.measure(
+            if (!TxCheck.isScripted(tx)) Right(tx)
+            else
               for {
                 _ <- Either.cond(
                   utxSettings.allowTransactionsFromSmartAccounts,
                   (),
                   GenericError("transactions from scripted accounts are denied from UTX pool")
                 )
-
-                scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
                 _ <- Either.cond(
-                  skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
+                  skipSizeCheck || transactions.values().asScala.count(TxCheck.isScripted) < utxSettings.maxScriptedSize,
                   (),
                   GenericError("Transaction pool scripted txs size limit is reached")
                 )
               } yield tx
-
-            case _ =>
-              Right(tx)
-          })
+          )
 
         def checkNotBlacklisted(tx: Transaction): Either[SenderIsBlacklisted, Unit] = PoolMetrics.checkNotBlacklisted.measure {
           if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -140,15 +137,15 @@ class UtxPoolImpl(
         .sum
 
       for {
-        _ <- Either.cond(transactions.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
+        _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- Either.cond(
           skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
           (),
           GenericError("Transaction pool bytes size limit is reached")
         )
 
-        _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
         _ <- LimitChecks.checkNotBlacklisted(tx)
+        _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
         _ <- LimitChecks.checkAlias(tx)
         _ <- LimitChecks.canReissue(tx)
       } yield ()
@@ -257,7 +254,7 @@ class UtxPoolImpl(
                         log.trace(s"Packing transaction ${tx.id()}")
                         PackResult(
                           Some(packedTransactions.fold(Seq(tx))(tx +: _)),
-                          Monoid.combine(diff, newDiff),
+                          diff.combine(newDiff),
                           updatedConstraint,
                           iterationCount + 1,
                           newCheckedAddresses
@@ -303,16 +300,16 @@ class UtxPoolImpl(
   private[this] object TxCheck {
     private[this] val ExpirationTime = blockchain.settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis
 
-    def isExpired(transaction: Transaction): Boolean = {
+    def isExpired(transaction: Transaction): Boolean =
       (time.correctedTime() - transaction.timestamp) > ExpirationTime
-    }
 
-    def isScripted(transaction: Transaction): Boolean = {
+    def isScripted(transaction: Transaction): Boolean =
       transaction match {
-        case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)
-        case _                        => false
+        case _: InvokeScriptTransaction => true
+        case _: ExchangeTransaction     => false
+        case a: AuthorizedTransaction   => blockchain.hasScript(a.sender.toAddress)
+        case _                          => false
       }
-    }
 
     def canCreateAlias(alias: Alias): Boolean =
       blockchain.canCreateAlias(alias)
@@ -415,7 +412,7 @@ object UtxPoolImpl {
         txAccountPortfolio <- txPortfolios.get(accountAddr).toSeq
       } yield txAccountPortfolio
 
-      Monoid.combineAll[Portfolio](portfolios)
+      Monoid.combineAll(portfolios)
     }
 
     def remove(txId: ByteStr): Unit = {
