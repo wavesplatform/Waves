@@ -222,7 +222,7 @@ class UtxPoolImpl(
 
       def packIteration(r: PackResult, sortedTransactions: Iterator[Transaction]): PackResult =
         sortedTransactions
-          .filterNot(tx => r.transactions.exists(_.contains(tx)))
+          .filterNot(tx => r.validatedTransactions(tx.id()))
           .foldLeft[PackResult](r) {
             case (r, tx) =>
               if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached))
@@ -278,7 +278,7 @@ class UtxPoolImpl(
 
       @tailrec
       def pack(seed: PackResult): PackResult =
-        if (isTimeLimitReached && seed.transactions.nonEmpty || transactions.isEmpty) seed
+        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) seed
         else {
           val newSeed = packIteration(
             seed.copy(checkedAddresses = Set.empty),
