@@ -23,6 +23,7 @@ object BlockStats {
     case object Inv      extends Event
     case object Received extends Event
     case object Applied  extends Event
+    case object Appended extends Event
     case object Declined extends Event
     case object Mined    extends Event
   }
@@ -71,6 +72,14 @@ object BlockStats {
       .addField("bt", b.consensusData.baseTarget)
       .addField("height", baseHeight),
     Event.Mined,
+    Seq.empty
+  )
+
+  def appended(b: Block, complexity: Long): Unit = write(
+    measurement(Type.Block)
+      .tag("id", id(b.uniqueId))
+      .addField("complexity", complexity),
+    Event.Appended,
     Seq.empty
   )
 
