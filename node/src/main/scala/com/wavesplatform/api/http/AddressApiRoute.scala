@@ -43,7 +43,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balances ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
@@ -191,6 +191,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   )
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address))
+  }
+
+  def balances: Route = (path("balance") & get & parameters('height.as[Option[Int]]) & parameters('address.*)) { (height, addresses) =>
+    complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq))
   }
 
   @Path("/balance/details/{address}")
@@ -380,6 +384,23 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       case Some(pka) => complete(Json.obj("address" -> pka.stringRepr))
       case None      => complete(Unknown)
     }
+  }
+
+  def balancesJson(height: Int, addreses: Seq[String]) = {
+    import com.wavesplatform.common.state.ByteStr
+    import com.wavesplatform.state.BalanceSnapshot
+    implicit val balancesWrites: Writes[(String, BalanceSnapshot)] = Writes[(String, BalanceSnapshot)] { b =>
+      Json.obj("id" -> b._1, "balance" -> b._2.regularBalance)
+    }
+
+    val balances = addreses.flatMap { address =>
+      Address.fromString(address).right.toOption.flatMap { a =>
+        blockchain.balanceSnapshots(a, height, ByteStr(Array[Byte]())).headOption.map { balance =>
+          (address -> balance) 
+        }
+      }
+    }
+    ToResponseMarshallable(balances)
   }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
