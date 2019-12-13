@@ -289,7 +289,7 @@ class UtxPoolImpl(
           if (newSeed.constraint.isFull) {
             log.trace(s"Block is full: ${newSeed.constraint}")
             newSeed
-          } else if ((newSeed.validatedTransactions -- transactions.keys().asScala).isEmpty) {
+          } else if (transactions.keys().asScala.forall(newSeed.validatedTransactions)) {
             log.trace("No more transactions to validate")
             newSeed
           } else pack(newSeed)
