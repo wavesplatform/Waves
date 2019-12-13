@@ -22,10 +22,8 @@ class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSen
 
   s"Generate transactions and wait for one block with $maxTxs txs" in result(
     for {
-      _           <- processRequests(generateTransfersToRandomAddresses(1, nodeAddresses))
-      _           <- miner.waitForHeight(2)
       uploadedTxs <- processRequests(generateTransfersToRandomAddresses(maxTxs, nodeAddresses))
-      _           <- miner.waitForHeight(4)
+      _           <- miner.waitForHeight(3)
       block       <- miner.blockAt(2)
     } yield {
       block.transactions.size shouldBe maxTxs
@@ -34,7 +32,7 @@ class MicroblocksGenerationSuite extends FreeSpec with Matchers with TransferSen
       val diff     = uploadedTxs.map(_.id).toSet -- blockTxs
       diff shouldBe empty
     },
-    4.minutes
+    3.minutes
   )
 
 }

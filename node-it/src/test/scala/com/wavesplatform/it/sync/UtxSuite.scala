@@ -25,8 +25,6 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
   val AMOUNT     = ENOUGH_FEE * 10
 
   test("Invalid transaction should be removed from from utx") {
-    nodes.waitForHeightArise()
-
     val seed = Array.fill(32)(-1: Byte)
 
     Random.nextBytes(seed)
@@ -58,6 +56,30 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
       txInBlockchain(tx1Id, nodes) ^ txInBlockchain(tx2Id, nodes)
 
     assert(exactlyOneTxInBlockchain, "Only one tx should be in blockchain")
+  }
+
+  test("Transactions discarded before blockchain readiness") {
+    docker.stopContainer(dockerNodes()(1))
+    miner.waitForHeight(miner.height + 2)
+    docker.stopContainer(dockerNodes().head)
+    docker.startContainer(dockerNodes()(1).containerId)
+
+    val transferToAccount = TransferTransactionV1
+      .selfSigned(Waves, miner.privateKey, notMiner.publicKey, AMOUNT, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+      .explicitGet()
+
+    notMiner.signedBroadcast(transferToAccount.json())
+
+    notMiner.utxSize shouldBe 0
+
+    docker.startContainer(dockerNodes().head.containerId)
+    nodes.waitForSameBlockHeadersAt(miner.height)
+
+    notMiner.signedBroadcast(transferToAccount.json())
+
+    notMiner.utxSize shouldBe 1
+
+    nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
   }
 
   def waitForEmptyUtx(nodes: Seq[Node]): Unit = {

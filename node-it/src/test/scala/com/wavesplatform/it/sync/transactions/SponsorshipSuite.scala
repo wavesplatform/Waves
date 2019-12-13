@@ -48,7 +48,6 @@ class SponsorshipSuite extends FreeSpec with NodesFromDocker with Matchers with 
   }
 
   "Fee in sponsored asset works fine" - {
-    nodes.waitForHeightArise()
 
     val sponsorWavesBalance = sponsor.accountBalances(sponsor.address)._2
     val minerWavesBalance   = miner.accountBalances(miner.address)._2

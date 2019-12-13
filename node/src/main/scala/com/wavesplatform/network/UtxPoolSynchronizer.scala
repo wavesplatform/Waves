@@ -71,7 +71,9 @@ class UtxPoolSynchronizerImpl(
       }
 
   override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
-    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
+    if (lastObserved(blockSource).map(_.exists(_.ready))())
+      Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
+    else Right(false)
 
   override def close(): Unit = cancelableFuture.cancel()
 

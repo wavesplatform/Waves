@@ -52,7 +52,11 @@ class BlockchainUpdaterImpl(
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
   private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
 
-  private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
+  private lazy val blockchainReadinessAge =
+    math.min(
+      wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis,
+      wavesSettings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis
+    )
 
   private var ngState: Option[NgState]              = Option.empty
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
@@ -61,7 +65,8 @@ class BlockchainUpdaterImpl(
 
   private def publishLastBlockInfo(): Unit =
     for (id <- lastBlockId; ts <- ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)) {
-      val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
+      val currentTs = time.correctedTime()
+      val blockchainReady = ts + blockchainReadinessAge > currentTs
       internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
     }
 

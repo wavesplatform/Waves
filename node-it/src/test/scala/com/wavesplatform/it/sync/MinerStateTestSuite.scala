@@ -19,8 +19,6 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
   private def last  = nodes.last
 
   test("node w/o balance can forge blocks after effective balance increase") {
-    nodes.waitForHeightArise()
-
     val newAddress = last.createAddress()
 
     val (balance1, eff1)        = miner.accountBalances(miner.address)

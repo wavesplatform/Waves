@@ -67,7 +67,6 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
 
   s"Block is limited by size after activation" in result(
     for {
-      _ <- nodes.waitForHeightArise()
       _ <- miner.signedBroadcast(Json.toJsObject(toRequest(setScriptTx(smartPrivateKey))) + ("type" -> JsNumber(13)))
       _ <- processRequests(generateTransfersFromAccount(MaxScriptRunsInBlock * 3, smartPrivateKey.stringRepr))
       _ <- miner.waitForHeight(5)

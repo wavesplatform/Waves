@@ -37,7 +37,6 @@ class UtxPoolImpl(
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    acceptingLatch: () => Boolean,
     nanoTimeSource: () => Long = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
@@ -56,13 +55,8 @@ class UtxPoolImpl(
   TxQueue.consume()
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    if (!acceptingLatch()) {
-      log.trace(s"Transaction (${tx.id()}) has not been accepted by latch")
-      TracedResult.wrapValue(false)
-    } else if (transactions.containsKey(tx.id())) {
-      log.trace(s"Transaction (${tx.id()}) already accepted")
-      TracedResult.wrapValue(false)
-    } else putNewTx(tx, verify)
+    if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
+    else putNewTx(tx, verify)
   }
 
   private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
