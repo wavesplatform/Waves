@@ -188,7 +188,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(exchangeTx)))
 
       Post(routePath("/broadcast"), exchangeTx.json()) ~> ApiKeyHeader ~> route ~> check {
-        (responseAs[JsObject] \ "version").as[Byte] shouldBe exchangeTx.version
+        responseAs[JsObject] shouldBe exchangeTx.json()
       }
 
       decode(base64Str) shouldBe exchangeTx
@@ -413,7 +413,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
 
       Post(routePath("/broadcast"), updateAssetInfoTx.json()) ~> ApiKeyHeader ~> route ~> check {
-        (responseAs[JsObject] \ "version").as[Byte] shouldBe updateAssetInfoTx.version
+        responseAs[JsObject] shouldBe updateAssetInfoTx.json()
       }
 
       decode(base64Str) shouldBe updateAssetInfoTx
@@ -426,6 +426,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       response.status shouldBe StatusCodes.OK
 
       (responseAs[JsObject] \ "version").as[Byte] shouldBe tx.version
+      (responseAs[JsObject] \ "senderPublicKey").asOpt[String] shouldBe 'defined
 
       val json   = responseAs[JsObject]
       val proofs = (json \ "proofs").as[Proofs]
