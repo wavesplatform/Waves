@@ -28,7 +28,8 @@ class UtxPoolSynchronizerImpl(
     val settings: UtxSynchronizerSettings,
     putIfNew: Transaction => TracedResult[ValidationError, Boolean],
     broadcast: (Transaction, Option[Channel]) => Unit,
-    blockSource: Observable[LastBlockInfo]
+    blockSource: Observable[LastBlockInfo],
+    readiness: Observable[Boolean]
 )(
     implicit val scheduler: Scheduler
 ) extends UtxPoolSynchronizer
@@ -46,6 +47,8 @@ class UtxPoolSynchronizerImpl(
   val cancelableFuture = pollTransactions()
 
   blockSource.map(_.height).distinctUntilChanged.foreach(_ => knownTransactions.invalidateAll())
+
+  val lastReadiness = lastObserved(readiness).map(_.contains(true))
 
   private def transactionIsNew(txId: ByteStr): Boolean = {
     var isNew = false
@@ -71,9 +74,12 @@ class UtxPoolSynchronizerImpl(
       }
 
   override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
-    if (lastObserved(blockSource).map(_.exists(_.ready))())
+    if (lastReadiness())
       Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
-    else Right(false)
+    else {
+      log.trace(s"Blockchain is not ready yet, discarding transaction: ${tx.id()}")
+      Right(false)
+    }
 
   override def close(): Unit = cancelableFuture.cancel()
 
@@ -85,8 +91,15 @@ class UtxPoolSynchronizerImpl(
 }
 
 object UtxPoolSynchronizer extends ScorexLogging {
-  def apply(utx: UtxPool, settings: UtxSynchronizerSettings, allChannels: ChannelGroup, blockSource: Observable[LastBlockInfo])(
+  def apply(
+      utx: UtxPool,
+      settings: UtxSynchronizerSettings,
+      allChannels: ChannelGroup,
+      blockSource: Observable[LastBlockInfo],
+      readiness: Observable[Boolean]
+  )(
       implicit sc: Scheduler
-  ): UtxPoolSynchronizer = new UtxPoolSynchronizerImpl(settings, tx => utx.putIfNew(tx), (tx, ch) => allChannels.broadcast(tx, ch), blockSource)
+  ): UtxPoolSynchronizer =
+    new UtxPoolSynchronizerImpl(settings, tx => utx.putIfNew(tx), (tx, ch) => allChannels.broadcast(tx, ch), blockSource, readiness)
 
 }

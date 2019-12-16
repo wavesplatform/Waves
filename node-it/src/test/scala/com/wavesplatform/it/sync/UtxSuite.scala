@@ -60,7 +60,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
   test("Transactions discarded before blockchain readiness") {
     docker.stopContainer(dockerNodes()(1))
-    miner.waitForHeight(miner.height + 2)
+    miner.waitForHeight(miner.height + 3)
     docker.stopContainer(dockerNodes().head)
     docker.startContainer(dockerNodes()(1).containerId)
 

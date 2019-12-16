@@ -6,7 +6,7 @@ import java.nio.file.{Files, Path, Paths}
 import java.time.LocalDateTime
 import java.time.format.DateTimeFormatter
 import java.util.Collections._
-import java.util.concurrent.ConcurrentHashMap
+import java.util.concurrent.{ConcurrentHashMap, TimeUnit}
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.{Properties, List => JList, Map => JMap}
 
@@ -530,7 +530,8 @@ object Docker {
 
   val configTemplate: Config = parseResources("template.conf")
   def genesisOverride: Config = {
-    val genesisTs = System.currentTimeMillis()
+    val genesisTs = System.currentTimeMillis() + // needed to accept transactions in UTX right away after genesis block
+      configTemplate.getDuration("waves.blockchain.custom.genesis.average-block-delay", TimeUnit.MILLISECONDS)
 
     val timestampOverrides = parseString(s"""waves.blockchain.custom.genesis {
                                             |  timestamp = $genesisTs

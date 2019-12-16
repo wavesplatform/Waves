@@ -14,4 +14,4 @@ trait BlockchainUpdater {
   def shutdown(): Unit
 }
 
-case class LastBlockInfo(id: BlockId, height: Int, score: BigInt, ready: Boolean)
+case class LastBlockInfo(id: BlockId, timestamp: Long, height: Int, score: BigInt, ready: Boolean)

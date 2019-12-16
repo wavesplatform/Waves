@@ -52,11 +52,7 @@ class BlockchainUpdaterImpl(
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
   private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
 
-  private lazy val blockchainReadinessAge =
-    math.min(
-      wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis,
-      wavesSettings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis
-    )
+  private lazy val maxBlockReadinessAge = wavesSettings.minerSettings.intervalAfterLastBlockThenGenerationIsAllowed.toMillis
 
   private var ngState: Option[NgState]              = Option.empty
   private var restTotalConstraint: MiningConstraint = MiningConstraints(blockchain, blockchain.height).total
@@ -65,9 +61,8 @@ class BlockchainUpdaterImpl(
 
   private def publishLastBlockInfo(): Unit =
     for (id <- lastBlockId; ts <- ngState.map(_.base.timestamp).orElse(blockchain.lastBlockTimestamp)) {
-      val currentTs = time.correctedTime()
-      val blockchainReady = ts + blockchainReadinessAge > currentTs
-      internalLastBlockInfo.onNext(LastBlockInfo(id, height, score, blockchainReady))
+      val blockchainReady = ts + maxBlockReadinessAge > time.correctedTime()
+      internalLastBlockInfo.onNext(LastBlockInfo(id, ts, height, score, blockchainReady))
     }
 
   publishLastBlockInfo()
@@ -405,7 +400,7 @@ class BlockchainUpdaterImpl(
               restTotalConstraint = updatedMdConstraint.constraints.head
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
-              internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
+              internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, ng.base.getHeader().timestamp, height, score, ready = true))
 
               for {
                 (addr, p) <- diff.portfolios
