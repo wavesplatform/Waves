@@ -180,6 +180,11 @@ object AsyncHttpApi extends Assertions {
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
+    def balances(height: Option[Int], addresses: Seq[String]): Future[Seq[Balance]] =
+      get(s"""/addresses/balances?${addresses.map(a => "address=" ++ a).mkString("&")}${height.fold("")(h => "&height="++h.toString)}""")
+        .as[Seq[JsObject]]
+        .map(_.map(b => Balance((b \ "id").as[String], 0, (b \ "balance").as[Long])))
+
     def balanceDetails(address: String): Future[BalanceDetails] = get(s"/addresses/balance/details/$address").as[BalanceDetails]
 
     def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
@@ -695,6 +700,10 @@ object AsyncHttpApi extends Assertions {
     def accountEffectiveBalance(acc: String): Future[Long] = n.effectiveBalance(acc).map(_.balance)
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
+
+    def accountsBalances(height: Option[Int], accs: Seq[String]): Future[Seq[(String, Long)]] = {
+      n.balances(height,accs).map(_.map(b => (b.address, b.balance)))
+    }
 
     def accountBalances(acc: String): Future[(Long, Long)] = {
       n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
