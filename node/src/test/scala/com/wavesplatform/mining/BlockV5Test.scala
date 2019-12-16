@@ -60,7 +60,9 @@ class BlockV5Test
         withMiner(blockchain, testTime) {
           case (miner, appender, scheduler) =>
             for (h <- 2 until BlockV5ActivationHeight) {
+
               shiftTime(miner, minerAcc1)
+
               val forge = miner invokePrivate forgeBlock(minerAcc1)
               forge shouldBe 'right
               val block = forge.right.value._2
@@ -156,7 +158,9 @@ class BlockV5Test
             Await.result(appender(oldVersionBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
 
             for (h <- blockchain.height to 110) {
+
               shiftTime(miner, minerAcc1)
+
               val forged = miner invokePrivate forgeBlock(minerAcc1)
               forged shouldBe 'right
               val block = forged.right.value._2
@@ -176,7 +180,9 @@ class BlockV5Test
         withMiner(blockchain, testTime) {
           case (miner, appender, scheduler) =>
             for (h <- blockchain.height to 110) {
+
               shiftTime(miner, minerAcc1)
+
               val forged = miner invokePrivate forgeBlock(minerAcc1)
               forged shouldBe 'right
               val block = forged.right.value._2
@@ -261,13 +267,13 @@ class BlockV5Test
 
   type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
 
-  private def withMiner(blockchain: BlockchainUpdater with NG, time: Time = ntpTime, settings: WavesSettings = testSettings)(
+  private def withMiner(blockchain: BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
     val pos               = new PoSSelector(blockchain, settings.blockchainSettings, settings.synchronizationSettings)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, settings.utxSettings)
+    val utxPool           = new UtxPoolImpl(time, blockchain, ignoreSpendableBalanceChanged, settings.utxSettings)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)
