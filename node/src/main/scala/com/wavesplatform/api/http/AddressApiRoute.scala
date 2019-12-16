@@ -205,6 +205,20 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq))
   }
 
+  @Path("/balance")
+  @ApiOperation(value = "Balances", notes = "Balances for list of accounts", httpMethod = "POST")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "height", value = "Height", required = false, dataType = "integer", paramType = "body"),
+      new ApiImplicitParam(name = "ids", value = "One or more addresses", required = true, dataType = "Seq[string]", paramType = "body")
+    )
+  )
+  def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
+    val height = (request \ "height").asOpt[Int]
+    val addresses = (request \ "ids").as[Seq[String]]
+    complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq))
+  }
+
   @Path("/balance/details/{address}")
   @ApiOperation(value = "Details for balance", notes = "Account's balances", httpMethod = "GET")
   @ApiImplicitParams(
@@ -396,7 +410,6 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   def balancesJson(height: Int, addreses: Seq[String]) = {
     import com.wavesplatform.common.state.ByteStr
-    import com.wavesplatform.state.BalanceSnapshot
     implicit val balancesWrites: Writes[(String, (Int, Long))] = Writes[(String, (Int, Long))] { b =>
       Json.obj("id" -> b._1, "balance" -> b._2._2)
     }
