@@ -7,7 +7,7 @@ import java.util.concurrent.ThreadLocalRandom
 import cats.Show
 import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.generator.utils.{Gen, Universe}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -66,10 +66,8 @@ class NarrowTransactionGenerator(
         val tx: Option[Transaction] = typeGen.getRandom match {
           case IssueTransaction =>
             val sender      = randomFrom(accounts).get
-            val name        = new Array[Byte](10)
-            val description = new Array[Byte](10)
-            random.nextBytes(name)
-            random.nextBytes(description)
+            val name        = Base64.encode(Random.nextString(5).getBytes("utf-8"))
+            val description = Base64.encode(Random.nextString(5).getBytes("utf-8"))
             val reissuable = random.nextBoolean()
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
@@ -77,8 +75,8 @@ class NarrowTransactionGenerator(
                 .selfSigned(
                   TxVersion.V2,
                   sender,
-                  new String(name),
-                  new String(description),
+                  name,
+                  description,
                   amount,
                   Random.nextInt(9).toByte,
                   reissuable,
