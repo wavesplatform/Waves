@@ -397,13 +397,13 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   def balancesJson(height: Int, addreses: Seq[String]) = {
     import com.wavesplatform.common.state.ByteStr
     import com.wavesplatform.state.BalanceSnapshot
-    implicit val balancesWrites: Writes[(String, BalanceSnapshot)] = Writes[(String, BalanceSnapshot)] { b =>
-      Json.obj("id" -> b._1, "balance" -> b._2.regularBalance)
+    implicit val balancesWrites: Writes[(String, (Int, Long))] = Writes[(String, (Int, Long))] { b =>
+      Json.obj("id" -> b._1, "balance" -> b._2._2)
     }
 
     val balances = addreses.flatMap { address =>
       Address.fromString(address).right.toOption.flatMap { a =>
-        blockchain.balanceSnapshots(a, height, ByteStr(Array[Byte]())).headOption.map { balance =>
+        blockchain.balanceOnlySnapshots(a, height, height).headOption.map { balance =>
           (address -> balance) 
         }
       }

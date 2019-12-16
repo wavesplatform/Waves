@@ -744,6 +744,15 @@ class LevelDBWriter(
     .recordStats()
     .build[(Int, BigInt), LeaseBalance]()
 
+  override def balanceOnlySnapshots(address: Address, from: Int, to: Int): Seq[(Int, Long)] = readOnly { db =>
+    db.get(Keys.addressId(address)).fold(Seq((1, 0:scala.Long))) { addressId =>
+      slice(db.get(Keys.wavesBalanceHistory(addressId)), from, to).map { wh =>
+       val b: Long = balanceAtHeightCache.get((wh, addressId), () => db.get(Keys.wavesBalance(addressId)(wh)))
+       (wh, b)
+      }
+    }
+  }
+
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
       val toHeigth = this.heightOf(to).getOrElse(this.height)

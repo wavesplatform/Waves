@@ -680,6 +680,15 @@ class BlockchainUpdaterImpl(
   }
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+  override def balanceOnlySnapshots(address: Address, from: Int, to: Int): Seq[(Int, Long)] = readLock {
+    if (ngState.isEmpty) {
+      blockchain.balanceOnlySnapshots(address, from, to)
+    } else {
+      val bs = this.height -> blockchain.balance(address)
+      if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceOnlySnapshots(address, from, to) else Seq(bs)
+    }
+  }
+
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readLock {
     val blockchainBlock = blockchain.heightOf(to)
     if (blockchainBlock.nonEmpty || ngState.isEmpty) {
