@@ -1,6 +1,8 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URLEncoder}
+import java.nio.charset.StandardCharsets
+
 import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
@@ -9,7 +11,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -21,6 +23,7 @@ import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -176,6 +179,8 @@ object SyncHttpApi extends Assertions {
       sync(async(n).seed(address))
 
     def lastBlock: Block = sync(async(n).lastBlock)
+
+    def blockBySignature(signature: String): Block = sync(async(n).blockBySignature(signature))
 
     def lastBlockHeaders: BlockHeaders = sync(async(n).lastBlockHeaders)
 
@@ -446,6 +451,10 @@ object SyncHttpApi extends Assertions {
     def getDataListPost(sourceAddress: String, keys: String*): Seq[DataEntry[_]] =
       sync(async(n).getDataListPost(sourceAddress, keys: _*))
 
+    def getMerkleProof(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProof(ids: _*))
+
+    def getMerkleProofPost(ids: String*): Seq[MerkleProofResponse] = sync(async(n).getMerkleProofPost(ids: _*))
+
     def broadcastRequest[A: Writes](req: A): Transaction =
       sync(async(n).broadcastRequest(req))
 
@@ -524,6 +533,10 @@ object SyncHttpApi extends Assertions {
     def blockSeqByAddress(address: String, from: Int, to: Int): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to))
 
     def blockHeadersSeq(fromHeight: Int, toHeight: Int): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight))
+
+    def blockGenerationSignature(signature: String): GenerationSignatureResponse = sync(async(n).blockGenerationSignature(signature))
+
+    def lastBlockGenerationSignature: String = sync(async(n).lastBlockGenerationSignature)
 
     def rollback(to: Int, returnToUTX: Boolean = true): Unit =
       sync(async(n).rollback(to, returnToUTX))
@@ -636,6 +649,15 @@ object SyncHttpApi extends Assertions {
       )
     }
 
+    def rollbackToBlockWithSignature(signature: String): Unit = {
+      sync(
+        Future.traverse(nodes) { node =>
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollbackToBlockWithSignature(signature)
+        },
+        ConditionAwaitTime
+      )
+    }
+
     def waitForHeight(height: Int): Unit = {
       sync(
         Future.traverse(nodes) { node =>
@@ -648,9 +670,11 @@ object SyncHttpApi extends Assertions {
 
   class NodeExtGrpc(n: Node) {
     import com.wavesplatform.account.{Address => Addr}
+    import com.wavesplatform.block.{Block => VanillaBlock, BlockHeader => VanillaBlockHeader}
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private[this] lazy val accounts = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private[this] lazy val blocks = BlocksApiGrpc.blockingStub(n.grpcChannel)
 
     def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
       try Await.result(awaitable, atMost)
@@ -744,6 +768,27 @@ object SyncHttpApi extends Assertions {
     def height: Int = sync(async(n).grpc.height)
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
+
+    def blockAt(height: Int): VanillaBlock = {
+      val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height))).getBlock
+      PBBlocks.vanilla(block).toEither.explicitGet()
+    }
+
+    def blockById(blockId: ByteString): VanillaBlock = {
+      val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.BlockId.apply(blockId))).getBlock
+      PBBlocks.vanilla(block).toEither.explicitGet()
+    }
+
+    def blockSeq(fromHeight: Int, toHeight: Int): Seq[VanillaBlock] = {
+      val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = true, BlockRangeRequest.Filter.Empty))
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
+    }
+
+    def blockSeqByAddress(address: String, fromHeight: Int, toHeight: Int): Seq[VanillaBlock] = {
+      val blockIter = blocks.getBlockRange(BlockRangeRequest.of(fromHeight, toHeight, includeTransactions = true,
+        BlockRangeRequest.Filter.Generator.apply(ByteString.copyFrom(Base58.decode(address)))))
+      blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
+    }
   }
 
 }
