@@ -645,22 +645,10 @@ class BlockchainUpdaterImpl(
     )
   }
 
-  private[this] def lposPortfolioFromNG(a: Address, mb: ByteStr): Portfolio = readLock {
-    val diffPf  = ngState.fold(Portfolio.empty)(_.balanceDiffAt(a, mb))
-    val lease   = blockchain.leaseBalance(a)
-    val balance = blockchain.balance(a)
-    Portfolio(balance, lease, Map.empty).combine(diffPf)
-  }
-
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readLock {
-    val blockchainBlock = blockchain.heightOf(to)
-    if (blockchainBlock.nonEmpty || ngState.isEmpty) {
-      blockchain.balanceSnapshots(address, from, to)
-    } else {
-      val bs = BalanceSnapshot(height, lposPortfolioFromNG(address, to))
-      if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceSnapshots(address, from, to) else Seq(bs)
-    }
+    CompositeBlockchain(blockchain, ngState.map(_.bestLiquidDiff))
+      .balanceSnapshots(address, from, to)
   }
 
   override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = readLock {
