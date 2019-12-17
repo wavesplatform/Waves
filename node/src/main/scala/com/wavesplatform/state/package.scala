@@ -150,12 +150,13 @@ package object state {
       case _                          => false
     }
 
-    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
-      val blockHeight = block.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
-      val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
-      val balances    = block.fold(Seq[BalanceSnapshot]())(blockchain.balanceSnapshots(address, bottomLimit, _))
-      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
-    }
+    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long =
+      (for {
+        blockId     <- block.orElse(blockchain.lastBlockId)
+        blockHeight <- blockchain.heightOf(blockId)
+        bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
+        balances    = blockchain.balanceSnapshots(address, bottomLimit, blockId)
+      } yield balances.view.map(_.effectiveBalance).min).getOrElse(0L)
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
@@ -195,6 +196,9 @@ package object state {
 
     def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
+
+    def generatingBalance1(account: Address, blockId: BlockId = ByteStr.empty): Long =
+      GeneratingBalanceProvider.balance1(blockchain, account, blockId)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
   }
