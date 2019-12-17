@@ -125,9 +125,9 @@ object UtxSuite {
                                                             |  blockchain.custom.functionality {
                                                             |    pre-activated-features.1 = 0
                                                             |    generation-balance-depth-from-50-to-1000-after-height = 100
+                                                            |    allow-txs-only-when-blockchain-is-fully-extended = yes
                                                             |  }
                                                             |  miner.enable = no
-                                                            |  allow-txs-only-when-blockchain-is-fully-extended = true
                                                             |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
