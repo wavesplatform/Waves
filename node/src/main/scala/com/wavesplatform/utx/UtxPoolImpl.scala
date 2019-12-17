@@ -4,7 +4,8 @@ import java.time.Duration
 import java.time.temporal.ChronoUnit
 import java.util.concurrent.ConcurrentHashMap
 
-import cats._
+import cats.Monoid
+import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -13,6 +14,7 @@ import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -23,12 +25,13 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.execution.schedulers.SchedulerService
 import monix.execution.{AsyncQueue, CancelableFuture}
 import monix.reactive.Observer
+import org.slf4j.LoggerFactory
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -80,26 +83,22 @@ class UtxPoolImpl(
           })
 
         def checkScripted(tx: Transaction, skipSizeCheck: Boolean): Either[GenericError, Transaction] =
-          PoolMetrics.checkScripted.measure(tx match {
-            case scripted if TxCheck.isScripted(scripted) =>
+          PoolMetrics.checkScripted.measure(
+            if (!TxCheck.isScripted(tx)) Right(tx)
+            else
               for {
                 _ <- Either.cond(
                   utxSettings.allowTransactionsFromSmartAccounts,
                   (),
                   GenericError("transactions from scripted accounts are denied from UTX pool")
                 )
-
-                scriptedCount = transactions.values().asScala.count(TxCheck.isScripted)
                 _ <- Either.cond(
-                  skipSizeCheck || scriptedCount < utxSettings.maxScriptedSize,
+                  skipSizeCheck || transactions.values().asScala.count(TxCheck.isScripted) < utxSettings.maxScriptedSize,
                   (),
                   GenericError("Transaction pool scripted txs size limit is reached")
                 )
               } yield tx
-
-            case _ =>
-              Right(tx)
-          })
+          )
 
         def checkNotBlacklisted(tx: Transaction): Either[SenderIsBlacklisted, Unit] = PoolMetrics.checkNotBlacklisted.measure {
           if (utxSettings.blacklistSenderAddresses.isEmpty) {
@@ -140,15 +139,15 @@ class UtxPoolImpl(
         .sum
 
       for {
-        _ <- Either.cond(transactions.size < utxSettings.maxSize || skipSizeCheck, (), GenericError("Transaction pool size limit is reached"))
+        _ <- Either.cond(skipSizeCheck || transactions.size < utxSettings.maxSize, (), GenericError("Transaction pool size limit is reached"))
         _ <- Either.cond(
           skipSizeCheck || (transactionsBytes + tx.bytes().length) <= utxSettings.maxBytesSize,
           (),
           GenericError("Transaction pool bytes size limit is reached")
         )
 
-        _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
         _ <- LimitChecks.checkNotBlacklisted(tx)
+        _ <- LimitChecks.checkScripted(tx, skipSizeCheck)
         _ <- LimitChecks.checkAlias(tx)
         _ <- LimitChecks.canReissue(tx)
       } yield ()
@@ -156,8 +155,10 @@ class UtxPoolImpl(
 
     val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
     tracedIsNew.resultE match {
-      case Left(err)    => log.debug(s"UTX putIfNew(${tx.id()}) failed with $err")
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
+      case Left(err) =>
+        log.debug(s"UTX putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
+        logValidationError(tx, err)
     }
     tracedIsNew
   }
@@ -215,58 +216,61 @@ class UtxPoolImpl(
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
-    val PackResult(reversedValidTxs, _, finalConstraint, totalIterations, _) = PoolMetrics.packTimeStats.measure {
+    val packResult = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
-      @inline def bumpIterations(r: PackResult, newCheckedAddresses: Set[Address]): PackResult =
-        r.copy(iterations = r.iterations + 1, checkedAddresses = newCheckedAddresses)
 
       def packIteration(r: PackResult, sortedTransactions: Iterator[Transaction]): PackResult =
         sortedTransactions
-          .filterNot(tx => r.transactions.exists(_.contains(tx)))
+          .filterNot(tx => r.validatedTransactions(tx.id()))
           .foldLeft[PackResult](r) {
-            case (r @ PackResult(packedTransactions, diff, currentConstraint, iterationCount, checkedAddresses), tx) =>
-              if (currentConstraint.isFull || (packedTransactions.exists(_.nonEmpty) && isTimeLimitReached))
+            case (r, tx) =>
+              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached))
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
                 remove(tx.id())
-                bumpIterations(r, checkedAddresses)
+                r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
-                if (checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
+                if (r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
-                  val updatedBlockchain   = CompositeBlockchain(blockchain, Some(diff))
-                  val newCheckedAddresses = newScriptedAddresses ++ checkedAddresses
+                  val updatedBlockchain   = CompositeBlockchain(blockchain, Some(r.totalDiff))
+                  val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
                   differ(updatedBlockchain, tx).resultE match {
                     case Right(newDiff) =>
-                      val updatedConstraint = currentConstraint.put(updatedBlockchain, tx, newDiff)
+                      val updatedConstraint = r.constraint.put(updatedBlockchain, tx, newDiff)
                       if (updatedConstraint.isOverfilled) {
                         log.trace(
                           s"Transaction ${tx.id()} does not fit into the block: " +
-                            s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(currentConstraint, updatedConstraint).mkString(", ")}"
+                            s"${MultiDimensionalMiningConstraint.formatOverfilledConstraints(r.constraint, updatedConstraint).mkString(", ")}"
                         )
-                        PackResult(
-                          packedTransactions.orElse(Some(Seq.empty[Transaction])),
-                          diff,
-                          currentConstraint,
-                          iterationCount + 1,
-                          newCheckedAddresses
+                        r.copy(
+                          transactions = r.transactions.orElse(Some(Seq.empty[Transaction])),
+                          iterations = r.iterations + 1,
+                          checkedAddresses = newCheckedAddresses,
+                          validatedTransactions = r.validatedTransactions + tx.id()
                         )
                       } else {
                         log.trace(s"Packing transaction ${tx.id()}")
                         PackResult(
-                          Some(packedTransactions.fold(Seq(tx))(tx +: _)),
-                          Monoid.combine(diff, newDiff),
+                          Some(r.transactions.fold(Seq(tx))(tx +: _)),
+                          r.totalDiff.combine(newDiff),
                           updatedConstraint,
-                          iterationCount + 1,
-                          newCheckedAddresses
+                          r.iterations + 1,
+                          newCheckedAddresses,
+                          r.validatedTransactions + tx.id()
                         )
                       }
                     case Left(error) =>
-                      log.debug(s"Transaction ${tx.id()} removed due to $error")
+                      log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
+                      logValidationError(tx, error)
                       remove(tx.id())
-                      bumpIterations(r, newCheckedAddresses)
+                      r.copy(
+                        iterations = r.iterations + 1,
+                        validatedTransactions = r.validatedTransactions + tx.id(),
+                        checkedAddresses = newCheckedAddresses
+                      )
                   }
                 }
               }
@@ -282,37 +286,54 @@ class UtxPoolImpl(
               .sorted(TransactionsOrdering.InUTXPool)
               .iterator
           )
-          if (newSeed.constraint.isFull || newSeed.transactions == seed.transactions) newSeed
-          else pack(newSeed)
+          if (newSeed.constraint.isFull) {
+            log.trace(s"Block is full: ${newSeed.constraint}")
+            newSeed
+          } else if ((newSeed.validatedTransactions -- transactions.keys().asScala).isEmpty) {
+            log.trace("No more transactions to validate")
+            newSeed
+          } else pack(newSeed)
         }
 
-      pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty))
+      pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }
 
-    reversedValidTxs match {
-      case None =>
-        log.trace(s"After checking $totalIterations transactions UTX is empty")
-        (None, finalConstraint)
-      case Some(txs) =>
-        if (txs.nonEmpty) log.trace(s"Packed ${txs.length} transactions of $totalIterations checked, final constraint: $finalConstraint")
-        (Some(txs.reverse), finalConstraint)
-    }
+    log.trace(
+      s"Validated ${packResult.validatedTransactions.size} transactions, " +
+        s"of which ${packResult.transactions.fold(0)(_.size)} were packed, ${transactions.size()} transactions remaining"
+    )
+
+    packResult.transactions.map(_.reverse) -> packResult.constraint
+  }
+
+  private[this] val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
+  traceLogger.trace("Validation trace reporting is enabled")
+
+  private def extractErrorMessage(error: ValidationError): String = error match {
+    case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.error})"
+    case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
+    case TransactionValidationError(cause, _)               => extractErrorMessage(cause)
+    case other                                              => other.toString
+  }
+
+  private def logValidationError(tx: Transaction, error: ValidationError): Unit = if (traceLogger.logger.isTraceEnabled) {
+    traceLogger.trace(error.toString)
   }
 
   //noinspection ScalaStyle
   private[this] object TxCheck {
     private[this] val ExpirationTime = blockchain.settings.functionalitySettings.maxTransactionTimeBackOffset.toMillis
 
-    def isExpired(transaction: Transaction): Boolean = {
+    def isExpired(transaction: Transaction): Boolean =
       (time.correctedTime() - transaction.timestamp) > ExpirationTime
-    }
 
-    def isScripted(transaction: Transaction): Boolean = {
+    def isScripted(transaction: Transaction): Boolean =
       transaction match {
-        case a: AuthorizedTransaction => blockchain.hasScript(a.sender.toAddress)
-        case _                        => false
+        case _: InvokeScriptTransaction => true
+        case _: ExchangeTransaction     => false
+        case a: AuthorizedTransaction   => blockchain.hasScript(a.sender.toAddress)
+        case _                          => false
       }
-    }
 
     def canCreateAlias(alias: Alias): Boolean =
       blockchain.canCreateAlias(alias)
@@ -380,7 +401,8 @@ object UtxPoolImpl {
       totalDiff: Diff,
       constraint: MultiDimensionalMiningConstraint,
       iterations: Int,
-      checkedAddresses: Set[Address]
+      checkedAddresses: Set[Address],
+      validatedTransactions: Set[ByteStr]
   )
 
   private class PessimisticPortfolios(spendableBalanceChanged: Observer[(Address, Asset)], isTxKnown: ByteStr => Boolean) {
@@ -415,7 +437,7 @@ object UtxPoolImpl {
         txAccountPortfolio <- txPortfolios.get(accountAddr).toSeq
       } yield txAccountPortfolio
 
-      Monoid.combineAll[Portfolio](portfolios)
+      Monoid.combineAll(portfolios)
     }
 
     def remove(txId: ByteStr): Unit = {
