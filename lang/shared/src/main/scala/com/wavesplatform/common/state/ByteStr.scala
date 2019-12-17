@@ -4,7 +4,7 @@ import com.wavesplatform.common.utils.{Base58, Base64}
 
 import scala.util.Try
 
-final case class ByteStr(arr: Array[Byte]) {
+case class ByteStr(arr: Array[Byte]) {
   lazy val base58: String    = Base58.encode(arr)
   lazy val base64Raw: String = Base64.encode(arr)
   lazy val base64: String    = "base64:" + base64Raw
@@ -84,9 +84,17 @@ object ByteStr {
 
   def fill(size: Int)(b: Int): ByteStr = ByteStr(Array.fill(size)(b.toByte))
 
-  def decodeBase58(s: String): Try[ByteStr] = Base58.tryDecodeWithLimit(s).map(ByteStr(_))
+  def decodeBase58(s: String): Try[ByteStr] = Base58.tryDecodeWithLimit(s).map { bs =>
+    new ByteStr(bs) {
+      override lazy val base58: String = s // Optimization
+    }
+  }
 
-  def decodeBase64(s: String): Try[ByteStr] = Base64.tryDecode(s).map(ByteStr(_))
+  def decodeBase64(s: String): Try[ByteStr] = Base64.tryDecode(s).map { bs =>
+    new ByteStr(bs) {
+      override lazy val base64: String = s
+    }
+  }
 
   implicit val byteStrOrdering: Ordering[ByteStr] = (x, y) => compare(x.arr, y.arr)
 
