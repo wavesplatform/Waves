@@ -184,7 +184,7 @@ object Diff {
             scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = LinkedHashMap((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet)))б
+      transactions = LinkedHashMap((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,
