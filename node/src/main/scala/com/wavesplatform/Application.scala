@@ -202,16 +202,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val timer = new HashedWheelTimer()
     val utxSynchronizerScheduler =
       Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val readinessScheduler =
+      singleThread("utx-pool-readiness-synchronizer", reporter = log.error("Error in UTX pool synchronizer during readiness checking", _))
 
     val utxReadiness =
       if (settings.blockchainSettings.functionalitySettings.allowTxsOnlyWhenBlockchainIsFullyExtended)
         lastBlockInfo
           .map(_.timestamp + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis > time.correctedTime())
-          .executeOn(scheduler)
-      else Observable.repeat(true).executeOn(scheduler)
+      else Observable.repeat(true)
 
     val utxSynchronizer =
-      UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo, utxReadiness)(
+      UtxPoolSynchronizer(
+        utxStorage,
+        settings.synchronizationSettings.utxSynchronizer,
+        allChannels,
+        blockchainUpdater.lastBlockInfo,
+        utxReadiness,
+        readinessScheduler
+      )(
         utxSynchronizerScheduler
       )
 
