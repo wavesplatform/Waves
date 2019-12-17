@@ -201,7 +201,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       new ApiImplicitParam(name = "address", value = "One or more addresses", required = true, allowMultiple = true, dataType = "string", paramType = "query")
     )
   )
-  def balances: Route = (path("balance") & get & parameters('height.as[Option[Int]]) & parameters('address.*)) { (height, addresses) =>
+  def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*)) { (height, addresses) =>
     complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq))
   }
 
