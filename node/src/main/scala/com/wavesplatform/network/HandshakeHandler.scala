@@ -192,7 +192,7 @@ object HandshakeHandler extends ScorexLogging {
 
     override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
       case HandshakeTimeoutExpired =>
-        log.trace(s"Error awaiting for handshake: ${id(ctx.channel())}")
+        log.trace(s"Timeout expired while waiting for handshake: ${id(ctx.channel())}")
         peerDatabase.suspendAndClose(ctx.channel())
 
       case _ =>
