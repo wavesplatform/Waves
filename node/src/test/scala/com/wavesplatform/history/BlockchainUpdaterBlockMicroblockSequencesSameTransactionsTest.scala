@@ -69,6 +69,37 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     }
   }
 
+  property("Microblock tx sequence") {
+    val txCount = 10
+    val microBlockCount = 10
+    val preconditionsAndPayments: Gen[(KeyPair, GenesisTransaction, Seq[Seq[TransferTransactionV1]], Int)] =
+      for {
+        master <- accountGen
+        miner  <- accountGen
+        ts     <- positiveIntGen
+        fee    <- smallFeeGen
+        amt    <- smallFeeGen
+        genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+        microBlockTxs =
+          (1 to txCount * microBlockCount)
+            .map(step => createWavesTransfer(master, master, amt, fee, ts + step).explicitGet())
+            .grouped(microBlockCount)
+            .toSeq
+      } yield (miner, genesis, microBlockTxs, ts)
+    scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
+      case (domain, (miner, genesis, microBlockTxs, ts)) =>
+        val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
+        val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, microBlockTxs, miner, 3, ts)
+        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
+        domain.blockchainUpdater.processBlock(genBlock).explicitGet()
+        domain.blockchainUpdater.processBlock(base).explicitGet()
+        micros.foreach(domain.blockchainUpdater.processMicroBlock(_).explicitGet())
+        domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
+
+        domain.levelDBWriter.lastBlock.get.transactionData shouldBe microBlockTxs.flatten
+    }
+  }
+
   def randomPayment(accs: Seq[KeyPair], ts: Long): Gen[TransferTransactionV1] =
     for {
       from <- Gen.oneOf(accs)
