@@ -190,7 +190,7 @@ object AsyncHttpApi extends Assertions {
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
     def balances(height: Option[Int], addresses: Seq[String]): Future[Seq[Balance]] =
-      get(s"""/addresses/balances?${addresses.map(a => "address=" ++ a).mkString("&")}${height.fold("")(h => "&height="++h.toString)}""")
+      get(s"""/addresses/balance?${addresses.map(a => "address=" ++ a).mkString("&")}${height.fold("")(h => "&height="++h.toString)}""")
         .as[Seq[JsObject]]
         .map(_.map(b => Balance((b \ "id").as[String], 0, (b \ "balance").as[Long])))
 

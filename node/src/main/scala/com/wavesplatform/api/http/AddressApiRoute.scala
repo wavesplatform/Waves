@@ -43,7 +43,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balances ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
