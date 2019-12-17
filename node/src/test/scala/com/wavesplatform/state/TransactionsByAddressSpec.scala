@@ -103,8 +103,8 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
         }
       })
     }
-    "all transactions" in pendingUntilFixed(test { (sender, blocks, d) =>
+    "all transactions" in test { (sender, blocks, d) =>
       collectTransactions(sender, blocks) shouldEqual transactionsFromBlockchain(d.blockchainUpdater, sender)
-    })
+    }
   }
 }
