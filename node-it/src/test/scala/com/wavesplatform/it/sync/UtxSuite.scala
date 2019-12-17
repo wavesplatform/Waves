@@ -58,7 +58,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     assert(exactlyOneTxInBlockchain, "Only one tx should be in blockchain")
   }
 
-  test("Transactions discarded before blockchain readiness") {
+  test("Transactions should be discarded if blockchain is not fully extended") {
     docker.stopContainer(dockerNodes()(1))
     miner.waitForHeight(miner.height + 3)
     docker.stopContainer(dockerNodes().head)
@@ -127,6 +127,7 @@ object UtxSuite {
                                                             |    generation-balance-depth-from-50-to-1000-after-height = 100
                                                             |  }
                                                             |  miner.enable = no
+                                                            |  allow-txs-only-when-blockchain-is-fully-extended = true
                                                             |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(

@@ -12,8 +12,11 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
-import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
+import monix.execution.Ack.Continue
+import monix.execution.{Ack, AsyncQueue, CancelableFuture, Scheduler}
 import monix.reactive.Observable
+import monix.reactive.Observable.Operator
+import monix.reactive.observers.Subscriber
 
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
@@ -48,7 +51,7 @@ class UtxPoolSynchronizerImpl(
 
   blockSource.map(_.height).distinctUntilChanged.foreach(_ => knownTransactions.invalidateAll())
 
-  val lastReadiness = lastObserved(readiness).map(_.contains(true))
+  private val lastReadiness = lastObserved(readiness.liftByOperator(new UtxPoolSynchronizer.UtxReadinessOperator)).map(_.contains(true))
 
   private def transactionIsNew(txId: ByteStr): Boolean = {
     var isNew = false
@@ -102,4 +105,21 @@ object UtxPoolSynchronizer extends ScorexLogging {
   ): UtxPoolSynchronizer =
     new UtxPoolSynchronizerImpl(settings, tx => utx.putIfNew(tx), (tx, ch) => allChannels.broadcast(tx, ch), blockSource, readiness)
 
+  /** Memoized readiness operator */
+  class UtxReadinessOperator extends Operator[Boolean, Boolean] {
+    private[this] var initialized = false
+    override def apply(out: Subscriber[Boolean]): Subscriber[Boolean] =
+      new Subscriber[Boolean] {
+        override def onNext(elem: Boolean): Future[Ack] =
+          if (initialized) Continue
+          else {
+            initialized = elem
+            out.onNext(elem)
+          }
+
+        override def onError(ex: Throwable): Unit  = out.onError(ex)
+        override def onComplete(): Unit            = out.onComplete()
+        override implicit def scheduler: Scheduler = out.scheduler
+      }
+  }
 }
