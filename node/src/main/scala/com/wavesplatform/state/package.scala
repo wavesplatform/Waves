@@ -197,9 +197,6 @@ package object state {
     def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
-    def generatingBalance1(account: Address, blockId: BlockId = ByteStr.empty): Long =
-      GeneratingBalanceProvider.balance1(blockchain, account, blockId)
-
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
   }
 
