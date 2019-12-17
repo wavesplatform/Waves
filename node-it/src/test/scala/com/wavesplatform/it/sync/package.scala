@@ -43,7 +43,7 @@ package object sync {
     minFee + massTransferFeePerTransfer * (numberOfRecipients + 1)
   }
 
-  val supportedVersions: List[Byte] = List(1, 2)
+  val supportedVersions: List[Byte] = List(1, 2, 3)
 
   val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String = script.bytes.value.base64

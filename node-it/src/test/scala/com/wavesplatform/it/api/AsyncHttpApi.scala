@@ -13,6 +13,7 @@ import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesReq
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.ActivationStatus
@@ -29,7 +30,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -247,7 +248,9 @@ object AsyncHttpApi extends Assertions {
         fee: Long,
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
-        version: TxVersion = TxVersion.V2
+        version: TxVersion = TxVersion.V2,
+        attachmentType: Option[String] = None,
+        attachmentValue: Option[JsValue] = None
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -256,9 +259,23 @@ object AsyncHttpApi extends Assertions {
           "amount"     -> amount,
           "recipient"  -> recipient,
           "fee"        -> fee,
-          "version"    -> version,
-          "assetId"    -> { if (assetId.isDefined) JsString(assetId.get) else JsNull },
-          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
+          "version" -> version,
+          "assetId" -> {
+            if (assetId.isDefined) JsString(assetId.get) else JsNull
+          },
+          "feeAssetId" -> {
+            if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull
+          },
+          "attachment" -> {
+            if (attachmentValue.isDefined) {
+              version match {
+                case TxVersion.V3 => {
+                  Json.obj("type" -> attachmentType.get, "value" -> attachmentValue.get)
+                }
+                case _ => attachmentValue.get
+              }
+            } else JsNull
+          }
         )
       )
     }

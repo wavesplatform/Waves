@@ -2,7 +2,9 @@ package com.wavesplatform.it.api
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.transfer.Attachment
 import io.grpc.{Metadata, Status => GrpcStatus}
+import org.scalatest.Assertions
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -100,9 +102,60 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String])
+case class Transaction(
+                        _type: Int,
+                        id: String,
+                        fee: Long,
+                        timestamp: Long,
+                        sender: Option[String],
+                        version: Byte,
+                        name: Option[String],
+                        description: Option[String],
+                        attachmentType: Option[String],
+                        attachmentValue: Option[JsValue]
+                      )
+//{
+//  def attachmentString: Option[String] = attachmentValue.map(value => value.validate[String] match {
+//    case JsSuccess(v, _) => v
+//    case JsError(err) => Assertions.fail("expected ")
+//  })
+//}
+
 object Transaction {
-  implicit val transactionFormat: Format[Transaction] = Json.format
+  implicit val transactionFormat: Format[Transaction] = Format( //Json.format
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        version <- (jsv \ "version").validate[Byte]
+        name <- (jsv \ "name").validateOpt[String]
+        description <- (jsv \ "description").validateOpt[String]
+        attachmentType <- version match {
+          case v if v > 2 => (jsv \ "attachment" \ "type").validateOpt[String]
+          case _ => JsSuccess(None)
+        }
+        attachmentValue <- version match {
+          case v if v > 2 => (jsv \ "attachment" \ "value").validateOpt[JsValue]
+          case _ => (jsv \ "attachment").validateOpt[JsValue]
+        }
+      }
+        yield Transaction(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender,
+          version,
+          name,
+          description,
+          attachmentType,
+          attachmentValue
+        )),
+    Json.writes[Transaction]
+  )
 }
 
 trait TxInfo {

@@ -23,13 +23,14 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.{IssueTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion}
 import com.wavesplatform.utils._
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
@@ -260,6 +261,22 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
+    def broadcastUpdateAssetInfo(sender: KeyPair,
+                                 assetId: String,
+                                 name: String,
+                                 description: String,
+                                 timestamp: Long,
+                                 amount: Long,
+                                 feeAsset: Asset = Waves,
+                                 version: Byte,
+                                 waitForTx: Boolean): Transaction = {
+      val tx = UpdateAssetInfoTransaction.selfSigned(
+        version, chainId = 'I', sender, assetId = ByteStr.decodeBase58(assetId).toEither.explicitGet(), name, description, timestamp, amount, feeAsset
+      ).explicitGet()
+
+      maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
+    }
+
     def issue(
         sourceAddress: String,
         name: String = "Asset",
@@ -346,6 +363,7 @@ object SyncHttpApi extends Assertions {
         fee: Long = minFee,
         assetId: Option[String],
         feeAssetId: Option[String],
+        attachment: Option[Attachment] = None,
         waitForTx: Boolean = false
     ): Transaction = {
       val tx = TransferTransaction
@@ -357,7 +375,7 @@ object SyncHttpApi extends Assertions {
           amount = amount,
           feeAsset = Asset.fromString(feeAssetId),
           fee = fee,
-          attachment = None,
+          attachment = attachment,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -373,9 +391,11 @@ object SyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V2,
+        attachmentType: Option[String] = None,
+        attachmentValue: Option[JsValue] = None,
         waitForTx: Boolean = false
     ): Transaction = {
-      maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, attachmentType, attachmentValue)), waitForTx)
     }
 
     def massTransfer(

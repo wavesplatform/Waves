@@ -7,8 +7,10 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
+import play.api.libs.json.{JsBoolean, JsNumber, JsString}
 
 import scala.concurrent.duration._
 
@@ -116,5 +118,16 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(firstAddress, firstBalance - issueFee - 2 * minFee, firstEffBalance - issueFee - 2 * minFee)
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
     }
+  }
+
+  test("able to broadcast V3 transfer transaction") {
+
+    val tx1 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("string"), attachmentValue = Some(JsString("somestring")))
+    val tx2 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("boolean"), attachmentValue = Some(JsBoolean(true)))
+
+    val tx4 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("integer"), attachmentValue = Some(JsNumber(123)))
+
+    val tx5 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V2, attachmentValue = Some(JsString("ddd")))
+
   }
 }
