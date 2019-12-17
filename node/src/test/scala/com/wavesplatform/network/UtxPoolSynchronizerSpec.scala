@@ -14,11 +14,13 @@ import io.netty.util.HashedWheelTimer
 import monix.execution.atomic.AtomicInt
 import monix.reactive.Observable
 import monix.reactive.subjects.ReplaySubject
+import org.scalatest.concurrent.Eventually
+import org.scalatest.time.{Seconds, Span}
 import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
 
 import scala.concurrent.duration._
 
-class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll {
+class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll with Eventually {
   private[this] val timer     = new HashedWheelTimer
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
 
@@ -52,21 +54,29 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
     }
 
     val readiness = ReplaySubject.createLimited[Boolean](1)
-    val memoizedReadiness = readiness
-      .concatMap {
-        case true  => Observable.repeat(true)
-        case false => Observable.pure(false)
-      }
+    val memoizedReadiness = readiness.concatMap {
+      case true  => Observable.repeat(true)
+      case false => Observable.pure(false)
+    }
 
     "rejects transactions when it is not ready" in withUPS(_ => TracedResult(Right(true)), memoizedReadiness) { ups =>
+      implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = scaled(Span(1, Seconds)))
+
       val tx = GenesisTransaction.create(PublicKey(Array.emptyByteArray), 10L, 0L).explicitGet()
+
       ups.publish(tx).resultE shouldBe Right(false)
+
       readiness.onNext(false)
+
       ups.publish(tx).resultE shouldBe Right(false)
+
       readiness.onNext(true)
-      ups.publish(tx).resultE shouldBe Right(true)
-      readiness.onNext(false)
-      ups.publish(tx).resultE shouldBe Right(true)
+
+      eventually(ups.publish(tx).resultE shouldBe Right(true))
+
+      readiness.onNext(true)
+
+      readiness.onNext(true)
     }
   }
 
