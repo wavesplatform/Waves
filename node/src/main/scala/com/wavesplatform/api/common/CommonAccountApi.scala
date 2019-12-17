@@ -25,7 +25,7 @@ class CommonAccountApi(blockchain: Blockchain) {
     val portfolio = blockchain.wavesPortfolio(address)
     BalanceDetails(
       portfolio.balance,
-      blockchain.generatingBalance(address).getOrElse(0L),
+      blockchain.generatingBalance(address),
       portfolio.balance - portfolio.lease.out,
       portfolio.effectiveBalance,
       portfolio.lease.in,

@@ -277,7 +277,7 @@ case class DebugApiRoute(
               ng.effectiveBalance(
                 address,
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
-                ng.microblockIds.lastOption.getOrElse(ByteStr.empty)
+                ng.microblockIds.lastOption
               ),
               System.currentTimeMillis() + offset.toMillis
             )
