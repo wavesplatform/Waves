@@ -143,6 +143,16 @@ final case class CompositeBlockchain(
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
+  override def balanceOnlySnapshots(address: Address, from: Int, to: Int): Seq[(Int, Long)] = {
+    if (maybeDiff.isEmpty) {
+      inner.balanceOnlySnapshots(address, from, to)
+    } else {
+      val balance = this.balance(address)
+      val bs = height -> balance
+      if (inner.height > 0 && from < this.height) bs +: inner.balanceOnlySnapshots(address, from, to) else Seq(bs)
+    }
+  }
+
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
