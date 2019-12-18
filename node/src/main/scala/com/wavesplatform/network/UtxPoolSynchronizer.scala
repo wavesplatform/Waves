@@ -32,8 +32,7 @@ class UtxPoolSynchronizerImpl(
     putIfNew: Transaction => TracedResult[ValidationError, Boolean],
     broadcast: (Transaction, Option[Channel]) => Unit,
     blockSource: Observable[LastBlockInfo],
-    readiness: Observable[Boolean],
-    timeBoundedScheduler: Scheduler
+    readiness: Observable[Boolean]
 )(
     implicit val scheduler: Scheduler
 ) extends UtxPoolSynchronizer
@@ -52,8 +51,7 @@ class UtxPoolSynchronizerImpl(
 
   blockSource.map(_.height).distinctUntilChanged.foreach(_ => knownTransactions.invalidateAll())
 
-  private val lastReadiness =
-    lastObserved(readiness.liftByOperator(new UtxPoolSynchronizer.UtxReadinessOperator)).map(_.contains(true))
+  private val lastReadiness = lastObserved(readiness.liftByOperator(new UtxPoolSynchronizer.UtxReadinessOperator)).map(_.contains(true))
 
   private def transactionIsNew(txId: ByteStr): Boolean = {
     var isNew = false
@@ -68,7 +66,7 @@ class UtxPoolSynchronizerImpl(
   }
 
   private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
-    Future(putIfNew(tx))(timeBoundedScheduler)
+    Future(putIfNew(tx))(scheduler)
       .recover {
         case t =>
           log.warn(s"Error validating transaction ${tx.id()}", t)
@@ -101,19 +99,11 @@ object UtxPoolSynchronizer extends ScorexLogging {
       settings: UtxSynchronizerSettings,
       allChannels: ChannelGroup,
       blockSource: Observable[LastBlockInfo],
-      readiness: Observable[Boolean],
-      timeBoundedScheduler: Scheduler
+      readiness: Observable[Boolean]
   )(
       implicit sc: Scheduler
   ): UtxPoolSynchronizer =
-    new UtxPoolSynchronizerImpl(
-      settings,
-      tx => utx.putIfNew(tx),
-      (tx, ch) => allChannels.broadcast(tx, ch),
-      blockSource,
-      readiness,
-      timeBoundedScheduler
-    )
+    new UtxPoolSynchronizerImpl(settings, tx => utx.putIfNew(tx), (tx, ch) => allChannels.broadcast(tx, ch), blockSource, readiness)
 
   /** Memoized readiness operator */
   class UtxReadinessOperator extends Operator[Boolean, Boolean] {
