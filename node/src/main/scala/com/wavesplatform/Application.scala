@@ -207,7 +207,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         lastBlockInfo
           .map(_.timestamp + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis > time.correctedTime())
           .share(scheduler)
-      else Observable.repeat(true).share(scheduler)
+      else Observable.evalOnce(true).share(scheduler)
 
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo, utxReadiness)(
