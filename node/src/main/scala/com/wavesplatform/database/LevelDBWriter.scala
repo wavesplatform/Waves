@@ -51,6 +51,11 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
     c1 :+ c2.headOption.getOrElse(1)
   }
 
+  private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
+    v.takeWhile(_ <= h).lastOption // Should we use binary search?
+  }
+
+
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
       for {
@@ -700,6 +705,23 @@ class LevelDBWriter(
     .maximumSize(100000)
     .recordStats()
     .build[(Int, BigInt), LeaseBalance]()
+
+  override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
+    db.get(Keys.addressId(address)).flatMap { addressId =>
+      assetId match {
+        case Waves =>
+            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+              (wh, b)
+            }
+        case asset @ IssuedAsset(_) =>
+            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+              (wh, b)
+            }
+      }
+    }
+  }
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
