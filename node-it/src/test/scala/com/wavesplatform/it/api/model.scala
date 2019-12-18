@@ -381,3 +381,8 @@ case class PaymentRequest(amount: Long, fee: Long, sender: String, recipient: St
 object PaymentRequest {
   implicit val paymentFormat: Format[PaymentRequest] = Json.format
 }
+
+case class TransactionStatus(id: String, status: String, height: Option[Int], confirmations: Option[Int])
+object TransactionStatus {
+  implicit val jsonFormat = Json.format[TransactionStatus]
+}

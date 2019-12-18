@@ -102,7 +102,9 @@ case class TransactionsApiRoute(
   )
   def status: Route = path("status") {
     protobufEntity(TransactionsByIdRequest) { request =>
-      request.ids.map(ByteStr.decodeBase58).toList.sequence match {
+      if (request.ids.length > settings.transactionsByAddressLimit)
+        complete(TooBigArrayAllocation)
+      else request.ids.map(ByteStr.decodeBase58).toList.sequence match {
         case Success(ids) =>
           val results = ids.map { id =>
             val statusJson = blockchain.transactionInfo(id) match {
