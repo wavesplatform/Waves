@@ -58,6 +58,30 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     assert(exactlyOneTxInBlockchain, "Only one tx should be in blockchain")
   }
 
+  test("Transactions should be discarded if blockchain is not fully extended") {
+    docker.stopContainer(dockerNodes()(1))
+    miner.waitForHeight(miner.height + 3)
+    docker.stopContainer(dockerNodes().head)
+    docker.startContainer(dockerNodes()(1).containerId)
+
+    val transferToAccount = TransferTransactionV1
+      .selfSigned(Waves, miner.privateKey, notMiner.publicKey, AMOUNT, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
+      .explicitGet()
+
+    assertBadRequestAndMessage(notMiner.signedBroadcast(transferToAccount.json()), "TX is rejected because blockchain is stale")
+
+    notMiner.utxSize shouldBe 0
+
+    docker.startContainer(dockerNodes().head.containerId)
+    nodes.waitForSameBlockHeadersAt(miner.height)
+
+    notMiner.signedBroadcast(transferToAccount.json())
+
+    notMiner.utxSize shouldBe 1
+
+    nodes.waitForHeightAriseAndTxPresent(transferToAccount.id().toString)
+  }
+
   def waitForEmptyUtx(nodes: Seq[Node]): Unit = {
     implicit val sch: Scheduler = monix.execution.Scheduler.global
 
@@ -103,6 +127,7 @@ object UtxSuite {
                                                             |    generation-balance-depth-from-50-to-1000-after-height = 100
                                                             |  }
                                                             |  miner.enable = no
+                                                            |  utx.reject-txs-when-blockchain-is-stale = true
                                                             |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
