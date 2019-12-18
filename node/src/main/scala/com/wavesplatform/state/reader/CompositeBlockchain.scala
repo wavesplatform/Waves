@@ -12,7 +12,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -143,6 +143,16 @@ final case class CompositeBlockchain(
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+    if (maybeDiff.isEmpty || h < this.height) {
+      inner.balanceOnlySnapshots(address, h, assetId)
+    } else {
+      val balance = this.balance(address, assetId)
+      val bs = height -> balance
+      Some(bs)
+    }
+  }
+
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
@@ -247,7 +257,9 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
 
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {
       case Some(ng) if to == height =>

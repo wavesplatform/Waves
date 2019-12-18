@@ -17,10 +17,9 @@ Seq(
   "org.scoverage"      % "sbt-scoverage"             % "1.5.1",
   "se.marcuslonnberg"  % "sbt-docker"                % "1.4.1",
   "com.typesafe.sbt"   % "sbt-git"                   % "1.0.0",
-  "org.scala-js"       % "sbt-scalajs"               % "0.6.28",
-  "org.portable-scala" % "sbt-crossproject"          % "0.3.1",
-  "org.portable-scala" % "sbt-scalajs-crossproject"  % "0.3.1",
-  "org.scalameta"      % "sbt-scalafmt"              % "2.0.1",
+  "org.scala-js"       % "sbt-scalajs"               % "0.6.31",
+  "org.portable-scala" % "sbt-scalajs-crossproject"  % "0.6.0",
+  "org.scalameta"      % "sbt-scalafmt"              % "2.2.1",
   "pl.project13.scala" % "sbt-jmh"                   % "0.3.3",
   "com.jsuereth"       % "sbt-pgp"                   % "1.1.1",
   "com.github.cb372"   % "sbt-explicit-dependencies" % "0.2.10"

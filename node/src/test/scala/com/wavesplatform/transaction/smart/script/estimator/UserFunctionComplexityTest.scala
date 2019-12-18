@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart.script.estimator
 
-import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2

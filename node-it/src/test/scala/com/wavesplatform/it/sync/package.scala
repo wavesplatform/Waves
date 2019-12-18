@@ -16,6 +16,7 @@ package object sync {
   val minFee: Long                     = 0.001.waves
   val leasingFee: Long                 = 0.002.waves
   val issueFee: Long                   = 1.waves
+  val reissueFee: Long                 = 1.waves
   val burnFee: Long                    = 1.waves
   val sponsorFee: Long                 = 1.waves
   val setAssetScriptFee: Long          = 1.waves
@@ -45,6 +46,7 @@ package object sync {
 
   val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String = script.bytes.value.base64
+  val scriptBase64Raw: String = script.bytes.value.base64Raw
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"
   val errNotAllowedByTokenApiError: AssertiveApiError =
