@@ -247,7 +247,9 @@ object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain]
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
 
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {
       case Some(ng) if to == height =>
