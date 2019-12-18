@@ -948,7 +948,7 @@ object AsyncHttpApi extends Assertions {
       }
     }
 
-    def getTransaction(id: String): Future[PBSignedTransaction] = {
+    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] = {
       def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
         val subj = ConcurrentSubject.publishToOne[T]
 
@@ -961,7 +961,7 @@ object AsyncHttpApi extends Assertions {
         (observer, subj.toListL)
       }
       val (obs, result) = createCallObserver[TransactionResponse]
-      val req = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))))
+      val req = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))), sender = sender, recipient = recipient)
       transactions.getTransactions(req,obs)
       result.map(_.headOption.getOrElse(throw new NoSuchElementException("Transaction not found")).getTransaction).runToFuture
     }
