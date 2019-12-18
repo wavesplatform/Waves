@@ -9,7 +9,6 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.DBCacheSettings
-import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
@@ -142,7 +141,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     Resource.make {
       val defaultWriter: LevelDbWriterWithReward = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
       val blockchainUpdater: BlockchainUpdater with NG =
-        new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, PublishSubject[BlockchainUpdated])
+        new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
       defaultWriter.saveReward(settings.blockchainSettings.rewardsSettings.initial)
       Task.now((blockchainUpdater, db))
     } {

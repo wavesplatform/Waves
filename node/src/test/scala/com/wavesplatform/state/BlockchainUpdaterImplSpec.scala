@@ -2,15 +2,17 @@ package com.wavesplatform.state
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted}
+import com.wavesplatform.events.{BlockAppended, BlockchainUpdateTriggers, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.Waves
@@ -24,6 +26,7 @@ import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
+import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 
 class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
@@ -45,14 +48,18 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings))
     )
 
-  def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])], enableNg: Boolean = false, events: Observer[BlockchainUpdated] = Observer.empty)(
+  def baseTest(
+      gen: Time => Gen[(KeyPair, Seq[Block])],
+      enableNg: Boolean = false,
+      triggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
+  )(
       f: (BlockchainUpdaterImpl, KeyPair) => Unit
   ): Unit = {
     val (fs, settings) =
       if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
 
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
-    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, events)
+    val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
 
@@ -60,11 +67,9 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         bcu.processBlock(block).explicitGet()
       }
 
-      events.onComplete()
       bcu.shutdown()
       f(bcu, account)
     } finally {
-      events.onComplete()
       bcu.shutdown()
       db.close()
     }
@@ -172,40 +177,63 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   }
 
   "blochain update events sending" - {
+    sealed trait BlockchainUpdateTriggerCall
+    final case class OnProcessBlock(block: Block, prevBlockchainHeight: Int, diff: DetailedDiff)            extends BlockchainUpdateTriggerCall
+    final case class OnProcessMicroBlock(microBlock: MicroBlock, blockchainHeight: Int, diff: DetailedDiff) extends BlockchainUpdateTriggerCall
+    final case class OnRollback(toSig: ByteStr, toHeight: Int)                                              extends BlockchainUpdateTriggerCall
+    final case class OnMicroBlockRollback(toSig: ByteStr)                                                   extends BlockchainUpdateTriggerCall
+
+    def blockchainTriggersMock: (BlockchainUpdateTriggers, Seq[BlockchainUpdateTriggerCall]) = {
+      val calls = ArrayBuffer.empty[BlockchainUpdateTriggerCall]
+
+      val t = new BlockchainUpdateTriggers {
+        override def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit =
+          calls += OnProcessBlock(block, blockchainBefore.height, diff)
+
+        override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit =
+          calls += OnProcessMicroBlock(microBlock, blockchainBefore.height, diff)
+
+        override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
+          calls += OnRollback(toBlockId, toHeight)
+
+        override def onMicroBlockRollback(toTotalResBlockSig: ByteStr): Unit =
+          calls += OnMicroBlockRollback(toTotalResBlockSig)
+      }
+
+      (t, calls)
+    }
+
     "without NG" - {
       "genesis block and two transfers blocks" in {
-        val events = ReplaySubject[BlockchainUpdated]()
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, events) { (_, _) =>
-          val updates = events.toListL
-            .runSyncUnsafe(5.seconds)
-
-          updates.length shouldBe 3
+        val (triggersMock, triggerCalls) = blockchainTriggersMock
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, triggersMock) { (_, _) =>
+          triggerCalls.length shouldBe 3
 
           // genesis block
-          updates.head match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
-              height shouldBe 1
+          triggerCalls.head match {
+            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
+              prevBlockchainHeight shouldBe 0
               block.transactionData.length shouldBe 1
-              blockStateUpdate.balances.length shouldBe 0
-              transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
-              txIds shouldBe block.transactionData.map(_.id.apply)
+
+              diff.parentDiff.portfolios.head._2.balance shouldBe 0
+              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT
             case _ => fail()
           }
 
           // transfers block
-          updates(1) match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
-              height shouldBe 2
+          triggerCalls(1) match {
+            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
+              prevBlockchainHeight shouldBe 1
               block.transactionData.length shouldBe 5
+
               // miner reward, no NG — all txs fees
-              blockStateUpdate.balances.length shouldBe 1
-              blockStateUpdate.balances.head._3 shouldBe FEE_AMT * 5
+              diff.parentDiff.portfolios.size shouldBe 1
+              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 5
 
               // first Tx updated balances
-              transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT / 5
-              transactionsStateUpdates.head.balances.last._3 shouldBe (ENOUGH_AMT - ENOUGH_AMT / 5 - FEE_AMT)
-
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              println(diff.transactionDiffs.head.portfolios)
+              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT / 5
+              diff.transactionDiffs.head.portfolios.last._2.balance shouldBe (-ENOUGH_AMT / 5 - FEE_AMT)
             case _ => fail()
           }
         }
@@ -214,51 +242,43 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
     "with NG" - {
       "genesis block and two transfers blocks" in {
-        val events = ReplaySubject[BlockchainUpdated]()
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, events) { (_, _) =>
-          val updates = events.toListL
-            .runSyncUnsafe(5.seconds)
-
-          updates.length shouldBe 3
+        val (triggersMock, triggerCalls) = blockchainTriggersMock
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, triggersMock) { (_, _) =>
+          triggerCalls.length shouldBe 3
 
           // genesis block, same as without NG
-          updates.head match {
-            case BlockAppended(block, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
-              height shouldBe 1
+          triggerCalls.head match {
+            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
+              prevBlockchainHeight shouldBe 0
               block.transactionData.length shouldBe 1
-              blockStateUpdate.balances.length shouldBe 0
-              transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
-              txIds shouldBe block.transactionData.map(_.id.apply)
+
+              diff.parentDiff.portfolios.head._2.balance shouldBe 0
+              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT
             case _ => fail()
           }
 
           // first transfers block
-          updates(1) match {
-            case BlockAppended(block, height, blockStateUpdate, _, txIds) =>
-              height shouldBe 2
+          triggerCalls(1) match {
+            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
+              prevBlockchainHeight shouldBe 1
               block.transactionData.length shouldBe 5
 
-              // miner reward, with NG — 40% of all txs fees
-              blockStateUpdate.balances.length shouldBe 1
-              blockStateUpdate.balances.head._3 shouldBe FEE_AMT * 5 * 0.4
-              txIds shouldBe block.transactionData.map(_.id.apply)
+              diff.parentDiff.portfolios.size shouldBe 1
+              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 5 * 0.4
             case _ => fail()
           }
 
           // second transfers block, with carryFee
-          updates(2) match {
-            case BlockAppended(block, height, blockStateUpdate, _, txIds) =>
-              height shouldBe 3
+          triggerCalls(2) match {
+            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
+              prevBlockchainHeight shouldBe 2
               block.transactionData.length shouldBe 4
 
-              // miner reward, with NG — 40% of all txs fees and 60% from previous block
-              blockStateUpdate.balances.length shouldBe 1
-              blockStateUpdate.balances.head._3 shouldBe (
-                FEE_AMT * 5 * 0.4     // miner balance from prev block
-                  + FEE_AMT * 4 * 0.4 // carry from prev block
-                  + FEE_AMT * 5 * 0.6 // current block reward
+              diff.parentDiff.portfolios.size shouldBe 1
+              diff.parentDiff.portfolios.head._2.balance shouldBe (
+                FEE_AMT * 5 * 0.6     // carry from prev block
+                  + FEE_AMT * 4 * 0.4 // current block reward
               )
-              txIds shouldBe block.transactionData.map(_.id.apply)
             case _ => fail()
           }
         }
@@ -279,10 +299,11 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             )
           } yield (genesis, transfers)
 
-        val events = ReplaySubject[BlockchainUpdated]()
+        val (triggersMock, triggerCalls) = blockchainTriggersMock
+
         val defaultWriter =
           TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
-        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, events)
+        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, triggersMock)
 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get
@@ -295,49 +316,53 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           bcu.processBlock(block2).explicitGet() // this should remove previous microblock
           bcu.processMicroBlock(microBlock3.head).explicitGet()
           bcu.shutdown()
-          events.onComplete()
 
-          // test goes here
-          val updates = events.toListL
-            .runSyncUnsafe(5.seconds)
+          triggerCalls.length shouldBe 6
 
-          updates.length shouldBe 6
-          updates.head match {
-            case BlockAppended(b, height, blockStateUpdate, transactionsStateUpdates, txIds) =>
-              height shouldBe 1
-              b.transactionData.length shouldBe 1
-              blockStateUpdate.balances.length shouldBe 0
-              transactionsStateUpdates.head.balances.head._3 shouldBe ENOUGH_AMT
-              txIds shouldBe b.transactionData.map(_.id.apply)
+          // genesis block
+          triggerCalls.head match {
+            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
+              prevBlockchainHeight shouldBe 0
+              block.transactionData.length shouldBe 1
+
+              diff.parentDiff.portfolios.head._2.balance shouldBe 0
+              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT
             case _ => fail()
           }
 
-          updates(1) match {
-            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _, txIds) =>
-              height shouldBe 1
+          // microblock 1
+          triggerCalls(1) match {
+            case OnProcessMicroBlock(microBlock, blockchainHeight, diff) =>
+              blockchainHeight shouldBe 1
               microBlock.transactionData.length shouldBe 2
               // microBlock transactions miner reward
-              microBlockStateUpdate.balances.length shouldBe 1
-              microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 2 * 0.4
-              txIds shouldBe microBlock.transactionData.map(_.id.apply)
+              diff.parentDiff.portfolios.size shouldBe 1
+              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 2 * 0.4
             case _ => fail()
           }
 
-          updates(2) match {
-            case MicroBlockAppended(microBlock, height, microBlockStateUpdate, _, txIds) =>
-              height shouldBe 1
+          // microblock 2
+          triggerCalls(2) match {
+            case OnProcessMicroBlock(microBlock, blockchainHeight, diff) =>
+              blockchainHeight shouldBe 1
               microBlock.transactionData.length shouldBe 1
               // microBlock transactions miner reward
-              microBlockStateUpdate.balances.length shouldBe 1
-              microBlockStateUpdate.balances.head._3 shouldBe FEE_AMT * 0.4
-              txIds shouldBe microBlock.transactionData.map(_.id.apply)
+              diff.parentDiff.portfolios.size shouldBe 1
+              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 1 * 0.4
             case _ => fail()
           }
 
-          updates(3) match {
-            case MicroBlockRollbackCompleted(to, height) =>
-              height shouldBe 1
-              to shouldBe microBlocks1And2.head.totalResBlockSig
+          // rollback microblock 2 before applying next keyblock
+          triggerCalls(3) match {
+            case OnMicroBlockRollback(toSig) =>
+              toSig shouldBe microBlocks1And2.head.totalResBlockSig
+            case _ => fail()
+          }
+
+          // next keyblock
+          triggerCalls(4) match {
+            case OnProcessBlock(_, prevBlockchainHeight, _) =>
+              prevBlockchainHeight shouldBe 1
             case _ => fail()
           }
         } finally {
@@ -347,4 +372,5 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       }
     }
   }
+
 }

@@ -210,7 +210,7 @@ class BlockV5Test
 
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]])(f: BlockchainUpdater with NG => Unit): Unit = {
     withLevelDBWriter(testSettings.blockchainSettings) { blockchain =>
-      val bcu: BlockchainUpdaterImpl = new BlockchainUpdaterImpl(blockchain, Observer.stopped, testSettings, ntpTime, ignoreBlockchainUpdated) {
+      val bcu: BlockchainUpdaterImpl = new BlockchainUpdaterImpl(blockchain, Observer.stopped, testSettings, ntpTime, ignoreBlockchainUpdateTriggers) {
         override def activatedFeatures: Map[Short, Int] = super.activatedFeatures -- disabledFeatures.get()
       }
       try f(bcu)

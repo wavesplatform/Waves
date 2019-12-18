@@ -4,7 +4,7 @@ import java.nio.file.Files
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.LevelDBFactory
-import com.wavesplatform.events.BlockchainUpdated
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject
@@ -19,7 +19,7 @@ trait WithDB extends BeforeAndAfterEach {
 
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = Subject.empty
 
-  protected val ignoreBlockchainUpdated: Subject[BlockchainUpdated, BlockchainUpdated] = Subject.empty
+  protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers = BlockchainUpdateTriggers.noop
 
   def db: DB = currentDBInstance
 
