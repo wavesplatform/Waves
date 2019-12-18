@@ -206,7 +206,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       if (settings.blockchainSettings.functionalitySettings.allowTxsOnlyWhenBlockchainIsFullyExtended)
         lastBlockInfo
           .map(_.timestamp + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis > time.correctedTime())
-      else Observable.repeat(true)
+          .share(scheduler)
+      else Observable.repeat(true).share(scheduler)
 
     val utxSynchronizer =
       UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo, utxReadiness)(
