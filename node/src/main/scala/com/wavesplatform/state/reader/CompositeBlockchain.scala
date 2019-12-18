@@ -12,7 +12,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -143,13 +143,13 @@ final case class CompositeBlockchain(
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceOnlySnapshots(address: Address, from: Int, to: Int): Seq[(Int, Long)] = {
-    if (maybeDiff.isEmpty) {
-      inner.balanceOnlySnapshots(address, from, to)
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+    if (maybeDiff.isEmpty || h < this.height) {
+      inner.balanceOnlySnapshots(address, h, assetId)
     } else {
-      val balance = this.balance(address)
+      val balance = this.balance(address, assetId)
       val bs = height -> balance
-      if (inner.height > 0 && from < this.height) bs +: inner.balanceOnlySnapshots(address, from, to) else Seq(bs)
+      Some(bs)
     }
   }
 

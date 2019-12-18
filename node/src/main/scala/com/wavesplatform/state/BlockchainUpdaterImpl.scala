@@ -20,7 +20,7 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
@@ -646,12 +646,12 @@ class BlockchainUpdaterImpl(
   }
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceOnlySnapshots(address: Address, from: Int, to: Int): Seq[(Int, Long)] = readLock {
-    if (ngState.isEmpty) {
-      blockchain.balanceOnlySnapshots(address, from, to)
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
+    if (ngState.isEmpty || h < this.height) {
+      blockchain.balanceOnlySnapshots(address, h, assetId)
     } else {
-      val bs = this.height -> blockchain.balance(address)
-      if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceOnlySnapshots(address, from, to) else Seq(bs)
+      val bs = this.height -> blockchain.balance(address, assetId)
+      Some(bs)
     }
   }
 
