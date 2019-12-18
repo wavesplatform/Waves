@@ -16,12 +16,12 @@ import monix.reactive.Observable
 import monix.reactive.subjects.ReplaySubject
 import org.scalatest.concurrent.Eventually
 import org.scalatest.time.{Seconds, Span}
-import org.scalatest.{BeforeAndAfterAll, FreeSpec, Matchers}
+import org.scalatest.{BeforeAndAfterAll, EitherValues, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 
-class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll with Eventually with ScalaCheckPropertyChecks {
+class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll with Eventually with ScalaCheckPropertyChecks with EitherValues {
   private[this] val timer     = new HashedWheelTimer
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
 
@@ -61,17 +61,17 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
 
       val tx = GenesisTransaction.create(PublicKey(Array.emptyByteArray), 10L, 0L).explicitGet()
 
-      ups.publish(tx).resultE shouldBe Right(false)
+      ups.publish(tx).resultE shouldBe 'left
 
       readiness.onNext(false)
-      ups.publish(tx).resultE shouldBe Right(false)
+      ups.publish(tx).resultE shouldBe 'left
 
       readiness.onNext(true)
-      eventually(ups.publish(tx).resultE shouldBe Right(true))
+      eventually(ups.publish(tx).resultE shouldBe 'right)
 
       forAll { i: Boolean =>
         readiness.onNext(i)
-        ups.publish(tx).resultE shouldBe Right(true)
+        ups.publish(tx).resultE shouldBe 'right
       }
     }
   }
