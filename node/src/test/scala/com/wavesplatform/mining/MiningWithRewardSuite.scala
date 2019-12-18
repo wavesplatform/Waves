@@ -166,7 +166,7 @@ object MiningWithRewardSuite {
   val commonSettings: WavesSettings                    = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
   val minerSettings: MinerSettings                     = commonSettings.minerSettings.copy(quorum = 0, intervalAfterLastBlockThenGenerationIsAllowed = 1 hour)
   val synchronizationSettings: SynchronizationSettings = commonSettings.synchronizationSettings
-  val utxSettings: UtxSettings                         = commonSettings.utxSettings
+  val utxSettings: UtxSettings                         = commonSettings.utxSettings.copy(rejectTransactionsWhenBlockchainIsStale = false)
 
   val functionalitySettings: FunctionalitySettings =
     Enabled

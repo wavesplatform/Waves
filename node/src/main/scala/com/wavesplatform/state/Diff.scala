@@ -12,8 +12,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
-import scala.collection.immutable.HashMap
-import scala.collection.mutable
 import scala.collection.mutable.LinkedHashMap
 
 case class LeaseBalance(in: Long, out: Long)
