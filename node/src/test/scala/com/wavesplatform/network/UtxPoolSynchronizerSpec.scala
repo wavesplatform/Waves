@@ -56,7 +56,7 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
 
     val readiness = ReplaySubject.createLimited[Boolean](1)
 
-    "rejects transactions when blockchain is not ready" in withUPS(_ => TracedResult(Right(true)), readiness) { ups =>
+    "rejects transactions when blockchain is stale" in withUPS(_ => TracedResult(Right(true)), readiness) { ups =>
       implicit val patienceConfig: PatienceConfig = PatienceConfig(timeout = scaled(Span(3, Seconds)))
 
       val tx = GenesisTransaction.create(PublicKey(Array.emptyByteArray), 10L, 0L).explicitGet()

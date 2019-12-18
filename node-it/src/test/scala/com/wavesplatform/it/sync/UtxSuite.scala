@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -68,7 +69,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
       .selfSigned(Waves, miner.privateKey, notMiner.publicKey, AMOUNT, System.currentTimeMillis(), Waves, ENOUGH_FEE, Array.emptyByteArray)
       .explicitGet()
 
-    notMiner.signedBroadcast(transferToAccount.json())
+    assertApiError(notMiner.signedBroadcast(transferToAccount.json()), CustomValidationError("Transaction is rejected because blockchain is stale"))
 
     notMiner.utxSize shouldBe 0
 
@@ -125,14 +126,14 @@ object UtxSuite {
                                                             |  blockchain.custom.functionality {
                                                             |    pre-activated-features.1 = 0
                                                             |    generation-balance-depth-from-50-to-1000-after-height = 100
-                                                            |    allow-txs-only-when-blockchain-is-fully-extended = yes
+                                                            |    reject-transactions-when-blockchain-is-stale = yes
                                                             |  }
                                                             |  miner.enable = no
                                                             |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
     minerConfig.withFallback(Default.head),
-    notMinerConfig.withFallback(Default(1)),
+    notMinerConfig.withFallback(Default(1))
   )
 
 }

@@ -203,7 +203,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
 
     val utxReadiness =
-      if (settings.blockchainSettings.functionalitySettings.allowTxsOnlyWhenBlockchainIsFullyExtended)
+      if (settings.blockchainSettings.functionalitySettings.rejectTransactionsWhenBlockchainIsStale)
         lastBlockInfo
           .map(_.timestamp + settings.blockchainSettings.genesisSettings.averageBlockDelay.toMillis > time.correctedTime())
           .share(scheduler)

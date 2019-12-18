@@ -80,8 +80,8 @@ class UtxPoolSynchronizerImpl(
     if (lastReadiness())
       Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
     else {
-      log.trace(s"Blockchain is not ready yet, discarding transaction: ${tx.id()}")
-      Right(false)
+      log.trace(s"Blockchain is stale, rejecting transaction: ${tx.id()}")
+      TracedResult.wrapE(Left(GenericError("Transaction is rejected because blockchain is stale")))
     }
 
   override def close(): Unit = cancelableFuture.cancel()
