@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import cats.implicits._
 import cats.kernel.Monoid
@@ -195,7 +196,12 @@ case class DebugApiRoute(
     )
   )
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    optionalHeaderValueByType[Accept](()) {
+      case Some(accept) if accept.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b.toString }))
+      case _ =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    }
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
