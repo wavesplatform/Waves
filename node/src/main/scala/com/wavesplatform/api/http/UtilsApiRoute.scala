@@ -247,7 +247,7 @@ case class UtilsApiRoute(
   }
 
   @Path("/script/meta")
-  @ApiOperation(value = "Meta", notes = "Account's script meta", httpMethod = "POST")
+  @ApiOperation(value = "Meta", notes = "Account's script meta", httpMethod = "POST", hidden = true)
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(
