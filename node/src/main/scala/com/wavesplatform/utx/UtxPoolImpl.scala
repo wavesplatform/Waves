@@ -62,7 +62,7 @@ class UtxPoolImpl(
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
-    else if (utxSettings.rejectTxsWhenBlockchainIsStale && !TxCheck.blockchainIsFresh) TracedResult.wrapE(Left(GenericError("TX is rejected because blockchain is stale")))
+    else if (utxSettings.rejectTransactionsWhenBlockchainIsStale && !TxCheck.blockchainIsFresh) TracedResult.wrapE(Left(GenericError("TX is rejected because blockchain is stale")))
     else putNewTx(tx, verify)
   }
 

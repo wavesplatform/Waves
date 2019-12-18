@@ -127,7 +127,7 @@ object UtxSuite {
                                                             |    generation-balance-depth-from-50-to-1000-after-height = 100
                                                             |  }
                                                             |  miner.enable = no
-                                                            |  utx.reject-txs-when-blockchain-is-stale = true
+                                                            |  utx.reject-transactions-when-blockchain-is-stale = true
                                                             |}""".stripMargin)
 
   val Configs: Seq[Config] = Seq(
