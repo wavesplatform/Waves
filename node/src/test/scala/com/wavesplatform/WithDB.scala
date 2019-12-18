@@ -4,7 +4,7 @@ import java.nio.file.Files
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.LevelDBFactory
-import com.wavesplatform.state.BlockchainUpdated
+import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject

@@ -4,9 +4,10 @@ import java.nio.file.Files
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.history.Domain
 import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings, loadConfig}
-import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl}
+import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.utils.Implicits.SubjectOps

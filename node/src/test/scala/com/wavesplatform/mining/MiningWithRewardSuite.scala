@@ -9,11 +9,12 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl, NG}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
