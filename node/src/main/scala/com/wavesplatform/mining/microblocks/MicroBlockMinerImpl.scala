@@ -17,7 +17,7 @@ import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
-import kamon.metric.TimerMetric
+import kamon.metric.Timer
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
@@ -34,7 +34,7 @@ class MicroBlockMinerImpl(
 ) extends MicroBlockMiner
     with ScorexLogging {
 
-  val microBlockBuildTimeStats: TimerMetric = Kamon.timer("miner.forge-microblock-time")
+  val microBlockBuildTimeStats: Timer = Kamon.timer("miner.forge-microblock-time").withoutTags()
 
   def generateMicroBlockSequence(
       account: KeyPair,

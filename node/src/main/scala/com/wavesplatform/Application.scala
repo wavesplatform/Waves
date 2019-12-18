@@ -47,7 +47,6 @@ import io.netty.util.HashedWheelTimer
 import io.netty.util.concurrent.GlobalEventExecutor
 import kamon.Kamon
 import kamon.influxdb.InfluxDBReporter
-import kamon.system.SystemMetrics
 import monix.eval.{Coeval, Task}
 import monix.execution.schedulers.{ExecutorScheduler, SchedulerService}
 import monix.reactive.Observable
@@ -440,13 +439,13 @@ object Application {
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects
     Kamon.reconfigure(config)
     sys.addShutdownHook { () =>
-      Kamon.stopAllReporters()
+      Kamon.stopModules()
       Metrics.shutdown()
     }
 
     if (config.getBoolean("kamon.enable")) {
-      Kamon.addReporter(new InfluxDBReporter())
-      SystemMetrics.startCollecting()
+      Kamon.registerModule("InfluxDBReporter", new InfluxDBReporter())
+      Kamon.init()
     }
 
     settings

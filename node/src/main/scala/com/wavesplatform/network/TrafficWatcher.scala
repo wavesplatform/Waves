@@ -5,6 +5,7 @@ import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
 import kamon.Kamon
 import kamon.metric.{Histogram, MeasurementUnit}
+import kamon.tag.TagSet
 
 @Sharable
 class TrafficWatcher extends ChannelDuplexHandler {
@@ -24,10 +25,10 @@ class TrafficWatcher extends ChannelDuplexHandler {
   private def createHistogram(dir: String, spec: BasicMessagesRepo.Spec): Histogram =
     Kamon
       .histogram("traffic", MeasurementUnit.information.bytes)
-      .refine(
+      .withTags(TagSet.from(Map(
         "type" -> spec.messageName,
-        "dir"  -> dir
-      )
+        "dir" -> dir
+      )))
 
   override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
     msg match {

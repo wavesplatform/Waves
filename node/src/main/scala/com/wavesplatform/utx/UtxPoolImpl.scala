@@ -303,18 +303,18 @@ class UtxPoolImpl(
   private[this] object PoolMetrics {
     private[this] val SampleInterval: Duration = Duration.of(500, ChronoUnit.MILLIS)
 
-    private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval)
-    private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval)
+    private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval).withoutTags()
+    private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval).withoutTags()
 
-    val putTimeStats    = Kamon.timer("utx.put-if-new")
-    val putRequestStats = Kamon.counter("utx.put-if-new.requests")
-    val packTimeStats   = Kamon.timer("utx.pack-unconfirmed")
+    val putTimeStats    = Kamon.timer("utx.put-if-new").withoutTags()
+    val putRequestStats = Kamon.counter("utx.put-if-new.requests").withoutTags()
+    val packTimeStats   = Kamon.timer("utx.pack-unconfirmed").withoutTags()
 
-    val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable")
-    val checkAlias            = Kamon.timer("utx.check.alias")
-    val checkCanReissue       = Kamon.timer("utx.check.can-reissue")
-    val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted")
-    val checkScripted         = Kamon.timer("utx.check.scripted")
+    val checkIsMostProfitable = Kamon.timer("utx.check.is-most-profitable").withoutTags()
+    val checkAlias            = Kamon.timer("utx.check.alias").withoutTags()
+    val checkCanReissue       = Kamon.timer("utx.check.can-reissue").withoutTags()
+    val checkNotBlacklisted   = Kamon.timer("utx.check.not-blacklisted").withoutTags()
+    val checkScripted         = Kamon.timer("utx.check.scripted").withoutTags()
 
     def addTransaction(tx: Transaction): Unit = {
       sizeStats.increment()

@@ -71,7 +71,7 @@ object Exporter extends ScorexLogging {
         }
 
         time.close()
-        Await.ready(Kamon.stopAllReporters(), 20.seconds)
+        Await.ready(Kamon.stopModules(), 20.seconds)
         Metrics.shutdown()
     }
   }
