@@ -22,8 +22,9 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 import scala.concurrent.duration._
 
 class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfterAll with Eventually with ScalaCheckPropertyChecks {
-  private[this] val timer     = new HashedWheelTimer
-  private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
+  private[this] val timer                = new HashedWheelTimer
+  private[this] val timeBoundedScheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-time-bounded-utx-sync")
+  private[this] val scheduler            = Schedulers.singleThread("test-utx-sync", reporter = _.printStackTrace())
 
   "UtxPoolSynchronizer" - {
     def sleep(millis: Int)(tx: Transaction): TracedResult[ValidationError, Boolean] = {
@@ -80,13 +81,14 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
       f: UtxPoolSynchronizer => Unit
   ): Unit = {
     val ups = new UtxPoolSynchronizerImpl(UtxSynchronizerSettings(1000, 2, 1000, true), putIfNew, { (_, _) =>
-    }, Observable.empty, readiness)(scheduler)
+    }, Observable.empty, readiness, timeBoundedScheduler)(scheduler)
     f(ups)
     ups.close()
   }
 
   override protected def afterAll(): Unit = {
     super.afterAll()
+    timeBoundedScheduler.shutdown()
     scheduler.shutdown()
     timer.stop()
   }

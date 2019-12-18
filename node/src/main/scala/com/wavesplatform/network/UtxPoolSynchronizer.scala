@@ -33,7 +33,7 @@ class UtxPoolSynchronizerImpl(
     broadcast: (Transaction, Option[Channel]) => Unit,
     blockSource: Observable[LastBlockInfo],
     readiness: Observable[Boolean],
-    readinessScheduler: Scheduler
+    timeBoundedScheduler: Scheduler
 )(
     implicit val scheduler: Scheduler
 ) extends UtxPoolSynchronizer
@@ -53,7 +53,7 @@ class UtxPoolSynchronizerImpl(
   blockSource.map(_.height).distinctUntilChanged.foreach(_ => knownTransactions.invalidateAll())
 
   private val lastReadiness =
-    lastObserved(readiness.liftByOperator(new UtxPoolSynchronizer.UtxReadinessOperator))(readinessScheduler).map(_.contains(true))
+    lastObserved(readiness.liftByOperator(new UtxPoolSynchronizer.UtxReadinessOperator)).map(_.contains(true))
 
   private def transactionIsNew(txId: ByteStr): Boolean = {
     var isNew = false
@@ -68,7 +68,7 @@ class UtxPoolSynchronizerImpl(
   }
 
   private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
-    Future(putIfNew(tx))(scheduler)
+    Future(putIfNew(tx))(timeBoundedScheduler)
       .recover {
         case t =>
           log.warn(s"Error validating transaction ${tx.id()}", t)
@@ -102,7 +102,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
       allChannels: ChannelGroup,
       blockSource: Observable[LastBlockInfo],
       readiness: Observable[Boolean],
-      readinessScheduler: Scheduler
+      timeBoundedScheduler: Scheduler
   )(
       implicit sc: Scheduler
   ): UtxPoolSynchronizer =
@@ -112,7 +112,7 @@ object UtxPoolSynchronizer extends ScorexLogging {
       (tx, ch) => allChannels.broadcast(tx, ch),
       blockSource,
       readiness,
-      readinessScheduler
+      timeBoundedScheduler
     )
 
   /** Memoized readiness operator */
