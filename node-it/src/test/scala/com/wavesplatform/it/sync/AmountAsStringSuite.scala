@@ -108,7 +108,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
 
     for (block <- Seq(blockLast, blockAt, blockHeadersLast, blockHeadersAt, blockBySignature)) {
       (Json.parse(block.getResponseBody) \ "reward").validate[JsString] shouldBe a[JsSuccess[_]]
-      //      (Json.parse(block.getResponseBody) \ "desiredReward").validate[JsString] shouldBe a[JsSuccess[_]]
+      (Json.parse(block.getResponseBody) \ "desiredReward").validate[JsString] shouldBe a[JsSuccess[_]]
       (Json.parse(block.getResponseBody) \ "totalFee").validate[JsString] shouldBe a[JsSuccess[_]]
     }
 
@@ -119,7 +119,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
 
     for (block <- Seq(blockSeq, blockHeadersSeq, blockSeqByAddress)) {
       (Json.parse(block.getResponseBody) \ 0 \ "reward").validate[JsString] shouldBe a[JsSuccess[_]]
-      //      (Json.parse(block.getResponseBody) \ 0 \ "desiredReward").validate[JsString] shouldBe a[JsSuccess[_]]
+      (Json.parse(block.getResponseBody) \ 0 \ "desiredReward").validate[JsString] shouldBe a[JsSuccess[_]]
       (Json.parse(block.getResponseBody) \ 0 \ "totalFee").validate[JsString] shouldBe a[JsSuccess[_]]
     }
   }
