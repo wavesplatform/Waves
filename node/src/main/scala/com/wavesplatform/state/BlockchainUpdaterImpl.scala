@@ -647,12 +647,8 @@ class BlockchainUpdaterImpl(
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
-    if (ngState.isEmpty || h < this.height) {
-      blockchain.balanceOnlySnapshots(address, h, assetId)
-    } else {
-      val bs = this.height -> blockchain.balance(address, assetId)
-      Some(bs)
-    }
+    CompositeBlockchain(blockchain, ngState.map(_.bestLiquidDiff))
+      .balanceOnlySnapshots(address, h, assetId)
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readLock {
