@@ -205,11 +205,11 @@ object Importer extends ScorexLogging {
             }
             scripts.foreach {
               case (txId, script) =>
-                val e1 = Script.estimate(script, ScriptEstimatorV1).getOrElse(-1L)
-                val e2 = Script.estimate(script, ScriptEstimatorV2).getOrElse(-1L)
-                val e3 = Script.estimate(script, ScriptEstimatorV3).getOrElse(-1L)
-                println(s"$txId,$e1,$e2,$e3")
-                pw.println(s"$txId,$e1,$e2,$e3")
+                val e1 = Script.estimate(script, ScriptEstimatorV1).fold(identity, _.toString)
+                val e2 = Script.estimate(script, ScriptEstimatorV2).fold(identity, _.toString)
+                val e3 = Script.estimate(script, ScriptEstimatorV3).fold(identity, _.toString)
+                println(s"${counter+2},$txId,$e1,$e2,$e3")
+                pw.println(s"${counter+2},$txId,$e1,$e2,$e3")
             }
             counter += 1
           }
