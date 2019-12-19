@@ -17,10 +17,9 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.TransactionFactory
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, TransactionFactory}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -200,12 +199,20 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "height", value = "Height", required = false, dataType = "integer", paramType = "query"),
-      new ApiImplicitParam(name = "address", value = "One or more addresses", required = true, allowMultiple = true, dataType = "string", paramType = "query"),
-      new ApiImplicitParam(name = "asset", value = "Asset Id", required = false, dataType = "string", paramType = "query"),
+      new ApiImplicitParam(
+        name = "address",
+        value = "One or more addresses",
+        required = true,
+        allowMultiple = true,
+        dataType = "string",
+        paramType = "query"
+      ),
+      new ApiImplicitParam(name = "asset", value = "Asset Id", required = false, dataType = "string", paramType = "query")
     )
   )
-  def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*) & parameters('asset.?)) { (height, addresses, assetId) =>
-    complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves:Asset)(a => IssuedAsset(Base58.decode(a)))))
+  def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*) & parameters('asset.?)) {
+    (height, addresses, assetId) =>
+      complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
 
   @Path("/balance")
@@ -214,14 +221,14 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     Array(
       new ApiImplicitParam(name = "height", value = "Height", required = false, dataType = "integer", paramType = "body"),
       new ApiImplicitParam(name = "ids", value = "One or more addresses", required = true, dataType = "Seq[string]", paramType = "body"),
-      new ApiImplicitParam(name = "asset", value = "Asset Id", required = false, dataType = "string", paramType = "body"),
+      new ApiImplicitParam(name = "asset", value = "Asset Id", required = false, dataType = "string", paramType = "body")
     )
   )
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
-    val height = (request \ "height").asOpt[Int]
+    val height    = (request \ "height").asOpt[Int]
     val addresses = (request \ "ids").as[Seq[String]]
-    val assetId = (request \ "asset").asOpt[String]
-    complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves:Asset)(a => IssuedAsset(Base58.decode(a)))))
+    val assetId   = (request \ "asset").asOpt[String]
+    complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
 
   @Path("/balance/details/{address}")
@@ -413,20 +420,22 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     }
   }
 
-  private def balancesJson(height: Int, addreses: Seq[String], assetId: Asset) = {
-    implicit val balancesWrites: Writes[(String, (Int, Long))] = Writes[(String, (Int, Long))] { b =>
-      Json.obj("id" -> b._1, "balance" -> b._2._2)
-    }
+  private def balancesJson(height: Int, addreses: Seq[String], assetId: Asset): ToResponseMarshallable =
+    if (addreses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
+    else {
+      implicit val balancesWrites: Writes[(String, (Int, Long))] = Writes[(String, (Int, Long))] { b =>
+        Json.obj("id" -> b._1, "balance" -> b._2._2)
+      }
 
-    val balances = addreses.flatMap { address =>
-      Address.fromString(address).right.toOption.flatMap { a =>
-        blockchain.balanceOnlySnapshots(a, height, assetId).headOption.map { balance =>
-          (address -> balance) 
+      val balances = addreses.flatMap { address =>
+        Address.fromString(address).right.toOption.flatMap { a =>
+          blockchain.balanceOnlySnapshots(a, height, assetId).map { balance =>
+            (address -> balance)
+          }
         }
       }
+      ToResponseMarshallable(balances)
     }
-    ToResponseMarshallable(balances)
-  }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address
