@@ -1021,6 +1021,26 @@ object AsyncHttpApi extends Assertions {
       result.map(_.headOption.getOrElse(throw new NoSuchElementException("Balances not found for address")).getWaves).runToFuture
     }
 
+    def broadcastBurn(source: KeyPair,
+                      assetId: String,
+                      amount: Long,
+                      fee: Long,
+                      version: Int = 2): Future[PBSignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(source.publicKey),
+        Some(Amount.of(ByteString.EMPTY, fee)),
+        System.currentTimeMillis(),
+        version,
+        PBTransaction.Data.Burn(BurnTransactionData.of(
+          Some(Amount.of(ByteString.copyFrom(Base58.decode(assetId)), amount))
+        )))
+
+      val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
+      transactions.broadcast(transaction)
+    }
+
     def broadcast(unsignedTx: PBTransaction, proofs: Seq[ByteString]): Future[PBSignedTransaction] = transactions.broadcast(SignedTransaction(Some(unsignedTx), proofs))
 
     def broadcastSponsorFee(sender: KeyPair,
