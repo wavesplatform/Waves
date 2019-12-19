@@ -73,7 +73,7 @@ object Importer extends ScorexLogging {
 
             log.info(s"Skipping $blocksToSkip block(s)")
 
-            val pw = new PrintWriter(new FileOutputStream("script-estimations.csv", true))
+            val pw = new PrintWriter(new FileOutputStream("script-estimations.csv", true), true)
             sys.addShutdownHook {
               import scala.concurrent.duration._
               val millis = (System.nanoTime() - start).nanos.toMillis
