@@ -131,6 +131,16 @@ object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
 
+case class TransactionStatus(
+    id: String,
+    status: String,
+    confirmations: Option[Int],
+    height: Option[Int]
+)
+object TransactionStatus {
+  implicit val format: Format[TransactionStatus] = Json.format
+}
+
 case class OrderInfo(
     id: String,
     version: Option[Byte],
