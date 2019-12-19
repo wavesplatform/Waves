@@ -2,10 +2,13 @@ package com.wavesplatform.it.sync
 
 import java.net.URLDecoder
 
-import com.wavesplatform.it.NTPTime
+import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.StringDataEntry
+import org.asynchttpclient.Response
 import play.api.libs.json._
 
 import scala.util.Random
@@ -51,19 +54,81 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     }
   }
 
-  test("balances should be correct") {
-    val assetId   = miner.issue(miner.address, "Test", "Test", 10000, 0, waitForTx = true).id
-    val addresses = (1 to 5).map(i => (notMiner.createAddress(), i * 100)).toList
+  test("balances for waves should be correct") {
+    assertBalances(None)
+  }
 
-    addresses.foreach { case (address, a) => miner.transfer(miner.address, address, a, minFee, Some(assetId), waitForTx = true) }
+  test("balances for issued asset should be correct") {
+    val asset = miner.issue(miner.address, "Test", "Test", 10000, 0, waitForTx = true).id
+    assertBalances(Some(asset))
+  }
 
-    val height = miner.height
+  test("limit violation requests should be handled") {
+    val limit     = miner.config.getInt("waves.rest-api.transactions-by-address-limit")
+    val address   = miner.createAddress()
+    val addresses = List.fill(limit + 1)(address)
+    assertApiError(
+      miner.get(s"/addresses/balance?${addresses.map(a => s"address=$a").mkString("&")}"),
+      TooBigArrayAllocation
+    )
+    assertApiError(
+      miner.postJson(
+        "/addresses/balance",
+        Json.obj("ids" -> addresses)
+      ),
+      TooBigArrayAllocation
+    )
+  }
 
-    val response = Json.parse(
-      miner.get(s"/addresses/balance?height=$height&asset=$assetId&${addresses.map(a => s"address=${a._1}").mkString("&")}").getResponseBody
+  private def assertBalances(asset: Option[String]): Unit = {
+    val addresses = (1 to 5).map(i => (miner.createAddress(), (i * 100).toLong)).toList
+
+    val firstAddresses  = addresses.slice(0, 2)
+    val secondAddresses = addresses.slice(2, 5)
+
+    val heightBefore  = transferAndReturnHeights(firstAddresses, asset).min - 1
+    val heightBetween = nodes.waitForHeightArise()
+    nodes.waitForHeightArise() // prevents next transfers from accepting on the heightBetween
+    val heightAfter = transferAndReturnHeights(secondAddresses, asset).max
+
+    nodes.waitForHeightArise()
+
+    checkBalances(List(), addresses.map(_._1), Some(heightBefore), asset)          // balances at the height before all transfers
+    checkBalances(firstAddresses, addresses.map(_._1), Some(heightBetween), asset) // balances at the height after the 2nd transfer
+    checkBalances(addresses, addresses.map(_._1), Some(heightAfter), asset)        // balances at the height after all transfers
+    checkBalances(addresses, addresses.map(_._1), None, asset)                     // balances at the current height
+  }
+
+  private def transferAndReturnHeights(addresses: List[(String, Long)], asset: Option[String]): List[Int] = {
+    val ids = addresses.map { case (address, a) => miner.transfer(miner.address, address, a, minFee, asset).id }
+    ids.map(id => miner.waitForTransaction(id).height)
+  }
+
+  private def checkBalances(expected: List[(String, Long)], addresses: List[String], height: Option[Int], assetId: Option[String]): Unit = {
+    val getResult = miner.get(
+      s"/addresses/balance?${height.fold("")(h => s"height=$h&")}${assetId.fold("")(a => s"asset=$a&")}${addresses.map(a => s"address=$a").mkString("&")}"
     )
 
-    val result = response.as[List[JsObject]].map(r => ((r \ "id").as[String], (r \ "balance").as[Long]))
-    result should contain theSameElementsAs addresses
+    asResult(getResult) should contain theSameElementsAs expected
+
+    val postResult = miner.postJson(
+      "/addresses/balance",
+      Json.obj("ids" -> addresses) ++
+        height.fold(Json.obj())(h => Json.obj("height" -> h)) ++
+        assetId.fold(Json.obj())(a => Json.obj("asset" -> a))
+    )
+
+    asResult(postResult) should contain theSameElementsAs expected
   }
+
+  private def asResult(json: Response): List[(String, Long)] =
+    Json.parse(json.getResponseBody).as[List[JsObject]].map(r => ((r \ "id").as[String], (r \ "balance").as[Long]))
+
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.raw("waves.rest-api.transactions-by-address-limit = 10"))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 }
