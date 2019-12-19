@@ -97,7 +97,8 @@ message StateUpdate {
                 Related to a bug in the blockchain when it was possible to reissue
                 assets so that the total volume became more then int64 max value.
                 This field represents accurate volume even for those assets.
-                If the target system does not need such accuracy, this field can be ignored.
+
+                This field can be ignored if the target system does not need such accuracy/
 
                 Encoding: like Java BigInteger, https://docs.oracle.com/javase/7/docs/api/java/math/BigInteger.html#toByteArray()
             */
