@@ -8,17 +8,13 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
 import com.wavesplatform.history.StorageFactory
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.UtxPoolImpl
 import kamon.Kamon
@@ -27,20 +23,9 @@ import monix.reactive.Observer
 import monix.reactive.subjects.PublishSubject
 import scopt.OParser
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, Future}
-import scala.util.{Failure, Success, Try}
-import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import scala.concurrent.Await
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
   //noinspection ScalaStyle
@@ -67,7 +52,7 @@ object Importer extends ScorexLogging {
             val lenBytes      = new Array[Byte](Ints.BYTES)
             val start         = System.nanoTime()
             var counter       = 0
-            val startHeight = 1 // blockchainUpdater.height
+            val startHeight   = 1 // blockchainUpdater.height
             var blocksToSkip  = startHeight - 1
             val blocksToApply = importHeight - startHeight + 1
 
@@ -79,8 +64,8 @@ object Importer extends ScorexLogging {
               val millis = (System.nanoTime() - start).nanos.toMillis
               log.info(s"Imported $counter block(s) from ${startHeight} to ${startHeight + counter} in ${humanReadableDuration(millis)}")
               pw.flush()
-      pw.close()
-    }
+              pw.close()
+            }
 
             while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
@@ -105,9 +90,9 @@ object Importer extends ScorexLogging {
                       case (txId, script) =>
                         val e1 = Script.estimate(script, ScriptEstimatorV1).fold(identity, _.toString)
                         val e2 = Script.estimate(script, ScriptEstimatorV2).fold(identity, _.toString)
-                        val e3 = Script.estimate(script, ScriptEstimatorV3).fold(identity, _.toString)
-                        println(s"${counter+2},$txId,$e1,$e2,$e3")
-                pw.println(s"${counter+2},$txId,$e1,$e2,$e3")
+//                        val e3 = Script.estimate(script, ScriptEstimatorV3).fold(identity, _.toString)
+                        println(s"${counter + 2},$txId,$e1,$e2")
+                        pw.println(s"${counter + 2},$txId,$e1,$e2")
                     }
                     counter += 1
                   }
@@ -132,11 +117,13 @@ object Importer extends ScorexLogging {
     }
   }
 
-  private[this] final case class ImportOptions(configFile: File = new File("waves-testnet.conf"),
-                                               blockchainFile: File = new File("blockchain"),
-                                               importHeight: Int = Int.MaxValue,
-                                               format: String = Formats.Binary,
-                                               verify: Boolean = true)
+  private[this] final case class ImportOptions(
+      configFile: File = new File("waves-testnet.conf"),
+      blockchainFile: File = new File("blockchain"),
+      importHeight: Int = Int.MaxValue,
+      format: String = Formats.Binary,
+      verify: Boolean = true
+  )
 
   private[this] lazy val commandParser = {
     import scopt.OParser
