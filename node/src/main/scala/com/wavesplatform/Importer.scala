@@ -169,7 +169,7 @@ object Importer extends ScorexLogging {
     val start    = System.currentTimeMillis()
     var counter  = 0
 
-    val startHeight   = blockchainUpdater.height
+    val startHeight   = 1 // blockchainUpdater.height
     var blocksToSkip  = startHeight - 1
     val blocksToApply = importOptions.importHeight - startHeight + 1
 
