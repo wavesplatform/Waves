@@ -79,8 +79,8 @@ object Importer extends ScorexLogging {
               val millis = (System.nanoTime() - start).nanos.toMillis
               log.info(s"Imported $counter block(s) from ${startHeight} to ${startHeight + counter} in ${humanReadableDuration(millis)}")
               pw.flush()
-              pw.close()
-            }
+      pw.close()
+    }
 
             while (!quit && counter < blocksToApply) {
               val s1 = bis.read(lenBytes)
@@ -106,7 +106,8 @@ object Importer extends ScorexLogging {
                         val e1 = Script.estimate(script, ScriptEstimatorV1).getOrElse(-1L)
                         val e2 = Script.estimate(script, ScriptEstimatorV2).getOrElse(-1L)
                         val e3 = Script.estimate(script, ScriptEstimatorV3).getOrElse(-1L)
-                        pw.print(s"$txId,$e1,$e2,$e3")
+                        println(s"$txId,$e1,$e2,$e3")
+                pw.println(s"$txId,$e1,$e2,$e3")
                     }
                     counter += 1
                   }
