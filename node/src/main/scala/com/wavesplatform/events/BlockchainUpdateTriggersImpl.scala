@@ -19,17 +19,18 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
 
   override def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {
     val (blockStateUpdate, txsStateUpdates) = containerStateUpdate(blockchainBefore, diff, block.transactionData)
-    events.onNext(BlockAppended(block, blockchainBefore.height + 1, blockStateUpdate, txsStateUpdates))
+    events.onNext(BlockAppended(block.signature, blockchainBefore.height + 1, block, blockStateUpdate, txsStateUpdates))
   }
 
   override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {
     val (microBlockStateUpdate, txsStateUpdates) = containerStateUpdate(blockchainBefore, diff, microBlock.transactionData)
-    events.onNext(MicroBlockAppended(microBlock, blockchainBefore.height, microBlockStateUpdate, txsStateUpdates))
+    events.onNext(MicroBlockAppended(microBlock.totalResBlockSig, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates))
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = events.onNext(RollbackCompleted(toBlockId, toHeight))
 
-  override def onMicroBlockRollback(toTotalResBlockSig: ByteStr): Unit = events.onNext(MicroBlockRollbackCompleted(toTotalResBlockSig))
+  override def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit =
+    events.onNext(MicroBlockRollbackCompleted(toTotalResBlockSig, height))
 
   private def getIssuedAssets(diff: Diff): Seq[Issue] =
     for {

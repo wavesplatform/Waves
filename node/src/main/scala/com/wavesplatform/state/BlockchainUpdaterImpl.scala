@@ -203,7 +203,7 @@ class BlockchainUpdaterImpl(
                     val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(blockchain, height)
 
-                    blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference)
+                    blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
 
                     BlockDiffer
                       .fromBlock(
@@ -228,7 +228,7 @@ class BlockchainUpdaterImpl(
                       val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                       val miningConstraints = MiningConstraints(blockchain, height)
 
-                      blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference)
+                      blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
 
                       BlockDiffer
                         .fromBlock(
@@ -256,7 +256,7 @@ class BlockchainUpdaterImpl(
                         val height = blockchain.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                         if (discarded.nonEmpty) {
-                          blockchainUpdateTriggers.onMicroBlockRollback(referencedForgedBlock.uniqueId)
+                          blockchainUpdateTriggers.onMicroBlockRollback(referencedForgedBlock.uniqueId, this.height)
                           metrics.microBlockForkStats.increment()
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
@@ -357,7 +357,7 @@ class BlockchainUpdaterImpl(
     val prevNgState = ngState
     val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
-      blockchainUpdateTriggers.onMicroBlockRollback(blockId)
+      blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq

@@ -5,6 +5,7 @@ option java_package = "com.wavesplatform.events.protobuf";
 import "waves/block.proto";
 import "waves/amount.proto";
 import "waves/transaction.proto";
+import "waves/script.proto";
 
 message BlockchainUpdated {
     bytes id = 1;
@@ -33,22 +34,86 @@ message BlockchainUpdated {
 }
 
 message StateUpdate {
+    repeated BalanceUpdate balances = 1;
+    repeated LeasingUpdate leases = 2;
+    repeated DataEntryUpdate data_entries = 3;
+    repeated AssetStateUpdate assets = 4;
+
     message BalanceUpdate {
         bytes address = 1;
         Amount amount = 2;
     }
-    repeated BalanceUpdate balances = 1;
 
     message LeasingUpdate {
         bytes address = 1;
         int64 in = 2;
         int64 out = 3;
     }
-    repeated LeasingUpdate leases = 2;
 
     message DataEntryUpdate {
         bytes address = 1;
         DataTransactionData.DataEntry data_entry = 2;
     }
-    repeated DataEntryUpdate data_entries = 3;
+
+    message AssetStateUpdate {
+        bytes asset_id = 1;
+
+        oneof type {
+            Issue issue = 2;
+            UpdateAssetVolume update_asset_volume = 3;
+            ForbidReissue forbid_reissue = 4;
+            SetAssetScript set_asset_script = 5;
+            SetSponsorship set_sponsorship = 6;
+            UpdateAssetInfo update_asset_info = 7;
+        }
+
+        message NameDescriptionBytes {
+            bytes name = 1;
+            bytes description = 2;
+        }
+
+        message NameDescriptionString {
+            string name = 1;
+            string description = 2;
+        }
+
+        message Issue {
+            oneof name_description {
+                NameDescriptionBytes bytes = 1;
+                NameDescriptionString string = 2;
+            }
+
+            int32 decimals = 3;
+            bool reissuable = 4;
+            int64 volume = 5;
+            Script script = 6;
+            bool nft = 7;
+        }
+
+        message UpdateAssetVolume {
+            int64 new_volume = 1;
+
+            /*
+                Related to a bug in the blockchain when it was possible to reissue
+                assets so that the total volume became more then int64 max value.
+                This field represents accurate volume even for those assets (3 assets on mainnet).
+                If the target system does not need such accuracy, this field can be ignored.
+            */
+            bytes safe_new_volume = 2;
+        }
+
+        message ForbidReissue {}
+
+        message SetAssetScript {
+            Script script = 1;
+        }
+
+        message SetSponsorship {
+            int64 sponsorship = 1;
+        }
+
+        message UpdateAssetInfo {
+            NameDescriptionString new_name_description = 1;
+        }
+    }
 }

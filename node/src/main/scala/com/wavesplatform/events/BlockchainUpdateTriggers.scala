@@ -12,7 +12,7 @@ trait BlockchainUpdateTriggers {
 
   def onRollback(toBlockId: ByteStr, toHeight: Int)
 
-  def onMicroBlockRollback(toTotalResBlockSig: ByteStr): Unit
+  def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit
 }
 
 object BlockchainUpdateTriggers {
@@ -23,6 +23,6 @@ object BlockchainUpdateTriggers {
 
     override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = {}
 
-    override def onMicroBlockRollback(toTotalResBlockSig: ByteStr): Unit = {}
+    override def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit = {}
   }
 }

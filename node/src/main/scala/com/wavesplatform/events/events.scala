@@ -49,18 +49,23 @@ final case class StateUpdate(
   def isEmpty: Boolean = balances.isEmpty && leases.isEmpty && dataEntries.isEmpty && assets.isEmpty
 }
 
-sealed trait BlockchainUpdated extends Product with Serializable
+sealed trait BlockchainUpdated extends Product with Serializable {
+  def toId: ByteStr
+  def toHeight: Int
+}
 final case class BlockAppended(
+    toId: ByteStr,
+    toHeight: Int,
     block: Block,
-    height: Int,
     blockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate]
 ) extends BlockchainUpdated
 final case class MicroBlockAppended(
+    toId: ByteStr,
+    toHeight: Int,
     microBlock: MicroBlock,
-    height: Int,
     microBlockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate]
 ) extends BlockchainUpdated
-final case class RollbackCompleted(to: ByteStr, height: Int) extends BlockchainUpdated
-final case class MicroBlockRollbackCompleted(to: ByteStr)    extends BlockchainUpdated
+final case class RollbackCompleted(toId: ByteStr, toHeight: Int)           extends BlockchainUpdated
+final case class MicroBlockRollbackCompleted(toId: ByteStr, toHeight: Int) extends BlockchainUpdated

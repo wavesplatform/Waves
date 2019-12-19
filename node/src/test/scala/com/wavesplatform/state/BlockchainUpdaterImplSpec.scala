@@ -181,7 +181,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     final case class OnProcessBlock(block: Block, prevBlockchainHeight: Int, diff: DetailedDiff)            extends BlockchainUpdateTriggerCall
     final case class OnProcessMicroBlock(microBlock: MicroBlock, blockchainHeight: Int, diff: DetailedDiff) extends BlockchainUpdateTriggerCall
     final case class OnRollback(toSig: ByteStr, toHeight: Int)                                              extends BlockchainUpdateTriggerCall
-    final case class OnMicroBlockRollback(toSig: ByteStr)                                                   extends BlockchainUpdateTriggerCall
+    final case class OnMicroBlockRollback(toSig: ByteStr, height: Int)                                      extends BlockchainUpdateTriggerCall
 
     def blockchainTriggersMock: (BlockchainUpdateTriggers, Seq[BlockchainUpdateTriggerCall]) = {
       val calls = ArrayBuffer.empty[BlockchainUpdateTriggerCall]
@@ -196,8 +196,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
           calls += OnRollback(toBlockId, toHeight)
 
-        override def onMicroBlockRollback(toTotalResBlockSig: ByteStr): Unit =
-          calls += OnMicroBlockRollback(toTotalResBlockSig)
+        override def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit =
+          calls += OnMicroBlockRollback(toTotalResBlockSig, height)
       }
 
       (t, calls)
@@ -354,7 +354,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
 
           // rollback microblock 2 before applying next keyblock
           triggerCalls(3) match {
-            case OnMicroBlockRollback(toSig) =>
+            case OnMicroBlockRollback(toSig, height) =>
               toSig shouldBe microBlocks1And2.head.totalResBlockSig
             case _ => fail()
           }
