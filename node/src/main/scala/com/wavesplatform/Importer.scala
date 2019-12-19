@@ -13,10 +13,16 @@ import com.wavesplatform.database.openDB
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -27,7 +33,6 @@ import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
-import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -134,7 +139,7 @@ object Importer extends ScorexLogging {
         override def wallet: Wallet = ???
         override def utx: UtxPool   = utxPool
 
-        override def broadcastTransaction(tx: Transaction) = ???
+        override def broadcastTransaction(tx: Transaction)                 = ???
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
@@ -170,10 +175,12 @@ object Importer extends ScorexLogging {
 
     log.info(s"Skipping $blocksToSkip block(s)")
 
+    val pw = new PrintWriter(new FileOutputStream("script-estimations.csv", true))
     sys.addShutdownHook {
       import scala.concurrent.duration._
       val millis = (System.nanoTime() - start).nanos.toMillis
       log.info(s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}")
+      pw.close()
     }
 
     while (!quit && counter < blocksToApply) {
@@ -190,15 +197,19 @@ object Importer extends ScorexLogging {
               if (importOptions.format == Formats.Binary) Block.parseBytes(buffer)
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
-            if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
-              Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
-                case Left(ve) =>
-                  log.error(s"Error appending block: $ve")
-                  quit = true
-                case _ =>
-                  counter = counter + 1
-              }
+            val scripts = block.transactionData.collect {
+              case s: SetScriptTransaction if s.script.nonEmpty      => (s.id(), s.script.get)
+              case s: SetAssetScriptTransaction if s.script.nonEmpty => (s.id(), s.script.get)
+              case i: IssueTransaction if i.script.nonEmpty          => (i.id(), i.script.get)
             }
+            scripts.foreach {
+              case (txId, script) =>
+                val e1 = Script.estimate(script, ScriptEstimatorV1)
+                val e2 = Script.estimate(script, ScriptEstimatorV2)
+                val e3 = Script.estimate(script, ScriptEstimatorV3)
+                pw.print(s"$txId,$e1,$e2,$e3")
+            }
+            counter += 1
           }
         } else {
           log.info(s"$s2 != expected $len")
