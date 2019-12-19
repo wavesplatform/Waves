@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.{verify => sigVerify}
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -29,7 +30,6 @@ import com.wavesplatform.utils.{ScorexLogging, Time, UnsupportedFeature, forceSt
 import kamon.Kamon
 import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
-import com.wavesplatform.crypto.{verify => sigVerify}
 
 class BlockchainUpdaterImpl(
     private val blockchain: LevelDBWriter,
@@ -394,12 +394,13 @@ class BlockchainUpdaterImpl(
               totalSignatureValid <- ng
                 .totalDiffOf(microBlock.prevResBlockSig)
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
-                .map { case (accumulatedBlock, _, _, _, _) =>
-                  val bytes = accumulatedBlock
-                    .copy(transactionData = accumulatedBlock.transactionData ++ microBlock.transactionData)
-                    .bytesWithoutSignature()
+                .map {
+                  case (accumulatedBlock, _, _, _, _) =>
+                    val bytes = accumulatedBlock
+                      .copy(transactionData = accumulatedBlock.transactionData ++ microBlock.transactionData)
+                      .bytesWithoutSignature()
 
-                  sigVerify(microBlock.totalResBlockSig, bytes, microBlock.sender)
+                    sigVerify(microBlock.totalResBlockSig, bytes, microBlock.sender)
                 }
               _ <- Either
                 .cond(
@@ -664,12 +665,7 @@ class BlockchainUpdaterImpl(
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
-    if (ngState.isEmpty || h < this.height) {
-      blockchain.balanceOnlySnapshots(address, h, assetId)
-    } else {
-      val bs = this.height -> blockchain.balance(address, assetId)
-      Some(bs)
-    }
+    CompositeBlockchain(blockchain, ngState.map(_.bestLiquidDiff)).balanceOnlySnapshots(address, h, assetId)
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readLock {
