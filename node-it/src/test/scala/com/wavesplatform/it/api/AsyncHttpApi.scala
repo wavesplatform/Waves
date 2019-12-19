@@ -196,6 +196,11 @@ object AsyncHttpApi extends Assertions {
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
+    def balances(height: Option[Int], addresses: Seq[String]): Future[Seq[Balance]] =
+      get(s"""/addresses/balance?${addresses.map(a => "address=" ++ a).mkString("&")}${height.fold("")(h => "&height="++h.toString)}""")
+        .as[Seq[JsObject]]
+        .map(_.map(b => Balance((b \ "id").as[String], 0, (b \ "balance").as[Long])))
+
     def balanceDetails(address: String): Future[BalanceDetails] = get(s"/addresses/balance/details/$address").as[BalanceDetails]
 
     def getAddresses: Future[Seq[String]] = get(s"/addresses").as[Seq[String]]
@@ -720,6 +725,10 @@ object AsyncHttpApi extends Assertions {
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
 
+    def accountsBalances(height: Option[Int], accs: Seq[String]): Future[Seq[(String, Long)]] = {
+      n.balances(height,accs).map(_.map(b => (b.address, b.balance)))
+    }
+
     def accountBalances(acc: String): Future[(Long, Long)] = {
       n.balance(acc).map(_.balance).zip(n.effectiveBalance(acc).map(_.balance))
     }
@@ -991,7 +1000,7 @@ object AsyncHttpApi extends Assertions {
       }
     }
 
-    def getTransaction(id: String): Future[PBSignedTransaction] = {
+    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] = {
       def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
         val subj = ConcurrentSubject.publishToOne[T]
 
@@ -1004,7 +1013,7 @@ object AsyncHttpApi extends Assertions {
         (observer, subj.toListL)
       }
       val (obs, result) = createCallObserver[TransactionResponse]
-      val req = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))))
+      val req = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))), sender = sender, recipient = recipient)
       transactions.getTransactions(req,obs)
       result.map(_.headOption.getOrElse(throw new NoSuchElementException("Transaction not found")).getTransaction).runToFuture
     }

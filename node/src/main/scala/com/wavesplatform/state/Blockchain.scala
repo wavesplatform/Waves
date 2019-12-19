@@ -67,6 +67,7 @@ trait Blockchain {
   def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+  def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
   def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
 
   def accountScriptWithComplexity(address: Address): Option[(Script, Long)]
