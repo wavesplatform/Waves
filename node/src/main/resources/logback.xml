@@ -51,6 +51,7 @@
         <then>
             <property name="appender.name" value="FILE"/>
             <property name="appender.file" value="waves"/>
+            <property name="appender.level" value="${logback.file.level}"/>
 
             <include resource="file-appender-template.xml"/>
 

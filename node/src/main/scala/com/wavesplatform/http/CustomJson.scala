@@ -2,8 +2,8 @@ package com.wavesplatform.http
 
 import java.io.IOException
 
-import akka.http.scaladsl.model.{MediaRange, MediaType}
 import akka.http.scaladsl.model.MediaTypes.`application/json`
+import akka.http.scaladsl.model.{MediaRange, MediaType}
 import com.fasterxml.jackson.core.io.SegmentedStringWriter
 import com.fasterxml.jackson.core.util.BufferRecyclers
 import com.fasterxml.jackson.core.{JsonGenerator, JsonProcessingException}
@@ -18,6 +18,7 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
     "balance",
     "buyMatcherFee",
     "currentReward",
+    "desiredReward",
     "effective",
     "fee",
     "feeAmount",
@@ -27,6 +28,7 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
     "minSponsoredAssetFee",
     "out",
     "price",
+    "quantity",
     "regular",
     "reward",
     "sellMatcherFee",
@@ -34,6 +36,7 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
     "totalAmount",
     "totalFee",
     "totalWavesAmount",
+    "value"
   )
 
   override def serialize(value: JsValue, json: JsonGenerator, provider: SerializerProvider): Unit = {
@@ -66,7 +69,7 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
 }
 
 object CustomJson {
-  val jsonWithNumbersAsStrings: MediaType.WithFixedCharset = `application/json`.withParams(Map("number-format" -> "string"))
+  val jsonWithNumbersAsStrings: MediaType.WithFixedCharset = `application/json`.withParams(Map("large-significand-format" -> "string"))
 
   def acceptsNumbersAsStrings(mr: MediaRange): Boolean = mr match {
     case MediaRange.One(`jsonWithNumbersAsStrings`, _) => true
