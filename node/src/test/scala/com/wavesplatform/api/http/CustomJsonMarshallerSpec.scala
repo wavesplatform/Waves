@@ -40,7 +40,7 @@ class CustomJsonMarshallerSpec
   private val utx             = mock[UtxPool]
   private val utxSynchronizer = mock[UtxPoolSynchronizer]
 
-  private val numberFormat = Accept(`application/json`.withParams(Map("number-format" -> "string")))
+  private val numberFormat = Accept(`application/json`.withParams(Map("large-significand-format" -> "string")))
 
   (blockchain.activatedFeatures _).expects().returning(BlockchainFeatures.implemented.map(_ -> 0).toMap).anyNumberOfTimes()
   (blockchain.settings _).expects().returning(DefaultBlockchainSettings).anyNumberOfTimes()
