@@ -22,7 +22,7 @@ import com.wavesplatform.http.{DebugMessage, RollbackParams, `X-Api-Key`}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.script.{ScriptReader, Script}
+import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -30,7 +30,7 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
-import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransactionV2, Order, ExchangeTransaction => ExchangeTx}
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -45,6 +45,7 @@ import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
 import org.scalatest.{Assertions, Matchers}
+import play.api.libs.json
 import play.api.libs.json.Json.{stringify, toJson}
 import play.api.libs.json._
 
@@ -62,6 +63,19 @@ object AsyncHttpApi extends Assertions {
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
+
+//    def getWithCustomHeader(path: String, headerName: String, headerValue: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+//      retrying(f(_get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue)).build())
+
+    def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false, f: RequestBuilder => RequestBuilder = identity): Future[Response] = {
+      val requestBuilder = if (withApiKey) {
+        _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue).withApiKey(n.apiKey)
+      } else {
+        _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue)
+      }
+      retrying(f(requestBuilder).build())
+//      retrying(f(_get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue).withApiKey(n.apiKey)).build())
+    }
 
     def seed(address: String): Future[String] = getWithApiKey(s"/addresses/seed/$address").as[JsValue].map(v => (v \ "seed").as[String])
 
@@ -518,6 +532,35 @@ object AsyncHttpApi extends Assertions {
           "alias"   -> alias
         )
       )
+
+    def exchange(matcher: KeyPair,
+                 buyOrder: Order,
+                 sellOrder: Order,
+                 amount: Long,
+                 price: Long,
+                 buyMatcherFee: Long,
+                 sellMatcherFee: Long,
+                 fee: Long,
+                 version: Byte,
+                 matcherFeeAssetId: Option[String]): Future[Transaction] = {
+      val tx = ExchangeTransactionV2
+        .create(
+          matcher = matcher,
+          buyOrder = buyOrder,
+          sellOrder = sellOrder,
+          amount = amount,
+          price = price,
+          buyMatcherFee = buyMatcherFee,
+          sellMatcherFee = sellMatcherFee,
+          fee = fee,
+          timestamp = System.currentTimeMillis()
+        )
+        .right
+        .get
+        .json()
+
+        signedBroadcast(tx)
+    }
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]

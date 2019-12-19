@@ -155,6 +155,12 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       sync(async(n).get(path))
 
+    def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false): Response =
+      sync(async(n).getWithCustomHeader(path, headerName, headerValue, withApiKey))
+
+//    def getWithCustomHeaderAndApiKey(path: String, headerName: String, headerValue: String): Response =
+//      sync(async(n).getWithCustomHeaderAndApiKey(path, headerName, headerValue))
+
     def utx: Seq[Transaction] = sync(async(n).utx)
 
     def utxSize: Int = sync(async(n).utxSize)
@@ -348,6 +354,20 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
+    def exchange(matcher: KeyPair,
+                 buyOrder: Order,
+                 sellOrder: Order,
+                 amount: Long,
+                 price: Long,
+                 buyMatcherFee: Long,
+                 sellMatcherFee: Long,
+                 fee: Long,
+                 version: Byte = 2,
+                 matcherFeeAssetId: Option[String] = None,
+                 waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).exchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, version, matcherFeeAssetId)), waitForTx)
+    }
+
     def transfer(
         sourceAddress: String,
         recipient: String,
@@ -395,8 +415,8 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee, version)), waitForTx)
 
-    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
-      sync(async(n).putData(sourceAddress, data, fee))
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, waitForTx: Boolean = false): Transaction =
+      maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, fee)), waitForTx)
 
     def getData(sourceAddress: String): List[DataEntry[_]] =
       sync(async(n).getData(sourceAddress))
