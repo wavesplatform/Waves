@@ -204,9 +204,9 @@ object Importer extends ScorexLogging {
             }
             scripts.foreach {
               case (txId, script) =>
-                val e1 = Script.estimate(script, ScriptEstimatorV1).getOrElse(-1)
-                val e2 = Script.estimate(script, ScriptEstimatorV2).getOrElse(-1)
-                val e3 = Script.estimate(script, ScriptEstimatorV3).getOrElse(-1)
+                val e1 = Script.estimate(script, ScriptEstimatorV1).getOrElse(-1L)
+                val e2 = Script.estimate(script, ScriptEstimatorV2).getOrElse(-1L)
+                val e3 = Script.estimate(script, ScriptEstimatorV3).getOrElse(-1L)
                 pw.print(s"$txId,$e1,$e2,$e3")
             }
             counter += 1
