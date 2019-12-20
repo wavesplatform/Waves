@@ -113,7 +113,7 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
-    estimatorPreCheckHeight = 1847570
+    estimatorPreCheckHeight = 1847610
   )
 
   val TESTNET = apply(
@@ -123,7 +123,7 @@ object FunctionalitySettings {
     blockVersion3AfterHeight = 161700,
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
     lastTimeBasedForkParameter = 1492560000000L,
-    estimatorPreCheckHeight = 817330
+    estimatorPreCheckHeight = 817380
   )
 
   val STAGENET = apply(
