@@ -158,9 +158,6 @@ object SyncHttpApi extends Assertions {
     def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false): Response =
       sync(async(n).getWithCustomHeader(path, headerName, headerValue, withApiKey))
 
-//    def getWithCustomHeaderAndApiKey(path: String, headerName: String, headerValue: String): Response =
-//      sync(async(n).getWithCustomHeaderAndApiKey(path, headerName, headerValue))
-
     def utx: Seq[Transaction] = sync(async(n).utx)
 
     def utxSize: Int = sync(async(n).utxSize)
