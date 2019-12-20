@@ -15,7 +15,7 @@ import io.netty.channel.group.ChannelGroup
 import monix.execution.{AsyncQueue, CancelableFuture, Scheduler}
 import monix.reactive.Observable
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.Success
 
@@ -71,7 +71,7 @@ class UtxPoolSynchronizerImpl(
       }
 
   override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
-    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
+    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), 10.seconds)
 
   override def close(): Unit = cancelableFuture.cancel()
 

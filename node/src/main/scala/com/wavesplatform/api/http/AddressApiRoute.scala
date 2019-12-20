@@ -194,41 +194,16 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     complete(balanceJson(address))
   }
 
-  @Path("/balance")
-  @ApiOperation(value = "Balances", notes = "Balances for list of accounts", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "height", value = "Height", required = false, dataType = "integer", paramType = "query"),
-      new ApiImplicitParam(
-        name = "address",
-        value = "One or more addresses",
-        required = true,
-        allowMultiple = true,
-        dataType = "string",
-        paramType = "query"
-      ),
-      new ApiImplicitParam(name = "asset", value = "Asset Id", required = false, dataType = "string", paramType = "query")
-    )
-  )
   def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*) & parameters('asset.?)) {
     (height, addresses, assetId) =>
       complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
 
-  @Path("/balance")
-  @ApiOperation(value = "Balances", notes = "Balances for list of accounts", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "height", value = "Height", required = false, dataType = "integer", paramType = "body"),
-      new ApiImplicitParam(name = "ids", value = "One or more addresses", required = true, dataType = "Seq[string]", paramType = "body"),
-      new ApiImplicitParam(name = "asset", value = "Asset Id", required = false, dataType = "string", paramType = "body")
-    )
-  )
   def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
     val height    = (request \ "height").asOpt[Int]
-    val addresses = (request \ "ids").as[Seq[String]]
+    val addresses = (request \ "addresses").as[Seq[String]]
     val assetId   = (request \ "asset").asOpt[String]
-    complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
+    complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
 
   @Path("/balance/details/{address}")
