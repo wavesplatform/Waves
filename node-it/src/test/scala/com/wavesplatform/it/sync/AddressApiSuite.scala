@@ -4,11 +4,10 @@ import java.net.URLDecoder
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.state.StringDataEntry
-import org.asynchttpclient.Response
 import play.api.libs.json._
 
 import scala.util.Random
@@ -28,8 +27,8 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
     val invalidRegexps = List("%5Ba-z", "%5Ba-z%5D%7B0", "%5Ba-z%5D%7B%2C5%7D")
     val data           = dataKeys.map(str => StringDataEntry(str, Random.nextString(16)))
-    val transferFee    = calcDataFee(data)
-    val txId           = sender.putData(firstAddress, data, transferFee).id
+    val dataFee        = calcDataFee(data)
+    val txId           = sender.putData(firstAddress, data, dataFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
     for (regexp <- regexps) {
@@ -63,28 +62,24 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     assertBalances(Some(asset))
   }
 
-  test("limit violation requests should be handled") {
+  test("limit violation requests should be handled correctly") {
     val limit     = miner.config.getInt("waves.rest-api.transactions-by-address-limit")
-    val address   = miner.createAddress()
-    val addresses = List.fill(limit + 1)(address)
+    val addresses = List.fill(limit + 1)(firstAddress)
     assertApiError(
       miner.get(s"/addresses/balance?${addresses.map(a => s"address=$a").mkString("&")}"),
       TooBigArrayAllocation
     )
     assertApiError(
-      miner.postJson(
-        "/addresses/balance",
-        Json.obj("ids" -> addresses)
-      ),
+      miner.accountsBalances(None, addresses),
       TooBigArrayAllocation
     )
   }
 
   private def assertBalances(asset: Option[String]): Unit = {
-    val addresses = (1 to 5).map(i => (miner.createAddress(), (i * 100).toLong)).toList
+    val addressesAndBalances = (1 to 5).map(i => (miner.createAddress(), (i * 100).toLong)).toList
 
-    val firstAddresses  = addresses.slice(0, 2)
-    val secondAddresses = addresses.slice(2, 5)
+    val firstAddresses  = addressesAndBalances.slice(0, 2)
+    val secondAddresses = addressesAndBalances.slice(2, 5)
 
     val heightBefore  = transferAndReturnHeights(firstAddresses, asset).min - 1
     val heightBetween = nodes.waitForHeightArise()
@@ -93,10 +88,10 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
 
     nodes.waitForHeightArise()
 
-    checkBalances(List(), addresses.map(_._1), Some(heightBefore), asset)          // balances at the height before all transfers
-    checkBalances(firstAddresses, addresses.map(_._1), Some(heightBetween), asset) // balances at the height after the 2nd transfer
-    checkBalances(addresses, addresses.map(_._1), Some(heightAfter), asset)        // balances at the height after all transfers
-    checkBalances(addresses, addresses.map(_._1), None, asset)                     // balances at the current height
+    checkBalances(List(), addressesAndBalances.map(_._1), Some(heightBefore), asset)              // balances at the height before all transfers
+    checkBalances(firstAddresses, addressesAndBalances.map(_._1), Some(heightBetween), asset)     // balances at the height after the 2nd transfer
+    checkBalances(addressesAndBalances, addressesAndBalances.map(_._1), Some(heightAfter), asset) // balances at the height after all transfers
+    checkBalances(addressesAndBalances, addressesAndBalances.map(_._1), None, asset)              // balances at the current height
   }
 
   private def transferAndReturnHeights(addresses: List[(String, Long)], asset: Option[String]): List[Int] = {
@@ -105,24 +100,18 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   private def checkBalances(expected: List[(String, Long)], addresses: List[String], height: Option[Int], assetId: Option[String]): Unit = {
-    val getResult = miner.get(
+    val getResponse = miner.get(
       s"/addresses/balance?${height.fold("")(h => s"height=$h&")}${assetId.fold("")(a => s"asset=$a&")}${addresses.map(a => s"address=$a").mkString("&")}"
     )
 
-    asResult(getResult) should contain theSameElementsAs expected
+    val getResult = Json.parse(getResponse.getResponseBody).as[List[JsObject]].map(r => ((r \ "id").as[String], (r \ "balance").as[Long]))
 
-    val postResult = miner.postJson(
-      "/addresses/balance",
-      Json.obj("ids" -> addresses) ++
-        height.fold(Json.obj())(h => Json.obj("height" -> h)) ++
-        assetId.fold(Json.obj())(a => Json.obj("asset" -> a))
-    )
+    getResult should contain theSameElementsAs expected
 
-    asResult(postResult) should contain theSameElementsAs expected
+    val postResult = miner.accountsBalances(height, addresses, assetId)
+
+    postResult should contain theSameElementsAs expected
   }
-
-  private def asResult(json: Response): List[(String, Long)] =
-    Json.parse(json.getResponseBody).as[List[JsObject]].map(r => ((r \ "id").as[String], (r \ "balance").as[Long]))
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
