@@ -24,6 +24,7 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
     "feeAmount",
     "generating",
     "in",
+    "matcherFee",
     "minIncrement",
     "minSponsoredAssetFee",
     "out",

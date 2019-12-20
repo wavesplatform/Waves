@@ -181,11 +181,19 @@ case class DebugApiRoute(
     }))
   }
 
+  private def wavesDistribution(height: Int): Route =
+    optionalHeaderValueByType[Accept](()) {
+      case Some(accept) if accept.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b.toString }))
+      case _ =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    }
+
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(dst.wavesDistribution(ng.height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    wavesDistribution(ng.height)
   }
 
   @Path("/stateWaves/{height}")
@@ -196,12 +204,7 @@ case class DebugApiRoute(
     )
   )
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    optionalHeaderValueByType[Accept](()) {
-      case Some(accept) if accept.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) =>
-        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b.toString }))
-      case _ =>
-        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
-    }
+    wavesDistribution(height)
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
