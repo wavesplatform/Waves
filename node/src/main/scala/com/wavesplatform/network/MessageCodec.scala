@@ -28,13 +28,19 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     case g: GetBlock           => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
     case m: MicroBlockInv      => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
     case m: MicroBlockRequest  => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
-    case m: MicroBlockResponse => out.add(RawBytes(MicroBlockResponseSpec.messageCode, MicroBlockResponseSpec.serializeData(m)))
+    case MicroBlockResponse(m) => out.add(RawBytes.fromMicroblock(m))
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
-    specsByCodes(msg.code).deserializeData(msg.data) match {
-      case Success(x) => out.add(x)
-      case Failure(e) => block(ctx, e)
+    specsByCodes.get(msg.code) match {
+      case Some(spec) =>
+        spec.deserializeData(msg.data) match {
+          case Success(x) => out.add(x)
+          case Failure(e) => block(ctx, e)
+        }
+
+      case None =>
+        block(ctx, new IllegalArgumentException(s"Unknown message: $msg"))
     }
   }
 

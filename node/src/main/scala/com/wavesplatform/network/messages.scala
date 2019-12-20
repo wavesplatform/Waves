@@ -27,7 +27,9 @@ case class GetBlock(signature: ByteStr) extends Message
 
 case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 
-case class RawBytes(code: Byte, data: Array[Byte]) extends Message
+case class RawBytes(code: Byte, data: Array[Byte]) extends Message {
+  override def toString: String = s"RawBytes($code, ${data.mkString("[", ", ", "]")})"
+}
 
 object RawBytes {
   def fromTransaction(tx: Transaction): RawBytes = tx match {
@@ -42,7 +44,7 @@ object RawBytes {
   def fromMicroblock(mb: MicroBlock): RawBytes =
     if (mb.version < Block.ProtoBlockVersion)
       RawBytes(MicroBlockResponseSpec.messageCode, MicroBlockResponseSpec.serializeData(MicroBlockResponse(mb)))
-    else RawBytes(PBMicroBlockSpec.messageCode, PBMicroBlockSpec.serializeData(mb))
+    else RawBytes(PBMicroBlockSpec.messageCode, PBMicroBlockSpec.serializeData(MicroBlockResponse(mb)))
 }
 
 case class BlockForged(block: Block) extends Message
