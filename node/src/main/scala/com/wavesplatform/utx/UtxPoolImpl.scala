@@ -343,7 +343,7 @@ class UtxPoolImpl(
       blockchain.assetDescription(asset).forall(_.reissuable)
 
     def blockchainIsFresh: Boolean =
-      blockchain.lastBlockTimestamp.forall(ts => (ts + blockchain.settings.genesisSettings.averageBlockDelay.toMillis) >= time.correctedTime())
+      blockchain.lastBlockTimestamp.forall(ts => (ts + (blockchain.settings.genesisSettings.averageBlockDelay.toMillis * 10)) >= time.correctedTime())
   }
 
   private[this] object TxQueue {
