@@ -192,6 +192,9 @@ object SyncHttpApi extends Assertions {
     def postJsonWithApiKey[A: Writes](path: String, body: A): Response =
       sync(async(n).postJsonWithApiKey(path, body))
 
+    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String, headerValue: String): Response =
+      sync(async(n).postJsObjectWithCustomHeader(path, body, headerName, headerValue))
+
     def getWithApiKey(path: String): Response =
       sync(async(n).getWithApiKey(path))
 

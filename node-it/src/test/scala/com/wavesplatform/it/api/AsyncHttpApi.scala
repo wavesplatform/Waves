@@ -64,9 +64,6 @@ object AsyncHttpApi extends Assertions {
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
 
-//    def getWithCustomHeader(path: String, headerName: String, headerValue: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
-//      retrying(f(_get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue)).build())
-
     def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false, f: RequestBuilder => RequestBuilder = identity): Future[Response] = {
       val requestBuilder = if (withApiKey) {
         _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue).withApiKey(n.apiKey)
@@ -74,7 +71,6 @@ object AsyncHttpApi extends Assertions {
         _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue)
       }
       retrying(f(requestBuilder).build())
-//      retrying(f(_get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue).withApiKey(n.apiKey)).build())
     }
 
     def seed(address: String): Future[String] = getWithApiKey(s"/addresses/seed/$address").as[JsValue].map(v => (v \ "seed").as[String])
@@ -97,6 +93,15 @@ object AsyncHttpApi extends Assertions {
       _post(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
         .setHeader("Content-type", "application/json")
+        .setBody(stringify(body))
+        .build()
+    }
+
+    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String, headerValue: String): Future[Response] = retrying {
+      _post(s"${n.nodeApiEndpoint}$path")
+        .withApiKey(n.apiKey)
+        .setHeader("Content-type", "application/json")
+        .setHeader(headerName, headerValue)
         .setBody(stringify(body))
         .build()
     }
