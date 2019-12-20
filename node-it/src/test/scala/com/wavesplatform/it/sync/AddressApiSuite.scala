@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync
 import java.net.URLDecoder
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.TooBigArrayAllocation
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
@@ -75,11 +75,33 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
   }
 
+  test("requests to the illegal height should be handled correctly ") {
+    val height = miner.height + 100
+    assertApiError(
+      miner.get(s"/addresses/balance?height=$height&address=$firstAddress"),
+      CustomValidationError(s"Illegal height: $height")
+    )
+    assertApiError(
+      miner.get(s"/addresses/balance?height=$height&address=$firstAddress"),
+      CustomValidationError(s"Illegal height: $height")
+    )
+
+    assertApiError(
+      miner.get(s"/addresses/balance?height=-1&address=$firstAddress"),
+      CustomValidationError("Illegal height: -1")
+    )
+    assertApiError(
+      miner.get(s"/addresses/balance?height=-1&address=$firstAddress"),
+      CustomValidationError("Illegal height: -1")
+    )
+  }
+
   private def assertBalances(asset: Option[String]): Unit = {
     val addressesAndBalances = (1 to 5).map(i => (miner.createAddress(), (i * 100).toLong)).toList
 
-    val firstAddresses  = addressesAndBalances.slice(0, 2)
-    val secondAddresses = addressesAndBalances.slice(2, 5)
+    val firstAddresses   = addressesAndBalances.slice(0, 2)
+    val secondAddresses  = addressesAndBalances.slice(2, 5)
+    val illegalAddresses = List.fill(3)(Random.nextString(10))
 
     val heightBefore  = transferAndReturnHeights(firstAddresses, asset).min - 1
     val heightBetween = nodes.waitForHeightArise()
@@ -88,10 +110,16 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
 
     nodes.waitForHeightArise()
 
-    checkBalances(List(), addressesAndBalances.map(_._1), Some(heightBefore), asset)              // balances at the height before all transfers
-    checkBalances(firstAddresses, addressesAndBalances.map(_._1), Some(heightBetween), asset)     // balances at the height after the 2nd transfer
-    checkBalances(addressesAndBalances, addressesAndBalances.map(_._1), Some(heightAfter), asset) // balances at the height after all transfers
-    checkBalances(addressesAndBalances, addressesAndBalances.map(_._1), None, asset)              // balances at the current height
+    val requestedAddresses = addressesAndBalances.map(_._1) ++ illegalAddresses :+ firstAddresses.head._1 :+ secondAddresses.head._1
+
+    // balances at the height before all transfers
+    checkBalances(addressesAndBalances.map { case (a, _) => (a, 0L) }, requestedAddresses, Some(heightBefore), asset)
+    // balances at the height after the 2nd transfer
+    checkBalances(firstAddresses ++ secondAddresses.map { case (a, _) => (a, 0L) }, requestedAddresses, Some(heightBetween), asset)
+    // balances at the height after all transfers
+    checkBalances(addressesAndBalances, requestedAddresses, Some(heightAfter), asset)
+    // balances at the current height
+    checkBalances(addressesAndBalances, requestedAddresses, None, asset)
   }
 
   private def transferAndReturnHeights(addresses: List[(String, Long)], asset: Option[String]): List[Int] = {
@@ -116,7 +144,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
-      .overrideBase(_.raw("waves.rest-api.transactions-by-address-limit = 10"))
+      .overrideBase(_.raw("waves.rest-api.transactions-by-address-limit = 20"))
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
