@@ -95,6 +95,8 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
                 blockchainBefore.assetDescription(a).forall(_.reissuable))
             } yield ForbidReissue(a)
             issued ++ volumeUpdates ++ reissueForbidden
+
+          case _ => Seq.empty
         }
       case None => Seq.empty
     }
