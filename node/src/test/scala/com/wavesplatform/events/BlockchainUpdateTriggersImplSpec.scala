@@ -13,7 +13,6 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.{NoShrink, RequestGen}
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ReplaySubject
@@ -27,8 +26,6 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
 
   private val sigGen: Gen[ByteStr] = bytes64gen.map(ByteStr.apply)
   private val heightGen: Gen[Int]  = Gen.choose(1, 1000)
-
-  private val FEE = 1000000
 
   private def produceEvent(useTrigger: BlockchainUpdateTriggers => Unit): BlockchainUpdated = {
     val evts = ReplaySubject[BlockchainUpdated]()
@@ -95,11 +92,8 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
       val recipient = accountGen.sample.get.publicKey.toAddress
       val miner     = accountGen.sample.get
 
-      val tx = TransferTransaction
-        .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, FEE, None, 1)
-        .explicitGet()
-
-      val b = TestBlock.create(miner, Seq(tx))
+      val tx = transferGeneratorPV2(1, master, recipient, ENOUGH_AMT / 3).sample.get
+      val b  = TestBlock.create(miner, Seq(tx))
 
       produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
         case BlockAppended(toId, toHeight, block, blockStateUpdate, transactionStateUpdates) =>
@@ -107,34 +101,30 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
           toHeight shouldBe bc.height + 1
           areBlocksEqual(b, block) shouldBe true
 
-          println(blockStateUpdate)
-          println(transactionStateUpdates)
-
           // miner reward
           blockStateUpdate.balances.head match {
             case (address, asset, newBalance) =>
               address shouldBe miner.publicKey.toAddress
               asset shouldBe Waves
-              newBalance shouldBe FEE
+              newBalance shouldBe tx.fee
           }
 
+          // transferred Waves
           val masterUpd = transactionStateUpdates.head.balances.find(_._1 == master.publicKey.toAddress).get
-          masterUpd._3 shouldBe (ENOUGH_AMT - tx.amount - FEE)
+          masterUpd._3 shouldBe (ENOUGH_AMT - tx.amount - tx.fee)
 
           val recipientUpd = transactionStateUpdates.head.balances.find(_._1 == recipient).get
           recipientUpd._3 shouldBe tx.amount
-
         case _ => fail()
       }
     }
 
     "block with data entries" in withBlockchainAndGenesis { (bc, master) =>
       val tx = dataTransactionGen.sample.get
-
-      val b = TestBlock.create(master, Seq(tx))
+      val b  = TestBlock.create(master, Seq(tx))
 
       produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-        case BlockAppended(toId, toHeight, block, blockStateUpdate, transactionStateUpdates) =>
+        case BlockAppended(toId, toHeight, block, _, transactionStateUpdates) =>
           toId shouldBe b.signature
           toHeight shouldBe bc.height + 1
           areBlocksEqual(b, block) shouldBe true
