@@ -111,18 +111,18 @@ case class TransactionsApiRoute(
               case Some((height, _)) =>
                 Json.obj("status" -> "confirmed", "height" -> height, "confirmations" -> (blockchain.height - height).max(0))
 
-              case None =>
-                utx.transactionById(id) match {
-                  case Some(_) => Json.obj("status" -> "unconfirmed")
-                  case None    => Json.obj("status" -> "not_found")
-                }
+                case None =>
+                  utx.transactionById(id) match {
+                    case Some(_) => Json.obj("status" -> "unconfirmed")
+                    case None    => Json.obj("status" -> "not_found")
+                  }
+              }
+              statusJson ++ Json.obj("id" -> id.toString)
             }
-            statusJson ++ Json.obj("id" -> id.toString)
-          }
-          complete(results)
+            complete(results)
 
-        case _ => complete(InvalidSignature)
-      }
+          case _ => complete(InvalidSignature)
+        }
     }
   }
 
