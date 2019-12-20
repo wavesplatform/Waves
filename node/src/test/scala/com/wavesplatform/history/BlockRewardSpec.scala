@@ -57,7 +57,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = InitialReward - 1 * Constants.UnitsInWave, version = Block.RewardBlockVersion)
 
   private def mkEmptyBlockReward(ref: ByteStr, signer: KeyPair, vote: Long): Block =
-    TestBlock.create(ntpNow, ref, Seq.empty, signer,rewardVote = vote, version = Block.RewardBlockVersion)
+    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = vote, version = Block.RewardBlockVersion)
 
   private val InitialMinerBalance = 10000 * Constants.UnitsInWave
   private val OneTotalFee         = 100000
@@ -326,19 +326,19 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     }
 
     val blockWithoutFeesScenario = for {
-    (_, _, miner1, miner2, genesisBlock) <- genesis
-                                            b2 = mkEmptyBlock(genesisBlock.uniqueId, miner1)
-                                                   b3 = mkEmptyBlock(b2.uniqueId, miner1)
-                                                          b4 = mkEmptyBlock(b3.uniqueId, miner1)
-                                                                 b5 = mkEmptyBlockIncReward(b4.uniqueId, miner1)
-                                                                        b6s = Range
-                                                                              .inclusive(BlockRewardActivationHeight + 1, BlockRewardActivationHeight + rewardSettings.blockchainSettings.rewardsSettings.term)
-    .foldLeft(Seq(b5)) {
-      case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
-        prev :+ mkEmptyBlockIncReward(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
-      case (prev, i) => prev :+ mkEmptyBlock(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
-    }
-      .tail
+      (_, _, miner1, miner2, genesisBlock) <- genesis
+      b2 = mkEmptyBlock(genesisBlock.uniqueId, miner1)
+      b3 = mkEmptyBlock(b2.uniqueId, miner1)
+      b4 = mkEmptyBlock(b3.uniqueId, miner1)
+      b5 = mkEmptyBlockIncReward(b4.uniqueId, miner1)
+      b6s = Range
+        .inclusive(BlockRewardActivationHeight + 1, BlockRewardActivationHeight + rewardSettings.blockchainSettings.rewardsSettings.term)
+        .foldLeft(Seq(b5)) {
+          case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
+            prev :+ mkEmptyBlockIncReward(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
+          case (prev, i) => prev :+ mkEmptyBlock(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
+        }
+        .tail
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, b6s.init, b6s.last)
 
     "when all blocks without fees" in forAll(blockWithoutFeesScenario) {

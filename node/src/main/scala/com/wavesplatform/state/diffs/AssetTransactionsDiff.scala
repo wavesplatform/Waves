@@ -15,7 +15,7 @@ object AssetTransactionsDiff {
   def issue(blockchain: Blockchain, height: Int)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     val info  = AssetInfo(isReissuable = tx.reissuable, volume = tx.quantity)
     val asset = IssuedAsset(tx.id())
-    DiffsCommon.countScriptComplexity(tx.script, blockchain)
+    DiffsCommon.countVerifierComplexity(tx.script, blockchain)
       .map(script =>
         Diff(
           height = height,
@@ -31,7 +31,7 @@ object AssetTransactionsDiff {
   def setAssetScript(blockchain: Blockchain, height: Int, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     validateAsset(tx, blockchain, tx.asset, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
-        DiffsCommon.countScriptComplexity(tx.script, blockchain)
+        DiffsCommon.countVerifierComplexity(tx.script, blockchain)
           .map(script =>
             Diff(
               height = height,

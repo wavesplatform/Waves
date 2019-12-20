@@ -16,7 +16,6 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    allow-blacklisted-transfer-to = ["b"]
         |    allow-transactions-from-smart-accounts = false
         |    allow-skip-checks = false
-        |    reject-transactions-when-blockchain-is-stale = true
         |  }
         |}""".stripMargin).resolve()
 
@@ -28,6 +27,5 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
     settings.allowBlacklistedTransferTo shouldBe Set("b")
     settings.allowTransactionsFromSmartAccounts shouldBe false
     settings.allowSkipChecks shouldBe false
-    settings.rejectTransactionsWhenBlockchainIsStale shouldBe true
   }
 }

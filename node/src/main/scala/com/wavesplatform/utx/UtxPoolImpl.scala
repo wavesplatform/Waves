@@ -62,7 +62,6 @@ class UtxPoolImpl(
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
-    else if (utxSettings.rejectTransactionsWhenBlockchainIsStale && !TxCheck.blockchainIsFresh) TracedResult.wrapE(Left(GenericError("TX is rejected because blockchain is stale")))
     else putNewTx(tx, verify)
   }
 
@@ -341,9 +340,6 @@ class UtxPoolImpl(
 
     def canReissue(asset: IssuedAsset): Boolean =
       blockchain.assetDescription(asset).forall(_.reissuable)
-
-    def blockchainIsFresh: Boolean =
-      blockchain.lastBlockTimestamp.forall(ts => (ts + blockchain.settings.genesisSettings.averageBlockDelay.toMillis) >= time.correctedTime())
   }
 
   private[this] object TxQueue {
