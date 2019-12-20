@@ -9,7 +9,8 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.ProvenTransaction
 import cats.implicits._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 private[diffs] object DiffsCommon {
@@ -61,11 +62,20 @@ private[diffs] object DiffsCommon {
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }
 
-  def countScriptComplexity(
+  def countVerifierComplexity(
     script: Option[Script],
     blockchain: Blockchain
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
-      .traverse(s => Script.verifierComplexity(s, blockchain.estimator).map((s, _)))
+      .traverse { script =>
+        val cost =
+          if (blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight)
+            Script.verifierComplexity(script, ScriptEstimatorV1) *>
+            Script.verifierComplexity(script, ScriptEstimatorV2)
+          else
+            Script.verifierComplexity(script, blockchain.estimator)
+
+        cost.map((script, _))
+      }
       .leftMap(GenericError(_))
 }

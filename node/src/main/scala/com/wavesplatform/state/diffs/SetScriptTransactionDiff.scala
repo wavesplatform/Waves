@@ -6,7 +6,7 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 object SetScriptTransactionDiff {
   def apply(blockchain: Blockchain, height: Int)(tx: SetScriptTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.countScriptComplexity(tx.script, blockchain)
+    DiffsCommon.countVerifierComplexity(tx.script, blockchain)
       .map(
         script => Diff(
           height = height,
