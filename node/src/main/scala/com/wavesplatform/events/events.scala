@@ -9,10 +9,10 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 sealed trait AssetStateUpdate extends Product with Serializable {
-  def assetId: IssuedAsset
+  def asset: IssuedAsset
 }
 final case class Issue(
-    assetId: IssuedAsset,
+    asset: IssuedAsset,
     name: Either[ByteStr, String],
     description: Either[ByteStr, String],
     decimals: Int,
@@ -22,20 +22,20 @@ final case class Issue(
     nft: Boolean
 ) extends AssetStateUpdate
 final case class UpdateAssetVolume(
-    assetId: IssuedAsset,
+    asset: IssuedAsset,
     volume: BigInt
 ) extends AssetStateUpdate
-final case class ForbidReissue(assetId: IssuedAsset) extends AssetStateUpdate
+final case class ForbidReissue(asset: IssuedAsset) extends AssetStateUpdate
 final case class SetAssetScript(
-    assetId: IssuedAsset,
+    asset: IssuedAsset,
     script: Option[Script]
 ) extends AssetStateUpdate
 final case class SetSponsorship(
-    assetId: IssuedAsset,
+    asset: IssuedAsset,
     sponsorship: Long
 ) extends AssetStateUpdate
 final case class UpdateAssetInfo(
-    assetId: IssuedAsset,
+    asset: IssuedAsset,
     name: String,
     description: String
 ) extends AssetStateUpdate

@@ -67,7 +67,7 @@ object PBEvents {
 
   private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
     AssetStateUpdate(
-      a.assetId.id,
+      a.asset.id,
       `type` = a match {
         case events.Issue(_, name, description, decimals, reissuable, volume, script, nft) =>
           AssetStateUpdate.Type.Issue(

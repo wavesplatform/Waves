@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -97,10 +97,6 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
 
       produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
         case BlockAppended(toId, toHeight, block, blockStateUpdate, transactionStateUpdates) =>
-          toId shouldBe b.signature
-          toHeight shouldBe bc.height + 1
-          areBlocksEqual(b, block) shouldBe true
-
           // miner reward
           blockStateUpdate.balances.head match {
             case (address, asset, newBalance) =>
@@ -124,15 +120,36 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
       val b  = TestBlock.create(master, Seq(tx))
 
       produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-        case BlockAppended(toId, toHeight, block, _, transactionStateUpdates) =>
-          toId shouldBe b.signature
-          toHeight shouldBe bc.height + 1
-          areBlocksEqual(b, block) shouldBe true
+        case BlockAppended(toId, _, _, _, transactionStateUpdates) =>
           transactionStateUpdates.head.dataEntries.map(_._2).sortBy(_.key) shouldBe tx.data.sortBy(_.key)
         case _ => fail()
       }
     }
 
-    // @todo different assets state update
+    "asset state updates" - {
+      "issue" in withBlockchainAndGenesis { (bc, master) =>
+        forAll(issueV2TransactionGen(Gen.const(master))) { tx =>
+          val b = TestBlock.create(master, Seq(tx))
+          produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
+            case BlockAppended(_, _, _, _, transactionStateUpdates) =>
+              transactionStateUpdates.head.assets.head match {
+                case Issue(asset, name, description, decimals, reissuable, volume, script, nft) =>
+                  asset.id shouldBe tx.id()
+                  name.left.get shouldBe tx.nameBytes
+                  description.left.get shouldBe tx.descriptionBytes
+                  decimals shouldBe tx.decimals
+                  reissuable shouldBe tx.reissuable
+                  volume shouldBe tx.quantity
+                  script shouldBe tx.script
+                  nft shouldBe (tx.quantity == 1 && decimals == 0 && !tx.reissuable)
+                case _ => fail()
+              }
+            case _ => fail()
+          }
+        }
+      }
+
+      // @todo all assets state update cases
+    }
   }
 }
