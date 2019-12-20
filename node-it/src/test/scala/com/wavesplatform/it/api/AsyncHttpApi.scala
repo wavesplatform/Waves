@@ -186,7 +186,7 @@ object AsyncHttpApi extends Assertions {
       for {
         json <- postJson(
           "/addresses/balance",
-          Json.obj("ids" -> addresses) ++
+          Json.obj("addresses" -> addresses) ++
             height.fold(Json.obj())(h => Json.obj("height" -> h)) ++
             asset.fold(Json.obj())(a => Json.obj("asset" -> a))
         )
