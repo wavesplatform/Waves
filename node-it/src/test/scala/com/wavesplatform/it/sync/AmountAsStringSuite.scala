@@ -89,15 +89,16 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     (Json.parse(utxExchangeTxInfo.getResponseBody) \ "price").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utxExchangeTxInfo.getResponseBody) \ "sellMatcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utxExchangeTxInfo.getResponseBody) \ "buyMatcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
-//    (Json.parse(utxExchangeTxInfo.getResponseBody) \ "order1" \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
-//    (Json.parse(utxExchangeTxInfo.getResponseBody) \ "order2" \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(utxExchangeTxInfo.getResponseBody) \ "order1" \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(utxExchangeTxInfo.getResponseBody) \ "order2" \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utxExchangeTxInfo.getResponseBody) \ "fee").validate[JsString] shouldBe a[JsSuccess[_]]
     val utx = sender.getWithCustomHeader(s"/transactions/unconfirmed", headerName, headerValue)
     (Json.parse(utx.getResponseBody) \ 0 \ "amount").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utx.getResponseBody) \ 0 \ "price").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utx.getResponseBody) \ 0 \ "sellMatcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utx.getResponseBody) \ 0 \ "buyMatcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
-//    (Json.parse(utx.getResponseBody) \ 0 \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(utx.getResponseBody) \ 0 \ "order1" \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(utx.getResponseBody) \ 0 \ "order2" \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(utx.getResponseBody) \ 0 \ "fee").validate[JsString] shouldBe a[JsSuccess[_]]
     sender.waitForTransaction(exchangeTxId)
     val exchangeTxInfo = sender.getWithCustomHeader(s"/transactions/info/$exchangeTxId", headerName, headerValue)
@@ -105,10 +106,12 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     (Json.parse(exchangeTxInfo.getResponseBody) \ "price").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(exchangeTxInfo.getResponseBody) \ "sellMatcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(exchangeTxInfo.getResponseBody) \ "buyMatcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
-//    (Json.parse(exchangeTxInfo.getResponseBody) \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(exchangeTxInfo.getResponseBody) \ "matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(exchangeTxInfo.getResponseBody) \ "order1" \"matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
+    (Json.parse(exchangeTxInfo.getResponseBody) \ "order2" \"matcherFee").validate[JsString] shouldBe a[JsSuccess[_]]
     (Json.parse(exchangeTxInfo.getResponseBody) \ "fee").validate[JsString] shouldBe a[JsSuccess[_]]
 
-    val dataEntries = List(IntegerDataEntry("int", 666), BinaryDataEntry("blob", ByteStr.decodeBase58("boop").get))
+    val dataEntries = List(IntegerDataEntry("int", 666))
     val dataTxId = sender.putData(firstAddress, dataEntries, calcDataFee(dataEntries)).id
     val utxDataTxInfo = sender.getWithCustomHeader(s"/transactions/unconfirmed/info/$dataTxId", headerName, headerValue)
     (Json.parse(utxDataTxInfo.getResponseBody) \ "data" \ 0 \ "value").validate[JsString] shouldBe a[JsSuccess[_]]
