@@ -9,6 +9,4 @@ private[node] case class AssetInfoResponse(
     scripted:             Boolean,
     lastUpdatedAt:        Int,
     minSponsoredAssetFee: Option[Long]
-) {
-    def sponsored: Boolean = minSponsoredAssetFee.nonEmpty
-}
+)

@@ -387,17 +387,18 @@ object Bindings {
         "issuer"          -> mapRecipient(sAInfo.issuer)._2,
         "issuerPublicKey" -> sAInfo.issuerPk,
         "reissuable"      -> sAInfo.reissuable,
-        "scripted"        -> sAInfo.scripted,
-        "sponsored"       -> sAInfo.sponsored
+        "scripted"        -> sAInfo.scripted
       )
 
-    val lastUpdateFieldO: Map[String, EVALUATED] =
-      if (version >= V4) Map("lastUpdatedAt" -> sAInfo.lastUpdatedAt)
-      else Map()
+    val v4VariableFields: Map[String, EVALUATED] =
+      if (version >= V4)
+        Map("lastUpdatedAt" -> sAInfo.lastUpdatedAt, "minSponsoredFee" -> sAInfo.minSponsoredFee)
+      else
+        Map("sponsored" -> sAInfo.minSponsoredFee.isDefined)
 
     CaseObj(
       assetType(version),
-      commonFields ++ lastUpdateFieldO
+      commonFields ++ v4VariableFields
     )
   }
 

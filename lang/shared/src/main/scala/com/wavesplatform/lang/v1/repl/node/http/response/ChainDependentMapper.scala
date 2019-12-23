@@ -38,7 +38,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       pkToAddress(a.issuer),
       a.reissuable,
       a.scripted,
-      a.sponsored,
+      a.minSponsoredAssetFee,
       a.lastUpdatedAt
     )
 
