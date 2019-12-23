@@ -82,7 +82,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
       CustomValidationError(s"Illegal height: $height")
     )
     assertApiError(
-      miner.get(s"/addresses/balance?height=$height&address=$firstAddress"),
+      miner.accountsBalances(Some(height), Seq("firstAddress")),
       CustomValidationError(s"Illegal height: $height")
     )
 
@@ -91,7 +91,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
       CustomValidationError("Illegal height: -1")
     )
     assertApiError(
-      miner.get(s"/addresses/balance?height=-1&address=$firstAddress"),
+      miner.accountsBalances(Some(-1), Seq("firstAddress")),
       CustomValidationError("Illegal height: -1")
     )
   }
