@@ -388,12 +388,11 @@ object Bindings {
         "issuerPublicKey" -> sAInfo.issuerPk,
         "reissuable"      -> sAInfo.reissuable,
         "scripted"        -> sAInfo.scripted,
-        "sponsored"       -> sAInfo.sponsored,
-        "lastUpdatedAt"   -> sAInfo.lastUpdatedAt
+        "sponsored"       -> sAInfo.sponsored
       )
 
     val lastUpdateFieldO: Map[String, EVALUATED] =
-      if (version >= V4) Map("lastUpdate" -> sAInfo.lastUpdatedAt)
+      if (version >= V4) Map("lastUpdatedAt" -> sAInfo.lastUpdatedAt)
       else Map()
 
     CaseObj(
