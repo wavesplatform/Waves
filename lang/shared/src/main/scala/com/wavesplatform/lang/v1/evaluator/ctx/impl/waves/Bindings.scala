@@ -378,9 +378,9 @@ object Bindings {
       )
     )
 
-  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
+  def buildAssetInfo(sAInfo: ScriptAssetInfo, version: StdLibVersion) =
     CaseObj(
-      assetType,
+      assetType(version),
       Map(
         "id"              -> sAInfo.id,
         "quantity"        -> sAInfo.quantity,

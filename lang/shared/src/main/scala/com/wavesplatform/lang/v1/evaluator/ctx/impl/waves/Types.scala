@@ -27,19 +27,20 @@ object Types {
     )
   )
 
-  val assetType = CASETYPEREF(
-    "Asset",
-    List(
-      "id"              -> BYTESTR,
-      "quantity"        -> LONG,
-      "decimals"        -> LONG,
-      "issuer"          -> addressType,
-      "issuerPublicKey" -> BYTESTR,
-      "reissuable"      -> BOOLEAN,
-      "scripted"        -> BOOLEAN,
-      "sponsored"       -> BOOLEAN
+  def assetType(version: StdLibVersion) =
+    CASETYPEREF(
+      "Asset",
+      List(
+        "id"              -> BYTESTR,
+        "quantity"        -> LONG,
+        "decimals"        -> LONG,
+        "issuer"          -> addressType,
+        "issuerPublicKey" -> BYTESTR,
+        "reissuable"      -> BOOLEAN,
+        "scripted"        -> BOOLEAN,
+        "sponsored"       -> BOOLEAN
+      )
     )
-  )
 
   val blockInfo = CASETYPEREF(
     "BlockInfo",
@@ -53,7 +54,8 @@ object Types {
     )
   )
 
-  val optionAsset = UNION(assetType, UNIT)
+  def optionAsset(version: StdLibVersion) =
+    UNION(assetType(version), UNIT)
 
   val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
@@ -178,7 +180,7 @@ object Types {
       paymentType,
       scriptTransfer,
       invocationType(version),
-      assetType,
+      assetType(version),
       blockInfo
     ) ::: callableTypes(version)
 
