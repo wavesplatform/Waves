@@ -38,7 +38,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       pkToAddress(a.issuer),
       a.reissuable,
       a.scripted,
-      a.sponsored
+      a.sponsored,
+      a.lastUpdatedAt
     )
 
   def toRideModel(b: BlockInfoResponse): BlockInfo =

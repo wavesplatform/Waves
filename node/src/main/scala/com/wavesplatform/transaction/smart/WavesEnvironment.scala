@@ -113,7 +113,8 @@ class WavesEnvironment(
         issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
-        sponsored = assetDesc.sponsorship != 0
+        sponsored = assetDesc.sponsorship != 0,
+        assetDesc.lastUpdatedAt
       )
     }
   }

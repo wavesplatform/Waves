@@ -27,7 +27,11 @@ object Types {
     )
   )
 
-  def assetType(version: StdLibVersion) =
+  def assetType(version: StdLibVersion) = {
+    val lastUpdateFieldO =
+      if (version >= V4) List("lastUpdatedAt" -> LONG)
+      else List()
+
     CASETYPEREF(
       "Asset",
       List(
@@ -39,8 +43,9 @@ object Types {
         "reissuable"      -> BOOLEAN,
         "scripted"        -> BOOLEAN,
         "sponsored"       -> BOOLEAN
-      )
+      ) ::: lastUpdateFieldO
     )
+  }
 
   val blockInfo = CASETYPEREF(
     "BlockInfo",
