@@ -101,5 +101,6 @@ class AssetsApiRouteSpec
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     (response \ "originTransactionId").as[String] shouldBe tx.id().toString
+    (response \ "lastUpdatedAt").as[Int] shouldBe desc.lastUpdatedAt
   }
 }
