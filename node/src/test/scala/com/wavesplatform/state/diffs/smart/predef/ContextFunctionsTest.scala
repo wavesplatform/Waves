@@ -1,13 +1,16 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import java.util.Dictionary
+
 import cats.kernel.Monoid
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures.MultiPaymentInvokeScript
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -22,7 +25,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -276,9 +279,18 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("get assetInfo by asset id") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
+    forAll(for {
+      (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
+      version      <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      v4Activation <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation) =>
+
+        val fs =
+          if (v4Activation) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+          else smartEnabledFS
+
+        assertDiffAndState(fs) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
 
@@ -307,7 +319,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val script = ScriptCompiler
             .compile(
               s"""
-              | {-# STDLIB_VERSION 3 #-}
+              | {-# STDLIB_VERSION ${version.id} #-}
               | {-# CONTENT_TYPE EXPRESSION #-}
               | {-# SCRIPT_TYPE ACCOUNT #-}
               |
@@ -323,6 +335,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | let reissuable      = aInfo.reissuable == $reissuable
               | let sponsored       = aInfo.sponsored == $sponsored
               |
+              | ${if (version >= V4) s"let lastUpdatedAt = aInfo.lastUpdatedAt == transactionHeightById(base58'$assetId').value()" else ""}
+              |
               | id              &&
               | quantity        &&
               | decimals        &&
@@ -331,6 +345,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | scripted        &&
               | reissuable      &&
               | sponsored
+              | ${if (version >= V4) "&& lastUpdatedAt" else ""}
               |
             """.stripMargin,
               estimator
