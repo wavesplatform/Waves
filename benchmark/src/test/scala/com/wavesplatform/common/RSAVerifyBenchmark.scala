@@ -55,7 +55,7 @@ object RSAVerifyBenchmark {
       generator.generateKeyPair()
     }
     val publicKey = pair.getPublic.getEncoded
-    println("PK: " + publicKey.size)
+
     val signature = {
       val privateKey = pair.getPrivate
       val prefix = RSA.digestAlgorithmPrefix(alg)
@@ -66,7 +66,6 @@ object RSAVerifyBenchmark {
       privateSignature.update(message32Kb)
       privateSignature.sign
     }
-    println("SIG: " + signature.size)
   }
 }
 
