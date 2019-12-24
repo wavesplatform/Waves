@@ -2,7 +2,6 @@ package com.wavesplatform.network
 
 import java.util
 
-import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
