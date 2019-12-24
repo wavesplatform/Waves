@@ -141,18 +141,24 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
   val contractScriptGen: Gen[Script] = contractGen.map(e => ContractScript(V3, e).explicitGet())
   val contractOrExpr: Gen[Script]    = Gen.oneOf(scriptGen, contractScriptGen)
 
-  val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] = for {
-    (sender, assetName, description, quantity, decimals, _, iFee, _) <- issueParamGen
-    timestamp                                                        <- timestampGen
-    script                                                           <- Gen.option(scriptGen)
-    issue = IssueTransaction(TxVersion.V2, sender, assetName, description, quantity, decimals, reissuable = true, script, iFee, timestamp)
-      .signWith(sender.privateKey)
-  } yield (
-    Seq(issue),
-    SetAssetScriptTransaction
-      .selfSigned(1.toByte, sender, IssuedAsset(issue.id()), script, 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp)
-      .explicitGet()
-  )
+  def issueAndSetAssetScriptGen(sender: KeyPair): Gen[(IssueTransaction, SetAssetScriptTransaction)] =
+    for {
+      (_, assetName, description, quantity, decimals, _, iFee, _) <- issueParamGen
+      timestamp                                                   <- timestampGen
+      script1                                                     <- scriptGen
+      script2                                                     <- scriptGen
+      issue = IssueTransaction(TxVersion.V2, sender, assetName, description, quantity, decimals, reissuable = true, Some(script1), iFee, timestamp)
+        .signWith(sender.privateKey)
+      setAssetScript = SetAssetScriptTransaction
+        .selfSigned(1.toByte, sender, IssuedAsset(issue.id()), Some(script2), 1 * Constants.UnitsInWave + ScriptExtraFee, timestamp)
+        .explicitGet()
+    } yield (issue, setAssetScript)
+
+  val setAssetScriptTransactionGen: Gen[(Seq[Transaction], SetAssetScriptTransaction)] =
+    for {
+      sender                  <- accountGen
+      (issue, setAssetScript) <- issueAndSetAssetScriptGen(sender)
+    } yield (Seq(issue), setAssetScript)
 
   val setScriptTransactionGen: Gen[SetScriptTransaction] = for {
     sender    <- accountGen

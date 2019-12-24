@@ -24,8 +24,8 @@ import scala.concurrent.duration._
 
 class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with RequestGen with ScalaCheckPropertyChecks with NoShrink with WithDomain {
 
-  private val sigGen: Gen[ByteStr] = bytes64gen.map(ByteStr.apply)
-  private val heightGen: Gen[Int]  = Gen.choose(1, 1000)
+  private val sigGen: Gen[ByteStr]   = bytes64gen.map(ByteStr.apply)
+  private val heightGen: Gen[Int]    = Gen.choose(1, 1000)
   private val assetAmtGen: Gen[Long] = Gen.oneOf(Gen.const[Long](1), Gen.choose[Long](2, ENOUGH_AMT))
 
   private def produceEvent(useTrigger: BlockchainUpdateTriggers => Unit): BlockchainUpdated = {
@@ -35,6 +35,12 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
     evts.onComplete()
     evts.toListL.runSyncUnsafe(500.milliseconds).head
   }
+
+  private def appendBlock(b: Block, bc: Blockchain): BlockAppended =
+    produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
+      case ba: BlockAppended => ba
+      case _                 => fail()
+    }
 
   private def withBlockchainAndGenesis[A](test: (Blockchain, KeyPair) => A): A =
     withDomain() { d =>
@@ -76,28 +82,27 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
 
   "appends" - {
     "empty block" in withBlockchainAndGenesis { (bc, _) =>
-      val b = TestBlock.create(1, Seq.empty)
-      produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-        case BlockAppended(toId, toHeight, block, blockStateUpdate, transactionStateUpdates) =>
-          toId shouldBe b.signature
-          toHeight shouldBe bc.height + 1
-          areBlocksEqual(b, block) shouldBe true
+      val b                                          = TestBlock.create(1, Seq.empty)
+      val BlockAppended(toId, toHeight, block, _, _) = appendBlock(b, bc)
 
-          blockStateUpdate.isEmpty shouldBe true
-          transactionStateUpdates.isEmpty shouldBe true
-        case _ => fail()
-      }
+      toId shouldBe b.signature
+      toHeight shouldBe bc.height + 1
+      areBlocksEqual(b, block) shouldBe true
     }
 
     "block with balance updates" in withBlockchainAndGenesis { (bc, master) =>
-      val recipient = accountGen.sample.get.publicKey.toAddress
-      val miner     = accountGen.sample.get
+      forAll {
+        for {
+          recipient <- accountGen.map(_.publicKey.toAddress)
+          miner     <- accountGen
+          amt       <- Gen.choose(1, ENOUGH_AMT / 3)
+          tx        <- transferGeneratorPV2(1, master, recipient, amt)
+        } yield (recipient, miner, tx)
+      } {
+        case (recipient, miner, tx) =>
+          val b                                                                 = TestBlock.create(miner, Seq(tx))
+          val BlockAppended(_, _, _, blockStateUpdate, transactionStateUpdates) = appendBlock(b, bc)
 
-      val tx = transferGeneratorPV2(1, master, recipient, ENOUGH_AMT / 3).sample.get
-      val b  = TestBlock.create(miner, Seq(tx))
-
-      produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-        case BlockAppended(toId, toHeight, block, blockStateUpdate, transactionStateUpdates) =>
           // miner reward
           blockStateUpdate.balances.head match {
             case (address, asset, newBalance) =>
@@ -112,18 +117,13 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
 
           val recipientUpd = transactionStateUpdates.head.balances.find(_._1 == recipient).get
           recipientUpd._3 shouldBe tx.amount
-        case _ => fail()
       }
     }
 
     "block with data entries" in withBlockchainAndGenesis { (bc, master) =>
-      val tx = dataTransactionGen.sample.get
-      val b  = TestBlock.create(master, Seq(tx))
-
-      produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-        case BlockAppended(toId, _, _, _, transactionStateUpdates) =>
-          transactionStateUpdates.head.dataEntries.map(_._2).sortBy(_.key) shouldBe tx.data.sortBy(_.key)
-        case _ => fail()
+      forAll(dataTransactionGen) { tx =>
+        val b = TestBlock.create(master, Seq(tx))
+        appendBlock(b, bc).transactionStateUpdates.head.dataEntries.map(_._2).sortBy(_.key) shouldBe tx.data.sortBy(_.key)
       }
     }
 
@@ -131,20 +131,16 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
       "issue" in withBlockchainAndGenesis { (bc, master) =>
         forAll(issueV2TransactionGen(Gen.const(master))) { tx =>
           val b = TestBlock.create(master, Seq(tx))
-          produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-            case BlockAppended(_, _, _, _, transactionStateUpdates) =>
-              transactionStateUpdates.head.assets.head match {
-                case Issue(asset, name, description, decimals, reissuable, volume, script, nft) =>
-                  asset.id shouldBe tx.id()
-                  name.left.get shouldBe tx.nameBytes
-                  description.left.get shouldBe tx.descriptionBytes
-                  decimals shouldBe tx.decimals
-                  reissuable shouldBe tx.reissuable
-                  volume shouldBe tx.quantity
-                  script shouldBe tx.script
-                  nft shouldBe (tx.quantity == 1 && decimals == 0 && !tx.reissuable)
-                case _ => fail()
-              }
+          appendBlock(b, bc).transactionStateUpdates.head.assets.head match {
+            case Issue(asset, name, description, decimals, reissuable, volume, script, nft) =>
+              asset.id shouldBe tx.id()
+              name.left.get shouldBe tx.nameBytes
+              description.left.get shouldBe tx.descriptionBytes
+              decimals shouldBe tx.decimals
+              reissuable shouldBe tx.reissuable
+              volume shouldBe tx.quantity
+              script shouldBe tx.script
+              nft shouldBe (tx.quantity == 1 && decimals == 0 && !tx.reissuable)
             case _ => fail()
           }
         }
@@ -159,28 +155,25 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
           } yield (issue, reissue)
         } {
           case (issue, reissue) =>
-            val b = TestBlock.create(master, Seq(issue, reissue))
-            produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-              case BlockAppended(_, _, _, _, transactionStateUpdates) =>
-                // update volume
-                transactionStateUpdates.last.assets.exists {
-                  case UpdateAssetVolume(_, newVolume) =>
-                    newVolume shouldBe (BigInt(issue.quantity) + BigInt(reissue.quantity))
-                    true
-                  case _ => false
-                } shouldBe true
+            val b              = TestBlock.create(master, Seq(issue, reissue))
+            val reissueUpdates = appendBlock(b, bc).transactionStateUpdates.last.assets
 
-                // check forbid reissue
-                if (issue.reissuable && !reissue.reissuable) {
-                  transactionStateUpdates.last.assets.exists {
-                    case ForbidReissue(asset) =>
-                      asset.id shouldBe issue.assetId
-                      true
-                    case _ => false
-                  } shouldBe true
-                }
+            // update volume
+            reissueUpdates.exists {
+              case UpdateAssetVolume(_, newVolume) =>
+                newVolume shouldBe (BigInt(issue.quantity) + BigInt(reissue.quantity))
+                true
+              case _ => false
+            } shouldBe true
 
-              case _ => fail()
+            // check forbid reissue
+            if (!reissue.reissuable) {
+              reissueUpdates.exists {
+                case ForbidReissue(asset) =>
+                  asset.id shouldBe issue.assetId
+                  true
+                case _ => false
+              } shouldBe true
             }
         }
       }
@@ -195,20 +188,53 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
         } {
           case (issue, burn) =>
             val b = TestBlock.create(master, Seq(issue, burn))
-            produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
-              case BlockAppended(_, _, _, _, transactionStateUpdates) =>
-                transactionStateUpdates.last.assets.exists {
-                  case UpdateAssetVolume(_, newVolume) =>
-                    newVolume shouldBe (issue.quantity - burn.quantity)
-                    true
-                  case _ => false
-                } shouldBe true
+            appendBlock(b, bc).transactionStateUpdates.last.assets.head match {
+              case UpdateAssetVolume(_, newVolume) =>
+                newVolume shouldBe (issue.quantity - burn.quantity)
               case _ => fail()
             }
         }
       }
 
-      // @todo all assets state update cases
+      "set script" in withBlockchainAndGenesis { (bc, master) =>
+        forAll(issueAndSetAssetScriptGen(master)) {
+          case (issue, setAssetScript) =>
+            val b = TestBlock.create(master, Seq(issue, setAssetScript))
+            appendBlock(b, bc).transactionStateUpdates.last.assets.head match {
+              case SetAssetScript(asset, script) =>
+                asset.id shouldBe issue.id()
+                script shouldBe setAssetScript.script
+              case _ => fail()
+            }
+        }
+      }
+
+      "set sponsorship" in withBlockchainAndGenesis { (bc, master) =>
+        forAll(sponsorFeeCancelSponsorFeeGen(master)) {
+          case (issue, setSponsorship, _, cancelSponsorship) =>
+            val txs                                                = Seq(issue, setSponsorship, cancelSponsorship)
+            val b                                                  = TestBlock.create(master, txs)
+            val BlockAppended(_, _, _, _, transactionStateUpdates) = appendBlock(b, bc)
+
+            // set sponsoprship
+            transactionStateUpdates(1).assets.head match {
+              case SetSponsorship(asset, sponsorship) =>
+                asset.id shouldBe issue.id()
+                sponsorship shouldBe setSponsorship.minSponsoredAssetFee
+              case _ => fail()
+            }
+
+            // cancel sponsorship
+            transactionStateUpdates.last.assets.head match {
+              case SetSponsorship(asset, sponsorship) =>
+                asset.id shouldBe issue.id()
+                sponsorship shouldBe cancelSponsorship.minSponsoredAssetFee
+              case _ => fail()
+            }
+        }
+      }
+
+      // @todo invoke script with assets actions?
     }
   }
 }

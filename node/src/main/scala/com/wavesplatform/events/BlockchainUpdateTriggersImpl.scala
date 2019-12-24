@@ -8,7 +8,7 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AccountDataInfo, Blockchain, Diff, DiffToStateApplier}
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction}
+import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.reactive.Observer
@@ -96,6 +96,10 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
                 blockchainBefore.assetDescription(a).forall(_.reissuable))
             } yield ForbidReissue(a)
             issued ++ volumeUpdates ++ reissueForbidden
+
+          case t: SetAssetScriptTransaction => Seq(SetAssetScript(t.asset, t.script))
+
+          case t: SponsorFeeTransaction => Seq(SetSponsorship(t.asset, t.minSponsoredAssetFee))
 
           case _ => Seq.empty
         }

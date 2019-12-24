@@ -32,7 +32,7 @@ final case class SetAssetScript(
 ) extends AssetStateUpdate
 final case class SetSponsorship(
     asset: IssuedAsset,
-    sponsorship: Long
+    sponsorship: Option[Long]
 ) extends AssetStateUpdate
 final case class UpdateAssetInfo(
     asset: IssuedAsset,
