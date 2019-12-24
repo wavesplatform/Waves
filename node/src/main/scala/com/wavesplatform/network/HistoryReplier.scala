@@ -25,15 +25,15 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
   private val knownMicroBlocks = CacheBuilder
     .newBuilder()
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
-    .build(new CacheLoader[MicroBlockSignature, MicroBlock] {
-      override def load(key: MicroBlockSignature): MicroBlock = ng.microBlock(key).get
+    .build(new CacheLoader[MicroBlockSignature, RawBytes] {
+      override def load(key: MicroBlockSignature): RawBytes = RawBytes.fromMicroBlock(ng.microBlock(key).get)
     })
 
   private val knownBlocks = CacheBuilder
     .newBuilder()
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
     .build(new CacheLoader[ByteStr, Block] {
-      override def load(key: ByteStr): Block = ng.blockById(key).get
+      override def load(key: ByteStr): RawBytes = RawBytes.fromBlock(ng.blockById(key).get)
     })
 
   private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Any]]): Unit =
@@ -74,7 +74,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
       respondWith(ctx, Task(handlingNSE(knownBlocks.get(sig))))
 
     case MicroBlockRequest(totalResBlockSig) =>
-      respondWith(ctx, Task(handlingNSE(knownMicroBlocks.get(totalResBlockSig)).map(MicroBlockResponse)))
+      respondWith(ctx, Task(handlingNSE(knownMicroBlocks.get(totalResBlockSig))))
 
     case _: Handshake =>
       respondWith(ctx, Task(Some(LocalScoreChanged(ng.score))))
