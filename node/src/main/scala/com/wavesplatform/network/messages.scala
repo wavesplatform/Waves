@@ -28,7 +28,7 @@ case class GetBlock(signature: ByteStr) extends Message
 case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 
 case class RawBytes(code: Byte, data: Array[Byte]) extends Message {
-  override def toString: String = s"RawBytes($code, ${ByteStr(data).trim})"
+  override def toString: String = s"RawBytes($code, ${data.length} bytes, ${data.take(100).mkString("[", ", ", "]")})"
 }
 
 object RawBytes {
