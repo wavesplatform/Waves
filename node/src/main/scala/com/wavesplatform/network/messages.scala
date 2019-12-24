@@ -51,7 +51,7 @@ case class BlockForged(block: Block) extends Message
 
 case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
-case class MicroBlockResponse(microblock: MicroBlock) extends Message
+case class MicroBlockResponse(microblock: MicroBlock)
 
 case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =

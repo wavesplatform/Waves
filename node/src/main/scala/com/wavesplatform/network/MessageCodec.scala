@@ -29,7 +29,6 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     case g: GetBlock          => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
     case m: MicroBlockInv     => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
     case m: MicroBlockRequest => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
-    case mb: MicroBlock       => out.add(RawBytes.fromMicroBlock(mb))
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
