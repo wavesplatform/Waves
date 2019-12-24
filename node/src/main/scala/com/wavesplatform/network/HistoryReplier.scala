@@ -13,6 +13,8 @@ import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
+import scala.util.Try
+
 @Sharable
 class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: SchedulerService) extends ChannelInboundHandlerAdapter with ScorexLogging {
   private lazy val historyReplierSettings = settings.historyReplier
@@ -25,8 +27,13 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
     .newBuilder()
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
     .build(new CacheLoader[MicroBlockSignature, RawBytes] {
-      override def load(key: MicroBlockSignature): RawBytes = RawBytes.fromMicroblock(ng.microBlock(key).get)
-
+      override def load(key: MicroBlockSignature): RawBytes = {
+        val value = Try(ng.microBlock(key).get)
+        log.trace(s"Microblock ${key.trim}: $value")
+        val bytes = value.map(RawBytes.fromMicroblock)
+        log.trace(s"Microblock ${key.trim} bytes: $bytes")
+        bytes.get
+      }
     })
 
   private val knownBlocks = CacheBuilder
@@ -39,7 +46,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
   private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Message]]): Unit =
     loader.map {
       case Some(msg) if ctx.channel().isOpen => ctx.writeAndFlush(msg)
-      case _                                 =>
+      case _ =>
     }.runAsyncLogErr
 
   private def handlingNSE[A](f: => A): Option[A] =
@@ -74,6 +81,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
       respondWith(ctx, Task(handlingNSE(knownBlocks.get(sig))))
 
     case MicroBlockRequest(totalResBlockSig) =>
+      log.trace(s"Loading microblock with id ${totalResBlockSig.trim}")
       respondWith(ctx, Task(handlingNSE(knownMicroBlocks.get(totalResBlockSig))))
 
     case _: Handshake =>
@@ -86,5 +94,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
 }
 
 object HistoryReplier {
+
   case class CacheSizes(blocks: Long, microBlocks: Long)
+
 }
