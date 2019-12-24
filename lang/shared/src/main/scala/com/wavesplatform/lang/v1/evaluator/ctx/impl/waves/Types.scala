@@ -29,7 +29,7 @@ object Types {
 
   def assetType(version: StdLibVersion) = {
     val v4VariableFields =
-      if (version >= V4) List("lastUpdatedAt" -> LONG, "minSponsoredFee" -> optionLong)
+      if (version >= V4) List("infoUpdatedAt" -> LONG, "minSponsoredFee" -> optionLong)
       else List("sponsored" -> BOOLEAN)
 
     CASETYPEREF(

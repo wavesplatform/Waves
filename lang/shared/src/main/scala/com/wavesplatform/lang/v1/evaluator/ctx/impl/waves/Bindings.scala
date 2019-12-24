@@ -392,7 +392,7 @@ object Bindings {
 
     val v4VariableFields: Map[String, EVALUATED] =
       if (version >= V4)
-        Map("lastUpdatedAt" -> sAInfo.lastUpdatedAt, "minSponsoredFee" -> sAInfo.minSponsoredFee)
+        Map("infoUpdatedAt" -> sAInfo.infoUpdatedAt, "minSponsoredFee" -> sAInfo.minSponsoredFee)
       else
         Map("sponsored" -> sAInfo.minSponsoredFee.isDefined)
 

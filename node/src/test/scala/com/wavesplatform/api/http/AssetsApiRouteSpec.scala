@@ -35,7 +35,7 @@ class AssetsApiRouteSpec
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
-    lastUpdatedAt = Height @@ 0,
+    infoUpdatedAt = Height @@ 0,
     script = smartAssetTx.script,
     sponsorship = 0,
     nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
@@ -67,7 +67,7 @@ class AssetsApiRouteSpec
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
-    lastUpdatedAt = Height @@ 0,
+    infoUpdatedAt = Height @@ 0,
     script = sillyAssetTx.script,
     sponsorship = 0,
     nft = sillyAssetTx.decimals == 0 && sillyAssetTx.quantity == 1 && !sillyAssetTx.reissuable
@@ -101,6 +101,6 @@ class AssetsApiRouteSpec
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume
     (response \ "minSponsoredAssetFee").asOpt[Long] shouldBe empty
     (response \ "originTransactionId").as[String] shouldBe tx.id().toString
-    (response \ "lastUpdatedAt").as[Int] shouldBe desc.lastUpdatedAt
+    (response \ "infoUpdatedAt").as[Int] shouldBe desc.infoUpdatedAt
   }
 }

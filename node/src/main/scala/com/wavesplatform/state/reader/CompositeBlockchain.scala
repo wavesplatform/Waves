@@ -83,7 +83,7 @@ final case class CompositeBlockchain(
             .get(asset)
             .fold(description) {
               case Ior.Left(info) =>
-                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
+                description.copy(name = info.name, description = info.description, infoUpdatedAt = info.lastUpdatedAt)
               case Ior.Right(vol) =>
                 description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
               case Ior.Both(info, vol) =>
@@ -93,7 +93,7 @@ final case class CompositeBlockchain(
                     totalVolume = description.totalVolume + vol.volume,
                     name = info.name,
                     description = info.description,
-                    lastUpdatedAt = info.lastUpdatedAt
+                    infoUpdatedAt = info.lastUpdatedAt
                   )
             }
         }
@@ -109,7 +109,7 @@ final case class CompositeBlockchain(
     assetDescription map { z =>
       diff.transactions
         .foldLeft(z.copy(script = script)) {
-          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = Right(ut.name), description = Right(ut.description), lastUpdatedAt = Height(height))
+          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = Right(ut.name), description = Right(ut.description), infoUpdatedAt = Height(height))
           case (acc, _)                                        => acc
         }
     }

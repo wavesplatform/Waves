@@ -105,7 +105,7 @@ object AssetTransactionsDiff {
       for {
         lastUpdateHeight <- blockchain
           .assetDescription(tx.assetId)
-          .map(_.lastUpdatedAt)
+          .map(_.infoUpdatedAt)
           .toRight(GenericError("Asset doesn't exist"))
         updateAllowedAt = lastUpdateHeight + minUpdateInfoInterval
         _ <- Either.cond(

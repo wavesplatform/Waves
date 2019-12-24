@@ -287,17 +287,17 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     ScriptCompiler.compile(script, estimator) shouldBe 'right
   }
 
-  property("lastUpdatedAt field unexists at V3") {
+  property("infoUpdatedAt field unexists at V3") {
     val script =
       """
         | {-# STDLIB_VERSION 3 #-}
         | {-# CONTENT_TYPE EXPRESSION #-}
         | {-# SCRIPT_TYPE ACCOUNT #-}
         |
-        | assetInfo(base58'').lastUpdatedAt == 1
+        | assetInfo(base58'').infoUpdatedAt == 1
       """.stripMargin
 
-    ScriptCompiler.compile(script, estimator) should produce("Undefined field `lastUpdatedAt`")
+    ScriptCompiler.compile(script, estimator) should produce("Undefined field `infoUpdatedAt`")
   }
 
   private val expectedExpr = LET_BLOCK(
