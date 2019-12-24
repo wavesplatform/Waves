@@ -41,7 +41,7 @@ object RawBytes {
     if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))
     else RawBytes(PBBlockSpec.messageCode, PBBlockSpec.serializeData(b))
 
-  def fromMicroblock(mb: MicroBlock): RawBytes =
+  def fromMicroBlock(mb: MicroBlock): RawBytes =
     if (mb.version < Block.ProtoBlockVersion)
       RawBytes(MicroBlockResponseSpec.messageCode, MicroBlockResponseSpec.serializeData(MicroBlockResponse(mb)))
     else RawBytes(PBMicroBlockSpec.messageCode, PBMicroBlockSpec.serializeData(MicroBlockResponse(mb)))

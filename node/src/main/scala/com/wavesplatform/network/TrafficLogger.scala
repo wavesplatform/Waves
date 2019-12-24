@@ -5,10 +5,16 @@ import com.wavesplatform.network.message.{Message => ScorexMessage}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
-import io.netty.channel.{ChannelDuplexHandler, ChannelHandlerContext, ChannelPromise}
+import io.netty.channel.{
+  ChannelDuplexHandler,
+  ChannelHandlerContext,
+  ChannelPromise
+}
 
 @Sharable
-class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandler with ScorexLogging {
+class TrafficLogger(settings: TrafficLogger.Settings)
+    extends ChannelDuplexHandler
+    with ScorexLogging {
 
   import BasicMessagesRepo.specsByClasses
 
@@ -25,7 +31,9 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
     aux.lift
   }
 
-  override def write(ctx: ChannelHandlerContext, msg: AnyRef, promise: ChannelPromise): Unit = {
+  override def write(ctx: ChannelHandlerContext,
+                     msg: AnyRef,
+                     promise: ChannelPromise): Unit = {
     codeOf(msg).filterNot(settings.ignoreTxMessages).foreach { code =>
       log.trace(s"${id(ctx)} <-- transmitted($code): ${stringify(msg)}")
     }
@@ -50,6 +58,7 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
 object TrafficLogger {
 
-  case class Settings(ignoreTxMessages: Set[ScorexMessage.MessageCode], ignoreRxMessages: Set[ScorexMessage.MessageCode])
+  case class Settings(ignoreTxMessages: Set[ScorexMessage.MessageCode],
+                      ignoreRxMessages: Set[ScorexMessage.MessageCode])
 
 }
