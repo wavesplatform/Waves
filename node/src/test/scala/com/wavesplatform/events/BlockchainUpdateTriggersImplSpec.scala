@@ -3,7 +3,7 @@ package com.wavesplatform.events
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -26,6 +26,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
 
   private val sigGen: Gen[ByteStr] = bytes64gen.map(ByteStr.apply)
   private val heightGen: Gen[Int]  = Gen.choose(1, 1000)
+  private val assetAmtGen: Gen[Long] = Gen.oneOf(Gen.const[Long](1), Gen.choose[Long](2, ENOUGH_AMT))
 
   private def produceEvent(useTrigger: BlockchainUpdateTriggers => Unit): BlockchainUpdated = {
     val evts = ReplaySubject[BlockchainUpdated]()
@@ -146,6 +147,64 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
               }
             case _ => fail()
           }
+        }
+      }
+
+      "reissue" in withBlockchainAndGenesis { (bc, master) =>
+        forAll {
+          for {
+            issueAmt            <- assetAmtGen
+            reissueAmt          <- assetAmtGen
+            (issue, reissue, _) <- issueReissueBurnGeneratorP(issueAmt, reissueAmt, 1, master).suchThat(_._1.reissuable)
+          } yield (issue, reissue)
+        } {
+          case (issue, reissue) =>
+            val b = TestBlock.create(master, Seq(issue, reissue))
+            produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
+              case BlockAppended(_, _, _, _, transactionStateUpdates) =>
+                // update volume
+                transactionStateUpdates.last.assets.exists {
+                  case UpdateAssetVolume(_, newVolume) =>
+                    newVolume shouldBe (BigInt(issue.quantity) + BigInt(reissue.quantity))
+                    true
+                  case _ => false
+                } shouldBe true
+
+                // check forbid reissue
+                if (issue.reissuable && !reissue.reissuable) {
+                  transactionStateUpdates.last.assets.exists {
+                    case ForbidReissue(asset) =>
+                      asset.id shouldBe issue.assetId
+                      true
+                    case _ => false
+                  } shouldBe true
+                }
+
+              case _ => fail()
+            }
+        }
+      }
+
+      "burn" in withBlockchainAndGenesis { (bc, master) =>
+        forAll {
+          for {
+            issueAmt         <- assetAmtGen
+            burnAmt          <- Gen.choose(1, issueAmt)
+            (issue, _, burn) <- issueReissueBurnGeneratorP(issueAmt, 1, burnAmt, master)
+          } yield (issue, burn)
+        } {
+          case (issue, burn) =>
+            val b = TestBlock.create(master, Seq(issue, burn))
+            produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
+              case BlockAppended(_, _, _, _, transactionStateUpdates) =>
+                transactionStateUpdates.last.assets.exists {
+                  case UpdateAssetVolume(_, newVolume) =>
+                    newVolume shouldBe (issue.quantity - burn.quantity)
+                    true
+                  case _ => false
+                } shouldBe true
+              case _ => fail()
+            }
         }
       }
 

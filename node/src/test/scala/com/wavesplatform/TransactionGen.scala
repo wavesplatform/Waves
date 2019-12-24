@@ -397,10 +397,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fee: Long,
       timestamp: Long
   ): Gen[IssueTransaction] =
-    Gen.oneOf(TxVersion.V1, TxVersion.V1).map { version =>
-      IssueTransaction(version, issuer.publicKey, nameBytes, descriptionBytes, quantity, decimals, reissuable, None, fee, timestamp)
-        .signWith(issuer.privateKey)
-    }
+    IssueTransaction(TxVersion.V1, issuer.publicKey, nameBytes, descriptionBytes, quantity, decimals, reissuable, None, fee, timestamp)
+      .signWith(issuer.privateKey)
 
   def createReissue(
       reissuer: KeyPair,
@@ -441,12 +439,18 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
         .explicitGet()
     } yield tx
 
+  /**
+    * @param issueQuantity must be positive
+    * @param reissueQuantity must be positive
+    * @param burnQuantity must be positive
+    */
   def issueReissueBurnGeneratorP(
       issueQuantity: Long,
       reissueQuantity: Long,
       burnQuantity: Long,
       sender: KeyPair
-  ): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] =
+  ): Gen[(IssueTransaction, ReissueTransaction, BurnTransaction)] = {
+    require(issueQuantity > 0 && reissueQuantity > 0 && burnQuantity > 0, "Asset amounts must be positive")
     for {
       (_, assetName, description, _, decimals, reissuable, iFee, timestamp) <- issueParamGen
       reissuable2                                                           <- Arbitrary.arbitrary[Boolean]
@@ -455,6 +459,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       reissue                                                               <- createReissue(sender, IssuedAsset(issue.assetId), reissueQuantity, reissuable2, fee, timestamp)
       burn                                                                  <- createBurn(sender, IssuedAsset(issue.assetId), burnQuantity, fee, timestamp)
     } yield (issue, reissue, burn)
+  }
 
   val issueWithInvalidReissuesGen: Gen[(IssueTransaction, ReissueTransaction, ReissueTransaction)] = for {
     (sender, assetName, description, quantity, decimals, _, iFee, timestamp) <- issueParamGen

@@ -47,13 +47,14 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
       staticInfo.nft
     )
 
-  private def getAssetVolumeUpdates(diff: Diff): Seq[UpdateAssetVolume] =
+  private def getAssetVolumeUpdates(diff: Diff, blockchainBefore: Blockchain): Seq[UpdateAssetVolume] =
     for {
-      ua <- diff.updatedAssets.toSeq
-      v  <- ua._2.right.toSeq
+      ua           <- diff.updatedAssets.toSeq
+      v            <- ua._2.right.toSeq
+      volumeBefore <- blockchainBefore.assetDescription(ua._1).map(_.totalVolume).toSeq
     } yield UpdateAssetVolume(
       ua._1,
-      v.volume
+      volumeBefore + v.volume
     )
 
   private def atomicStateUpdate(blockchainBefore: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
@@ -73,7 +74,7 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
           case _: IssueTransaction => getIssuedAssets(diff)
 
           case _: ReissueTransaction =>
-            val volumeUpdates = getAssetVolumeUpdates(diff)
+            val volumeUpdates = getAssetVolumeUpdates(diff, blockchainBefore)
             // reissuable: false in ReissueTransaction means that reissue has been forbidden
             val reissueForbidden = for {
               (a, info) <- diff.updatedAssets.headOption.toSeq
@@ -81,12 +82,12 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
             } yield ForbidReissue(a)
             volumeUpdates ++ reissueForbidden
 
-          case _: BurnTransaction => getAssetVolumeUpdates(diff)
+          case _: BurnTransaction => getAssetVolumeUpdates(diff, blockchainBefore)
 
           case _: InvokeScriptTransaction =>
             // inferring what happened in the invoke
             val issued        = getIssuedAssets(diff)
-            val volumeUpdates = getAssetVolumeUpdates(diff)
+            val volumeUpdates = getAssetVolumeUpdates(diff, blockchainBefore)
             val reissueForbidden = for {
               (a, info) <- diff.updatedAssets.toSeq
               v         <- info.right.toSeq
