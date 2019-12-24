@@ -33,15 +33,9 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
-    specsByCodes.get(msg.code) match {
-      case Some(spec) =>
-        spec.deserializeData(msg.data) match {
-          case Success(x) => out.add(x)
-          case Failure(e) => block(ctx, e)
-        }
-
-      case None =>
-        block(ctx, new IllegalArgumentException(s"Unknown message: $msg"))
+    specsByCodes(msg.code).deserializeData(msg.data) match {
+      case Success(x) => out.add(x)
+      case Failure(e) => block(ctx, e)
     }
   }
 

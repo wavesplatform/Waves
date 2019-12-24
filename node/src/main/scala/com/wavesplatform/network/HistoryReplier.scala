@@ -32,11 +32,11 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
   private val knownBlocks = CacheBuilder
     .newBuilder()
     .maximumSize(historyReplierSettings.maxBlockCacheSize)
-    .build(new CacheLoader[ByteStr, Block] {
+    .build(new CacheLoader[ByteStr, RawBytes] {
       override def load(key: ByteStr): RawBytes = RawBytes.fromBlock(ng.blockById(key).get)
     })
 
-  private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Any]]): Unit =
+  private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Message]]): Unit =
     loader.map {
       case Some(msg) if ctx.channel().isOpen => ctx.writeAndFlush(msg)
       case _                                 =>
