@@ -395,20 +395,19 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     }
   }
 
-  private def balancesJson(height: Int, addreses: Seq[String], assetId: Asset): ToResponseMarshallable =
-    if (addreses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
+  private def balancesJson(height: Int, addresses: Seq[String], assetId: Asset): ToResponseMarshallable =
+    if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
+    else if (height < 1 || height > blockchain.height) CustomValidationError(s"Illegal height: $height")
     else {
-      implicit val balancesWrites: Writes[(String, (Int, Long))] = Writes[(String, (Int, Long))] { b =>
-        Json.obj("id" -> b._1, "balance" -> b._2._2)
+      implicit val balancesWrites: Writes[(String, Long)] = Writes[(String, Long)] { b =>
+        Json.obj("id" -> b._1, "balance" -> b._2)
       }
 
-      val balances = addreses.flatMap { address =>
-        Address.fromString(address).right.toOption.flatMap { a =>
-          blockchain.balanceOnlySnapshots(a, height, assetId).map { balance =>
-            (address -> balance)
-          }
-        }
-      }
+      val balances = for {
+        addressStr <- addresses.toSet[String]
+        address    <- Address.fromString(addressStr).toOption
+      } yield blockchain.balanceOnlySnapshots(address, height, assetId).map(addressStr -> _._2).getOrElse(addressStr -> 0L)
+
       ToResponseMarshallable(balances)
     }
 

@@ -182,10 +182,16 @@ object AsyncHttpApi extends Assertions {
 
     def balance(address: String): Future[Balance] = get(s"/addresses/balance/$address").as[Balance]
 
-    def balances(height: Option[Int], addresses: Seq[String]): Future[Seq[Balance]] =
-      get(s"""/addresses/balance?${addresses.map(a => "address=" ++ a).mkString("&")}${height.fold("")(h => "&height="++h.toString)}""")
-        .as[Seq[JsObject]]
-        .map(_.map(b => Balance((b \ "id").as[String], 0, (b \ "balance").as[Long])))
+    def balances(height: Option[Int], addresses: Seq[String], asset: Option[String]): Future[Seq[Balance]] = {
+      for {
+        json <- postJson(
+          "/addresses/balance",
+          Json.obj("addresses" -> addresses) ++
+            height.fold(Json.obj())(h => Json.obj("height" -> h)) ++
+            asset.fold(Json.obj())(a => Json.obj("asset" -> a))
+        )
+      } yield Json.parse(json.getResponseBody).as[Seq[JsObject]].map(r => Balance((r \ "id").as[String], 0, (r \ "balance").as[Long]))
+    }
 
     def balanceDetails(address: String): Future[BalanceDetails] = get(s"/addresses/balance/details/$address").as[BalanceDetails]
 
@@ -682,8 +688,8 @@ object AsyncHttpApi extends Assertions {
 
     def accountBalance(acc: String): Future[Long] = n.balance(acc).map(_.balance)
 
-    def accountsBalances(height: Option[Int], accs: Seq[String]): Future[Seq[(String, Long)]] = {
-      n.balances(height,accs).map(_.map(b => (b.address, b.balance)))
+    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String]): Future[Seq[(String, Long)]] = {
+      n.balances(height,accounts, asset).map(_.map(b => (b.address, b.balance)))
     }
 
     def accountBalances(acc: String): Future[(Long, Long)] = {

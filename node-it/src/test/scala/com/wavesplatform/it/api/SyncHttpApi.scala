@@ -192,8 +192,8 @@ object SyncHttpApi extends Assertions {
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
 
-    def accountsBalances(height: Option[Int], accs: Seq[String]): Seq[(String, Long)] =
-      sync(async(n).accountsBalances(height, accs))
+    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
+      sync(async(n).accountsBalances(height, accounts, asset))
 
     def balanceDetails(acc: String): BalanceDetails = sync(async(n).balanceDetails(acc))
 
