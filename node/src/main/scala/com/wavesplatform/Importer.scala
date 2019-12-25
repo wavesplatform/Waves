@@ -2,6 +2,7 @@ package com.wavesplatform
 
 import java.io._
 import java.net.URL
+import java.util.zip.GZIPInputStream
 
 import akka.actor.ActorSystem
 import com.google.common.io.ByteStreams
@@ -43,7 +44,8 @@ object Importer extends ScorexLogging {
       blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
-      verify: Boolean = true
+      verify: Boolean = true,
+      gzip: Boolean = false
   )
 
   def parseOptions(args: Array[String]): Try[ImportOptions] = {
@@ -75,9 +77,12 @@ object Importer extends ScorexLogging {
             case f if Formats.isSupportedInImporter(f) => success
             case f                                     => failure(s"Unsupported format: $f")
           },
+        opt[Unit]('z', "gzip")
+          .text("Read from GZIP compressed file")
+          .action((_, c) => c.copy(gzip = true)),
         opt[Unit]('n', "no-verify")
           .text("Disable signatures verification")
-          .action((n, c) => c.copy(verify = false)),
+          .action((_, c) => c.copy(verify = false)),
         help("help").hidden()
       )
     }
@@ -140,7 +145,7 @@ object Importer extends ScorexLogging {
         override def wallet: Wallet = ???
         override def utx: UtxPool   = utxPool
 
-        override def broadcastTransaction(tx: Transaction) = ???
+        override def broadcastTransaction(tx: Transaction)                 = ???
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
@@ -160,7 +165,7 @@ object Importer extends ScorexLogging {
 
   def startImport(
       scheduler: Scheduler,
-      bis: BufferedInputStream,
+      bis: InputStream,
       blockchainUpdater: Blockchain,
       appendBlock: AppendBlock,
       importOptions: ImportOptions
@@ -228,8 +233,9 @@ object Importer extends ScorexLogging {
         override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
       }
 
-      fis <- initFileStream(importOptions.blockchainFile)
-      bis = new BufferedInputStream(fis)
+      fileIS <- initFileStream(importOptions.blockchainFile)
+      bufferedIS = new BufferedInputStream(fileIS)
+      decodedIS  = if (importOptions.gzip) new GZIPInputStream(bufferedIS) else bufferedIS
 
       scheduler = Schedulers.singleThread("appender")
       time      = new NTP(wavesSettings.ntpServer)
@@ -237,11 +243,10 @@ object Importer extends ScorexLogging {
       blockchainUpdated                         = ConcurrentSubject.publish[BlockchainUpdated]
       (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdated)
       extensions                                = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
-      _                                         = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
+      _                                         = startImport(scheduler, decodedIS, blockchainUpdater, appendBlock, importOptions)
     } yield () => {
       Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
-      bis.close()
-      fis.close()
+      decodedIS.close()
       time.close()
       utxPool.close()
       blockchainUpdated.onComplete()

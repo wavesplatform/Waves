@@ -1,6 +1,7 @@
 package com.wavesplatform
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
+import java.util.zip.GZIPOutputStream
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
@@ -36,7 +37,7 @@ object Exporter extends ScorexLogging {
   //noinspection ScalaStyle
   def main(args: Array[String]): Unit = {
     OParser.parse(commandParser, args, ExporterOptions()).foreach {
-      case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format) =>
+      case ExporterOptions(configFile, outputFileNamePrefix, exportHeight, format, gzip) =>
         implicit val reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default
 
         val settings = Application.loadApplicationConfig(Some(configFile))
@@ -47,10 +48,10 @@ object Exporter extends ScorexLogging {
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
-        val outputFilename = s"$outputFileNamePrefix-$height"
+        val outputFilename = s"$outputFileNamePrefix-$height${if (gzip) ".gz" else ""}"
         log.info(s"Output file: $outputFilename")
 
-        IO.createOutputStream(outputFilename) match {
+        IO.createOutputStream(outputFilename, gzip) match {
           case Success(output) =>
             var exportedBytes = 0L
             val bos           = new BufferedOutputStream(output)
@@ -77,8 +78,10 @@ object Exporter extends ScorexLogging {
   }
 
   private[this] object IO {
-    def createOutputStream(filename: String): Try[FileOutputStream] =
-      Try(new FileOutputStream(filename))
+    def createOutputStream(filename: String, gzip: Boolean): Try[OutputStream] = {
+      val result = Try(new BufferedOutputStream(new FileOutputStream(filename)))
+      if (gzip) result.map(new GZIPOutputStream(_)) else result
+    }
 
     def exportBlockToBinary(stream: OutputStream, blockchain: Blockchain, height: Int, legacy: Boolean): Int = {
       val maybeBlockBytes = blockchain.blockBytes(height)
@@ -124,10 +127,13 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
-                                                 outputFileNamePrefix: String = "blockchain",
-                                                 exportHeight: Option[Int] = None,
-                                                 format: String = Formats.Binary)
+  private[this] final case class ExporterOptions(
+      configFileName: File = new File("waves-testnet.conf"),
+      outputFileNamePrefix: String = "blockchain",
+      exportHeight: Option[Int] = None,
+      format: String = Formats.Binary,
+      gzip: Boolean = false
+  )
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -152,6 +158,9 @@ object Exporter extends ScorexLogging {
           case f if Formats.isSupported(f.toUpperCase) => success
           case f                                       => failure(s"Unsupported format: $f")
         },
+      opt[Unit]('z', "gzip")
+        .text("Compress file with GZIP")
+        .action((_, c) => c.copy(gzip = true)),
       help("help").hidden()
     )
   }
