@@ -1,8 +1,10 @@
 package com.wavesplatform
 
 import java.io._
+import java.net.URL
 
 import akka.actor.ActorSystem
+import com.google.common.io.ByteStreams
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
 import com.wavesplatform.account.{Address, AddressScheme}
@@ -38,7 +40,7 @@ object Importer extends ScorexLogging {
 
   final case class ImportOptions(
       configFile: File = new File("waves-testnet.conf"),
-      blockchainFile: File = new File("blockchain"),
+      blockchainFile: String = "blockchain",
       importHeight: Int = Int.MaxValue,
       format: String = Formats.Binary,
       verify: Boolean = true
@@ -57,7 +59,7 @@ object Importer extends ScorexLogging {
         opt[File]('c', "config")
           .text("Config file name")
           .action((f, c) => c.copy(configFile = f)),
-        opt[File]('i', "input-file")
+        opt[String]('i', "input-file")
           .required()
           .text("Blockchain data file name")
           .action((f, c) => c.copy(blockchainFile = f)),
@@ -88,13 +90,17 @@ object Importer extends ScorexLogging {
 
   def loadSettings(file: File): WavesSettings = Application.loadApplicationConfig(Some(file))
 
-  def initFileStream(file: File): Try[FileInputStream] =
-    Try(new FileInputStream(file)) match {
-      case t: Failure[FileInputStream] =>
-        log.error(s"Failed to open file '$file")
-        t
-      case t => t
-    }
+  def initFileStream(file: String): Try[InputStream] = {
+    val result = Try(file match {
+      case url if url.startsWith("http://") || url.startsWith("https://") || url.startsWith("ftp://") =>
+        new URL(url).openStream()
+      case _ =>
+        new FileInputStream(file)
+    })
+
+    result.failed.foreach(log.error(s"Failed to open $file", _))
+    result
+  }
 
   def initBlockchain(
       scheduler: Scheduler,
@@ -177,11 +183,11 @@ object Importer extends ScorexLogging {
     }
 
     while (!quit && counter < blocksToApply) {
-      val s1 = bis.read(lenBytes)
+      val s1 = ByteStreams.read(bis, lenBytes, 0, Ints.BYTES)
       if (s1 == Ints.BYTES) {
         val len    = Ints.fromByteArray(lenBytes)
         val buffer = new Array[Byte](len)
-        val s2     = bis.read(buffer)
+        val s2     = ByteStreams.read(bis, buffer, 0, len)
         if (s2 == len) {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
