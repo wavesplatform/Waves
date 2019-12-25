@@ -1,17 +1,17 @@
 package com.wavesplatform.state
 
 import com.typesafe.config.ConfigFactory
+import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
-import com.wavesplatform.events.{BlockAppended, BlockchainUpdateTriggers, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted}
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings, WavesSettings, loadConfig}
+import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
@@ -20,14 +20,10 @@ import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{NTPTime, RequestGen, WithDB}
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.Observer
-import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
 import scala.collection.mutable.ArrayBuffer
-import scala.concurrent.duration._
 
 class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
 
@@ -37,17 +33,6 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   private lazy val functionalitySettings = TestFunctionalitySettings.Stub
   private lazy val wavesSettings         = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
 
-  // to settings with NG enabled
-  private def withNg(settings: FunctionalitySettings): FunctionalitySettings =
-    settings.copy(
-      blockVersion3AfterHeight = 0,
-      preActivatedFeatures = settings.preActivatedFeatures ++ Map(BlockchainFeatures.NG.id -> 0)
-    )
-  private def withNg(settings: WavesSettings): WavesSettings =
-    settings.copy(
-      blockchainSettings = settings.blockchainSettings.copy(functionalitySettings = withNg(settings.blockchainSettings.functionalitySettings))
-    )
-
   def baseTest(
       gen: Time => Gen[(KeyPair, Seq[Block])],
       enableNg: Boolean = false,
@@ -56,7 +41,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       f: (BlockchainUpdaterImpl, KeyPair) => Unit
   ): Unit = {
     val (fs, settings) =
-      if (enableNg) (withNg(functionalitySettings), withNg(wavesSettings)) else (functionalitySettings, wavesSettings)
+      if (enableNg) (enableNG(functionalitySettings), enableNG(wavesSettings)) else (functionalitySettings, wavesSettings)
 
     val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers)
@@ -302,8 +287,8 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         val (triggersMock, triggerCalls) = blockchainTriggersMock
 
         val defaultWriter =
-          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, withNg(functionalitySettings), dbSettings)
-        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, withNg(wavesSettings), ntpTime, triggersMock)
+          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings), dbSettings)
+        val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock)
 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get

@@ -23,7 +23,7 @@ final case class Issue(
 ) extends AssetStateUpdate
 final case class UpdateAssetVolume(
     asset: IssuedAsset,
-    volume: BigInt
+    newVolume: BigInt
 ) extends AssetStateUpdate
 final case class ForbidReissue(asset: IssuedAsset) extends AssetStateUpdate
 final case class SetAssetScript(

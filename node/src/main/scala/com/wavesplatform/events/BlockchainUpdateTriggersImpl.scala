@@ -86,14 +86,20 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
 
           case _: InvokeScriptTransaction =>
             // inferring what happened in the invoke
-            val issued        = getIssuedAssets(diff)
-            val volumeUpdates = getAssetVolumeUpdates(diff, blockchainBefore)
+            val issued = getIssuedAssets(diff)
+            /*
+             When the asset has been issued and reussied/burned in one Invoke transaction,
+             at the moment of reissue it has not yet been added to the blockchain.
+             This intermediary `emulated` blockchain allows for querying newly issued assets.
+             */
+            val bcWithIssued  = CompositeBlockchain(blockchainBefore, Some(Diff.empty.copy(issuedAssets = diff.issuedAssets)))
+            val volumeUpdates = getAssetVolumeUpdates(diff, bcWithIssued)
             val reissueForbidden = for {
               (a, info) <- diff.updatedAssets.toSeq
               v         <- info.right.toSeq
               // is asset became non-reissuable after the invoke, but was reissuable before
               if (!v.isReissuable &&
-                blockchainBefore.assetDescription(a).forall(_.reissuable))
+                bcWithIssued.assetDescription(a).forall(_.reissuable))
             } yield ForbidReissue(a)
             issued ++ volumeUpdates ++ reissueForbidden
 

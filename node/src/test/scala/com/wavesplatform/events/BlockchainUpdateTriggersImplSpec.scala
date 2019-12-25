@@ -4,16 +4,17 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
+import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.{NoShrink, RequestGen}
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.{BlockGen, NoShrink, RequestGen, TestHelpers, crypto}
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
@@ -22,11 +23,26 @@ import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.duration._
 
-class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with RequestGen with ScalaCheckPropertyChecks with NoShrink with WithDomain {
+class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with WithBlockchain {
+  override protected def settings: WavesSettings = TestHelpers.enableNG(super.settings)
+
+  // add a genesis block to the blockchain
+  private val master: KeyPair = accountGen.sample.get
+  private val genesis         = TestBlock.create(0, Seq(GenesisTransaction.create(master, ENOUGH_AMT, 0).explicitGet()), master)
+  override protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
+    blockchainUpdater.processBlock(genesis).explicitGet()
+    super.initBlockchain(blockchainUpdater)
+  }
 
   private val sigGen: Gen[ByteStr]   = bytes64gen.map(ByteStr.apply)
   private val heightGen: Gen[Int]    = Gen.choose(1, 1000)
   private val assetAmtGen: Gen[Long] = Gen.oneOf(Gen.const[Long](1), Gen.choose[Long](2, ENOUGH_AMT))
+
+  private def microBlockGen(txs: Seq[Transaction], signer: KeyPair): Gen[MicroBlock] =
+    for {
+      sig <- byteArrayGen(crypto.SignatureLength).map(ByteStr.apply)
+      mb = MicroBlock.buildAndSign(3.toByte, signer, txs, genesis.signature, sig).explicitGet()
+    } yield mb
 
   private def produceEvent(useTrigger: BlockchainUpdateTriggers => Unit): BlockchainUpdated = {
     val evts = ReplaySubject[BlockchainUpdated]()
@@ -36,32 +52,36 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
     evts.toListL.runSyncUnsafe(500.milliseconds).head
   }
 
-  private def appendBlock(b: Block, bc: Blockchain): BlockAppended =
-    produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b, bc), bc)) match {
+  private def detailedDiffFromBlock(b: Block): DetailedDiff =
+    BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
+
+  private def appendBlock(b: Block): BlockAppended =
+    produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b), blockchain)) match {
       case ba: BlockAppended => ba
       case _                 => fail()
     }
 
-  private def withBlockchainAndGenesis[A](test: (Blockchain, KeyPair) => A): A =
-    withDomain() { d =>
-      val masterAccount = accountGen.sample.get
-      val genesisBlock = TestBlock
-        .create(0, Seq(GenesisTransaction.create(masterAccount, ENOUGH_AMT, 0).explicitGet()))
-      d.blockchainUpdater.processBlock(genesisBlock).explicitGet()
-      test(d.blockchainUpdater, masterAccount)
+  private def appendMicroBlock(mb: MicroBlock): MicroBlockAppended = {
+    val dd = BlockDiffer.fromMicroBlock(blockchain, Some(0), mb, 1, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
+    produceEvent(_.onProcessMicroBlock(mb, dd, blockchain)) match {
+      case mba: MicroBlockAppended => mba
+      case _                       => fail()
     }
+  }
 
-  private def detailedDiffFromBlock(b: Block, bc: Blockchain): DetailedDiff =
-    BlockDiffer.fromBlock(bc, None, b, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
+  /**
+    * Tests the assertion both for transactions added in a block and in a microblock
+    */
+  private def testTxsStateUpdates[A](txs: Seq[Transaction])(assertion: Seq[StateUpdate] => A): Unit = {
+    val b = blockGen(txs, master).sample.get
+    assertion(appendBlock(b).transactionStateUpdates)
 
-  private def detailedDiffFromMicroBlock(mb: MicroBlock, bc: Blockchain): DetailedDiff =
-    BlockDiffer.fromMicroBlock(bc, Some(0), mb, 1, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
+    val mb = microBlockGen(txs, master).sample.get
+    assertion(appendMicroBlock(mb).transactionStateUpdates)
+  }
 
-  private def areBlocksEqual(b1: Block, b2: Block): Boolean =
-    b1.signature == b2.signature && b1.transactionData == b2.transactionData
-
-  "rollbacks" - {
-    "block rollback produces correct events in the observer" in forAll(sigGen, heightGen) { (sig, height) =>
+  "rollbacks correctly" - {
+    "block" in forAll(sigGen, heightGen) { (sig, height) =>
       produceEvent(_.onRollback(sig, height)) match {
         case RollbackCompleted(toId, toHeight) =>
           toId shouldBe sig
@@ -70,7 +90,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
       }
     }
 
-    "microblock rollback produces correct events in the observer" in forAll(sigGen, heightGen) { (sig, height) =>
+    "microblock" in forAll(sigGen, heightGen) { (sig, height) =>
       produceEvent(_.onMicroBlockRollback(sig, height)) match {
         case MicroBlockRollbackCompleted(toId, toHeight) =>
           toId shouldBe sig
@@ -80,58 +100,88 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
     }
   }
 
-  "appends" - {
-    "empty block" in withBlockchainAndGenesis { (bc, _) =>
-      val b                                          = TestBlock.create(1, Seq.empty)
-      val BlockAppended(toId, toHeight, block, _, _) = appendBlock(b, bc)
+  "appends correctly" - {
+    "empty block" in forAll {
+      for {
+        b <- blockGen(Seq.empty, master)
+        ba = appendBlock(b)
+      } yield (b, ba)
+    } {
+      case (b, BlockAppended(toId, toHeight, block, _, _)) =>
+        toId shouldBe b.signature
+        toHeight shouldBe blockchain.height + 1
 
-      toId shouldBe b.signature
-      toHeight shouldBe bc.height + 1
-      areBlocksEqual(b, block) shouldBe true
+        block.signature shouldBe b.signature
+        block.transactionData shouldBe b.transactionData
     }
 
-    "block with balance updates" in withBlockchainAndGenesis { (bc, master) =>
-      forAll {
+    "microblock with one transaction" in forAll {
+      for {
+        tx <- dataTransactionGen(0)
+        mb <- microBlockGen(Seq(tx), master)
+        mba = appendMicroBlock(mb)
+      } yield (mb, mba)
+    } {
+      case (mb, MicroBlockAppended(toId, toHeight, microBlock, _, _)) =>
+        toId shouldBe mb.totalResBlockSig
+        toHeight shouldBe blockchain.height
+
+        microBlock.signature shouldBe mb.signature
+        microBlock.transactionData shouldBe mb.transactionData
+    }
+
+    "including correct miner rewards for" - {
+      "block" in forAll {
         for {
-          recipient <- accountGen.map(_.publicKey.toAddress)
-          miner     <- accountGen
-          amt       <- Gen.choose(1, ENOUGH_AMT / 3)
-          tx        <- transferGeneratorPV2(1, master, recipient, amt)
-        } yield (recipient, miner, tx)
+          miner <- accountGen
+          tx    <- dataTransactionGen(0)
+          mb    <- blockGen(Seq(tx), miner)
+          ba = appendBlock(mb)
+        } yield (tx, miner, ba.blockStateUpdate)
+      } { case (tx, miner, su) => su.balances.find(_._1 == miner.publicKey.toAddress).get._3 shouldBe 0.4 * tx.fee }
+
+      "microblock, giving reward to a key block miner" in forAll {
+        for {
+          tx <- dataTransactionGen(0)
+          mb <- microBlockGen(Seq(tx), master)
+          mba = appendMicroBlock(mb)
+        } yield (tx, mba.microBlockStateUpdate)
       } {
-        case (recipient, miner, tx) =>
-          val b                                                                 = TestBlock.create(miner, Seq(tx))
-          val BlockAppended(_, _, _, blockStateUpdate, transactionStateUpdates) = appendBlock(b, bc)
-
-          // miner reward
-          blockStateUpdate.balances.head match {
-            case (address, asset, newBalance) =>
-              address shouldBe miner.publicKey.toAddress
-              asset shouldBe Waves
-              newBalance shouldBe tx.fee
-          }
-
-          // transferred Waves
-          val masterUpd = transactionStateUpdates.head.balances.find(_._1 == master.publicKey.toAddress).get
-          masterUpd._3 shouldBe (ENOUGH_AMT - tx.amount - tx.fee)
-
-          val recipientUpd = transactionStateUpdates.head.balances.find(_._1 == recipient).get
-          recipientUpd._3 shouldBe tx.amount
+        case (tx, su) =>
+          su.balances.find(_._1 == master.publicKey.toAddress).get._3 shouldBe (0.4 * tx.fee + ENOUGH_AMT)
       }
     }
 
-    "block with data entries" in withBlockchainAndGenesis { (bc, master) =>
-      forAll(dataTransactionGen) { tx =>
-        val b = TestBlock.create(master, Seq(tx))
-        appendBlock(b, bc).transactionStateUpdates.head.dataEntries.map(_._2).sortBy(_.key) shouldBe tx.data.sortBy(_.key)
+    "block/microblock with balance updates from transfer txs" in forAll {
+      for {
+        sender        <- accountGen
+        recipient     <- accountGen
+        master2sender <- transferGeneratorPV2(1, master, sender, ENOUGH_AMT / 3)
+        fee           <- Gen.choose(1, master2sender.amount - 1)
+        sender2recipient = TransferTransaction
+          .selfSigned(2.toByte, sender, recipient, Waves, master2sender.amount - fee, Waves, fee, None, 2)
+          .explicitGet()
+      } yield (sender, recipient, master2sender, sender2recipient)
+    } {
+      case (sender, recipient, master2sender, sender2recipient) =>
+        testTxsStateUpdates(Seq(master2sender, sender2recipient)) { transactionStateUpdates =>
+          transactionStateUpdates.last.balances.find(_._1 == sender.publicKey.toAddress).get._3 shouldBe 0
+
+          transactionStateUpdates.last.balances.find(_._1 == recipient.publicKey.toAddress).get._3 shouldBe
+            sender2recipient.amount
+        }
+    }
+
+    "block/microblock with a data transaction" in forAll(dataTransactionGen) { tx =>
+      testTxsStateUpdates(Seq(tx)) {
+        _.head.dataEntries.map(_._2).sortBy(_.key) shouldBe tx.data.sortBy(_.key)
       }
     }
 
-    "asset state updates" - {
-      "issue" in withBlockchainAndGenesis { (bc, master) =>
-        forAll(issueV2TransactionGen(Gen.const(master))) { tx =>
-          val b = TestBlock.create(master, Seq(tx))
-          appendBlock(b, bc).transactionStateUpdates.head.assets.head match {
+    "blocks/microblocks with correct asset state updates by" - {
+      "issue transaction" in forAll(issueV2TransactionGen(Gen.const(master))) { tx =>
+        testTxsStateUpdates(Seq(tx)) {
+          _.head.assets.head match {
             case Issue(asset, name, description, decimals, reissuable, volume, script, nft) =>
               asset.id shouldBe tx.id()
               name.left.get shouldBe tx.nameBytes
@@ -146,17 +196,16 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
         }
       }
 
-      "reissue" in withBlockchainAndGenesis { (bc, master) =>
-        forAll {
-          for {
-            issueAmt            <- assetAmtGen
-            reissueAmt          <- assetAmtGen
-            (issue, reissue, _) <- issueReissueBurnGeneratorP(issueAmt, reissueAmt, 1, master).suchThat(_._1.reissuable)
-          } yield (issue, reissue)
-        } {
-          case (issue, reissue) =>
-            val b              = TestBlock.create(master, Seq(issue, reissue))
-            val reissueUpdates = appendBlock(b, bc).transactionStateUpdates.last.assets
+      "reissue transaction" in forAll {
+        for {
+          issueAmt            <- assetAmtGen
+          reissueAmt          <- assetAmtGen
+          (issue, reissue, _) <- issueReissueBurnGeneratorP(issueAmt, reissueAmt, 1, master).suchThat(_._1.reissuable)
+        } yield (issue, reissue)
+      } {
+        case (issue, reissue) =>
+          testTxsStateUpdates(Seq(issue, reissue)) { transactionStateUpdates =>
+            val reissueUpdates = transactionStateUpdates.last.assets
 
             // update volume
             reissueUpdates.exists {
@@ -175,47 +224,41 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
                 case _ => false
               } shouldBe true
             }
-        }
+          }
       }
 
-      "burn" in withBlockchainAndGenesis { (bc, master) =>
-        forAll {
-          for {
-            issueAmt         <- assetAmtGen
-            burnAmt          <- Gen.choose(1, issueAmt)
-            (issue, _, burn) <- issueReissueBurnGeneratorP(issueAmt, 1, burnAmt, master)
-          } yield (issue, burn)
-        } {
-          case (issue, burn) =>
-            val b = TestBlock.create(master, Seq(issue, burn))
-            appendBlock(b, bc).transactionStateUpdates.last.assets.head match {
+      "burn transaction" in forAll {
+        for {
+          issueAmt         <- assetAmtGen
+          burnAmt          <- Gen.choose(1, issueAmt)
+          (issue, _, burn) <- issueReissueBurnGeneratorP(issueAmt, 1, burnAmt, master)
+        } yield (issue, burn)
+      } {
+        case (issue, burn) =>
+          testTxsStateUpdates(Seq(issue, burn)) {
+            _.last.assets.head match {
               case UpdateAssetVolume(_, newVolume) =>
                 newVolume shouldBe (issue.quantity - burn.quantity)
               case _ => fail()
             }
-        }
+          }
       }
 
-      "set script" in withBlockchainAndGenesis { (bc, master) =>
-        forAll(issueAndSetAssetScriptGen(master)) {
-          case (issue, setAssetScript) =>
-            val b = TestBlock.create(master, Seq(issue, setAssetScript))
-            appendBlock(b, bc).transactionStateUpdates.last.assets.head match {
+      "set asset script transaction" in forAll(issueAndSetAssetScriptGen(master)) {
+        case (issue, setAssetScript) =>
+          testTxsStateUpdates(Seq(issue, setAssetScript)) {
+            _.last.assets.head match {
               case SetAssetScript(asset, script) =>
                 asset.id shouldBe issue.id()
                 script shouldBe setAssetScript.script
               case _ => fail()
             }
-        }
+          }
       }
 
-      "set sponsorship" in withBlockchainAndGenesis { (bc, master) =>
-        forAll(sponsorFeeCancelSponsorFeeGen(master)) {
-          case (issue, setSponsorship, _, cancelSponsorship) =>
-            val txs                                                = Seq(issue, setSponsorship, cancelSponsorship)
-            val b                                                  = TestBlock.create(master, txs)
-            val BlockAppended(_, _, _, _, transactionStateUpdates) = appendBlock(b, bc)
-
+      "sponsor fee transaction " in forAll(sponsorFeeCancelSponsorFeeGen(master)) {
+        case (issue, setSponsorship, _, cancelSponsorship) =>
+          testTxsStateUpdates(Seq(issue, setSponsorship, cancelSponsorship)) { transactionStateUpdates =>
             // set sponsoprship
             transactionStateUpdates(1).assets.head match {
               case SetSponsorship(asset, sponsorship) =>
@@ -231,10 +274,43 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Reque
                 sponsorship shouldBe cancelSponsorship.minSponsoredAssetFee
               case _ => fail()
             }
-        }
+          }
       }
 
-      // @todo invoke script with assets actions?
+      "invokeScript transaction (diff emulated by issue, reussue and burn txs)" in forAll {
+        for {
+          issueAmt            <- assetAmtGen
+          reissueAmt          <- assetAmtGen
+          (issue, reissue, _) <- issueReissueBurnGeneratorP(issueAmt, reissueAmt, 1, master).suchThat(_._1.reissuable)
+          invoke              <- invokeScriptGen(Gen.const(Seq.empty))
+        } yield (issue, reissue, invoke)
+      } {
+        case (issue, reissue, invoke) =>
+          // create a block with issue and reissue txs, getting their diffs
+          val assetsDummyBlock     = TestBlock.create(master, Seq(issue, reissue))
+          val assetsDummyBlockDiff = detailedDiffFromBlock(assetsDummyBlock)
+
+          val invokeBlock = TestBlock.create(master, Seq(invoke))
+          // merge issue/reissue diffs as if they were produced by a single invoke
+          val invokeTxDiff = assetsDummyBlockDiff.transactionDiffs
+            .foldLeft(Diff.empty)(Diff.diffMonoid.combine)
+            .copy(transactions = Map(invoke.id() -> (invoke, Set(master))))
+          val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
+
+          produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, blockchain)) match {
+            case ba: BlockAppended =>
+              val i = ba.transactionStateUpdates.head.assets.collectFirst { case u: Issue => u }.get
+              i.asset.id shouldBe issue.id()
+
+              val uav = ba.transactionStateUpdates.head.assets.collectFirst { case u: UpdateAssetVolume => u }
+              uav.map(_.newVolume) shouldBe Some((BigInt(issue.quantity) + BigInt(reissue.quantity)))
+
+              // if asset reussue has been forbidden, should get a corresponding event
+              val fr: Option[ForbidReissue] = ba.transactionStateUpdates.head.assets.collectFirst { case u: ForbidReissue => u }
+              fr.isDefined shouldBe !reissue.reissuable
+            case _ => fail()
+          }
+      }
     }
   }
 }
