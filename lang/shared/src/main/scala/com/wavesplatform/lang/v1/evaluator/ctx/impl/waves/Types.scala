@@ -28,9 +28,9 @@ object Types {
   )
 
   def assetType(version: StdLibVersion) = {
-    val v4VariableFields =
-      if (version >= V4) List("lastUpdatedAt" -> LONG, "minSponsoredFee" -> optionLong)
-      else List("sponsored" -> BOOLEAN)
+    val sponsoredFields =
+      if (version >= V4) "minSponsoredFee" -> optionLong
+      else "sponsored" -> BOOLEAN
 
     CASETYPEREF(
       "Asset",
@@ -42,7 +42,7 @@ object Types {
         "issuerPublicKey" -> BYTESTR,
         "reissuable"      -> BOOLEAN,
         "scripted"        -> BOOLEAN
-      ) ::: v4VariableFields
+      ) :+ sponsoredFields
     )
   }
 

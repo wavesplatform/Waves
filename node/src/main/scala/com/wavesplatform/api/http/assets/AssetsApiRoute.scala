@@ -435,7 +435,6 @@ object AssetsApiRoute {
           case 0           => JsNull
           case sponsorship => JsNumber(sponsorship)
         }),
-        "lastUpdatedAt" -> JsNumber(description.lastUpdatedAt),
         "originTransactionId" -> JsString(description.source.toString)
       ) ++ script.toSeq.map { script =>
         "scriptDetails" -> Json.obj(

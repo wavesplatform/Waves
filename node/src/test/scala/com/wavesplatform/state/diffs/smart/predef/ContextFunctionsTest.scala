@@ -330,18 +330,11 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           val assetId = issueTx.assetId
 
-          val variableDefs =
+          val sponsored =
             if (version >= V4)
-              s"""
-                 | let lastUpdatedAt   = aInfo.lastUpdatedAt   == transactionHeightById(base58'$assetId').value()
-                 | let minSponsoredFee = aInfo.minSponsoredFee == $sponsoredFee
-              """.stripMargin
+              s"let sponsored = aInfo.minSponsoredFee == $sponsoredFee"
             else
               s"let sponsored = aInfo.sponsored == true"
-
-
-          val variableTransferChecks =
-            if (version >= V4) "lastUpdatedAt && minSponsoredFee" else "sponsored"
 
           val script = ScriptCompiler
             .compile(
@@ -359,7 +352,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
               | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
               | let reissuable      = aInfo.reissuable == $reissuable
-              | $variableDefs
+              | $sponsored
               |
               | id              &&
               | quantity        &&
@@ -368,7 +361,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | issuerPublicKey &&
               | scripted        &&
               | reissuable      &&
-              | $variableTransferChecks
+              | sponsored
               |
             """.stripMargin,
               estimator

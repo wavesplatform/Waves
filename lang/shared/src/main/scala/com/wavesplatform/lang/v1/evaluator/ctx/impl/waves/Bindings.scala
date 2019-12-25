@@ -390,15 +390,15 @@ object Bindings {
         "scripted"        -> sAInfo.scripted
       )
 
-    val v4VariableFields: Map[String, EVALUATED] =
+    val sponsoredField: (String, EVALUATED) =
       if (version >= V4)
-        Map("lastUpdatedAt" -> sAInfo.lastUpdatedAt, "minSponsoredFee" -> sAInfo.minSponsoredFee)
+        "minSponsoredFee" -> sAInfo.minSponsoredFee
       else
-        Map("sponsored" -> sAInfo.minSponsoredFee.isDefined)
+        "sponsored" -> sAInfo.minSponsoredFee.isDefined
 
     CaseObj(
       assetType(version),
-      commonFields ++ v4VariableFields
+      commonFields + sponsoredField
     )
   }
 
