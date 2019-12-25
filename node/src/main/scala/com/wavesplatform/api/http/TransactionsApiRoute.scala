@@ -93,7 +93,7 @@ case class TransactionsApiRoute(
       }
   }
 
-  @Path("/status/{id}")
+  @Path("/status")
   @ApiOperation(value = "Transaction status", notes = "Get a transaction status by its ID", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
