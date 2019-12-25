@@ -66,7 +66,7 @@ case class AssetDescription(
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
-    infoUpdatedAt: Height,
+    lastUpdatedAt: Height,
     script: Option[Script],
     sponsorship: Long,
     nft: Boolean

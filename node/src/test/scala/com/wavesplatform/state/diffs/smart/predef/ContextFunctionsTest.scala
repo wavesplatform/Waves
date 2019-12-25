@@ -333,7 +333,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val variableDefs =
             if (version >= V4)
               s"""
-                 | let infoUpdatedAt   = aInfo.infoUpdatedAt   == transactionHeightById(base58'$assetId').value()
+                 | let lastUpdatedAt   = aInfo.lastUpdatedAt   == transactionHeightById(base58'$assetId').value()
                  | let minSponsoredFee = aInfo.minSponsoredFee == $sponsoredFee
               """.stripMargin
             else
@@ -341,7 +341,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
 
           val variableTransferChecks =
-            if (version >= V4) "infoUpdatedAt && minSponsoredFee" else "sponsored"
+            if (version >= V4) "lastUpdatedAt && minSponsoredFee" else "sponsored"
 
           val script = ScriptCompiler
             .compile(
