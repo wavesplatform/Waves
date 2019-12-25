@@ -11,6 +11,5 @@ case class ScriptAssetInfo(
   issuerPk:      ByteStr,
   reissuable:    Boolean,
   scripted:      Boolean,
-  minSponsoredFee: Option[Long],
-  lastUpdatedAt: Long
+  minSponsoredFee: Option[Long]
 )
