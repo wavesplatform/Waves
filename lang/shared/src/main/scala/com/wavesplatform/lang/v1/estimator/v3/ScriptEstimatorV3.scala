@@ -10,8 +10,14 @@ import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
 import monix.eval.Coeval
+import monix.execution.misc.ThreadLocal
 
 object ScriptEstimatorV3 extends ScriptEstimator {
+  private val isInterrupted: ThreadLocal[Boolean] = ThreadLocal(false)
+
+  def interrupt(): Unit =
+    isInterrupted.set(true)
+
   override def apply(
     vars:  Set[String],
     funcs: Map[FunctionHeader, Coeval[Long]],
@@ -21,17 +27,21 @@ object ScriptEstimatorV3 extends ScriptEstimator {
     evalExpr(expr).run(EstimatorContext(f)).value._2
   }
 
-  private def evalExpr(t: EXPR): EvalM[Long] =
-    t match {
-      case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
-      case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
-      case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
-      case REF(str)                    => markRef(str)
-      case _: EVALUATED                => const(1L)
-      case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
-      case GETTER(expr, _)             => evalGetter(expr)
-      case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
-    }
+  private def evalExpr(t: EXPR): EvalM[Long] = {
+    if (isInterrupted.get())
+      raiseError[Id, EstimatorContext, ExecutionError, Long]("Script estimation was interrupted")
+    else
+      t match {
+        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
+        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
+        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
+        case REF(str)                    => markRef(str)
+        case _: EVALUATED                => const(1L)
+        case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
+        case GETTER(expr, _)             => evalGetter(expr)
+        case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
+      }
+  }
 
   private def evalHoldingFuncs(expr: EXPR): EvalM[Long] =
     for {
