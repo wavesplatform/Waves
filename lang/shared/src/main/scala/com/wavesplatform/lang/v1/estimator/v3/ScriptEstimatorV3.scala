@@ -28,9 +28,10 @@ object ScriptEstimatorV3 extends ScriptEstimator {
   }
 
   private def evalExpr(t: EXPR): EvalM[Long] = {
-    if (isInterrupted.get())
+    if (isInterrupted.get()) {
+      isInterrupted.set(false)
       raiseError("Script estimation was interrupted")
-    else
+    } else
       t match {
         case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
         case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
