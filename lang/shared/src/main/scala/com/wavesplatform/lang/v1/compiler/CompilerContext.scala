@@ -10,7 +10,7 @@ import shapeless._
 
 case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
   private lazy val allFuncDefs: FunctionTypes = predefTypes.collect {
-    case (_, t @ CASETYPEREF(typeName, fields)) =>
+    case (_, t @ CASETYPEREF(typeName, fields, false)) =>
       typeName -> List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName)))
   } ++ functionDefs
 

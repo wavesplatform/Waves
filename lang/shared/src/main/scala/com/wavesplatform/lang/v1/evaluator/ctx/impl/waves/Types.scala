@@ -133,7 +133,7 @@ object Types {
       List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType)
     )
 
-  val issueScriptType = CASETYPEREF(FieldNames.IssueScript, Nil)
+  val issueScriptType = CASETYPEREF(FieldNames.IssueScript, Nil, true)
 
   val issueActionType =
     CASETYPEREF(
@@ -375,8 +375,8 @@ object Types {
     )
   )
 
-  val buyType  = CASETYPEREF("Buy", List.empty)
-  val sellType = CASETYPEREF("Sell", List.empty)
+  val buyType  = CASETYPEREF("Buy", List.empty, true)
+  val sellType = CASETYPEREF("Sell", List.empty, true)
 
   val ordTypeType = UNION(buyType, sellType)
 

@@ -671,13 +671,13 @@ object PureContext {
     throwNoMessage
   ) ++ operators
 
-  val roundCeiling  = CASETYPEREF("Ceiling", List.empty)
-  val roundFloor    = CASETYPEREF("Floor", List.empty)
-  val roundHalfEven = CASETYPEREF("HalfEven", List.empty)
-  val roundDown     = CASETYPEREF("Down", List.empty)
-  val roundUp       = CASETYPEREF("Up", List.empty)
-  val roundHalfUp   = CASETYPEREF("HalfUp", List.empty)
-  val roundHalfDown = CASETYPEREF("HalfDown", List.empty)
+  val roundCeiling  = CASETYPEREF("Ceiling", List.empty, true)
+  val roundFloor    = CASETYPEREF("Floor", List.empty, true)
+  val roundHalfEven = CASETYPEREF("HalfEven", List.empty, true)
+  val roundDown     = CASETYPEREF("Down", List.empty, true)
+  val roundUp       = CASETYPEREF("Up", List.empty, true)
+  val roundHalfUp   = CASETYPEREF("HalfUp", List.empty, true)
+  val roundHalfDown = CASETYPEREF("HalfDown", List.empty, true)
   val rounds        = UNION(roundDown, roundUp, roundHalfUp, roundHalfDown, roundCeiling, roundFloor, roundHalfEven)
 
   def roundMode(m: EVALUATED): BaseGlobal.Rounds = {
