@@ -105,7 +105,13 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
 
           case t: SetAssetScriptTransaction => Seq(SetAssetScript(t.asset, t.script))
 
-          case t: SponsorFeeTransaction => Seq(SetSponsorship(t.asset, t.minSponsoredAssetFee))
+          case t: SponsorFeeTransaction =>
+            Seq(
+              t.minSponsoredAssetFee match {
+                case Some(fee) => StartSponsorship(t.asset, fee)
+                case None      => CancelSponsorship(t.asset)
+              }
+            )
 
           case _ => Seq.empty
         }

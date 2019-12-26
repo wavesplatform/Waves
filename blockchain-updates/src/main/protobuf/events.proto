@@ -63,8 +63,9 @@ message StateUpdate {
             UpdateAssetVolume update_asset_volume = 3;
             ForbidReissue forbid_reissue = 4;
             SetAssetScript set_asset_script = 5;
-            SetSponsorship set_sponsorship = 6;
-            UpdateAssetInfo update_asset_info = 7;
+            StartSponsorship start_sponsorship = 6;
+            CancelSponsorship cancel_sponsorship = 7;
+            UpdateAssetInfo update_asset_info = 8;
         }
 
         message Issue {
@@ -106,9 +107,11 @@ message StateUpdate {
             Script script = 1;
         }
 
-        message SetSponsorship {
+        message StartSponsorship {
             int64 sponsorship = 1;
         }
+
+        message CancelSponsorship {}
 
         message UpdateAssetInfo {
             string name = 1;

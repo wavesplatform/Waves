@@ -96,8 +96,9 @@ object PBEvents {
             )
           )
         case events.ForbidReissue(_) => AssetStateUpdate.Type.ForbidReissue(AssetStateUpdate.ForbidReissue())
-        case events.SetSponsorship(_, sponsorship) =>
-          AssetStateUpdate.Type.SetSponsorship(AssetStateUpdate.SetSponsorship(sponsorship = sponsorship.getOrElse(0)))
+        case events.StartSponsorship(_, sponsorship) =>
+          AssetStateUpdate.Type.StartSponsorship(AssetStateUpdate.StartSponsorship(sponsorship))
+        case events.CancelSponsorship(_) => AssetStateUpdate.Type.CancelSponsorship(AssetStateUpdate.CancelSponsorship())
         case events.SetAssetScript(_, script) =>
           AssetStateUpdate.Type.SetAssetScript(AssetStateUpdate.SetAssetScript(script = script.map(PBTransactions.toPBScript)))
         case events.UpdateAssetInfo(_, name, description) =>

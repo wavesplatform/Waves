@@ -261,17 +261,16 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
           testTxsStateUpdates(Seq(issue, setSponsorship, cancelSponsorship)) { transactionStateUpdates =>
             // set sponsoprship
             transactionStateUpdates(1).assets.head match {
-              case SetSponsorship(asset, sponsorship) =>
+              case StartSponsorship(asset, sponsorship) =>
                 asset.id shouldBe issue.id()
-                sponsorship shouldBe setSponsorship.minSponsoredAssetFee
+                sponsorship shouldBe setSponsorship.minSponsoredAssetFee.get
               case _ => fail()
             }
 
             // cancel sponsorship
             transactionStateUpdates.last.assets.head match {
-              case SetSponsorship(asset, sponsorship) =>
+              case CancelSponsorship(asset) =>
                 asset.id shouldBe issue.id()
-                sponsorship shouldBe cancelSponsorship.minSponsoredAssetFee
               case _ => fail()
             }
           }
