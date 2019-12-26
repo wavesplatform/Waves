@@ -14,7 +14,7 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
-import com.wavesplatform.{BlockGen, NoShrink, RequestGen, TestHelpers, crypto}
+import com.wavesplatform.{BlockGen, TestHelpers, crypto}
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
@@ -294,7 +294,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
           // merge issue/reissue diffs as if they were produced by a single invoke
           val invokeTxDiff = assetsDummyBlockDiff.transactionDiffs
             .foldLeft(Diff.empty)(Diff.diffMonoid.combine)
-            .copy(transactions = Map(invoke.id() -> (invoke, Set(master))))
+            .copy(transactions = Map((invoke.id(), (invoke, Set(master)))))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
           produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, blockchain)) match {
