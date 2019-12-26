@@ -75,7 +75,7 @@ package object utils {
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext[Environment, Id]): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
-      case (typeName, CASETYPEREF(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
+      case (typeName, CASETYPEREF(_, fields, hidden)) if (!hidden || version < V4) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>

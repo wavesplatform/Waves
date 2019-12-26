@@ -11,6 +11,10 @@ import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
 
+import scala.concurrent.duration._
+import scala.concurrent.ExecutionContext.Implicits.global
+import scala.concurrent.Future
+
 trait GrpcIntegrationSuiteWithThreeAddress
     extends BeforeAndAfterAll
     with Matchers
@@ -78,7 +82,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
 
       val height = nodes.map(_.grpc.height).max
 
-      withClue(s"waitForHeight(${height + 1})") {
+      withClue(s"waitForHeight(${height + 2})") {
+        nodes.foreach(n => n.grpc.waitForHeight(height + 1))
         nodes.foreach(n => n.grpc.waitForHeight(height + 2))
       }
 

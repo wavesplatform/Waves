@@ -113,7 +113,7 @@ class WavesEnvironment(
         issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
-        sponsored = assetDesc.sponsorship != 0
+        minSponsoredFee = Some(assetDesc.sponsorship).filter(_ != 0)
       )
     }
   }

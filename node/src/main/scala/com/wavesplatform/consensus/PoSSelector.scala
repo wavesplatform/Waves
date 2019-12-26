@@ -113,13 +113,18 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   private def getHit(height: Int, accountPublicKey: PublicKey): Either[ValidationError, BigInt] = {
-    val message =
-      if (fairPosActivated(height) && height > 100) blockchain.hitSourceAtHeight(height - 100)
-      else blockchain.hitSourceAtHeight(blockchain.height)
+    val hitHeight =
+      if (fairPosActivated(height) && height > 100) height - 100
+      else blockchain.height
 
-    message
-      .map(msg => if (vrfActivated(height)) msg.arr else generationSignature(msg, accountPublicKey))
-      .map(msg => hit(msg))
+    blockchain
+      .hitSourceAtHeight(hitHeight)
+      .collect {
+        case msg if vrfActivated(height) && hitHeight == 1 => generationSignature(msg.arr, blockchain.genesis.header.generator)
+        case msg if vrfActivated(height)                   => msg.arr
+        case msg                                           => generationSignature(msg.arr, accountPublicKey)
+      }
+      .map(hit)
       .toRight(GenericError(s"Couldn't find hit source at height: $height"))
   }
 

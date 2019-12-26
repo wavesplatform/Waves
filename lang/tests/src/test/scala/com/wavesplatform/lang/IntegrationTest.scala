@@ -998,6 +998,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
   }
 
+  property("HalfUp is type") {
+    eval("let r = if true then HALFUP else HALFDOWN ; match r { case _:HalfUp => 1 case _ => 0 }") shouldBe Right(CONST_LONG(1))
+  }
+
+
+  property("HalfUp type have no constructor") {
+    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe 'Left
+  }
+
   property("concat empty list") {
     val script =
       s"""
