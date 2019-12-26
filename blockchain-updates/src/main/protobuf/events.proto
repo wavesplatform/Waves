@@ -67,27 +67,22 @@ message StateUpdate {
             UpdateAssetInfo update_asset_info = 7;
         }
 
-        message NameDescriptionBytes {
-            bytes name = 1;
-            bytes description = 2;
-        }
-
-        message NameDescriptionString {
-            string name = 1;
-            string description = 2;
-        }
-
         message Issue {
-            oneof name_description {
-                NameDescriptionBytes bytes = 1;
-                NameDescriptionString string = 2;
+            oneof name {
+                string name_string = 1;
+                bytes name_bytes = 2;
             }
 
-            int32 decimals = 3;
-            bool reissuable = 4;
-            int64 volume = 5;
-            Script script = 6;
-            bool nft = 7;
+            oneof description {
+                string description_string = 3;
+                bytes description_bytes = 4;
+            }
+
+            int32 decimals = 5;
+            bool reissuable = 6;
+            int64 volume = 7;
+            Script script = 8;
+            bool nft = 9;
         }
 
         message UpdateAssetVolume {
@@ -116,7 +111,8 @@ message StateUpdate {
         }
 
         message UpdateAssetInfo {
-            NameDescriptionString new_name_description = 1;
+            string name = 1;
+            string description = 2;
         }
     }
 }

@@ -2,7 +2,6 @@ package com.wavesplatform.events.protobuf
 
 import com.wavesplatform.events
 import com.google.protobuf.ByteString
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -12,6 +11,8 @@ import com.wavesplatform.events.protobuf.StateUpdate.{
   LeasingUpdate => PBLeasingUpdate
 }
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
+import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.Issue.Description.{DescriptionBytes, DescriptionString}
+import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.Issue.Name.{NameBytes, NameString}
 import com.wavesplatform.transaction.Transaction
 
 object PBEvents {
@@ -72,7 +73,14 @@ object PBEvents {
         case events.Issue(_, name, description, decimals, reissuable, volume, script, nft) =>
           AssetStateUpdate.Type.Issue(
             AssetStateUpdate.Issue(
-              nameDescription = unsafeProtobufAssetNameDescription(name, description),
+              name = name match {
+                case Left(bytes) => NameBytes(bytes)
+                case Right(str)  => NameString(str)
+              },
+              description = description match {
+                case Left(bytes) => DescriptionBytes(bytes)
+                case Right(str)  => DescriptionString(str)
+              },
               decimals = decimals,
               reissuable = reissuable,
               volume = volume,
@@ -89,27 +97,15 @@ object PBEvents {
           )
         case events.ForbidReissue(_) => AssetStateUpdate.Type.ForbidReissue(AssetStateUpdate.ForbidReissue())
         case events.SetSponsorship(_, sponsorship) =>
-          AssetStateUpdate.Type.SetSponsorship(AssetStateUpdate.SetSponsorship(sponsorship = sponsorship))
+          AssetStateUpdate.Type.SetSponsorship(AssetStateUpdate.SetSponsorship(sponsorship = sponsorship.getOrElse(0)))
         case events.SetAssetScript(_, script) =>
           AssetStateUpdate.Type.SetAssetScript(AssetStateUpdate.SetAssetScript(script = script.map(PBTransactions.toPBScript)))
         case events.UpdateAssetInfo(_, name, description) =>
           AssetStateUpdate.Type.UpdateAssetInfo(
-            AssetStateUpdate.UpdateAssetInfo(newNameDescription = Some(AssetStateUpdate.NameDescriptionString(name, description)))
+            AssetStateUpdate.UpdateAssetInfo(name, description)
           )
       }
     )
-
-  // @todo refactor after better name/description typing in node
-  private def unsafeProtobufAssetNameDescription(
-      name: Either[ByteStr, String],
-      description: Either[ByteStr, String]
-  ): AssetStateUpdate.Issue.NameDescription = {
-    (name, description) match {
-      case (Right(n), Right(d)) => AssetStateUpdate.Issue.NameDescription.String(AssetStateUpdate.NameDescriptionString(n, d))
-      case (Left(n), Left(d))   => AssetStateUpdate.Issue.NameDescription.Bytes(AssetStateUpdate.NameDescriptionBytes(n, d))
-      case _                    => throw new IllegalArgumentException("Asset name and description have different types")
-    }
-  }
 
   private def protobufStateUpdate(su: events.StateUpdate): StateUpdate = {
     StateUpdate(
