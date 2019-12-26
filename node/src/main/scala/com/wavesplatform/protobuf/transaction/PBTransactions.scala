@@ -142,7 +142,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
+          script.map(toVanillaScript),
           feeAmount,
           timestamp,
           proofs
@@ -232,7 +232,7 @@ object PBTransactions {
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
 
-          desFCOpt = Deser.parseByteArrayOptionWithLength(functionCall.asReadOnlyByteBuffer()).map(Serde.deserialize(_))
+          desFCOpt = Deser.parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
 
           _ <- Either.cond(
             desFCOpt.isEmpty || desFCOpt.get.isRight,
@@ -411,9 +411,8 @@ object PBTransactions {
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser
-            .parseByteArrayOptionWithLength(functionCall.asReadOnlyByteBuffer())
-            .map(Serde.deserialize(_, all = false))
-            .map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
@@ -539,7 +538,7 @@ object PBTransactions {
 
     InvokeScriptTransactionData(
       Some(PBRecipients.create(dappAddress)),
-      ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(fcOpt)(Serde.serialize(_))),
+      ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
       payment.map(p => (p.assetId, p.amount): Amount)
     )
   }
