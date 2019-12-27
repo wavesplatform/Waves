@@ -215,9 +215,6 @@ object Importer extends ScorexLogging {
         quit = true
       }
     }
-
-    val duration = System.currentTimeMillis() - start
-    log.info(s"Imported $counter block(s) in ${humanReadableDuration(duration)}")
   }
 
   def run(args: Array[String]): Try[() => Unit] =
