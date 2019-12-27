@@ -1,5 +1,7 @@
 package com.wavesplatform.protobuf.transaction
 
+import java.nio.ByteBuffer
+
 import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
@@ -227,7 +229,7 @@ object PBTransactions {
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
-          functionCallParsed <- Try(parseFunctionCall(functionCall.toByteArray)).toEither.left
+          functionCallParsed <- Try(parseFunctionCall(functionCall.asReadOnlyByteBuffer())).toEither.left
             .map(err => GenericError(s"Invalid InvokeScript function call: $err"))
           tx <- vt.smart.InvokeScriptTransaction.create(
             version.toByte,
@@ -392,7 +394,7 @@ object PBTransactions {
           version.toByte,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
-          parseFunctionCall(functionCall.toByteArray),
+          parseFunctionCall(functionCall.asReadOnlyByteBuffer()),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
@@ -583,9 +585,9 @@ object PBTransactions {
     Script.of(ByteString.copyFrom(body.toArray), ver)
   }
 
-  private[this] def parseFunctionCall(bs: Array[Byte]): Option[FUNCTION_CALL] = {
-    Try(Deser.parseOption(bs, 0)(Serde.deserialize(_, all = false)))
-      .map(_._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]))
-      .getOrElse(Deser.parseByteArrayOption(bs, 0, bs.length)._1.map(Serde.deserialize(_, all = false).explicitGet()._1.asInstanceOf[FUNCTION_CALL]))
+  private[this] def parseFunctionCall(bs: ByteBuffer): Option[FUNCTION_CALL] = {
+    Try(Deser.parseOption(bs)(Serde.deserialize))
+      .map(_.map(_.explicitGet().asInstanceOf[FUNCTION_CALL]))
+      .getOrElse(Deser.parseByteArrayOptionWithLength(bs).map(Serde.deserialize(_, all = false).explicitGet()._1.asInstanceOf[FUNCTION_CALL]))
   }
 }
