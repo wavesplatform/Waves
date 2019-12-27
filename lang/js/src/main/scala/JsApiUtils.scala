@@ -241,7 +241,7 @@ package object JsApiUtils {
 
   def typeRepr(t: TYPE): js.Any = t match {
     case UNION(l, _) => l.map(typeRepr).toJSArray
-    case CASETYPEREF(name, fields) =>
+    case CASETYPEREF(name, fields, false) =>
       js.Dynamic.literal("typeName" -> name, "fields" -> fields.map(f => js.Dynamic.literal("name" -> f._1, "type" -> typeRepr(f._2))).toJSArray)
     case LIST(t) => js.Dynamic.literal("listOf" -> typeRepr(t))
     case t       => t.toString
