@@ -10,14 +10,8 @@ import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v3.EstimatorContext.Lenses._
 import monix.eval.Coeval
-import monix.execution.misc.ThreadLocal
 
 object ScriptEstimatorV3 extends ScriptEstimator {
-  private val isInterrupted: ThreadLocal[Boolean] = ThreadLocal(false)
-
-  def interrupt(): Unit =
-    isInterrupted.set(true)
-
   override def apply(
     vars:  Set[String],
     funcs: Map[FunctionHeader, Coeval[Long]],
@@ -28,10 +22,9 @@ object ScriptEstimatorV3 extends ScriptEstimator {
   }
 
   private def evalExpr(t: EXPR): EvalM[Long] = {
-    if (isInterrupted.get()) {
-      isInterrupted.set(false)
+    if (Thread.currentThread().isInterrupted)
       raiseError("Script estimation was interrupted")
-    } else
+    else
       t match {
         case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
         case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
