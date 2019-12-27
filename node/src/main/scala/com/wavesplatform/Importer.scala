@@ -167,7 +167,7 @@ object Importer extends ScorexLogging {
   ): Unit = {
     var quit     = false
     val lenBytes = new Array[Byte](Ints.BYTES)
-    val start    = System.currentTimeMillis()
+    val start    = System.nanoTime()
     var counter  = 0
 
     val startHeight   = blockchainUpdater.height
