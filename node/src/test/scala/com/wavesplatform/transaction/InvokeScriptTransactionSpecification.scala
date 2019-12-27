@@ -53,7 +53,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
         transaction.PBTransaction.Data.InvokeScript(
           InvokeScriptTransactionData(
             Some(PBRecipients.create(tx.dAppAddressOrAlias)),
-            ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(tx.funcCallOpt)(Serde.serialize(_))),
+            ByteString.copyFrom(Deser.serializeOption(tx.funcCallOpt)(Serde.serialize(_))),
             tx.payments.map(p => Amount.of(PBAmounts.toPBAssetId(p.assetId), p.amount))
           )
         )

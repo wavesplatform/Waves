@@ -105,7 +105,7 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
           header match {
             case FunctionHeader.User(typeName, _) =>
               types.get(ctx).get(typeName).collect {
-                case t @ CASETYPEREF(_, fields) =>
+                case t @ CASETYPEREF(_, fields, hidden) =>
                   args
                     .traverse[EvalM[F, C, ?], EVALUATED](evalExpr)
                     .map(values => CaseObj(t, fields.map(_._1).zip(values).toMap): EVALUATED)
