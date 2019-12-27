@@ -4,9 +4,10 @@ import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Attachment.Attachment.{BinaryValue, BoolValue, IntValue, StringValue}
@@ -21,7 +22,6 @@ import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
 import com.wavesplatform.{transaction => vt}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.util.Try
 
@@ -601,5 +601,11 @@ object PBTransactions {
   def toPBScript(script: com.wavesplatform.lang.script.Script): Script = {
     val Array(ver, body @ _*) = script.bytes().arr
     Script.of(ByteString.copyFrom(body.toArray), ver)
+  }
+
+  private[this] def parseFunctionCall(bs: Array[Byte]): Option[FUNCTION_CALL] = {
+    Try(Deser.parseOption(bs, 0)(Serde.deserialize(_, all = false)))
+      .map(_._1.map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]))
+      .getOrElse(Deser.parseByteArrayOption(bs, 0, bs.length)._1.map(Serde.deserialize(_, all = false).explicitGet()._1.asInstanceOf[FUNCTION_CALL]))
   }
 }
