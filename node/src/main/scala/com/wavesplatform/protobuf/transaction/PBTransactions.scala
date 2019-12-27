@@ -240,7 +240,7 @@ object PBTransactions {
             GenericError(s"Invalid InvokeScript function call: ${desFCOpt.get.left.get}")
           )
 
-          fcOpt = desFCOpt.map(_.explicitGet()._1)
+          fcOpt = desFCOpt.map(_.explicitGet())
 
           _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
 
