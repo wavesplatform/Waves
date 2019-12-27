@@ -1,20 +1,19 @@
 package com.wavesplatform.events.protobuf
 
-import java.nio.ByteBuffer
-import java.nio.charset.{CharsetDecoder, CodingErrorAction, StandardCharsets}
+import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.events
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
-import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
-import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.events
+import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
 import com.wavesplatform.events.protobuf.StateUpdate.{
+  AssetStateUpdate,
   BalanceUpdate => PBBalanceUpdate,
   DataEntryUpdate => PBDataEntryUpdate,
   LeasingUpdate => PBLeasingUpdate
 }
-import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
+import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Transaction
 
 object PBEvents {
@@ -68,15 +67,9 @@ object PBEvents {
         )
     }
 
-  private lazy val decoder: CharsetDecoder = StandardCharsets.UTF_8
-    .newDecoder()
-    .onMalformedInput(CodingErrorAction.REPLACE)
-    .onUnmappableCharacter(CodingErrorAction.REPLACE)
-    .replaceWith("")
-
   private def toString(bytesOrString: Either[ByteStr, String]): String =
     bytesOrString match {
-      case Left(bytes) => decoder.decode(ByteBuffer.wrap(bytes)).toString
+      case Left(bytes) => new String(bytes, StandardCharsets.UTF_8)
       case Right(s)    => s
     }
 
