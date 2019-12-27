@@ -225,30 +225,15 @@ object PBTransactions {
         )
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
-        import com.wavesplatform.common.utils._
-        import com.wavesplatform.lang.v1.Serde
-        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
-
-          desFCOpt = Deser.parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
-
-          _ <- Either.cond(
-            desFCOpt.isEmpty || desFCOpt.get.isRight,
-            (),
-            GenericError(s"Invalid InvokeScript function call: ${desFCOpt.get.left.get}")
-          )
-
-          fcOpt = desFCOpt.map(_.explicitGet())
-
-          _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
-
+          functionCallParsed <- Try(parseFunctionCall(functionCall.toByteArray)).toEither.left
+            .map(err => GenericError(s"Invalid InvokeScript function call: $err"))
           tx <- vt.smart.InvokeScriptTransaction.create(
             version.toByte,
             sender,
             dApp,
-            fcOpt.map(_.asInstanceOf[FUNCTION_CALL]),
+            functionCallParsed,
             payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
             feeAmount,
             feeAssetId,
@@ -403,16 +388,11 @@ object PBTransactions {
         vt.assets.SponsorFeeTransaction(version.toByte, sender, IssuedAsset(assetId), Option(minFee).filter(_ > 0), feeAmount, timestamp, proofs)
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
-        import com.wavesplatform.lang.v1.Serde
-        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-
         vt.smart.InvokeScriptTransaction(
           version.toByte,
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
-          Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
-            .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
+          parseFunctionCall(functionCall.toByteArray),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
