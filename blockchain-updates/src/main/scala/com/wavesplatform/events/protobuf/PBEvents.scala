@@ -1,7 +1,11 @@
 package com.wavesplatform.events.protobuf
 
+import java.nio.ByteBuffer
+import java.nio.charset.{CharsetDecoder, CodingErrorAction, StandardCharsets}
+
 import com.wavesplatform.events
 import com.google.protobuf.ByteString
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate
 import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -11,8 +15,6 @@ import com.wavesplatform.events.protobuf.StateUpdate.{
   LeasingUpdate => PBLeasingUpdate
 }
 import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
-import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.Issue.Description.{DescriptionBytes, DescriptionString}
-import com.wavesplatform.events.protobuf.StateUpdate.AssetStateUpdate.Issue.Name.{NameBytes, NameString}
 import com.wavesplatform.transaction.Transaction
 
 object PBEvents {
@@ -66,46 +68,30 @@ object PBEvents {
         )
     }
 
+  private lazy val decoder: CharsetDecoder = StandardCharsets.UTF_8
+    .newDecoder()
+    .onMalformedInput(CodingErrorAction.REPORT)
+    .onUnmappableCharacter(CodingErrorAction.REPLACE)
+    .replaceWith("")
+
+  private def toString(bytesOrString: Either[ByteStr, String]): String =
+    bytesOrString match {
+      case Left(bytes) => decoder.decode(ByteBuffer.wrap(bytes)).toString
+      case Right(s)    => s
+    }
+
   private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
     AssetStateUpdate(
-      a.asset.id,
-      `type` = a match {
-        case events.Issue(_, name, description, decimals, reissuable, volume, script, nft) =>
-          AssetStateUpdate.Type.Issue(
-            AssetStateUpdate.Issue(
-              name = name match {
-                case Left(bytes) => NameBytes(bytes)
-                case Right(str)  => NameString(str)
-              },
-              description = description match {
-                case Left(bytes) => DescriptionBytes(bytes)
-                case Right(str)  => DescriptionString(str)
-              },
-              decimals = decimals,
-              reissuable = reissuable,
-              volume = volume,
-              script = script.map(PBTransactions.toPBScript),
-              nft = nft
-            )
-          )
-        case events.UpdateAssetVolume(_, volume) =>
-          AssetStateUpdate.Type.UpdateAssetVolume(
-            AssetStateUpdate.UpdateAssetVolume(
-              newVolume = volume.longValue,
-              safeNewVolume = ByteString.copyFrom(volume.toByteArray)
-            )
-          )
-        case events.ForbidReissue(_) => AssetStateUpdate.Type.ForbidReissue(AssetStateUpdate.ForbidReissue())
-        case events.StartSponsorship(_, sponsorship) =>
-          AssetStateUpdate.Type.StartSponsorship(AssetStateUpdate.StartSponsorship(sponsorship))
-        case events.CancelSponsorship(_) => AssetStateUpdate.Type.CancelSponsorship(AssetStateUpdate.CancelSponsorship())
-        case events.SetAssetScript(_, script) =>
-          AssetStateUpdate.Type.SetAssetScript(AssetStateUpdate.SetAssetScript(script = script.map(PBTransactions.toPBScript)))
-        case events.UpdateAssetInfo(_, name, description) =>
-          AssetStateUpdate.Type.UpdateAssetInfo(
-            AssetStateUpdate.UpdateAssetInfo(name, description)
-          )
-      }
+      assetId = a.asset.id,
+      decimals = a.decimals,
+      name = toString(a.name),
+      description = toString(a.description),
+      reissuable = a.reissuable,
+      volume = a.volume,
+      script = a.script.map(PBTransactions.toPBScript),
+      sponsorship = a.sponsorship.getOrElse(0),
+      nft = a.nft,
+      assetExistedBefore = a.assetExistedBefore
     )
 
   private def protobufStateUpdate(su: events.StateUpdate): StateUpdate = {

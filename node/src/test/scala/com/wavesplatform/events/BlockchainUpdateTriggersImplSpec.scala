@@ -12,6 +12,7 @@ import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.{BlockGen, TestHelpers, crypto}
@@ -79,6 +80,8 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
     val mb = microBlockGen(txs, master).sample.get
     assertion(appendMicroBlock(mb).transactionStateUpdates)
   }
+
+  private def isNFT(tx: IssueTransaction): Boolean = tx.quantity == 1 && tx.decimals == 0 && !tx.reissuable
 
   "rollbacks correctly" - {
     "block" in forAll(sigGen, heightGen) { (sig, height) =>
@@ -180,19 +183,19 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
 
     "blocks/microblocks with correct asset state updates by" - {
       "issue transaction" in forAll(issueV2TransactionGen(Gen.const(master))) { tx =>
-        testTxsStateUpdates(Seq(tx)) {
-          _.head.assets.head match {
-            case Issue(asset, name, description, decimals, reissuable, volume, script, nft) =>
-              asset.id shouldBe tx.id()
-              name.left.get shouldBe tx.nameBytes
-              description.left.get shouldBe tx.descriptionBytes
-              decimals shouldBe tx.decimals
-              reissuable shouldBe tx.reissuable
-              volume shouldBe tx.quantity
-              script shouldBe tx.script
-              nft shouldBe (tx.quantity == 1 && decimals == 0 && !tx.reissuable)
-            case _ => fail()
-          }
+        testTxsStateUpdates(Seq(tx)) { upds =>
+          val AssetStateUpdate(asset, decimals, name, description, reissuable, volume, script, sponsorship, nft, assetExistedBefore) =
+            upds.head.assets.head
+          asset.id shouldBe tx.id()
+          name shouldBe tx.safeName
+          description shouldBe tx.safeDescription
+          decimals shouldBe tx.decimals
+          reissuable shouldBe tx.reissuable
+          volume.toLong shouldBe tx.quantity
+          script shouldBe tx.script
+          nft shouldBe isNFT(tx)
+          sponsorship shouldBe None
+          assetExistedBefore shouldBe false
         }
       }
 
@@ -204,26 +207,15 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
         } yield (issue, reissue)
       } {
         case (issue, reissue) =>
-          testTxsStateUpdates(Seq(issue, reissue)) { transactionStateUpdates =>
-            val reissueUpdates = transactionStateUpdates.last.assets
+          testTxsStateUpdates(Seq(issue, reissue)) { upds =>
+            val issueUpd   = upds.head.assets.head
+            val reissueUpd = upds.last.assets.head
 
-            // update volume
-            reissueUpdates.exists {
-              case UpdateAssetVolume(_, newVolume) =>
-                newVolume shouldBe (BigInt(issue.quantity) + BigInt(reissue.quantity))
-                true
-              case _ => false
-            } shouldBe true
-
-            // check forbid reissue
-            if (!reissue.reissuable) {
-              reissueUpdates.exists {
-                case ForbidReissue(asset) =>
-                  asset.id shouldBe issue.assetId
-                  true
-                case _ => false
-              } shouldBe true
-            }
+            reissueUpd shouldBe issueUpd.copy(
+              volume = BigInt(issue.quantity) + BigInt(reissue.quantity),
+              reissuable = reissue.reissuable,
+              assetExistedBefore = !issueUpd.assetExistedBefore
+            )
           }
       }
 
@@ -235,44 +227,45 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
         } yield (issue, burn)
       } {
         case (issue, burn) =>
-          testTxsStateUpdates(Seq(issue, burn)) {
-            _.last.assets.head match {
-              case UpdateAssetVolume(_, newVolume) =>
-                newVolume shouldBe (issue.quantity - burn.quantity)
-              case _ => fail()
-            }
+          testTxsStateUpdates(Seq(issue, burn)) { upds =>
+            val issueUpd = upds.head.assets.head
+            val burnUpd  = upds.last.assets.head
+
+            burnUpd shouldBe issueUpd.copy(
+              volume = BigInt(issue.quantity) - BigInt(burn.quantity),
+              assetExistedBefore = !issueUpd.assetExistedBefore
+            )
           }
       }
 
       "set asset script transaction" in forAll(issueAndSetAssetScriptGen(master)) {
         case (issue, setAssetScript) =>
-          testTxsStateUpdates(Seq(issue, setAssetScript)) {
-            _.last.assets.head match {
-              case SetAssetScript(asset, script) =>
-                asset.id shouldBe issue.id()
-                script shouldBe setAssetScript.script
-              case _ => fail()
-            }
+          testTxsStateUpdates(Seq(issue, setAssetScript)) { upds =>
+            val issueUpd  = upds.head.assets.head
+            val scriptUpd = upds.last.assets.head
+
+            scriptUpd shouldBe issueUpd.copy(
+              script = setAssetScript.script,
+              assetExistedBefore = !issueUpd.assetExistedBefore
+            )
           }
       }
 
       "sponsor fee transaction " in forAll(sponsorFeeCancelSponsorFeeGen(master)) {
         case (issue, startSponsorship, _, cancelSponsorship) =>
-          testTxsStateUpdates(Seq(issue, startSponsorship, cancelSponsorship)) { transactionStateUpdates =>
-            // set sponsoprship
-            transactionStateUpdates(1).assets.head match {
-              case StartSponsorship(asset, sponsorship) =>
-                asset.id shouldBe issue.id()
-                sponsorship shouldBe startSponsorship.minSponsoredAssetFee.get
-              case _ => fail()
-            }
+          testTxsStateUpdates(Seq(issue, startSponsorship, cancelSponsorship)) { upds =>
+            val issueUpd             = upds.head.assets.head
+            val startSponsorshipUpd  = upds(1).assets.head
+            val cancelSponsorshipUpd = upds(2).assets.head
 
-            // cancel sponsorship
-            transactionStateUpdates.last.assets.head match {
-              case CancelSponsorship(asset) =>
-                asset.id shouldBe issue.id()
-              case _ => fail()
-            }
+            startSponsorshipUpd shouldBe issueUpd.copy(
+              sponsorship = startSponsorship.minSponsoredAssetFee,
+              assetExistedBefore = !issueUpd.assetExistedBefore
+            )
+
+            cancelSponsorshipUpd shouldBe startSponsorshipUpd.copy(
+              sponsorship = cancelSponsorship.minSponsoredAssetFee
+            )
           }
       }
 
@@ -298,15 +291,19 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
 
           produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, blockchain)) match {
             case ba: BlockAppended =>
-              val i = ba.transactionStateUpdates.head.assets.collectFirst { case u: Issue => u }.get
-              i.asset.id shouldBe issue.id()
+              val AssetStateUpdate(asset, decimals, name, description, reissuable, volume, script, sponsorship, nft, assetExistedBefore) =
+                ba.transactionStateUpdates.head.assets.head
 
-              val uav = ba.transactionStateUpdates.head.assets.collectFirst { case u: UpdateAssetVolume => u }
-              uav.map(_.newVolume) shouldBe Some((BigInt(issue.quantity) + BigInt(reissue.quantity)))
-
-              // if asset reussue has been forbidden, should get a corresponding event
-              val fr: Option[ForbidReissue] = ba.transactionStateUpdates.head.assets.collectFirst { case u: ForbidReissue => u }
-              fr.isDefined shouldBe !reissue.reissuable
+              asset.id shouldBe issue.assetId
+              decimals shouldBe issue.decimals
+              name shouldBe issue.safeName
+              description shouldBe issue.safeDescription
+              reissuable shouldBe reissue.reissuable
+              volume shouldBe (BigInt(issue.quantity) + BigInt(reissue.quantity))
+              script shouldBe issue.script
+              sponsorship shouldBe None
+              nft shouldBe isNFT(issue)
+              assetExistedBefore shouldBe false
             case _ => fail()
           }
       }

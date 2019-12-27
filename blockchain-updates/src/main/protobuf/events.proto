@@ -57,40 +57,22 @@ message StateUpdate {
 
     message AssetStateUpdate {
         bytes asset_id = 1;
+        int32 decimals = 2;
 
-        oneof type {
-            Issue issue = 2;
-            UpdateAssetVolume update_asset_volume = 3;
-            ForbidReissue forbid_reissue = 4;
-            SetAssetScript set_asset_script = 5;
-            StartSponsorship start_sponsorship = 6;
-            CancelSponsorship cancel_sponsorship = 7;
-            UpdateAssetInfo update_asset_info = 8;
-        }
+        string name = 3;
+        string description = 4;
 
-        message Issue {
-            oneof name {
-                string name_string = 1;
-                bytes name_bytes = 2;
-            }
+        bool reissuable = 5;
+        int64 volume = 6;
 
-            oneof description {
-                string description_string = 3;
-                bytes description_bytes = 4;
-            }
+        Script script = 7;
 
-            int32 decimals = 5;
-            bool reissuable = 6;
-            int64 volume = 7;
-            Script script = 8;
-            bool nft = 9;
-        }
+        int64 sponsorship = 8;
+        bool nft = 9;
 
-        message UpdateAssetVolume {
-            int64 new_volume = 1;
-
-            /*
-                Related to a bug in the blockchain when it was possible to reissue
+        bool asset_existed_before = 20;
+        /*
+                Related to a past behavior in the blockchain when it was possible to reissue
                 assets so that the total volume became more then int64 max value.
                 This field represents accurate volume even for those assets.
 
@@ -98,24 +80,6 @@ message StateUpdate {
 
                 Encoding: like Java BigInteger, https://docs.oracle.com/javase/7/docs/api/java/math/BigInteger.html#toByteArray()
             */
-            bytes safe_new_volume = 2;
-        }
-
-        message ForbidReissue {}
-
-        message SetAssetScript {
-            Script script = 1;
-        }
-
-        message StartSponsorship {
-            int64 sponsorship = 1;
-        }
-
-        message CancelSponsorship {}
-
-        message UpdateAssetInfo {
-            string name = 1;
-            string description = 2;
-        }
+        bytes safe_volume = 21;
     }
 }

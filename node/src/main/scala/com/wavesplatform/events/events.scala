@@ -8,40 +8,18 @@ import com.wavesplatform.state.{DataEntry, LeaseBalance}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
-sealed trait AssetStateUpdate extends Product with Serializable {
-  def asset: IssuedAsset
-}
-final case class Issue(
+final case class AssetStateUpdate(
     asset: IssuedAsset,
+    decimals: Int,
     name: Either[ByteStr, String],
     description: Either[ByteStr, String],
-    decimals: Int,
     reissuable: Boolean,
-    volume: Long,
+    volume: BigInt,
     script: Option[Script],
-    nft: Boolean
-) extends AssetStateUpdate
-final case class UpdateAssetVolume(
-    asset: IssuedAsset,
-    newVolume: BigInt
-) extends AssetStateUpdate
-final case class ForbidReissue(asset: IssuedAsset) extends AssetStateUpdate
-final case class SetAssetScript(
-    asset: IssuedAsset,
-    script: Option[Script]
-) extends AssetStateUpdate
-final case class StartSponsorship(
-    asset: IssuedAsset,
-    sponsorship: Long
-) extends AssetStateUpdate
-final case class CancelSponsorship(
-    asset: IssuedAsset
-) extends AssetStateUpdate
-final case class UpdateAssetInfo(
-    asset: IssuedAsset,
-    name: String,
-    description: String
-) extends AssetStateUpdate
+    sponsorship: Option[Long],
+    nft: Boolean,
+    assetExistedBefore: Boolean,
+)
 
 final case class StateUpdate(
     balances: Seq[(Address, Asset, Long)],

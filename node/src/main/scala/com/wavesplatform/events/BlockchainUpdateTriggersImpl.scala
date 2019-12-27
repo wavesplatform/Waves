@@ -7,9 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
-import com.wavesplatform.state.{AccountDataInfo, Blockchain, Diff, DiffToStateApplier}
-import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, ReissueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.state.{AccountDataInfo, AssetDescription, Blockchain, Diff, DiffToStateApplier}
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.reactive.Observer
 
@@ -32,32 +30,9 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
   override def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit =
     events.onNext(MicroBlockRollbackCompleted(toTotalResBlockSig, height))
 
-  private def getIssuedAssets(diff: Diff): Seq[Issue] =
-    for {
-      (issuedAsset, (staticInfo, info, volumeInfo)) <- diff.issuedAssets.toSeq
-      script = diff.assetScripts.get(issuedAsset).flatten.map(_._2)
-    } yield Issue(
-      issuedAsset,
-      info.name,
-      info.description,
-      staticInfo.decimals,
-      volumeInfo.isReissuable,
-      volumeInfo.volume.longValue,
-      script,
-      staticInfo.nft
-    )
-
-  private def getAssetVolumeUpdates(diff: Diff, blockchainBefore: Blockchain): Seq[UpdateAssetVolume] =
-    for {
-      ua           <- diff.updatedAssets.toSeq
-      v            <- ua._2.right.toSeq
-      volumeBefore <- blockchainBefore.assetDescription(ua._1).map(_.totalVolume).toSeq
-    } yield UpdateAssetVolume(
-      ua._1,
-      volumeBefore + v.volume
-    )
-
   private def atomicStateUpdate(blockchainBefore: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
+    val blockchainAfter = CompositeBlockchain(blockchainBefore, Some(diff))
+
     val PortfolioUpdates(updatedBalances, updatedLeases) = DiffToStateApplier.portfolios(blockchainBefore, diff)
 
     val balances = ArrayBuffer.empty[(Address, Asset, Long)]
@@ -68,55 +43,34 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
         data.toSeq.map { case (_, entry) => (address, entry) }
     }
 
-    val assets: Seq[AssetStateUpdate] = byTransaction match {
-      case Some(tx) =>
-        tx match {
-          case _: IssueTransaction => getIssuedAssets(diff)
-
-          case _: ReissueTransaction =>
-            val volumeUpdates = getAssetVolumeUpdates(diff, blockchainBefore)
-            // reissuable: false in ReissueTransaction means that reissue has been forbidden
-            val reissueForbidden = for {
-              (a, info) <- diff.updatedAssets.headOption.toSeq
-              v         <- info.right.toSeq if (!v.isReissuable)
-            } yield ForbidReissue(a)
-            volumeUpdates ++ reissueForbidden
-
-          case _: BurnTransaction => getAssetVolumeUpdates(diff, blockchainBefore)
-
-          case _: InvokeScriptTransaction =>
-            // inferring what happened in the invoke
-            val issued = getIssuedAssets(diff)
-            /*
-             When the asset has been issued and reussied/burned in one Invoke transaction,
-             at the moment of reissue it has not yet been added to the blockchain.
-             This intermediary `emulated` blockchain allows for querying newly issued assets.
-             */
-            val bcWithIssued  = CompositeBlockchain(blockchainBefore, Some(Diff.empty.copy(issuedAssets = diff.issuedAssets)))
-            val volumeUpdates = getAssetVolumeUpdates(diff, bcWithIssued)
-            val reissueForbidden = for {
-              (a, info) <- diff.updatedAssets.toSeq
-              v         <- info.right.toSeq
-              // is asset became non-reissuable after the invoke, but was reissuable before
-              if (!v.isReissuable &&
-                bcWithIssued.assetDescription(a).forall(_.reissuable))
-            } yield ForbidReissue(a)
-            issued ++ volumeUpdates ++ reissueForbidden
-
-          case t: SetAssetScriptTransaction => Seq(SetAssetScript(t.asset, t.script))
-
-          case t: SponsorFeeTransaction =>
-            Seq(
-              t.minSponsoredAssetFee match {
-                case Some(fee) => StartSponsorship(t.asset, fee)
-                case None      => CancelSponsorship(t.asset)
-              }
-            )
-
-          case _ => Seq.empty
-        }
-      case None => Seq.empty
-    }
+    val assets: Seq[AssetStateUpdate] = for {
+      a <- (diff.issuedAssets.keySet ++ diff.updatedAssets.keySet ++ diff.assetScripts.keySet ++ diff.sponsorship.keySet).toSeq
+      AssetDescription(
+        _,
+        _,
+        name,
+        description,
+        decimals,
+        reissuable,
+        totalVolume,
+        _,
+        script,
+        sponsorship,
+        nft
+      ) <- blockchainAfter.assetDescription(a).toSeq
+      existedBefore = !diff.issuedAssets.isDefinedAt(a)
+    } yield AssetStateUpdate(
+      a,
+      decimals,
+      name,
+      description,
+      reissuable,
+      totalVolume,
+      script,
+      if (sponsorship == 0) None else Some(sponsorship),
+      nft,
+      existedBefore
+    )
 
     StateUpdate(balances, updatedLeases.toSeq, dataEntries, assets)
   }
