@@ -318,12 +318,12 @@ object Functions {
       }
     }
 
-  val assetInfoF: BaseFunction[Environment] =
+  def assetInfoF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "assetInfo",
       100,
       GETASSETINFOBYID,
-      optionAsset,
+      optionAsset(version),
       ("id", BYTESTR)
     ) {
       new ContextfulNativeFunction[Environment] {
@@ -332,7 +332,7 @@ object Functions {
             case (env, CONST_BYTESTR(id: ByteStr) :: Nil) =>
               env
                 .assetInfoById(id.arr)
-                .map(_.map(buildAssetInfo) match {
+                .map(_.map(buildAssetInfo(_, version)) match {
                   case Some(result) => result.asRight[String]
                   case _            => unit.asRight[String]
                 })

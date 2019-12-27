@@ -1,13 +1,16 @@
 package com.wavesplatform.state.diffs.smart.predef
 
+import java.util.Dictionary
+
 import cats.kernel.Monoid
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures.{FeeSponsorship, MultiPaymentInvokeScript}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -22,9 +25,9 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
@@ -276,9 +279,20 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("get assetInfo by asset id") {
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
+    forAll(for {
+      (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
+      version      <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      v4Activation <- if (version >= V4) Gen.const(true) else Gen.oneOf(false, true)
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, v4Activation) =>
+
+        val fs = {
+          val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
+          if (v4Activation) features.copy(preActivatedFeatures = features.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+          else features
+        }
+
+        assertDiffAndState(fs) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
 
@@ -286,7 +300,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val decimals    = 6.toByte
           val reissuable  = true
           val assetScript = None
-          val sponsored   = false
+
           val issueTx = IssueTransaction(
               TxVersion.V2,
               masterAcc,
@@ -300,19 +314,36 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               dataTransaction.timestamp + 5
             ).signWith(masterAcc)
 
+          val sponsoredFee = 100
+          val sponsorTx =
+            SponsorFeeTransaction.signed(
+              TxVersion.V1,
+              masterAcc,
+              IssuedAsset(issueTx.assetId),
+              Some(sponsoredFee),
+              MinIssueFee,
+              dataTransaction.timestamp + 6,
+              masterAcc
+            ).explicitGet()
 
           append(Seq(transferTx, issueTx)).explicitGet()
 
           val assetId = issueTx.assetId
+
+          val sponsored =
+            if (version >= V4)
+              s"let sponsored = aInfo.minSponsoredFee == $sponsoredFee"
+            else
+              s"let sponsored = aInfo.sponsored == true"
+
           val script = ScriptCompiler
             .compile(
               s"""
-              | {-# STDLIB_VERSION 3 #-}
+              | {-# STDLIB_VERSION ${version.id} #-}
               | {-# CONTENT_TYPE EXPRESSION #-}
               | {-# SCRIPT_TYPE ACCOUNT #-}
               |
-              | let aInfoOpt = assetInfo(base58'$assetId')
-              |
+              | let aInfoOpt        = assetInfo(base58'$assetId')
               | let aInfo           = extract(aInfoOpt)
               | let id              = aInfo.id == base58'$assetId'
               | let quantity        = aInfo.quantity == $quantity
@@ -321,7 +352,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
               | let issuerPublicKey = aInfo.issuerPublicKey == base58'${issueTx.sender}'
               | let scripted        = aInfo.scripted == ${assetScript.nonEmpty}
               | let reissuable      = aInfo.reissuable == $reissuable
-              | let sponsored       = aInfo.sponsored == $sponsored
+              | $sponsored
               |
               | id              &&
               | quantity        &&
@@ -340,6 +371,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
 
           val setScriptTx = SetScriptTransaction.selfSigned(1.toByte, masterAcc, Some(script), 1000000L, issueTx.timestamp + 5).explicitGet()
 
+          append(Seq(sponsorTx)).explicitGet()
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
         }

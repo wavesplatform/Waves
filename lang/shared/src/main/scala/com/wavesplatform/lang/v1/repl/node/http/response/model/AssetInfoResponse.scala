@@ -8,6 +8,4 @@ private[node] case class AssetInfoResponse(
     reissuable:           Boolean,
     scripted:             Boolean,
     minSponsoredAssetFee: Option[Long]
-) {
-    def sponsored: Boolean = minSponsoredAssetFee.nonEmpty
-}
+)

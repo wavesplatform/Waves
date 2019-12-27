@@ -4,6 +4,7 @@
     <property name="logback.file.final-directory" value="${logback.file.directory:-${waves.directory}/log}"/>
 
     <logger name="io.netty" level="INFO"/>
+    <logger name="io.netty.channel.DefaultChannelPipeline" level="TRACE"/>
     <logger name="io.swagger" level="INFO"/>
 
     <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>

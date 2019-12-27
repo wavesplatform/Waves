@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.util
 
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.Message._
@@ -75,6 +75,7 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
       case rb: RawBytes => rb
       case tx: Transaction => RawBytes.fromTransaction(tx)
       case block: Block => RawBytes.fromBlock(block)
+      case mb: MicroBlock => RawBytes.fromMicroBlock(mb)
     }
 
     out.writeInt(Magic)
