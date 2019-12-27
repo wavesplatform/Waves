@@ -58,15 +58,11 @@ message StateUpdate {
     message AssetStateUpdate {
         bytes asset_id = 1;
         int32 decimals = 2;
-
         string name = 3;
         string description = 4;
-
         bool reissuable = 5;
         int64 volume = 6;
-
         Script script = 7;
-
         int64 sponsorship = 8;
         bool nft = 9;
 
@@ -76,7 +72,7 @@ message StateUpdate {
                 assets so that the total volume became more then int64 max value.
                 This field represents accurate volume even for those assets.
 
-                This field can be ignored if the target system does not need such accuracy.
+                Can be ignored if the target system does not need such accuracy.
 
                 Encoding: like Java BigInteger, https://docs.oracle.com/javase/7/docs/api/java/math/BigInteger.html#toByteArray()
             */
