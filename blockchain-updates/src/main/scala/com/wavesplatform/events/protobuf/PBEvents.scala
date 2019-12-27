@@ -70,7 +70,7 @@ object PBEvents {
 
   private lazy val decoder: CharsetDecoder = StandardCharsets.UTF_8
     .newDecoder()
-    .onMalformedInput(CodingErrorAction.REPORT)
+    .onMalformedInput(CodingErrorAction.REPLACE)
     .onUnmappableCharacter(CodingErrorAction.REPLACE)
     .replaceWith("")
 
