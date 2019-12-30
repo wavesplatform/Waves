@@ -75,9 +75,6 @@ object Schedulers {
     ExecutorScheduler(executor, reporter, executionModel, Features.empty)
   }
 
-  private[this] val stop0Method = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
-  stop0Method.setAccessible(true)
-
   private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] {
     @volatile
     private[this] var maybeScheduledTimeout     = Option.empty[Timeout]
@@ -89,7 +86,6 @@ object Schedulers {
       maybeScheduledTimeout = Some(timer.newTimeout(
           (t: Timeout) => if (!t.isCancelled) {
             workerThread.interrupt()
-            stop0Method.invoke(workerThread, new TimeoutException("Timeout executing task"))
           },
           timeout.toMillis,
           MILLISECONDS
