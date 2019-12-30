@@ -280,15 +280,9 @@ object Block {
         fee <- (jsv \ "fee").validate[Long]
         transactions <- (jsv \ "transactions").validate[Seq[Transaction]]
         version <- (jsv \ "version").validateOpt[Byte]
-        generationSignature <- version match {
-          case Some(v) if v > 4 => (jsv \ "generationSignature").validateOpt[String]
-          case _ => (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
-        }
+        generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
+        baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
-        baseTarget <- version match {
-          case Some(v) if v > 4 => (jsv \ "baseTarget").validateOpt[Int]
-          case _ => (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
-        }
       } yield Block(
         signature,
         height,

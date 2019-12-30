@@ -16,19 +16,12 @@ import scala.util.Try
 object BlockHeaderSerializer {
   def toJson(blockHeader: BlockHeader): JsObject = {
     val consensusJson =
-      if (blockHeader.version < ProtoBlockVersion)
-        Json.obj(
-          "nxt-consensus" -> Json.obj(
-            "base-target"          -> blockHeader.baseTarget,
-            "generation-signature" -> blockHeader.generationSignature.toString
-          )
+      Json.obj(
+        "nxt-consensus" -> Json.obj(
+          "base-target"          -> blockHeader.baseTarget,
+          "generation-signature" -> blockHeader.generationSignature.toString
         )
-      else
-        Json.obj(
-          "baseTarget"          -> blockHeader.baseTarget,
-          "generationSignature" -> blockHeader.generationSignature.toString,
-          "transactionsRoot"    -> blockHeader.transactionsRoot.toString
-        )
+      ) ++ (if (blockHeader.version >= ProtoBlockVersion) Json.obj("transactionsRoot" -> blockHeader.transactionsRoot.toString) else Json.obj())
 
     val featuresJson =
       if (blockHeader.version < NgBlockVersion) JsObject.empty
@@ -66,7 +59,7 @@ object BlockSerializer {
         val featuresBuf = ByteBuffer.allocate(Ints.BYTES + header.featureVotes.size * Shorts.BYTES)
         featuresBuf.putInt(header.featureVotes.size).asShortBuffer().put(header.featureVotes.toArray)
         featuresBuf.array
-     }
+    }
 
     val rewardVoteBytes = header.version match {
       case v if v < RewardBlockVersion => Array.empty[Byte]
