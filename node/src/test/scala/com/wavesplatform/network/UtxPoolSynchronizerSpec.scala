@@ -22,15 +22,6 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
 
   "UtxPoolSynchronizer" - {
-    def sleep(millis: Int)(tx: Transaction): TracedResult[ValidationError, Boolean] = {
-      while (true) {}
-      TracedResult(Right(true))
-    }
-
-    "rejects transactions which take too long to validate" in withUPS(sleep(Int.MaxValue)) { ups =>
-      ups.publish(GenesisTransaction.create(PublicKey(Array.emptyByteArray), 10L, 0L).explicitGet()).resultE should produce("Timeout executing task")
-    }
-
     val latch   = new CountDownLatch(5)
     val counter = AtomicInt(10)
 
