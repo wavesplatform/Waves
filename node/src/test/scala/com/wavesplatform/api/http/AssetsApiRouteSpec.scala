@@ -2,6 +2,7 @@ package com.wavesplatform.api.http
 
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
@@ -30,8 +31,8 @@ class AssetsApiRouteSpec
   private val smartAssetDesc = AssetDescription(
     source = smartAssetTx.id(),
     issuer = smartAssetTx.sender,
-    name = Left(smartAssetTx.nameBytes),
-    description = Left(smartAssetTx.descriptionBytes),
+    name = Left(ByteStr(smartAssetTx.name.utf8Bytes)),
+    description = Left(ByteStr(smartAssetTx.description.utf8Bytes)),
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
@@ -62,8 +63,8 @@ class AssetsApiRouteSpec
   private val sillyAssetDesc = AssetDescription(
     source = sillyAssetTx.id(),
     issuer = sillyAssetTx.sender,
-    name = Left(sillyAssetTx.nameBytes),
-    description = Left(sillyAssetTx.descriptionBytes),
+    name = Left(ByteStr(sillyAssetTx.name.utf8Bytes)),
+    description = Left(ByteStr(sillyAssetTx.description.utf8Bytes)),
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
