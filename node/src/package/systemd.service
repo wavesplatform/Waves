@@ -6,6 +6,7 @@ Requires=${{start_facilities}}
 Type=simple
 EnvironmentFile=${{env_config}}
 ExecStart=/usr/share/${{app_name}}/bin/${{exec}} \
+  -Dlogback.file.level=INFO \
   -Dlogback.file.directory=/var/log/${{app_name}} \
   -Dlogback.pattern="%%-5level %%logger{26} - %%msg%%n" \
   -- /etc/${{app_name}}/waves.conf
