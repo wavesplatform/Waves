@@ -11,8 +11,6 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
   override def validate(tx: ExchangeTransaction): ValidatedNel[ValidationError, ExchangeTransaction] = {
     import tx._
 
-    val comparablePrice = version < TxVersion.V3 || (buyOrder.version >= Order.V4 && sellOrder.version >= Order.V4)
-
     V.seq(tx)(
       V.fee(fee),
       V.positiveAmount(amount, "assets"),
@@ -28,10 +26,6 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
       V.cond(buyOrder.assetPair == sellOrder.assetPair, GenericError("Both orders should have same AssetPair")),
       V.cond(buyOrder.isValid(timestamp), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages())),
       V.cond(sellOrder.isValid(timestamp), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).messages())),
-      V.cond(
-        !comparablePrice || (price <= buyOrder.price && price >= sellOrder.price),
-        GenericError("price should be <= buyOrder.price and >= sellOrder.price")
-      ),
       V.cond(
         version > TxVersion.V1 || (buyOrder.version == Order.V1 && sellOrder.version == Order.V1),
         GenericError("can only contain orders of version 1")

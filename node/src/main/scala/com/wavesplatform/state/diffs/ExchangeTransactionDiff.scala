@@ -7,7 +7,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
@@ -30,6 +30,27 @@ object ExchangeTransactionDiff {
     val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
     val smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
 
+    lazy val amountDecimals = tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).get.decimals)
+    lazy val priceDecimals  = tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).get.decimals)
+    lazy val convertedPrice = Try {
+      (BigDecimal(10).pow(priceDecimals - amountDecimals) * tx.price).toBigInt().bigInteger.longValueExact()
+    }.toEither.leftMap(x => GenericError(x.getMessage))
+
+    def getPrice =
+      if (tx.version >= TxVersion.V3) convertedPrice else Right(tx.price)
+
+    def isBuyOrderPriceValid =
+      for {
+        p <- if (tx.version >= TxVersion.V3 && tx.buyOrder.version < Order.V4) convertedPrice else Right(tx.price)
+        _ <- Either.cond(p <= tx.buyOrder.price, (), GenericError("price should be <= buyOrder.price"))
+      } yield ()
+
+    def isSellOrderPriceValid =
+      for {
+        p <- if (tx.version >= TxVersion.V3 && tx.sellOrder.version < Order.V4) convertedPrice else Right(tx.price)
+        _ <- Either.cond(p >= tx.sellOrder.price, (), GenericError("price should be >= sellOrder.price"))
+      } yield ()
+
     for {
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       assetScripted = assets.values.count(_.flatMap(_.script).isDefined)
@@ -50,15 +71,14 @@ object ExchangeTransactionDiff {
         (),
         GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
-      tx <- enoughVolume(tx, blockchain)
-      amountDecimals = tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).get.decimals)
-      priceDecimals  = tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).get.decimals)
-      txAmount       = tx.amount
-      txPrice               <- tx.normalizedPrice(amountDecimals, priceDecimals)
-      buyPriceAssetChange   <- tx.buyOrder.getSpendAmount(txAmount, txPrice).liftValidationError(tx).map(-_)
-      buyAmountAssetChange  <- tx.buyOrder.getReceiveAmount(txAmount, txPrice).liftValidationError(tx)
-      sellPriceAssetChange  <- tx.sellOrder.getReceiveAmount(txAmount, txPrice).liftValidationError(tx)
-      sellAmountAssetChange <- tx.sellOrder.getSpendAmount(txAmount, txPrice).liftValidationError(tx).map(-_)
+      tx                    <- enoughVolume(tx, blockchain)
+      price                 <- getPrice
+      _                     <- isBuyOrderPriceValid
+      _                     <- isSellOrderPriceValid
+      buyPriceAssetChange   <- tx.buyOrder.getSpendAmount(tx.amount, price).liftValidationError(tx).map(-_)
+      buyAmountAssetChange  <- tx.buyOrder.getReceiveAmount(tx.amount, price).liftValidationError(tx)
+      sellPriceAssetChange  <- tx.sellOrder.getReceiveAmount(tx.amount, price).liftValidationError(tx)
+      sellAmountAssetChange <- tx.sellOrder.getSpendAmount(tx.amount, price).liftValidationError(tx).map(-_)
       scripts = {
         import com.wavesplatform.features.FeatureProvider._
 
@@ -175,13 +195,4 @@ object ExchangeTransactionDiff {
     */
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
-
-  private[diffs] implicit class ExchangeTransactionOps(val tx: ExchangeTransaction) extends AnyVal {
-    def normalizedPrice(amountAssetDecimals: Int, priceAssetDecimals: Int): Either[ValidationError, Long] =
-      if (tx.isProtobufVersion)
-        Try {
-          (BigDecimal(10).pow(priceAssetDecimals - amountAssetDecimals) * tx.price).toBigInt().bigInteger.longValueExact()
-        }.ensureOr(_ => new RuntimeException("Price should be > 0"))(_ != 0L).toEither.leftMap(x => GenericError(x.getMessage))
-      else Right(tx.price)
-  }
 }

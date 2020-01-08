@@ -52,13 +52,7 @@ case class Order(
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
-    (matchAmount < MaxAmount) :| "amount too large" &&
-    (if (version < V4) { // Orders >= V4 depends on the price and amount assets decimals
-       getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
-       (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-       getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
-       (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
-     } else Validation.success)
+    (matchAmount < MaxAmount) :| "amount too large"
   }
 
   // TODO: Check if we can remove ApiModelProperty annotations

@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -44,7 +44,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     )
   )
 
-  val fsWithOrderFeature: FunctionalitySettings = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.OrderV3.id -> 0))
+  val fsWithOrderFeature: FunctionalitySettings =
+    fs.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.OrderV3.id -> 0, BlockchainFeatures.BlockV5.id -> 0))
 
   val fsOrderMassTransfer =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
@@ -857,6 +858,84 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       }
     }) { _ =>
       ()
+    }
+  }
+
+  property("ExchangeTransaction with Orders V4 uses asset decimals for price calculation") {
+    val enoughFee = 100000000L
+    val buyer     = accountGen.sample.get
+    val seller    = accountGen.sample.get
+
+    val (preconditions, usdn, tidex, liquid) = {
+
+      val genesisTxs = Seq(
+        GenesisTransaction.create(buyer, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(seller, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(MATCHER, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet()
+      )
+      val usdnTx = IssueTransaction
+        .selfSigned(TxVersion.V3, buyer, "USD-N", "USD-N", ENOUGH_AMT, 6.toByte, false, None, enoughFee, ntpTime.correctedTime())
+        .explicitGet()
+      val tidexTx = IssueTransaction
+        .selfSigned(TxVersion.V3, seller, "Tidex", "Tidex", ENOUGH_AMT, 2.toByte, false, None, enoughFee, ntpTime.correctedTime())
+        .explicitGet()
+      val liquidTx = IssueTransaction
+        .selfSigned(TxVersion.V3, seller, "Liquid", "Liquid", ENOUGH_AMT, 8.toByte, false, None, enoughFee, ntpTime.correctedTime())
+        .explicitGet()
+
+      val usdn   = IssuedAsset(usdnTx.assetId)
+      val tidex  = IssuedAsset(tidexTx.assetId)
+      val liquid = IssuedAsset(liquidTx.assetId)
+
+      (Seq(TestBlock.create(genesisTxs), TestBlock.create(Seq(usdnTx, tidexTx, liquidTx))), usdn, tidex, liquid)
+    }
+
+    def createExchange(txVersion: TxVersion, orderVersion: Byte, amount: Long, price: Long, pair: AssetPair): ExchangeTransaction = {
+      val buyOrder =
+        Order.buy(orderVersion, buyer, MATCHER.publicKey, pair, amount, price, ntpTime.correctedTime(), ntpTime.getTimestamp() + 1000, enoughFee)
+      val sellOrder =
+        Order.sell(orderVersion, seller, MATCHER.publicKey, pair, amount, price, ntpTime.correctedTime(), ntpTime.getTimestamp() + 1000, enoughFee)
+
+      ExchangeTransaction
+        .signed(txVersion, MATCHER, buyOrder, sellOrder, amount, price, enoughFee, enoughFee, enoughFee, ntpTime.correctedTime())
+        .explicitGet()
+    }
+
+    val wavesUsdn   = AssetPair(Waves, usdn)
+    val tidexWaves  = AssetPair(tidex, Waves)
+    val liquidWaves = AssetPair(liquid, Waves)
+
+    val scenarios = Table(
+      ("transaction with orders v3", "transaction with orders v4"),
+      (
+        createExchange(TxVersion.V2, Order.V3, 55768188998L, 592600L, wavesUsdn),
+        createExchange(TxVersion.V3, Order.V4, 55768188998L, 59260000L, wavesUsdn)
+      ),
+      (
+        createExchange(TxVersion.V2, Order.V3, 213L, 35016774000000L, tidexWaves),
+        createExchange(TxVersion.V3, Order.V4, 213L, 35016774L, tidexWaves)
+      ),
+      (
+        createExchange(TxVersion.V2, Order.V3, 2000000000L, 13898832L, liquidWaves),
+        createExchange(TxVersion.V3, Order.V4, 2000000000L, 13898832L, liquidWaves)
+      )
+    )
+
+    forAll(scenarios) {
+      case (txWithV3, txWithV4) =>
+        val portfolios = collection.mutable.ListBuffer[Map[Address, Portfolio]]()
+
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4)), fsWithOrderFeature) {
+          case (blockDiff, _) =>
+            portfolios += blockDiff.portfolios
+        }
+
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3)), fsWithOrderFeature) {
+          case (blockDiff, _) => portfolios += blockDiff.portfolios
+        }
+
+        // all portfolios built on the state and on the composite blockchain are equal
+        portfolios.forall(_ == portfolios.head) shouldBe true
     }
   }
 
