@@ -3,12 +3,16 @@ package com.wavesplatform.transaction.validation.impl
 import cats.data.ValidatedNel
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 import com.wavesplatform.transaction.validation.TxValidator
 
 object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
   override def validate(tx: ExchangeTransaction): ValidatedNel[ValidationError, ExchangeTransaction] = {
     import tx._
+
+    val comparablePrice = version < TxVersion.V3 || (buyOrder.version >= Order.V4 && sellOrder.version >= Order.V4)
+
     V.seq(tx)(
       V.fee(fee),
       V.positiveAmount(amount, "assets"),
@@ -24,8 +28,18 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
       V.cond(buyOrder.assetPair == sellOrder.assetPair, GenericError("Both orders should have same AssetPair")),
       V.cond(buyOrder.isValid(timestamp), OrderValidationError(buyOrder, buyOrder.isValid(timestamp).messages())),
       V.cond(sellOrder.isValid(timestamp), OrderValidationError(sellOrder, sellOrder.isValid(timestamp).messages())),
-      V.cond(price <= buyOrder.price && price >= sellOrder.price, GenericError("priceIsValid")),
-      V.cond(version > 1 || (buyOrder.version == 1 && sellOrder.version == 1), GenericError("can only contain orders of version 1"))
+      V.cond(
+        !comparablePrice || (price <= buyOrder.price && price >= sellOrder.price),
+        GenericError("price should be <= buyOrder.price and >= sellOrder.price")
+      ),
+      V.cond(
+        version > TxVersion.V1 || (buyOrder.version == Order.V1 && sellOrder.version == Order.V1),
+        GenericError("can only contain orders of version 1")
+      ),
+      V.cond(
+        version > TxVersion.V2 || (buyOrder.version < Order.V4 && sellOrder.version < Order.V4),
+        GenericError("can only contain orders of version < 4")
+      )
     )
   }
 }

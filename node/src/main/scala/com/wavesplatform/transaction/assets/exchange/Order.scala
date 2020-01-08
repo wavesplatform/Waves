@@ -53,10 +53,12 @@ case class Order(
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
     (matchAmount < MaxAmount) :| "amount too large" &&
-    getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
-    (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
-    getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
-    (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+    (if (version < V4) { // Orders >= V4 depends on the price and amount assets decimals
+       getSpendAmount(matchAmount, matchPrice).isRight :| "SpendAmount too large" &&
+       (getSpendAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "SpendAmount should be > 0" &&
+       getReceiveAmount(matchAmount, matchPrice).isRight :| "ReceiveAmount too large" &&
+       (getReceiveAmount(matchAmount, matchPrice).getOrElse(0L) > 0) :| "ReceiveAmount should be > 0"
+     } else Validation.success)
   }
 
   // TODO: Check if we can remove ApiModelProperty annotations
@@ -109,7 +111,8 @@ case class Order(
   @ApiModelProperty(hidden = true)
   override def toString: String = {
     val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${matcherFeeAssetId.fold("Waves")(_.toString)}," else ""
-    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$matcherFeeAssetIdStr proofs=$proofs)"
+    s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, " +
+      s"price=$price, ts=$timestamp, exp=$expiration, fee=$matcherFee,$matcherFeeAssetIdStr proofs=$proofs)"
   }
 }
 
@@ -123,9 +126,10 @@ object Order {
   val PriceConstant     = 100000000L
   val MaxAmount: Long   = 100 * PriceConstant * PriceConstant
 
-  val V1: Version = 1
-  val V2: Version = 2
-  val V3: Version = 3
+  val V1: Version = 1.toByte
+  val V2: Version = 2.toByte
+  val V3: Version = 3.toByte
+  val V4: Version = 4.toByte
 
   implicit def sign(order: Order, privateKey: PrivateKey): Order =
     order.copy(proofs = Proofs(crypto.sign(privateKey, order.bodyBytes())))

@@ -12,7 +12,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 
-import scala.util.Right
+import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
 
@@ -25,14 +25,14 @@ object ExchangeTransactionDiff {
       List(tx.buyOrder.assetPair.amountAsset, tx.buyOrder.assetPair.priceAsset, tx.sellOrder.assetPair.amountAsset, tx.sellOrder.assetPair.priceAsset).collect {
         case asset: IssuedAsset => asset
       }.distinct
-    val assets = assetIds.map(blockchain.assetDescription)
+    val assets = assetIds.map(id => id -> blockchain.assetDescription(id)).toMap
 
     val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
     val smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
 
     for {
-      _ <- Either.cond(assets.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
-      assetScripted = assets.count(_.flatMap(_.script).isDefined)
+      _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
+      assetScripted = assets.values.count(_.flatMap(_.script).isDefined)
       _ <- Either.cond(
         smartAssetsEnabled || assetScripted == 0,
         (),
@@ -50,11 +50,15 @@ object ExchangeTransactionDiff {
         (),
         GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
-      tx                    <- enoughVolume(tx, blockchain)
-      buyPriceAssetChange   <- tx.buyOrder.getSpendAmount(tx.amount, tx.price).liftValidationError(tx).map(-_)
-      buyAmountAssetChange  <- tx.buyOrder.getReceiveAmount(tx.amount, tx.price).liftValidationError(tx)
-      sellPriceAssetChange  <- tx.sellOrder.getReceiveAmount(tx.amount, tx.price).liftValidationError(tx)
-      sellAmountAssetChange <- tx.sellOrder.getSpendAmount(tx.amount, tx.price).liftValidationError(tx).map(-_)
+      tx <- enoughVolume(tx, blockchain)
+      amountDecimals = tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).get.decimals)
+      priceDecimals  = tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).get.decimals)
+      txAmount       = tx.amount
+      txPrice               <- tx.normalizedPrice(amountDecimals, priceDecimals)
+      buyPriceAssetChange   <- tx.buyOrder.getSpendAmount(txAmount, txPrice).liftValidationError(tx).map(-_)
+      buyAmountAssetChange  <- tx.buyOrder.getReceiveAmount(txAmount, txPrice).liftValidationError(tx)
+      sellPriceAssetChange  <- tx.sellOrder.getReceiveAmount(txAmount, txPrice).liftValidationError(tx)
+      sellAmountAssetChange <- tx.sellOrder.getSpendAmount(txAmount, txPrice).liftValidationError(tx).map(-_)
       scripts = {
         import com.wavesplatform.features.FeatureProvider._
 
@@ -135,7 +139,7 @@ object ExchangeTransactionDiff {
 
     def isFeeValid(feeTotal: Long, amountTotal: Long, maxfee: Long, maxAmount: Long, order: Order): Boolean = {
       feeTotal <= (order match {
-        case o: Order if o.version == Order.V3 => BigInt(maxfee)
+        case o: Order if o.version >= Order.V3 => BigInt(maxfee)
         case _                                 => BigInt(maxfee) * BigInt(amountTotal) / BigInt(maxAmount)
       })
     }
@@ -171,4 +175,13 @@ object ExchangeTransactionDiff {
     */
   private[diffs] def getOrderFeePortfolio(order: Order, fee: Long): Portfolio =
     Portfolio.build(order.matcherFeeAssetId, fee)
+
+  private[diffs] implicit class ExchangeTransactionOps(val tx: ExchangeTransaction) extends AnyVal {
+    def normalizedPrice(amountAssetDecimals: Int, priceAssetDecimals: Int): Either[ValidationError, Long] =
+      if (tx.isProtobufVersion)
+        Try {
+          (BigDecimal(10).pow(priceAssetDecimals - amountAssetDecimals) * tx.price).toBigInt().bigInteger.longValueExact()
+        }.ensureOr(_ => new RuntimeException("Price should be > 0"))(_ != 0L).toEither.leftMap(x => GenericError(x.getMessage))
+      else Right(tx.price)
+  }
 }
