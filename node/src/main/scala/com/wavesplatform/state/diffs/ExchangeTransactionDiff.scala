@@ -42,12 +42,14 @@ object ExchangeTransactionDiff {
     def isBuyOrderPriceValid =
       for {
         p <- if (tx.version >= TxVersion.V3 && tx.buyOrder.version < Order.V4) convertedPrice else Right(tx.price)
+        _ <- Either.cond(p != 0L, (), GenericError("price should be > 0"))
         _ <- Either.cond(p <= tx.buyOrder.price, (), GenericError("price should be <= buyOrder.price"))
       } yield ()
 
     def isSellOrderPriceValid =
       for {
         p <- if (tx.version >= TxVersion.V3 && tx.sellOrder.version < Order.V4) convertedPrice else Right(tx.price)
+        _ <- Either.cond(p != 0L, (), GenericError("price should be > 0"))
         _ <- Either.cond(p >= tx.sellOrder.price, (), GenericError("price should be >= sellOrder.price"))
       } yield ()
 
