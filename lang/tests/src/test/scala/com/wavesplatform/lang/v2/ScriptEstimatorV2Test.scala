@@ -76,6 +76,8 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTest(ScriptEstimatorV2) {
     r shouldBe Left("Script estimation was interrupted")
     t.getState shouldBe Thread.State.TERMINATED
 
-    t.stop()
+    val stop0Method = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
+    stop0Method.setAccessible(true)
+    stop0Method.invoke(t, new ThreadDeath())
   }
 }
