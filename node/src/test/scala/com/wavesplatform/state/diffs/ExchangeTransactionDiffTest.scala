@@ -890,14 +890,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       (Seq(TestBlock.create(genesisTxs), TestBlock.create(Seq(usdnTx, tidexTx, liquidTx))), usdn, tidex, liquid)
     }
 
-    def createExchange(txVersion: TxVersion, orderVersion: Byte, amount: Long, price: Long, pair: AssetPair): ExchangeTransaction = {
+    def mkExchange(txv: Byte, bov: Byte, sov: Byte, amount: Long, txPrice: Long, boPrice: Long, soPrice: Long, pair: AssetPair)
+        : ExchangeTransaction = {
       val buyOrder =
-        Order.buy(orderVersion, buyer, MATCHER.publicKey, pair, amount, price, ntpTime.correctedTime(), ntpTime.getTimestamp() + 1000, enoughFee)
+        Order.buy(bov, buyer, MATCHER.publicKey, pair, amount, boPrice, ntpTime.correctedTime(), ntpTime.getTimestamp() + 1000, enoughFee)
       val sellOrder =
-        Order.sell(orderVersion, seller, MATCHER.publicKey, pair, amount, price, ntpTime.correctedTime(), ntpTime.getTimestamp() + 1000, enoughFee)
-
+        Order.sell(sov, seller, MATCHER.publicKey, pair, amount, soPrice, ntpTime.correctedTime(), ntpTime.getTimestamp() + 1000, enoughFee)
       ExchangeTransaction
-        .signed(txVersion, MATCHER, buyOrder, sellOrder, amount, price, enoughFee, enoughFee, enoughFee, ntpTime.correctedTime())
+        .signed(txv, MATCHER, buyOrder, sellOrder, amount, txPrice, enoughFee, enoughFee, enoughFee, ntpTime.correctedTime())
         .explicitGet()
     }
 
@@ -906,28 +906,41 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     val liquidWaves = AssetPair(liquid, Waves)
 
     val scenarios = Table(
-      ("transaction with orders v3", "transaction with orders v4"),
+      ("transaction with orders v3", "transaction with orders v4", "transaction with orders v3 and v4", "transaction with orders v4 and v3"),
       (
-        createExchange(TxVersion.V2, Order.V3, 55768188998L, 592600L, wavesUsdn),
-        createExchange(TxVersion.V3, Order.V4, 55768188998L, 59260000L, wavesUsdn)
+        mkExchange(TxVersion.V2, Order.V3, Order.V3, 55768188998L, 592600L, 592600L, 592600L, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V4, Order.V4, 55768188998L, 59260000L, 59260000L, 59260000L, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 55768188998L, 59260000L, 592600L, 59260000L, wavesUsdn),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 55768188998L, 59260000L, 59260000L, 592600L, wavesUsdn)
       ),
       (
-        createExchange(TxVersion.V2, Order.V3, 213L, 35016774000000L, tidexWaves),
-        createExchange(TxVersion.V3, Order.V4, 213L, 35016774L, tidexWaves)
+        mkExchange(TxVersion.V2, Order.V3, Order.V3, 213L, 35016774000000L, 35016774000000L, 35016774000000L, tidexWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V4, 213L, 35016774L, 35016774L, 35016774L, tidexWaves),
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 213L, 35016774L, 35016774000000L, 35016774L, tidexWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 213L, 35016774L, 35016774L, 35016774000000L, tidexWaves)
       ),
       (
-        createExchange(TxVersion.V2, Order.V3, 2000000000L, 13898832L, liquidWaves),
-        createExchange(TxVersion.V3, Order.V4, 2000000000L, 13898832L, liquidWaves)
+        mkExchange(TxVersion.V2, Order.V3, Order.V3, 2000000000L, 13898832L, 13898832L, 13898832L, liquidWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V4, 2000000000L, 13898832L, 13898832L, 13898832L, liquidWaves),
+        mkExchange(TxVersion.V3, Order.V3, Order.V4, 2000000000L, 13898832L, 13898832L, 13898832L, liquidWaves),
+        mkExchange(TxVersion.V3, Order.V4, Order.V3, 2000000000L, 13898832L, 13898832L, 13898832L, liquidWaves)
       )
     )
 
     forAll(scenarios) {
-      case (txWithV3, txWithV4) =>
+      case (txWithV3, txWithV4, txWithV3V4, txWithV4V3) =>
         val portfolios = collection.mutable.ListBuffer[Map[Address, Portfolio]]()
 
         assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4)), fsWithOrderFeature) {
-          case (blockDiff, _) =>
-            portfolios += blockDiff.portfolios
+          case (blockDiff, _) => portfolios += blockDiff.portfolios
+        }
+
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3V4)), fsWithOrderFeature) {
+          case (blockDiff, _) => portfolios += blockDiff.portfolios
+        }
+
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4V3)), fsWithOrderFeature) {
+          case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
         assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3)), fsWithOrderFeature) {
