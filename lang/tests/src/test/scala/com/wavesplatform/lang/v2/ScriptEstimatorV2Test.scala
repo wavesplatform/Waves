@@ -70,5 +70,6 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTest(ScriptEstimatorV2) {
     t.interrupt()
     Thread.sleep(500)
     r shouldBe Left("Script estimation was interrupted")
+    t.stop()
   }
 }
