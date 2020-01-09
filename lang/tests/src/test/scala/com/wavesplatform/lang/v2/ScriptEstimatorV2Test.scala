@@ -1,5 +1,7 @@
 package com.wavesplatform.lang.v2
 
+import java.util.concurrent.Executors
+
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils._
@@ -65,11 +67,15 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTest(ScriptEstimatorV2) {
     @volatile var r: Either[String, Long] = Right(0)
     val run: Runnable = { () => r = estimate(functionCosts(V3), compile(hangingScript)) }
     val t = new Thread(run)
+
     t.start()
     Thread.sleep(5000)
     t.interrupt()
     Thread.sleep(500)
+
     r shouldBe Left("Script estimation was interrupted")
+    t.getState shouldBe Thread.State.TERMINATED
+
     t.stop()
   }
 }
