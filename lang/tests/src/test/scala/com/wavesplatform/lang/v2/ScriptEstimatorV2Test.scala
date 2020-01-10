@@ -54,4 +54,30 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTest(ScriptEstimatorV2) {
       5 * 4              /* all blocks */ +
       7                  /* calc 1 + 1 + 1 + 1 exactly once */
   }
+
+  property("interrupting") {
+    val count = 30
+    val hangingScript =
+      s"""
+         | func f0() = 0
+         | ${(1 to count).map(i => s"func f$i() = if (true) then f${i-1}() else f${i-1}()").mkString("\n")}
+         | f$count()
+       """.stripMargin
+
+    @volatile var r: Either[String, Long] = Right(0)
+    val run: Runnable = { () => r = estimate(functionCosts(V3), compile(hangingScript)) }
+    val t = new Thread(run)
+
+    t.start()
+    Thread.sleep(5000)
+    t.interrupt()
+    Thread.sleep(500)
+
+    r shouldBe Left("Script estimation was interrupted")
+    t.getState shouldBe Thread.State.TERMINATED
+
+    val stop0Method = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
+    stop0Method.setAccessible(true)
+    stop0Method.invoke(t, new ThreadDeath())
+  }
 }
