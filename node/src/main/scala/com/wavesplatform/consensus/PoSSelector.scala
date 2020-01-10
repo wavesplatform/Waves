@@ -119,12 +119,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
     blockchain
       .hitSourceAtHeight(hitHeight)
-      .collect {
-        case msg if vrfActivated(height) && hitHeight == 1 => generationSignature(msg.arr, blockchain.genesis.header.generator)
-        case msg if vrfActivated(height)                   => msg.arr
-        case msg                                           => generationSignature(msg.arr, accountPublicKey)
-      }
-      .map(hit)
+      .map(hs => hit(generationSignature(hs.arr, accountPublicKey)))
       .toRight(GenericError(s"Couldn't find hit source at height: $height"))
   }
 
