@@ -26,10 +26,11 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
     val counter = AtomicInt(10)
 
     def countTransactions(tx: Transaction): TracedResult[ValidationError, Boolean] = {
-      if (counter.getAndDecrement() > 5) {
-        while (true) {}
-      }
-      latch.countDown()
+      if (counter.getAndDecrement() > 5)
+        while (!Thread.currentThread().isInterrupted) {}
+      else
+        latch.countDown()
+
       TracedResult(Right(true))
     }
 
