@@ -207,7 +207,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       )
 
     transactions.foreach {
-      case (channel, transaction) => utxSynchronizer.tryPublish(transaction, channel)
+      case (channel, transaction) =>
+        log.trace(s"Passing ${transaction.id()} on to synchronizer")
+        utxSynchronizer.tryPublish(transaction, channel)
     }
 
     val microBlockSink = microblockData

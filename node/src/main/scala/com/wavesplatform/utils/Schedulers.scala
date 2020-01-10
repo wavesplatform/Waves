@@ -1,6 +1,6 @@
 package com.wavesplatform.utils
 
-import java.util.concurrent.ThreadPoolExecutor.DiscardOldestPolicy
+import java.util.concurrent.ThreadPoolExecutor.{AbortPolicy, DiscardOldestPolicy}
 import java.util.concurrent._
 
 import io.netty.util.{Timeout, Timer}
@@ -110,8 +110,8 @@ object Schedulers {
       poolSize: Int,
       name: String,
       reporter: UncaughtExceptionReporter = UncaughtExceptionReporter.default,
-      executionModel: ExecutionModel = ExecutionModel.Default,
-      rejectedExecutionHandler: RejectedExecutionHandler = new DiscardOldestPolicy
+      executionModel: ExecutionModel = ExecutionModel.AlwaysAsyncExecution,
+      rejectedExecutionHandler: RejectedExecutionHandler = new AbortPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)
     val executor = new ScheduledThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) with AdaptedThreadPoolExecutorMixin {

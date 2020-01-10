@@ -17,7 +17,7 @@ import monix.reactive.Observable
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
-import scala.util.Success
+import scala.util.{Failure, Success}
 
 trait UtxPoolSynchronizer {
   def tryPublish(tx: Transaction, source: Channel): Unit
@@ -44,6 +44,10 @@ class UtxPoolSynchronizerImpl(
     .build[ByteStr, Object]
 
   val cancelableFuture = pollTransactions()
+  cancelableFuture.onComplete {
+    case Success(_) => log.info("UtxPoolSynchronizer stopped")
+    case Failure(e) => log.warn("UtxPoolSynchronizer stopped abnormally", e)
+  }
 
   blockSource.map(_.height).distinctUntilChanged.foreach(_ => knownTransactions.invalidateAll())
 
@@ -55,9 +59,14 @@ class UtxPoolSynchronizerImpl(
     isNew
   }
 
-  override def tryPublish(tx: Transaction, source: Channel): Unit = if (transactionIsNew(tx.id())) {
-    queue.tryOffer(tx -> source)
-  }
+  override def tryPublish(tx: Transaction, source: Channel): Unit =
+    if (!transactionIsNew(tx.id())) {
+      log.trace(s"Ignoring known transaction ${tx.id()}")
+    } else if (queue.tryOffer(tx -> source)) {
+      log.trace(s"Queueing transaction ${tx.id()} for processing")
+    } else {
+      log.trace(s"Dropping transaction ${tx.id()} because queue is full (isEmpty=${queue.isEmpty})")
+    }
 
   private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
     Future(putIfNew(tx))(scheduler)
@@ -75,10 +84,15 @@ class UtxPoolSynchronizerImpl(
 
   override def close(): Unit = cancelableFuture.cancel()
 
-  private def pollTransactions(): CancelableFuture[Unit] = queue.poll().flatMap {
-    case (tx, source) =>
-      validateFuture(tx, allowRebroadcast = false, Some(source))
-      pollTransactions()
+  private def pollTransactions(): CancelableFuture[Unit] = queue.poll().transformWith { result =>
+    result match {
+      case Success((tx, source)) =>
+        log.trace(s"Consuming transaction ${tx.id()} from $source")
+        validateFuture(tx, allowRebroadcast = false, Some(source))
+      case Failure(e) =>
+        log.warn(s"Error polling transaction queue", e)
+    }
+    pollTransactions()
   }
 }
 
