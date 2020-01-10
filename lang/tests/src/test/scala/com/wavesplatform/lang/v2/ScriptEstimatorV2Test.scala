@@ -67,6 +67,7 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTest(ScriptEstimatorV2) {
     @volatile var r: Either[String, Long] = Right(0)
     val run: Runnable = { () => r = estimate(functionCosts(V3), compile(hangingScript)) }
     val t = new Thread(run)
+    t.setDaemon(true)
 
     t.start()
     Thread.sleep(5000)
@@ -75,9 +76,5 @@ class ScriptEstimatorV2Test extends ScriptEstimatorTest(ScriptEstimatorV2) {
 
     r shouldBe Left("Script estimation was interrupted")
     t.getState shouldBe Thread.State.TERMINATED
-
-    val stop0Method = classOf[Thread].getDeclaredMethod("stop0", classOf[java.lang.Object])
-    stop0Method.setAccessible(true)
-    stop0Method.invoke(t, new ThreadDeath())
   }
 }
