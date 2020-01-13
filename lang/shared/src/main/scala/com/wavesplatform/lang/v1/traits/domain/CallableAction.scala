@@ -34,22 +34,27 @@ object Issue {
               name: String,
               quantity: Long,
               nonce: Long,
-              patent: ByteStr) = {
+              patent: ByteStr): Issue = {
+    val id = calculateId(decimals, description, isReissuable, name, quantity, nonce)
+    Issue(id, compiledScript, decimals, description, isReissuable, name, quantity, nonce)
+  }
+
+  def calculateId(
+    decimals: Int,
+    description: String,
+    isReissuable: Boolean,
+    name: String,
+    quantity: Long,
+    nonce: Long
+  ): ByteStr = {
     val out = new ByteArrayOutputStream()
     out.writeString(name)
     out.writeString(description)
     out.writeInt(decimals)
     out.writeLong(quantity)
-    out.writeShort((if(isReissuable) { 1 } else { 0 }))
+    out.writeShort(if (isReissuable) 1 else 0)
     out.writeLong(nonce)
-    Issue(ByteStr(Blake2b256.hash(out.toByteArray)),
-          compiledScript,
-          decimals: Int,
-          description: String,
-          isReissuable: Boolean,
-          name: String,
-          quantity: Long,
-          nonce: Long)
+    ByteStr(Blake2b256.hash(out.toByteArray))
   }
 }
 

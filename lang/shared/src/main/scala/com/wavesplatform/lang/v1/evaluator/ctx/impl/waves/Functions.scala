@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasT
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 object Functions {
@@ -487,5 +487,19 @@ object Functions {
             case (_, xs) => notImplemented[F](s"parseBlockHeader(u: ByteVector)", xs)
           }
       }
+    }
+
+  val calculateAssetIdF: BaseFunction[Environment] =
+    NativeFunction(
+      "calculateAssetId",
+      100,
+      CALCULATE_ASSET_ID,
+      BYTESTR,
+      ("issue", issueActionType)
+    ) {
+      case CaseObj(`issueActionType`, fields) :: Nil =>
+        Issue.calculateId(fields)
+
+      case xs => notImplemented[Id](s"calculateAssetId(i: Issue)", xs)
     }
 }
