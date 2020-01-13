@@ -13,6 +13,7 @@ import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesReq
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.ActivationStatus
@@ -28,17 +29,18 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction, UpdateAssetInfoTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
-import org.asynchttpclient.Dsl.{get => _get, post => _post, put => _put, delete => _delete}
+import org.asynchttpclient.Dsl.{delete => _delete, get => _get, post => _post, put => _put}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
@@ -388,26 +390,28 @@ object AsyncHttpApi extends Assertions {
     }
 
     def updateAssetInfo(
-                      caller: String,
-                      assetId: String,
-                      name: String,
-                      description: String,
-                      fee: Long,
-                      feeAssetId: Option[String] = None,
-                      version: TxVersion = TxVersion.V1
+                       sender: KeyPair,
+                       assetId: String,
+                       name: String,
+                       description: String,
+                       fee: Long,
+                       feeAssetId: Option[String] = None,
+                       version: TxVersion = TxVersion.V1,
+                       timestamp: Option[Long] = None
                     ): Future[(Transaction, JsValue)] = {
-      signAndTraceBroadcast(
-        Json.obj(
-          "type"    -> UpdateAssetInfoTransaction.typeId,
-          "version"     -> version,
-          "sender"      -> caller,
-          "assetId"     -> assetId,
-          "name"        -> name,
-          "description" -> description,
-          "fee"         -> fee,
-          "feeAssetId"  -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
-        )
-      )
+      val tx = UpdateAssetInfoTransaction(
+        version,
+        AddressScheme.current.chainId,
+        sender.publicKey,
+        IssuedAsset(ByteStr(Base58.decode(assetId))),
+        name,
+        description,
+        timestamp.getOrElse(System.currentTimeMillis()),
+        fee,
+        if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
+        Proofs.empty
+      ).signWith(sender.privateKey)
+      signedTraceBroadcast(tx.json())
     }
 
     def scriptCompile(code: String): Future[CompiledScript] = post("/utils/script/compileCode", code).as[CompiledScript]

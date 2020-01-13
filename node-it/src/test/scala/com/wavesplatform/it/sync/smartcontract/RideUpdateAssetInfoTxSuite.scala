@@ -31,6 +31,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
   private val name: String = "MyAsset"
   private val description: String = "Some description"
   private val fee = issueFee + smartFee * 2
+  private val timestamp = System.currentTimeMillis()
 
   def sourceDApp(version: Int): String =
     s"""
@@ -49,7 +50,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
        |      && uai.name == "$name"
        |      && uai.description == "$description"
        |      && uai.fee == $fee
-       |      && uai.timestamp > 0
+       |      && uai.timestamp == $timestamp
        |      && sigVerify(uai.bodyBytes, uai.proofs[0], uai.senderPublicKey)
        |    case _ => throw("UpdateAssetInfoTx was not matched")
        |  }
@@ -71,7 +72,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
        |    && uai.name == "$name"
        |    && uai.description == "$description"
        |    && uai.fee == $fee
-       |    && uai.timestamp > 0
+       |    && uai.timestamp == $timestamp
        |    && sigVerify(uai.bodyBytes, uai.proofs[0], uai.senderPublicKey)
        |  case _ => throw("UpdateAssetInfoTx was not matched")
        |}""".stripMargin
@@ -91,7 +92,7 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
        |    && uai.name == "$name"
        |    && uai.description == "$description"
        |    && uai.fee == $fee
-       |    && uai.timestamp > 0
+       |    && uai.timestamp == $timestamp
        |  case _ => throw("UpdateAssetInfoTx was not matched")
        |}""".stripMargin
 
@@ -111,18 +112,21 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
     val scriptAcc = ScriptCompiler.compile(sourceAcc(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val scriptAsset = ScriptCompiler.compile(sourceAsset(4), ScriptEstimatorV2).explicitGet()._1.bytes().base64
 
-    asset1 = IssuedAsset(ByteStr.decodeBase58(sender.issue(dApp, script = Some(scriptAsset), waitForTx = true).id).get)
-    asset2 = IssuedAsset(ByteStr.decodeBase58(sender.issue(smartAcc, script = Some(scriptAsset), waitForTx = true).id).get)
+    val issue1 = sender.issue(dApp, script = Some(scriptAsset), waitForTx = true)
+    val issue2 = sender.issue(smartAcc, script = Some(scriptAsset), waitForTx = true)
+    asset1 = IssuedAsset(ByteStr.decodeBase58(issue1.id).get)
+    asset2 = IssuedAsset(ByteStr.decodeBase58(issue2.id).get)
 
     sender.setScript(dApp, Some(scriptDApp), waitForTx = true)
     sender.setScript(smartAcc, Some(scriptAcc), waitForTx = true)
   }
 
   test("can check UpdateAssetInfo tx from contracts") {
-    nodes.waitForHeight(sender.height + 2)
+    val asset2Height = sender.transactionInfo(asset2.id.toString).height
+    nodes.waitForHeight(asset2Height + 2)
 
-    sender.updateAssetInfo(dApp, asset1.id.toString, "test", "", fee, waitForTx = true)
-    sender.updateAssetInfo(smartAcc, asset2.id.toString, "test", "", fee, waitForTx = true)
+    sender.updateAssetInfo(pkByAddress(dApp), asset1.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
+    sender.updateAssetInfo(pkByAddress(smartAcc), asset2.id.toString, name, description, fee, timestamp = Some(timestamp), waitForTx = true)
   }
 
 }
