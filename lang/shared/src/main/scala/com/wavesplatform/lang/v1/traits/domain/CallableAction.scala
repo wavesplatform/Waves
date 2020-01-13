@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import scorex.crypto.hash.Blake2b256
 
 sealed trait CallableAction
 
@@ -26,6 +25,9 @@ case class Issue(
 object Issue {
   import com.wavesplatform.lang.utils.Serialize._
   import java.io.ByteArrayOutputStream
+
+  import com.wavesplatform.lang.v1.BaseGlobal
+  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
 
   def create( compiledScript: Option[ByteStr],
               decimals: Int,
@@ -54,7 +56,7 @@ object Issue {
     out.writeLong(quantity)
     out.writeShort(if (isReissuable) 1 else 0)
     out.writeLong(nonce)
-    ByteStr(Blake2b256.hash(out.toByteArray))
+    ByteStr(Global.blake2b256(out.toByteArray))
   }
 }
 
