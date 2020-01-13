@@ -162,6 +162,9 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       sync(async(n).get(path))
 
+    def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false): Response =
+      sync(async(n).getWithCustomHeader(path, headerName, headerValue, withApiKey))
+
     def utx: Seq[Transaction] = sync(async(n).utx)
 
     def utxSize: Int = sync(async(n).utxSize)
@@ -194,6 +197,9 @@ object SyncHttpApi extends Assertions {
 
     def postJsonWithApiKey[A: Writes](path: String, body: A): Response =
       sync(async(n).postJsonWithApiKey(path, body))
+
+    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String, headerValue: String): Response =
+      sync(async(n).postJsObjectWithCustomHeader(path, body, headerName, headerValue))
 
     def getWithApiKey(path: String): Response =
       sync(async(n).getWithApiKey(path))
@@ -370,6 +376,20 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
+    def exchange(matcher: KeyPair,
+                 buyOrder: Order,
+                 sellOrder: Order,
+                 amount: Long,
+                 price: Long,
+                 buyMatcherFee: Long,
+                 sellMatcherFee: Long,
+                 fee: Long,
+                 version: Byte = 2,
+                 matcherFeeAssetId: Option[String] = None,
+                 waitForTx: Boolean = false): Transaction = {
+      maybeWaitForTransaction(sync(async(n).exchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, version, matcherFeeAssetId)), waitForTx)
+    }
+
     def transfer(
         sourceAddress: String,
         recipient: String,
@@ -424,8 +444,8 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee, version)), waitForTx)
 
-    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
-      sync(async(n).putData(sourceAddress, data, fee))
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, waitForTx: Boolean = false): Transaction =
+      maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, fee)), waitForTx)
 
     def removeData(sourceAddress: String, data: Seq[String], fee: Long): Transaction =
       sync(async(n).removeData(sourceAddress, data, fee))

@@ -28,7 +28,7 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{ExchangeTransactionData, IssueTransactionData, PBOrders, PBSignedTransaction, PBTransactions, Recipient, Script, SignedTransaction, TransferTransactionData}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
-import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
 import com.wavesplatform.transaction.assets.{BurnTransaction, IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -61,6 +61,15 @@ object AsyncHttpApi extends Assertions {
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
 
+    def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false, f: RequestBuilder => RequestBuilder = identity): Future[Response] = {
+      val requestBuilder = if (withApiKey) {
+        _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue).withApiKey(n.apiKey)
+      } else {
+        _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue)
+      }
+      retrying(f(requestBuilder).build())
+    }
+
     def delete(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_delete(s"${n.nodeApiEndpoint}$path")).withApiKey(n.apiKey).build())
 
@@ -84,6 +93,15 @@ object AsyncHttpApi extends Assertions {
       _post(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
         .setHeader("Content-type", "application/json")
+        .setBody(stringify(body))
+        .build()
+    }
+
+    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String, headerValue: String): Future[Response] = retrying {
+      _post(s"${n.nodeApiEndpoint}$path")
+        .withApiKey(n.apiKey)
+        .setHeader("Content-type", "application/json")
+        .setHeader(headerName, headerValue)
         .setBody(stringify(body))
         .build()
     }
@@ -552,6 +570,36 @@ object AsyncHttpApi extends Assertions {
           "alias"   -> alias
         )
       )
+
+    def exchange(matcher: KeyPair,
+                 buyOrder: Order,
+                 sellOrder: Order,
+                 amount: Long,
+                 price: Long,
+                 buyMatcherFee: Long,
+                 sellMatcherFee: Long,
+                 fee: Long,
+                 version: Byte,
+                 matcherFeeAssetId: Option[String]): Future[Transaction] = {
+      val tx = ExchangeTx
+        .signed(
+          matcher = matcher,
+          buyOrder = buyOrder,
+          sellOrder = sellOrder,
+          amount = amount,
+          price = price,
+          buyMatcherFee = buyMatcherFee,
+          sellMatcherFee = sellMatcherFee,
+          fee = fee,
+          timestamp = System.currentTimeMillis(),
+          version = version
+        )
+        .right
+        .get
+        .json()
+
+      signedBroadcast(tx)
+    }
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
       get(s"/alias/by-address/$targetAddress").as[Seq[String]]
