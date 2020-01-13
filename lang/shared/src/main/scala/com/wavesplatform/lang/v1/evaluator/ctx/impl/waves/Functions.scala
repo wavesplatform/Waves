@@ -498,7 +498,14 @@ object Functions {
       ("issue", issueActionType)
     ) {
       case CaseObj(`issueActionType`, fields) :: Nil =>
-        Issue.calculateId(fields)
+        Right(Issue.calculateId(
+          decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
+          description  = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s,
+          isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
+          name         = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s,
+          quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
+          nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t
+        ))
 
       case xs => notImplemented[Id](s"calculateAssetId(i: Issue)", xs)
     }
