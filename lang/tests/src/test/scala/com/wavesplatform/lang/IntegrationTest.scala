@@ -46,6 +46,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   ): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
 
+    val f: BaseFunction[C] =
+      NativeFunction(
+        "fn1",
+        1,
+        91:Short,
+        pointType,
+        ("value", pointType),
+      ) {
+        case _ :: Nil => throw new Exception("test exception")
+        case xs => notImplemented[Id]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+      }
+
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
     val ctx: CTX[C] =
@@ -54,7 +66,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
-          CTX[C](sampleTypes, stringToTuple, Array.empty),
+          CTX[C](sampleTypes, stringToTuple, Array(f)),
           ctxt
         )
       )
@@ -82,6 +94,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}
       """.stripMargin
     eval[EVALUATED](src) should produce("can't parse the expression")
+  }
+
+  property("Exception handling") {
+    val sampleScript =
+      """match fn1(p) {
+        |  case pa: PointA => 0
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe 'Left
   }
 
   property("patternMatching") {
