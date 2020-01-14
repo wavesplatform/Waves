@@ -69,7 +69,10 @@ class UtxPoolSynchronizerImpl(
     }
 
   private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
-    Future(putIfNew(tx))(scheduler)
+    Future {
+      log.trace(s"${Thread.currentThread()} validateFuture putIfNew")
+      putIfNew(tx)
+    }(scheduler)
       .recover {
         case t =>
           log.trace(s"${Thread.currentThread()} validateFuture recover")

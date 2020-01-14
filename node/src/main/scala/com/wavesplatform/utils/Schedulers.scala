@@ -75,7 +75,7 @@ object Schedulers {
     ExecutorScheduler(executor, reporter, executionModel, Features.empty)
   }
 
-  private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] {
+  private class TimedWrapper[V](timer: Timer, timeout: FiniteDuration, delegate: RunnableScheduledFuture[V]) extends RunnableScheduledFuture[V] with ScorexLogging {
     @volatile
     private[this] var maybeScheduledTimeout     = Option.empty[Timeout]
     override def isPeriodic: Boolean            = delegate.isPeriodic
@@ -85,6 +85,7 @@ object Schedulers {
       val workerThread = Thread.currentThread()
       maybeScheduledTimeout = Some(timer.newTimeout(
           (t: Timeout) => if (!t.isCancelled) {
+            log.warn(s"Interrupting thread: $workerThread")
             workerThread.interrupt()
           },
           timeout.toMillis,
