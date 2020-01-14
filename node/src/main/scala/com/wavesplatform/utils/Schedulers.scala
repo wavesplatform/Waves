@@ -85,7 +85,7 @@ object Schedulers {
       val workerThread = Thread.currentThread()
       maybeScheduledTimeout = Some(timer.newTimeout(
           (t: Timeout) => if (!t.isCancelled) {
-            log.warn(s"Interrupting thread: $workerThread")
+            log.warn(s"Interrupting thread: $workerThread\n${workerThread.getStackTrace.map("at " + _).mkString("\n")}")
             workerThread.interrupt()
           },
           timeout.toMillis,
@@ -115,12 +115,27 @@ object Schedulers {
       rejectedExecutionHandler: RejectedExecutionHandler = new AbortPolicy
   ): SchedulerService = {
     val factory = threadFactory(name, daemonic = true, reporter)
-    val executor = new ScheduledThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) with AdaptedThreadPoolExecutorMixin {
+    val executor = new ScheduledThreadPoolExecutor(poolSize, factory, rejectedExecutionHandler) with AdaptedThreadPoolExecutorMixin with ScorexLogging {
       override def reportFailure(t: Throwable): Unit = reporter.reportFailure(t)
       override def decorateTask[V](runnable: Runnable, task: RunnableScheduledFuture[V]): RunnableScheduledFuture[V] =
         new TimedWrapper(timer, timeout, task)
       override def decorateTask[V](callable: Callable[V], task: RunnableScheduledFuture[V]): RunnableScheduledFuture[V] =
         new TimedWrapper(timer, timeout, task)
+
+      @volatile
+      private[this] var scheduled = 0
+
+      override def execute(command: Runnable): Unit = {
+        super.execute(command)
+        scheduled += 1
+        if (scheduled % 10 == 0) log.trace(s"Scheduled tasks: $scheduled")
+      }
+
+      override def afterExecute(r: Runnable, t: Throwable): Unit = {
+        scheduled -= 1
+        if (scheduled % 10 == 0) log.trace(s"Scheduled tasks: $scheduled")
+        super.afterExecute(r, t)
+      }
     }
 
     ExecutorScheduler(executor, reporter, executionModel, Features.empty)
