@@ -498,14 +498,25 @@ object Functions {
       ("issue", issueActionType)
     ) {
       case CaseObj(`issueActionType`, fields) :: Nil =>
-        Right(Issue.calculateId(
-          decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
-          description  = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s,
-          isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
-          name         = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s,
-          quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
-          nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t
-        ))
+        val MaxAssetNameLength        = 16
+        val MaxAssetDescriptionLength = 1000
+
+        val name        = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s
+        val description = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s
+
+        if (description.length > MaxAssetDescriptionLength)
+          Left(s"Description length should not exceed $MaxAssetDescriptionLength")
+        else if (name.length > MaxAssetNameLength)
+          Left(s"Name length should not exceed $MaxAssetNameLength")
+        else
+          Right(Issue.calculateId(
+            decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
+            description  = description,
+            isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
+            name         = name,
+            quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
+            nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t
+          ))
 
       case xs => notImplemented[Id](s"calculateAssetId(i: Issue)", xs)
     }
