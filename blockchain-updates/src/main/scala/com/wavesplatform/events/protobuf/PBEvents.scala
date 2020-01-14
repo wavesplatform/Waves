@@ -80,11 +80,12 @@ object PBEvents {
       name = toString(a.name),
       description = toString(a.description),
       reissuable = a.reissuable,
-      volume = a.volume,
+      volume = a.volume.longValue,
       script = a.script.map(PBTransactions.toPBScript),
       sponsorship = a.sponsorship.getOrElse(0),
       nft = a.nft,
-      assetExistedBefore = a.assetExistedBefore
+      assetExistedBefore = a.assetExistedBefore,
+      safeVolume = ByteString.copyFrom(a.volume.toByteArray)
     )
 
   private def protobufStateUpdate(su: events.StateUpdate): StateUpdate = {
