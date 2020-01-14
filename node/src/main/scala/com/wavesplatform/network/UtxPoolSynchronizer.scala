@@ -72,11 +72,14 @@ class UtxPoolSynchronizerImpl(
     Future(putIfNew(tx))(scheduler)
       .recover {
         case t =>
+          log.trace(s"${Thread.currentThread()} validateFuture recover")
           log.warn(s"Error validating transaction ${tx.id()}", t)
           TracedResult(Left(GenericError(t)))
       }
       .andThen {
-        case Success(TracedResult(Right(isNew), _)) if isNew || allowRebroadcast => broadcast(tx, source)
+        case Success(TracedResult(Right(isNew), _)) if isNew || allowRebroadcast =>
+          log.trace(s"${Thread.currentThread()} validateFuture andThen broadcast")
+          broadcast(tx, source)
       }
 
   override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
@@ -85,6 +88,7 @@ class UtxPoolSynchronizerImpl(
   override def close(): Unit = cancelableFuture.cancel()
 
   private def pollTransactions(): CancelableFuture[Unit] = queue.poll().transformWith { result =>
+    log.trace(s"${Thread.currentThread()} pollTransactions")
     result match {
       case Success((tx, source)) =>
         log.trace(s"Consuming transaction ${tx.id()} from $source")
