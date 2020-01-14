@@ -85,7 +85,7 @@ object Schedulers {
       val workerThread = Thread.currentThread()
       maybeScheduledTimeout = Some(timer.newTimeout(
           (t: Timeout) => if (!t.isCancelled) {
-            log.warn(s"Interrupting thread: $workerThread\n${workerThread.getStackTrace.map("at " + _).mkString("\n")}")
+            log.warn(s"Interrupting thread: $workerThread\n${workerThread.getStackTrace.map("\tat " + _).mkString("\n")}")
             workerThread.interrupt()
           },
           timeout.toMillis,
