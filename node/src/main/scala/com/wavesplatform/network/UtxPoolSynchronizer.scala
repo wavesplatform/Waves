@@ -52,7 +52,7 @@ class UtxPoolSynchronizerImpl(
       case (tx, source) =>
         Task
           .deferFuture(validateFuture(tx, allowRebroadcast = false, Some(source)))
-          .timeout(10 seconds)
+          .timeout(5 seconds)
           .onErrorRecover { case err => TracedResult.wrapE(Left(GenericError(err.toString))) }
     }
     .doOnComplete(Task(log.info("UtxPoolSynchronizer stopped")))
