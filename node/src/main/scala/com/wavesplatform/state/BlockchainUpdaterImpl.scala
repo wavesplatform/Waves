@@ -8,6 +8,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto.{verify => sigVerify}
 import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -20,7 +21,7 @@ import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.{CompositeBlockchain, LeaseDetails}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, MicroBlockAppendError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
@@ -268,7 +269,10 @@ class BlockchainUpdaterImpl(
 
                       diff.map { hardenedDiff =>
                         blockchain.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, referencedForgedBlock)
+
+                        BlockStats.appended(referencedForgedBlock, referencedLiquidDiff.scriptsComplexity)
                         TxsInBlockchainStats.record(ng.transactions.size)
+
                         Some((hardenedDiff, discarded.flatMap(_.transactionData), reward))
                       }
                     } else {
@@ -387,6 +391,23 @@ class BlockchainUpdaterImpl(
           case _ =>
             for {
               _ <- microBlock.signaturesValid()
+              totalSignatureValid <- ng
+                .totalDiffOf(microBlock.prevResBlockSig)
+                .toRight(GenericError(s"No referenced block exists: $microBlock"))
+                .map {
+                  case (accumulatedBlock, _, _, _, _) =>
+                    val bytes = accumulatedBlock
+                      .copy(transactionData = accumulatedBlock.transactionData ++ microBlock.transactionData)
+                      .bytesWithoutSignature()
+
+                    sigVerify(microBlock.totalResBlockSig, bytes, microBlock.sender)
+                }
+              _ <- Either
+                .cond(
+                  totalSignatureValid,
+                  Unit,
+                  MicroBlockAppendError("Invalid total block signature", microBlock)
+                )
               blockDifferResult <- {
                 val constraints  = MiningConstraints(blockchain, blockchain.height)
                 val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
@@ -642,22 +663,14 @@ class BlockchainUpdaterImpl(
     )
   }
 
-  private[this] def lposPortfolioFromNG(a: Address, mb: ByteStr): Portfolio = readLock {
-    val diffPf  = ngState.fold(Portfolio.empty)(_.balanceDiffAt(a, mb))
-    val lease   = blockchain.leaseBalance(a)
-    val balance = blockchain.balance(a)
-    Portfolio(balance, lease, Map.empty).combine(diffPf)
+  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
+    CompositeBlockchain(blockchain, ngState.map(_.bestLiquidDiff)).balanceOnlySnapshots(address, h, assetId)
   }
 
-  /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readLock {
-    val blockchainBlock = blockchain.heightOf(to)
-    if (blockchainBlock.nonEmpty || ngState.isEmpty) {
-      blockchain.balanceSnapshots(address, from, to)
-    } else {
-      val bs = BalanceSnapshot(height, lposPortfolioFromNG(address, to))
-      if (blockchain.height > 0 && from < this.height) bs +: blockchain.balanceSnapshots(address, from, to) else Seq(bs)
-    }
+    CompositeBlockchain(blockchain, ngState.map(_.bestLiquidDiff))
+      .balanceSnapshots(address, from, to)
   }
 
   override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = readLock {

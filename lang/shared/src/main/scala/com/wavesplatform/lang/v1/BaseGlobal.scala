@@ -8,13 +8,15 @@ import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperS
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.{ValidationError, utils}
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
+import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 
 import scala.concurrent.Future
 
@@ -119,9 +121,8 @@ trait BaseGlobal {
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
 
-      vars  = utils.varNames(stdLibVersion, Expression)
-      costs = utils.functionCosts(stdLibVersion)
-      complexity <- estimator(vars, costs, ex)
+      _          <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV1)
+      complexity <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV2)
     } yield (x, ex, complexity)
 
   type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
@@ -134,7 +135,8 @@ trait BaseGlobal {
   ): Either[String, ContractInfo] =
     for {
       dapp       <- ContractCompiler.compile(input, ctx)
-      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, estimator)
+      _          <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV1)
+      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV2)
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)
 

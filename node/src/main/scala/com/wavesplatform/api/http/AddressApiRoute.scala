@@ -17,7 +17,8 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.TransactionFactory
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
@@ -43,7 +44,7 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
 
   override lazy val route =
     pathPrefix("addresses") {
-      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
+      validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
@@ -191,6 +192,18 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
   )
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address))
+  }
+
+  def balances: Route = (path("balance") & get & parameters('height.as[Int].?) & parameters('address.*) & parameters('asset.?)) {
+    (height, addresses, assetId) =>
+      complete(balancesJson(height.getOrElse(blockchain.height), addresses.toSeq, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
+  }
+
+  def balancesPost: Route = (path("balance") & (post & entity(as[JsObject]))) { request =>
+    val height    = (request \ "height").asOpt[Int]
+    val addresses = (request \ "addresses").as[Seq[String]]
+    val assetId   = (request \ "asset").asOpt[String]
+    complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
 
   @Path("/balance/details/{address}")
@@ -381,6 +394,22 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
       case None      => complete(Unknown)
     }
   }
+
+  private def balancesJson(height: Int, addresses: Seq[String], assetId: Asset): ToResponseMarshallable =
+    if (addresses.length > settings.transactionsByAddressLimit) TooBigArrayAllocation
+    else if (height < 1 || height > blockchain.height) CustomValidationError(s"Illegal height: $height")
+    else {
+      implicit val balancesWrites: Writes[(String, Long)] = Writes[(String, Long)] { b =>
+        Json.obj("id" -> b._1, "balance" -> b._2)
+      }
+
+      val balances = for {
+        addressStr <- addresses.toSet[String]
+        address    <- Address.fromString(addressStr).toOption
+      } yield blockchain.balanceOnlySnapshots(address, height, assetId).map(addressStr -> _._2).getOrElse(addressStr -> 0L)
+
+      ToResponseMarshallable(balances)
+    }
 
   private def balanceJson(address: String, confirmations: Int): ToResponseMarshallable = {
     Address

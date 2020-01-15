@@ -150,12 +150,13 @@ package object state {
       case _                          => false
     }
 
-    def effectiveBalance(address: Address, confirmations: Int, block: BlockId = blockchain.lastBlockId.getOrElse(ByteStr.empty)): Long = {
-      val blockHeight = blockchain.heightOf(block).getOrElse(blockchain.height)
-      val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
-      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
-    }
+    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long =
+      (for {
+        blockId     <- block.orElse(blockchain.lastBlockId)
+        blockHeight <- blockchain.heightOf(blockId)
+        bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
+        balances    = blockchain.balanceSnapshots(address, bottomLimit, blockId)
+      } yield balances.view.map(_.effectiveBalance).min).getOrElse(0L)
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
@@ -193,7 +194,7 @@ package object state {
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
 
-    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
+    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
@@ -221,12 +222,10 @@ package object state {
   type AssetDistributionPage = AssetDistributionPage.Type
 
   implicit val dstPageWrites: Writes[AssetDistributionPage] = Writes { page =>
-    JsObject(
-      Map(
-        "hasNext"  -> JsBoolean(page.hasNext),
-        "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
-        "items"    -> Json.toJson(page.items)
-      )
+    Json.obj(
+      "hasNext"  -> JsBoolean(page.hasNext),
+      "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
+      "items"    -> Json.toJson(page.items)
     )
   }
 
