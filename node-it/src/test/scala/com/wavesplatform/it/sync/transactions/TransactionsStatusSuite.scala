@@ -40,8 +40,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
     val checkData = CheckData(notMiner.height, confirmedTxsInfo, unconfirmedTxs.map(_.id().toString), notFoundTxs.map(_.id().toString))
 
-    val postJsonResult =
-      Json.parse(notMiner.postJson("/transactions/status", Json.obj("ids" -> txIds)).getResponseBody).as[List[TransactionStatus]]
+    val postJsonResult = notMiner.transactionStatus(txIds)
     val postFormResult =
       Json.parse(notMiner.postForm("/transactions/status", txIds.map(("id", _)): _*).getResponseBody).as[List[TransactionStatus]]
     val getResult =
@@ -50,9 +49,17 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     check(checkData, postJsonResult)
     check(checkData, postFormResult)
     check(checkData, getResult)
+
+    val maxTxList = (1 to 1000).map(_ => txIds.head).toList
+    val result = notMiner.transactionStatus(maxTxList)
+    result.size shouldBe 1
+    assertBadRequestAndMessage(notMiner.transactionStatus(maxTxList :+ txIds.head), "Too big sequences requested")
+
+    notMiner.transactionStatus(Seq(confirmedTxs.head.id.toString())).size shouldBe 0
+
   }
 
-  private def check(data: CheckData, result: List[TransactionStatus]): Unit = {
+  private def check(data: CheckData, result: Seq[TransactionStatus]): Unit = {
     result.size shouldBe data.size
 
     val confirmed   = result.filter(_.status == "confirmed")
