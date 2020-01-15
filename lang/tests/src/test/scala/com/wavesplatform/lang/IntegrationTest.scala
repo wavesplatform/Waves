@@ -993,6 +993,36 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 
+  property("rounding modes") {
+    eval[EVALUATED]("Down() == DOWN", None) should produce("Can't find a function")
+    eval[EVALUATED]("Up() == UP", None) should produce("Can't find a function")
+    eval[EVALUATED]("Ceiling() == CEILING", None) should produce("Can't find a function")
+    eval[EVALUATED]("HalfUp() == HALFUP", None) should produce("Can't find a function")
+    eval[EVALUATED]("HalfDown() == HALFDOWN", None) should produce("Can't find a function")
+    eval[EVALUATED]("HalfEven() == HALFEVEN", None) should produce("Can't find a function")
+  }
+
+  property("RSA hash algorithms") {
+    eval[EVALUATED]("NoAlg() == NOALG", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Md5() == MD5", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha1() == SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha224() == SHA224", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha256() == SHA256", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha384() == SHA384", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha512() == SHA512", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3224() == SHA3224", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3256() == SHA3256", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3384() == SHA3384", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3512() == SHA3512", None) shouldBe Right(CONST_BOOLEAN(true))
+
+    eval[EVALUATED]("NoAlg() != SHA224", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("MD5 != SHA3224", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("Sha512() != Sha3512()", None) should produce("Can't match inferred types")
+
+    eval[EVALUATED]("MD5 == if true then MD5 else SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("MD5 == if true then SHA1 else MD5", None) shouldBe Right(CONST_BOOLEAN(false))
+  }
+
   property("math functions") {
     eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
     eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
