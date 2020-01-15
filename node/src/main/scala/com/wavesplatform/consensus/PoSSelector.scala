@@ -18,7 +18,6 @@ import com.wavesplatform.utils.{BaseTargetReachedMaximum, ScorexLogging, forceSt
 import scala.concurrent.duration.FiniteDuration
 
 class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings, syncSettings: SynchronizationSettings) extends ScorexLogging {
-  import PoSCalculator._
 
   protected def pos(height: Int): PoSCalculator =
     if (fairPosActivated(height)) FairPoSCalculator
@@ -36,15 +35,25 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     val bt = pos(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
 
     checkBaseTargetLimit(bt, height).flatMap { _ =>
-      blockchain
-        .hitSourceAtHeight(height)
-        .toRight(GenericError(s"Couldn't find hit source at height: $height"))
-        .map(parentHitSource => NxtLikeConsensusBlockData(bt, headerGenerationSignature(height + 1, parentHitSource, account)))
+      val nextHeight = height + 1
+
+      val generationSignature =
+        if (vrfActivated(nextHeight))
+          hitSourceForHeight(nextHeight)
+            .map(hitSource => PoSCalculator.generationVRFSignature(hitSource.arr, account.privateKey))
+        else
+          blockchain
+            .blockInfo(height)
+            .map(blockInfo => PoSCalculator.generationSignature(blockInfo.header.generationSignature.arr, account.publicKey))
+            .toRight(GenericError(s"Couldn't find block info at height: $height"))
+
+      generationSignature.map(genSig => NxtLikeConsensusBlockData(bt, ByteStr(genSig)))
     }
   }
 
   def getValidBlockDelay(height: Int, accountPublicKey: PublicKey, refBlockBT: Long, balance: Long): Either[ValidationError, Long] =
-    getHit(height, accountPublicKey)
+    hitSourceForHeight(height)
+      .map(hitSource => PoSCalculator.hit(PoSCalculator.generationSignature(hitSource.arr, accountPublicKey)))
       .map(pos(height).calculateDelay(_, refBlockBT, balance))
 
   def validateBlockDelay(height: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
@@ -57,16 +66,17 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   def validateGenerationSignature(block: Block): Either[ValidationError, ByteStr] = {
-    val h             = blockchain.height
-    val prevHitSource = blockchain.hitSourceAtHeight(h).toRight(GenericError(s"Couldn't find hit source at height: $h"))
-    val genSig        = block.header.generationSignature
-    val generator     = block.header.generator
+    val nextHeight = blockchain.height + 1
+    val genSig     = block.header.generationSignature
+    val generator  = block.header.generator
 
-    if (vrfActivated(h + 1))
-      prevHitSource.flatMap(crypto.verifyVRF(genSig, _, generator))
+    if (vrfActivated(nextHeight))
+      hitSourceForHeight(nextHeight)
+        .flatMap(crypto.verifyVRF(genSig, _, generator))
     else
-      prevHitSource
-        .map(phs => ByteStr(generationSignature(phs.arr, generator)))
+      blockchain.lastBlock
+        .toRight(GenericError("No blocks in blockchain"))
+        .map(b => ByteStr(PoSCalculator.generationSignature(b.header.generationSignature.arr, generator)))
         .ensureOr { expectedGenSig =>
           GenericError(s"Generation signatures does not match: Expected = ${Base58.encode(expectedGenSig)}; Found = ${Base58.encode(genSig)}")
         } { expectedGenSig =>
@@ -112,22 +122,12 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     )
   }
 
-  private def getHit(height: Int, accountPublicKey: PublicKey): Either[ValidationError, BigInt] = {
-    val hitHeight =
-      if (fairPosActivated(height) && height > 100) height - 100
-      else blockchain.height
-
+  private def hitSourceForHeight(height: Int): Either[ValidationError, ByteStr] = {
+    val hitHeight = if (fairPosActivated(height) && height > 100) height - 100 else blockchain.height
     blockchain
       .hitSourceAtHeight(hitHeight)
-      .map(hs => hit(generationSignature(hs.arr, accountPublicKey)))
-      .toRight(GenericError(s"Couldn't find hit source at height: $height"))
+      .toRight(GenericError(s"Couldn't find hit source at height: $hitHeight"))
   }
-
-  private def headerGenerationSignature(height: Int, parentHitSource: ByteStr, account: KeyPair): ByteStr =
-    if (vrfActivated(height))
-      generationVRFSignature(parentHitSource.arr, account.privateKey)
-    else
-      generationSignature(parentHitSource.arr, account.publicKey)
 
   private def fairPosActivated(height: Int): Boolean = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.FairPoS.id)
   private def vrfActivated(height: Int): Boolean     = blockchain.activatedFeaturesAt(height).contains(BlockchainFeatures.BlockV5.id)
