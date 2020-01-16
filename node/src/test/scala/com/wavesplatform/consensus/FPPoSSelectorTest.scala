@@ -30,7 +30,7 @@ import scala.util.Random
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings with ScalaCheckPropertyChecks {
   import FPPoSSelectorTest._
 
-  val generationSignatureMethods = Table(
+  private val generationSignatureMethods = Table(
     ("method", "block version", "vrf activated"),
     ("Blake2b256", Block.NgBlockVersion, false),
     ("VRF", Block.ProtoBlockVersion, true)
@@ -112,7 +112,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             val block        = forgeBlock(miner, blockchain, pos, blockVersion)()
 
             pos
-              .validateBlockDelay(height + 1, block, lastBlock.header, minerBalance)
+              .validateBlockDelay(height, block, lastBlock.header, minerBalance)
               .explicitGet()
         }
     }
@@ -129,7 +129,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
             pos
               .validateBlockDelay(
-                height + 1,
+                height,
                 block,
                 lastBlock.header,
                 minerBalance
@@ -202,8 +202,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       case (_, blockVersion: Byte, vrfActivated: Boolean) =>
         withEnv(chainGen(List(ENOUGH_AMT), 10, blockVersion), vrfActivated) {
           case Env(pos, blockchain, miners) =>
-            val miner  = miners.head
-            val block  = forgeBlock(miner, blockchain, pos, blockVersion)()
+            val miner = miners.head
+            val block = forgeBlock(miner, blockchain, pos, blockVersion)()
 
             pos
               .validateGenerationSignature(block)
@@ -215,8 +215,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       case (_, blockVersion: Byte, vrfActivated: Boolean) =>
         withEnv(chainGen(List(ENOUGH_AMT), 100, blockVersion), vrfActivated) {
           case Env(pos, blockchain, miners) =>
-            val miner  = miners.head
-            val block  = forgeBlock(miner, blockchain, pos, blockVersion)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
+            val miner = miners.head
+            val block = forgeBlock(miner, blockchain, pos, blockVersion)(updateGS = gs => ByteStr(gs.arr |< Random.nextBytes))
 
             pos
               .validateGenerationSignature(
@@ -291,17 +291,17 @@ object FPPoSSelectorTest {
   def mkFork(blockCount: Int, miner: KeyPair, blockchain: Blockchain, blockVersion: Byte = Block.RewardBlockVersion): List[(Block, ByteStr)] = {
     val height = blockchain.height
 
-    val lastBlock                = blockchain.lastBlock.get
-    val lastBlockGenerationInput = blockchain.hitSourceAtHeight(height).get
+    val lastBlock          = blockchain.lastBlock.get
+    val lastBlockHitSource = blockchain.hitSourceAtHeight(height).get
 
-    ((1 to blockCount) foldLeft List((lastBlock, lastBlockGenerationInput))) { (forkChain, ind) =>
+    ((1 to blockCount) foldLeft List((lastBlock, lastBlockHitSource))) { (forkChain, ind) =>
       val blockForHit =
         forkChain
           .lift(100)
           .orElse(blockchain.blockAt(height + ind - 100).map((_, blockchain.hitSourceAtHeight(height + ind - 100).get)))
           .getOrElse(forkChain.head)
 
-      val (gs, generationInput) =
+      val (gs, hitSource) =
         if (blockVersion < Block.ProtoBlockVersion) {
           val gs = PoSCalculator
             .generationSignature(
@@ -344,7 +344,7 @@ object FPPoSSelectorTest {
         )
         .explicitGet()
 
-      (newBlock, ByteStr(generationInput)) :: forkChain
+      (newBlock, ByteStr(hitSource)) :: forkChain
     }
   }
 
