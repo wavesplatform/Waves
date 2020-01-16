@@ -571,7 +571,7 @@ object AsyncHttpApi extends Assertions {
         )
       )
 
-    def exchange(matcher: KeyPair,
+    def broadcastExchange(matcher: KeyPair,
                  buyOrder: Order,
                  sellOrder: Order,
                  amount: Long,

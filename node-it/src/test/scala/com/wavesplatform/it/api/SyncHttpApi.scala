@@ -376,7 +376,7 @@ object SyncHttpApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }
 
-    def exchange(matcher: KeyPair,
+    def broadcastExchange(matcher: KeyPair,
                  buyOrder: Order,
                  sellOrder: Order,
                  amount: Long,
@@ -387,7 +387,7 @@ object SyncHttpApi extends Assertions {
                  version: Byte = 2,
                  matcherFeeAssetId: Option[String] = None,
                  waitForTx: Boolean = false): Transaction = {
-      maybeWaitForTransaction(sync(async(n).exchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, version, matcherFeeAssetId)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).broadcastExchange(matcher, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, version, matcherFeeAssetId)), waitForTx)
     }
 
     def transfer(
