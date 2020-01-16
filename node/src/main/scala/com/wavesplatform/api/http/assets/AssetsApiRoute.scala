@@ -8,6 +8,7 @@ import cats.instances.either.catsStdInstancesForEither
 import cats.instances.option.catsStdInstancesForOption
 import cats.syntax.either._
 import cats.syntax.traverse._
+import com.google.common.base.Charsets
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountApi, CommonAssetsApi}
 import com.wavesplatform.api.http.ApiError._
@@ -417,8 +418,8 @@ object AssetsApiRoute {
       (timestamp, height) = tsh
       script              = description.script.filter(_ => full)
       complexity <- script.fold[Either[String, Long]](Right(0))(script => ScriptCompiler.estimate(script, script.stdLibVersion))
-      name = description.name.fold(bs => Base64.encode(bs.arr), identity)
-      desc = description.description.fold(bs => Base64.encode(bs.arr), identity)
+      name = description.name.fold(bs => new String(bs.arr, Charsets.UTF_8), identity)
+      desc = description.description.fold(bs => new String(bs.arr, Charsets.UTF_8), identity)
     } yield JsObject(
       Seq(
         "assetId"        -> JsString(id.toString),

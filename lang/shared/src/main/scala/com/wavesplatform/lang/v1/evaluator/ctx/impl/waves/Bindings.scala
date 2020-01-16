@@ -378,9 +378,8 @@ object Bindings {
       )
     )
 
-  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
-    CaseObj(
-      assetType,
+  def buildAssetInfo(sAInfo: ScriptAssetInfo, version: StdLibVersion) = {
+    val commonFields: Map[String, EVALUATED] =
       Map(
         "id"              -> sAInfo.id,
         "quantity"        -> sAInfo.quantity,
@@ -388,10 +387,20 @@ object Bindings {
         "issuer"          -> mapRecipient(sAInfo.issuer)._2,
         "issuerPublicKey" -> sAInfo.issuerPk,
         "reissuable"      -> sAInfo.reissuable,
-        "scripted"        -> sAInfo.scripted,
-        "sponsored"       -> sAInfo.sponsored
+        "scripted"        -> sAInfo.scripted
       )
+
+    val sponsoredField: (String, EVALUATED) =
+      if (version >= V4)
+        "minSponsoredFee" -> sAInfo.minSponsoredFee
+      else
+        "sponsored" -> sAInfo.minSponsoredFee.isDefined
+
+    CaseObj(
+      assetType(version),
+      commonFields + sponsoredField
     )
+  }
 
   def buildLastBlockInfo(blockInf: BlockInfo) =
     CaseObj(

@@ -25,8 +25,7 @@ class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: Sched
     .newBuilder()
     .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
     .build(new CacheLoader[MicroBlockSignature, RawBytes] {
-      override def load(key: MicroBlockSignature): RawBytes = RawBytes.fromMicroblock(ng.microBlock(key).get)
-
+      override def load(key: MicroBlockSignature): RawBytes = RawBytes.fromMicroBlock(ng.microBlock(key).get)
     })
 
   private val knownBlocks = CacheBuilder

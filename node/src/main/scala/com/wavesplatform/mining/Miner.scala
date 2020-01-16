@@ -199,7 +199,6 @@ class MinerImpl(
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)
-      log.info(s"")
       for {
         delay <- blockDelayE.leftMap(_.toString)
         expectedTS = delay + block.header.timestamp

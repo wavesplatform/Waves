@@ -11,7 +11,7 @@ import play.api.libs.json.{Format, Json}
 case class SignedUpdateAssetInfoRequest(
     version: TxVersion,
     chainId: Byte,
-    sender: String,
+    senderPublicKey: String,
     assetId: String,
     name: String,
     description: String,
@@ -23,7 +23,7 @@ case class SignedUpdateAssetInfoRequest(
 
   def toTx: Either[ValidationError, UpdateAssetInfoTransaction] =
     for {
-      _sender  <- PublicKey.fromBase58String(sender)
+      _sender  <- PublicKey.fromBase58String(senderPublicKey)
       _assetId <- parseBase58(assetId, "invalid.assetId", AssetIdStringLength)
       _feeAssetId <- feeAssetId
         .traverse(parseBase58(_, "invalid.assetId", AssetIdStringLength).map(IssuedAsset))

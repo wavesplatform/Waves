@@ -39,7 +39,7 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, T
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
-import org.asynchttpclient.Dsl.{get => _get, post => _post, put => _put}
+import org.asynchttpclient.Dsl.{get => _get, post => _post, put => _put, delete => _delete}
 import org.asynchttpclient._
 import org.asynchttpclient.util.HttpConstants.ResponseStatusCodes.OK_200
 import org.scalactic.source.Position
@@ -61,6 +61,9 @@ object AsyncHttpApi extends Assertions {
 
     def get(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
       retrying(f(_get(s"${n.nodeApiEndpoint}$path")).build())
+
+    def delete(path: String, f: RequestBuilder => RequestBuilder = identity): Future[Response] =
+      retrying(f(_delete(s"${n.nodeApiEndpoint}$path")).withApiKey(n.apiKey).build())
 
     def seed(address: String): Future[String] = getWithApiKey(s"/addresses/seed/$address").as[JsValue].map(v => (v \ "seed").as[String])
 
@@ -157,6 +160,8 @@ object AsyncHttpApi extends Assertions {
 
     def blockAt(height: Int): Future[Block] = get(s"/blocks/at/$height").as[Block]
 
+    def blockBySignature(signature: String): Future[Block] = get(s"/blocks/signature/$signature").as[Block]
+
     def utx: Future[Seq[Transaction]] = get(s"/transactions/unconfirmed").as[Seq[Transaction]]
 
     def utxSize: Future[Int] = get(s"/transactions/unconfirmed/size").as[JsObject].map(_.value("size").as[Int])
@@ -174,6 +179,10 @@ object AsyncHttpApi extends Assertions {
     def lastBlockHeaders: Future[BlockHeaders] = get("/blocks/headers/last").as[BlockHeaders]
 
     def status: Future[Status] = get("/node/status").as[Status]
+
+    def blockGenerationSignature(signature: String): Future[GenerationSignatureResponse] = get(s"/consensus/generationsignature/$signature").as[GenerationSignatureResponse]
+
+    def lastBlockGenerationSignature: Future[String] = get(s"/consensus/generationsignature").as[String]
 
     def activationStatus: Future[ActivationStatus] = get("/activation/status").as[ActivationStatus]
 
@@ -511,6 +520,12 @@ object AsyncHttpApi extends Assertions {
     def getDataList(address: String, keys: String*): Future[Seq[DataEntry[_]]] =
       get(s"/addresses/data/$address?${keys.map("key=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[DataEntry[_]]]
 
+    def getMerkleProof(ids: String*): Future[Seq[MerkleProofResponse]] =
+      get(s"/transactions/merkleProof?${ids.map("id=" + URLEncoder.encode(_, "UTF-8")).mkString("&")}").as[Seq[MerkleProofResponse]]
+
+    def getMerkleProofPost(ids: String*): Future[Seq[MerkleProofResponse]] =
+      postJson(s"/transactions/merkleProof", Json.obj("ids" -> ids)).as[Seq[MerkleProofResponse]]
+
     def broadcastRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast", req).as[Transaction]
 
     def broadcastTraceRequest[A: Writes](req: A): Future[Transaction] = postJson("/transactions/broadcast?trace=yes", req).as[Transaction]
@@ -563,6 +578,8 @@ object AsyncHttpApi extends Assertions {
 
     def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
       postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
+
+    def rollbackToBlockWithSignature(signature: String): Future[Unit] = delete(s"/debug/rollback-to/$signature").map(_ => ())
 
     def ensureTxDoesntExist(txId: String): Future[Unit] =
       utx

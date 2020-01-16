@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
@@ -21,6 +22,7 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -46,6 +48,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   ): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
 
+    val f: BaseFunction[C] =
+      NativeFunction(
+        "fn1",
+        1,
+        91:Short,
+        pointType,
+        ("value", pointType),
+      ) {
+        case _ :: Nil => throw new Exception("test exception")
+        case xs => notImplemented[Id]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+      }
+
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
     val ctx: CTX[C] =
@@ -54,7 +68,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
-          CTX[C](sampleTypes, stringToTuple, Array.empty),
+          CTX[C](sampleTypes, stringToTuple, Array(f)),
           ctxt
         )
       )
@@ -82,6 +96,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}
       """.stripMargin
     eval[EVALUATED](src) should produce("can't parse the expression")
+  }
+
+  property("Exception handling") {
+    val sampleScript =
+      """match fn1(p) {
+        |  case pa: PointA => 0
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe 'Left
   }
 
   property("patternMatching") {
@@ -998,6 +1022,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
   }
 
+  property("HalfUp is type") {
+    eval("let r = if true then HALFUP else HALFDOWN ; match r { case _:HalfUp => 1 case _ => 0 }") shouldBe Right(CONST_LONG(1))
+  }
+
+
+  property("HalfUp type have no constructor") {
+    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe 'Left
+  }
+
   property("concat empty list") {
     val script =
       s"""
@@ -1269,5 +1302,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | groth16Verify(key, proof, input)
        """.stripMargin
     eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateAssetId") {
+    val decimals = 100
+    val description = "description"
+    val isReissuable = true
+    val name = "name"
+    val quantity = 1234567
+    val nonce = 1
+    val issue = Issue.create(compiledScript = None, decimals, description, isReissuable, name, quantity, nonce, ByteStr.empty)
+    val script =
+     s"""
+        | let issue = Issue(unit, $decimals, "$description", $isReissuable, "$name", $quantity, $nonce)
+        | calculateAssetId(issue)
+      """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+      CONST_BYTESTR(issue.id)
   }
 }
