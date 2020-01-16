@@ -2,10 +2,7 @@ package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
 
-import com.google.common.base.Charsets
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.common.utils.Base64
-import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -18,11 +15,11 @@ object IssueTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"     -> id().toString,
-      "name"        -> (if (isProtobufVersion) name else new String(Base64.decode(name), Charsets.UTF_8)),
+      "name"        -> name.toStringUtf8,
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
-      "description" -> (if (isProtobufVersion) description else new String(Base64.decode(description), Charsets.UTF_8))
+      "description" -> description.toStringUtf8
     ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
       (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
   }
@@ -31,8 +28,8 @@ object IssueTxSerializer {
     import tx._
     lazy val baseBytes = Bytes.concat(
       sender,
-      Deser.serializeArrayWithLength(Base64.decode(name)),
-      Deser.serializeArrayWithLength(Base64.decode(description)),
+      Deser.serializeArrayWithLength(name.toByteArray),
+      Deser.serializeArrayWithLength(description.toByteArray),
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),

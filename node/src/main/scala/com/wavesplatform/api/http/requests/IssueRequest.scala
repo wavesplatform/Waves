@@ -37,8 +37,8 @@ case class IssueRequest(
       tx <- IssueTransaction.create(
         actualVersion,
         sender,
-        if (actualVersion >= TxVersion.V3) name else Base64.encode(name.utf8Bytes),
-        if (actualVersion >= TxVersion.V3) description else Base64.encode(description.utf8Bytes),
+        name,
+        description,
         quantity,
         decimals,
         reissuable,

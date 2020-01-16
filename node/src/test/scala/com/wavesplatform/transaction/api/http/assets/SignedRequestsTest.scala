@@ -34,8 +34,8 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    tx.nameBytes.toString shouldBe "zVbyBrMk"
-    tx.descriptionBytes.toString shouldBe "zVbyBrMk"
+    tx.name.toStringUtf8 shouldBe "string"
+    tx.description.toStringUtf8 shouldBe "string"
     tx.reissuable shouldBe true
     tx.decimals shouldBe 2
     tx.fee shouldBe 100000L
