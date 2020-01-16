@@ -25,7 +25,7 @@ import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 import scala.util.control.NonFatal
 
-object SyncGrpcApi {
+object SyncGrpcApi extends Assertions {
 
   def assertGrpcError[R](f: => R, errorRegex: String, expectedCode: Code): Assertion = Try(f) match {
     case Failure(GrpcStatusRuntimeException(status, _)) => Assertions.assert(status.getCode == expectedCode
