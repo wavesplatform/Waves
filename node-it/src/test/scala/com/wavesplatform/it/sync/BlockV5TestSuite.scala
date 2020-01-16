@@ -9,9 +9,6 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
-import scorex.crypto.authds.LeafData
-import scorex.crypto.authds.merkle.MerkleTree
-import scorex.crypto.hash.Blake2b256
 
 import scala.concurrent.duration._
 
@@ -26,8 +23,6 @@ class BlockV5TestSuite
   import BlockV5TestSuite._
 
   override protected def nodeConfigs: Seq[Config] = Configs
-
-  val emptyMerkleRoot = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))(Blake2b256).rootHash.toString
 
   "block v5 appears and blockchain grows" - {
     "when feature activation happened" in {
@@ -133,7 +128,8 @@ class BlockV5TestSuite
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight1 = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterActivationHeight1.version.value shouldBe Block.ProtoBlockVersion
-      nodes.waitForHeightArise()
+      nodes.head.waitForHeight(ActivationHeight + 2, 2.minutes)
+      nodes.last.waitForHeight(ActivationHeight + 2, 2.minutes)
 
       returnedTxIds.foreach(nodes.head.waitForTransaction(_))
 
@@ -146,7 +142,8 @@ class BlockV5TestSuite
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight2 = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterActivationHeight2.version.value shouldBe Block.ProtoBlockVersion
-      nodes.waitForHeightArise()
+      nodes.head.waitForHeight(ActivationHeight + 2, 2.minutes)
+      nodes.last.waitForHeight(ActivationHeight + 2, 2.minutes)
 
       //rollback to height after activation height using rollback to block with signature method
       nodes.rollbackToBlockWithSignature(nodes.head.blockAt(ActivationHeight + 1).signature)
