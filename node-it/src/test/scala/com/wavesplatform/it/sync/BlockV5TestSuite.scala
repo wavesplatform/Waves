@@ -128,8 +128,7 @@ class BlockV5TestSuite
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight1 = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterActivationHeight1.version.value shouldBe Block.ProtoBlockVersion
-      nodes.head.waitForHeight(ActivationHeight + 2, 2.minutes)
-      nodes.last.waitForHeight(ActivationHeight + 2, 2.minutes)
+      nodes.waitForHeightArise()
 
       returnedTxIds.foreach(nodes.head.waitForTransaction(_))
 
@@ -142,8 +141,7 @@ class BlockV5TestSuite
       nodes.head.waitForHeight(ActivationHeight + 1, 2.minutes)
       val blockAfterActivationHeight2 = nodes.head.blockAt(ActivationHeight + 1)
       blockAfterActivationHeight2.version.value shouldBe Block.ProtoBlockVersion
-      nodes.head.waitForHeight(ActivationHeight + 2, 2.minutes)
-      nodes.last.waitForHeight(ActivationHeight + 2, 2.minutes)
+      nodes.waitForHeightArise()
 
       //rollback to height after activation height using rollback to block with signature method
       nodes.rollbackToBlockWithSignature(nodes.head.blockAt(ActivationHeight + 1).signature)
@@ -179,5 +177,5 @@ object BlockV5TestSuite {
        |}""".stripMargin
   )
 
-  val Configs: Seq[Config] = Default.map(Config.withFallback(_)).take(2)
+  val Configs: Seq[Config] = Default.map(Config.withFallback(_)).tail.take(2)
 }
