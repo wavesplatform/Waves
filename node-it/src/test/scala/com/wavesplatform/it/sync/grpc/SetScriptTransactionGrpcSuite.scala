@@ -5,7 +5,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.grpc.TransactionsApiGrpc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
@@ -37,29 +37,29 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV2).explicitGet()
-    val setScriptTx = sender.grpc.setScript(firstAcc, Some(script.bytes().base64), setScriptFee, waitForTx = true)
+    val setScriptTx = sender.setScript(firstAcc, Some(script.bytes().base64), setScriptFee, waitForTx = true)
     val setScriptTxId = PBTransactions.vanilla(setScriptTx).explicitGet().id().base58
 
-    val scriptInfo = sender.grpc.scriptInfo(firstAddress)
+    val scriptInfo = sender.scriptInfo(firstAddress)
 
     scriptInfo.scriptBytes shouldBe ByteString.copyFrom(Base64.decode(script.bytes().base64))
     scriptInfo.scriptText shouldBe script.expr.toString
     scriptInfo.complexity shouldBe scriptComplexity
 
-    sender.grpc.getTransaction(setScriptTxId).getTransaction.getSetScript.script.get shouldBe PBScript.of(ByteString.copyFrom(Base64.decode(script.bytes().base64)))
+    sender.getTransaction(setScriptTxId).getTransaction.getSetScript.script.get shouldBe PBScript.of(ByteString.copyFrom(Base64.decode(script.bytes().base64)))
   }
 
   test("not able to broadcast tx from scripted acc if that is not allowed by account-script") {
     assertGrpcError(
-      sender.grpc.broadcastTransfer(firstAcc, recipient = Recipient().withAddress(thirdAddress), amount = transferAmount, fee = minFee + smartFee),
+      sender.broadcastTransfer(firstAcc, recipient = Recipient().withAddress(thirdAddress), amount = transferAmount, fee = minFee + smartFee),
       "Transaction is not allowed by account-script",
       Code.INVALID_ARGUMENT
     )
   }
 
   test("able to broadcast tx if that is allowed by account-script") {
-    val firstBalance = sender.grpc.wavesBalance(firstAddress).available
-    val thirdBalance = sender.grpc.wavesBalance(thirdAddress).available
+    val firstBalance = sender.wavesBalance(firstAddress).available
+    val thirdBalance = sender.wavesBalance(thirdAddress).available
     val transferFee = minFee + smartFee
 
     val unsignedTransfer = PBTransaction(
@@ -76,10 +76,10 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val sig1 = ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
     val sig2 = ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
 
-    sender.grpc.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
+    sender.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
 
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - transferFee
-    sender.grpc.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - transferFee
+    sender.wavesBalance(thirdAddress).available shouldBe thirdBalance + transferAmount
   }
 
   test("able to clear script from scripted account") {
@@ -94,40 +94,40 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val sig1 = ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
     val sig2 = ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
 
-    sender.grpc.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
+    sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 
-    val scriptInfo = sender.grpc.scriptInfo(firstAddress)
+    val scriptInfo = sender.scriptInfo(firstAddress)
     scriptInfo.scriptBytes shouldBe ByteString.EMPTY
     scriptInfo.scriptText shouldBe ""
     scriptInfo.complexity shouldBe 0L
 
-    val firstBalance = sender.grpc.wavesBalance(firstAddress).available
-    val secondBalance = sender.grpc.wavesBalance(secondAddress).available
+    val firstBalance = sender.wavesBalance(firstAddress).available
+    val secondBalance = sender.wavesBalance(secondAddress).available
 
-    sender.grpc.broadcastTransfer(firstAcc, Recipient().withAddress(secondAddress), transferAmount, minFee, waitForTx = true)
+    sender.broadcastTransfer(firstAcc, Recipient().withAddress(secondAddress), transferAmount, minFee, waitForTx = true)
 
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - minFee
-    sender.grpc.wavesBalance(secondAddress).available shouldBe secondBalance + transferAmount
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - minFee
+    sender.wavesBalance(secondAddress).available shouldBe secondBalance + transferAmount
   }
 
   test("not able to broadcast tx from scripted acc if tx fee doesn't include smart fee") {
     val script = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.grpc.setScript(firstAcc, Some(script), setScriptFee, waitForTx = true)
+    sender.setScript(firstAcc, Some(script), setScriptFee, waitForTx = true)
 
-    val firstBalance = sender.grpc.wavesBalance(firstAddress).available
-    val firstEffBalance = sender.grpc.wavesBalance(firstAddress).effective
-    val thirdBalance = sender.grpc.wavesBalance(thirdAddress).available
-    val thirdEffBalance = sender.grpc.wavesBalance(thirdAddress).effective
+    val firstBalance = sender.wavesBalance(firstAddress).available
+    val firstEffBalance = sender.wavesBalance(firstAddress).effective
+    val thirdBalance = sender.wavesBalance(thirdAddress).available
+    val thirdEffBalance = sender.wavesBalance(thirdAddress).effective
 
     assertGrpcError(
-    sender.grpc.broadcastTransfer(firstAcc, recipient = Recipient().withAddress(thirdAddress), amount = transferAmount, fee = minFee + smartFee - 1),
+    sender.broadcastTransfer(firstAcc, recipient = Recipient().withAddress(thirdAddress), amount = transferAmount, fee = minFee + smartFee - 1),
       "Transaction sent from smart account",
       Code.INVALID_ARGUMENT
     )
 
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance
-    sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance
-    sender.grpc.wavesBalance(thirdAddress).available shouldBe thirdBalance
-    sender.grpc.wavesBalance(thirdAddress).effective shouldBe thirdEffBalance
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance
+    sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+    sender.wavesBalance(thirdAddress).available shouldBe thirdBalance
+    sender.wavesBalance(thirdAddress).effective shouldBe thirdEffBalance
   }
 }

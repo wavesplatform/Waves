@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -45,9 +45,9 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.grpc.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
+    sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true)
 
-    val scriptInfo = sender.grpc.scriptInfo(firstAddress)
+    val scriptInfo = sender.scriptInfo(firstAddress)
 
     scriptInfo.scriptBytes shouldBe ByteString.copyFrom(Base64.decode(script))
   }
@@ -55,7 +55,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("dApp caller invokes a function on a dApp") {
     val arg               = ByteStr(Array(42: Byte))
 
-    sender.grpc.broadcastInvokeScript(
+    sender.broadcastInvokeScript(
       caller,
       Recipient().withAddress(dAppAddress),
       Some(FUNCTION_CALL(FunctionHeader.User("foo"), List(CONST_BYTESTR(arg).explicitGet()))),
@@ -63,29 +63,29 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       waitForTx = true
     )
 
-    sender.grpc.getDataByKey(dAppAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg))))
-    sender.grpc.getDataByKey(dAppAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.BinaryValue(ByteString.copyFrom(caller.toAddress.bytes))))
+    sender.getDataByKey(dAppAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.BinaryValue(ByteString.copyFrom(arg))))
+    sender.getDataByKey(dAppAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.BinaryValue(ByteString.copyFrom(caller.toAddress.bytes))))
   }
 
   test("dApp caller invokes a default function on a dApp") {
-    sender.grpc.broadcastInvokeScript(
+    sender.broadcastInvokeScript(
       caller,
       Recipient().withAddress(dAppAddress),
       functionCall = None,
       fee = 1.waves,
       waitForTx = true
     )
-    sender.grpc.getDataByKey(dAppAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.StringValue("b")))
-    sender.grpc.getDataByKey(dAppAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.StringValue("senderId")))
+    sender.getDataByKey(dAppAddress, "a") shouldBe List(DataEntry("a", DataEntry.Value.StringValue("b")))
+    sender.getDataByKey(dAppAddress, "sender") shouldBe List(DataEntry("sender", DataEntry.Value.StringValue("senderId")))
   }
 
   test("verifier works") {
-    val dAppBalance = sender.grpc.wavesBalance(dAppAddress)
+    val dAppBalance = sender.wavesBalance(dAppAddress)
     assertGrpcError(
-    sender.grpc.broadcastTransfer(dApp, Recipient().withAddress(dAppAddress), transferAmount, minFee),
+    sender.broadcastTransfer(dApp, Recipient().withAddress(dAppAddress), transferAmount, minFee),
       "Transaction is not allowed by account-script",
       Code.INVALID_ARGUMENT
     )
-    sender.grpc.wavesBalance(dAppAddress) shouldBe dAppBalance
+    sender.wavesBalance(dAppAddress) shouldBe dAppBalance
   }
 }

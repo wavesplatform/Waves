@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -38,13 +38,13 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
         |}
         |""".stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    sender.grpc.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+    sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
 
-    sender.grpc.setScript(caller, Some(scriptBase64), setScriptFee, waitForTx = true)
+    sender.setScript(caller, Some(scriptBase64), setScriptFee, waitForTx = true)
   }
 
   test("cannot invoke script without having enough fee; error message is informative") {
-    val asset1 = PBTransactions.vanilla(sender.grpc.
+    val asset1 = PBTransactions.vanilla(sender.
       broadcastIssue(
         caller,
         "ScriptedAsset",
@@ -58,7 +58,7 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
 
     val payments = Seq(Amount.of(ByteString.copyFrom(Base58.decode(asset1)), 10))
     assertGrpcError(
-      sender.grpc.broadcastInvokeScript(
+      sender.broadcastInvokeScript(
         caller,
         Recipient().withAddress(contractAddress),
         None,
@@ -70,7 +70,7 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
     )
 
     assertGrpcError(
-      sender.grpc.broadcastInvokeScript(
+      sender.broadcastInvokeScript(
         caller,
         Recipient().withAddress(contractAddress),
         None,
