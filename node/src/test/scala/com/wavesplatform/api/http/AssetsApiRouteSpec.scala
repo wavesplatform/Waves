@@ -31,8 +31,8 @@ class AssetsApiRouteSpec
   private val smartAssetDesc = AssetDescription(
     source = smartAssetTx.id(),
     issuer = smartAssetTx.sender,
-    name = Left(ByteStr(smartAssetTx.name.utf8Bytes)),
-    description = Left(ByteStr(smartAssetTx.description.utf8Bytes)),
+    name = smartAssetTx.name,
+    description = smartAssetTx.description,
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
@@ -63,8 +63,8 @@ class AssetsApiRouteSpec
   private val sillyAssetDesc = AssetDescription(
     source = sillyAssetTx.id(),
     issuer = sillyAssetTx.sender,
-    name = Left(ByteStr(sillyAssetTx.name.utf8Bytes)),
-    description = Left(ByteStr(sillyAssetTx.description.utf8Bytes)),
+    name = sillyAssetTx.name,
+    description = sillyAssetTx.description,
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
@@ -95,8 +95,8 @@ class AssetsApiRouteSpec
     (response \ "issueHeight").as[Long] shouldBe 1
     (response \ "issueTimestamp").as[Long] shouldBe tx.timestamp
     (response \ "issuer").as[String] shouldBe tx.sender.stringRepr
-    (response \ "name").as[String] shouldBe tx.name
-    (response \ "description").as[String] shouldBe tx.description
+    (response \ "name").as[String] shouldBe tx.name.toStringUtf8
+    (response \ "description").as[String] shouldBe tx.description.toStringUtf8
     (response \ "decimals").as[Int] shouldBe tx.decimals
     (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume

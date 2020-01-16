@@ -4,7 +4,7 @@ import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -20,10 +20,11 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.util.Try
+import com.wavesplatform.common.utils.EitherExt2
 
 object PBTransactions {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -326,8 +327,8 @@ object PBTransactions {
         vt.assets.IssueTransaction(
           version.toByte,
           sender,
-          name,
-          description,
+          name.toByteString,
+          description.toByteString,
           quantity,
           decimals.toByte,
           reissuable,
@@ -467,7 +468,7 @@ object PBTransactions {
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
-        val data = IssueTransactionData(name, description, quantity, decimals, reissuable, script.map(toPBScript))
+        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, script.map(toPBScript))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>

@@ -24,6 +24,7 @@ import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+import com.wavesplatform.utils.StringBytes
 
 class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
   private val time   = new TestTime
@@ -275,8 +276,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
-          val nameBytes = Left(ByteStr(name.utf8Bytes))
-          val descriptionBytes = Left(ByteStr(description.utf8Bytes))
+          val nameBytes = name.toByteString
+          val descriptionBytes = description.toByteString
           val desc1 = AssetDescription(issueTransaction.id(), sender, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
           actualDesc shouldBe Some(desc1)
 

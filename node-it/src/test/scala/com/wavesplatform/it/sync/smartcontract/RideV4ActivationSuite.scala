@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, StateCheckFailed}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{Assertion, CancelAfterFailure, Ignore}
+import org.scalatest.{Assertion, CancelAfterFailure}
 
 import scala.concurrent.duration._
 

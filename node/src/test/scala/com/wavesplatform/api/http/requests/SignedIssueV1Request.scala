@@ -30,8 +30,8 @@ case class SignedIssueV1Request(
       _t <- IssueTransaction.create(
         TxVersion.V1,
         _sender,
-        Base64.encode(name.utf8Bytes),
-        Base64.encode(description.utf8Bytes),
+        name,
+        description,
         quantity,
         decimals,
         reissuable,

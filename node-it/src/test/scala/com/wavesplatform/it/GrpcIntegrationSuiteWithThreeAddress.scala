@@ -11,10 +11,6 @@ import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
 import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
 
-import scala.concurrent.duration._
-import scala.concurrent.ExecutionContext.Implicits.global
-import scala.concurrent.Future
-
 trait GrpcIntegrationSuiteWithThreeAddress
     extends BeforeAndAfterAll
     with Matchers
