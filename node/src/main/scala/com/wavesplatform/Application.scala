@@ -199,9 +199,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
     val timer = new HashedWheelTimer()
     val utxSynchronizerScheduler =
-      Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+      Schedulers.timeBoundedFixedPool(
+        timer,
+        5.seconds,
+        settings.synchronizationSettings.utxSynchronizer.maxThreads,
+        "utx-pool-synchronizer",
+        reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
+      )
     val utxSynchronizer =
       UtxPoolSynchronizer(
         utxStorage,
