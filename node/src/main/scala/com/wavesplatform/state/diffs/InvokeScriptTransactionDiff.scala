@@ -84,7 +84,8 @@ object InvokeScriptTransactionDiff {
                 Coeval(blockchain.height),
                 blockchain,
                 Coeval(tx.dAppAddressOrAlias.bytes),
-                directives
+                directives,
+                tx.id()
               )
               evaluator <- ContractEvaluator(
                 Monoid

@@ -110,7 +110,8 @@ class ParseFunctionsTest extends PropSpec with PropertyChecks with Matchers {
       Coeval(???),
       EmptyBlockchain,
       Coeval(???),
-      ds
+      ds,
+      ByteStr.empty
     )
 
     val untyped = Parser.parseExpr(code).get.value

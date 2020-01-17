@@ -493,34 +493,40 @@ object Functions {
     }
 
   val calculateAssetIdF: BaseFunction[Environment] =
-    NativeFunction(
+    NativeFunction.withEnvironment[Environment](
       "calculateAssetId",
       10,
       CALCULATE_ASSET_ID,
       BYTESTR,
       ("issue", issueActionType)
     ) {
-      case CaseObj(`issueActionType`, fields) :: Nil =>
-        val MaxAssetNameLength        = 16
-        val MaxAssetDescriptionLength = 1000
+      new ContextfulNativeFunction[Environment]("calculateAddetId", BYTESTR, Seq(("issue", issueActionType))) {
+        override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, CaseObj(`issueActionType`, fields) :: Nil) =>
+              val MaxAssetNameLength        = 16
+              val MaxAssetDescriptionLength = 1000
 
-        val name        = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s
-        val description = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s
+              val name        = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s
+              val description = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s
 
-        if (description.length > MaxAssetDescriptionLength)
-          Left(s"Description length should not exceed $MaxAssetDescriptionLength")
-        else if (name.length > MaxAssetNameLength)
-          Left(s"Name length should not exceed $MaxAssetNameLength")
-        else
-          Right(Issue.calculateId(
-            decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
-            description  = description,
-            isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
-            name         = name,
-            quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
-            nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t
-          ))
+              (if (description.length > MaxAssetDescriptionLength)
+                 Left(s"Description length should not exceed $MaxAssetDescriptionLength")
+               else if (name.length > MaxAssetNameLength)
+                 Left(s"Name length should not exceed $MaxAssetNameLength")
+               else
+                 Right(CONST_BYTESTR(Issue.calculateId(
+                   decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
+                   description  = description,
+                   isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
+                   name         = name,
+                   quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
+                   nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t,
+                   parent       = env.txId
+                )).asInstanceOf[EVALUATED])).pure[F]
 
-      case xs => notImplemented[Id](s"calculateAssetId(i: Issue)", xs)
+            case (env, xs) => notImplemented[F](s"calculateAssetId(i: Issue)", xs)
+          }
+      }
     }
 }

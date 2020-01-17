@@ -31,7 +31,8 @@ class WavesEnvironment(
     h: Coeval[Int],
     blockchain: Blockchain,
     address: Coeval[ByteStr],
-    ds: DirectiveSet
+    ds: DirectiveSet,
+    override val txId: ByteStr
 ) extends Environment[Id] {
 
   override def height: Long = h()

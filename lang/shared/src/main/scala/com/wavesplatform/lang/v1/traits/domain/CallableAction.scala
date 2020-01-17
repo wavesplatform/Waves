@@ -36,8 +36,8 @@ object Issue {
               name: String,
               quantity: Long,
               nonce: Long,
-              patent: ByteStr): Issue = {
-    val id = calculateId(decimals, description, isReissuable, name, quantity, nonce)
+              parent: ByteStr): Issue = {
+    val id = calculateId(decimals, description, isReissuable, name, quantity, nonce, parent)
     Issue(id, compiledScript, decimals, description, isReissuable, name, quantity, nonce)
   }
 
@@ -47,7 +47,8 @@ object Issue {
     isReissuable: Boolean,
     name: String,
     quantity: Long,
-    nonce: Long
+    nonce: Long,
+    parent: ByteStr
   ): ByteStr = {
     val out = new ByteArrayOutputStream()
     out.writeString(name)
@@ -56,6 +57,7 @@ object Issue {
     out.writeLong(quantity)
     out.writeShort(if (isReissuable) 1 else 0)
     out.writeLong(nonce)
+    out.writeBytes(parent)
     ByteStr(Global.blake2b256(out.toByteArray))
   }
 }

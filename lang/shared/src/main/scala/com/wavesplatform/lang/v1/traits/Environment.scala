@@ -1,5 +1,6 @@
 package com.wavesplatform.lang.v1.traits
 
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain._
 import shapeless._
 
@@ -25,4 +26,5 @@ trait Environment[F[_]] {
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): F[Either[String, Long]]
   def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]
   def multiPaymentAllowed: Boolean
+  def txId: ByteStr
 }
