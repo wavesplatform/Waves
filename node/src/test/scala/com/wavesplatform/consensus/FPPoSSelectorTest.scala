@@ -112,7 +112,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             val block        = forgeBlock(miner, blockchain, pos, blockVersion)()
 
             pos
-              .validateBlockDelay(height, block, lastBlock.header, minerBalance)
+              .validateBlockDelay(height, block.header, lastBlock.header, minerBalance)
               .explicitGet()
         }
     }
@@ -130,7 +130,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             pos
               .validateBlockDelay(
                 height,
-                block,
+                block.header,
                 lastBlock.header,
                 minerBalance
               ) should produce("less than min valid timestamp")
@@ -221,7 +221,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             pos
               .validateGenerationSignature(
                 block
-              ) should produce("Generation signatures does not match")
+              ) should (if (!vrfActivated) produce("Generation signatures does not match") else produce("Could not verify VRF proof"))
         }
     }
   }

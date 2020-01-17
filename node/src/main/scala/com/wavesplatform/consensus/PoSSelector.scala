@@ -39,7 +39,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           getHitSource(height)
             .map(hs => NxtLikeConsensusBlockData(bt, crypto.signVRF(account.privateKey, hs)))
         else
-          blockchain.lastBlock
+          blockchain.blockInfo(height)
             .map(_.header.generationSignature.arr)
             .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generationSignature(gs, account.publicKey))))
             .toRight(GenericError("No blocks in blockchain"))
@@ -53,19 +53,19 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       .map(pc.calculateDelay(_, refBlockBT, balance))
   }
 
-  def validateBlockDelay(parentHeight: Int, block: Block, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
+  def validateBlockDelay(parentHeight: Int, header: BlockHeader, parent: BlockHeader, effectiveBalance: Long): Either[ValidationError, Unit] = {
     for {
       parentHitSource <- getHitSource(parentHeight)
       gs <- if (vrfActivated(parentHeight + 1)) {
-        crypto.verifyVRF(block.header.generationSignature, parentHitSource, block.header.generator).map(_.arr)
+        crypto.verifyVRF(header.generationSignature, parentHitSource, header.generator).map(_.arr)
       } else {
-        generationSignature(parentHitSource, block.header.generator).asRight[ValidationError]
+        generationSignature(parentHitSource, header.generator).asRight[ValidationError]
       }
       ts = pos(parentHeight).calculateDelay(hit(gs), parent.baseTarget, effectiveBalance) + parent.timestamp
       _ <- Either.cond(
-        ts <= block.header.timestamp,
+        ts <= header.timestamp,
         (),
-        GenericError(s"Block timestamp ${block.header.timestamp} less than min valid timestamp $ts")
+        GenericError(s"Block timestamp ${header.timestamp} less than min valid timestamp $ts")
       )
     } yield ()
   }
