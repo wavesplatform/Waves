@@ -35,7 +35,6 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     (parseResponse(assetBalance) \ "balance").as[String] shouldBe s"$assetBalanceInt"
     (parseResponse(assetsBalance) \ "balances" \ 0 \ "balance").as[String] shouldBe s"$assetBalanceInt"
     (parseResponse(nftBalance) \ 0 \ "quantity").as[String] shouldBe "1"
-    (parseResponse(nftBalance) \ 0 \ "fee").as[String] shouldBe s"$issueFee"
     (parseResponse(assetDistribution) \ "items" \ 0 \ 1).as[String] shouldBe s"$someAssetAmount"
     (parseResponse(assetDetails) \ "quantity").as[String] shouldBe s"$someAssetAmount"
   }
@@ -73,7 +72,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
       .id
     val ts = System.currentTimeMillis()
     val buyOrder = Order.buy(
-      version = '2'.toByte,
+      version = TxVersion.V2,
       exchanger,
       exchanger.publicKey,
       AssetPair.createAssetPair("WAVES", exchAssetId).get,
@@ -84,7 +83,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
       matcherFee
     )
     val sellOrder = Order.sell(
-      version = '2'.toByte,
+      version = TxVersion.V2,
       exchanger,
       exchanger.publicKey,
       AssetPair.createAssetPair("WAVES", exchAssetId).get,
