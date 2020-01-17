@@ -47,6 +47,7 @@ package object sync {
 
   val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String = script.bytes.value.base64
+  val scriptBase64Raw: String = script.bytes.value.base64Raw
 
   val errNotAllowedByToken = "Transaction is not allowed by token-script"
   val errNotAllowedByTokenApiError: AssertiveApiError =
@@ -62,8 +63,8 @@ package object sync {
       Some(tx.version),
       None,
       Some(Base58.encode(tx.sender)),
-      new String(tx.nameBytes.arr),
-      new String(tx.descriptionBytes.arr),
+      tx.name.toStringUtf8,
+      tx.description.toStringUtf8,
       quantity,
       decimals,
       reissuable,

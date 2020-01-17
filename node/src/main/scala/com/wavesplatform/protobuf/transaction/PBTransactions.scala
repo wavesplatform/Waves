@@ -4,7 +4,7 @@ import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -20,10 +20,11 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.{Proofs, TxValidationError}
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.util.Try
+import com.wavesplatform.common.utils.EitherExt2
 
 object PBTransactions {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -142,7 +143,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(s => ScriptReader.fromBytes(s.bytes.toByteArray).explicitGet()),
+          script.map(toVanillaScript),
           feeAmount,
           timestamp,
           proofs
@@ -232,7 +233,7 @@ object PBTransactions {
         for {
           dApp <- PBRecipients.toAddressOrAlias(dappAddress)
 
-          desFCOpt = Deser.parseByteArrayOptionWithLength(functionCall.asReadOnlyByteBuffer()).map(Serde.deserialize(_))
+          desFCOpt = Deser.parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
 
           _ <- Either.cond(
             desFCOpt.isEmpty || desFCOpt.get.isRight,
@@ -240,7 +241,7 @@ object PBTransactions {
             GenericError(s"Invalid InvokeScript function call: ${desFCOpt.get.left.get}")
           )
 
-          fcOpt = desFCOpt.map(_.explicitGet()._1)
+          fcOpt = desFCOpt.map(_.explicitGet())
 
           _ <- Either.cond(fcOpt.isEmpty || fcOpt.exists(_.isInstanceOf[FUNCTION_CALL]), (), GenericError(s"Not a function call: $fcOpt"))
 
@@ -326,8 +327,8 @@ object PBTransactions {
         vt.assets.IssueTransaction(
           version.toByte,
           sender,
-          name,
-          description,
+          name.toByteString,
+          description.toByteString,
           quantity,
           decimals.toByte,
           reissuable,
@@ -411,9 +412,8 @@ object PBTransactions {
           sender,
           PBRecipients.toAddressOrAlias(dappAddress).explicitGet(),
           Deser
-            .parseByteArrayOptionWithLength(functionCall.asReadOnlyByteBuffer())
-            .map(Serde.deserialize(_, all = false))
-            .map(_.explicitGet()._1.asInstanceOf[FUNCTION_CALL]),
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
           payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
           feeAmount,
           feeAssetId,
@@ -468,7 +468,7 @@ object PBTransactions {
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
-        val data = IssueTransactionData(name, description, quantity, decimals, reissuable, script.map(toPBScript))
+        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, script.map(toPBScript))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
@@ -539,7 +539,7 @@ object PBTransactions {
 
     InvokeScriptTransactionData(
       Some(PBRecipients.create(dappAddress)),
-      ByteString.copyFrom(Deser.serializeOptionOfArrayWithLength(fcOpt)(Serde.serialize(_))),
+      ByteString.copyFrom(Deser.serializeOption(fcOpt)(Serde.serialize(_))),
       payment.map(p => (p.assetId, p.amount): Amount)
     )
   }

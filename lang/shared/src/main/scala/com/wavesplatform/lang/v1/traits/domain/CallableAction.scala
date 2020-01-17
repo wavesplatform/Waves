@@ -2,7 +2,6 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import scorex.crypto.hash.Blake2b256
 
 sealed trait CallableAction
 
@@ -27,6 +26,9 @@ object Issue {
   import com.wavesplatform.lang.utils.Serialize._
   import java.io.ByteArrayOutputStream
 
+  import com.wavesplatform.lang.v1.BaseGlobal
+  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
+
   def create( compiledScript: Option[ByteStr],
               decimals: Int,
               description: String,
@@ -34,22 +36,27 @@ object Issue {
               name: String,
               quantity: Long,
               nonce: Long,
-              patent: ByteStr) = {
+              patent: ByteStr): Issue = {
+    val id = calculateId(decimals, description, isReissuable, name, quantity, nonce)
+    Issue(id, compiledScript, decimals, description, isReissuable, name, quantity, nonce)
+  }
+
+  def calculateId(
+    decimals: Int,
+    description: String,
+    isReissuable: Boolean,
+    name: String,
+    quantity: Long,
+    nonce: Long
+  ): ByteStr = {
     val out = new ByteArrayOutputStream()
     out.writeString(name)
     out.writeString(description)
     out.writeInt(decimals)
     out.writeLong(quantity)
-    out.writeShort((if(isReissuable) { 1 } else { 0 }))
+    out.writeShort(if (isReissuable) 1 else 0)
     out.writeLong(nonce)
-    Issue(ByteStr(Blake2b256.hash(out.toByteArray)),
-          compiledScript,
-          decimals: Int,
-          description: String,
-          isReissuable: Boolean,
-          name: String,
-          quantity: Long,
-          nonce: Long)
+    ByteStr(Global.blake2b256(out.toByteArray))
   }
 }
 

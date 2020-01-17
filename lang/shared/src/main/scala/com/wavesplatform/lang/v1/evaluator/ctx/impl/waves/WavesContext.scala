@@ -60,7 +60,7 @@ object WavesContext {
   }
 
   private def fromV3Funcs(v: StdLibVersion) =
-    extractedFuncs(v) ++ Array(assetInfoF, blockInfoByHeightF, stringFromAddressF)
+    extractedFuncs(v) ++ Array(assetInfoF(v), blockInfoByHeightF, stringFromAddressF)
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
     val commonFuncs =
@@ -74,7 +74,7 @@ object WavesContext {
         getBinaryByIndexF(version),
         getStringByIndexF(version),
       )
-    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF
+    lazy val v4Funcs = fromV3Funcs(version) :+ transferTxByIdF(proofsEnabled, version) :+ parseBlockHeaderF :+ calculateAssetIdF
     val versionSpecificFuncs =
       version match {
         case V1 | V2 => Array(txByIdF(proofsEnabled, version))
@@ -95,8 +95,8 @@ object WavesContext {
       case V1 => Map(txVal)
       case V2 => Map(sell, buy, txVal)
       case V3 | V4 =>
-        val `this` = if (isTokenContext) assetThis else accountThis
-        val txO = if (contentType == Expression) Map(txVal) else Map()
+        val `this` = if (isTokenContext) assetThis(version) else accountThis
+        val txO    = if (contentType == Expression) Map(txVal) else Map()
         val common = Map(sell, buy, lastBlock, `this`)
         common ++ txO
     }

@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.validation
 import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
+import com.google.protobuf.ByteString
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
@@ -92,18 +93,18 @@ object TxConstraints {
     }
   }
 
-  def assetName(name: Array[Byte]): ValidatedV[Array[Byte]] =
+  def assetName(name: ByteString): ValidatedV[ByteString] =
     Validated
       .condNel(
-        name.length >= IssueTransaction.MinAssetNameLength && name.length <= IssueTransaction.MaxAssetNameLength,
+        name.size >= IssueTransaction.MinAssetNameLength && name.size <= IssueTransaction.MaxAssetNameLength,
         name,
         TxValidationError.InvalidName
       )
 
-  def assetDescription(description: Array[Byte]): ValidatedV[Array[Byte]] =
+  def assetDescription(description: ByteString): ValidatedV[ByteString] =
     Validated
       .condNel(
-        description.length <= IssueTransaction.MaxAssetDescriptionLength,
+        description.size <= IssueTransaction.MaxAssetDescriptionLength,
         description,
         TxValidationError.TooBigArray
       )

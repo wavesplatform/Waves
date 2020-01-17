@@ -202,13 +202,13 @@ object MicroBlockRequestSpec extends MessageSpec[MicroBlockRequest] {
   override val maxLength: Int = 500
 }
 
-object MicroBlockResponseSpec extends MessageSpec[MicroBlockResponse] {
+object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlock] {
   override val messageCode: MessageCode = 28: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
-    MicroBlock.parseBytes(bytes).map(MicroBlockResponse)
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] =
+    MicroBlock.parseBytes(bytes)
 
-  override def serializeData(resp: MicroBlockResponse): Array[Byte] = resp.microblock.bytes()
+  override def serializeData(resp: MicroBlock): Array[Byte] = resp.bytes()
 
   override val maxLength: Int = 271 + TransactionSpec.maxLength * MaxTransactionsPerMicroblock
 }
@@ -226,7 +226,8 @@ object PBBlockSpec extends MessageSpec[Block] {
 object PBMicroBlockSpec extends MessageSpec[MicroBlock] {
   override val messageCode: MessageCode = 30: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] = PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes))
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] =
+    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes))
 
   override def serializeData(resp: MicroBlock): Array[Byte] = PBMicroBlocks.protobuf(resp).toByteArray
 
@@ -264,7 +265,7 @@ object BasicMessagesRepo {
     TransactionSpec,
     MicroBlockInvSpec,
     MicroBlockRequestSpec,
-    MicroBlockResponseSpec,
+    LegacyMicroBlockResponseSpec,
     PBBlockSpec,
     PBMicroBlockSpec,
     PBTransactionSpec

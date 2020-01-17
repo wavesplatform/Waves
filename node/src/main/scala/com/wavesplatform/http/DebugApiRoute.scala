@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import cats.implicits._
 import cats.kernel.Monoid
@@ -180,11 +181,19 @@ case class DebugApiRoute(
     }))
   }
 
+  private def wavesDistribution(height: Int): Route =
+    optionalHeaderValueByType[Accept](()) {
+      case Some(accept) if accept.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b.toString }))
+      case _ =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    }
+
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(dst.wavesDistribution(ng.height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    wavesDistribution(ng.height)
   }
 
   @Path("/stateWaves/{height}")
@@ -195,7 +204,7 @@ case class DebugApiRoute(
     )
   )
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    wavesDistribution(height)
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
@@ -277,7 +286,7 @@ case class DebugApiRoute(
               ng.effectiveBalance(
                 address,
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
-                ng.microblockIds.lastOption.getOrElse(ByteStr.empty)
+                ng.microblockIds.lastOption
               ),
               System.currentTimeMillis() + offset.toMillis
             )

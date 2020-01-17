@@ -14,9 +14,9 @@ import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySetti
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
@@ -261,8 +261,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
               AssetDescription(
                 issue.assetId,
                 issue.sender,
-                Left(issue.nameBytes),
-                Left(issue.descriptionBytes),
+                issue.name,
+                issue.description,
                 issue.decimals,
                 issue.reissuable,
                 BigInt(issue.quantity),
@@ -359,8 +359,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
             .left
             .get
 
-          info.name shouldEqual Right(update.name)
-          info.description shouldEqual Right(update.description)
+          info.name.toStringUtf8 shouldEqual (update.name)
+          info.description.toStringUtf8 shouldEqual (update.description)
         }
     }
   }
