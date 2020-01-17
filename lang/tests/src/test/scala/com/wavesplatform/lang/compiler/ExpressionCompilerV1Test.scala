@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.v1.compiler.CompilerContext.VariableInfo
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
@@ -52,7 +53,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("GETTER")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
     expr = Expressions.GETTER(
       AnyPos,
       ref = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
@@ -65,7 +66,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("REF(OBJECT)")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right((REF("p"), pointType))
@@ -74,7 +75,7 @@ class ExpressionCompilerV1Test extends PropSpec with PropertyChecks with Matcher
 
   treeTypeTest("REF x = y")(
     ctx =
-      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> pointType), functionDefs = Map.empty),
+      CompilerContext(predefTypes = Map(pointType.name -> pointType), varDefs = Map("p" -> VariableInfo(AnyPos, pointType)), functionDefs = Map.empty),
     expr = Expressions.REF(AnyPos, Expressions.PART.VALID(AnyPos, "p")),
     expectedResult = {
         res: Either[String, (EXPR, TYPE)] => res shouldBe Right((REF("p"), pointType))

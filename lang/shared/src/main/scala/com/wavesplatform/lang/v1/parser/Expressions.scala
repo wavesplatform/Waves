@@ -83,7 +83,7 @@ object Expressions {
   type Type      = (PART[String], TypeParam)
   type FuncArgs  = Seq[(PART[String], Seq[Type])]
 
-  type CtxOpt = Option[CompilerContext]
+  type CtxOpt = Option[Map[String, Pos]]
 
   case class FUNC(position: Pos, name: PART[String], args: FuncArgs, expr: EXPR) extends Declaration {
     val allowShadowing = false

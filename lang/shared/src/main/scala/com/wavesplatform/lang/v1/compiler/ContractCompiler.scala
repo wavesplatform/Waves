@@ -8,12 +8,13 @@ import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
-import com.wavesplatform.lang.v1.compiler.CompilerContext.vars
+import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
 import com.wavesplatform.lang.v1.compiler.Types.{BOOLEAN, BYTESTR, LONG, STRING}
 import com.wavesplatform.lang.v1.evaluator.ctx.FunctionTypeSignature
 import com.wavesplatform.lang.v1.evaluator.ctx.impl._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types._
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions.{FUNC, PART, Type}
 import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.task.imports._
@@ -24,7 +25,8 @@ object ContractCompiler {
   def compileAnnotatedFunc(
       af: Expressions.ANNOTATEDFUNC,
       version: StdLibVersion,
-      saveExprContext: Boolean): CompileM[(Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])] = {
+      saveExprContext: Boolean
+  ): CompileM[(Option[AnnotatedFunction], List[(String, Types.FINAL)], Expressions.ANNOTATEDFUNC, Iterable[CompilationError])] = {
 
     def getCompiledAnnotatedFunc(
         annListWithErr: (Option[Iterable[Annotation]], Iterable[CompilationError]),
@@ -69,7 +71,11 @@ object ContractCompiler {
 
     for {
       annotationsWithErr <- annotationsWithErrM
-      annotationBindings = annotationsWithErr._1.map(_.flatMap(_.dic(version).toList)).getOrElse(List.empty)
+      annotationBindings = annotationsWithErr._1
+        .map(
+          _.flatMap(_.dic(version).toList).map(nameAndType => (nameAndType._1, VariableInfo(AnyPos, nameAndType._2)))
+        )
+        .getOrElse(List.empty)
       compiledBody <- local {
         modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ ++ annotationBindings)).flatMap(
           _ => compiler.ExpressionCompiler.compileFunc(af.f.position, af.f, saveExprContext, annotationBindings.map(_._1))
@@ -101,7 +107,7 @@ object ContractCompiler {
           compiledFunc <- compileFunc(dec.position, f, saveExprContext)
           (funcName, compiledFuncBodyType, argTypes) = (compiledFunc._1.dec.name, compiledFunc._1.t, compiledFunc._2)
           typeSig                                    = FunctionTypeSignature(compiledFuncBodyType, argTypes, FunctionHeader.User(funcName))
-          updateCtxWithErr <- updateCtx(funcName, typeSig).handleError()
+          updateCtxWithErr <- updateCtx(funcName, typeSig, dec.position).handleError()
         } yield compiledFunc._1.copy(errors = compiledFunc._1.errors ++ updateCtxWithErr._2)
     }
   }
@@ -171,11 +177,10 @@ object ContractCompiler {
         case (_, typedParams, _, _) => typedParams.map(_._2)
       }
 
-      mappedCallableTypes =
-        if (version <= V3)
-          MetaMapper.toProto(V1)(callableFuncsTypeInfo)
-        else
-          MetaMapper.toProto(V2)(callableFuncsTypeInfo)
+      mappedCallableTypes = if (version <= V3)
+        MetaMapper.toProto(V1)(callableFuncsTypeInfo)
+      else
+        MetaMapper.toProto(V2)(callableFuncsTypeInfo)
 
       metaWithErr <- mappedCallableTypes
         .leftMap(Generic(parsedDapp.position.start, parsedDapp.position.start, _))
@@ -222,22 +227,25 @@ object ContractCompiler {
   }
 
   private def validateAnnotatedFuncsArgTypes(ctx: CompilerContext, contract: Expressions.DAPP): CompileM[Unit] =
-    contract.fs.traverse { func =>
-      for {
-        funcName <- handleValid(func.f.name)
-        funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
-        () <- funcArgs.map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
-          .find(!checkAnnotatedParamType(_))
-          .map(argTypesError(func, funcName, _))
-          .getOrElse(().pure[CompileM])
-      } yield ()
-    }.map(_ => ())
+    contract.fs
+      .traverse { func =>
+        for {
+          funcName <- handleValid(func.f.name)
+          funcArgs <- func.f.args.flatMap(_._2).toList.traverse(resolveGenericType)
+          () <- funcArgs
+            .map { case (argType, typeParam) => (argType.v, typeParam.map(_.v)) }
+            .find(!checkAnnotatedParamType(_))
+            .map(argTypesError(func, funcName, _))
+            .getOrElse(().pure[CompileM])
+        } yield ()
+      }
+      .map(_ => ())
 
   private def argTypesError(
-                             func: Expressions.ANNOTATEDFUNC,
-                             funcName: PART.VALID[String],
-                             t: (String, Option[String])
-                           ): CompileM[Unit] =
+      func: Expressions.ANNOTATEDFUNC,
+      funcName: PART.VALID[String],
+      t: (String, Option[String])
+  ): CompileM[Unit] =
     raiseError[Id, CompilerContext, CompilationError, Unit](
       WrongArgumentType(func.f.position.start, func.f.position.end, funcName.v, typeStr(t), allowedCallableTypesV4)
     )
@@ -262,7 +270,6 @@ object ContractCompiler {
 
   val allowedCallableTypesV4: Set[String] =
     primitiveCallableTypes + "List[]"
-
 
   private def validateDuplicateVarsInContract(contract: Expressions.DAPP): CompileM[Any] = {
     for {

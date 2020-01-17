@@ -4,7 +4,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, LIST, NOTHING, TYPE, UNION}
 import com.wavesplatform.lang.v1.parser.Expressions
-import com.wavesplatform.lang.v1.parser.Expressions.{PART, Type}
+import com.wavesplatform.lang.v1.parser.Expressions.{PART, Pos, Type}
 
 import scala.scalajs.js
 import scala.scalajs.js.Any
@@ -70,7 +70,7 @@ package object JsApiUtils {
       "posStart"   -> expr.position.start,
       "posEnd"     -> expr.position.end,
       "resultType" -> expr.resultType.getOrElse(NOTHING).toString,
-      "ctx"        -> serCtx(expr.ctxOpt.getOrElse(CompilerContext.empty))
+      "ctx"        -> serCtx(expr.ctxOpt.getOrElse(Map.empty))
     )
 
     expr match {
@@ -121,7 +121,7 @@ package object JsApiUtils {
       case Expressions.MATCH(_, expr, cases, _, ctxOpt) => {
         val additionalDataObj = jObj.applyDynamic("apply")(
           "expr"  -> serExpr(expr),
-          "cases" -> cases.map(serMatchCase(_, ctxOpt.getOrElse(CompilerContext.empty))).toJSArray
+          "cases" -> cases.map(serMatchCase(_, ctxOpt.getOrElse(Map.empty))).toJSArray
         )
         mergeJSObjects(commonDataObj, additionalDataObj)
       }
@@ -139,7 +139,7 @@ package object JsApiUtils {
     result.asInstanceOf[js.Object]
   }
 
-  def serMatchCase(c: Expressions.MATCH_CASE, ctx: CompilerContext): js.Object = {
+  def serMatchCase(c: Expressions.MATCH_CASE, simpleCtx: Map[String, Pos]): js.Object = {
     jObj.applyDynamic("apply")(
       "type"       -> "MATCH_CASE",
       "posStart"   -> c.position.start,
@@ -148,11 +148,11 @@ package object JsApiUtils {
       "varTypes"   -> c.types.map(serPartStr).toJSArray,
       "resultType" -> c.resultType.getOrElse(NOTHING).toString,
       "expr"       -> serExpr(c.expr),
-      "ctx"        -> serCtx(ctx)
+      "ctx"        -> serCtx(simpleCtx)
     )
   }
 
-  def serCtx(ctx: CompilerContext): js.Object = {
+  /*def serCtx(ctx: CompilerContext): js.Object = {
     jObj.applyDynamic("apply")(
       "vars" -> ctx.varDefs.map { vd =>
         jObj.applyDynamic("apply")("name" -> vd._1, "type" -> vd._2.toString)
@@ -160,7 +160,7 @@ package object JsApiUtils {
       "funcs" -> ctx.functionDefs.map { func =>
         jObj.applyDynamic("apply")(
           "name" -> func._1,
-          "signatureList" -> func._2.map { sig =>
+          "signatureList" -> func._2.fSigList.map { sig =>
             jObj.applyDynamic("apply")("type" -> typeRepr(sig.result), "args" -> sig.args.map { arg =>
               jObj.applyDynamic("apply")("name" -> arg._1, "type" -> typeRepr(arg._2))
             }.toJSArray)
@@ -168,6 +168,16 @@ package object JsApiUtils {
         )
       }.toJSArray
     )
+  }*/
+
+  def serCtx(simpleCtx: Map[String, Pos]): js.Object = {
+    simpleCtx.map { ctxEl =>
+      jObj.applyDynamic("apply")(
+        "name" -> ctxEl._1,
+        "posStart"   -> ctxEl._2.start,
+        "posEnd"     -> ctxEl._2.end
+      )
+    }.toJSArray
   }
 
   def serDec(dec: Expressions.Declaration): js.Object = {

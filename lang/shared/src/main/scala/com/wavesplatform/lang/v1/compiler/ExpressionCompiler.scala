@@ -153,7 +153,7 @@ object ExpressionCompiler {
         condWithErr._1.parseNodeExpr,
         ifTrue.parseNodeExpr,
         ifFalse.parseNodeExpr,
-        ctxOpt = saveExprContext.toOption(ctx)
+        ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
       )
       errorList = condWithErr._1.errors ++ ifTrue.errors ++ ifFalse.errors
 
@@ -251,7 +251,7 @@ object ExpressionCompiler {
           mkIfCases(
             updatedCtx,
             cases,
-            Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx)),
+            Expressions.REF(p, PART.VALID(p, refTmpKey), ctxOpt = saveExprContext.toOption(updatedCtx.getSimpleContext())),
             allowShadowVarName,
             exprTypes
           ).toCompileM
@@ -260,7 +260,7 @@ object ExpressionCompiler {
         p,
         Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty),
         ifCasesWithErr._1.getOrElse(
-          Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = saveExprContext.toOption(ctx))
+          Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
         ),
         saveExprContext
       )
@@ -290,7 +290,7 @@ object ExpressionCompiler {
           ctx,
           FAILED_EXPR(),
           NOTHING,
-          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = saveExprContext.toOption(ctx)),
+          Expressions.MATCH(p, typedExpr.parseNodeExpr, cases, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())),
           errorList ++ typedExpr.errors
         )
       }
@@ -373,7 +373,7 @@ object ExpressionCompiler {
                 })
               types <- liftEither[Id, CompilerContext, CompilationError, List[FINAL]](genericFlat(p, ctx.predefTypes, typeDecls))
               union = UNION.reduce(UNION.create(types))
-            } yield (name, union)
+            } yield (name, VariableInfo(argName.position, union))
         }
         .handleError()
       compiledFuncBody <- local {
@@ -396,14 +396,14 @@ object ExpressionCompiler {
       } else {
         CompilationStepResultDec(ctx, FAILED_DEC(), compiledFuncBody.t, parseNodeDecl, errorList ++ compiledFuncBody.errors)
       }
-    } yield (result, argTypesWithErr._1.getOrElse(List.empty))
+    } yield (result, argTypesWithErr._1.map(_.map(nameAnfInfo => (nameAnfInfo._1, nameAnfInfo._2.vType))).getOrElse(List.empty))
   }
 
   def updateCtx(letName: String, letType: Types.FINAL, p: Pos): CompileM[Unit] =
-    modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> letType)))
+    modify[Id, CompilerContext, CompilationError](vars.modify(_)(_ + (letName -> VariableInfo(p, letType))))
 
-  def updateCtx(funcName: String, typeSig: FunctionTypeSignature): CompileM[Unit] =
-    modify[Id, CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> List(typeSig))))
+  def updateCtx(funcName: String, typeSig: FunctionTypeSignature, p: Pos): CompileM[Unit] =
+    modify[Id, CompilerContext, CompilationError](functions.modify(_)(_ + (funcName -> FunctionInfo(p, List(typeSig)))))
 
   private def compileLetBlock(
       p: Pos,
@@ -424,7 +424,7 @@ object ExpressionCompiler {
         compLetResult.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        ctxOpt = saveExprContext.toOption(compiledBody.ctx)
+        ctxOpt = saveExprContext.toOption(compiledBody.ctx.getSimpleContext())
       )
       result = if (!compLetResult.dec.isItFailed) {
         LET_BLOCK(compLetResult.dec.asInstanceOf[LET], compiledBody.expr)
@@ -445,7 +445,7 @@ object ExpressionCompiler {
       funcname                    = compFuncStepRes.dec.name
       typeSig                     = FunctionTypeSignature(compFuncStepRes.t, argTypes, FunctionHeader.User(funcname))
       compiledBody <- local {
-        updateCtx(funcname, typeSig)
+        updateCtx(funcname, typeSig, p)
           .flatMap(_ => compileExprWithCtx(body, saveExprContext))
       }
 
@@ -455,7 +455,7 @@ object ExpressionCompiler {
         compFuncStepRes.parseNodeExpr,
         compiledBody.parseNodeExpr,
         compiledBody.parseNodeExpr.resultType,
-        ctxOpt = saveExprContext.toOption(compFuncStepRes.ctx)
+        ctxOpt = saveExprContext.toOption(compFuncStepRes.ctx.getSimpleContext())
       )
     } yield CompilationStepResultExpr(compiledBody.ctx, expr, compiledBody.t, parseNodeExpr, compFuncStepRes.errors ++ compiledBody.errors)
   }
@@ -473,7 +473,7 @@ object ExpressionCompiler {
       getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
-      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx))
+      parseNodeExpr = Expressions.GETTER(p, compiledRef.parseNodeExpr, fieldPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
 
       result = if (errorList.isEmpty) {
         val (ctx, expr, t) = getterWithErr._1.get
@@ -512,7 +512,7 @@ object ExpressionCompiler {
 
       errorList     = nameWithErr._2 ++ funcCallWithErr._2
       argErrorList  = compiledArgs.flatMap(_.errors)
-      parseNodeExpr = Expressions.FUNCTION_CALL(p, namePart, compiledArgs.map(_.parseNodeExpr), ctxOpt = saveExprContext.toOption(ctx))
+      parseNodeExpr = Expressions.FUNCTION_CALL(p, namePart, compiledArgs.map(_.parseNodeExpr), ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
 
       result = if (errorList.isEmpty) {
         val (expr, t) = funcCallWithErr._1.get
@@ -529,7 +529,7 @@ object ExpressionCompiler {
       typeWithErr = ctx.varDefs
         .get(keyWithErr._1.getOrElse(""))
         .fold[(Option[FINAL], Iterable[CompilationError])]((None, List(DefNotFound(p.start, p.end, keyWithErr._1.getOrElse("")))))(
-          t => (Some(t), List.empty)
+          info => (Some(info.vType), List.empty)
         )
 
       errorList = keyWithErr._2 ++ typeWithErr._2
@@ -539,10 +539,10 @@ object ExpressionCompiler {
           ctx,
           REF(keyWithErr._1.get),
           typeWithErr._1.get,
-          Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = saveExprContext.toOption(ctx))
+          Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
         )
       } else {
-        CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx)), errorList)
+        CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())), errorList)
       }
     } yield result
 
