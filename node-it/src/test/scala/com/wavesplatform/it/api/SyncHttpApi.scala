@@ -10,7 +10,12 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, AssetInfoResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc}
+
+import com.wavesplatform.api.grpc._//{AccountsApiGrpc, AssetInfoResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc}
+
+//import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
+//import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
+//>>>>>>> master
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -20,10 +25,14 @@ import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.api.SyncHttpApi.sync
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient, _}
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -94,11 +103,11 @@ object SyncHttpApi extends Assertions {
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
-  def assertGrpcError[R](f: => R, errorMessage: String, expectedCode: Code): Assertion = Try(f) match {
+  def assertGrpcError[R](f: => R, errorRegex: String, expectedCode: Code): Assertion = Try(f) match {
     case Failure(GrpcStatusRuntimeException(status, _)) =>
       Assertions.assert(
         status.getCode == expectedCode
-          && status.getDescription.contains(errorMessage)
+          && status.getDescription.matches(s".*$errorRegex.*"), s"\nexpected '$errorRegex'\nactual '${status.getDescription}'"
       )
     case Failure(e) => Assertions.fail(e)
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
@@ -200,6 +209,9 @@ object SyncHttpApi extends Assertions {
 
     def accountBalances(acc: String): (Long, Long) =
       sync(async(n).accountBalances(acc))
+
+    def accountsBalances(height: Option[Int], accounts: Seq[String], asset: Option[String] = None): Seq[(String, Long)] =
+      sync(async(n).accountsBalances(height, accounts, asset))
 
     def balanceDetails(acc: String): BalanceDetails = sync(async(n).balanceDetails(acc))
 
@@ -435,8 +447,8 @@ object SyncHttpApi extends Assertions {
                        ): Transaction =
       maybeWaitForTransaction(sync(async(n).updateAssetInfo(sender, assetId, updatedName, updatedDescription, fee, feeAsset, version)), waitForTx)
 
-    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Transaction =
-      sync(async(n).putData(sourceAddress, data, fee))
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, waitForTx: Boolean = false): Transaction =
+      maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, fee)), waitForTx)
 
     def removeData(sourceAddress: String, data: Seq[String], fee: Long): Transaction =
       sync(async(n).removeData(sourceAddress, data, fee))
@@ -678,10 +690,11 @@ object SyncHttpApi extends Assertions {
 
   class NodeExtGrpc(n: Node) {
     import com.wavesplatform.account.{Address => Addr}
-    import com.wavesplatform.block.{Block => VanillaBlock, BlockHeader => VanillaBlockHeader}
+    import com.wavesplatform.block.{Block => VanillaBlock}
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
     private[this] lazy val accounts = AccountsApiGrpc.blockingStub(n.grpcChannel)
+    private[this] lazy val transactions = TransactionsApiGrpc.blockingStub(n.grpcChannel)
     private[this] lazy val blocks = BlocksApiGrpc.blockingStub(n.grpcChannel)
 
     def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
@@ -735,7 +748,7 @@ object SyncHttpApi extends Assertions {
         source: KeyPair,
         name: String,
         quantity: Long,
-        decimals: Byte,
+        decimals: Int,
         reissuable: Boolean,
         fee: Long,
         description: String = "",
@@ -756,10 +769,37 @@ object SyncHttpApi extends Assertions {
         fee: Long,
         version: Int = 2,
         assetId: String = "WAVES",
-        attachment: ByteString = ByteString.EMPTY,
-        waitForTx: Boolean = false
+        feeAssetId: String = "WAVES",attachment: ByteString = ByteString.EMPTY,
+        timestamp: Long = System.currentTimeMillis(),waitForTx: Boolean = false
     ): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, attachment)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastTransfer(source, recipient, amount, fee, version, assetId, feeAssetId, attachment, timestamp)), waitForTx)
+    }
+
+    def broadcastReissue(source: KeyPair,
+                         fee: Long,
+                         assetId: String,
+                         amount: Long,
+                         reissuable: Boolean = false,
+                         version: Int = 2,
+                         waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastReissue(source, fee, assetId, amount, reissuable, version)), waitForTx)
+    }
+
+    def broadcastCreateAlias(source: KeyPair,
+                             alias: String,
+                             fee: Long,
+                             version: Int = 2,
+                             waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastCreateAlias(source, alias, fee, version)), waitForTx)
+    }
+
+    def putData(source: KeyPair,
+                data: Seq[DataTransactionData.DataEntry],
+                fee: Long,
+                version: Int = 1,
+                timestamp: Long = System.currentTimeMillis(),
+                waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.putData(source, data, fee, version, timestamp)), waitForTx)
     }
 
     def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
@@ -772,8 +812,13 @@ object SyncHttpApi extends Assertions {
       accounts.getBalances(BalancesRequest.of(address, Seq(ByteString.EMPTY))).next().getWaves
     }
 
-    def getTransaction(id: String): PBSignedTransaction = {
-      sync(async(n).grpc.getTransaction(id))
+    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): PBSignedTransaction = {
+      sync(async(n).grpc.getTransaction(id, sender, recipient))
+    }
+
+    def getTransactionSeq(ids: Seq[String], sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): List[PBSignedTransaction] = {
+      val txs = transactions.getTransactions(TransactionsRequest(sender, recipient, ids.map(id => ByteString.copyFrom(Base58.decode(id)))))
+      txs.toList.map(resp => resp.getTransaction)
     }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): PBSignedTransaction =
@@ -787,6 +832,52 @@ object SyncHttpApi extends Assertions {
     def height: Int = sync(async(n).grpc.height)
 
     def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
+
+    def broadcastBurn(sender: KeyPair,
+                      assetId: String,
+                      amount: Long,
+                      fee: Long,
+                      version: Int = 2,
+                      waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastBurn(sender, assetId, amount, fee, version)), waitForTx)
+    }
+
+    def broadcastMassTransfer(sender: KeyPair,
+                              assetId: Option[String] = None,
+                              transfers: Seq[MassTransferTransactionData.Transfer],
+                              attachment: ByteString = ByteString.EMPTY,
+                              fee: Long,
+                              version: Int = 1,
+                              waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastMassTransfer(sender, assetId, transfers, attachment, fee, version)), waitForTx)
+    }
+
+    def setAssetScript(sender: KeyPair,
+                       assetId: String,
+                       script: Option[String],
+                       fee: Long,
+                       timestamp: Long = System.currentTimeMillis(),
+                       version: Int = 1,
+                       waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.setAssetScript(sender, assetId, script, fee, timestamp, version)), waitForTx)
+    }
+
+    def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
+    }
+
+    def getData(address: ByteString): List[DataTransactionData.DataEntry] = {
+      accounts.getDataEntries(DataRequest(address)).toList.map(res => res.getEntry)
+    }
+
+    def setScript(sender: KeyPair,
+                  script: Option[Script],
+                  fee: Long,
+                  timestamp: Long = System.currentTimeMillis(),
+                  version: Int = 1,
+                  waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.setScript(sender, script, fee, timestamp, version)), waitForTx)
+    }
 
     def blockAt(height: Int): VanillaBlock = {
       val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height))).getBlock
@@ -810,6 +901,43 @@ object SyncHttpApi extends Assertions {
     }
 
     def assetInfo(assetId: String): AssetInfoResponse = sync(async(n).grpc.assetInfo(assetId))
-  }
 
+    def scriptInfo(address: ByteString): ScriptData = {
+      accounts.getScript(AccountRequest.of(address))
+    }
+
+    def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcast(tx,proofs)), waitForTx)
+    }
+
+    def broadcastSponsorFee(sender: KeyPair,
+                            minFee: Option[Amount],
+                            fee: Long,
+                            version: Int = 1,
+                            waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastSponsorFee(sender, minFee, fee, version)), waitForTx)
+    }
+
+    def broadcastLease(source: KeyPair,
+                       recipient: Recipient,
+                       amount: Long,
+                       fee: Long,
+                       version: Int = 2,
+                       waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastLease(source, recipient, amount, fee, version)), waitForTx)
+    }
+
+    def broadcastLeaseCancel(source: KeyPair,
+                             leaseId: String,
+                             fee: Long,
+                             version: Int = 2,
+                             waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.broadcastLeaseCancel(source, leaseId, fee, version)), waitForTx)
+    }
+
+    def getActiveLeases(address: ByteString): List[PBSignedTransaction] = {
+      val leases = accounts.getActiveLeases(AccountRequest.of(address))
+      leases.toList.map(resp => resp.getTransaction)
+    }
+  }
 }

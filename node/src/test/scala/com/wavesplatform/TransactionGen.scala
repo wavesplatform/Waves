@@ -123,8 +123,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val issueParamGen: Gen[(KeyPair, Array[Byte], Array[Byte], Long, Byte, Boolean, Long, TxTimestamp)] = for {
     sender      <- accountGen
-    assetName   <- genBoundedBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-    description <- genBoundedBytes(0, IssueTransaction.MaxAssetDescriptionLength)
+    assetName   <- genBoundedStringBytes(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+    description <- genBoundedStringBytes(0, IssueTransaction.MaxAssetDescriptionLength)
     quantity    <- Gen.choose(Long.MaxValue / 200, Long.MaxValue / 100)
     decimals    <- Gen.choose(0: Byte, 8: Byte)
     reissuable  <- Arbitrary.arbitrary[Boolean]
