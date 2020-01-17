@@ -22,22 +22,19 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   val updateInterval = 2
   override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
 
-  val issuer    = KeyPair("issuer".getBytes)
-  val nonIssuer = KeyPair("nonIssuer".getBytes)
+  val issuer    = pkByAddress(firstAddress)
+  val nonIssuer = pkByAddress(secondAddress)
   var assetId   = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-
-    sender.transfer(firstAddress, issuer.publicKey.stringRepr, transferAmount, waitForTx = true)
-    sender.transfer(firstAddress, nonIssuer.publicKey.stringRepr, transferAmount, waitForTx = true)
-    val (defaultName, defaultDescription) = ("asset", "description")
-    assetId = sender.broadcastIssue(issuer, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
+    assetId = sender.broadcastIssue(issuer, "asset", "description", someAssetAmount, 8, true, script = None, waitForTx = true).id
   }
 
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo(assetId).height + updateInterval + 1
     sender.waitForHeight(nextTerm, 3.minutes)
+    val issuerBalance = sender.balanceDetails(issuer.publicKey.stringRepr)
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee).id
     checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
@@ -52,6 +49,8 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.assetsDetails(assetId).name shouldBe "updatedName"
     sender.assetsDetails(assetId).description shouldBe "updatedDescription"
+
+    sender.balanceDetails(issuer.publicKey.stringRepr).available shouldBe issuerBalance.available - minFee
   }
 
   test("not able to update name/description more than once within interval") {
@@ -78,12 +77,27 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     }
   }
 
-  test(s"not able to set too big description") {
+  test("not able to set too big description") {
     val tooBigDescription = Random.nextString(1001)
     assertApiError(
       sender.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
       TooBigArrayAllocation
     )
+  }
+
+  test("not able to update asset info without paying enough fee") {
+    assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message shouldBe s"State check failed. Reason: . Fee for UpdateAssetInfoTransaction (${minFee - 1} in WAVES) does not exceed minimal value of $minFee WAVES."
+    }
+  }
+
+  test("not able to update info of not-issued asset") {
+    val notIssuedAssetId = "BzARFPgBqWFu6MHGxwkPVKmaYAzyShu495Ehsgru72Wz"
+    assertApiError(sender.updateAssetInfo(issuer, notIssuedAssetId, "updatedName", "updatedDescription", minFee)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message shouldBe "State check failed. Reason: Referenced assetId not found"
+    }
   }
 
   test("non-issuer cannot update asset info") {

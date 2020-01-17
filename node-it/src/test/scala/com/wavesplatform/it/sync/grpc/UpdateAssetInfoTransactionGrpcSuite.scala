@@ -90,6 +90,23 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     )
   }
 
+  test("not able to update asset info without paying enough fee") {
+    assertGrpcError(
+      sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1),
+      s"Fee for UpdateAssetInfoTransaction (${minFee - 1} in WAVES) does not exceed minimal value of $minFee WAVES.",
+      Code.INVALID_ARGUMENT
+    )
+  }
+
+  test("not able to update info of not-issued asset") {
+    val notIssuedAssetId = "BzARFPgBqWFu6MHGxwkPVKmaYAzyShu495Ehsgru72Wz"
+    assertGrpcError(
+      sender.updateAssetInfo(issuer, notIssuedAssetId, "updatedName", "updatedDescription", minFee),
+      "Referenced assetId not found",
+      Code.INVALID_ARGUMENT
+    )
+  }
+
   test("non-issuer cannot update asset info") {
     assertGrpcError(
       sender.grpc.updateAssetInfo(nonIssuer, assetId, "updatedName", "updatedDescription", minFee),
