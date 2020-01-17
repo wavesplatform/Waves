@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
@@ -21,6 +22,7 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -1300,5 +1302,25 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
          | groth16Verify(key, proof, input)
        """.stripMargin
     eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateAssetId") {
+    val decimals = 100
+    val description = "description"
+    val isReissuable = true
+    val name = "name"
+    val quantity = 1234567
+    val nonce = 1
+    val issue = Issue.create(compiledScript = None, decimals, description, isReissuable, name, quantity, nonce, ByteStr.empty)
+    val script =
+     s"""
+        | let issue = Issue(unit, $decimals, "$description", $isReissuable, "$name", $quantity, $nonce)
+        | calculateAssetId(issue)
+      """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+      CONST_BYTESTR(issue.id)
   }
 }
