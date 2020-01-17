@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{AssetDescription, AssetDistribution, AssetDistributionPage, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
 
 private[state] final class CompositeDistributions(blockchain: Blockchain, baseProvider: Distributions, getDiff: () => Option[Diff])

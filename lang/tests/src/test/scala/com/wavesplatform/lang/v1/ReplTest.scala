@@ -6,6 +6,7 @@ import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.Common.produce
 import org.scalatest.{Matchers, PropSpec}
 
 import scala.concurrent.duration._
@@ -60,8 +61,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
   property("waves context funcs absent") {
     val repl = Repl()
 
-    val err = the[BlockchainUnavailableException] thrownBy await(repl.execute(s""" transferTransactionById(base58'fdg') """))
-    err.toString shouldBe "Blockchain state is unavailable from REPL"
+    await(repl.execute(s""" transferTransactionById(base58'fdg') """)) should produce("Blockchain state is unavailable from REPL")
 
     await(repl.execute(s""" let a = 1 """))
     await(repl.execute(s""" a """))  shouldBe Right("res1: Int = 1")

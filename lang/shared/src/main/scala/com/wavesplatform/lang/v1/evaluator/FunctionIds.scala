@@ -92,7 +92,5 @@ object FunctionIds {
 
   val BLOCKHEADER_FROM_BYTES: Short = 1070
 
-
- 
-
+  val CALCULATE_ASSET_ID: Short = 1080
 }

@@ -4,9 +4,24 @@ import cats.implicits._
 import cats.{Eval, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, EXPR}
+import com.wavesplatform.lang.v1.compiler.Types.TYPE
 
-trait ContextfulNativeFunction[C[_[_]]] {
-  def apply[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]]
+abstract class ContextfulNativeFunction[C[_[_]]](name: String, resultType: TYPE, args: Seq[(String, TYPE)]) {
+  def ev[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]]
+  final def apply[F[_]: Monad](input: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] = {
+    try {
+     ev(input)
+    } catch {
+       case _: SecurityException =>
+         Either.left[ExecutionError, EVALUATED](s"""An access to <$name(${args /*.toSeq.map(a => s"${a._1}: ${a._2}").mkString(", ") */ }): $resultType> is denied""").pure[F]
+       case e: Throwable =>
+         Either.left[ExecutionError, EVALUATED](s"""An error during run <$name(${args.toSeq.map(a => s"${a._1}: ${a._2}").mkString(", ")}): $resultType>: ${e.getClass()} ${
+           e.getMessage() match {
+             case null => e.toString
+             case msg => msg
+         }}""").pure[F]
+    }
+  }
 }
 
 trait ContextfulUserFunction[C[_[_]]] {

@@ -4,7 +4,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.validation.{TxValidator, ValidatedV}
 import com.wavesplatform.transaction.{Asset, TxValidationError}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.StringBytes
 
 object UpdateAssetInfoTxValidator extends TxValidator[UpdateAssetInfoTransaction] {
   override def validate(tx: UpdateAssetInfoTransaction): ValidatedV[UpdateAssetInfoTransaction] =
@@ -13,7 +13,7 @@ object UpdateAssetInfoTxValidator extends TxValidator[UpdateAssetInfoTransaction
       V.fee(tx.feeAmount),
       V.asset[IssuedAsset](tx.assetId),
       V.asset[Asset](tx.feeAsset),
-      V.assetName(tx.name.utf8Bytes),
-      V.assetDescription(tx.description.utf8Bytes)
+      V.assetName(tx.name.toByteString),
+      V.assetDescription(tx.description.toByteString)
     )
 }
