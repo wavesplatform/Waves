@@ -8,9 +8,9 @@ import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, TxVersion}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
-import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order, OrderType}
 
 import scala.util.{Right, Try}
 
@@ -30,28 +30,24 @@ object ExchangeTransactionDiff {
     val smartTradesEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccountTrading)
     val smartAssetsEnabled = blockchain.isFeatureActivated(BlockchainFeatures.SmartAssets)
 
-    lazy val amountDecimals = tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).get.decimals)
-    lazy val priceDecimals  = tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).get.decimals)
-    lazy val convertedPrice = Try {
-      (BigDecimal(10).pow(priceDecimals - amountDecimals) * tx.price).toBigInt().bigInteger.longValueExact()
-    }.toEither.leftMap(x => GenericError(x.getMessage))
+    def isPriceValid(amountDecimals: Int, priceDecimals: Int) = {
+      def convertPrice(price: Long, amountDecimals: Int, priceDecimals: Int) =
+        Try {
+          (BigDecimal(price) / BigDecimal(10).pow(priceDecimals - amountDecimals)).toBigInt().bigInteger.longValueExact()
+        }.toEither.leftMap(x => GenericError(x.getMessage))
 
-    def getPrice =
-      if (tx.version >= TxVersion.V3) convertedPrice else Right(tx.price)
+      def orderPrice(order: Order, amountDecimals: Int, priceDecimals: Int) =
+        if (tx.version >= TxVersion.V3 && order.version < Order.V4) convertPrice(order.price, amountDecimals, priceDecimals)
+        else Right(order.price)
 
-    def isBuyOrderPriceValid =
       for {
-        p <- if (tx.version >= TxVersion.V3 && tx.buyOrder.version < Order.V4) convertedPrice else Right(tx.price)
-        _ <- Either.cond(p != 0L, (), GenericError("price should be > 0"))
-        _ <- Either.cond(p <= tx.buyOrder.price, (), GenericError("price should be <= buyOrder.price"))
+        _              <- Either.cond(tx.price != 0L, (), GenericError("price should be > 0"))
+        buyOrderPrice  <- orderPrice(tx.buyOrder, amountDecimals, priceDecimals)
+        sellOrderPrice <- orderPrice(tx.sellOrder, amountDecimals, priceDecimals)
+        _              <- Either.cond(tx.price <= buyOrderPrice, (), GenericError("price should be <= buyOrder.price"))
+        _              <- Either.cond(tx.price >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
       } yield ()
-
-    def isSellOrderPriceValid =
-      for {
-        p <- if (tx.version >= TxVersion.V3 && tx.sellOrder.version < Order.V4) convertedPrice else Right(tx.price)
-        _ <- Either.cond(p != 0L, (), GenericError("price should be > 0"))
-        _ <- Either.cond(p >= tx.sellOrder.price, (), GenericError("price should be >= sellOrder.price"))
-      } yield ()
+    }
 
     for {
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
@@ -73,14 +69,14 @@ object ExchangeTransactionDiff {
         (),
         GenericError(s"Seller $seller can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
+      amountDecimals = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.amountAsset.fold(8)(ia => assets(ia).get.decimals)
+      priceDecimals  = if (tx.version < TxVersion.V3) 8 else tx.buyOrder.assetPair.priceAsset.fold(8)(ia => assets(ia).get.decimals)
+      _                     <- isPriceValid(amountDecimals, priceDecimals)
       tx                    <- enoughVolume(tx, blockchain)
-      price                 <- getPrice
-      _                     <- isBuyOrderPriceValid
-      _                     <- isSellOrderPriceValid
-      buyPriceAssetChange   <- tx.buyOrder.getSpendAmount(tx.amount, price).liftValidationError(tx).map(-_)
-      buyAmountAssetChange  <- tx.buyOrder.getReceiveAmount(tx.amount, price).liftValidationError(tx)
-      sellPriceAssetChange  <- tx.sellOrder.getReceiveAmount(tx.amount, price).liftValidationError(tx)
-      sellAmountAssetChange <- tx.sellOrder.getSpendAmount(tx.amount, price).liftValidationError(tx).map(-_)
+      buyPriceAssetChange   <- getSpendAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx).map(-_)
+      buyAmountAssetChange  <- getReceiveAmount(tx.buyOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx)
+      sellPriceAssetChange  <- getReceiveAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx)
+      sellAmountAssetChange <- getSpendAmount(tx.sellOrder, amountDecimals, priceDecimals, tx.amount, tx.price).liftValidationError(tx).map(-_)
       scripts = {
         import com.wavesplatform.features.FeatureProvider._
 
@@ -191,6 +187,25 @@ object ExchangeTransactionDiff {
     else if (!sellFeeValid) Left(OrderValidationError(exTrans.sellOrder, s"Insufficient sell fee"))
     else Right(exTrans)
   }
+
+  def getSpendAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+    Try {
+      if (order.orderType == OrderType.SELL) matchAmount
+      else {
+        val spend = (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt()
+        if (order.getSpendAssetId == Waves && !(spend + order.matcherFee).isValidLong) {
+          throw new ArithmeticException("BigInteger out of long range")
+        } else spend.bigInteger.longValueExact()
+      }
+    }.toEither.left.map(x => GenericError(x.getMessage))
+
+  def getReceiveAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+    Try {
+      if (order.orderType == OrderType.BUY) matchAmount
+      else {
+        (BigDecimal(matchAmount) * matchPrice * BigDecimal(10).pow(priceDecimals - amountDecimals - 8)).toBigInt().bigInteger.longValueExact()
+      }
+    }.toEither.left.map(x => GenericError(x.getMessage))
 
   /**
     * Calculates fee portfolio from the order (taking into account that in OrderV3 fee can be paid in asset != Waves)

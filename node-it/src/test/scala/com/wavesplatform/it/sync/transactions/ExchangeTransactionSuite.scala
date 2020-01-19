@@ -206,8 +206,13 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   }
 
   test("exchange tx with orders v4 can use price impossible with orders v3/v2/v1") {
-    val seller = acc0
-    val buyer  = acc1
+
+    sender.transfer(sender.address, firstAddress, 1000.waves, waitForTx = true)
+
+    val seller        = acc1
+    val buyer         = acc0
+    val sellerAddress = secondAddress
+    val buyerAddress  = firstAddress
 
     val nft = IssueTransaction(
       TxVersion.V1,
@@ -232,14 +237,14 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val ts                  = ntpTime.correctedTime()
     val expirationTimestamp = ts + Order.MaxLiveTime
     val amount              = 1
-    val price               = 1000
+    val price               = 1000 * math.pow(10, 8).toLong
 
     val assetPair = AssetPair.createAssetPair(assetId, "WAVES").get
 
     val sell          = Order.sell(4.toByte, seller, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, Waves)
     val buy           = Order.buy(4.toByte, buyer, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, Waves)
-    val sellerBalance = sender.balanceDetails(firstAddress).regular
-    val buyerBalance  = sender.balanceDetails(secondAddress).regular
+    val sellerBalance = sender.balanceDetails(sellerAddress).regular
+    val buyerBalance  = sender.balanceDetails(buyerAddress).regular
 
     val tx =
       ExchangeTransaction
@@ -262,9 +267,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     nodes.waitForHeightAriseAndTxPresent(tx.id().toString)
 
-    sender.nftAssetsBalance(secondAddress, 1).head.assetId shouldBe assetId
-    sender.balanceDetails(firstAddress).regular shouldBe sellerBalance + price - matcherFee
-    sender.balanceDetails(secondAddress).regular shouldBe buyerBalance - price - matcherFee
+    sender.nftAssetsBalance(buyerAddress, 1).head.assetId shouldBe assetId
+    sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + price - matcherFee
+    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - price - matcherFee
   }
 
   override protected def nodeConfigs: Seq[Config] =

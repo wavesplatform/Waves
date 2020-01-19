@@ -3,9 +3,7 @@ package com.wavesplatform.transaction.assets.exchange
 import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
@@ -76,28 +74,6 @@ case class Order(
     case OrderType.BUY  => assetPair.priceAsset
     case OrderType.SELL => assetPair.amountAsset
   }
-
-  @ApiModelProperty(hidden = true)
-  def getSpendAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Try {
-      // We should not correct amount here, because it could lead to fork. See ExchangeTransactionDiff
-      if (orderType == OrderType.SELL) matchAmount
-      else {
-        val spend = BigInt(matchAmount) * matchPrice / PriceConstant
-        if (getSpendAssetId == Waves && !(spend + matcherFee).isValidLong) {
-          throw new ArithmeticException("BigInteger out of long range")
-        } else spend.bigInteger.longValueExact()
-      }
-    }.toEither.left.map(x => GenericError(x.getMessage))
-
-  @ApiModelProperty(hidden = true)
-  def getReceiveAmount(matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
-    Try {
-      if (orderType == OrderType.BUY) matchAmount
-      else {
-        (BigInt(matchAmount) * matchPrice / PriceConstant).bigInteger.longValueExact()
-      }
-    }.toEither.left.map(x => GenericError(x.getMessage))
 
   @ApiModelProperty(hidden = true)
   val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))

@@ -11,6 +11,7 @@ import com.wavesplatform.it.sync.{someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.ExchangeTransactionDiff
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
@@ -332,6 +333,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
   }
 
   test("/transactions/broadcast should produce ExchangeTransaction with custom asset") {
+    val issueTxDecimals = 2
     val issueTx = signBroadcastAndCalcFee(
       Json.obj(
         "type"        -> IssueTransaction.typeId,
@@ -339,7 +341,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
         "quantity"    -> 1000 * someAssetAmount,
         "description" -> "ExchangeCoin Description",
         "sender"      -> firstAddress,
-        "decimals"    -> 2,
+        "decimals"    -> issueTxDecimals,
         "reissuable"  -> true
       ),
       usesProofs = false,
@@ -404,9 +406,9 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
             .explicitGet()
             .json()
         }
-      val s = sell.getReceiveAmount(amount, sellPrice).right.get
+      val s = ExchangeTransactionDiff.getReceiveAmount(sell, 8, issueTxDecimals, amount, sellPrice).right.get
       log.info(s"SELLER: ${s}")
-      log.info(s"BUYER: ${buy.getReceiveAmount(amount, sellPrice).right.get}")
+      log.info(s"BUYER: ${ExchangeTransactionDiff.getReceiveAmount(buy, 8, issueTxDecimals, amount, sellPrice).right.get}")
 
       val txId = sender.signedBroadcast(tx).id
       sender.waitForTransaction(txId)
