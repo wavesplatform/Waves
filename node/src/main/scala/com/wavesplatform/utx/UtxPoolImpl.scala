@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
 import org.slf4j.LoggerFactory
@@ -340,12 +341,21 @@ class UtxPoolImpl(
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
+  private[this] object TxCleanup {
+    private[this] val scheduled = AtomicBoolean(false)
+
+    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
+      cleanupScheduler.execute { () =>
+        try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+        finally scheduled.set(false)
+      }
+    }
+  }
+
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
     for (tx <- transactions) addTransaction(tx, verify = false)
-    cleanupScheduler.executeAsync { () =>
-      packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
-    }
+    TxCleanup.runCleanupAsync()
   }
 
   override def close(): Unit = {
