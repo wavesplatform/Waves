@@ -188,7 +188,7 @@ object ExchangeTransactionDiff {
     else Right(exTrans)
   }
 
-  def getSpendAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+  private[diffs] def getSpendAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (order.orderType == OrderType.SELL) matchAmount
       else {
@@ -199,7 +199,7 @@ object ExchangeTransactionDiff {
       }
     }.toEither.left.map(x => GenericError(x.getMessage))
 
-  def getReceiveAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
+  private[diffs] def getReceiveAmount(order: Order, amountDecimals: Int, priceDecimals: Int, matchAmount: Long, matchPrice: Long): Either[ValidationError, Long] =
     Try {
       if (order.orderType == OrderType.BUY) matchAmount
       else {
