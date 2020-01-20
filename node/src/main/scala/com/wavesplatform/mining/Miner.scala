@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import cats.effect.concurrent.Ref
 import cats.implicits._
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block._
 import com.wavesplatform.consensus.PoSSelector
@@ -194,7 +194,7 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: KeyPair): Either[String, Long] = {
     val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.uniqueId))
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
