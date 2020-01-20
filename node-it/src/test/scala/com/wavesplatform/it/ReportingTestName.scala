@@ -33,9 +33,9 @@ trait ReportingTestName extends SuiteMixin with ScorexLogging {
 
   private def printThreadDump(): Unit = {
     nodes.collect {
-      case dn: DockerNode =>
+      case node: DockerNode =>
         this match {
-          case db: DockerBased => db.docker.printThreadDump(dn)
+          case db: DockerBased => db.docker.printThreadDump(node)
           case _               => // Ignore
         }
     }
