@@ -323,6 +323,11 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     }
   }
 
+  def printThreadDump(node: DockerNode): Unit = {
+    val id = node.containerId
+    client.killContainer(id, DockerClient.Signal.SIGQUIT)
+  }
+
   def killAndStartContainer(node: DockerNode): DockerNode = {
     val id = node.containerId
     log.info(s"Killing container with id: $id")
