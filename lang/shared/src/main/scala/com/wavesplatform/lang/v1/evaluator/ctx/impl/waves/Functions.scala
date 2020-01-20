@@ -515,7 +515,7 @@ object Functions {
                else if (name.length > MaxAssetNameLength)
                  Left(s"Name length should not exceed $MaxAssetNameLength")
                else
-                 Right(CONST_BYTESTR(Issue.calculateId(
+                 CONST_BYTESTR(Issue.calculateId(
                    decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
                    description  = description,
                    isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
@@ -523,7 +523,8 @@ object Functions {
                    quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
                    nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t,
                    parent       = env.txId
-                )).asInstanceOf[EVALUATED])).pure[F]
+                )):Either[String, EVALUATED]
+              ).pure[F]
 
             case (env, xs) => notImplemented[F](s"calculateAssetId(i: Issue)", xs)
           }

@@ -38,7 +38,7 @@ package object utils {
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
-    override def txId: ByteStr                                                                                   = ???
+    override val txId: ByteStr                                                                                   = ByteStr.empty
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
