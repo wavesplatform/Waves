@@ -138,13 +138,13 @@ object ExpressionCompiler {
   ): CompileM[CompilationStepResultExpr] =
     for {
       condWithErr <- local {
-        compileExprWithCtx(condExpr).map { condCompRes =>
+        compileExprWithCtx(condExpr, saveExprContext).map { condCompRes =>
           val error = Some(UnexpectedType(p.start, p.end, BOOLEAN.toString, condCompRes.t.toString)).filter(_ => !(condCompRes.t equivalent BOOLEAN))
           (condCompRes, error)
         }
       }
-      ifTrue  <- local(compileExprWithCtx(ifTrueExpr))
-      ifFalse <- local(compileExprWithCtx(ifFalseExpr))
+      ifTrue  <- local(compileExprWithCtx(ifTrueExpr, saveExprContext))
+      ifFalse <- local(compileExprWithCtx(ifFalseExpr, saveExprContext))
 
       ctx = ifFalse.ctx
       t   = TypeInferrer.findCommonType(ifTrue.t, ifFalse.t)
@@ -233,7 +233,7 @@ object ExpressionCompiler {
   ): CompileM[CompilationStepResultExpr] =
     for {
       ctx       <- get[Id, CompilerContext, CompilationError]
-      typedExpr <- compileExprWithCtx(expr)
+      typedExpr <- compileExprWithCtx(expr, saveExprContext)
       exprTypesWithErr <- (typedExpr.t match {
         case u: UNION => u.pure[CompileM]
         case _        => raiseError[Id, CompilerContext, CompilationError, UNION](MatchOnlyUnion(p.start, p.end))
@@ -469,7 +469,7 @@ object ExpressionCompiler {
     for {
       ctx           <- get[Id, CompilerContext, CompilationError]
       fieldWithErr  <- handlePart(fieldPart).handleError()
-      compiledRef   <- compileExprWithCtx(refExpr)
+      compiledRef   <- compileExprWithCtx(refExpr, saveExprContext)
       getterWithErr <- mkGetter(p, ctx, compiledRef.t.typeList, fieldWithErr._1.getOrElse("NO_NAME"), compiledRef.expr).toCompileM.handleError()
 
       errorList     = fieldWithErr._2 ++ getterWithErr._2
@@ -494,7 +494,7 @@ object ExpressionCompiler {
       nameWithErr <- handlePart(namePart).handleError()
       name = nameWithErr._1.getOrElse("NO_NAME")
       signatures   <- get[Id, CompilerContext, CompilationError].map(_.functionTypeSignaturesByName(name))
-      compiledArgs <- args.traverse(arg => compileExprWithCtx(arg))
+      compiledArgs <- args.traverse(arg => compileExprWithCtx(arg, saveExprContext))
       funcCallWithErr <- (signatures match {
         case Nil           => FunctionNotFound(p.start, p.end, name, compiledArgs.map(_.t.toString)).asLeft[(EXPR, FINAL)]
         case single :: Nil => matchFuncOverload(p, name, args, compiledArgs, ctx.predefTypes, single)

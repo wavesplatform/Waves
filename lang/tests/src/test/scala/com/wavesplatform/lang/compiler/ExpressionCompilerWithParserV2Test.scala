@@ -1,34 +1,30 @@
 package com.wavesplatform.lang.compiler
 
-import cats.kernel.Monoid
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{Account, ContentType, Expression, V3}
+import com.wavesplatform.lang.directives.values.Imports
+import com.wavesplatform.lang.directives.{Directive, DirectiveParser}
+import com.wavesplatform.lang.utils.lazyContexts
+import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Types._
-import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks with Matchers with NoShrink {
 
-  def compile(script: String): Either[String, Expressions.EXPR] = {
-    val ctx = Monoid.combine(
-      compilerContext,
-      WavesContext
-        .build(
-          DirectiveSet(V3, Account, Expression).explicitGet()
-        )
-        .compilerContext
-    )
-    val compResult = ExpressionCompiler.compileWithParseResult(script, ctx, false)
-    compResult.map(_._2.expr)
+  def compile(script: String, saveExprContext: Boolean = false): Either[String, Expressions.EXPR] = {
+
+    val result = for {
+      directives  <- DirectiveParser(script)
+      ds          <- Directive.extractDirectives(directives)
+      ctx = lazyContexts(ds.copy(imports = Imports()))().compilerContext
+      compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext)
+    } yield compResult
+
+    result.map(_._2.expr)
   }
 
   property("simple test") {

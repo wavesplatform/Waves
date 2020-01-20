@@ -21,8 +21,8 @@ case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTyp
   def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, FunctionInfo(AnyPos, List.empty)).fSigList
 
   def getSimpleContext(): Map[String, Pos] = {
-    varDefs.map(el => el._1 -> el._2.pos) ++
-      functionDefs.map(el => el._1 -> el._2.pos)
+    (varDefs.map(el => el._1 -> el._2.pos) ++ functionDefs.map(el => el._1 -> el._2.pos))
+      .filter(_._2.start != -1)
   }
 }
 
