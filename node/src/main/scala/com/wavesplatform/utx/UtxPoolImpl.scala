@@ -29,7 +29,6 @@ import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.execution.schedulers.SchedulerService
-import monix.execution.{AsyncQueue, CancelableFuture}
 import monix.reactive.Observer
 import org.slf4j.LoggerFactory
 
@@ -342,25 +341,13 @@ class UtxPoolImpl(
       blockchain.assetDescription(asset).forall(_.reissuable)
   }
 
-  private[this] object TxQueue {
-    private[this] val queue = AsyncQueue.unbounded[Seq[Transaction]]()(cleanupScheduler)
-
-    def offer(transactions: Seq[Transaction]): Unit =
-      queue.offer(transactions)
-
-    def consume(): CancelableFuture[Unit] =
-      queue
-        .drain(1, Int.MaxValue)
-        .flatMap { transactionSeq =>
-          for (ts <- transactionSeq; transaction <- ts) addTransaction(transaction, verify = false)
-          packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
-          consume()
-        }(cleanupScheduler)
-  }
-
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction]): Unit =
-    TxQueue.offer(transactions)
+  def addAndCleanup(transactions: Seq[Transaction]): Unit = {
+    for (tx <- transactions) addTransaction(tx, verify = false)
+    cleanupScheduler.executeAsync { () =>
+      packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+    }
+  }
 
   override def close(): Unit = {
     cleanupScheduler.shutdown()
