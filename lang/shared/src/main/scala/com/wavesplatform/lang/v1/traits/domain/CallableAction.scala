@@ -57,7 +57,7 @@ object Issue {
     out.writeLong(quantity)
     out.writeShort(if (isReissuable) 1 else 0)
     out.writeLong(nonce)
-    out.writeBytes(parent)
+    out.write(parent.arr)
     ByteStr(Global.blake2b256(out.toByteArray))
   }
 }
