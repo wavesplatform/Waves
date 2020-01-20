@@ -56,9 +56,6 @@ class UtxPoolImpl(
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
 
-  // Init consume loop
-  TxQueue.consume()
-
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
     else putNewTx(tx, verify)
@@ -309,6 +306,7 @@ class UtxPoolImpl(
   private[this] val traceLogger = LoggerFacade(LoggerFactory.getLogger(this.getClass.getCanonicalName + ".trace"))
   traceLogger.trace("Validation trace reporting is enabled")
 
+  @scala.annotation.tailrec
   private def extractErrorMessage(error: ValidationError): String = error match {
     case see: TxValidationError.ScriptExecutionError        => s"ScriptExecutionError(${see.error})"
     case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
