@@ -36,7 +36,7 @@ class CalculateAssetIdBenchmark {
 
   @Benchmark
   def calculateAssetId(st: CalculateAssetIdSt, bh: Blackhole): Unit =
-    bh.consume(Issue.calculateId(Int.MaxValue, st.MaxAssetDescription, isReissuable = true, st.MaxAssetName, Long.MaxValue, Long.MaxValue, ByteStr(new Array[Bytes](64))))
+    bh.consume(Issue.calculateId(Int.MaxValue, st.MaxAssetDescription, isReissuable = true, st.MaxAssetName, Long.MaxValue, Long.MaxValue, ByteStr(new Array[Byte](64))))
 }
 
 object CalculateAssetIdBenchmark {
