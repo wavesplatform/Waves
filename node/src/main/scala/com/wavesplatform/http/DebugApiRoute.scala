@@ -281,7 +281,7 @@ case class DebugApiRoute(
               blockchain.effectiveBalance(
                 address,
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
-                blockchain.microblockIds.lastOption.getOrElse(ByteStr.empty)
+                blockchain.microblockIds.lastOption
               ),
               System.currentTimeMillis() + offset.toMillis
             )

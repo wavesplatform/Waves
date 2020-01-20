@@ -67,6 +67,8 @@ object FunctionIds {
 
   val CHECK_MERKLE_PROOF: Short = 700
 
+  val BLS12_GROTH16_VERIFY: Short = 800
+
   // Waves
   val GETTRANSACTIONBYID: Short      = 1000
   val TRANSACTIONHEIGHTBYID: Short   = 1001
@@ -90,4 +92,5 @@ object FunctionIds {
 
   val BLOCKHEADER_FROM_BYTES: Short = 1070
 
+  val CALCULATE_ASSET_ID: Short = 1080
 }

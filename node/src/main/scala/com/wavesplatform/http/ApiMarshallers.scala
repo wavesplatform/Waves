@@ -34,21 +34,15 @@ trait ApiMarshallers {
 
   implicit lazy val logWrites: Writes[TraceStep] = Writes(_.json)
 
-  implicit lazy val tracedResultMarshaller: ToResponseMarshaller[TracedResult[ApiError, Transaction]] =
-    fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
-      (
-        ae.resultE.fold(_.code, _ => StatusCodes.OK),
-        ae.json
+  implicit def tracedResultMarshaller[A](implicit writes: Writes[A]): ToResponseMarshaller[TracedResult[ApiError, A]] =
+    fromStatusCodeAndValue[StatusCode, JsValue]
+      .compose(
+        ae =>
+          (
+            ae.resultE.fold(_.code, _ => StatusCodes.OK),
+            ae.resultE.fold(_.json, writes.writes)
+          )
       )
-    }
-
-  implicit lazy val tracedJsValueMarshaller: ToResponseMarshaller[TracedResult[ApiError, JsValue]] =
-    fromStatusCodeAndValue[StatusCode, JsValue].compose { ae =>
-      (
-        ae.resultE.fold(_.code, _ => StatusCodes.OK),
-        ae.resultE.fold(_.json, (j => j))
-      )
-    }
 
   private[this] lazy val jsonStringUnmarshaller =
     Unmarshaller.byteStringUnmarshaller
@@ -60,6 +54,9 @@ trait ApiMarshallers {
 
   private[this] lazy val jsonStringMarshaller =
     Marshaller.stringMarshaller(`application/json`)
+
+  private[this] lazy val customJsonStringMarshaller =
+    Marshaller.stringMarshaller(CustomJson.jsonWithNumbersAsStrings)
 
   implicit def playJsonUnmarshaller[A](implicit reads: Reads[A]): FromEntityUnmarshaller[A] =
     jsonStringUnmarshaller.map { data =>
@@ -79,11 +76,17 @@ trait ApiMarshallers {
   implicit val stringUnmarshaller: FromEntityUnmarshaller[String] = PredefinedFromEntityUnmarshallers.stringUnmarshaller
   implicit val intUnmarshaller: FromEntityUnmarshaller[Int]       = stringUnmarshaller.map(_.toInt)
 
-  implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] = {
-    jsonStringMarshaller
-      .compose(jsValueToString)
-      .compose(writes.writes)
-  }
+  implicit def playJsonMarshaller[A](implicit writes: Writes[A], jsValueToString: JsValue => String = Json.stringify): ToEntityMarshaller[A] =
+    Marshaller.oneOf(
+      jsonStringMarshaller
+        .compose(jsValueToString)
+        .compose(writes.writes),
+      customJsonStringMarshaller
+        .compose(CustomJson.writeValueAsString)
+        .compose(writes.writes)
+    )
+
+
 
   // preserve support for using plain strings as request entities
   implicit val stringMarshaller: ToEntityMarshaller[String] = PredefinedToEntityMarshallers.stringMarshaller(`text/plain`)

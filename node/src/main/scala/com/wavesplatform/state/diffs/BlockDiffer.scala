@@ -28,7 +28,7 @@ object BlockDiffer extends ScorexLogging {
     fromBlockTraced(blockchain, maybePrevBlock, block, constraint, verify).resultE
 
   def fromBlockTraced(blockchain: Blockchain,
-                      maybePrevBlock: Option[Block],
+                      maybePrevBlockFeePart: Option[Portfolio],
                       block: Block,
                       constraint: MiningConstraint,
                       verify: Boolean = true): TracedResult[ValidationError, Result] = {
@@ -45,7 +45,7 @@ object BlockDiffer extends ScorexLogging {
       if (stateHeight >= sponsorshipHeight)
         Portfolio.empty.copy(balance = blockchain.carryFee)
       else if (stateHeight > ngHeight)
-        maybePrevBlock.map(_.prevBlockFeePart()).getOrElse(Portfolio.empty)
+        maybePrevBlockFeePart.getOrElse(Portfolio.empty)
       else Portfolio.empty
 
     val currentBlockFeeDistr: Portfolio =

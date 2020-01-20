@@ -2,9 +2,6 @@ package com.wavesplatform.lang.v1.traits.domain
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
-import scorex.crypto.hash.Blake2b256
-
-import monix.eval.Coeval
 
 sealed trait CallableAction
 
@@ -15,25 +12,51 @@ case class AssetTransfer(
 ) extends CallableAction
 
 case class Issue(
+    id: ByteStr,
     compiledScript: Option[ByteStr],
     decimals: Int,
     description: String,
     isReissuable: Boolean,
     name: String,
-    quantity: Long
-) extends CallableAction {
+    quantity: Long,
+    nonce: Long
+) extends CallableAction
+
+object Issue {
   import com.wavesplatform.lang.utils.Serialize._
   import java.io.ByteArrayOutputStream
 
-  def id : Coeval[ByteStr] = Coeval.evalOnce {
+  import com.wavesplatform.lang.v1.BaseGlobal
+  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
+
+  def create( compiledScript: Option[ByteStr],
+              decimals: Int,
+              description: String,
+              isReissuable: Boolean,
+              name: String,
+              quantity: Long,
+              nonce: Long,
+              patent: ByteStr): Issue = {
+    val id = calculateId(decimals, description, isReissuable, name, quantity, nonce)
+    Issue(id, compiledScript, decimals, description, isReissuable, name, quantity, nonce)
+  }
+
+  def calculateId(
+    decimals: Int,
+    description: String,
+    isReissuable: Boolean,
+    name: String,
+    quantity: Long,
+    nonce: Long
+  ): ByteStr = {
     val out = new ByteArrayOutputStream()
     out.writeString(name)
     out.writeString(description)
     out.writeInt(decimals)
     out.writeLong(quantity)
-    out.writeShort((if(isReissuable) { 1 } else { 0 }))
-    out.writeLong(0L) // Nonce
-    ByteStr(Blake2b256.hash(out.toByteArray))
+    out.writeShort(if (isReissuable) 1 else 0)
+    out.writeLong(nonce)
+    ByteStr(Global.blake2b256(out.toByteArray))
   }
 }
 

@@ -4,13 +4,10 @@ import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidBase58, InvalidSignature, TooBigArrayAllocation}
-import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.TransactionsRootSpec._
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -19,13 +16,10 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.settings.{BlockchainSettings, GenesisSettings, RewardsSettings, TestFunctionalitySettings, WalletSettings}
-import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
 import monix.eval.Coeval
@@ -497,8 +491,6 @@ class TransactionsRouteSpec
 
     "returns error in case of all transactions are filtered" in {
       forAll(invalidBlocksGen) { blocks =>
-        prepareBlockchain(blocks)
-
         val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
 
         val queryParams = txIdsToBlock.keySet.map(id => s"id=$id").mkString("?", "&", "")

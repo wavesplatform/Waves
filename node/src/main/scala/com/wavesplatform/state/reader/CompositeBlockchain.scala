@@ -2,6 +2,7 @@ package com.wavesplatform.state.reader
 
 import cats.data.Ior
 import cats.implicits._
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, SignedBlockHeader}
@@ -10,7 +11,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -100,9 +101,10 @@ final case class CompositeBlockchain(
         }
 
     assetDescription map { z =>
-      diff.transactions
+      diff.transactions.values
         .foldLeft(z.copy(script = script)) {
-          case (acc, (ut: UpdateAssetInfoTransaction, _)) => acc.copy(name = Right(ut.name), description = Right(ut.description), lastUpdatedAt = Height(height))
+          case (acc, (ut: UpdateAssetInfoTransaction, _)) =>
+            acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _)                                        => acc
         }
     }
@@ -110,7 +112,7 @@ final case class CompositeBlockchain(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
-      diff.transactionMap().get(leaseId).collect {
+      diff.transactions.get(leaseId).collect {
         case (lt: LeaseTransaction, _) =>
           LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
@@ -118,7 +120,7 @@ final case class CompositeBlockchain(
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = {
     diff
-      .transactionMap()
+      .transactions
       .get(id)
       .collect {
         case (tx: TransferTransaction, _) => (height, tx)
@@ -128,14 +130,14 @@ final case class CompositeBlockchain(
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff
-      .transactionMap()
+      .transactions
       .get(id)
       .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
     diff
-      .transactionMap()
+      .transactions
       .get(id)
       .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
@@ -160,13 +162,23 @@ final case class CompositeBlockchain(
     inner.collectLposPortfolios(pf) ++ b.result()
   }
 
-  override def containsTransaction(tx: Transaction): Boolean = diff.transactionMap().contains(tx.id()) || inner.containsTransaction(tx)
+  override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
-  override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
-    if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+    if (maybeDiff.isEmpty || h < this.height) {
+      inner.balanceOnlySnapshots(address, h, assetId)
+    } else {
+      val balance = this.balance(address, assetId)
+      val bs = height -> balance
+      Some(bs)
+    }
+  }
+
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = {
+    if (maybeDiff.isEmpty || to.exists(id => inner.heightOf(id).isDefined)) {
       inner.balanceSnapshots(address, from, to)
     } else {
       val balance = this.balance(address)
@@ -236,7 +248,7 @@ object CompositeBlockchain {
         val cancelledInLiquidBlock = ng.leaseState.collect {
           case (id, false) => id
         }.toSet
-        val addedInLiquidBlock = ng.transactions.collect {
+        val addedInLiquidBlock = ng.transactions.values.collect {
           case (lt: LeaseTransaction, _) if !cancelledInLiquidBlock(lt.id()) => lt
         }
         innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock

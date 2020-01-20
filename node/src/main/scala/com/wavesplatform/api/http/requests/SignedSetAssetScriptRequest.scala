@@ -11,7 +11,8 @@ import play.api.libs.json.{JsPath, Reads}
 
 object SignedSetAssetScriptRequest {
   implicit val signedSetAssetScriptRequestReads: Reads[SignedSetAssetScriptRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").read[IssuedAsset] and
       (JsPath \ "script").readNullable[String] and
       (JsPath \ "fee").read[Long] and
@@ -21,6 +22,7 @@ object SignedSetAssetScriptRequest {
 }
 
 case class SignedSetAssetScriptRequest(
+    version: Option[Byte],
     senderPublicKey: String,
     assetId: IssuedAsset,
     script: Option[String],
@@ -35,6 +37,6 @@ case class SignedSetAssetScriptRequest(
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      t <- SetAssetScriptTransaction.create(1.toByte, _sender, assetId, _script, fee, timestamp, proofs)
+      t <- SetAssetScriptTransaction.create(version.getOrElse(1.toByte), _sender, assetId, _script, fee, timestamp, proofs)
     } yield t
 }

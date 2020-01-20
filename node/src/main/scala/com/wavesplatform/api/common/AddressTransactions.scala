@@ -72,7 +72,7 @@ object AddressTransactions {
         subject,
         sender,
         types,
-        fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactionMap().contains(id) })
+        fromId.filter(id => maybeDiff.exists { case (_, diff) => !diff.transactions.contains(id) })
       )
 
   def transactionsFromDB(
@@ -107,7 +107,7 @@ object AddressTransactions {
   ): Iterable[(Height, Transaction)] =
     (for {
       (h, diff)       <- maybeDiff.toSeq
-      (tx, addresses) <- diff.transactions.reverse
+      (tx, addresses) <- diff.transactions.values.toSeq.reverse
       if addresses(subject)
     } yield h -> tx)
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }

@@ -7,45 +7,15 @@ import com.google.common.collect.AbstractIterator
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.Address
 import com.wavesplatform.crypto
-import com.wavesplatform.database.{DBExt, DBResource, Keys, readIntSeq}
+import com.wavesplatform.database.{DBResource, Keys, readIntSeq}
 import com.wavesplatform.state.Portfolio.longSemigroup
 import com.wavesplatform.state.{AssetDescription, Diff}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import monix.eval.Task
-import monix.reactive.Observable
-import org.iq80.leveldb.DB
 
 import scala.collection.JavaConverters._
 
-trait AddressPortfolio {
-  import AddressPortfolio._
-
-  def nftList(
-      db: DB,
-      address: Address,
-      diff: Diff,
-      isNFT: IssuedAsset => Boolean,
-      from: Option[IssuedAsset]
-  ): Observable[(IssuedAsset, AssetDescription)] =
-    db.resourceObservable.flatMap { resource =>
-      Observable.fromIterator(Task(loadNftList(resource, address, diff, isNFT, from)))
-    }
-
-  def portfolio(db: DB, address: Address, overrides: Map[IssuedAsset, Long], includeAsset: IssuedAsset => Boolean): Observable[(IssuedAsset, Long)] =
-    db.resourceObservable.flatMap { resource =>
-      val maybeAddressId = resource.get(Keys.addressId(address))
-      maybeAddressId.foreach { addressId =>
-        resource.iterator.seek(Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ addressId.toByteArray)
-      }
-      Observable
-        .fromIterator(Task(new BalanceIterator(maybeAddressId, includeAsset, resource, overrides).asScala))
-        .filter(_._2 != 0)
-
-    }
-}
-
 object AddressPortfolio {
-  def loadNftList(
+  def nftIterator(
       resource: DBResource,
       address: Address,
       diff: Diff,
@@ -64,10 +34,24 @@ object AddressPortfolio {
 
     new BalanceIterator(maybeAddressId, isNFT, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
       .filter(_._2 != 0)
-      .flatMap { case (assetId, _) => loadIssueTransaction(diff, resource, assetId).iterator }
+      .flatMap { case (assetId, _) => loadAssetDescription(diff, resource, assetId).iterator }
   }
 
-  private def loadIssueTransaction(diff: Diff, resource: DBResource, assetId: IssuedAsset): Option[(IssuedAsset, AssetDescription)] = ???
+  def assetBalanceIterator(
+      resource: DBResource,
+      address: Address,
+      diff: Diff,
+      includeAsset: IssuedAsset => Boolean
+  ): Iterator[(IssuedAsset, Long)] = {
+    val maybeAddressId = resource.get(Keys.addressId(address))
+    maybeAddressId.foreach { addressId =>
+      resource.iterator.seek(Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ addressId.toByteArray)
+    }
+    new BalanceIterator(maybeAddressId, includeAsset, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
+      .filter(_._2 != 0)
+  }
+
+  private def loadAssetDescription(diff: Diff, resource: DBResource, assetId: IssuedAsset): Option[(IssuedAsset, AssetDescription)] = ???
 
   class BalanceIterator(
       addressId: Option[BigInt],

@@ -1,16 +1,18 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
+import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
@@ -33,8 +35,8 @@ class AssetsApiRouteSpec
   private val smartAssetDesc = AssetDescription(
     source = smartAssetTx.id(),
     issuer = smartAssetTx.sender,
-    name = Left(smartAssetTx.nameBytes),
-    description = Left(smartAssetTx.descriptionBytes),
+    name = smartAssetTx.name,
+    description = smartAssetTx.description,
     decimals = smartAssetTx.decimals,
     reissuable = smartAssetTx.reissuable,
     totalVolume = smartAssetTx.quantity,
@@ -46,6 +48,25 @@ class AssetsApiRouteSpec
 
   (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
   (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
+
+  private val gen = for {
+    script <- scriptGen
+    complexity = Script.estimate(script, ScriptEstimatorV1)
+    smartAssetTx <- issueV2TransactionGen(_scriptGen = Gen.const(Some(script)))
+  } yield (smartAssetTx, AssetDescription(
+    source = smartAssetTx.id(),
+    issuer = smartAssetTx.sender,
+    name = smartAssetTx.name,
+    description = smartAssetTx.description,
+    decimals = smartAssetTx.decimals,
+    reissuable = smartAssetTx.reissuable,
+    totalVolume = smartAssetTx.quantity,
+    lastUpdatedAt = Height @@ 0,
+    script = Some((script, complexity)),
+    sponsorship = 0,
+    nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
+  ))
+
   routePath(s"/details/${smartAssetTx.id().toString}") in {
     Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -65,8 +86,8 @@ class AssetsApiRouteSpec
   private val sillyAssetDesc = AssetDescription(
     source = sillyAssetTx.id(),
     issuer = sillyAssetTx.sender,
-    name = Left(sillyAssetTx.nameBytes),
-    description = Left(sillyAssetTx.descriptionBytes),
+    name = sillyAssetTx.name,
+    description = sillyAssetTx.description,
     decimals = sillyAssetTx.decimals,
     reissuable = sillyAssetTx.reissuable,
     totalVolume = sillyAssetTx.quantity,
@@ -97,8 +118,8 @@ class AssetsApiRouteSpec
     (response \ "issueHeight").as[Long] shouldBe 1
     (response \ "issueTimestamp").as[Long] shouldBe tx.timestamp
     (response \ "issuer").as[String] shouldBe tx.sender.stringRepr
-    (response \ "name").as[String] shouldBe tx.name
-    (response \ "description").as[String] shouldBe tx.description
+    (response \ "name").as[String] shouldBe tx.name.toStringUtf8
+    (response \ "description").as[String] shouldBe tx.description.toStringUtf8
     (response \ "decimals").as[Int] shouldBe tx.decimals
     (response \ "reissuable").as[Boolean] shouldBe tx.reissuable
     (response \ "quantity").as[BigDecimal] shouldBe desc.totalVolume

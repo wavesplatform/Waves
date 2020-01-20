@@ -2,7 +2,6 @@ package com.wavesplatform.network
 import java.util.concurrent.CountDownLatch
 
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSettings
@@ -22,23 +21,15 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
   private[this] val scheduler = Schedulers.timeBoundedFixedPool(timer, 1.second, 2, "test-utx-sync")
 
   "UtxPoolSynchronizer" - {
-    def sleep(millis: Int)(tx: Transaction): TracedResult[ValidationError, Boolean] = {
-      while (true) {}
-      TracedResult(Right(true))
-    }
-
-    "rejects transactions which take too long to validate" in withUPS(sleep(Int.MaxValue)) { ups =>
-      ups.publish(GenesisTransaction.create(PublicKey(Array.emptyByteArray), 10L, 0L).explicitGet()).resultE should produce("Timeout executing task")
-    }
-
     val latch   = new CountDownLatch(5)
     val counter = AtomicInt(10)
 
     def countTransactions(tx: Transaction): TracedResult[ValidationError, Boolean] = {
-      if (counter.getAndDecrement() > 5) {
-        while (true) {}
-      }
-      latch.countDown()
+      if (counter.getAndDecrement() > 5)
+        while (!Thread.currentThread().isInterrupted) {}
+      else
+        latch.countDown()
+
       TracedResult(Right(true))
     }
 
@@ -52,8 +43,7 @@ class UtxPoolSynchronizerSpec extends FreeSpec with Matchers with BeforeAndAfter
   }
 
   private def withUPS(putIfNew: Transaction => TracedResult[ValidationError, Boolean])(f: UtxPoolSynchronizer => Unit): Unit = {
-    val ups = new UtxPoolSynchronizerImpl(UtxSynchronizerSettings(1000, 2, 1000, true), putIfNew, { (_, _) =>
-    }, Observable.empty)(scheduler)
+    val ups = new UtxPoolSynchronizerImpl(UtxSynchronizerSettings(1000, 2, 1000, true), putIfNew, (_, _) => (), Observable.empty, scheduler)
     f(ups)
     ups.close()
   }

@@ -10,7 +10,8 @@ import play.api.libs.json._
 
 object SignedMassTransferRequest {
   implicit val MassTransferRequestReads: Reads[SignedMassTransferRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").readNullable[String] and
       (JsPath \ "transfers").read[List[Transfer]] and
       (JsPath \ "fee").read[Long] and
@@ -21,6 +22,7 @@ object SignedMassTransferRequest {
 }
 
 case class SignedMassTransferRequest(
+    version: Option[Byte],
     senderPublicKey: String,
     assetId: Option[String],
     transfers: List[Transfer],
@@ -31,9 +33,9 @@ case class SignedMassTransferRequest(
 ) {
   def toTx: Either[ValidationError, MassTransferTransaction] =
     for {
-      _sender     <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58ToAsset(assetId.filter(_.length > 0), "invalid.assetId")
-      _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
-      t           <- MassTransferTransaction.create(1.toByte, _sender, _assetId, _transfers, fee, timestamp, attachment, proofs)
+      _sender    <- PublicKey.fromBase58String(senderPublicKey)
+      _assetId   <- parseBase58ToAsset(assetId.filter(_.length > 0), "invalid.assetId")
+      _transfers <- MassTransferTransaction.parseTransfersList(transfers)
+      t          <- MassTransferTransaction.create(version.getOrElse(1.toByte), _sender, _assetId, _transfers, fee, timestamp, attachment, proofs)
     } yield t
 }

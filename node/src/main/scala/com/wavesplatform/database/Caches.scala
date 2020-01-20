@@ -180,7 +180,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for ((_, addresses) <- diff.transactions; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for ((_, addresses) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
 
@@ -200,17 +200,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       (orderId, fillInfo) <- diff.orderFills
     } yield orderId -> volumeAndFeeCache.get(orderId).combine(fillInfo)
 
-    val transactionList = diff.transactions
+    val transactionList = diff.transactions.toList
 
     transactionList.foreach {
-      case (tx, _) =>
+      case (_, (tx, _)) =>
         transactionIds.put(tx.id(), newHeight)
     }
 
     val addressTransactions: Map[AddressId, Seq[TransactionId]] =
       transactionList
         .flatMap {
-          case (tx, addrs) =>
+          case (_, (tx, addrs)) =>
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>

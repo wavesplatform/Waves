@@ -2,20 +2,17 @@ package com.wavesplatform.mining
 
 import cats.effect.concurrent.Ref
 import cats.implicits._
-import com.wavesplatform.account.{KeyPair, PublicKey}
-import com.wavesplatform.block.Block._
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.block.Block._
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
-import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -26,6 +23,8 @@ import kamon.metric.TimerMetric
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.{CanBlock, SchedulerService}
+import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.state.appender.BlockAppender
 
 import scala.concurrent.duration._
 
@@ -98,11 +97,7 @@ class MinerImpl(
       )
 
   private def checkScript(account: KeyPair): Either[String, Unit] = {
-    Either.cond(
-      !blockchainUpdater.hasAccountScript(account),
-      (),
-      s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks"
-    )
+    Either.cond(!blockchainUpdater.hasAccountScript(account.toAddress), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
   }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
@@ -146,7 +141,7 @@ class MinerImpl(
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.header.timestamp
-    lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
+    lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, Some(refBlockID))
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
@@ -199,20 +194,14 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(
-      fs: FunctionalitySettings,
-      height: Int,
-      block: BlockHeader,
-      blockUniqueId: ByteStr,
-      account: PublicKey
-  ): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, blockUniqueId)
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.signature))
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
-      val blockDelayE = pos.getValidBlockDelay(height, account, block.baseTarget, balance)
+      val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)
       for {
         delay <- blockDelayE.leftMap(_.toString)
-        expectedTS = delay + block.timestamp
+        expectedTS = delay + block.header.timestamp
         result <- Either.cond(
           0 < expectedTS && expectedTS < Long.MaxValue,
           expectedTS,
@@ -223,12 +212,12 @@ class MinerImpl(
   }
 
   private def nextBlockGenOffsetWithConditions(account: KeyPair): Either[String, FiniteDuration] = {
-    val height                                 = blockchainUpdater.height
-    val SignedBlockHeader(lastBlock, uniqueId) = blockchainUpdater.blockHeader(height).get
+    val height    = blockchainUpdater.height
+    val lastBlock = blockchainUpdater.lastBlockHeader.get
     for {
-      _  <- checkAge(height, lastBlock.timestamp)
+      _  <- checkAge(height, blockchainUpdater.lastBlockTimestamp.get) // lastBlock ?
       _  <- checkScript(account)
-      ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, uniqueId, account)
+      ts <- nextBlockGenerationTime(blockchainSettings.functionalitySettings, height, lastBlock, account)
       calculatedOffset = ts - timeService.correctedTime()
       offset           = Math.max(calculatedOffset, minerSettings.minimalBlockGenerationOffset.toMillis).millis
 

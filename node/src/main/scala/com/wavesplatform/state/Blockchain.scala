@@ -54,7 +54,8 @@ trait Blockchain {
   def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
+  def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
+  def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[AccountScriptInfo]
   def hasAccountScript(address: Address): Boolean
@@ -103,8 +104,8 @@ object Blockchain {
       case _                          => false
     }
 
-    def effectiveBalance(address: Address, confirmations: Int, block: BlockId = blockchain.lastBlockId.getOrElse(ByteStr.empty)): Long = {
-      val blockHeight = blockchain.heightOf(block).getOrElse(blockchain.height)
+    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
+      val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
       val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
       val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
       if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
@@ -113,7 +114,7 @@ object Blockchain {
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
       val signature   = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).signature
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, signature)
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(signature))
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
@@ -134,7 +135,7 @@ object Blockchain {
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
 
-    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
+    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(_ => true)

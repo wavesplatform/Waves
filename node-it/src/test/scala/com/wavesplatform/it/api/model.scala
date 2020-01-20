@@ -132,6 +132,16 @@ object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Json.format
 }
 
+case class TransactionStatus(
+    id: String,
+    status: String,
+    confirmations: Option[Int],
+    height: Option[Int]
+)
+object TransactionStatus {
+  implicit val format: Format[TransactionStatus] = Json.format
+}
+
 case class OrderInfo(
     id: String,
     version: Option[Byte],
@@ -208,7 +218,7 @@ case class IssueInfoResponse(
     decimals: Int,
     isReissuable: Boolean,
     compiledScript: Option[String],
-    nonce: Option[Int]
+    nonce: Int
 )
 object IssueInfoResponse {
   implicit val IssueInfoFormat: Format[IssueInfoResponse] = Json.format
@@ -250,15 +260,60 @@ case class Block(
     height: Int,
     timestamp: Long,
     generator: String,
+    transactionCount: Int,
+    generationSignature: Option[String],
+    transactionsRoot: Option[String],
+    baseTarget: Option[Int],
+    blocksize: Int,
     transactions: Seq[Transaction],
     totalFee: Long,
-    features: Option[Seq[Short]],
+    totalFee: Option[Long],
+    features: Option[Set[Short]],
     reward: Option[Long],
     desiredReward: Option[Long],
     version: Option[Byte] = None
 )
 object Block {
-  implicit val blockFormat: Format[Block] = Json.format
+  implicit val blockFormat: Format[Block] = Format(
+    Reads( jsv =>
+      for {
+        signature <- (jsv \ "signature").validate[String]
+        height <- (jsv \ "height").validate[Int]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        generator <- (jsv \ "generator").validate[String]
+        transactionCount <- (jsv \ "transactionCount").validate[Int]
+        blocksize <- (jsv \ "blocksize").validate[Int]
+        features <- (jsv \ "features").validateOpt[Set[Short]]
+        reward <- (jsv \ "reward").validateOpt[Long]
+        desiredReward <- (jsv \ "desiredReward").validateOpt[Long]
+        totalFee <- (jsv \ "totalFee").validateOpt[Long]
+        fee <- (jsv \ "fee").validate[Long]
+        transactions <- (jsv \ "transactions").validate[Seq[Transaction]]
+        version <- (jsv \ "version").validateOpt[Byte]
+        generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
+        baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
+        transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
+      } yield Block(
+        signature,
+        height,
+        timestamp,
+        generator,
+        transactionCount,
+        generationSignature,
+        transactionsRoot,
+        baseTarget,
+        blocksize,
+        transactions,
+        fee,
+        totalFee,
+        features,
+        reward,
+        desiredReward,
+        version
+      )
+    ),
+    Json.writes[Block]
+  )
 }
 
 case class BlockHeader(
@@ -267,6 +322,9 @@ case class BlockHeader(
     timestamp: Long,
     generator: String,
     transactionCount: Int,
+    generationSignature: Option[String],
+    transactionsRoot: Option[String],
+    baseTarget: Option[Int],
     blocksize: Int,
     features: Option[Set[Short]],
     reward: Option[Long],
@@ -275,7 +333,47 @@ case class BlockHeader(
     version: Option[Byte] = None
 )
 object BlockHeader {
-  implicit val blockHeadersFormat: Format[BlockHeader] = Json.format
+  implicit val blockHeadersFormat: Format[BlockHeader] = Format(
+    Reads( jsv =>
+      for {
+        signature <- (jsv \ "signature").validate[String]
+        height <- (jsv \ "height").validate[Int]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        generator <- (jsv \ "generator").validate[String]
+        transactionCount <- (jsv \ "transactionCount").validate[Int]
+        blocksize <- (jsv \ "blocksize").validate[Int]
+        features <- (jsv \ "features").validateOpt[Set[Short]]
+        reward <- (jsv \ "reward").validateOpt[Long]
+        desiredReward <- (jsv \ "desiredReward").validateOpt[Long]
+        totalFee <- (jsv \ "totalFee").validate[Long]
+        version <- (jsv \ "version").validateOpt[Byte]
+        generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
+        baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
+        transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
+      } yield BlockHeaders(
+        signature,
+        height,
+        timestamp,
+        generator,
+        transactionCount,
+        generationSignature,
+        transactionsRoot,
+        baseTarget,
+        blocksize,
+        features,
+        reward,
+        desiredReward,
+        totalFee,
+        version
+      )
+    ),
+    Json.writes[BlockHeaders]
+  )
+}
+
+case class GenerationSignatureResponse(generationSignature: String)
+object GenerationSignatureResponse {
+  implicit val generationSignatureResponseFormat: Format[GenerationSignatureResponse] = Json.format
 }
 
 case class MatcherMessage(id: String)
@@ -375,6 +473,11 @@ object LevelResponse {
 case class OrderBookResponse(timestamp: Long, pair: PairResponse, bids: List[LevelResponse], asks: List[LevelResponse])
 object OrderBookResponse {
   implicit val orderBookResponseFormat: Format[OrderBookResponse] = Json.format
+}
+
+case class MerkleProofResponse(id: String, transactionIndex: Int, merkleProof: Seq[String])
+object  MerkleProofResponse {
+  implicit val merkleProofResponseFormat: Format[MerkleProofResponse] = Json.format
 }
 
 case class MarketStatusResponse(

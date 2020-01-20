@@ -21,14 +21,15 @@ import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks,
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
+import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
-import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, Future}
+import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
@@ -240,6 +241,7 @@ object Importer extends ScorexLogging {
       Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
       bis.close()
       fis.close()
+      Await.result(Kamon.stopAllReporters(), 10.seconds)
       time.close()
       utxPool.close()
       blockchainUpdated.onComplete()

@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -43,7 +44,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
       val (script, complexity) = ScriptCompiler(scriptText, isAssetScript = false, estimator).explicitGet()
 
       (bc.accountScript _).when(tx.sellOrder.sender.toAddress).returns(None)
-      (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(AccountScriptInfo(script, complexity)))
+      (bc.accountScript _).when(tx.buyOrder.sender.toAddress).returns(Some(AccountScriptInfo(tx.buyOrder.sender, script, complexity)))
       (bc.accountScript _).when(tx.sender.toAddress).returns(None)
 
       (bc.height _).when().returns(0)
@@ -64,7 +65,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   }
 
   private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, Right(""), Right(""), decimals, reissuable = false, BigInt(0), Height(0), None, 0, decimals == 0))
+    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), None, 0, decimals == 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen

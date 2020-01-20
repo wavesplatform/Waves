@@ -14,7 +14,8 @@ object Asset {
   case object Waves                         extends Asset
 
   implicit val assetReads: Reads[IssuedAsset] = Reads {
-    case JsString(str) if str.length > AssetIdStringLength => JsError("invalid.feeAssetId")
+    case JsString(str) if str.length > AssetIdStringLength =>
+      JsError(s"Too long assetId: length of $str exceeds $AssetIdStringLength")
     case JsString(str) =>
       Base58.tryDecodeWithLimit(str) match {
         case Success(arr) => JsSuccess(IssuedAsset(ByteStr(arr)))

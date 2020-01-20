@@ -10,7 +10,8 @@ import play.api.libs.json._
 
 object SignedSetScriptRequest {
   implicit val signedSetScriptRequestReads: Reads[SignedSetScriptRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "script").readNullable[String] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
@@ -22,6 +23,7 @@ object SignedSetScriptRequest {
 }
 
 case class SignedSetScriptRequest(
+    version: Option[Byte],
     senderPublicKey: String,
     script: Option[String],
     fee: Long,
@@ -35,6 +37,6 @@ case class SignedSetScriptRequest(
         case None | Some("") => Right(None)
         case Some(s)         => Script.fromBase64String(s).map(Some(_))
       }
-      t <- SetScriptTransaction.create(1.toByte, _sender, _script, fee, timestamp, proofs)
+      t <- SetScriptTransaction.create(version.getOrElse(1.toByte), _sender, _script, fee, timestamp, proofs)
     } yield t
 }

@@ -4,6 +4,7 @@ import com.google.common.base.Charsets
 import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
+import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, Keys}
 import com.wavesplatform.features.BlockchainFeatures
@@ -13,6 +14,7 @@ import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain,
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.ScorexLogging
+import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
@@ -45,6 +47,9 @@ trait CommonAccountsApi {
 }
 
 object CommonAccountsApi extends ScorexLogging {
+  def includeNft(blockchain: Blockchain)(assetId: IssuedAsset): Boolean =
+    !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
+
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
 
   def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAccountsApi = new CommonAccountsApi {
@@ -72,23 +77,14 @@ object CommonAccountsApi extends ScorexLogging {
     override def assetBalance(address: Address, asset: IssuedAsset): Long = blockchain.balance(address, asset)
 
     override def portfolio(address: Address): Observable[(IssuedAsset, Long)] =
-      common.portfolio(
-        db,
-        address,
-        diff.portfolios.get(address).fold(Map.empty[IssuedAsset, Long])(_.assets),
-        assetId => !blockchain.isFeatureActivated(BlockchainFeatures.ReduceNFTFee) || !blockchain.assetDescription(assetId).exists(_.nft)
-      )
+      db.resourceObservable.flatMap { resource =>
+        Observable.fromIterator(Task(assetBalanceIterator(resource, address, diff, includeNft(blockchain))))
+      }
 
-    override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] = {
-      log.info(s"Diff: $diff")
-      nftList(
-        db,
-        address,
-        diff,
-        id => blockchain.assetDescription(id).exists(_.nft),
-        from
-      )
-    }
+    override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
+      db.resourceObservable.flatMap { resource =>
+        Observable.fromIterator(Task(nftIterator(resource, address, diff, id => blockchain.assetDescription(id).exists(_.nft), from)))
+      }
 
     override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)
 

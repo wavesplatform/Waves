@@ -155,8 +155,8 @@ class AddressRouteSpec
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     val script = ExprScript(TRUE).explicitGet()
 
-    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(script, 1L))).once()
-    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(script, 1L))).once()
+    (commonAccountApi.script _).expects(allAccounts(1).toAddress).returning(Some(AccountScriptInfo(allAccounts(1), script, 1L))).once()
+    (blockchain.accountScript _).when(allAccounts(1).toAddress).returns(Some(AccountScriptInfo(allAccounts(1), script, 1L))).once()
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -207,8 +207,8 @@ class AddressRouteSpec
     )
 
     val contractScript     = ContractScript(V3, contractWithMeta).explicitGet()
-    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(contractScript, 11L))).once()
-    (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(AccountScriptInfo(contractScript, 11L)))
+    (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L))).once()
+    (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(3)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -237,7 +237,7 @@ class AddressRouteSpec
     val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
     (blockchain.accountScript _)
       .when(allAccounts(4).toAddress)
-      .onCall((_: AddressOrAlias) => Some(AccountScriptInfo(ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
+      .onCall((_: AddressOrAlias) => Some(AccountScriptInfo(allAccounts(4), ContractScript(V3, contractWithoutMeta).explicitGet(), 11L)))
 
     Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]

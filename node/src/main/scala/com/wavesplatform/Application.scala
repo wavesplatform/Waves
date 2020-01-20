@@ -137,7 +137,11 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     val utxSynchronizerScheduler =
       Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
-      UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
+      UtxPoolSynchronizer(
+        utxStorage,
+        settings.synchronizationSettings.utxSynchronizer,
+        allChannels,
+        blockchainUpdater.lastBlockInfo,
         utxSynchronizerScheduler
       )
 
@@ -176,7 +180,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] = loadBlockMetaAt(height).map { meta =>
       meta -> blockchainUpdater
         .liquidBlock(meta.signature)
-        .orElse(history.loadBlockBytes(meta.signature).flatMap(bytes => Block.parseBytes(bytes).toOption))
+        .orElse(history.loadBlockBytes(meta.signature).flatMap { case (_, bytes) => Block.parseBytes(bytes).toOption })
         .fold(Seq.empty[Transaction])(_.transactionData)
     }
 

@@ -89,7 +89,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
         effBalance(masterToAlice.recipient, domain) > 0 shouldBe true
-        effBalance(aliceToBob.recipient, domain) shouldBe 0
+        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount
     }
   }
 
@@ -122,8 +122,8 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processBlock(block2).explicitGet() // silently discards worse version
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
-        effBalance(masterToAlice.recipient, domain) shouldBe 0
-        effBalance(aliceToBob.recipient, domain) shouldBe 0
+        effBalance(masterToAlice.recipient, domain) shouldBe 1
+        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount
     }
   }
 
@@ -140,8 +140,8 @@ class BlockchainUpdaterMicroblockSunnyDayTest
         domain.blockchainUpdater.processBlock(block2) shouldBe 'right
 
         effBalance(genesis.recipient, domain) > 0 shouldBe true
-        effBalance(masterToAlice.recipient, domain) shouldBe 0
-        effBalance(aliceToBob.recipient, domain) shouldBe 0
+        effBalance(masterToAlice.recipient, domain) shouldBe 1
+        effBalance(aliceToBob.recipient, domain) shouldBe aliceToBob.amount
     }
   }
 

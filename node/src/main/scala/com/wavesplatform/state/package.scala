@@ -53,12 +53,10 @@ package object state {
   type AssetDistributionPage = AssetDistributionPage.Type
 
   implicit val dstPageWrites: Writes[AssetDistributionPage] = Writes { page =>
-    JsObject(
-      Map(
-        "hasNext"  -> JsBoolean(page.hasNext),
-        "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
-        "items"    -> Json.toJson(page.items)
-      )
+    Json.obj(
+      "hasNext"  -> JsBoolean(page.hasNext),
+      "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
+      "items"    -> Json.toJson(page.items)
     )
   }
 

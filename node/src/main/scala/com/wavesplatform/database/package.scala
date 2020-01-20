@@ -16,7 +16,6 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.protobuf.AssetDetails.BytesOrString.Value
 import com.wavesplatform.database.protobuf.{AccountScriptInfo => PBAccountScriptInfo, AssetDetails => PBAssetDetails, BlockMeta => PBBlockMeta}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -27,6 +26,7 @@ import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
+
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -263,14 +263,8 @@ package object database extends ScorexLogging {
 
     val pbad = PBAssetDetails.parseFrom(data)
 
-    def extract(value: PBAssetDetails.BytesOrString.Value): Either[ByteStr, String] = value match {
-      case Value.Bytes(value)  => Left(ByteStr(value.toByteArray))
-      case Value.String(value) => Right(value)
-      case _                   => throw new IllegalArgumentException("value is missing")
-    }
-
     (
-      AssetInfo(extract(pbad.getName.value), extract(pbad.getDescription.value), Height(pbad.lastRenamedAt)),
+      AssetInfo(pbad.name, pbad.description, Height(pbad.lastRenamedAt)),
       AssetVolumeInfo(pbad.reissuable, BigInt(pbad.totalVolume.toByteArray))
     )
   }
@@ -278,15 +272,9 @@ package object database extends ScorexLogging {
   def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
     val (info, volumeInfo) = ai
 
-    def encode(v: Either[ByteStr, String]): PBAssetDetails.BytesOrString =
-      PBAssetDetails.BytesOrString(v match {
-        case Left(bs) => PBAssetDetails.BytesOrString.Value.Bytes(ByteString.copyFrom(bs.arr))
-        case Right(s) => PBAssetDetails.BytesOrString.Value.String(s)
-      })
-
     PBAssetDetails(
-      Some(encode(info.name)),
-      Some(encode(info.description)),
+      info.name,
+      info.description,
       info.lastUpdatedAt,
       volumeInfo.isReissuable,
       ByteString.copyFrom(volumeInfo.volume.toByteArray)

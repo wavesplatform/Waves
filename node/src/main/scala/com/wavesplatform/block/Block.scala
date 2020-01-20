@@ -17,6 +17,7 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
+import scorex.crypto.authds.merkle.MerkleTree
 import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
@@ -77,9 +78,11 @@ case class Block(
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
+  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(Merkle.mkMerkleTree(transactionData))
+
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    val transactionsMerkleTree = Merkle.mkMerkleTree(transactionData)
-    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree.rootHash untag Digest32) sameElements header.transactionsRoot.arr)
+    require(header.version >= Block.ProtoBlockVersion, "Block's version should be >= 5 to retrieve transactionsRoot")
+    (transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr
   }
 
   override def toString: String =

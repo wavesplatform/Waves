@@ -103,7 +103,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
       withBlockchain(blockGen(scripts, _)) {
         case (List(account), bcu) =>
-          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(script, complexity))
+          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account, script, complexity))
 
           val SignedBlockHeader(lastBlock, uniqueId) = bcu.lastBlockHeader.get
 
@@ -124,7 +124,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
           bcu.accountScript(account.toAddress) shouldEqual None
           bcu.removeAfter(uniqueId)
-          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(script, complexity))
+          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account, script, complexity))
       }
     }
 

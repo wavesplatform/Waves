@@ -127,7 +127,7 @@ trait WithDomain extends WithState with NTPTime { _: Suite =>
   def withDomain[A](settings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(None)))(test: Domain => A): A =
     withLevelDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, PublishSubject())
-      try test(Domain(bcu, blockchain))
+      try test(Domain(db, bcu, blockchain))
       finally bcu.shutdown()
     }
 }

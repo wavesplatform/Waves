@@ -1,10 +1,12 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Asset, V4}
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -19,13 +21,13 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
+class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState {
   property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
@@ -225,11 +227,11 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }.explicitGet()
 
   def multiActionDApp(
-      assetId: ByteStr,
-      recipient: Address,
-      reissueAmount: Long,
-      burnAmount: Long,
-      transferAmount: Long
+    assetId: ByteStr,
+    recipient: Address,
+    reissueAmount: Long,
+    burnAmount: Long,
+    transferAmount: Long
   ): Script =
     dApp(
       s"""
@@ -385,7 +387,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   private def issuePreconditions(
       assetScript: Option[Script] = None,
       feeMultiplier: Int
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
+  ): Gen[(List[Transaction], InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
@@ -399,7 +401,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
         ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
+      } yield (List(genesis, genesis2, setDApp), ci, master, invoker, amount)
     }.explicitGet()
 
   private def issueDApp(
@@ -412,20 +414,21 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     dApp(
       s"""
          | [
-         |   Issue(unit, $decimals, "$description", $reissuable, "$name", $issueAmount)
+         |   Issue(unit, $decimals, "$description", $reissuable, "$name", $issueAmount, 0)
          | ]
        """.stripMargin
     )
 
   property("issue action results state") {
     forAll(issuePreconditions(feeMultiplier = 7)) {
-      case (genesis, setScript, invoke, master, invoker, amount) =>
+      case (genesis, invoke, master, invoker, amount) =>
         assertDiffAndState(
-          Seq(TestBlock.create(genesis :+ setScript)),
+          Seq(TestBlock.create(genesis)),
           TestBlock.create(Seq(invoke)),
           features
         ) {
           case (_, blockchain) =>
+            Domain()
             val assets = blockchain.portfolio(master).assets
             assets.values.toList shouldBe List(amount)
 

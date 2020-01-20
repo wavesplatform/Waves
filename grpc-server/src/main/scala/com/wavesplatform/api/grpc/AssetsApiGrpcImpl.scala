@@ -13,8 +13,8 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi)(implicit sc: Scheduler) exte
       for (info <- assetsApi.fullInfo(IssuedAsset(request.assetId)))
         yield AssetInfoResponse(
           info.description.issuer,
-          info.description.name.fold(bs => new String(bs.arr), identity),
-          info.description.description.fold(bs => new String(bs.arr), identity),
+          info.description.name.toStringUtf8,
+          info.description.description.toStringUtf8,
           info.description.decimals,
           info.description.reissuable,
           info.description.totalVolume.longValue(),

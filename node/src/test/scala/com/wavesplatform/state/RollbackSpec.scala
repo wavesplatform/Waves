@@ -19,7 +19,7 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
@@ -113,8 +113,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          val stransactions1 = d.addressTransactions(db, sender).sortBy(_._2.timestamp)
-          val rtransactions1 = d.addressTransactions(db, recipient).sortBy(_._2.timestamp)
+          val stransactions1 = d.addressTransactions(sender).sortBy(_._2.timestamp)
+          val rtransactions1 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
 
           d.removeAfter(genesisSignature)
 
@@ -128,8 +128,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          val stransactions2 = d.addressTransactions(db, sender).sortBy(_._2.timestamp)
-          val rtransactions2 = d.addressTransactions(db, recipient).sortBy(_._2.timestamp)
+          val stransactions2 = d.addressTransactions(sender).sortBy(_._2.timestamp)
+          val rtransactions2 = d.addressTransactions(recipient).sortBy(_._2.timestamp)
 
           stransactions1 shouldBe stransactions2
           rtransactions1 shouldBe rtransactions2
@@ -275,8 +275,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithIssue = d.lastBlockId
 
           val actualDesc = d.blockchainUpdater.assetDescription(IssuedAsset(issueTransaction.id()))
-          val nameBytes = Left(ByteStr(name.utf8Bytes))
-          val descriptionBytes = Left(ByteStr(description.utf8Bytes))
+          val nameBytes = name.toByteString
+          val descriptionBytes = description.toByteString
           val desc1 = AssetDescription(issueTransaction.id(), sender, nameBytes, descriptionBytes, 8, reissuable = true, BigInt(2000), Height @@ 2, None, 0, false)
           actualDesc shouldBe Some(desc1)
 
@@ -365,7 +365,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockWithScriptId = d.lastBlockId
 
-          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(script, 1))
+          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(sender, script, 1))
 
           d.appendBlock(
             TestBlock.create(
@@ -378,7 +378,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
 
           d.removeAfter(blockWithScriptId)
-          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(script, 1))
+          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(sender, script, 1))
 
           d.removeAfter(genesisBlockId)
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty

@@ -263,8 +263,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
               AssetDescription(
                 issue.assetId,
                 issue.sender,
-                Left(issue.nameBytes),
-                Left(issue.descriptionBytes),
+                issue.name,
+                issue.description,
                 issue.decimals,
                 issue.reissuable,
                 BigInt(issue.quantity),
@@ -361,8 +361,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Transa
             .left
             .get
 
-          info.name shouldEqual Right(update.name)
-          info.description shouldEqual Right(update.description)
+          info.name.toStringUtf8 shouldEqual (update.name)
+          info.description.toStringUtf8 shouldEqual (update.description)
         }
     }
   }

@@ -3,6 +3,7 @@ package com.wavesplatform.state
 import cats.data.Ior
 import cats.implicits._
 import cats.kernel.{Monoid, Semigroup}
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -11,8 +12,9 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-import monix.eval.Coeval
 import play.api.libs.json._
+
+import scala.collection.mutable.LinkedHashMap
 
 case class LeaseBalance(in: Long, out: Long)
 
@@ -42,10 +44,13 @@ object VolumeAndFee {
   }
 }
 
-case class AssetInfo(name: Either[ByteStr, String], description: Either[ByteStr, String], lastUpdatedAt: Height)
+case class AssetInfo(name: ByteString, description: ByteString, lastUpdatedAt: Height)
 
 object AssetInfo {
   implicit val sg: Semigroup[AssetInfo] = (x, y) => y
+
+  def apply(name: String, description: String, lastUpdatedAt: Height): AssetInfo =
+    AssetInfo(ByteString.copyFromUtf8(name), ByteString.copyFromUtf8(description), lastUpdatedAt)
 }
 
 case class AssetStaticInfo(source: TransactionId, issuer: PublicKey, decimals: Int, nft: Boolean)
@@ -62,8 +67,8 @@ object AssetVolumeInfo {
 case class AssetDescription(
     source: ByteStr,
     issuer: PublicKey,
-    name: Either[ByteStr, String],
-    description: Either[ByteStr, String],
+    name: ByteString,
+    description: ByteString,
     decimals: Int,
     reissuable: Boolean,
     totalVolume: BigInt,
@@ -72,7 +77,6 @@ case class AssetDescription(
     sponsorship: Long,
     nft: Boolean
 )
-
 
 case class AccountDataInfo(data: Map[String, DataEntry[_]])
 
@@ -134,7 +138,7 @@ object Sponsorship {
 }
 
 case class Diff(
-    transactions: Seq[(Transaction, Set[Address])],
+    transactions: collection.Map[ByteStr, (Transaction, Set[Address])],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
@@ -148,10 +152,7 @@ case class Diff(
     scriptsRun: Int,
     scriptsComplexity: Long,
     scriptResults: Map[ByteStr, InvokeScriptResult]
-) {
-  val transactionMap: Coeval[Map[ByteStr, (Transaction, Set[Address])]] =
-    Coeval.evalOnce(transactions.map { case v @ (tx, _) => tx.id() -> v }.toMap)
-}
+)
 
 object Diff {
   def stateOps(
@@ -168,7 +169,7 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
-      transactions = Seq.empty,
+      transactions = LinkedHashMap(),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -201,7 +202,8 @@ object Diff {
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
   ): Diff =
     Diff(
-      transactions = Seq((tx, (portfolios.keys ++ accountData.keys).toSet)),
+      // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
+      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -218,7 +220,7 @@ object Diff {
     )
 
   val empty =
-    new Diff(Seq.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+    new Diff(LinkedHashMap(), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty

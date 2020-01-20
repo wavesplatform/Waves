@@ -9,11 +9,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{BlockchainUpdater, DiscardedTransactions, _}
 import org.iq80.leveldb.DB
 
-case class Domain(blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
+case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
@@ -28,13 +28,13 @@ case class Domain(blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: Level
   def balance(address: Address): Long               = blockchainUpdater.balance(address)
   def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
 
-  def nftList(db: DB, address: Address): Seq[IssueTransaction] = db.withResource { resource =>
+  def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .loadNftList(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(_.isNFT), None)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(_.nft), None)
       .toSeq
   }
 
-  def addressTransactions(db: DB, address: Address): Seq[(Height, Transaction)] = db.withResource { resource =>
+  def addressTransactions(address: Address): Seq[(Height, Transaction)] = db.withResource { resource =>
     AddressTransactions
       .allAddressTransactions(
         resource,
@@ -44,6 +44,12 @@ case class Domain(blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: Level
         Set.empty,
         None
       )
+      .toSeq
+  }
+
+  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
+    AddressPortfolio
+      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
       .toSeq
   }
 }

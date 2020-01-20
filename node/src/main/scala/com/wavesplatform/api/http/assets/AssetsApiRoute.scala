@@ -14,7 +14,6 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -88,8 +87,8 @@ case class AssetsApiRoute(
               path(AssetId)(balance(address, _))
           }
         } ~ pathPrefix("details") {
-          (pathEndOrSingleSlash & parameters('id.*, 'full.as[Boolean] ? false)) { (ids, full) =>
-            multipleDetailsGet(ids, full)
+          (pathEndOrSingleSlash & parameters(('id.*, 'full.as[Boolean] ? false))) { (ids, full) =>
+            multipleDetailsGet(ids.toSeq, full)
           } ~ (path(AssetId) & parameter('full.as[Boolean] ? false)) { (assetId, full) =>
             singleDetails(assetId, full)
           }
@@ -206,8 +205,6 @@ case class AssetsApiRoute(
     }
   }
 
-  def details: Route = pathPrefix("details")(singleDetails ~ multipleDetails)
-
   @Path("/details/{assetId}")
   @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
   @ApiImplicitParams(
@@ -218,8 +215,6 @@ case class AssetsApiRoute(
   )
   def singleDetails(assetId: IssuedAsset, full: Boolean): Route = complete(assetDetails(assetId, full))
 
-  def multipleDetails: Route = pathEndOrSingleSlash(multipleDetailsGet ~ multipleDetailsPost)
-
   @Path("/details")
   @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "GET")
   @ApiImplicitParams(
@@ -228,8 +223,8 @@ case class AssetsApiRoute(
       new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
     )
   )
-  def multipleDetailsGet(ids: Seq[ByteStr], full: Boolean): Route =
-    complete(ids.toList.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity)))
+  def multipleDetailsGet(ids: Seq[String], full: Boolean): Route =
+    complete(ids.toList.map(id => assetDetails(IssuedAsset(ByteStr.decodeBase58(id).get), full).fold(_.json, identity)))
 
   @Path("/details")
   @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "POST")
@@ -247,12 +242,14 @@ case class AssetsApiRoute(
     )
   )
   def multipleDetailsPost(full: Boolean): Route =
-      complete(entity(as[JsObject]) { jsv =>
+    entity(as[JsObject]) { jsv =>
+      complete(
         (jsv \ "ids").validate[List[ByteStr]] match {
-          case JsSuccess(ids, _) => ids.map(id => assetDetails(IssuedAsset(id), full.getOrElse(false)).fold(_.json, identity))
+          case JsSuccess(ids, _) => Json.arr(ids.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity)))
           case JsError(err)      => WrongJson(errors = err)
         }
-      })
+      )
+    }
 
   @Path("/nft/{address}/limit/{limit}")
   @ApiOperation(value = "NFTs", notes = "Account's NFTs balance", httpMethod = "GET")
@@ -344,7 +341,7 @@ object AssetsApiRoute {
     } yield limit
   }
 
-  def jsonDetails(blockchain: Blockchain)(id: ByteStr, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
+  def jsonDetails(blockchain: Blockchain)(id: IssuedAsset, description: AssetDescription, full: Boolean): Either[String, JsObject] = {
     // (timestamp, height)
     def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
       for {
@@ -361,8 +358,8 @@ object AssetsApiRoute {
       tsh <- additionalInfo(description.source)
       (timestamp, height) = tsh
       script              = description.script.filter(_ => full)
-      name                = description.name.fold(bs => Base64.encode(bs.arr), identity)
-      desc                = description.description.fold(bs => Base64.encode(bs.arr), identity)
+      name                = description.name.toStringUtf8
+      desc                = description.description.toStringUtf8
     } yield JsObject(
       Seq(
         "assetId"        -> JsString(id.toString),

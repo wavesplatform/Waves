@@ -54,6 +54,11 @@ object LevelDBWriter {
     c1 :+ c2.headOption.getOrElse(1)
   }
 
+  private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
+    v.takeWhile(_ <= h).lastOption // Should we use binary search?
+  }
+
+
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
       for {
@@ -677,9 +682,26 @@ class LevelDBWriter(
     .recordStats()
     .build[(Int, BigInt), LeaseBalance]()
 
-  override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
+  override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
+    db.get(Keys.addressId(address)).flatMap { addressId =>
+      assetId match {
+        case Waves =>
+            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+              (wh, b)
+            }
+        case asset @ IssuedAsset(_) =>
+            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+              (wh, b)
+            }
+      }
+    }
+  }
+
+  override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>
-      val toHeigth = this.heightOf(to).getOrElse(this.height)
+      val toHeigth = to.flatMap(this.heightOf).getOrElse(this.height)
       val wbh      = slice(db.get(Keys.wavesBalanceHistory(addressId)), from, toHeigth)
       val lbh      = slice(db.get(Keys.leaseBalanceHistory(addressId)), from, toHeigth)
       for {

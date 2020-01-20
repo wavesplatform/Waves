@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 import org.iq80.leveldb.DB
 
-package object common extends BalanceDistribution with AddressPortfolio with AddressTransactions {
+package object common extends BalanceDistribution with AddressTransactions {
   def aliasesOfAddress(db: DB, maybeDiff: => Option[(Height, Diff)], address: Address): Observable[(Height, CreateAliasTransaction)] = {
     val disabledAliases = db.get(Keys.disabledAliases)
     addressTransactions(db, maybeDiff, address, Some(address), Set(CreateAliasTransaction.typeId), None)

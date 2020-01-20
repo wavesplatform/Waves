@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
 import com.wavesplatform.lang.Testing._
@@ -21,6 +22,7 @@ import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, Evaluator
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
+import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -46,14 +48,27 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   ): Either[String, T] = {
     val untyped = Parser.parseExpr(code).get.value
 
+    val f: BaseFunction[C] =
+      NativeFunction(
+        "fn1",
+        1,
+        91:Short,
+        pointType,
+        ("value", pointType),
+      ) {
+        case _ :: Nil => throw new Exception("test exception")
+        case xs => notImplemented[Id]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+      }
+
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
     val ctx: CTX[C] =
       Monoid.combineAll(
         Seq(
           PureContext.build(Global, version).withEnvironment[C],
+          CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
-          CTX[C](sampleTypes, stringToTuple, Array.empty),
+          CTX[C](sampleTypes, stringToTuple, Array(f)),
           ctxt
         )
       )
@@ -81,6 +96,16 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |}
       """.stripMargin
     eval[EVALUATED](src) should produce("can't parse the expression")
+  }
+
+  property("Exception handling") {
+    val sampleScript =
+      """match fn1(p) {
+        |  case pa: PointA => 0
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe 'Left
   }
 
   property("patternMatching") {
@@ -968,6 +993,36 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](script, None) shouldBe Right(CONST_BOOLEAN(true))
   }
 
+  property("rounding modes") {
+    eval[EVALUATED]("Down() == DOWN", None) should produce("Can't find a function")
+    eval[EVALUATED]("Up() == UP", None) should produce("Can't find a function")
+    eval[EVALUATED]("Ceiling() == CEILING", None) should produce("Can't find a function")
+    eval[EVALUATED]("HalfUp() == HALFUP", None) should produce("Can't find a function")
+    eval[EVALUATED]("HalfDown() == HALFDOWN", None) should produce("Can't find a function")
+    eval[EVALUATED]("HalfEven() == HALFEVEN", None) should produce("Can't find a function")
+  }
+
+  property("RSA hash algorithms") {
+    eval[EVALUATED]("NoAlg() == NOALG", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Md5() == MD5", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha1() == SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha224() == SHA224", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha256() == SHA256", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha384() == SHA384", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha512() == SHA512", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3224() == SHA3224", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3256() == SHA3256", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3384() == SHA3384", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("Sha3512() == SHA3512", None) shouldBe Right(CONST_BOOLEAN(true))
+
+    eval[EVALUATED]("NoAlg() != SHA224", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("MD5 != SHA3224", None) should produce("Can't match inferred types")
+    eval[EVALUATED]("Sha512() != Sha3512()", None) should produce("Can't match inferred types")
+
+    eval[EVALUATED]("MD5 == if true then MD5 else SHA1", None) shouldBe Right(CONST_BOOLEAN(true))
+    eval[EVALUATED]("MD5 == if true then SHA1 else MD5", None) shouldBe Right(CONST_BOOLEAN(false))
+  }
+
   property("math functions") {
     eval[EVALUATED]("pow(12, 1, 3456, 3, 2, DOWN)", None) shouldBe Right(CONST_LONG(187))
     eval[EVALUATED]("pow(12, 1, 3456, 3, 2, UP)", None) shouldBe Right(CONST_LONG(188))
@@ -995,6 +1050,15 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("pow result size abs min") {
     eval("pow(10, 0, -8, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(1))
     eval("pow(10, 0, -9, 0, 8, HALFUP)") shouldBe Right(CONST_LONG(0))
+  }
+
+  property("HalfUp is type") {
+    eval("let r = if true then HALFUP else HALFDOWN ; match r { case _:HalfUp => 1 case _ => 0 }") shouldBe Right(CONST_LONG(1))
+  }
+
+
+  property("HalfUp type have no constructor") {
+    eval("pow(10, 0, -8, 0, 8, HalfUp())") shouldBe 'Left
   }
 
   property("concat empty list") {
@@ -1257,5 +1321,36 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val src =
       s"""["1", "2"].median()"""
     eval(src, version = V4) should produce("Compilation failed: Non-matching types: expected: Int, actual: String")
+  }
+
+  property("groth16Verify") {
+    val src =
+      s"""
+         | let key = base64'hwk883gUlTKCyXYA6XWZa8H9/xKIYZaJ0xEs0M5hQOMxiGpxocuX/8maSDmeCk3bo5ViaDBdO7ZBxAhLSe5k/5TFQyF5Lv7KN2tLKnwgoWMqB16OL8WdbePIwTCuPtJNAFKoTZylLDbSf02kckMcZQDPF9iGh+JC99Pio74vDpwTEjUx5tQ99gNQwxULtztsqDRsPnEvKvLmsxHt8LQVBkEBm2PBJFY+OXf1MNW021viDBpR10mX4WQ6zrsGL5L0GY4cwf4tlbh+Obit+LnN/SQTnREf8fPpdKZ1sa/ui3pGi8lMT6io4D7Ujlwx2RdCkBF+isfMf77HCEGsZANw0hSrO2FGg14Sl26xLAIohdaW8O7gEaag8JdVAZ3OVLd5Df1NkZBEr753Xb8WwaXsJjE7qxwINL1KdqA4+EiYW4edb7+a9bbBeOPtb67ZxmFqgyTNS/4obxahezNkjk00ytswsENg//Ee6dWBJZyLH+QGsaU2jO/W4WvRyZhmKKPdipOhiz4Rlrd2XYgsfHsfWf5v4GOTL+13ZB24dW1/m39n2woJ+v686fXbNW85XP/r'
+         | let proof = base64'lvQLU/KqgFhsLkt/5C/scqs7nWR+eYtyPdWiLVBux9GblT4AhHYMdCgwQfSJcudvsgV6fXoK+DUSRgJ++Nqt+Wvb7GlYlHpxCysQhz26TTu8Nyo7zpmVPH92+UYmbvbQCSvX2BhWtvkfHmqDVjmSIQ4RUMfeveA1KZbSf999NE4qKK8Do+8oXcmTM4LZVmh1rlyqznIdFXPN7x3pD4E0gb6/y69xtWMChv9654FMg05bAdueKt9uA4BEcAbpkdHF'
+         | let input = base64'LcMT3OOlkHLzJBKCKjjzzVMg+r+FVgd52LlhZPB4RFg='
+         | groth16Verify(key, proof, input)
+       """.stripMargin
+    eval(src, version = V4) shouldBe Right(CONST_BOOLEAN(true))
+  }
+
+  property("calculateAssetId") {
+    val decimals = 100
+    val description = "description"
+    val isReissuable = true
+    val name = "name"
+    val quantity = 1234567
+    val nonce = 1
+    val issue = Issue.create(compiledScript = None, decimals, description, isReissuable, name, quantity, nonce, ByteStr.empty)
+    val script =
+     s"""
+        | let issue = Issue(unit, $decimals, "$description", $isReissuable, "$name", $quantity, $nonce)
+        | calculateAssetId(issue)
+      """.stripMargin
+
+    val ctx = WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
+
+    genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
+      CONST_BYTESTR(issue.id)
   }
 }

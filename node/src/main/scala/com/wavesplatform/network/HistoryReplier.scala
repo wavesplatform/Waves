@@ -1,5 +1,6 @@
 package com.wavesplatform.network
 
+import com.wavesplatform.block.Block
 import com.wavesplatform.history.History
 import com.wavesplatform.network.HistoryReplier._
 import com.wavesplatform.settings.SynchronizationSettings
@@ -34,18 +35,21 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
       respondWith(
         ctx,
         Future(history.loadBlockBytes(sig))
-          .map(bb => RawBytes(BlockSpec.messageCode, bb.getOrElse(throw new NoSuchElementException(s"Error loading block $sig"))))
+          .map {
+            case Some((blockVersion, bytes)) =>
+              RawBytes(if (blockVersion < Block.ProtoBlockVersion) BlockSpec.messageCode else PBBlockSpec.messageCode, bytes)
+            case _ => throw new NoSuchElementException(s"Error loading block $sig")
+          }
       )
 
     case MicroBlockRequest(totalResBlockSig) =>
       respondWith(
         ctx,
-        Future(
-          RawBytes(
-            MicroBlockResponseSpec.messageCode,
-            history.loadMicroBlockBytes(totalResBlockSig).getOrElse(throw new NoSuchElementException(s"Error loading microblock $totalResBlockSig"))
-          )
-        )
+        Future(history.loadMicroBlockBytes(totalResBlockSig)).map {
+          case Some((mbVersion, bytes)) =>
+            RawBytes(if (mbVersion < Block.ProtoBlockVersion) LegacyMicroBlockResponseSpec.messageCode else PBMicroBlockSpec.messageCode, bytes)
+          case _ => throw new NoSuchElementException(s"Error loading microblock $totalResBlockSig")
+        }
       )
 
     case _: Handshake =>

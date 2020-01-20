@@ -1,10 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import cats.instances.either._
-import cats.instances.option._
-import cats.syntax.either._
-import cats.syntax.ior._
-import cats.syntax.traverse._
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
@@ -13,7 +9,8 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Reissue}
 import com.wavesplatform.state.{AssetVolumeInfo, Blockchain, Diff, LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -52,12 +49,21 @@ object DiffsCommon {
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }
 
-  def countScriptComplexity(
+  def countVerifierComplexity(
       script: Option[Script],
       blockchain: Blockchain
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
-      .traverse(s => Script.verifierComplexity(s, blockchain.estimator).map((s, _)))
+      .traverse { script =>
+        val cost =
+          if (blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight)
+            Script.verifierComplexity(script, ScriptEstimatorV1) *>
+            Script.verifierComplexity(script, ScriptEstimatorV2)
+          else
+            Script.verifierComplexity(script, blockchain.estimator)
+
+        cost.map((script, _))
+      }
       .leftMap(GenericError(_))
 
   def validateAsset(

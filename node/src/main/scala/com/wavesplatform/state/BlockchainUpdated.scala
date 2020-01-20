@@ -59,7 +59,7 @@ object BlockchainUpdateNotifier {
         )
     }
 
-    val txIds = txsDiffs.flatMap(txDiff => txDiff.transactions.map(_._1.id()))
+    val txIds = txsDiffs.flatMap(txDiff => txDiff.transactions.values.map(_._1.id()))
 
     (parentStateUpdate, txsStateUpdates, txIds)
   }

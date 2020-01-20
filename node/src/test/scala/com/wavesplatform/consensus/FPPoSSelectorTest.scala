@@ -30,7 +30,7 @@ import scala.util.Random
 class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with TransactionGen with DBCacheSettings with ScalaCheckPropertyChecks {
   import FPPoSSelectorTest._
 
-  val generationSignatureMethods = Table(
+  private val generationSignatureMethods = Table(
     ("method", "block version", "vrf activated"),
     ("Blake2b256", Block.NgBlockVersion, false),
     ("VRF", Block.ProtoBlockVersion, true)
@@ -62,7 +62,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
               val gs =
                 if (vrfActivated)
-                  blockForHit._2
+                  blockForHit._2.arr
                 else
                   PoSCalculator
                     .generationSignature(
@@ -85,7 +85,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
               val gs =
                 if (vrfActivated)
-                  blockForHit._2
+                  blockForHit._2.arr
                 else
                   PoSCalculator
                     .generationSignature(
@@ -112,7 +112,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             val block        = forgeBlock(miner, blockchain, pos, blockVersion)()
 
             pos
-              .validateBlockDelay(height + 1, block, lastBlock.header, minerBalance)
+              .validateBlockDelay(height, block.header, lastBlock.header, minerBalance)
               .explicitGet()
         }
     }
@@ -129,8 +129,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
             pos
               .validateBlockDelay(
-                height + 1,
-                block,
+                height,
+                block.header,
                 lastBlock.header,
                 minerBalance
               ) should produce("less than min valid timestamp")
@@ -221,7 +221,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
             pos
               .validateGenerationSignature(
                 block
-              ) should produce("Generation signatures does not match")
+              ) should (if (!vrfActivated) produce("Generation signatures does not match") else produce("Could not verify VRF proof"))
         }
     }
   }
@@ -297,16 +297,16 @@ object FPPoSSelectorTest {
   ): List[(Block, ByteStr)] = {
     val height = blockchain.height
 
-    val lastBlockGenerationInput = blockchain.hitSource(height).get
+    val lastBlockHitSource = blockchain.hitSource(height).get
 
-    ((1 to blockCount) foldLeft List((lastBlock, lastBlockGenerationInput))) { (forkChain, ind) =>
+    ((1 to blockCount) foldLeft List((lastBlock, lastBlockHitSource))) { (forkChain, ind) =>
       val blockForHit =
         forkChain
           .lift(100)
           .orElse(blockchain.blockHeader(height + ind - 100).map((_, blockchain.hitSource(height + ind - 100).get)))
           .getOrElse(forkChain.head)
 
-      val (gs, generationInput) =
+      val (gs, hitSource) =
         if (blockVersion < Block.ProtoBlockVersion) {
           val gs = PoSCalculator
             .generationSignature(
@@ -321,7 +321,7 @@ object FPPoSSelectorTest {
               miner.privateKey
             )
           val gi = crypto.verifyVRF(ByteStr(gs), blockForHit._2, miner.publicKey).explicitGet().arr
-          (gs, ByteStr(gi))
+          (gs, gi)
         }
 
       val delay: Long = 60000
@@ -349,7 +349,7 @@ object FPPoSSelectorTest {
         )
         .explicitGet()
 
-      (newBlock, generationInput) :: forkChain
+      (newBlock, ByteStr(hitSource)) :: forkChain
     }
   }
 

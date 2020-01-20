@@ -25,6 +25,7 @@ object MetaMapper {
     version match {
       case 0          => Right(None)
       case 1          => Right(Some(V1))
+      case 2          => Right(Some(V2))
       case n if n > 0 => Left(s"Unsupported meta version $n")
       case n          => Left(s"Illegal meta version $n, expected positive value")
     }

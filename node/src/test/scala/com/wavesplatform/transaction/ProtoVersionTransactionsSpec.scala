@@ -17,6 +17,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.utils.StringBytes
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
@@ -50,7 +51,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val decimals    = 2.toByte
       val reissuable  = true
 
-      val issueTx = IssueTransaction(TxVersion.V3, Account, name, description, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty)
+      val issueTx = IssueTransaction(TxVersion.V3, Account, name.toByteString, description.toByteString, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty)
         .signWith(Account)
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
