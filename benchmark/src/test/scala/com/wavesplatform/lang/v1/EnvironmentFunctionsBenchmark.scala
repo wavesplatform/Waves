@@ -94,6 +94,7 @@ object EnvironmentFunctionsBenchmark {
     override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
+    override def txId: ByteStr                                                                                   = ButeStr(new Array[Byte](64))
   }
 
   val environmentFunctions = new EnvironmentFunctions(defaultEnvironment)
