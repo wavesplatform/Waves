@@ -178,10 +178,11 @@ class UtxPoolImpl(
         pessimisticPortfolios.add(tx.id(), diff); true
       }
 
-    if (!verify || isNew.resultE.isRight) {
-      transactions.put(tx.id(), tx)
-      PoolMetrics.addTransaction(tx)
-    }
+    if (!verify || isNew.resultE.isRight)
+      transactions.computeIfAbsent(tx.id(), { _ =>
+        PoolMetrics.addTransaction(tx)
+        tx
+      })
 
     isNew
   }
