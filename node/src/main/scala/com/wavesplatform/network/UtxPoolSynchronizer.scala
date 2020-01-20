@@ -17,8 +17,9 @@ import monix.execution.{AsyncQueue, Scheduler}
 import monix.reactive.Observable
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Future}
+import scala.concurrent.{Await, Future, Promise}
 import scala.util.Success
+import scala.util.control.NonFatal
 
 trait UtxPoolSynchronizer {
   def tryPublish(tx: Transaction, source: Channel): Unit
@@ -73,8 +74,16 @@ class UtxPoolSynchronizerImpl(
     if (transactionIsNew(tx.id())) queue.tryOffer(tx -> source)
   }
 
-  private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
-    Future(putIfNew(tx))(timedScheduler)
+  private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] = {
+    val p = Promise[TracedResult[ValidationError, Boolean]]()
+    timedScheduler.executeAsync { () =>
+      try p.success(putIfNew(tx))
+      catch {
+        case t @ (NonFatal(_) | _: InterruptedException) => p.failure(t)
+      }
+    }
+
+    p.future
       .recover {
         case t =>
           log.warn(s"Error validating transaction ${tx.id()}", t)
@@ -83,9 +92,10 @@ class UtxPoolSynchronizerImpl(
       .andThen {
         case Success(TracedResult(Right(isNew), _)) if isNew || allowRebroadcast => broadcast(tx, source)
       }
+  }
 
   override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
-    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), 10.seconds)
+    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
 
   override def close(): Unit = pollLoopCancelable.cancel()
 }
