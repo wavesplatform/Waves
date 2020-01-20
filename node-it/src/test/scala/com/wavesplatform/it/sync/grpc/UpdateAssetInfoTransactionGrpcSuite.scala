@@ -24,19 +24,16 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   val updateInterval = 2
   override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
 
-  val issuer = KeyPair("issuer".getBytes)
-  val nonIssuer = KeyPair("nonIssuer".getBytes)
+  val issuer = firstAcc
+  val nonIssuer = secondAcc
   var assetId   = ""
   var issueHeight = 0
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    sender.grpc.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(ByteString.copyFrom(issuer.publicKey)), transferAmount, minFee, waitForTx = true)
-    sender.grpc.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(ByteString.copyFrom(nonIssuer.publicKey)), transferAmount, minFee, waitForTx = true)
-    val (defaultName, defaultDescription) = ("asset", "description")
     assetId = Base58.encode(PBTransactions.vanilla(
-      sender.grpc.broadcastIssue(issuer, defaultName, someAssetAmount, 8, reissuable = true, script = None, fee = issueFee, description = defaultDescription, version = 1, waitForTx = true)
+      sender.grpc.broadcastIssue(issuer, "asset", someAssetAmount, 8, reissuable = true, script = None, fee = issueFee, description = "description", version = 1, waitForTx = true)
     ).explicitGet().id())
     issueHeight = sender.grpc.height
   }
@@ -49,8 +46,6 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     ).explicitGet().id())
     sender.grpc.waitForTransaction(updateAssetInfoTxId)
 
-    sender.grpc.getTransaction(assetId).getTransaction.getUpdateAssetInfo.name shouldBe "updatedName"
-    sender.grpc.getTransaction(assetId).getTransaction.getUpdateAssetInfo.description shouldBe "updatedDescription"
     sender.grpc.assetInfo(assetId).name shouldBe "updatedName"
     sender.grpc.assetInfo(assetId).description shouldBe "updatedDescription"
   }
@@ -72,11 +67,11 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   forAll(invalidAssetsNames) { assetName: String =>
     test(s"not able to update name to $assetName") {
-      sender.grpc.waitForHeight(sender.height + 3)
+      sender.grpc.waitForHeight(sender.height + 3, 2.minutes)
       assertGrpcError(
         sender.grpc.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
-        "invalid name",
-        Code.INVALID_ARGUMENT
+        "InvalidName",
+        Code.INTERNAL
       )
     }
   }
@@ -85,15 +80,15 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val tooBigDescription = Random.nextString(1001)
     assertGrpcError(
       sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "Too big sequences requested",
-        Code.INVALID_ARGUMENT
+      "TooBigArray",
+        Code.INTERNAL
     )
   }
 
   test("not able to update asset info without paying enough fee") {
     assertGrpcError(
-      sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1),
-      s"Fee for UpdateAssetInfoTransaction (${minFee - 1} in WAVES) does not exceed minimal value of $minFee WAVES.",
+      sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1),
+      s"does not exceed minimal value of $minFee WAVES",
       Code.INVALID_ARGUMENT
     )
   }
@@ -101,7 +96,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   test("not able to update info of not-issued asset") {
     val notIssuedAssetId = "BzARFPgBqWFu6MHGxwkPVKmaYAzyShu495Ehsgru72Wz"
     assertGrpcError(
-      sender.updateAssetInfo(issuer, notIssuedAssetId, "updatedName", "updatedDescription", minFee),
+      sender.grpc.updateAssetInfo(issuer, notIssuedAssetId, "updatedName", "updatedDescription", minFee),
       "Referenced assetId not found",
       Code.INVALID_ARGUMENT
     )

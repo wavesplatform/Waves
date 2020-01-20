@@ -421,6 +421,20 @@ object PBTransactions {
           proofs
         )
 
+      case Data.UpdateAssetInfo(UpdateAssetInfoTransactionData(assetId, name, description)) =>
+        vt.assets.UpdateAssetInfoTransaction(
+          version.toByte,
+          chainId,
+          sender,
+          IssuedAsset(assetId),
+          name,
+          description,
+          timestamp,
+          feeAmount,
+          feeAssetId,
+          proofs
+        )
+
       case other =>
         throw new IllegalArgumentException(s"Unsupported transaction data: $other")
     }

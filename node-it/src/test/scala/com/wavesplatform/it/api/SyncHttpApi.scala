@@ -10,12 +10,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-
-import com.wavesplatform.api.grpc._//{AccountsApiGrpc, AssetInfoResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc}
-
-//import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
-//import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
-//>>>>>>> master
+import com.wavesplatform.api.grpc._
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -831,7 +826,7 @@ object SyncHttpApi extends Assertions {
 
     def height: Int = sync(async(n).grpc.height)
 
-    def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
+    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int = sync(async(n).grpc.waitForHeight(expectedHeight), requestAwaitTime)
 
     def broadcastBurn(sender: KeyPair,
                       assetId: String,
