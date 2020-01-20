@@ -38,11 +38,12 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee).id
     checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
-    checkUpdateAssetInfoTx(sender.blockAt(nextTerm).transactions.head, "updatedName", "updatedDescription")
+    val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
+    checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(sender.lastBlock.transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(sender.blockSeq(nextTerm, nextTerm).head.transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock.signature).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(sender.blockSeqByAddress(miner.address, nextTerm, nextTerm).head.transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head, "updatedName", "updatedDescription")
 
     checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.stringRepr, 1).head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTxInfo(sender.transactionInfo(updateAssetInfoTxId), "updatedName", "updatedDescription")
@@ -54,6 +55,13 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("not able to update name/description more than once within interval") {
+    val nextTermEnd = sender.transactionInfo(assetId).height + 2 * updateInterval
+    assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message should include("Can't update asset info before")
+    }
+    sender.waitForHeight(nextTermEnd)
+
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
       error.message should include("Can't update asset info before")
@@ -62,8 +70,11 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   val invalidAssetsNames =
     Table(
+      "",
+      null,
       "abc",
-      "UpperCaseAssetCoinTest",
+      "NameIsLongerThanLimit",
+      "\\uDC00",
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
