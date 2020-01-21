@@ -18,6 +18,7 @@ import com.wavesplatform.utils.{Schedulers, Time}
 import io.netty.util.HashedWheelTimer
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import monix.execution.Scheduler
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -27,27 +28,12 @@ import scala.concurrent.duration._
 case class UtilsApiRoute(
     timeService: Time,
     settings: RestAPISettings,
-    estimator: ScriptEstimator
+    estimator: ScriptEstimator,
+    limitedScheduler: Scheduler
 ) extends ApiRoute
-    with AuthRoute {
+    with AuthRoute with TimeLimitedRoute {
 
   import UtilsApiRoute._
-
-  private[this] val limitedScheduler =
-    Schedulers.timeBoundedFixedPool(
-      new HashedWheelTimer(),
-      5.seconds,
-      1,
-      "rest-script-compiler",
-      reporter = log.trace("Uncaught exception in script compiler", _)
-    )
-
-  private[this] def executeLimited[T](f: => T): Directive1[T] = {
-    val handler = ExceptionHandler {
-      case _: InterruptedException => complete(ApiError.CustomValidationError("Timeout"))
-    }
-    handleExceptions(handler) & onSuccess(Schedulers.executeOnTimeBoundedPool(limitedScheduler)(f))
-  }
 
   private def seed(length: Int) = {
     val seed = new Array[Byte](length)
