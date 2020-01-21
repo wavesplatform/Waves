@@ -15,7 +15,7 @@ object ResponsivenessLogs extends ScorexLogging {
     val fileStream = new FileOutputStream(s"${sys.props("waves.directory")}/tx-events-$date.csv", true)
     val pw = new PrintWriter(fileStream)
     val logLine = s"$txId,$eventType,$height,$txType,${System.currentTimeMillis()}"
-    log.info(logLine)
+    // log.info(logLine)
     try pw.println(logLine)
     finally pw.close()
   })
