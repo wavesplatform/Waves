@@ -109,7 +109,7 @@ object AssetTransactionsDiff {
           .toRight(GenericError("Asset doesn't exist"))
         updateAllowedAt = lastUpdateHeight + minUpdateInfoInterval
         _ <- Either.cond(
-          updateAllowedAt < blockchain.height,
+          blockchain.height >= updateAllowedAt,
           (),
           GenericError(s"Can't update info of asset with id=${tx.assetId.id} before $updateAllowedAt block, " +
                        s"current height=${blockchain.height}, minUpdateInfoInterval=$minUpdateInfoInterval")
