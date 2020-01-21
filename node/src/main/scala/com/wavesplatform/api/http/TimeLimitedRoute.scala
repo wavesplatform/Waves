@@ -13,7 +13,8 @@ trait TimeLimitedRoute { self: ApiRoute =>
 
   def executeLimited[T](f: => T): Directive1[T] = {
     val handler = ExceptionHandler {
-      case _: InterruptedException | _: ExecutionException | _: ExecutionError | _: UncheckedExecutionException => complete(ApiError.CustomValidationError("Thread was interrupted"))
+      case _: InterruptedException | _: ExecutionException | _: ExecutionError | _: UncheckedExecutionException =>
+        complete(ApiError.CustomValidationError("The request took too long to complete"))
     }
     handleExceptions(handler) & onSuccess(Schedulers.executeOnTimeBoundedPool(limitedScheduler)(f))
   }
