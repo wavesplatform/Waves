@@ -162,7 +162,7 @@ class UtxPoolImpl(
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = txs.foreach { tx =>
-    if (transactions.contains(tx.id())) ResponsivenessLogs.writeEvent(blockchain.height, tx.builder.typeId, tx.id(), "mined")
+    if (transactions.containsKey(tx.id())) ResponsivenessLogs.writeEvent(blockchain.height, tx.builder.typeId, tx.id(), "mined")
     remove(tx.id())
   }
 
