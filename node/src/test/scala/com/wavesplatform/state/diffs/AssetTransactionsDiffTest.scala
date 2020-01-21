@@ -439,11 +439,12 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   private val twoUpdates = for {
     (gen, issue, update) <- genesisIssueUpdate
-    account1             <- accountGen
+    accountС             <- accountGen
+    genesisTx3 = GenesisTransaction.create(accountС, Long.MaxValue / 100, gen.head.timestamp).explicitGet()
     issue1 = IssueTransaction
       .selfSigned(
         TxVersion.V2,
-        account1,
+        accountС,
         issue.name.toStringUtf8,
         issue.description.toStringUtf8,
         issue.quantity,
@@ -458,7 +459,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       .selfSigned(
         TxVersion.V1,
         AddressScheme.current.chainId,
-        account1,
+        accountС,
         issue1.assetId,
         "Invalid",
         "Invalid",
@@ -467,5 +468,5 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         Waves
       )
       .explicitGet()
-  } yield (gen, issue, update, issue1, update1)
+  } yield (gen :+ genesisTx3, issue, update, issue1, update1)
 }
