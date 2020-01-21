@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.activation
 
 import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -14,7 +15,7 @@ import scala.concurrent.duration._
 
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
   val activationHeight = 9
-  val updateInterval = 2
+  val updateInterval = 6
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
@@ -32,7 +33,6 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("not able to broadcast UpdateAssetInfoTransaction before activation") {
-    sender.waitForHeight(sender.transactionInfo(assetId).height + updateInterval + 1)
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
@@ -40,8 +40,18 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     }
   }
 
-  test("able to broadcast UpdateAssetInfoTransaction after activation") {
+  test("not able to update asset info after activation if update interval has not been reached after asset issue") {
     sender.waitForHeight(activationHeight, 2.minutes)
+    assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
+      error.id shouldBe StateCheckFailed.Id
+      error.message should include("Can't update asset info before")
+    }
+
+  }
+
+  test("able to broadcast UpdateAssetInfoTransaction after activation") {
+    val nextTerm = sender.transactionInfo(assetId).height + updateInterval + 1
+    sender.waitForHeight(nextTerm, 2.minutes)
     sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
 }
