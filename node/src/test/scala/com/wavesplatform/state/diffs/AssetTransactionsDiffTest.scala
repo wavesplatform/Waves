@@ -402,6 +402,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
           val desc1 = cb.assetDescription(IssuedAsset(issue1.assetId)).get
           desc1.name.toStringUtf8 shouldBe update1.name
           desc1.description.toStringUtf8 shouldBe update1.description
+
+          desc.lastUpdatedAt shouldBe cb.height
+          desc1.lastUpdatedAt shouldBe cb.height
         }
     }
   }
