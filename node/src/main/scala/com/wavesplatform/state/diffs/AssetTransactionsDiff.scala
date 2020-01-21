@@ -111,7 +111,8 @@ object AssetTransactionsDiff {
         _ <- Either.cond(
           updateAllowedAt < blockchain.height,
           (),
-          GenericError(s"Can't update asset info before $updateAllowedAt block")
+          GenericError(s"Can't update info of asset with id=${tx.assetId.id} before $updateAllowedAt block, " +
+                       s"current height=${blockchain.height}, minUpdateInfoInterval=$minUpdateInfoInterval")
         )
         updatedInfo = AssetInfo(Right(tx.name), Right(tx.description), Height @@ blockchain.height)
       } yield Diff(
