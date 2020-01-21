@@ -6,6 +6,7 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.Monoid
 import cats.syntax.monoid._
+import com.wavesplatform.ResponsivenessLogs
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
@@ -160,10 +161,10 @@ class UtxPoolImpl(
     tracedIsNew
   }
 
-  override def removeAll(txs: Traversable[Transaction]): Unit =
-    txs.view
-      .map(_.id())
-      .foreach(remove)
+  override def removeAll(txs: Traversable[Transaction]): Unit = txs.foreach { tx =>
+    if (transactions.contains(tx.id())) ResponsivenessLogs.writeEvent(blockchain.height, tx.builder.typeId, tx.id(), "mined")
+    remove(tx.id())
+  }
 
   private[this] def remove(txId: ByteStr): Unit = for (tx <- Option(transactions.remove(txId))) {
     PoolMetrics.removeTransaction(tx)
@@ -178,6 +179,7 @@ class UtxPoolImpl(
 
     if (!verify || isNew.resultE.isRight)
       transactions.computeIfAbsent(tx.id(), { _ =>
+        ResponsivenessLogs.writeEvent(blockchain.height, tx.builder.typeId, tx.id(), "received")
         PoolMetrics.addTransaction(tx)
         tx
       })
@@ -227,6 +229,7 @@ class UtxPoolImpl(
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
+                ResponsivenessLogs.writeEvent(blockchain.height, tx.builder.typeId, tx.id(), "expired")
                 remove(tx.id())
                 r.copy(iterations = r.iterations + 1)
               } else {
