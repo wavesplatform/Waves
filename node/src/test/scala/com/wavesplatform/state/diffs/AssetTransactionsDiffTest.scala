@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
+import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
@@ -194,7 +195,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       issue       <- createLegacyIssue(issuer, assetName, description, quantity, decimals, reissuable = true, fee, timestamp)
       assetId = IssuedAsset(issue.assetId)
       attachment <- genBoundedBytes(0, TransferTransaction.MaxAttachmentSize)
-      transfer = TransferTransaction.selfSigned(1.toByte, issuer, holder, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp).explicitGet()
+      transfer = TransferTransaction
+        .selfSigned(1.toByte, issuer, holder, assetId, quantity - 1, Waves, fee, Some(Attachment.Bin(attachment)), timestamp)
+        .explicitGet()
       reissue = ReissueTransaction
         .selfSigned(1.toByte, issuer, assetId, (Long.MaxValue - quantity) + 1, reissuable = true, 1, timestamp)
         .explicitGet()
@@ -239,8 +242,18 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       reissuable = true
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      issue = IssueTransaction(TxVersion.V2, accountA, assetName, description, quantity, decimals, reissuable, Some(createScript(code)), smallFee, timestamp + 1)
-        .signWith(accountA)
+      issue = IssueTransaction(
+        TxVersion.V2,
+        accountA,
+        assetName,
+        description,
+        quantity,
+        decimals,
+        reissuable,
+        Some(createScript(code)),
+        smallFee,
+        timestamp + 1
+      ).signWith(accountA)
       assetId = IssuedAsset(issue.id())
       transfer = TransferTransaction
         .selfSigned(TxVersion.V1, accountA, accountB, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
@@ -365,6 +378,34 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
     }
   }
 
+  property(s"Can update with CompositeBlockchain") {
+    forAll(twoUpdates) {
+      case (gen, issue, update, issue1, update1) =>
+        val blocks = Seq(TestBlock.create(gen :+ issue :+ issue1))
+
+        assertDiffAndState(blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0)) { (_, blockchain) =>
+          val info = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
+
+          info.name.toStringUtf8 shouldEqual (update.name)
+          info.description.toStringUtf8 shouldEqual (update.description)
+
+          val diff = Monoid.combine(
+            AssetTransactionsDiff.updateInfo(blockchain)(update).explicitGet(),
+            AssetTransactionsDiff.updateInfo(blockchain)(update1).explicitGet()
+          )
+          val cb = CompositeBlockchain(blockchain, Some(diff), Some(TestBlock.create(Seq(update, update1))))
+
+          val desc = cb.assetDescription(IssuedAsset(issue.assetId)).get
+          desc.name.toStringUtf8 shouldBe update.name
+          desc.description.toStringUtf8 shouldBe update.description
+
+          val desc1 = cb.assetDescription(IssuedAsset(issue.assetId)).get
+          desc1.name.toStringUtf8 shouldBe update1.name
+          desc1.description.toStringUtf8 shouldBe update1.description
+        }
+    }
+  }
+
   private val genesisIssueUpdate =
     for {
       timestamp          <- timestampGen
@@ -375,8 +416,8 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
       genesisTx1 = GenesisTransaction.create(accountA, initialWavesAmount, timestamp).explicitGet()
       genesisTx2 = GenesisTransaction.create(accountB, initialWavesAmount, timestamp).explicitGet()
       (_, assetName, description, quantity, decimals, _, _, _) <- issueParamGen
-      updName <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
-      updDescription <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
+      updName                                                  <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
+      updDescription                                           <- genBoundedString(0, IssueTransaction.MaxAssetDescriptionLength)
       issue = IssueTransaction(TxVersion.V2, accountA, assetName, description, quantity, decimals, false, None, smallFee, timestamp + 1)
         .signWith(accountA)
       assetId = IssuedAsset(issue.id())
@@ -393,6 +434,38 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
           Waves
         )
         .explicitGet()
+
     } yield (Seq(genesisTx1, genesisTx2), issue, update)
 
+  private val twoUpdates = for {
+    (gen, issue, update) <- genesisIssueUpdate
+    account1             <- accountGen
+    issue1 = IssueTransaction
+      .selfSigned(
+        TxVersion.V2,
+        account1,
+        issue.name.toStringUtf8,
+        issue.description.toStringUtf8,
+        issue.quantity,
+        issue.decimals,
+        false,
+        None,
+        10,
+        issue.timestamp
+      )
+      .explicitGet()
+    update1 = UpdateAssetInfoTransaction
+      .selfSigned(
+        TxVersion.V1,
+        AddressScheme.current.chainId,
+        account1,
+        issue1.assetId,
+        "Invalid",
+        "Invalid",
+        issue1.timestamp + 1,
+        10,
+        Waves
+      )
+      .explicitGet()
+  } yield (gen, issue, update, issue1, update1)
 }
