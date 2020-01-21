@@ -276,7 +276,7 @@ class AddressRouteSpec
     implicit val timeout          = routeTestTimeout.duration
     Get(routePath(s"/scriptInfo/${allAddresses(5)}")) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "message").as[String] shouldBe "Thread was interrupted"
+      (json \ "message").as[String] shouldBe "The request took too long to complete"
     }
   }
 
