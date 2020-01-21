@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Types.{addressOrAliasT
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{EnvironmentFunctions, PureContext, notImplemented, unit}
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.evaluator.{ContextfulNativeFunction, ContextfulUserFunction}
-import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.{Issue, Recipient}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 object Functions {
@@ -490,5 +490,37 @@ object Functions {
             case (_, xs) => notImplemented[F](s"parseBlockHeader(u: ByteVector)", xs)
           }
       }
+    }
+
+  val calculateAssetIdF: BaseFunction[Environment] =
+    NativeFunction(
+      "calculateAssetId",
+      10,
+      CALCULATE_ASSET_ID,
+      BYTESTR,
+      ("issue", issueActionType)
+    ) {
+      case CaseObj(`issueActionType`, fields) :: Nil =>
+        val MaxAssetNameLength        = 16
+        val MaxAssetDescriptionLength = 1000
+
+        val name        = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s
+        val description = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s
+
+        if (description.length > MaxAssetDescriptionLength)
+          Left(s"Description length should not exceed $MaxAssetDescriptionLength")
+        else if (name.length > MaxAssetNameLength)
+          Left(s"Name length should not exceed $MaxAssetNameLength")
+        else
+          Right(Issue.calculateId(
+            decimals     = fields(FieldNames.IssueDecimals).asInstanceOf[CONST_LONG].t.toInt,
+            description  = description,
+            isReissuable = fields(FieldNames.IssueIsReissuable).asInstanceOf[CONST_BOOLEAN].b,
+            name         = name,
+            quantity     = fields(FieldNames.IssueQuantity).asInstanceOf[CONST_LONG].t,
+            nonce        = fields(FieldNames.IssueNonce).asInstanceOf[CONST_LONG].t
+          ))
+
+      case xs => notImplemented[Id](s"calculateAssetId(i: Issue)", xs)
     }
 }
