@@ -1,10 +1,9 @@
 package com.wavesplatform.api.http
 
 import java.security.SecureRandom
-import java.util.concurrent.Executors
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.Route
+import akka.http.scaladsl.server.{Directive1, ExceptionHandler, Route}
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.common.utils._
@@ -15,22 +14,40 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.Time
+import com.wavesplatform.utils.{Schedulers, Time}
+import io.netty.util.HashedWheelTimer
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import play.api.libs.json._
 
-import scala.concurrent.ExecutionContext
+import scala.concurrent.duration._
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")
 case class UtilsApiRoute(
-  timeService: Time,
-  settings:    RestAPISettings,
-  estimator:   ScriptEstimator
-) extends ApiRoute with AuthRoute {
+    timeService: Time,
+    settings: RestAPISettings,
+    estimator: ScriptEstimator
+) extends ApiRoute
+    with AuthRoute {
 
   import UtilsApiRoute._
+
+  private[this] val limitedScheduler =
+    Schedulers.timeBoundedFixedPool(
+      new HashedWheelTimer(),
+      5.seconds,
+      1,
+      "rest-script-compiler",
+      reporter = log.trace("Uncaught exception in script compiler", _)
+    )
+
+  private[this] def executeLimited[T](f: => T): Directive1[T] = {
+    val handler = ExceptionHandler {
+      case _: InterruptedException => complete(ApiError.CustomValidationError("Timeout"))
+    }
+    handleExceptions(handler) & onSuccess(Schedulers.executeOnTimeBoundedPool(limitedScheduler)(f))
+  }
 
   private def seed(length: Int) = {
     val seed = new Array[Byte](length)
@@ -41,8 +58,6 @@ case class UtilsApiRoute(
   override val route: Route = pathPrefix("utils") {
     decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
   }
-
-  private[this] val decompilerExecutionContext = ExecutionContext.fromExecutorService(Executors.newSingleThreadExecutor())
 
   @Path("/script/decompile")
   @ApiOperation(value = "Decompile", notes = "Decompiles base64 script representation to string code", httpMethod = "POST")
@@ -66,23 +81,25 @@ case class UtilsApiRoute(
   def decompile: Route = path("script" / "decompile") {
     import play.api.libs.json.Json.toJsFieldJsValueWrapper
 
-    (post & entity(as[String]) & withExecutionContext(decompilerExecutionContext)) { code =>
+    (post & entity(as[String])) { code =>
       Script.fromBase64String(code.trim) match {
         case Left(err) => complete(err)
         case Right(script) =>
-          val (scriptText, meta) = Script.decompile(script)
-          val directives: List[(String, JsValue)] = meta.map {
-            case (k, v) =>
-              (k, v match {
-                case n: Number => JsNumber(BigDecimal(n.toString))
-                case s         => JsString(s.toString)
-              })
+          executeLimited(Script.decompile(script)) {
+            case (scriptText, meta) =>
+              val directives: List[(String, JsValue)] = meta.map {
+                case (k, v) =>
+                  (k, v match {
+                    case n: Number => JsNumber(BigDecimal(n.toString))
+                    case s         => JsString(s.toString)
+                  })
+              }
+              val result  = directives ::: "script" -> JsString(scriptText) :: Nil
+              val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
+              complete(
+                Json.obj(wrapped: _*)
+              )
           }
-          val result  = directives ::: "script" -> JsString(scriptText) :: Nil
-          val wrapped = result.map { case (k, v) => (k, toJsFieldJsValueWrapper(v)) }
-          complete(
-            Json.obj(wrapped: _*)
-          )
       }
     }
   }
@@ -110,18 +127,20 @@ case class UtilsApiRoute(
   def compile: Route = path("script" / "compile") {
     (post & entity(as[String])) { code =>
       parameter('assetScript.as[Boolean] ? false) { isAssetScript =>
-        complete(
-          ScriptCompiler(code, isAssetScript, estimator).fold(
-            e => ScriptCompilerError(e), {
-              case (script, complexity) =>
-                Json.obj(
-                  "script"     -> script.bytes().base64,
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
-                )
-            }
+        executeLimited(ScriptCompiler(code, isAssetScript, estimator)) { result =>
+          complete(
+            result.fold(
+              e => ScriptCompilerError(e), {
+                case (script, complexity) =>
+                  Json.obj(
+                    "script"     -> script.bytes().base64,
+                    "complexity" -> complexity,
+                    "extraFee"   -> FeeValidation.ScriptExtraFee
+                  )
+              }
+            )
           )
-        )
+        }
       }
     }
   }
@@ -147,20 +166,23 @@ case class UtilsApiRoute(
   )
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      complete(
-        ScriptCompiler
-          .compile(code, estimator)
-          .fold(
-            e => ScriptCompilerError(e), {
-              case (script, complexity) =>
-                Json.obj(
-                  "script"     -> script.bytes().base64,
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
-                )
-            }
-          )
-      )
+      executeLimited(ScriptCompiler.compile(code, estimator)) { result =>
+        complete(
+          result
+            .fold(
+              e => ScriptCompilerError(e), {
+                case (script, complexity) =>
+                  Json.obj(
+                    "script"     -> script.bytes().base64,
+                    "complexity" -> complexity,
+                    "extraFee"   -> FeeValidation.ScriptExtraFee
+                  )
+              }
+            )
+        )
+
+      }
+
     }
   }
 
@@ -185,20 +207,21 @@ case class UtilsApiRoute(
   def compileWithImports: Route = path("script" / "compileWithImports") {
     import ScriptWithImportsRequest._
     (post & entity(as[ScriptWithImportsRequest])) { req =>
-      complete(
-        ScriptCompiler
-          .compile(req.script, estimator, req.imports)
-          .fold(
-            e => ScriptCompilerError(e), {
-              case (script, complexity) =>
-                Json.obj(
-                  "script"     -> script.bytes().base64,
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
-                )
-            }
-          )
-      )
+      executeLimited(ScriptCompiler.compile(req.script, estimator, req.imports)) { result =>
+        complete(
+          result
+            .fold(
+              e => ScriptCompilerError(e), {
+                case (script, complexity) =>
+                  Json.obj(
+                    "script"     -> script.bytes().base64,
+                    "complexity" -> complexity,
+                    "extraFee"   -> FeeValidation.ScriptExtraFee
+                  )
+              }
+            )
+        )
+      }
     }
   }
 
@@ -223,7 +246,7 @@ case class UtilsApiRoute(
   )
   def estimate: Route = path("script" / "estimate") {
     (post & entity(as[String])) { code =>
-      complete(
+      executeLimited(
         Script
           .fromBase64String(code)
           .left
@@ -231,7 +254,9 @@ case class UtilsApiRoute(
           .flatMap { script =>
             Script.estimate(script, estimator).map((script, _))
           }
-          .fold(
+      ) { result =>
+        complete(
+          result.fold(
             e => ScriptCompilerError(e), {
               case (script, complexity) =>
                 Json.obj(
@@ -242,7 +267,8 @@ case class UtilsApiRoute(
                 )
             }
           )
-      )
+        )
+      }
     }
   }
 
@@ -266,13 +292,9 @@ case class UtilsApiRoute(
     )
   )
   def scriptMeta: Route = path("script" / "meta") {
-    (
-      post
-        & entity(as[String])
-        & withExecutionContext(decompilerExecutionContext)
-    ) { code =>
+    (post & entity(as[String])) { code =>
       val result: ToResponseMarshallable = Global
-        .scriptMeta(code)
+        .scriptMeta(code) // Should not hang
         .map(metaConverter.foldRoot)
         .fold(e => e, r => r)
       complete(result)
