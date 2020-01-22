@@ -523,7 +523,9 @@ class BlockchainUpdaterImpl(
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
-    compositeBlockchain.heightOf(blockId)
+    blockchain
+      .heightOf(blockId)
+      .orElse(ngState.collect { case ng if ng.contains(blockId) => this.height })
   }
 
   override def lastBlockIds(howMany: Int): Seq[BlockId] = readLock {
