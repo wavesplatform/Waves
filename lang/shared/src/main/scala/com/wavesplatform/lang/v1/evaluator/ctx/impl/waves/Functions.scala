@@ -482,6 +482,8 @@ object Functions {
             case (env, CaseObj(`issueActionType`, fields) :: Nil) =>
               val MaxAssetNameLength        = 16
               val MaxAssetDescriptionLength = 1000
+              // This constants are dublicate of IssueTransaction.* but need to limit of hash calculating complexity and dom't relate with consensus.
+              // Consensus check it in InvokeScriptTransactionDiff.
 
               val name        = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s
               val description = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s
