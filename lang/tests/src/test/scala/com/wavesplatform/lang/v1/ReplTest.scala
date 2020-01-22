@@ -1,6 +1,5 @@
 package com.wavesplatform.lang.v1
 
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.BlockchainUnavailableException
