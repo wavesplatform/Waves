@@ -32,10 +32,14 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   val issuer    = pkByAddress(firstAddress)
   val nonIssuer = pkByAddress(secondAddress)
   var assetId   = ""
+  var otherAssetId   = ""
+  var nftId   = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     assetId = sender.broadcastIssue(issuer, "asset", "description", someAssetAmount, 8, true, script = None, waitForTx = true).id
+    otherAssetId = sender.broadcastIssue(issuer, "otherasset", "otherdescription", someAssetAmount, 8, true, script = None, waitForTx = true).id
+    nftId = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
   }
 
   test("able to update name/description of issued asset") {
@@ -67,6 +71,8 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.assetsDetails(assetId).description shouldBe "updatedDescription"
 
     sender.balanceDetails(issuer.publicKey.stringRepr).available shouldBe issuerBalance.available - minFee
+
+    sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
 
   test("not able to update name/description more than once within interval") {
@@ -88,7 +94,6 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "",
       "abc",
       "NameIsLongerThanLimit",
-      "\\uDC00",
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
@@ -152,6 +157,35 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     }
 
     sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
+  }
+
+  test("able to update name/description of nft") {
+    val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
+    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee).id
+    checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
+    sender.waitForTransaction(updateAssetInfoTxId)
+    val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
+    checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.lastBlock.transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(
+      sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
+      "updatedName",
+      "updatedDescription"
+    )
+    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock.signature).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(
+      sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
+      "updatedName",
+      "updatedDescription"
+    )
+
+    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.stringRepr, 1).head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTxInfo(sender.transactionInfo(updateAssetInfoTxId), "updatedName", "updatedDescription")
+
+    sender.assetsDetails(nftId).name shouldBe "updatedName"
+    sender.assetsDetails(nftId).description shouldBe "updatedDescription"
+
+    sender.balanceDetails(issuer.publicKey.stringRepr).available shouldBe issuerBalance.available - minFee
   }
 
   def checkUpdateAssetInfoTx(transaction: Transaction, updatedName: String, updatedDescription: String): Unit = {
