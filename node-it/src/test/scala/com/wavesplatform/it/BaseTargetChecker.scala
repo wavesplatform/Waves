@@ -1,9 +1,8 @@
 package com.wavesplatform.it
 
 import com.typesafe.config.ConfigFactory.{defaultApplication, defaultReference}
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
@@ -37,7 +36,7 @@ object BaseTargetChecker {
 
       NodeConfigs.Default.map(_.withFallback(sharedConfig)).collect {
         case cfg if cfg.as[Boolean]("waves.miner.enable") =>
-          val account   = PublicKey(cfg.as[ByteStr]("public-key").arr)
+          val account = KeyPair.fromSeed(cfg.getString("account-seed")).explicitGet()
           val address   = account.toAddress
           val balance   = blockchainUpdater.balance(address, Waves)
           val timeDelay = poSSelector

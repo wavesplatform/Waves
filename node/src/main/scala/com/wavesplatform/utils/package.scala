@@ -3,6 +3,7 @@ package com.wavesplatform
 import java.security.SecureRandom
 
 import com.google.common.base.Charsets
+import com.google.protobuf.ByteString
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.ByteStr._
 import org.joda.time.Duration
@@ -75,5 +76,6 @@ package object utils extends ScorexLogging {
 
   implicit class StringBytes(val s: String) extends AnyVal {
     def utf8Bytes: Array[Byte] = s.getBytes(Charsets.UTF_8)
+    def toByteString: ByteString = ByteString.copyFromUtf8(s)
   }
 }

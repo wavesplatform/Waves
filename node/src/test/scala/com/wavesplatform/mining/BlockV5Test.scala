@@ -168,6 +168,18 @@ class BlockV5Test
 
               Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
               blockchain.height shouldBe (h + 1)
+
+              val hitSource = blockchain.hitSourceAtHeight(if (h > 100) h - 100 else h).value
+              val nextHitSource = blockchain.hitSourceAtHeight(h + 1).value
+              val lastBlock = blockchain.lastBlock.value
+
+              nextHitSource shouldBe crypto
+                .verifyVRF(
+                  lastBlock.header.generationSignature,
+                  hitSource,
+                  minerAcc1.publicKey
+                )
+                .explicitGet()
             }
         }
       }

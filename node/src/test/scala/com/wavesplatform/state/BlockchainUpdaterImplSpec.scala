@@ -161,7 +161,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     }
   }
 
-  "blochain update events sending" - {
+  "blockchain update events sending" - {
     sealed trait BlockchainUpdateTriggerCall
     final case class OnProcessBlock(block: Block, prevBlockchainHeight: Int, diff: DetailedDiff)            extends BlockchainUpdateTriggerCall
     final case class OnProcessMicroBlock(microBlock: MicroBlock, blockchainHeight: Int, diff: DetailedDiff) extends BlockchainUpdateTriggerCall
