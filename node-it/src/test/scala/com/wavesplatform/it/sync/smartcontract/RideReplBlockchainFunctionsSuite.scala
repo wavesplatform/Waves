@@ -60,7 +60,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("this") {
-    execute("this.toString()").right.value should endWith(alice.stringRepr)
+    execute("this.toString()").right.value should endWith(s""""${alice.stringRepr}"""")
   }
   test("height") {
     execute("height > 0").right.value should endWith("true")
@@ -81,10 +81,10 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("getBinary()") {
-    execute("""this.getBinary("bin").value()""").right.value should endWith(s" ${Base58.encode("binary".getBytes)}")
+    execute("""this.getBinary("bin").value()""").right.value should endWith(s" base58\'${Base58.encode("binary".getBytes)}\'")
   }
   test("getBinaryValue()") {
-    execute("""this.getBinaryValue("bin")""").right.value should endWith(s" ${Base58.encode("binary".getBytes)}")
+    execute("""this.getBinaryValue("bin")""").right.value should endWith(s" base58\'${Base58.encode("binary".getBytes)}\'")
   }
   test("getBoolean()") {
     execute("""this.getBoolean("bool1").value()""").right.value should endWith(" true")
@@ -101,14 +101,14 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
     execute("""this.getIntegerValue("int")""").right.value should endWith(" 100500")
   }
   test("getString()") {
-    execute("""this.getString("str").value()""").right.value should endWith(" Hello")
+    execute("""this.getString("str").value()""").right.value should endWith(" \"Hello\"")
   }
   test("getStringValue()") {
-    execute("""this.getStringValue("str")""").right.value should endWith(" Hello")
+    execute("""this.getStringValue("str")""").right.value should endWith(" \"Hello\"")
   }
 
   test("assetInfo()") {
-    execute(s"assetInfo(base58'$assetId').value().issuer.toString()").right.value should endWith(alice.stringRepr)
+    execute(s"assetInfo(base58'$assetId').value().issuer.toString()").right.value should endWith(s""""${alice.stringRepr}"""")
   }
   test("blockInfoByHeight()") {
     val h  = miner.height - 1
@@ -160,10 +160,10 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
     execute(s"addressFromRecipient(transferTx.recipient).toString()").right.value should endWith(bob.stringRepr)
   }
   test("addressFromString()") {
-    execute(s"""addressFromString("${alice.stringRepr}").value().toString()""").right.value should endWith(alice.stringRepr)
+    execute(s"""addressFromString("${alice.stringRepr}").value().toString()""").right.value should endWith(s""""${alice.stringRepr}"""")
   }
   test("addressFromStringValue()") {
-    execute(s"""addressFromStringValue("${alice.stringRepr}").toString()""").right.value should endWith(alice.stringRepr)
+    execute(s"""addressFromStringValue("${alice.stringRepr}").toString()""").right.value should endWith(s""""${alice.stringRepr}"""")
   }
 
 }
