@@ -18,8 +18,8 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
   def compile(script: String, saveExprContext: Boolean = false): Either[String, Expressions.EXPR] = {
 
     val result = for {
-      directives  <- DirectiveParser(script)
-      ds          <- Directive.extractDirectives(directives)
+      directives <- DirectiveParser(script)
+      ds         <- Directive.extractDirectives(directives)
       ctx = lazyContexts(ds.copy(imports = Imports()))().compilerContext
       compResult <- ExpressionCompiler.compileWithParseResult(script, ctx, saveExprContext)
     } yield compResult

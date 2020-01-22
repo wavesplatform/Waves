@@ -128,7 +128,7 @@ trait BaseGlobal {
 
       vars  = utils.varNames(stdLibVersion, Expression)
       costs = utils.functionCosts(stdLibVersion)
-      complexity <- estimator(vars, costs, compExpr)
+      complexity <- if (compErrorList.isEmpty) estimator(vars, costs, compExpr) else Either.right(0L)
     } yield (bytes, complexity, exprScript, compErrorList)
   }
 

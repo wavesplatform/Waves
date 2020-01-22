@@ -415,7 +415,7 @@ object ExpressionCompiler {
       compLetResult <- compileLet(p, let, saveExprContext)
       letName = compLetResult.dec.name
       compiledBody <- local {
-        updateCtx(letName, compLetResult.t, p)
+        updateCtx(letName, compLetResult.t, let.position)
           .flatMap(_ => compileExprWithCtx(body, saveExprContext))
       }
 
@@ -445,7 +445,7 @@ object ExpressionCompiler {
       funcname                    = compFuncStepRes.dec.name
       typeSig                     = FunctionTypeSignature(compFuncStepRes.t, argTypes, FunctionHeader.User(funcname))
       compiledBody <- local {
-        updateCtx(funcname, typeSig, p)
+        updateCtx(funcname, typeSig, func.position)
           .flatMap(_ => compileExprWithCtx(body, saveExprContext))
       }
 
