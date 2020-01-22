@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
@@ -13,18 +14,24 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TransactionGen}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB {
+class AssetTransactionsDiffTest
+    extends PropSpec
+    with PropertyChecks
+    with Matchers
+    with TransactionGen
+    with NoShrink
+    with BlocksTransactionsHelpers
+    with WithDomain {
 
   def issueReissueBurnTxs(isReissuable: Boolean): Gen[((GenesisTransaction, IssueTransaction), (ReissueTransaction, BurnTransaction))] =
     for {
@@ -333,7 +340,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
   val assetInfoUpdateEnabled: FunctionalitySettings = TestFunctionalitySettings.Enabled
     .copy(
-      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0),
+      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0) + (BlockchainFeatures.NG.id -> 0),
       minAssetInfoUpdateInterval = 100
     )
 
@@ -379,32 +386,47 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property(s"Can update with CompositeBlockchain") {
-    forAll(twoUpdates) {
-      case (gen, issue, update, issue1, update1) =>
-        val blocks = Seq(TestBlock.create(gen :+ issue :+ issue1))
+    forAll(genesisIssueUpdateWithSecondAsset) {
+      case (gen, Seq(issue, issue1), signer, update1) =>
+        withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
+          val blockchain   = d.blockchainUpdater
+          val genesisBlock = TestBlock.create(gen :+ issue :+ issue1)
+          d.appendBlock(genesisBlock)
 
-        assertDiffAndState(blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0)) { (_, blockchain) =>
-          val info = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
+          val (keyBlock, Seq(microBlock)) =
+            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.uniqueId, Nil, Seq(Seq(update1)), signer, 3, genesisBlock.header.timestamp + 100)
+          d.appendBlock(keyBlock)
+          d.appendMicroBlock(microBlock)
 
-          info.name.toStringUtf8 shouldEqual (update.name)
-          info.description.toStringUtf8 shouldEqual (update.description)
+          { // Check liquid block
+            val desc = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
+            desc.name shouldBe issue.name
+            desc.description shouldBe issue.description
 
-          val diff = Monoid.combine(
-            AssetTransactionsDiff.updateInfo(blockchain)(update).explicitGet(),
-            AssetTransactionsDiff.updateInfo(blockchain)(update1).explicitGet()
-          )
-          val cb = CompositeBlockchain(blockchain, Some(diff), Some(TestBlock.create(Seq(update, update1))))
+            val desc1 = blockchain.assetDescription(IssuedAsset(issue1.assetId)).get
+            desc1.name.toStringUtf8 shouldBe update1.name
+            desc1.description.toStringUtf8 shouldBe update1.description
 
-          val desc = cb.assetDescription(IssuedAsset(issue.assetId)).get
-          desc.name.toStringUtf8 shouldBe update.name
-          desc.description.toStringUtf8 shouldBe update.description
+            desc.lastUpdatedAt shouldBe 1
+            desc1.lastUpdatedAt shouldBe blockchain.height
+          }
 
-          val desc1 = cb.assetDescription(IssuedAsset(issue1.assetId)).get
-          desc1.name.toStringUtf8 shouldBe update1.name
-          desc1.description.toStringUtf8 shouldBe update1.description
+          val (keyBlock1, Nil) =
+            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockSig, Nil, Nil, signer, 3, keyBlock.header.timestamp + 100)
+          d.appendBlock(keyBlock1)
 
-          desc.lastUpdatedAt shouldBe cb.height
-          desc1.lastUpdatedAt shouldBe cb.height
+          { // Check after new key block
+            val desc = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
+            desc.name shouldBe issue.name
+            desc.description shouldBe issue.description
+
+            val desc1 = blockchain.assetDescription(IssuedAsset(issue1.assetId)).get
+            desc1.name.toStringUtf8 shouldBe update1.name
+            desc1.description.toStringUtf8 shouldBe update1.description
+
+            desc.lastUpdatedAt shouldBe 1
+            desc1.lastUpdatedAt shouldBe (blockchain.height - 1)
+          }
         }
     }
   }
@@ -440,9 +462,9 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
 
     } yield (Seq(genesisTx1, genesisTx2), issue, update)
 
-  private val twoUpdates = for {
-    (gen, issue, update) <- genesisIssueUpdate
-    accountС             <- accountGen
+  private val genesisIssueUpdateWithSecondAsset = for {
+    (gen, issue, _) <- genesisIssueUpdate
+    accountС        <- accountGen
     genesisTx3 = GenesisTransaction.create(accountС, Long.MaxValue / 100, gen.head.timestamp).explicitGet()
     issue1 = IssueTransaction
       .selfSigned(
@@ -471,5 +493,5 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
         Waves
       )
       .explicitGet()
-  } yield (gen :+ genesisTx3, issue, update, issue1, update1)
+  } yield (gen :+ genesisTx3, Seq(issue, issue1), accountС, update1)
 }

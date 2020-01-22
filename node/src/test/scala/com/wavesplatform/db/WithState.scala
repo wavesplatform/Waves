@@ -33,7 +33,15 @@ trait WithState extends DBCacheSettings {
 }
 
 trait WithDomain extends WithState with NTPTime { _: Suite =>
-  def withDomain[A](settings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(None)))(test: Domain => A): A =
+  def defaultDomainSettings: WavesSettings =
+    WavesSettings.fromRootConfig(loadConfig(None))
+
+  def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings = {
+    val ds = defaultDomainSettings
+    ds.copy(blockchainSettings = ds.blockchainSettings.copy(functionalitySettings = fs))
+  }
+
+  def withDomain[A](settings: WavesSettings = defaultDomainSettings)(test: Domain => A): A =
     withLevelDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, ignoreBlockchainUpdated)
       try test(Domain(bcu, blockchain))

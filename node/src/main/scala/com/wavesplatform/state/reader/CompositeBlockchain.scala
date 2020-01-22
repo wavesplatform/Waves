@@ -289,6 +289,9 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
+  def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
+    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
+
   def addressTransactions(bu: CompositeBlockchain): AddressTransactions =
     new CompositeAddressTransactions(bu.inner, Height @@ bu.height, () => bu.maybeDiff)
 
