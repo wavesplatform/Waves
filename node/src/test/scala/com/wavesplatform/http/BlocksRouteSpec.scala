@@ -13,9 +13,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with NoShrink {
-
   private val blockchain = stub[Blockchain]
-  (blockchain.activatedFeatures _).when().returning(Map())
 
   private val route =
     BlocksApiRoute(restAPISettings, blockchain).route
@@ -24,7 +22,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   val testBlock2 = TestBlock.create(Nil)
 
   val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 10L)
-  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 10L, "VRF" -> testBlock2.uniqueId.toString)
+  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 10L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)
 
   (blockchain.blockBytes(_: Int)).when(1).returning(Some(testBlock1.bytes()))
   (blockchain.blockBytes(_: Int)).when(2).returning(Some(testBlock2.bytes()))
@@ -40,10 +38,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   (blockchain.activatedFeatures _)
     .when()
     .returning(Map(BlockchainFeatures.BlockV5.id -> 2, BlockchainFeatures.BlockReward.id -> 2))
-    .anyNumberOfTimes()
   (blockchain.height _).when().returning(2).anyNumberOfTimes()
-
-  println(blockchain.activatedFeatures)
 
   routePath("/first") in {
     Get(routePath("/first")) ~> route ~> check {
