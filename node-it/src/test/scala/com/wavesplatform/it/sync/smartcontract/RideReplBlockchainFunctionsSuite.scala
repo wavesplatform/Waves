@@ -73,7 +73,6 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("assetBalance()") {
-    //TODO always returns waves balance instead of asset
     execute(s"this.assetBalance(base58'$assetId')").right.value should endWith(" 900")
   }
   test("wavesBalance()") {

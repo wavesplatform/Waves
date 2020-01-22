@@ -58,8 +58,9 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
     assetId:   Option[Array[Byte]]
   ): Future[Either[String, Long]] =
     for {
-     address <- extractAddress(recipient)
-     entity  <- getEntity[Either[String, ?], BalanceResponse, Long](s"/addresses/balance/$address")
+      address <- extractAddress(recipient)
+      url = assetId.fold(s"/addresses/balance/$address")(id => s"/assets/balance/$address/${Base58.encode(id)}")
+      entity  <- getEntity[Either[String, ?], BalanceResponse, Long](url)
     } yield entity
 
   override def inputEntity: InputEntity                             = ???
