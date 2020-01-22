@@ -347,7 +347,7 @@ class AssetTransactionsDiffTest extends PropSpec with PropertyChecks with Matche
   }
 
   property(s"Can't update right before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval} blocks") {
-    forAll(genesisIssueUpdate, Gen.chooseNum(0, assetInfoUpdateEnabled.minAssetInfoUpdateInterval - 1)) {
+    forAll(genesisIssueUpdate, Gen.chooseNum(0, assetInfoUpdateEnabled.minAssetInfoUpdateInterval - 2)) {
       case ((gen, issue, update), blocksCount) =>
         val blocks = Seq.fill(blocksCount)(TestBlock.create(Seq.empty))
 
