@@ -1,12 +1,14 @@
 package com.wavesplatform.api.http
 
 import akka.http.scaladsl.server.Route
+import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.protobuf.api.TransactionsByIdRequest
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -33,13 +35,14 @@ case class TransactionsApiRoute(
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
-    with AuthRoute {
+    with AuthRoute
+    with AutoParamsDirective {
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
   override lazy val route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast
+      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast
     }
 
   @Path("/address/{address}/limit/{limit}")
@@ -88,6 +91,40 @@ case class TransactionsApiRoute(
           case _ => complete(InvalidSignature)
         }
       }
+  }
+
+  @Path("/status")
+  @ApiOperation(value = "Transaction status", notes = "Get a transaction status by its ID", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "query", allowMultiple = true)
+    )
+  )
+  def status: Route = path("status") {
+    protobufEntity(TransactionsByIdRequest) { request =>
+      if (request.ids.length > settings.transactionsByAddressLimit)
+        complete(TooBigArrayAllocation)
+      else
+        request.ids.map(ByteStr.decodeBase58).toList.sequence match {
+          case Success(ids) =>
+            val results = ids.map { id =>
+              val statusJson = blockchain.transactionInfo(id) match {
+                case Some((height, _)) =>
+                  Json.obj("status" -> "confirmed", "height" -> height, "confirmations" -> (blockchain.height - height).max(0))
+
+                case None =>
+                  utx.transactionById(id) match {
+                    case Some(_) => Json.obj("status" -> "unconfirmed")
+                    case None    => Json.obj("status" -> "not_found")
+                  }
+              }
+              statusJson ++ Json.obj("id" -> id.toString)
+            }
+            complete(results)
+
+          case _ => complete(InvalidSignature)
+        }
+    }
   }
 
   @Path("/unconfirmed")

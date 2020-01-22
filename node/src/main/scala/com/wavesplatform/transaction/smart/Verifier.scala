@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.Id
 import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
@@ -70,7 +71,7 @@ object Verifier extends ScorexLogging {
   private def logIfNecessary(
                               result: Either[ValidationError, _],
                               id:     String,
-                              eval:   (Log, Either[ExecutionError, EVALUATED])
+                              eval:   (Log[Id], Either[ExecutionError, EVALUATED])
                             ): Unit =
     result match {
       case Left(_) if log.logger.isDebugEnabled => log.debug(buildLogs(id, eval))
@@ -224,7 +225,7 @@ object Verifier extends ScorexLogging {
   @VisibleForTesting
   private[smart] def buildLogs(
                                 id:     String,
-                                result: (Log, Either[String, EVALUATED])
+                                result: (Log[Id], Either[String, EVALUATED])
                               ): String = {
     val (execLog, execResult) = result
     val builder = new StringBuilder(s"Script for $id evaluated to $execResult")

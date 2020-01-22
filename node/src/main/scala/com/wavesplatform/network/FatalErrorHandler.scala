@@ -17,7 +17,9 @@ class FatalErrorHandler extends ChannelInboundHandlerAdapter with ScorexLogging 
     case NonFatal(_) =>
       log.debug(s"${id(ctx)} Exception caught", cause)
     case _ =>
-      log.error(s"${id(ctx)} Fatal error in channel, terminating application", cause)
-      forceStopApplication()
+      new Thread(() => {
+        log.error(s"${id(ctx)} Fatal error in channel, terminating application", cause)
+        forceStopApplication()
+      }, "waves-platform-shutdown-thread").start()
   }
 }

@@ -27,27 +27,29 @@ package object state {
 
   private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
       address: Address,
-      maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = {
+      maybeAfter: Option[IssuedAsset]
+  ): Observable[IssueTransaction] = {
 
-    def nonZeroBalance(asset: IssuedAsset): Boolean = {
-      val balanceFromDiff = for {
-        diff      <- maybeDiff
-        portfolio <- diff.portfolios.get(address)
-        balance   <- portfolio.assets.get(asset)
-      } yield balance
+    def notWithdrawn(asset: IssuedAsset): Boolean = {
+      val changeFromDiff = for {
+        diff          <- maybeDiff
+        portfolio     <- diff.portfolios.get(address)
+        balanceChange <- portfolio.assets.get(asset)
+      } yield balanceChange
 
-      !balanceFromDiff.exists(_ < 0)
+      changeFromDiff.forall(_ >= 0)
     }
-    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] = {
+
+    def transactionFromDiff(diff: Diff, id: ByteStr): Option[Transaction] =
       diff.transactions.get(id).map(_._2)
-    }
 
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] = {
-      diff.portfolios
-        .get(address)
-        .toIterable
-        .flatMap(_.assets.keys)
-    }
+    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
+      for {
+        portfolio <- diff.portfolios
+          .get(address)
+          .toIterable
+        (asset, balance) <- portfolio.assets if balance > 0
+      } yield asset
 
     def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[IssueTransaction] = Observable.fromIterable {
       maybeAfter
@@ -56,13 +58,13 @@ package object state {
             .dropWhile(_ != after)
             .drop(1)
         }
-        .filter(nonZeroBalance)
+        .filter(notWithdrawn)
         .map { asset =>
           transactionFromDiff(diff, asset.id)
             .orElse(blockchain.transactionInfo(asset.id).map(_._2))
         }
         .collect {
-          case Some(itx: IssueTransaction) if itx.isNFT => itx
+          case Some(itx: IssueTransaction) if itx.isNFT(blockchain) => itx
         }
     }
 
@@ -71,23 +73,23 @@ package object state {
         .nftObservable(address, maybeAfter)
         .filter { itx =>
           val asset = IssuedAsset(itx.assetId)
-          nonZeroBalance(asset)
+          notWithdrawn(asset)
         }
 
     maybeDiff.fold(nftFromBlockchain) { diff =>
       maybeAfter match {
-        case None                                         => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
+        case None                                            => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
         case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case _                                            => nftFromBlockchain
+        case _                                               => nftFromBlockchain
       }
     }
   }
 
   // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsCompose(at: AddressTransactions, fromDiffIter: Observable[(Height, Transaction, Set[Address])])(
-      address: Address,
-      types: Set[TransactionParser],
-      fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
+  def addressTransactionsCompose(
+      at: AddressTransactions,
+      fromDiffIter: Observable[(Height, Transaction, Set[Address])]
+  )(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
 
     def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
       fromId match {
@@ -148,12 +150,13 @@ package object state {
       case _                          => false
     }
 
-    def effectiveBalance(address: Address, confirmations: Int, block: BlockId = blockchain.lastBlockId.getOrElse(ByteStr.empty)): Long = {
-      val blockHeight = blockchain.heightOf(block).getOrElse(blockchain.height)
-      val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
-      if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
-    }
+    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long =
+      (for {
+        blockId     <- block.orElse(blockchain.lastBlockId)
+        blockHeight <- blockchain.heightOf(blockId)
+        bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
+        balances    = blockchain.balanceSnapshots(address, bottomLimit, blockId)
+      } yield balances.view.map(_.effectiveBalance).min).getOrElse(0L)
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
@@ -191,7 +194,7 @@ package object state {
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
 
-    def generatingBalance(account: Address, blockId: BlockId = ByteStr.empty): Long =
+    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
       GeneratingBalanceProvider.balance(blockchain, account, blockId)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
@@ -219,12 +222,10 @@ package object state {
   type AssetDistributionPage = AssetDistributionPage.Type
 
   implicit val dstPageWrites: Writes[AssetDistributionPage] = Writes { page =>
-    JsObject(
-      Map(
-        "hasNext"  -> JsBoolean(page.hasNext),
-        "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
-        "items"    -> Json.toJson(page.items)
-      )
+    Json.obj(
+      "hasNext"  -> JsBoolean(page.hasNext),
+      "lastItem" -> Json.toJson(page.lastItem.map(_.stringRepr)),
+      "items"    -> Json.toJson(page.items)
     )
   }
 

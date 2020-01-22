@@ -17,7 +17,7 @@ import com.spotify.docker.client.messages.EndpointConfig.EndpointIpamConfig
 import com.spotify.docker.client.messages._
 import com.spotify.docker.client.{DefaultDockerClient, DockerClient}
 import com.typesafe.config.ConfigFactory._
-import com.typesafe.config.{Config, ConfigRenderOptions}
+import com.typesafe.config.{Config, ConfigFactory, ConfigRenderOptions}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
@@ -54,7 +54,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       .setMaxRequestRetry(1)
       .setReadTimeout(10000)
       .setKeepAlive(false)
-      .setRequestTimeout(10000))
+      .setRequestTimeout(10000)
+  )
 
   private val client = DefaultDockerClient.fromEnv().build()
 
@@ -124,7 +125,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
                     .build()
                 )
                 .checkDuplicate(true)
-                .build())
+                .build()
+            )
             Option(r.warnings()).foreach(log.warn(_))
             attempt(rest - 1)
         }
@@ -141,24 +143,29 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
 
   def startNodes(nodeConfigs: Seq[Config]): Seq[DockerNode] = {
     log.trace(s"Starting ${nodeConfigs.size} containers")
-    val all = nodeConfigs.map(startNodeInternal)
+    val all = nodeConfigs.map(startNodeInternal(_))
     Await.result(
-      for {
-        _ <- Future.traverse(all)(_.waitForStartup())
-        _ <- Future.traverse(all)(connectToAll)
-      } yield (),
+      Future.traverse(all)(_.waitForStartup()),
       5.minutes
     )
     all
   }
 
   def startNode(nodeConfig: Config, autoConnect: Boolean = true): DockerNode = {
-    val node = startNodeInternal(nodeConfig)
-    Await.result(
-      node.waitForStartup().flatMap(_ => if (autoConnect) connectToAll(node) else Future.successful(())),
-      3.minutes
-    )
+    val node = startNodeInternal(nodeConfig, autoConnect)
+    Await.result(node.waitForStartup(), 3.minutes)
     node
+  }
+
+  private def peersFor(nodeName: String): Seq[InetSocketAddress] = {
+    nodes.asScala
+      .filterNot(_.name == nodeName)
+      .filterNot { node =>
+        // Exclude disconnected
+        client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
+      }
+      .map(_.containerNetworkAddress)
+      .toSeq
   }
 
   private def connectToAll(node: DockerNode): Future[Unit] = {
@@ -179,24 +186,29 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
       } yield ()
     }
 
-    val seedAddresses = nodes.asScala
-      .filterNot(_.name == node.name)
-      .filterNot { node =>
-        // Exclude disconnected
-        client.inspectContainer(node.containerId).networkSettings().networks().isEmpty
-      }
-      .map(_.containerNetworkAddress)
-
-    if (seedAddresses.isEmpty) Future.successful(())
+    val seedAddresses = peersFor(node.name)
+    if (seedAddresses.isEmpty)
+      Future.successful(())
     else
       Future
         .traverse(seedAddresses)(connectToOne)
         .map(_ => ())
   }
 
-  private def startNodeInternal(nodeConfig: Config): DockerNode =
+  private def startNodeInternal(nodeConfig: Config, autoConnect: Boolean = true): DockerNode =
     try {
-      val overrides = nodeConfig
+      val nodeName = nodeConfig.getString("waves.network.node-name")
+      val peersOverrides = if (autoConnect) {
+        import scala.collection.JavaConverters._
+        val otherAddrs = peersFor(nodeName)
+
+        ConfigFactory
+          .parseMap(Map("known-peers" -> otherAddrs.map(addr => s"${addr.getHostString}:${addr.getPort}").asJava).asJava)
+          .atPath("waves.network")
+      } else ConfigFactory.empty()
+
+      val overrides = peersOverrides
+        .withFallback(nodeConfig)
         .withFallback(suiteConfig)
         .withFallback(genesisOverride)
 
@@ -212,7 +224,6 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .publishAllPorts(true)
         .build()
 
-      val nodeName   = actualConfig.getString("waves.network.node-name")
       val nodeNumber = nodeName.replace("node", "").toInt
       val ip         = ipForNode(nodeNumber)
 
@@ -244,7 +255,8 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
         .build()
 
       val containerId = {
-        val containerName = s"${wavesNetwork.name()}-$nodeName"
+        val jenkinsJobIdFromEnv = sys.env.get("JENKINS_JOB_ID").fold("")(s => s"-$s")
+        val containerName = s"${wavesNetwork.name()}-$nodeName$jenkinsJobIdFromEnv"
         dumpContainers(
           client.listContainers(DockerClient.ListContainersParam.filter("name", containerName)),
           "Containers with same name"

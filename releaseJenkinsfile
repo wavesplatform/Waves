@@ -1,0 +1,191 @@
+#!/usr/bin/env groovy
+import groovy.json.JsonOutput
+import devops.waves.*
+@Library('jenkins-shared-lib')
+
+ut = new utils()
+scripts = new scripts()
+def artifactsDir="out"
+def networks
+def artifacts
+def shaSumField = "## SHA256 Checksums\n```\n"
+def user = "wavesplatform"
+def repo = "Waves"
+def repoUrl = "https://github.com/${user}/${repo}"
+def dockerImageName = "wavesplatform/wavesnode"
+def dockerImage
+def wavesVersion
+def useNodeSbtCache = false
+def dockerRegistryCreds = 'dockerhub-wavesnode-creds'
+def dockerRegistryAddress = 'https://index.docker.io/v1/'
+
+properties([
+
+    ut.buildDiscarderPropertyObject('14', '30'),
+
+    parameters([
+        ut.stringParameterDefinitionObject('tag','v0.0.0'),
+        ut.gitParameterDefinitionObject('branch', 'origin/(version-.*)', 'ASCENDING_SMART', 'NONE', repoUrl),
+        ut.extendedChoiceParameterDefinitionObject("network", "mainnet,testnet,stagenet", "mainnet", 0, "" ),
+        ut.cascadeChoiceParameterObject('dockerTags', "return ['latest:selected', binding.variables.get('tag').replace('v', '')+':selected' ]", 'tag','PARAMETER_TYPE_CHECK_BOX'),
+        ut.extendedChoiceParameterDefinitionObject('useNodeSbtCache', "yes", "yes", 0, "")
+    ])
+])
+
+stage('Build information'){
+    if (! params.tag || params.branch.contains('No values in a list') || ! params.network )
+    {
+        echo "Aborting this build. Please run it again with the required parameters specified"
+        currentBuild.result = Constants.PIPELINE_ABORTED
+        return
+    }
+    else
+    {
+        networks = network.split(',').collect{it.toLowerCase()}
+        echo "Parameters are specified:" + params
+        if (params.useNodeSbtCache == "yes"){
+            useNodeSbtCache = true
+        }
+    }
+}
+
+if (currentBuild.result == Constants.PIPELINE_ABORTED){
+    return
+}
+
+node('vostok'){
+    currentBuild.result = Constants.PIPELINE_SUCCESS
+
+    timestamps {
+        wrap([$class: 'AnsiColorBuildWrapper', 'colorMapName': 'XTerm']) {
+            try {
+
+                currentBuild.displayName = "#${env.BUILD_NUMBER} - ${branch} - release ${tag}"
+
+                stage('Checkout') {
+                    sh 'env'
+                    step([$class: 'WsCleanup'])
+                    ut.checkout(branch, repoUrl)
+                    sh "mkdir -p ${artifactsDir}/all"
+                }
+
+                stage ('Build artifacts'){
+                    dir ('docker'){
+                        wavesVersion = tag.replace('v','')
+                        def specifiedNetworks = networks.join(" ")
+                        if (useNodeSbtCache){
+                            def text = readFile "Dockerfile"
+                            sh """
+                                cp -R  ${env.HOME}/.ivy2 ./.ivy2
+                                cp -R  ${env.HOME}/.sbt ./.sbt
+                                mkdir -p ./.ivy2 ./.sbt
+                            """
+                            replacement="as builder\nCOPY ./.ivy2 /root/.ivy2\nCOPY ./.sbt /root/.sbt"
+                            writeFile file: "Dockerfile", text: text.replace('as builder', replacement).replace('sbt "node/assembly"','true')
+                        }
+                        def dockerImageBuilder = imageIt(
+                            dockerRegistryAddress: dockerRegistryAddress,
+                            dockerRegistryCreds: dockerRegistryCreds,
+                            imageName: 'wavesbuilder',
+                            dockerTag: wavesVersion,
+                            args: "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch} --target builder --no-cache",
+                            skipPush: true
+                        )
+                        dockerImage = imageIt(
+                            dockerRegistryAddress: dockerRegistryAddress,
+                            dockerRegistryCreds: dockerRegistryCreds,
+                            imageName: dockerImageName,
+                            dockerTag: wavesVersion,
+                            args: "--build-arg WAVES_VERSION=${wavesVersion} --build-arg 'DEB_PACKAGE_NETWORKS=${specifiedNetworks}' --build-arg BRANCH=${branch}",
+                            skipPush: true
+                        )
+                        sh  """
+                                id=\$(docker create wavesbuilder:${wavesVersion})
+                                docker cp \${id}:/out "${env.WORKSPACE}"
+                                docker rm -v \${id}
+                            """
+                        networks.each {
+                            def networkIdentifier = (it == 'mainnet') ? '' : '-' + it
+                            sh """
+                                mv "${env.WORKSPACE}/${artifactsDir}/${it}"/*.jar "${env.WORKSPACE}/${artifactsDir}/all/"
+                                mv "${env.WORKSPACE}/${artifactsDir}/${it}"/*.tgz "${env.WORKSPACE}/${artifactsDir}/all/"
+                                cp "${env.WORKSPACE}/${artifactsDir}/${it}"/*.deb "${env.WORKSPACE}/${artifactsDir}/all/"
+                                """
+                        }
+                    }
+
+                    dir (artifactsDir + '/all'){
+                        artifacts = findFiles(glob: '**/*')
+                        artifacts.each{
+                            shaSumField += ut.shWithOutput("shasum -a 256 ${it.name}") + "\n"
+                        }
+                    }
+                }
+
+                stage ('Create a release'){
+                    withCredentials([string(credentialsId: 'waves-release-github-token', variable: 'token')]) {
+                        dir (artifactsDir + '/all'){
+                            def createReleaseBody = [
+                                tag_name: "${tag}",
+                                target_commitish: "${branch}",
+                                name: "Version ${tag.replace('v','')} (${networks.collect{ it.capitalize() }.join(" + ")})",
+                                body: "# In this release\n${shaSumField}```",
+                                draft: true,
+                                prerelease: false]
+                            def createReleaseBodyJson = JsonOutput.toJson(createReleaseBody)
+                            def createReleaseUrl = "https://api.github.com/repos/${user}/${repo}/releases"
+                            def id = ut.shWithOutput "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: application/json' -d '${createReleaseBodyJson}' ${createReleaseUrl} | grep -m 1 'id.:' | tr -cd '[0-9]='"
+
+                            artifacts.each{
+                                def contentType = (it.name.contains('tgz')) ? "application/gzip" : "application/octet-stream"
+                                def uploadAssetsUrl = "https://uploads.github.com/repos/${user}/${repo}/releases/${id}/assets?name=${it.name}"
+                                sh "curl -s -H 'Authorization:token ${token}' -X 'POST' -H 'Content-Type: ${contentType}' --data-binary @${it.name} ${uploadAssetsUrl}"
+                            }
+                        }
+                    }
+                }
+
+                withCredentials([sshUserPrivateKey(credentialsId: Constants.DEPLOYBOT_CREDS_ID, keyFileVariable: 'identity', passphraseVariable: '', usernameVariable: 'userName')]) {
+                    def remote = [:]
+                    remote.host = Constants.APT_REPO_CONTROLLER_SERVER
+                    remote.name = Constants.APT_REPO_CONTROLLER_SERVER
+                    remote.user = userName
+                    remote.identityFile = identity
+                    remote.allowAnyHosts = true
+                    stage ('Updating APT repo'){
+                        networks.each {
+                            ut.remotePut(remote, "${artifactsDir}/${it}", Constants.APT_PUBLISH_DIR)
+                        }
+                        ut.remoteExec (remote, "${Constants.APT_PUBLISH_DIR}/publish.sh")
+                    }
+                }
+
+                stage ('Pushing docker image'){
+                    docker.withRegistry(dockerRegistryAddress, dockerRegistryCreds) {
+                        if (dockerTags.contains(wavesVersion)){
+                            dockerImage.push()
+                        }
+                        if (dockerTags.contains('latest')){
+                            dockerImage.push("latest")
+                        }
+                    }
+                }
+            }
+            catch (err) {
+                currentBuild.result = Constants.PIPELINE_FAILURE
+                println("ERROR caught")
+                println(err)
+                println(err.getMessage())
+                println(err.getStackTrace())
+                println(err.getCause())
+                println(err.getLocalizedMessage())
+                println(err.toString())
+            }
+            finally{
+                sh "tar -czvf artifacts.tar.gz -C ${artifactsDir} ."
+                archiveArtifacts artifacts: 'artifacts.tar.gz'
+                slackIt(buildStatus:currentBuild.result)
+            }
+        }
+    }
+}

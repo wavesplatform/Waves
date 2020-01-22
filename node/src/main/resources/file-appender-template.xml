@@ -1,0 +1,21 @@
+<included>
+    <appender name="${appender.name}" class="ch.qos.logback.core.rolling.RollingFileAppender">
+        <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
+            <level>${appender.level:-DEBUG}</level>
+        </filter>
+        <file>${logback.file.final-directory}/${appender.file}.log</file>
+        <rollingPolicy class="ch.qos.logback.core.rolling.SizeAndTimeBasedRollingPolicy">
+            <!-- daily rollover -->
+            <fileNamePattern>${logback.file.final-directory}/${appender.file}.%d{yyyy-MM-dd}.%i.log.gz</fileNamePattern>
+
+            <!-- keep 30 days' worth of history capped at 5GB total size -->
+            <maxHistory>30</maxHistory>
+            <maxFileSize>500MB</maxFileSize>
+            <totalSizeCap>1GB</totalSizeCap>
+        </rollingPolicy>
+
+        <encoder>
+            <pattern>${appender.pattern:-${default.pattern}}</pattern>
+        </encoder>
+    </appender>
+</included>

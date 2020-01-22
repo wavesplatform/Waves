@@ -233,11 +233,23 @@ class AddressRouteSpec
     Get(routePath(s"/scriptInfo/${allAddresses(3)}/meta")) ~> route ~> check {
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(3)
+      (response \ "meta" \ "version").as[String] shouldBe "1"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ "a").as[String] shouldBe "Int"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ "b").as[String] shouldBe "ByteVector"
       (response \ "meta" \ "callableFuncTypes" \ "call1" \ "c").as[String] shouldBe "ByteVector|Int"
       (response \ "meta" \ "callableFuncTypes" \ "call2" \ "d").as[String] shouldBe "String"
       (response \ "meta" \ "callableFuncTypes" \ "call3").as[JsObject] shouldBe JsObject(Seq())
+    }
+
+    val contractWithoutMeta = contractWithMeta.copy(meta = DAppMeta())
+    (blockchain.accountScript _)
+      .when(allAccounts(4).toAddress)
+      .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithoutMeta).explicitGet()))
+
+    Get(routePath(s"/scriptInfo/${allAddresses(4)}/meta")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      (response \ "address").as[String] shouldBe allAddresses(4)
+      (response \ "meta" \ "version").as[String] shouldBe "0"
     }
   }
 

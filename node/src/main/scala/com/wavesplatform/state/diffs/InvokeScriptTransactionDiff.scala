@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
@@ -17,6 +18,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResult}
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{DataItem, Recipient}
 import com.wavesplatform.metrics._
@@ -73,18 +75,18 @@ object InvokeScriptTransactionDiff {
               tx.feeAssetId.compatId
             )
             val result = for {
-              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem]))
-              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem]))
+              invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
+              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(
                     Seq(
-                      PureContext.build(Global, V3),
-                      CryptoContext.build(Global, V3),
-                      WavesContext.build(directives, environment)
+                      PureContext.build(Global, V3).withEnvironment[Environment],
+                      CryptoContext.build(Global, V3).withEnvironment[Environment],
+                      WavesContext.build(directives)
                     )
                   )
-                  .evaluationContext,
+                  .evaluationContext(environment),
                 contract,
                 invocation
               )
@@ -95,9 +97,9 @@ object InvokeScriptTransactionDiff {
         for {
           scriptResult <- TracedResult(
             scriptResultE,
-            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1)))
+            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functioncall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
           )
-          (ScriptResult(ds, ps), invocationComplexity) = scriptResult
+          ((ScriptResult(ds, ps), log), invocationComplexity) = scriptResult
 
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
 
@@ -160,13 +162,14 @@ object InvokeScriptTransactionDiff {
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) 1 else 0)
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            val txName   = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               (),
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for $txName with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES.")
             )
           }
           scriptsInvoked <- TracedResult {
@@ -176,12 +179,14 @@ object InvokeScriptTransactionDiff {
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
                 (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
-            val minWaves = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
+            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
-              GenericError(s"Fee in ${tx.assetFee._1
-                .fold("WAVES")(_.toString)} for ${tx.builder.classTag} with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES: ${tx.assetFee._2}")
+              GenericError(s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES.")
             )
           }
 

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 
 import java.nio.charset.StandardCharsets
 
+import cats.Id
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -14,15 +15,20 @@ import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1
 import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, Testing}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
+import com.wavesplatform.state.diffs.smart.predef.chainId
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransactionV2
+import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
+import com.wavesplatform.utils.EmptyBlockchain
 import com.wavesplatform.{NoShrink, TransactionGen}
+import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -114,13 +120,15 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
        accountBDataTransaction,
        transferFromAToB)
 
-  def dummyEvalContext(version: StdLibVersion): EvaluationContext =
-    lazyContexts(DirectiveSet(V1, Asset, Expression).explicitGet())().evaluationContext
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null))
+
+  def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] =
+    lazyContexts(DirectiveSet(V1, Asset, Expression).explicitGet())().evaluationContext(environment)
 
   private def eval(code: String) = {
     val untyped = Parser.parseExpr(code).get.value
     val typed   = ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untyped).map(_._1)
-    typed.flatMap(EvaluatorV1[EVALUATED](dummyEvalContext(V1), _))
+    typed.flatMap(EvaluatorV1().apply[EVALUATED](dummyEvalContext(V1), _))
   }
 
   property("Script toBase58String") {

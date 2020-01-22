@@ -26,9 +26,9 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.{FatalDBError, ScorexLogging}
+import com.wavesplatform.utils.ScorexLogging
 import monix.reactive.Observer
-import org.iq80.leveldb.{DB, DBException, ReadOptions, Snapshot}
+import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
 
 import scala.annotation.tailrec
 import scala.collection.mutable.{ArrayBuffer, ListBuffer}
@@ -50,6 +50,11 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
     val (c1, c2) = v.dropWhile(_ > to).partition(_ > from)
     c1 :+ c2.headOption.getOrElse(1)
   }
+
+  private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
+    v.takeWhile(_ <= h).lastOption // Should we use binary search?
+  }
+
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -88,27 +93,14 @@ class LevelDBWriter(
   private[this] val balanceSnapshotMaxRollbackDepth: Int = dbSettings.maxRollbackDepth + 1000
   import LevelDBWriter._
 
-  @inline
-  private[this] def withNodeStopOnError[A](f: => A): A = {
-    try f
-    catch {
-      case e: DBException =>
-        val message = "Fatal DB error, force stopping node"
-        log.error(message, e)
-        com.wavesplatform.utils.forceStopApplication(FatalDBError)
-        throw new RuntimeException(message, e)
-    }
-  }
+  private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private[database] def readOnly[A](f: ReadOnlyDB => A): A =
-    withNodeStopOnError(writableDB.readOnly(f))
-
-  private[database] def readOnlyNoClose[A](f: (Snapshot, ReadOnlyDB) => A): A = withNodeStopOnError {
+  private[database] def readOnlyNoClose[A](f: (Snapshot, ReadOnlyDB) => A): A = {
     val snapshot = writableDB.getSnapshot
     f(snapshot, new ReadOnlyDB(writableDB, new ReadOptions().snapshot(snapshot)))
   }
 
-  private[this] def readWrite[A](f: RW => A): A = withNodeStopOnError(writableDB.readWrite(f))
+  private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
 
   override protected def loadMaxAddressId(): BigInt = readOnly(db => db.get(Keys.lastAddressId).getOrElse(BigInt(0)))
 
@@ -713,6 +705,23 @@ class LevelDBWriter(
     .maximumSize(100000)
     .recordStats()
     .build[(Int, BigInt), LeaseBalance]()
+
+  override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = readOnly { db =>
+    db.get(Keys.addressId(address)).flatMap { addressId =>
+      assetId match {
+        case Waves =>
+            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+              (wh, b)
+            }
+        case asset @ IssuedAsset(_) =>
+            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+              (wh, b)
+            }
+      }
+    }
+  }
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = readOnly { db =>
     db.get(Keys.addressId(address)).fold(Seq(BalanceSnapshot(1, 0, 0, 0))) { addressId =>

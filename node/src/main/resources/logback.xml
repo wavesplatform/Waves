@@ -3,29 +3,30 @@
     <property name="default.pattern" value="%date %-5level [%.25thread] %logger{26} - %msg%n"/>
     <property name="logback.file.final-directory" value="${logback.file.directory:-${waves.directory}/log}"/>
 
+    <logger name="io.grpc.netty" level="ERROR"/>
     <logger name="io.netty" level="INFO"/>
     <logger name="io.swagger" level="INFO"/>
 
-    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
-    <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
-
-    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
-
+    <logger name="kamon.influxdb.InfluxDBReporter" level="INFO"/>
     <logger name="org.apache.kafka" level="INFO"/>
     <logger name="org.apache.kafka.common.network.Selector" level="DEBUG"/> <!-- https://issues.apache.org/jira/browse/KAFKA-5133 -->
-
     <logger name="org.aspectj" level="INFO"/>
     <logger name="org.asynchttpclient" level="INFO"/>
 
     <logger name="sun.rmi" level="INFO"/>
     <logger name="javax.management" level="INFO"/>
 
-    <logger name="io.grpc.netty" level="ERROR"/>
+    <logger name="com.wavesplatform.utx.UtxPoolImpl.trace" level="OFF"/>
+    <logger name="com.wavesplatform.network.PeerSynchronizer" level="DEBUG"/>
+    <logger name="com.wavesplatform.transaction.smart" level="INFO"/>
+
+    <logger name="scorex.crypto.signatures.Curve25519" level="INFO"/>
 
     <root level="TRACE"/>
 
     <property name="logback.file.enabled" value="true"/>
     <property name="logback.stdout.enabled" value="true"/>
+    <property name="logback.utx-trace.enabled" value="false"/>
 
     <include optional="true" file="${waves.config.directory:-.}/logback.xml"/>
 
@@ -48,28 +49,29 @@
 
     <if condition='property("logback.file.enabled").contains("true")'>
         <then>
-            <appender name="FILE" class="ch.qos.logback.core.rolling.RollingFileAppender">
-                <filter class="ch.qos.logback.classic.filter.ThresholdFilter">
-                    <level>${logback.file.level:-DEBUG}</level>
-                </filter>
-                <file>${logback.file.final-directory}/waves.log</file>
-                <rollingPolicy class="ch.qos.logback.core.rolling.TimeBasedRollingPolicy">
-                    <!-- daily rollover -->
-                    <fileNamePattern>${logback.file.final-directory}/waves.%d{yyyy-MM-dd}.log.gz</fileNamePattern>
+            <property name="appender.name" value="FILE"/>
+            <property name="appender.file" value="waves"/>
+            <property name="appender.level" value="${logback.file.level}"/>
 
-                    <!-- keep 30 days' worth of history capped at 1GB total size -->
-                    <maxHistory>30</maxHistory>
-                    <totalSizeCap>1GB</totalSizeCap>
-                </rollingPolicy>
-
-                <encoder>
-                    <pattern>${default.pattern}</pattern>
-                </encoder>
-            </appender>
+            <include resource="file-appender-template.xml"/>
 
             <root>
                 <appender-ref ref="FILE"/>
             </root>
+        </then>
+    </if>
+
+    <if condition='property("logback.utx-trace.enabled").contains("true")'>
+        <then>
+            <property name="appender.name" value="UTX-TRACE"/>
+            <property name="appender.file" value="utx-trace"/>
+            <property name="appender.level" value="TRACE"/>
+
+            <include resource="file-appender-template.xml"/>
+
+            <logger name="com.wavesplatform.utx.UtxPoolImpl.trace" additivity="false" level="TRACE">
+                <appender-ref ref="UTX-TRACE"/>
+            </logger>
         </then>
     </if>
 </configuration>

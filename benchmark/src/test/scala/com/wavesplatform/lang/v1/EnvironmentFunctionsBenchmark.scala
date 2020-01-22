@@ -2,6 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
+import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark._
@@ -77,7 +78,7 @@ object EnvironmentFunctionsBenchmark {
   val DataBytesLength   = 512
   val SeedBytesLength   = 128
 
-  private val defaultEnvironment: Environment = new Environment {
+  private val defaultEnvironment: Environment[Id] = new Environment[Id] {
     override def height: Long                                                                                    = 1
     override def chainId: Byte                                                                                   = ChainId
     override def inputEntity: Environment.InputEntity                                                            = ???

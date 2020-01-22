@@ -13,9 +13,10 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.EXPR
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.TypedScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, FunctionHeader}
 import com.wavesplatform.lang.{Global, utils}
-import com.wavesplatform.state.diffs.smart.predef.scriptWithAllV1Functions
+import com.wavesplatform.state.diffs.smart.predef.{chainId, scriptWithAllV1Functions}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.WavesEnvironment
@@ -28,20 +29,24 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scorex.crypto.encode.Base64
 
 class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with PropertyChecks with Matchers with TypedScriptGen {
+  private val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null))
 
-  private def estimate(expr: Terms.EXPR, ctx: CTX, funcCosts: Map[FunctionHeader, Coeval[Long]]): Either[String, Long] =
-    estimator(ctx.evaluationContext.letDefs.keySet, funcCosts, expr)
+  private def estimate(
+    expr: Terms.EXPR,
+    ctx: CTX[Environment],
+    funcCosts: Map[FunctionHeader, Coeval[Long]]
+  ): Either[String, Long] =
+    estimator(ctx.evaluationContext(environment).letDefs.keySet, funcCosts, expr)
 
   private val ctxV1 = {
     utils.functionCosts(V1)
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V1),
-          CryptoContext.build(Global, V1),
+          PureContext.build(Global, V1).withEnvironment[Environment],
+          CryptoContext.build(Global, V1).withEnvironment[Environment],
           WavesContext.build(
-            DirectiveSet(V1, Account, Expression).explicitGet(),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???)),
+            DirectiveSet(V1, Account, Expression).explicitGet()
           )
         ))
   }
@@ -51,11 +56,10 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V2),
-          CryptoContext.build(Global, V2),
+          PureContext.build(Global, V2).withEnvironment[Environment],
+          CryptoContext.build(Global, V2).withEnvironment[Environment],
           WavesContext.build(
-            DirectiveSet(V2, Account, Expression).explicitGet(),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+            DirectiveSet(V2, Account, Expression).explicitGet()
           )
         ))
   }
@@ -65,11 +69,10 @@ class FunctionComplexityTest(estimator: ScriptEstimator) extends PropSpec with P
     Monoid
       .combineAll(
         Seq(
-          PureContext.build(Global, V3),
-          CryptoContext.build(Global, V3),
+          PureContext.build(Global, V3).withEnvironment[Environment],
+          CryptoContext.build(Global, V3).withEnvironment[Environment],
           WavesContext.build(
-            DirectiveSet(V3, Account, Expression).explicitGet(),
-            new WavesEnvironment('T'.toByte, Coeval(???), Coeval(???), EmptyBlockchain, Coeval(???))
+            DirectiveSet(V3, Account, Expression).explicitGet()
           )
         ))
   }

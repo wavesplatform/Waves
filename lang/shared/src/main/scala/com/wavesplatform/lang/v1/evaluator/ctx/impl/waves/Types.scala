@@ -5,9 +5,9 @@ import com.wavesplatform.lang.v1.compiler.Types._
 
 object Types {
 
-  val addressType        = CASETYPEREF("Address", List("bytes" -> BYTESTR))
-  val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
-  val addressOrAliasType = UNION(addressType, aliasType)
+  lazy val addressType        = CASETYPEREF("Address", List("bytes" -> BYTESTR))
+  lazy val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
+  lazy val addressOrAliasType = UNION(addressType, aliasType)
 
   val assetType = CASETYPEREF(
     "Asset",
@@ -45,6 +45,11 @@ object Types {
 
   val optionPayment = UNION(paymentType, UNIT)
 
+  lazy val verifierInput = UNION.create(
+    buildOrderType(true) :: buildActiveTransactionTypes(true, V3),
+    Some("VerifierInput")
+  )
+
   val invocationType =
     CASETYPEREF(
       "Invocation",
@@ -58,13 +63,52 @@ object Types {
       )
     )
 
+  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
+
+  val dataEntryType = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
+
+  val writeSetType =
+    CASETYPEREF(
+      FieldNames.WriteSet,
+      List(FieldNames.Data -> LIST(dataEntryType))
+    )
+
+  private val scriptTransfer =
+    CASETYPEREF(
+      FieldNames.ScriptTransfer,
+      List("recipient" -> addressOrAliasType, "amount" -> LONG, "asset" -> optionByteVector)
+    )
+
+  val scriptTransferSetType =
+    CASETYPEREF(
+      FieldNames.TransferSet,
+      List(FieldNames.Transfers -> LIST(scriptTransfer))
+    )
+
+  val scriptResultType =
+    CASETYPEREF(
+      FieldNames.ScriptResult,
+      List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType)
+    )
+
+  val dAppTypes = List(
+    writeSetType,
+    paymentType,
+    scriptTransfer,
+    scriptTransferSetType,
+    scriptResultType,
+    invocationType,
+    assetType,
+    blockInfo
+  )
+
   private val header = List(
     "id"        -> BYTESTR,
     "fee"       -> LONG,
     "timestamp" -> LONG,
     "version"   -> LONG,
   )
-  private val proven = List(
+  private lazy val proven = List(
     "sender"          -> addressType,
     "senderPublicKey" -> BYTESTR,
     "bodyBytes"       -> BYTESTR
@@ -76,6 +120,14 @@ object Types {
     "GenesisTransaction",
     List("amount" -> LONG, "recipient" -> addressOrAliasType) ++ header
   )
+
+  def anyTransactionType(proofsEnabled: Boolean, version: StdLibVersion): UNION =
+    UNION(
+      buildObsoleteTransactionTypes(proofsEnabled) ++ buildActiveTransactionTypes(proofsEnabled, version)
+    )
+
+  def txByIdReturnType(proofsEnabled: Boolean, version: StdLibVersion): UNION =
+    UNION.create(UNIT +: anyTransactionType(proofsEnabled, version).typeList)
 
   def buildTransferTransactionType(proofsEnabled: Boolean) = {
     CASETYPEREF(
@@ -258,8 +310,6 @@ object Types {
     )
   )
 
-  private val dataEntryValueType = UNION(LONG, BOOLEAN, BYTESTR, STRING)
-  val dataEntryType              = CASETYPEREF("DataEntry", List("key" -> STRING, "value" -> dataEntryValueType))
 
   def buildDataTransactionType(proofsEnabled: Boolean) = CASETYPEREF(
     "DataTransaction",
@@ -319,7 +369,6 @@ object Types {
   }
 
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[FINAL] = {
-
     val activeTxTypes                       = buildActiveTransactionTypes(proofsEnabled, v)
     val obsoleteTxTypes                     = buildObsoleteTransactionTypes(proofsEnabled)
     val transactionsCommonType              = UNION.create(activeTxTypes, Some("Transaction"))

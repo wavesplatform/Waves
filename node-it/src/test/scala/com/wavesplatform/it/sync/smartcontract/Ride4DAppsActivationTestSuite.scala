@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -24,20 +24,32 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   private val smartAcc  = pkByAddress(firstAddress)
   private val callerAcc = pkByAddress(secondAddress)
 
-  private val scriptV3 = ScriptCompiler.compile("""
-                                            |{-# STDLIB_VERSION 3 #-}
-                                            |{-# CONTENT_TYPE DAPP #-}
-                                            |
-                                            |@Callable(i)
-                                            |func doAction() = { WriteSet([DataEntry("0", true)]) }
-                                            |
-                                            |@Verifier(i)
-                                            |func verify() = { true }
-                                          """.stripMargin, estimator).explicitGet()._1.bytes().base64
-  private val scriptV2 = ScriptCompiler.compile("""
-                                          |func isTrue() = true
-                                          |isTrue()
-                                        """.stripMargin, estimator).explicitGet()._1.bytes().base64
+  private val scriptV3 = ScriptCompiler
+    .compile(
+      """{-# STDLIB_VERSION 3 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        |@Callable(i)
+        |func doAction() = { WriteSet([DataEntry("0", true)]) }
+        |
+        |@Verifier(i)
+        |func verify() = { true }""".stripMargin,
+      estimator
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
+  private val scriptV2 = ScriptCompiler
+    .compile(
+      """func isTrue() = true
+        |isTrue()""".stripMargin,
+      estimator
+    )
+    .explicitGet()
+    ._1
+    .bytes()
+    .base64
 
   test("send waves to accounts") {
     sender
@@ -64,8 +76,10 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can't set contract to account before Ride4DApps activation") {
-    assertBadRequestAndMessage(sender.setScript(smartAcc.stringRepr, Some(scriptV3), setScriptFee + smartFee),
-                               "RIDE 4 DAPPS feature has not been activated yet")
+    assertBadRequestAndMessage(
+      sender.setScript(smartAcc.stringRepr, Some(scriptV3), setScriptFee + smartFee),
+      "RIDE 4 DAPPS feature has not been activated yet"
+    )
   }
 
   test("can't set script with user function to account before Ride4DApps activation") {
@@ -101,7 +115,7 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
         Asset.IssuedAsset("Test".getBytes("UTF-8")).id.base58,
         smartAcc.stringRepr,
         issueFee,
-        Some(scriptV2),
+        Some(scriptV2)
       ),
       "RIDE 4 DAPPS feature has not been activated yet"
     )
@@ -139,9 +153,10 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
   }
 
   test("can set contract and invoke script after Ride4DApps activation") {
-  sender.setScript(smartAcc.stringRepr, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc.stringRepr, Some(scriptV3), setScriptFee + smartFee, waitForTx = true).id
 
-    sender.invokeScript(
+    sender
+      .invokeScript(
         callerAcc.stringRepr,
         smartAcc.stringRepr,
         Some("doAction"),
@@ -150,7 +165,9 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
         smartMinFee,
         None,
         waitForTx = true
-      ).id
+      )
+      ._1
+      .id
 
     sender.setScript(smartAcc.stringRepr, Some(scriptV2), setScriptFee + smartFee, waitForTx = true).id
   }
@@ -161,12 +178,20 @@ class Ride4DAppsActivationTestSuite extends BaseTransactionSuite with CancelAfte
 }
 
 object Ride4DAppsActivationTestSuite {
-  val activationHeight = 35
+  val activationHeight = 15
 
-  private val configWithRide4DAppsFeature: Seq[Config] =
-    Default.map(ConfigFactory.parseString(s"""
-                                             | waves.blockchain.custom.functionality {
-                                             |   pre-activated-features.11 = ${activationHeight - 1}
-                                             |}""".stripMargin).withFallback(_))
+  val configWithRide4DAppsFeature = NodeConfigs.newBuilder
+    .withDefault(1)
+    .withSpecial(1, _.nonMiner)
+    .buildNonConflicting()
+    .map(
+      ConfigFactory
+        .parseString(
+          s"""waves.blockchain.custom.functionality {
+             |  pre-activated-features.11 = ${activationHeight - 1}
+             |}""".stripMargin
+        )
+        .withFallback(_)
+    )
 
 }

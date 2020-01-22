@@ -127,7 +127,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         )
         .explicitGet()
 
-    assertBadRequest(sender.signedBroadcast(txToSwapBC1.json()))
+    assertApiErrorRaised(sender.signedBroadcast(txToSwapBC1.json()))
   }
 
   test("step5 - Bob makes transfer; after revert Alice takes funds back") {

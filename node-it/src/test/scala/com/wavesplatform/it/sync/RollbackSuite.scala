@@ -4,7 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.it.{Node, NodeConfigs, ReportingTestName, TransferSending}
 import com.wavesplatform.lang.v2.estimator.ScriptEstimatorV2
 import com.wavesplatform.state.{BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -16,7 +16,14 @@ import scala.concurrent.Await
 import scala.concurrent.duration._
 import scala.util.Random
 
-class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSending with NodesFromDocker with Matchers with TableDrivenPropertyChecks {
+class RollbackSuite
+    extends FunSuite
+    with CancelAfterFailure
+    with TransferSending
+    with NodesFromDocker
+    with ReportingTestName
+    with Matchers
+    with TableDrivenPropertyChecks {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -120,14 +127,14 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     assert(data2 == List(entry3, entry2))
 
     nodes.rollback(tx1height, returnToUTX = false)
-    nodes.waitForSameBlockHeadesAt(tx1height)
+    nodes.waitForSameBlockHeadersAt(tx1height)
 
     val data1 = node.getData(firstAddress)
     assert(data1 == List(entry1))
     sender.transactionsByAddress(firstAddress, 10) should contain theSameElementsAs txsBefore1
 
     nodes.rollback(tx1height - 1, returnToUTX = false)
-    nodes.waitForSameBlockHeadesAt(tx1height - 1)
+    nodes.waitForSameBlockHeadersAt(tx1height - 1)
 
     val data0 = node.getData(firstAddress)
     assert(data0 == List.empty)
@@ -202,12 +209,12 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
     sender.connect(miner.networkAddress)
     miner.connect(sender.networkAddress)
 
-    nodes.waitForSameBlockHeadesAt(height)
+    nodes.waitForSameBlockHeadersAt(height)
 
     nodes.waitForHeightArise()
 
     assert(sender.findTransactionInfo(dtx).isDefined)
-    assert(sender.findTransactionInfo(tx).isEmpty)
+    assert(sender.findTransactionInfo(tx).isDefined)
 
   }
 
@@ -216,14 +223,15 @@ class RollbackSuite extends FunSuite with CancelAfterFailure with TransferSendin
       ("num", "name"),
       (1, "1 of N"),
       (nodes.size, "N of N")
-    )) { (num, name) =>
+    )
+  ) { (num, name) =>
     test(s"generate more blocks and resynchronise after rollback $name") {
       val baseHeight = nodes.map(_.height).max + 5
       nodes.waitForHeight(baseHeight)
       val rollbackNodes = Random.shuffle(nodes).take(num)
       rollbackNodes.foreach(_.rollback(baseHeight - 1))
       nodes.waitForHeightArise()
-      nodes.waitForSameBlockHeadesAt(baseHeight)
+      nodes.waitForSameBlockHeadersAt(baseHeight)
     }
   }
 }

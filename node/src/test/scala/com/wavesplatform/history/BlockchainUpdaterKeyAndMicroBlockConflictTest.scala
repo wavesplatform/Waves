@@ -50,7 +50,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0) > 0)
 
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, leaseBlock.uniqueId) > 0)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, Some(leaseBlock.uniqueId)) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
         }

@@ -1,0 +1,13 @@
+syntax = "proto3";
+package waves.api;
+option java_package = "com.wavesplatform.protobuf.api";
+option csharp_namespace = "Waves.Api";
+
+message DataRequest {
+    repeated string keys = 1;
+    string matches = 2;
+}
+
+message TransactionsByIdRequest {
+    repeated string ids = 1;
+}

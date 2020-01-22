@@ -20,14 +20,15 @@ import play.api.libs.json.{Format, JsObject, JsValue, Json}
 import scala.annotation.meta.field
 import scala.util.{Either, Try}
 
-case class MassTransferTransaction private (assetId: Asset,
-                                            sender: PublicKey,
-                                            transfers: List[ParsedTransfer],
-                                            timestamp: Long,
-                                            fee: Long,
-                                            attachment: Array[Byte],
-                                            proofs: Proofs)
-    extends ProvenTransaction
+case class MassTransferTransaction private (
+    assetId: Asset,
+    sender: PublicKey,
+    transfers: List[ParsedTransfer],
+    timestamp: Long,
+    fee: Long,
+    attachment: Array[Byte],
+    proofs: Proofs
+) extends ProvenTransaction
     with VersionedTransaction
     with FastHashId {
 
@@ -38,14 +39,13 @@ case class MassTransferTransaction private (assetId: Asset,
 
     val transferBytes = transfers
       .map { case ParsedTransfer(recipient, amount) => recipient.bytes.arr ++ Longs.toByteArray(amount) }
-      .fold(Array())(_ ++ _)
 
     Bytes.concat(
       Array(builder.typeId, version),
       sender,
       assetIdBytes,
       Shorts.toByteArray(transfers.size.toShort),
-      transferBytes,
+      Bytes.concat(transferBytes: _*),
       Longs.toByteArray(timestamp),
       Longs.toByteArray(fee),
       Deser.serializeArray(attachment)
@@ -74,11 +74,11 @@ case class MassTransferTransaction private (assetId: Asset,
     jsonBase() ++ Json.obj("transfers" -> toJson(transfers.filter(t => recipients.contains(t.address))))
 
   override def checkedAssets(): Seq[IssuedAsset] = assetId match {
-    case Waves => Seq()
+    case Waves          => Seq()
     case a: IssuedAsset => Seq(a)
   }
 
-  override def version: Byte               = MassTransferTransaction.version
+  override def version: Byte = MassTransferTransaction.version
 }
 
 object MassTransferTransaction extends TransactionParserFor[MassTransferTransaction] with TransactionParser.OneVersion {
@@ -90,7 +90,8 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
   @ApiModel
   case class Transfer(
       @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk", required = true) recipient: String,
-      @(ApiModelProperty @field)(dataType = "long", example = "3000000000", required = true) amount: Long)
+      @(ApiModelProperty @field)(dataType = "long", example = "3000000000", required = true) amount: Long
+  )
 
   case class ParsedTransfer(address: AddressOrAlias, amount: Long)
 
@@ -112,19 +113,21 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
               Left(InsufficientFee())
             } else {
               Right(tx)
-          }
+            }
         )
         .foldToTry
     }
   }
 
-  def create(assetId: Asset,
-             sender: PublicKey,
-             transfers: List[ParsedTransfer],
-             timestamp: Long,
-             feeAmount: Long,
-             attachment: Array[Byte],
-             proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(
+      assetId: Asset,
+      sender: PublicKey,
+      transfers: List[ParsedTransfer],
+      timestamp: Long,
+      feeAmount: Long,
+      attachment: Array[Byte],
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] = {
     Try {
       transfers.map(_.amount).fold(feeAmount)(Math.addExact)
     }.fold(
@@ -140,28 +143,32 @@ object MassTransferTransaction extends TransactionParserFor[MassTransferTransact
           Left(InsufficientFee())
         } else {
           Right(MassTransferTransaction(assetId, sender, transfers, timestamp, feeAmount, attachment, proofs))
-      }
+        }
     )
   }
 
-  def signed(assetId: Asset,
-             sender: PublicKey,
-             transfers: List[ParsedTransfer],
-             timestamp: Long,
-             feeAmount: Long,
-             attachment: Array[Byte],
-             signer: PrivateKey): Either[ValidationError, TransactionT] = {
+  def signed(
+      assetId: Asset,
+      sender: PublicKey,
+      transfers: List[ParsedTransfer],
+      timestamp: Long,
+      feeAmount: Long,
+      attachment: Array[Byte],
+      signer: PrivateKey
+  ): Either[ValidationError, TransactionT] = {
     create(assetId, sender, transfers, timestamp, feeAmount, attachment, Proofs.empty).right.map { unsigned =>
       unsigned.copy(proofs = Proofs.create(Seq(ByteStr(crypto.sign(signer, unsigned.bodyBytes())))).explicitGet())
     }
   }
 
-  def selfSigned(assetId: Asset,
-                 sender: KeyPair,
-                 transfers: List[ParsedTransfer],
-                 timestamp: Long,
-                 feeAmount: Long,
-                 attachment: Array[Byte]): Either[ValidationError, TransactionT] = {
+  def selfSigned(
+      assetId: Asset,
+      sender: KeyPair,
+      transfers: List[ParsedTransfer],
+      timestamp: Long,
+      feeAmount: Long,
+      attachment: Array[Byte]
+  ): Either[ValidationError, TransactionT] = {
     signed(assetId, sender, transfers, timestamp, feeAmount, attachment, sender)
   }
 

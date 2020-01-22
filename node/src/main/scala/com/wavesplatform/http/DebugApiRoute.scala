@@ -4,6 +4,7 @@ import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
 import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import cats.implicits._
 import cats.kernel.Monoid
@@ -11,14 +12,13 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
-import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
-import com.wavesplatform.network.{LocalScoreChanged, PeerDatabase, PeerInfo, _}
+import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.extensions.Distributions
@@ -31,7 +31,6 @@ import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
-import io.netty.channel.group.ChannelGroup
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.eval.{Coeval, Task}
@@ -53,15 +52,15 @@ case class DebugApiRoute(
     ng: NG,
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
-    rollbackTask: ByteStr => Task[Either[ValidationError, Seq[Block]]],
-    allChannels: ChannelGroup,
+    rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
     utxStorage: UtxPool,
     miner: Miner with MinerDebugInfo,
     historyReplier: HistoryReplier,
     extLoaderStateReporter: Coeval[RxExtensionLoader.State],
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
-    configRoot: ConfigObject
+    configRoot: ConfigObject,
+    loadBalanceHistory: Address => Seq[(Int, Long)]
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -75,7 +74,7 @@ case class DebugApiRoute(
 
   override val settings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    stateChanges ~ withAuth {
+    stateChanges ~ balanceHistory ~ withAuth {
       blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
     }
   }
@@ -159,11 +158,42 @@ case class DebugApiRoute(
     }
   }
 
+  @Path("/balances/history/{address}")
+  @ApiOperation(
+    value = "Waves balance history",
+    notes = "Waves balance history",
+    httpMethod = "GET"
+  )
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(
+        name = "address",
+        value = "An address to load waves balance history for",
+        required = true,
+        dataType = "string",
+        paramType = "path"
+      )
+    )
+  )
+  def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
+    complete(Json.toJson(loadBalanceHistory(address).map {
+      case (h, b) => Json.obj("height" -> h, "balance" -> b)
+    }))
+  }
+
+  private def wavesDistribution(height: Int): Route =
+    optionalHeaderValueByType[Accept](()) {
+      case Some(accept) if accept.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b.toString }))
+      case _ =>
+        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    }
+
   @Path("/state")
   @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET")
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
-    complete(dst.wavesDistribution(ng.height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    wavesDistribution(ng.height)
   }
 
   @Path("/stateWaves/{height}")
@@ -174,19 +204,14 @@ case class DebugApiRoute(
     )
   )
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+    wavesDistribution(height)
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
       implicit ec: ExecutionContext
   ): Future[Either[ValidationError, JsObject]] = {
-    rollbackTask(blockId).asyncBoundary
-      .map(_.map { blocks =>
-        allChannels.broadcast(LocalScoreChanged(ng.score))
-        if (returnTransactionsToUtx) blocks.view.flatMap(_.transactionData).foreach(utxStorage.putIfNew(_))
-        miner.scheduleMining()
-        Json.obj("BlockId" -> blockId.toString)
-      })
+    rollbackTask(blockId, returnTransactionsToUtx)
+      .map(_ => Right(Json.obj("BlockId" -> blockId.toString)))
       .runAsyncLogErr(Scheduler(ec))
   }
 
@@ -261,7 +286,7 @@ case class DebugApiRoute(
               ng.effectiveBalance(
                 address,
                 ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
-                ng.microblockIds.lastOption.getOrElse(ByteStr.empty)
+                ng.microblockIds.lastOption
               ),
               System.currentTimeMillis() + offset.toMillis
             )
@@ -352,6 +377,7 @@ case class DebugApiRoute(
             case _ =>
           }
         }
+        peerDatabase.blacklist(address, "Debug API request")
         complete(StatusCodes.OK)
       } catch {
         case NonFatal(_) => complete(StatusCodes.BadRequest)
@@ -379,7 +405,7 @@ case class DebugApiRoute(
       val response = Json.obj(
         "valid"          -> tracedDiff.resultE.isRight,
         "validationTime" -> timeSpent,
-        "trace"          -> tracedDiff.trace.map(_.toString)
+        "trace"          -> tracedDiff.trace.map(_.loggedJson.toString)
       )
       tracedDiff.resultE.fold(
         err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),

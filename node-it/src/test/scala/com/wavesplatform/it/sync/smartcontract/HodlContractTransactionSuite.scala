@@ -109,7 +109,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         fee = 1.waves,
         waitForTx = true
       )
-      .id
+      ._1.id
 
     sender.waitForTransaction(invokeScriptId)
 
@@ -145,7 +145,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
         fee = 1.waves,
         waitForTx = true
       )
-      .id
+      ._1.id
 
     val balanceAfter = sender.accountBalances(contract.stringRepr)._1
 

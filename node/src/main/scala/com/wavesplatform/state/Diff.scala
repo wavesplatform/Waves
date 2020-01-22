@@ -12,6 +12,8 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
 import play.api.libs.json._
 
+import scala.collection.mutable.LinkedHashMap
+
 case class LeaseBalance(in: Long, out: Long)
 
 object LeaseBalance {
@@ -123,7 +125,7 @@ object Sponsorship {
   }
 }
 
-case class Diff(transactions: Map[ByteStr, (Int, Transaction, Set[Address])],
+case class Diff(transactions: collection.Map[ByteStr, (Int, Transaction, Set[Address])],
                 portfolios: Map[Address, Portfolio],
                 issuedAssets: Map[IssuedAsset, AssetInfo],
                 aliases: Map[Alias, Address],
@@ -149,7 +151,7 @@ object Diff {
                sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
                scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
     Diff(
-      transactions = Map(),
+      transactions = LinkedHashMap(),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,
@@ -179,7 +181,8 @@ object Diff {
             scriptsComplexity: Long = 0,
             scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty): Diff =
     Diff(
-      transactions = Map((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet))),
+      // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
+      transactions = LinkedHashMap((tx.id(), (height, tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = assetInfos,
       aliases = aliases,
@@ -194,7 +197,7 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
-  val empty = new Diff(Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+  val empty = new Diff(LinkedHashMap(), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
 
   implicit val diffMonoid = new Monoid[Diff] {
     override def empty: Diff = Diff.empty
