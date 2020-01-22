@@ -1,6 +1,8 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
+import com.google.common.base.Utf8
+import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -13,31 +15,44 @@ import com.wavesplatform.transaction.assets._
 
 object AssetTransactionsDiff {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
+    def requireValidUtf(): Boolean = {
+      def isValid(str: ByteString): Boolean = {
+        val convertible = ByteString.copyFromUtf8(str.toStringUtf8) == str
+        val wellFormed  = Utf8.isWellFormed(str.toByteArray)
+        convertible && wellFormed
+      }
+      val activated = blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
+      !activated || (isValid(tx.name) && isValid(tx.description))
+    }
+
     val staticInfo = AssetStaticInfo(TransactionId @@ tx.id(), tx.sender, tx.decimals, blockchain.isNFT(tx))
     val volumeInfo = AssetVolumeInfo(tx.reissuable, BigInt(tx.quantity))
-    val info       = AssetInfo(tx.safeName, tx.safeDescription, Height @@ blockchain.height)
+    val info       = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
 
     val asset = IssuedAsset(tx.id())
 
-    DiffsCommon
-      .countScriptComplexity(tx.script, blockchain)
-      .map(
-        script =>
-          Diff(
-            tx = tx,
-            portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
-            issuedAssets = Map(asset             -> ((staticInfo, info, volumeInfo))),
-            assetScripts = Map(asset             -> script.map(script => (tx.sender, script._1, script._2))),
-            scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
-          )
-      )
+    for {
+      _ <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
+      result <- DiffsCommon
+        .countVerifierComplexity(tx.script, blockchain)
+        .map(
+          script =>
+            Diff(
+              tx = tx,
+              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
+              issuedAssets = Map(asset             -> ((staticInfo, info, volumeInfo))),
+              assetScripts = Map(asset             -> script.map(script => (tx.sender, script._1, script._2))),
+              scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
+            )
+        )
+    } yield result
   }
 
   def setAssetScript(blockchain: Blockchain, blockTime: Long)(tx: SetAssetScriptTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
         DiffsCommon
-          .countScriptComplexity(tx.script, blockchain)
+          .countVerifierComplexity(tx.script, blockchain)
           .map(
             script =>
               Diff(
@@ -114,7 +129,7 @@ object AssetTransactionsDiff {
           GenericError(s"Can't update info of asset with id=${tx.assetId.id} before $updateAllowedAt block, " +
                        s"current height=${blockchain.height}, minUpdateInfoInterval=$minUpdateInfoInterval")
         )
-        updatedInfo = AssetInfo(Right(tx.name), Right(tx.description), Height @@ blockchain.height)
+        updatedInfo = AssetInfo(tx.name, tx.description, Height @@ blockchain.height)
       } yield Diff(
         tx = tx,
         portfolios = Map(tx.sender.toAddress -> portfolioUpdate),

@@ -1,18 +1,19 @@
 package com.wavesplatform.transaction.smart
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs.produce
 import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.Verifier.ValidationResult
-import com.wavesplatform.lang.script.v1.ExprScript
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.{NTPTime, TransactionGen}
@@ -64,7 +65,7 @@ class VerifierSpecification extends PropSpec with PropertyChecks with Matchers w
   }
 
   private def mkAssetDescription(assetId: ByteStr, matcherAccount: PublicKey, decimals: Int): Option[AssetDescription] =
-    Some(AssetDescription(assetId, matcherAccount, Right(""), Right(""), decimals, reissuable = false, BigInt(0), Height(0), None, 0, decimals == 0))
+    Some(AssetDescription(assetId, matcherAccount, ByteString.EMPTY, ByteString.EMPTY, decimals, reissuable = false, BigInt(0), Height(0), None, 0, decimals == 0))
 
   private val exchangeTransactionV2Gen: Gen[ExchangeTransaction] = for {
     sender1: KeyPair <- accountGen

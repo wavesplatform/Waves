@@ -6,7 +6,6 @@ import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.state.{AssetDescription, Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 
