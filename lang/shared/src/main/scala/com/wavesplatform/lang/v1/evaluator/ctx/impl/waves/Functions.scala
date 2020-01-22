@@ -486,9 +486,9 @@ object Functions {
               val name        = fields(FieldNames.IssueName).asInstanceOf[CONST_STRING].s
               val description = fields(FieldNames.IssueDescription).asInstanceOf[CONST_STRING].s
 
-              (if (description.length > MaxAssetDescriptionLength)
+              (if (description.getBytes("UTF-8").length > MaxAssetDescriptionLength)
                  Left(s"Description length should not exceed $MaxAssetDescriptionLength")
-               else if (name.length > MaxAssetNameLength)
+               else if (name.getBytes("UTF-8").length > MaxAssetNameLength)
                  Left(s"Name length should not exceed $MaxAssetNameLength")
                else
                  CONST_BYTESTR(Issue.calculateId(
