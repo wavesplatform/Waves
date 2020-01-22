@@ -7,7 +7,7 @@ import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.NodeConfigs
-import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
+import com.wavesplatform.it.NodeConfigs.{Default, Miners, NotMiner}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync._
@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -38,7 +39,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     assetId = sender.broadcastIssue(issuer, "asset", "description", someAssetAmount, 8, true, script = None, waitForTx = true).id
-    otherAssetId = sender.broadcastIssue(issuer, "otherasset", "otherdescription", someAssetAmount, 8, true, script = None, waitForTx = true).id
+    otherAssetId = sender.broadcastIssue(issuer, "otherAsset", "otherDescription", someAssetAmount, 8, true, script = None, waitForTx = true).id
     nftId = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
   }
 
