@@ -63,10 +63,33 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.assetsDetails(assetId).description shouldBe "updatedDescription"
 
     sender.balanceDetails(issuer.publicKey.stringRepr).available shouldBe issuerBalance.available - minFee
-
-    sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
 
+  test("able to update info of other asset after updating info of first asset") {
+    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee).id
+    checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
+    sender.waitForTransaction(updateAssetInfoTxId)
+    val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
+    checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.lastBlock.transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(
+      sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
+      "updatedName",
+      "updatedDescription"
+    )
+    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock.signature).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(
+      sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
+      "updatedName",
+      "updatedDescription"
+    )
+
+    checkUpdateAssetInfoTxInfo(sender.transactionsByAddress(issuer.publicKey.stringRepr, 1).head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTxInfo(sender.transactionInfo(updateAssetInfoTxId), "updatedName", "updatedDescription")
+
+    sender.assetsDetails(otherAssetId).name shouldBe "updatedName"
+    sender.assetsDetails(otherAssetId).description shouldBe "updatedDescription"
+  }
   test("not able to update name/description more than once within interval") {
     val nextTermEnd = sender.transactionInfo(assetId).height + 2 * updateInterval
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
@@ -152,7 +175,6 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update name/description of nft") {
-    val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee).id
     checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
@@ -176,8 +198,6 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.assetsDetails(nftId).name shouldBe "updatedName"
     sender.assetsDetails(nftId).description shouldBe "updatedDescription"
-
-    sender.balanceDetails(issuer.publicKey.stringRepr).available shouldBe issuerBalance.available - minFee
   }
 
   def checkUpdateAssetInfoTx(transaction: Transaction, updatedName: String, updatedDescription: String): Unit = {
