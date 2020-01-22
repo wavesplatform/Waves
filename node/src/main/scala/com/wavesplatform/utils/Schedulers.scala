@@ -132,7 +132,7 @@ object Schedulers {
   import scala.util.control.NonFatal
 
   // Catches InterruptedException correctly
-  def executeOnTimeBoundedPool[T](pool: Scheduler)(f: => T): Future[T] = {
+  def executeCatchingInterruptedException[T](pool: Scheduler)(f: => T): Future[T] = {
     val promise = Promise[T]
     pool.execute { () =>
       try promise.success(f)

@@ -16,7 +16,7 @@ trait TimeLimitedRoute { self: ApiRoute =>
       case _: InterruptedException | _: ExecutionException | _: ExecutionError | _: UncheckedExecutionException =>
         complete(ApiError.CustomValidationError("The request took too long to complete"))
     }
-    handleExceptions(handler) & onSuccess(Schedulers.executeOnTimeBoundedPool(limitedScheduler)(f))
+    handleExceptions(handler) & onSuccess(Schedulers.executeCatchingInterruptedException(limitedScheduler)(f))
   }
 
   def completeLimited(f: => ToResponseMarshallable): Route =

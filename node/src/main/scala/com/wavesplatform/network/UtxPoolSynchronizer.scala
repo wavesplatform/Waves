@@ -73,9 +73,13 @@ class UtxPoolSynchronizerImpl(
     if (transactionIsNew(tx.id())) queue.tryOffer(tx -> source)
   }
 
-  private[this] def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
+  private[this] def validateFuture(
+      tx: Transaction,
+      allowRebroadcast: Boolean,
+      source: Option[Channel]
+  ): Future[TracedResult[ValidationError, Boolean]] =
     Schedulers
-      .executeOnTimeBoundedPool(timedScheduler)(putIfNew(tx))
+      .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx))
       .recover {
         case err =>
           log.warn(s"Error validating transaction ${tx.id()}", err)
