@@ -62,8 +62,8 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
     } yield AssetStateUpdate(
       a,
       decimals,
-      name,
-      description,
+      name.toByteArray,
+      description.toByteArray,
       reissuable,
       totalVolume,
       script,

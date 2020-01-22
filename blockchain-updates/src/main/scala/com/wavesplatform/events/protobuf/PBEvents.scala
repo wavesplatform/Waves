@@ -67,11 +67,7 @@ object PBEvents {
         )
     }
 
-  private def toString(bytesOrString: Either[ByteStr, String]): String =
-    bytesOrString match {
-      case Left(bytes) => new String(bytes, StandardCharsets.UTF_8)
-      case Right(s)    => s
-    }
+  private def toString(bytes: ByteStr): String = new String(bytes, StandardCharsets.UTF_8)
 
   private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
     AssetStateUpdate(

@@ -11,8 +11,8 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 final case class AssetStateUpdate(
     asset: IssuedAsset,
     decimals: Int,
-    name: Either[ByteStr, String],
-    description: Either[ByteStr, String],
+    name: ByteStr,
+    description: ByteStr,
     reissuable: Boolean,
     volume: BigInt,
     script: Option[Script],

@@ -3,8 +3,7 @@ package com.wavesplatform.state
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.TestHelpers.enableNG
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.events.BlockchainUpdateTriggers
@@ -12,7 +11,6 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{chainBaseAndMicro, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.Waves
@@ -21,11 +19,10 @@ import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{NTPTime, RequestGen, WithDB}
 import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{FreeSpec, Matchers}
 
-import scala.collection.mutable.ArrayBuffer
-
-class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
+class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings with MockFactory {
 
   private val FEE_AMT = 1000000L
 
@@ -162,111 +159,84 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
   }
 
   "blockchain update events sending" - {
-    sealed trait BlockchainUpdateTriggerCall
-    final case class OnProcessBlock(block: Block, prevBlockchainHeight: Int, diff: DetailedDiff)            extends BlockchainUpdateTriggerCall
-    final case class OnProcessMicroBlock(microBlock: MicroBlock, blockchainHeight: Int, diff: DetailedDiff) extends BlockchainUpdateTriggerCall
-    final case class OnRollback(toSig: ByteStr, toHeight: Int)                                              extends BlockchainUpdateTriggerCall
-    final case class OnMicroBlockRollback(toSig: ByteStr, height: Int)                                      extends BlockchainUpdateTriggerCall
-
-    def blockchainTriggersMock: (BlockchainUpdateTriggers, Seq[BlockchainUpdateTriggerCall]) = {
-      val calls = ArrayBuffer.empty[BlockchainUpdateTriggerCall]
-
-      val t = new BlockchainUpdateTriggers {
-        override def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit =
-          calls += OnProcessBlock(block, blockchainBefore.height, diff)
-
-        override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit =
-          calls += OnProcessMicroBlock(microBlock, blockchainBefore.height, diff)
-
-        override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit =
-          calls += OnRollback(toBlockId, toHeight)
-
-        override def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit =
-          calls += OnMicroBlockRollback(toTotalResBlockSig, height)
-      }
-
-      (t, calls)
-    }
-
     "without NG" - {
       "genesis block and two transfers blocks" in {
-        val (triggersMock, triggerCalls) = blockchainTriggersMock
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, triggersMock) { (_, _) =>
-          triggerCalls.length shouldBe 3
+        val triggersMock = mock[BlockchainUpdateTriggers]
 
-          // genesis block
-          triggerCalls.head match {
-            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
-              prevBlockchainHeight shouldBe 0
-              block.transactionData.length shouldBe 1
+        inSequence {
+          (triggersMock.onProcessBlock _)
+            .expects(where {
+              case (block, diff, bc) =>
+                bc.height == 0 &&
+                  block.transactionData.length == 1 &&
+                  diff.parentDiff.portfolios.head._2.balance == 0 &&
+                  diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+            })
+            .once()
 
-              diff.parentDiff.portfolios.head._2.balance shouldBe 0
-              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT
-            case _ => fail()
-          }
+          (triggersMock.onProcessBlock _)
+            .expects(where {
+              case (block, diff, bc) =>
+                bc.height == 1 &&
+                  block.transactionData.length == 5 &&
+                  // miner reward, no NG — all txs fees
+                  diff.parentDiff.portfolios.size == 1 &&
+                  diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 &&
+                  // first Tx updated balances
+                  diff.transactionDiffs.head.portfolios.head._2.balance == (ENOUGH_AMT / 5) &&
+                  diff.transactionDiffs.head.portfolios.last._2.balance == (-ENOUGH_AMT / 5 - FEE_AMT)
+            })
+            .once()
 
-          // transfers block
-          triggerCalls(1) match {
-            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
-              prevBlockchainHeight shouldBe 1
-              block.transactionData.length shouldBe 5
-
-              // miner reward, no NG — all txs fees
-              diff.parentDiff.portfolios.size shouldBe 1
-              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 5
-
-              // first Tx updated balances
-              println(diff.transactionDiffs.head.portfolios)
-              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT / 5
-              diff.transactionDiffs.head.portfolios.last._2.balance shouldBe (-ENOUGH_AMT / 5 - FEE_AMT)
-            case _ => fail()
-          }
+          (triggersMock.onProcessBlock _).expects(*, *, *).once()
         }
+
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = false, triggersMock)((_, _) => ())
       }
     }
 
     "with NG" - {
       "genesis block and two transfers blocks" in {
-        val (triggersMock, triggerCalls) = blockchainTriggersMock
-        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, triggersMock) { (_, _) =>
-          triggerCalls.length shouldBe 3
+        val triggersMock = mock[BlockchainUpdateTriggers]
 
-          // genesis block, same as without NG
-          triggerCalls.head match {
-            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
-              prevBlockchainHeight shouldBe 0
-              block.transactionData.length shouldBe 1
+        inSequence {
+          (triggersMock.onProcessBlock _)
+            .expects(where {
+              case (block, diff, bc) =>
+                bc.height == 0 &&
+                  block.transactionData.length == 1 &&
+                  diff.parentDiff.portfolios.head._2.balance == 0 &&
+                  diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+            })
+            .once()
 
-              diff.parentDiff.portfolios.head._2.balance shouldBe 0
-              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT
-            case _ => fail()
-          }
+          (triggersMock.onProcessBlock _)
+            .expects(where {
+              case (block, diff, bc) =>
+                bc.height == 1 &&
+                  block.transactionData.length == 5 &&
+                  // miner reward, no NG — all txs fees
+                  diff.parentDiff.portfolios.size == 1 &&
+                  diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 5 * 0.4
+            })
+            .once()
 
-          // first transfers block
-          triggerCalls(1) match {
-            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
-              prevBlockchainHeight shouldBe 1
-              block.transactionData.length shouldBe 5
-
-              diff.parentDiff.portfolios.size shouldBe 1
-              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 5 * 0.4
-            case _ => fail()
-          }
-
-          // second transfers block, with carryFee
-          triggerCalls(2) match {
-            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
-              prevBlockchainHeight shouldBe 2
-              block.transactionData.length shouldBe 4
-
-              diff.parentDiff.portfolios.size shouldBe 1
-              diff.parentDiff.portfolios.head._2.balance shouldBe (
-                FEE_AMT * 5 * 0.6     // carry from prev block
-                  + FEE_AMT * 4 * 0.4 // current block reward
-              )
-            case _ => fail()
-          }
+          (triggersMock.onProcessBlock _)
+            .expects(where {
+              case (block, diff, bc) =>
+                bc.height == 2 &&
+                  block.transactionData.length == 4 &&
+                  // miner reward, no NG — all txs fees
+                  diff.parentDiff.portfolios.size == 1 &&
+                  diff.parentDiff.portfolios.head._2.balance == (
+                    FEE_AMT * 5 * 0.6     // carry from prev block
+                      + FEE_AMT * 4 * 0.4 // current block reward
+                  )
+            })
+            .once()
         }
+
+        baseTest(time => commonPreconditions(time.correctedTime()), enableNg = true, triggersMock)((_, _) => ())
       }
 
       "block, then 2 microblocks, then block referencing previous microblock" in {
@@ -284,7 +254,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             )
           } yield (genesis, transfers)
 
-        val (triggersMock, triggerCalls) = blockchainTriggersMock
+        val triggersMock = mock[BlockchainUpdateTriggers]
 
         val defaultWriter =
           TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings), dbSettings)
@@ -295,61 +265,73 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
           val (block1, microBlocks1And2) = chainBaseAndMicro(randomSig, genesis, Seq(transfers.take(2), Seq(transfers(2))))
           val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockSig, transfers(3), Seq(Seq(transfers(4))))
 
+          inSequence {
+            // genesis
+            (triggersMock.onProcessBlock _)
+              .expects(where {
+                case (block, diff, bc) =>
+                  bc.height == 0 &&
+                    block.transactionData.length == 1 &&
+                    diff.parentDiff.portfolios.head._2.balance == 0 &&
+                    diff.transactionDiffs.head.portfolios.head._2.balance == ENOUGH_AMT
+              })
+              .once()
+
+            // microblock 1
+            (triggersMock.onProcessMicroBlock _)
+              .expects(where {
+                case (microBlock, diff, bc) =>
+                  bc.height == 1 &&
+                    microBlock.transactionData.length == 2 &&
+                    // miner reward, no NG — all txs fees
+                    diff.parentDiff.portfolios.size == 1 &&
+                    diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 2 * 0.4
+              })
+              .once()
+
+            // microblock 2
+            (triggersMock.onProcessMicroBlock _)
+              .expects(where {
+                case (microBlock, diff, bc) =>
+                  bc.height == 1 &&
+                    microBlock.transactionData.length == 1 &&
+                    // miner reward, no NG — all txs fees
+                    diff.parentDiff.portfolios.size == 1 &&
+                    diff.parentDiff.portfolios.head._2.balance == FEE_AMT * 0.4
+              })
+              .once()
+
+            // rollback microblock
+            (triggersMock.onMicroBlockRollback _)
+              .expects(where {
+                case (toSig, height) => height == 1 && toSig == microBlocks1And2.head.totalResBlockSig
+              })
+              .once()
+
+            // next keyblock
+            (triggersMock.onProcessBlock _)
+              .expects(where {
+                case (block, _, bc) =>
+                  bc.height == 1 &&
+                    block.header.reference == microBlocks1And2.head.totalResBlockSig
+              })
+              .once()
+
+            // microblock 3
+            (triggersMock.onProcessMicroBlock _)
+              .expects(where {
+                case (microBlock, diff, bc) =>
+                  bc.height == 2 && microBlock.prevResBlockSig == block2.signature
+              })
+              .once()
+          }
+
           bcu.processBlock(block1).explicitGet()
           bcu.processMicroBlock(microBlocks1And2.head).explicitGet()
           bcu.processMicroBlock(microBlocks1And2.last).explicitGet()
           bcu.processBlock(block2).explicitGet() // this should remove previous microblock
           bcu.processMicroBlock(microBlock3.head).explicitGet()
           bcu.shutdown()
-
-          triggerCalls.length shouldBe 6
-
-          // genesis block
-          triggerCalls.head match {
-            case OnProcessBlock(block, prevBlockchainHeight, diff) =>
-              prevBlockchainHeight shouldBe 0
-              block.transactionData.length shouldBe 1
-
-              diff.parentDiff.portfolios.head._2.balance shouldBe 0
-              diff.transactionDiffs.head.portfolios.head._2.balance shouldBe ENOUGH_AMT
-            case _ => fail()
-          }
-
-          // microblock 1
-          triggerCalls(1) match {
-            case OnProcessMicroBlock(microBlock, blockchainHeight, diff) =>
-              blockchainHeight shouldBe 1
-              microBlock.transactionData.length shouldBe 2
-              // microBlock transactions miner reward
-              diff.parentDiff.portfolios.size shouldBe 1
-              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 2 * 0.4
-            case _ => fail()
-          }
-
-          // microblock 2
-          triggerCalls(2) match {
-            case OnProcessMicroBlock(microBlock, blockchainHeight, diff) =>
-              blockchainHeight shouldBe 1
-              microBlock.transactionData.length shouldBe 1
-              // microBlock transactions miner reward
-              diff.parentDiff.portfolios.size shouldBe 1
-              diff.parentDiff.portfolios.head._2.balance shouldBe FEE_AMT * 1 * 0.4
-            case _ => fail()
-          }
-
-          // rollback microblock 2 before applying next keyblock
-          triggerCalls(3) match {
-            case OnMicroBlockRollback(toSig, height) =>
-              toSig shouldBe microBlocks1And2.head.totalResBlockSig
-            case _ => fail()
-          }
-
-          // next keyblock
-          triggerCalls(4) match {
-            case OnProcessBlock(_, prevBlockchainHeight, _) =>
-              prevBlockchainHeight shouldBe 1
-            case _ => fail()
-          }
         } finally {
           bcu.shutdown()
           db.close()

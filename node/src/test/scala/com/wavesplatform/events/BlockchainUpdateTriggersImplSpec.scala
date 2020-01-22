@@ -22,6 +22,8 @@ import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
+import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
+
 import scala.concurrent.duration._
 
 class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with WithBlockchain {
@@ -187,8 +189,8 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
           val AssetStateUpdate(asset, decimals, name, description, reissuable, volume, script, sponsorship, nft, assetExistedBefore) =
             upds.head.assets.head
           asset.id shouldBe tx.id()
-          name shouldBe tx.safeName
-          description shouldBe tx.safeDescription
+          name shouldBe tx.name.byteStr
+          description shouldBe tx.description.byteStr
           decimals shouldBe tx.decimals
           reissuable shouldBe tx.reissuable
           volume.toLong shouldBe tx.quantity
@@ -296,8 +298,8 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
 
               asset.id shouldBe issue.assetId
               decimals shouldBe issue.decimals
-              name shouldBe issue.safeName
-              description shouldBe issue.safeDescription
+              name shouldBe issue.name.byteStr
+              description shouldBe issue.description.byteStr
               reissuable shouldBe reissue.reissuable
               volume shouldBe (BigInt(issue.quantity) + BigInt(reissue.quantity))
               script shouldBe issue.script
