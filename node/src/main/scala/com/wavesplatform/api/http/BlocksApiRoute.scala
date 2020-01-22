@@ -7,11 +7,12 @@ import com.wavesplatform.api.http.ApiError.{BlockDoesNotExist, CustomValidationE
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import io.swagger.annotations._
 import javax.ws.rs.Path
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 @Path("/blocks")
@@ -214,7 +215,9 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       (if (includeTransactions) {
          commonApi.lastBlock().map(_.json())
        } else {
-         commonApi.lastBlock().map(block => BlockHeaderSerializer.toJson(block.header, block.bytes().length, block.transactionData.size, block.signature))
+         commonApi
+           .lastBlock()
+           .map(block => BlockHeaderSerializer.toJson(block.header, block.bytes().length, block.transactionData.size, block.signature))
        }).map(_.addBlockFields(height))
     }
   }
@@ -261,12 +264,18 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
     def addBlockFields(height: Int): JsObject =
       json ++ createFields(height)
 
-    private[this] def createFields(height: Int) =
-      Json.obj(
-        "height"   -> height,
-        "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))
-      ) ++ (if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward, height))
-              Json.obj("reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_)))
-            else Json.obj())
+    private[this] def createFields(height: Int) = {
+      def optional(feature: BlockchainFeature)(fields: (String, JsValueWrapper)*): JsObject =
+        (if (blockchain.isFeatureActivated(feature, height)) Json.obj(fields:_*) else Json.obj())
+
+      Seq(
+        Json.obj(
+          "height"   -> height,
+          "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))
+        ),
+        optional(BlockchainFeatures.BlockReward)("reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))),
+        optional(BlockchainFeatures.BlockV5)("VRF" -> blockchain.hitSourceAtHeight(height).fold(JsNull: JsValue)(bs => JsString(bs.toString)))
+      ).reduce(_ ++ _)
+    }
   }
 }
