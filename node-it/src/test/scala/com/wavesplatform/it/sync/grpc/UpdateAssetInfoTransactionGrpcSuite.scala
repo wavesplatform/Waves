@@ -91,8 +91,9 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   val invalidAssetsNames =
     Table(
+      "",
       "abc",
-      "UpperCaseAssetCoinTest",
+      "NameIsLongerThanLimit",
       "~!|#$%^&*()_+=\";:/?><|\\][{}"
     )
 
