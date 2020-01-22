@@ -404,9 +404,6 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
             .explicitGet()
             .json()
         }
-      val s = sell.getReceiveAmount(amount, sellPrice).right.get
-      log.info(s"SELLER: ${s}")
-      log.info(s"BUYER: ${buy.getReceiveAmount(amount, sellPrice).right.get}")
 
       val txId = sender.signedBroadcast(tx).id
       sender.waitForTransaction(txId)
