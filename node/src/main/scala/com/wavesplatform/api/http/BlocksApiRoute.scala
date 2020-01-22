@@ -265,7 +265,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
       json ++ createFields(height)
 
     private[this] def createFields(height: Int) = {
-      def optional(feature: BlockchainFeature)(fields: (String, JsValueWrapper)*): JsObject =
+      def optional(feature: BlockchainFeature)(fields: => Seq[(String, JsValueWrapper)]): JsObject =
         (if (blockchain.isFeatureActivated(feature, height)) Json.obj(fields:_*) else Json.obj())
 
       Seq(
@@ -273,8 +273,8 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
           "height"   -> height,
           "totalFee" -> blockchain.totalFee(height).fold(JsNull: JsValue)(JsNumber(_))
         ),
-        optional(BlockchainFeatures.BlockReward)("reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_))),
-        optional(BlockchainFeatures.BlockV5)("VRF" -> blockchain.hitSourceAtHeight(height).fold(JsNull: JsValue)(bs => JsString(bs.toString)))
+        optional(BlockchainFeatures.BlockReward)(Seq("reward" -> blockchain.blockReward(height).fold(JsNull: JsValue)(JsNumber(_)))),
+        optional(BlockchainFeatures.BlockV5)(Seq("VRF" -> blockchain.hitSourceAtHeight(height).fold(JsNull: JsValue)(bs => JsString(bs.toString))))
       ).reduce(_ ++ _)
     }
   }
