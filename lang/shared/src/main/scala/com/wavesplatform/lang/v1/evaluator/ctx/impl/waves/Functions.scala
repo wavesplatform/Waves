@@ -476,7 +476,7 @@ object Functions {
       BYTESTR,
       ("issue", issueActionType)
     ) {
-      new ContextfulNativeFunction[Environment]("calculateAddetId", BYTESTR, Seq(("issue", issueActionType))) {
+      new ContextfulNativeFunction[Environment]("calculateAssetId", BYTESTR, Seq(("issue", issueActionType))) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CaseObj(`issueActionType`, fields) :: Nil) =>
