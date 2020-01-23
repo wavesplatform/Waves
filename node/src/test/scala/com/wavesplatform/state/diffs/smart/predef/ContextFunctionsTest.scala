@@ -444,8 +444,9 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
+                 | let checkVrf = block.vrf == base58'$generatorSignature'
                  |
-                 | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
+                 | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey && checkVrf
                  |
               """.stripMargin,
               estimator

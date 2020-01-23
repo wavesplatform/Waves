@@ -162,7 +162,9 @@ class RIDEFuncSuite extends BaseTransactionSuite with CancelAfterFailure {
          |    let checkTs = lastBlock.timestamp == block.timestamp
          |    let checkHeight = block.height == height
          |    let checkHeightLast = lastBlock.height == height
-         |    checkTs && checkHeight && checkHeightLast
+         |    let checkVrf = lastBlock.vrf == block.vrf
+         |
+         |    checkTs && checkHeight && checkHeightLast && checkVrf
          |  }
       """.stripMargin, estimator).explicitGet()._1
 
