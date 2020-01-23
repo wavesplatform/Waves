@@ -10,6 +10,7 @@ import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -36,7 +37,7 @@ class BlockchainUpdaterImpl(
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
-    blockchainUpdated: Observer[BlockchainUpdated]
+    blockchainUpdateTriggers: BlockchainUpdateTriggers
 ) extends BlockchainUpdater
     with NG
     with ScorexLogging {
@@ -199,7 +200,7 @@ class BlockchainUpdaterImpl(
                     val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(blockchain, height)
 
-                    BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.header.reference, height)
+                    blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
 
                     BlockDiffer
                       .fromBlock(
@@ -224,8 +225,7 @@ class BlockchainUpdaterImpl(
                       val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                       val miningConstraints = MiningConstraints(blockchain, height)
 
-                      BlockchainUpdateNotifier
-                        .notifyMicroBlockRollback(blockchainUpdated, block.header.reference, height)
+                      blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
 
                       BlockDiffer
                         .fromBlock(
@@ -253,8 +253,7 @@ class BlockchainUpdaterImpl(
                         val height = blockchain.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                         if (discarded.nonEmpty) {
-                          BlockchainUpdateNotifier
-                            .notifyMicroBlockRollback(blockchainUpdated, referencedForgedBlock.uniqueId, height)
+                          blockchainUpdateTriggers.onMicroBlockRollback(referencedForgedBlock.uniqueId, this.height)
                           metrics.microBlockForkStats.increment()
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
@@ -319,7 +318,7 @@ class BlockchainUpdaterImpl(
                     log.info(s"New height: $newHeight")
                   }
 
-                  BlockchainUpdateNotifier.notifyProcessBlock(blockchainUpdated, block, detailedDiff, blockchain)
+                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, blockchain)
 
                   discarded
               }
@@ -356,7 +355,7 @@ class BlockchainUpdaterImpl(
     val prevNgState = ngState
     val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
-      BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, blockId, blockchain.height)
+      blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
@@ -364,7 +363,7 @@ class BlockchainUpdaterImpl(
       blockchain
         .rollbackTo(blockId)
         .map { bs =>
-          BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, blockId, blockchain.height)
+          blockchainUpdateTriggers.onRollback(blockId, blockchain.height)
           bs ++ discardedNgBlock
         }
         .leftMap(err => GenericError(err))
@@ -430,7 +429,7 @@ class BlockchainUpdaterImpl(
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
-              BlockchainUpdateNotifier.notifyProcessMicroBlock(blockchainUpdated, microBlock, detailedDiff, blockchain)
+              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this)
               restTotalConstraint = updatedMdConstraint
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
