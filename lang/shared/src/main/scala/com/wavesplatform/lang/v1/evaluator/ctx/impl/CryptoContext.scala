@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator.ctx.impl
 
 import cats.{Id, Monad}
+import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_STRING, CaseObj}
@@ -12,6 +13,8 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+
+import scala.util.Try
 
 object CryptoContext {
 
@@ -93,8 +96,10 @@ object CryptoContext {
             if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
           Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
-          algFromCO(digestAlg) map { alg =>
-            CONST_BOOLEAN(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
+          algFromCO(digestAlg) flatMap { alg =>
+            Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
+              .toEither
+              .bimap(_ => "Illegal input params", CONST_BOOLEAN)
           }
         case xs => notImplemented[Id](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
