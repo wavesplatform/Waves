@@ -120,13 +120,13 @@ class WavesEnvironment(
 
   override def lastBlockOpt(): Option[BlockInfo] =
     blockchain.lastBlock
-      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt).get))
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
     blockchain.blockInfo(blockHeight)
-      .map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(height.toInt).get))
+      .map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(height.toInt)))
 
-  private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: ByteStr) = {
+  private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
       timestamp = blockH.timestamp,
       height = bHeight,

@@ -402,18 +402,21 @@ object Bindings {
     )
   }
 
-  def buildLastBlockInfo(blockInf: BlockInfo) =
-    CaseObj(
-      blockInfo,
+  def buildLastBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+    val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
         "height"              -> blockInf.height.toLong,
         "baseTarget"          -> blockInf.baseTarget,
         "generationSignature" -> blockInf.generationSignature,
         "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
-        "generatorPublicKey"  -> blockInf.generatorPublicKey,
-        "vrf"                 -> blockInf.vrf
+        "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
-    )
 
+    val vrfFieldOpt: Map[String, EVALUATED] =
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf.get)
+      else Map()
+
+    CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)
+  }
 }
