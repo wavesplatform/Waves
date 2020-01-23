@@ -20,6 +20,7 @@ message BlockMeta {
     int32 transaction_count = 5;
     int64 total_fee_in_waves = 6;
     int64 reward = 7;
+    bytes vrf = 8;
 }
 
 message AccountScriptInfo {

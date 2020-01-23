@@ -194,5 +194,5 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
 }
 
 object BlocksApiRoute {
-  private def toJson(v: (BlockMeta, Seq[Transaction])) = v._1.json() ++ Json.obj("transactions" -> Json.toJson(v._2))
+  private def toJson(v: (BlockMeta, Seq[Transaction])): JsObject = v._1.json() ++ Json.obj("transactions" -> Json.toJson(v._2))
 }

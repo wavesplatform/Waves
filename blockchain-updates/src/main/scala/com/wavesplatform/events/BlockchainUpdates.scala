@@ -6,7 +6,6 @@ import java.util
 import com.wavesplatform.extensions.{Context, Extension}
 import net.ceedubs.ficus.Ficus._
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
-import com.wavesplatform.state.BlockchainUpdated
 import com.wavesplatform.utils.{ScorexLogging, forceStopApplication}
 import monix.execution.Ack
 import monix.execution.Ack.Continue
@@ -15,13 +14,13 @@ import org.apache.kafka.clients.producer.{KafkaProducer, RecordMetadata}
 import com.wavesplatform.events.kafka.{createProducer, createProducerRecord, createProperties}
 import org.apache.kafka.clients.consumer.{ConsumerConfig, KafkaConsumer}
 import org.apache.kafka.common.serialization.Deserializer
-import com.wavesplatform.events.protobuf.PBBlockchainUpdated
+import com.wavesplatform.events.protobuf.{BlockchainUpdated => PBBlockchainUpdated}
 import org.apache.kafka.common.TopicPartition
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
 
-class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
+class BlockchainUpdates(private val context: Context) extends Extension with ScorexLogging {
   import monix.execution.Scheduler.Implicits.global
 
   private[this] val settings = context.settings.config.as[BlockchainUpdatesSettings]("blockchain-updates")
@@ -117,7 +116,7 @@ class BlockchainUpdates(context: Context) extends Extension with ScorexLogging {
               if (exception != null) {
                 log.error("Error sending blockchain updates", exception)
                 forceStopApplication()
-            }
+              }
           )
           Continue
         }

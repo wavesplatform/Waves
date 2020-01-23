@@ -103,7 +103,7 @@ final case class CompositeBlockchain(
     assetDescription map { z =>
       diff.transactions.values
         .foldLeft(z.copy(script = script)) {
-          case (acc, (ut: UpdateAssetInfoTransaction, _)) =>
+          case (acc, (ut: UpdateAssetInfoTransaction, _)) if ut.assetId == asset =>
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _)                                        => acc
         }
@@ -239,6 +239,9 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain {
+  def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
+    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
+
   def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff])(
       filter: LeaseTransaction => Boolean
   ): Seq[LeaseTransaction] = {

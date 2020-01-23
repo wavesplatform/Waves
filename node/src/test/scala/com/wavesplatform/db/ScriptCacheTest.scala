@@ -139,7 +139,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       TestFunctionalitySettings.Stub,
       settings0.dbSettings.copy(maxCacheSize = CACHE_SIZE)
     )
-    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdated)
+    val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 

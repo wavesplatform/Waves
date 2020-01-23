@@ -4,9 +4,10 @@ import akka.actor.ActorSystem
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events.BlockchainUpdated
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Time

@@ -292,7 +292,8 @@ package object database extends ScorexLogging {
       data.size,
       data.transactionCount,
       data.totalFeeInWaves,
-      data.reward.getOrElse(-1L)
+      data.reward.getOrElse(-1L),
+      data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf))
     ).toByteArray
 
   def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
@@ -304,7 +305,8 @@ package object database extends ScorexLogging {
       pbbm.size,
       pbbm.transactionCount,
       pbbm.totalFeeInWaves,
-      Option(pbbm.reward).filter(_ >= 0)
+      Option(pbbm.reward).filter(_ >= 0),
+      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) }
     )
   }
 

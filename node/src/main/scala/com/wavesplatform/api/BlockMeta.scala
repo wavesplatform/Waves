@@ -13,7 +13,8 @@ case class BlockMeta(
     size: Int,
     transactionCount: Int,
     totalFeeInWaves: Long,
-    reward: Option[Long]
+    reward: Option[Long],
+    vrf: Option[ByteStr]
 ) {
   def toSignedHeader: SignedBlockHeader = SignedBlockHeader(header, signature)
 

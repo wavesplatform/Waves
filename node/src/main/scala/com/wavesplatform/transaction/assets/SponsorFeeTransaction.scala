@@ -17,7 +17,7 @@ case class SponsorFeeTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    minSponsoredAssetFee: Option[TxTimestamp],
+    minSponsoredAssetFee: Option[TxAmount],
     fee: TxAmount,
     timestamp: TxTimestamp,
     proofs: Proofs

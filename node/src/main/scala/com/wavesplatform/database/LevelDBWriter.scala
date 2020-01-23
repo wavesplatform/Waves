@@ -58,7 +58,6 @@ object LevelDBWriter {
     v.takeWhile(_ <= h).lastOption // Should we use binary search?
   }
 
-
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
       for {
@@ -248,7 +247,19 @@ class LevelDBWriter(
 
       rw.put(
         Keys.blockMetaAt(Height(height)),
-        Some(BlockMeta(block.header, block.signature, height, block.bytes().length, block.transactionData.size, totalFee, reward))
+        Some(
+          BlockMeta(
+            block.header,
+            block.signature,
+            height,
+            block.bytes().length,
+            block.transactionData.size,
+            totalFee,
+            reward,
+            if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource)
+            else None
+          )
+        )
       )
       rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
@@ -686,15 +697,15 @@ class LevelDBWriter(
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
-            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
-              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+            val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+            (wh, b)
+          }
         case asset @ IssuedAsset(_) =>
-            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
-              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+            val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+            (wh, b)
+          }
       }
     }
   }

@@ -94,7 +94,7 @@ class UtxPoolSpecification
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), PublishSubject(), PublishSubject())
+    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }

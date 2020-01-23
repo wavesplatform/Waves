@@ -55,8 +55,12 @@ object DiffsCommon {
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse { script =>
+        val useV1PreCheck =
+          blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
+          !blockchain.isFeatureActivated(BlockchainFeatures.MultiPaymentInvokeScript)
+
         val cost =
-          if (blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight)
+          if (useV1PreCheck)
             Script.verifierComplexity(script, ScriptEstimatorV1) *>
             Script.verifierComplexity(script, ScriptEstimatorV2)
           else

@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -36,6 +37,7 @@ package object utils {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
+    override val txId: ByteStr                                                                                   = ByteStr.empty
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

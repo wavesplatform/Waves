@@ -3,9 +3,11 @@ package com.wavesplatform.db
 import java.nio.file.Files
 
 import cats.Monoid
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -15,15 +17,17 @@ import com.wavesplatform.state.diffs.{BlockDiffer, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, Diff}
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.{NTPTime, TestHelpers}
 import monix.reactive.Observer
-import monix.reactive.subjects.PublishSubject
+import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, Suite}
 
-trait WithState extends Matchers with DBCacheSettings { _: Suite =>
+trait WithState extends DBCacheSettings with Matchers {
+  protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
+  protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers     = BlockchainUpdateTriggers.noop
 
   private[this] var currentDbInstance: DB = _
   protected def db: DB                    = currentDbInstance
@@ -124,9 +128,17 @@ trait WithState extends Matchers with DBCacheSettings { _: Suite =>
 }
 
 trait WithDomain extends WithState with NTPTime { _: Suite =>
-  def withDomain[A](settings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(None)))(test: Domain => A): A =
+  def defaultDomainSettings: WavesSettings =
+    WavesSettings.fromRootConfig(loadConfig(None))
+
+  def domainSettingsWithFS(fs: FunctionalitySettings): WavesSettings = {
+    val ds = defaultDomainSettings
+    ds.copy(blockchainSettings = ds.blockchainSettings.copy(functionalitySettings = fs))
+  }
+
+  def withDomain[A](settings: WavesSettings = defaultDomainSettings)(test: Domain => A): A =
     withLevelDBWriter(settings.blockchainSettings) { blockchain =>
-      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, PublishSubject())
+      val bcu = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, ntpTime, ignoreBlockchainUpdateTriggers)
       try test(Domain(db, bcu, blockchain))
       finally bcu.shutdown()
     }

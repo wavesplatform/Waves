@@ -3,7 +3,7 @@ package com.wavesplatform.history
 import cats.syntax.option._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.{DBExt, LevelDBWriter}
@@ -20,6 +20,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
 
   def removeAfter(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
+
+  def appendMicroBlock(b: MicroBlock) = blockchainUpdater.processMicroBlock(b).explicitGet()
 
   def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.get
 
