@@ -54,7 +54,8 @@ object Types {
       "baseTarget"          -> LONG,
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
-      "generatorPublicKey"  -> BYTESTR
+      "generatorPublicKey"  -> BYTESTR,
+      "vrf"                 -> BYTESTR
     )
   )
 

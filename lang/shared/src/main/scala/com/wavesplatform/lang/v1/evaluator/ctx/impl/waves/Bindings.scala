@@ -411,7 +411,8 @@ object Bindings {
         "baseTarget"          -> blockInf.baseTarget,
         "generationSignature" -> blockInf.generationSignature,
         "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
-        "generatorPublicKey"  -> blockInf.generatorPublicKey
+        "generatorPublicKey"  -> blockInf.generatorPublicKey,
+        "vrf"                 -> blockInf.vrf
       )
     )
 
