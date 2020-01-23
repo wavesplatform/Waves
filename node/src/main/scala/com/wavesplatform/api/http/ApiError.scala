@@ -199,6 +199,18 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
+  case class InvalidIds(ids: Seq[String]) extends ApiError {
+    override val id: Int          = InvalidIds.Id
+    override val message: String  = s"Request contains invalid IDs. ${ids.mkString(", ")}"
+    override val code: StatusCode = StatusCodes.BadRequest
+
+    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
+  }
+
+  case object InvalidIds {
+    val Id = 116
+  }
+
   final case class CustomValidationError(errorMessage: String) extends ApiError {
     override val id: Int          = CustomValidationError.Id
     override val message: String  = errorMessage

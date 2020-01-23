@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -10,8 +11,9 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.transfer.TransferTransactionV2
-
 import play.api.libs.json._
+
+import scala.util.Random
 
 class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
@@ -52,11 +54,13 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
     val maxTxList = (1 to 1000).map(_ => txIds.head).toList
     val result = notMiner.transactionStatus(maxTxList)
-    result.size shouldBe 1
+    result.size shouldBe maxTxList.size
+    result.forall(_ == result.head)
+
     assertBadRequestAndMessage(notMiner.transactionStatus(maxTxList :+ txIds.head), "Too big sequences requested")
+    assertBadRequestAndMessage(notMiner.transactionStatus(Seq()), "Empty request")
 
-    notMiner.transactionStatus(Seq(confirmedTxs.head.id.toString())).size shouldBe 0
-
+    assertApiError(notMiner.transactionStatus(Random.shuffle(txIds :+ "illegal id")), InvalidIds(Seq("illegal id")))
   }
 
   private def check(data: CheckData, result: Seq[TransactionStatus]): Unit = {
