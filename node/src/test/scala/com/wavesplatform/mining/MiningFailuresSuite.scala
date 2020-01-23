@@ -4,19 +4,19 @@ import java.io.{PrintWriter, StringWriter}
 
 import cats.effect.Resource
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.{Keys, LevelDBWriter}
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
@@ -25,7 +25,6 @@ import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
-import monix.reactive.Observer
 import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
@@ -153,17 +152,6 @@ object MiningFailuresSuite {
       .map(bs => KeyPair(bs))
       .sample
       .get
-
-  class LevelDbWriterWithReward(
-      val db: DB,
-      val spendableBalanceChanged: Observer[(Address, Asset)],
-      override val settings: BlockchainSettings,
-      override val dbSettings: DBSettings
-  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
-    def saveReward(newReward: Long): Unit = {
-      db.put(Keys.blockReward(0).keyBytes, Keys.blockReward(0).encode(Some(newReward)))
-    }
-  }
 
   private implicit def taskToFuture(task: Task[Assertion]): Future[Assertion] = task.runToFuture
 }
