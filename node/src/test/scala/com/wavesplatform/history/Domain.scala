@@ -1,7 +1,7 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.database.LevelDBWriter
@@ -20,6 +20,8 @@ case class Domain(blockchainUpdater: BlockchainUpdater with NG, levelDBWriter: L
   def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block) = blockchainUpdater.processBlock(b).explicitGet()
+
+  def appendMicroBlock(b: MicroBlock) = blockchainUpdater.processMicroBlock(b).explicitGet()
 
   def removeAfter(blockId: ByteStr) = blockchainUpdater.removeAfter(blockId).explicitGet()
 
