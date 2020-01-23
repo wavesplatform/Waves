@@ -49,7 +49,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       b.`nxt-consensus`.`generation-signature`.byteStr,
       pkToAddress(b.generator),
       b.generator.byteStr,
-      b.VRF.byteStr
+      Some(b.VRF.byteStr)
     )
 
 
