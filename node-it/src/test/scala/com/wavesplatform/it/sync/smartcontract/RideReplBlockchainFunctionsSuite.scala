@@ -152,7 +152,7 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
 
   test("addressFromPublicKey()") {
     //TODO possibly using wrong chain Id
-    execute(s"addressFromPublicKey(base58'${alice.publicKey.stringRepr}').value().toString()").right.value should endWith(alice.stringRepr)
+    execute(s"addressFromPublicKey(base58'${alice.publicKey.stringRepr}').value().toString()").right.value should endWith(s""""${alice.stringRepr}"""")
   }
   test("addressFromRecipient() with alias") {
     //TODO Left because recipient alias can't be parsed

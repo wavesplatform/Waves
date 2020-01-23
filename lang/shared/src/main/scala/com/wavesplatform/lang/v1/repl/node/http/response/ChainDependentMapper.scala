@@ -3,11 +3,12 @@ package com.wavesplatform.lang.v1.repl.node.http.response
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.repl.global
 import com.wavesplatform.lang.v1.repl.node.http.response.model.{AssetInfoResponse, BlockInfoResponse, ByteString, TransferTransaction, TransferTransactionV1, TransferTransactionV2}
-import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven, Transfer}
-import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, ScriptAssetInfo}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo}
 
 private[node] class ChainDependentMapper(chainId: Byte) {
   def toRideModel(tx: TransferTransaction): Transfer =
@@ -16,7 +17,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.feeAssetId.map(_.byteStr),
       tx.assetId.map(_.byteStr),
       tx.amount,
-      Address(tx.recipient.byteStr),
+      recipient(tx.recipient.byteStr),
       tx.attachment.byteStr
     )
 
@@ -28,6 +29,17 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       tx.senderPublicKey.byteStr,
       tx.proofs.map(_.byteStr).toIndexedSeq
     )
+
+  private def recipient(bytes: Array[Byte]): Recipient =
+    bytes match {
+      case Array(AddressVersion, _*) =>
+        Address(bytes)
+      case Array(AliasVersion, _, _, _, rest @ _*) =>
+        Alias(new String(rest.toArray, "UTF-8"))
+      case _ =>
+        throw new RuntimeException("Unknown address/alias version")
+    }
+
 
   def toRideModel(a: AssetInfoResponse): ScriptAssetInfo =
     ScriptAssetInfo(
@@ -53,6 +65,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
 
 
   private val AddressVersion = 1
+  private val AliasVersion   = 2
   private val ChecksumLength = 4
   private val HashLength     = 20
   private val AddressLength  = 1 + 1 + HashLength + ChecksumLength
