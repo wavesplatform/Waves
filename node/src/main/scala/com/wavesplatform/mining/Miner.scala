@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import cats.effect.concurrent.Ref
 import cats.implicits._
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block._
 import com.wavesplatform.consensus.PoSSelector
@@ -141,7 +141,7 @@ class MinerImpl(
     val refBlockID          = referencedBlockInfo.blockId
     lazy val currentTime    = timeService.correctedTime()
     lazy val blockDelay     = currentTime - lastBlock.header.timestamp
-    lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, refBlockID)
+    lazy val balance        = blockchainUpdater.generatingBalance(account.toAddress, Some(refBlockID))
 
     metrics.blockBuildTimeStats.measureSuccessful(for {
       _ <- checkQuorumAvailable()
@@ -194,12 +194,11 @@ class MinerImpl(
     if (version < RewardBlockVersion) -1L
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
-  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: PublicKey): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, block.uniqueId)
+  private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: KeyPair): Either[String, Long] = {
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.uniqueId))
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)
-      log.info(s"")
       for {
         delay <- blockDelayE.leftMap(_.toString)
         expectedTS = delay + block.header.timestamp

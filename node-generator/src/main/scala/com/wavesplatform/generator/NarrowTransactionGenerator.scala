@@ -266,7 +266,7 @@ class NarrowTransactionGenerator(
               if (function.name.isEmpty) None
               else Some(Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList))
 
-            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(new String(a.name))))
+            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
 
             logOption(

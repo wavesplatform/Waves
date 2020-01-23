@@ -22,6 +22,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
+import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -34,7 +35,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -100,9 +101,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
+  private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
 
-  private val blockchainUpdater =
-    StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdated)
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -131,9 +132,14 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     maybeUtx = Some(utxStorage)
 
     val timer = new HashedWheelTimer()
-    val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val utxSynchronizerScheduler =
+      Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
     val utxSynchronizer =
-      UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
+      UtxPoolSynchronizer(
+        utxStorage,
+        settings.synchronizationSettings.utxSynchronizer,
+        allChannels,
+        blockchainUpdater.lastBlockInfo,
         utxSynchronizerScheduler
       )
 

@@ -38,7 +38,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       pkToAddress(a.issuer),
       a.reissuable,
       a.scripted,
-      a.sponsored
+      a.minSponsoredAssetFee
     )
 
   def toRideModel(b: BlockInfoResponse): BlockInfo =
@@ -48,7 +48,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       b.`nxt-consensus`.`base-target`,
       b.`nxt-consensus`.`generation-signature`.byteStr,
       pkToAddress(b.generator),
-      b.generator.byteStr
+      b.generator.byteStr,
+      Some(b.VRF.byteStr)
     )
 
 

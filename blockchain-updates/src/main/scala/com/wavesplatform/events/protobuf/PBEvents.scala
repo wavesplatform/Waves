@@ -1,21 +1,91 @@
 package com.wavesplatform.events.protobuf
 
+import java.nio.charset.StandardCharsets
+
 import com.google.protobuf.ByteString
-import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
-import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.events
+import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
 import com.wavesplatform.events.protobuf.StateUpdate.{
+  AssetStateUpdate,
   BalanceUpdate => PBBalanceUpdate,
   DataEntryUpdate => PBDataEntryUpdate,
   LeasingUpdate => PBLeasingUpdate
 }
-import com.wavesplatform.events.protobuf.BlockchainUpdated.{Append => PBAppend, Rollback => PBRollback}
-import com.wavesplatform.state.{BlockAppended, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
+import com.wavesplatform.protobuf.block.{PBBlocks, PBMicroBlocks}
+import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.Transaction
 
 object PBEvents {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
 
-  private def protobufStateUpdated(su: VanillaStateUpdate): PBStateUpdate = {
-    PBStateUpdate(
+  def protobuf(event: events.BlockchainUpdated): BlockchainUpdated =
+    event match {
+      case events.BlockAppended(sig, height, block, blockStateUpdate, transactionStateUpdates) =>
+        val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdate)
+        val txsUpdates  = transactionStateUpdates.map(protobufStateUpdate)
+
+        BlockchainUpdated(
+          id = sig,
+          height = height,
+          update = BlockchainUpdated.Update.Append(
+            PBAppend(
+              transactionIds = getIds(block.transactionData),
+              stateUpdate = blockUpdate,
+              transactionStateUpdates = txsUpdates,
+              body = PBAppend.Body.Block(PBBlocks.protobuf(block))
+            )
+          )
+        )
+      case events.MicroBlockAppended(sig, height, microBlock, microBlockStateUpdate, transactionStateUpdates) =>
+        val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdate)
+        val txsUpdates       = transactionStateUpdates.map(protobufStateUpdate)
+
+        BlockchainUpdated(
+          id = sig,
+          height = height,
+          update = BlockchainUpdated.Update.Append(
+            PBAppend(
+              transactionIds = getIds(microBlock.transactionData),
+              stateUpdate = microBlockUpdate,
+              transactionStateUpdates = txsUpdates,
+              body = PBAppend.Body.MicroBlock(PBMicroBlocks.protobuf(microBlock))
+            )
+          )
+        )
+      case events.RollbackCompleted(to, height) =>
+        BlockchainUpdated(
+          id = to,
+          height = height,
+          update = BlockchainUpdated.Update.Rollback(PBRollback.BLOCK)
+        )
+      case events.MicroBlockRollbackCompleted(toSig, height) =>
+        BlockchainUpdated(
+          id = toSig,
+          height = height,
+          update = BlockchainUpdated.Update.Rollback(PBRollback.MICROBLOCK)
+        )
+    }
+
+  private def toString(bytes: ByteStr): String = new String(bytes, StandardCharsets.UTF_8)
+
+  private def protobufAssetStateUpdate(a: events.AssetStateUpdate): AssetStateUpdate =
+    AssetStateUpdate(
+      assetId = a.asset.id,
+      decimals = a.decimals,
+      name = toString(a.name),
+      description = toString(a.description),
+      reissuable = a.reissuable,
+      volume = a.volume.longValue,
+      script = a.script.map(PBTransactions.toPBScript),
+      sponsorship = a.sponsorship.getOrElse(0),
+      nft = a.nft,
+      assetExistedBefore = a.assetExistedBefore,
+      safeVolume = ByteString.copyFrom(a.volume.toByteArray)
+    )
+
+  private def protobufStateUpdate(su: events.StateUpdate): StateUpdate = {
+    StateUpdate(
       balances = su.balances.map {
         case (addr, assetId, amt) =>
           PBBalanceUpdate(address = addr, amount = Some((assetId, amt)))
@@ -26,55 +96,10 @@ object PBEvents {
       },
       dataEntries = su.dataEntries.map {
         case (addr, entry) => PBDataEntryUpdate(address = addr, dataEntry = Some(PBTransactions.toPBDataEntry(entry)))
-      }
+      },
+      assets = su.assets.map(protobufAssetStateUpdate)
     )
   }
 
-  def protobuf(event: VanillaBlockchainUpdated): PBBlockchainUpdated =
-    event match {
-      case BlockAppended(block, height, blockStateUpdate, transactionStateUpdates, txIds) =>
-        val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdated)
-        val txsUpdates  = transactionStateUpdates.map(protobufStateUpdated)
-
-        PBBlockchainUpdated(
-          id = block.uniqueId,
-          height = height,
-          update = PBBlockchainUpdated.Update.Append(
-            PBAppend(
-              transactionIds = txIds.map(_.toByteArray).map(ByteString.copyFrom),
-              stateUpdate = blockUpdate,
-              transactionStateUpdates = txsUpdates,
-              body = PBAppend.Body.Block(PBBlocks.protobuf(block))
-            )
-          )
-        )
-      case MicroBlockAppended(microBlock, height, microBlockStateUpdate, transactionStateUpdates, txIds) =>
-        val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdated)
-        val txsUpdates       = transactionStateUpdates.map(protobufStateUpdated)
-
-        PBBlockchainUpdated(
-          id = microBlock.totalResBlockSig,
-          height = height,
-          update = PBBlockchainUpdated.Update.Append(
-            PBAppend(
-              transactionIds = txIds.map(_.toByteArray).map(ByteString.copyFrom),
-              stateUpdate = microBlockUpdate,
-              transactionStateUpdates = txsUpdates,
-              body = PBAppend.Body.MicroBlock(PBMicroBlocks.protobuf(microBlock))
-            )
-          )
-        )
-      case RollbackCompleted(to, height) =>
-        PBBlockchainUpdated(
-          id = to,
-          height = height,
-          update = PBBlockchainUpdated.Update.Rollback(PBRollback.BLOCK)
-        )
-      case MicroBlockRollbackCompleted(to, height) =>
-        PBBlockchainUpdated(
-          id = to,
-          height = height,
-          update = PBBlockchainUpdated.Update.Rollback(PBRollback.MICROBLOCK)
-        )
-    }
+  private def getIds(txs: Seq[Transaction]): Seq[ByteString] = txs.map(t => ByteString.copyFrom(t.id().arr)),
 }

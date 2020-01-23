@@ -21,14 +21,13 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     case BlockForged(b)           => out.add(RawBytes.fromBlock(b))
 
     // With a spec
-    case GetPeers              => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
-    case k: KnownPeers         => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
-    case gs: GetSignatures     => out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
-    case s: Signatures         => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
-    case g: GetBlock           => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
-    case m: MicroBlockInv      => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
-    case m: MicroBlockRequest  => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
-    case m: MicroBlockResponse => out.add(RawBytes(MicroBlockResponseSpec.messageCode, MicroBlockResponseSpec.serializeData(m)))
+    case GetPeers             => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
+    case k: KnownPeers        => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
+    case gs: GetSignatures    => out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
+    case s: Signatures        => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
+    case g: GetBlock          => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
+    case m: MicroBlockInv     => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
+    case m: MicroBlockRequest => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {

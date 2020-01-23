@@ -22,7 +22,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
     with ScorexLogging {
   this: Suite =>
 
-  def miner: Node    = nodes.init.last
+  def miner: Node    = nodes.head
   def notMiner: Node = nodes.last
 
   protected def sender: Node = miner
@@ -78,7 +78,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
 
       val height = nodes.map(_.grpc.height).max
 
-      withClue(s"waitForHeight(${height + 1})") {
+      withClue(s"waitForHeight(${height + 2})") {
+        nodes.foreach(n => n.grpc.waitForHeight(height + 1))
         nodes.foreach(n => n.grpc.waitForHeight(height + 2))
       }
 

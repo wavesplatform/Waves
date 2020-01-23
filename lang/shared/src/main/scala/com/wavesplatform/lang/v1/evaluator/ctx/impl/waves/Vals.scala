@@ -68,27 +68,27 @@ object Vals {
         }
     }
 
-  val assetThisVal: ContextfulVal[Environment] =
+  def assetThisVal(version: StdLibVersion): ContextfulVal[Environment] =
     new ContextfulVal[Environment] {
       override def apply[F[_] : Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env.assetInfoById(env.tthis.bytes)
-            .map(v => buildAssetInfo(v.get): EVALUATED)
+            .map(v => buildAssetInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }
     }
 
-  val lastBlockVal: ContextfulVal[Environment] =
+  def lastBlockVal(version: StdLibVersion): ContextfulVal[Environment] =
     new ContextfulVal[Environment] {
       override def apply[F[_] : Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env.lastBlockOpt()
-            .map(v => Bindings.buildLastBlockInfo(v.get): EVALUATED)
+            .map(v => Bindings.buildLastBlockInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }
     }
 
-  val lastBlock = ("lastBlock", (blockInfo, lastBlockVal))
+  def lastBlock(version: StdLibVersion) = ("lastBlock", (blockInfo(version), lastBlockVal(version)))
 
   val sellOrdTypeVal: ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Sell))))
   val buyOrdTypeVal:  ContextfulVal[Environment] = ContextfulVal.fromEval(Eval.now(Right(ordType(OrdType.Buy))))
@@ -99,6 +99,7 @@ object Vals {
   val height: (ExecutionError, (LONG.type, ContextfulVal[Environment])) = ("height", (LONG, heightVal))
 
   val accountThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment])) = ("this", (addressType, accountThisVal))
-  val assetThis: (ExecutionError, (CASETYPEREF, ContextfulVal[Environment]))   = ("this", (assetType,   assetThisVal))
+  def assetThis(version: StdLibVersion): (ExecutionError, (CASETYPEREF, ContextfulVal[Environment]))   =
+    ("this", (assetType(version), assetThisVal(version)))
 
 }

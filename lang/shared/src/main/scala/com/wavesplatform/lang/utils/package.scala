@@ -3,6 +3,7 @@ package com.wavesplatform.lang
 import cats.Id
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
@@ -34,9 +35,9 @@ package object utils {
     override def data(addressOrAlias: Recipient, key: String, dataType: DataType): Option[Any]                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
-    override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader]                                      = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
+    override val txId: ByteStr                                                                                   = ByteStr.empty
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
@@ -75,7 +76,7 @@ package object utils {
 
   def estimate(version: StdLibVersion, ctx: EvaluationContext[Environment, Id]): Map[FunctionHeader, Coeval[Long]] = {
     val costs: mutable.Map[FunctionHeader, Coeval[Long]] = ctx.typeDefs.collect {
-      case (typeName, CASETYPEREF(_, fields)) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
+      case (typeName, CASETYPEREF(_, fields, hidden)) if (!hidden || version < V4) => FunctionHeader.User(typeName) -> Coeval.now(fields.size.toLong)
     }(collection.breakOut)
 
     ctx.functions.values.foreach { func =>

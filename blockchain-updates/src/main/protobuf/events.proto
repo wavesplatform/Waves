@@ -5,6 +5,7 @@ option java_package = "com.wavesplatform.events.protobuf";
 import "waves/block.proto";
 import "waves/amount.proto";
 import "waves/transaction.proto";
+import "waves/script.proto";
 
 message BlockchainUpdated {
     bytes id = 1;
@@ -33,22 +34,48 @@ message BlockchainUpdated {
 }
 
 message StateUpdate {
+    repeated BalanceUpdate balances = 1;
+    repeated LeasingUpdate leases = 2;
+    repeated DataEntryUpdate data_entries = 3;
+    repeated AssetStateUpdate assets = 4;
+
     message BalanceUpdate {
         bytes address = 1;
         Amount amount = 2;
     }
-    repeated BalanceUpdate balances = 1;
 
     message LeasingUpdate {
         bytes address = 1;
         int64 in = 2;
         int64 out = 3;
     }
-    repeated LeasingUpdate leases = 2;
 
     message DataEntryUpdate {
         bytes address = 1;
         DataTransactionData.DataEntry data_entry = 2;
     }
-    repeated DataEntryUpdate data_entries = 3;
+
+    message AssetStateUpdate {
+        bytes asset_id = 1;
+        int32 decimals = 2;
+        string name = 3;
+        string description = 4;
+        bool reissuable = 5;
+        int64 volume = 6;
+        Script script = 7;
+        int64 sponsorship = 8;
+        bool nft = 9;
+
+        bool asset_existed_before = 20;
+        /*
+                Related to a past behavior in the blockchain when it was possible to reissue
+                assets so that the total volume became more then int64 max value.
+                This field represents accurate volume even for those assets.
+
+                Can be ignored if the target system does not need such accuracy.
+
+                Encoding: like Java BigInteger, https://docs.oracle.com/javase/7/docs/api/java/math/BigInteger.html#toByteArray()
+            */
+        bytes safe_volume = 21;
+    }
 }

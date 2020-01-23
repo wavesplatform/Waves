@@ -104,8 +104,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
                  |   let quantity = t.quantity == ${t.quantity}
                  |   let decimals = t.decimals == ${t.decimals}
                  |   let reissuable = t.reissuable == ${t.reissuable}
-                 |   let name = t.name == base58'${ByteStr(t.nameBytes).toString}'
-                 |   let description = t.description == base58'${ByteStr(t.descriptionBytes).toString}'
+                 |   let name = t.name == base58'${ByteStr(t.name.toByteArray).toString}'
+                 |   let description = t.description == base58'${ByteStr(t.description.toByteArray).toString}'
                  |   let script = if (${t.script.isDefined}) then extract(t.script) == base64'${t.script
                    .map(_.bytes().base64)
                    .getOrElse("")}' else isDefined(t.script) == false
@@ -669,7 +669,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
         CryptoContext.build(Global, V2).withEnvironment[Environment] |+|
         WavesContext.build(DirectiveSet(V2, Asset, Expression).explicitGet())
 
-    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(???), directives)
+    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(???), directives, ByteStr.empty)
     for {
       compileResult <- compiler.ExpressionCompiler(ctx.compilerContext, expr)
       (typedExpr, _) = compileResult
@@ -698,7 +698,8 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
       null,
       EmptyBlockchain,
       Coeval(null),
-      directives
+      directives,
+      ByteStr.empty
     )
 
     for {

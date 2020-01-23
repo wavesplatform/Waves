@@ -27,21 +27,26 @@ object Types {
     )
   )
 
-  val assetType = CASETYPEREF(
-    "Asset",
-    List(
-      "id"              -> BYTESTR,
-      "quantity"        -> LONG,
-      "decimals"        -> LONG,
-      "issuer"          -> addressType,
-      "issuerPublicKey" -> BYTESTR,
-      "reissuable"      -> BOOLEAN,
-      "scripted"        -> BOOLEAN,
-      "sponsored"       -> BOOLEAN
-    )
-  )
+  def assetType(version: StdLibVersion) = {
+    val sponsoredFields =
+      if (version >= V4) "minSponsoredFee" -> optionLong
+      else "sponsored" -> BOOLEAN
 
-  val blockInfo = CASETYPEREF(
+    CASETYPEREF(
+      "Asset",
+      List(
+        "id"              -> BYTESTR,
+        "quantity"        -> LONG,
+        "decimals"        -> LONG,
+        "issuer"          -> addressType,
+        "issuerPublicKey" -> BYTESTR,
+        "reissuable"      -> BOOLEAN,
+        "scripted"        -> BOOLEAN
+      ) :+ sponsoredFields
+    )
+  }
+
+  def blockInfo(version: StdLibVersion) = CASETYPEREF(
     "BlockInfo",
     List(
       "timestamp"           -> LONG,
@@ -50,10 +55,11 @@ object Types {
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
-    )
+    ) ::: (if (version >= V4) List("vrf" -> BYTESTR) else Nil)
   )
 
-  val optionAsset = UNION(assetType, UNIT)
+  def optionAsset(version: StdLibVersion) =
+    UNION(assetType(version), UNIT)
 
   val transfer = CASETYPEREF("Transfer", List("recipient" -> addressOrAliasType, "amount" -> LONG))
 
@@ -127,7 +133,7 @@ object Types {
       List(FieldNames.ScriptWriteSet -> writeSetType, FieldNames.ScriptTransferSet -> scriptTransferSetType)
     )
 
-  val issueScriptType = CASETYPEREF(FieldNames.IssueScript, Nil)
+  val issueScriptType = CASETYPEREF(FieldNames.IssueScript, Nil, true)
 
   val issueActionType =
     CASETYPEREF(
@@ -178,8 +184,8 @@ object Types {
       paymentType,
       scriptTransfer,
       invocationType(version),
-      assetType,
-      blockInfo
+      assetType(version),
+      blockInfo(version)
     ) ::: callableTypes(version)
 
   private val callableV3ReturnType =
@@ -369,8 +375,8 @@ object Types {
     )
   )
 
-  val buyType  = CASETYPEREF("Buy", List.empty)
-  val sellType = CASETYPEREF("Sell", List.empty)
+  val buyType  = CASETYPEREF("Buy", List.empty, true)
+  val sellType = CASETYPEREF("Sell", List.empty, true)
 
   val ordTypeType = UNION(buyType, sellType)
 

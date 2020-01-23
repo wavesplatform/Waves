@@ -31,7 +31,8 @@ class WavesEnvironment(
     h: Coeval[Int],
     blockchain: Blockchain,
     address: Coeval[ByteStr],
-    ds: DirectiveSet
+    ds: DirectiveSet,
+    override val txId: ByteStr
 ) extends Environment[Id] {
 
   override def height: Long = h()
@@ -113,93 +114,29 @@ class WavesEnvironment(
         issuerPk = assetDesc.issuer,
         reissuable = assetDesc.reissuable,
         scripted = assetDesc.script.nonEmpty,
-        sponsored = assetDesc.sponsorship != 0
+        minSponsoredFee = Some(assetDesc.sponsorship).filter(_ != 0)
       )
     }
   }
 
   override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock.map(block => toBlockInfo(block.header, height.toInt))
+    blockchain.lastBlock
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockInfo(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight))
+    blockchain.blockInfo(blockHeight)
+      .map(blockHAndSize =>
+        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(blockHeight)))
 
-  private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
+  private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
       timestamp = blockH.timestamp,
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.generator)
+      generatorPublicKey = ByteStr(blockH.generator),
+      vrf
     )
-  }
-
-  override def blockHeaderParser(bytes: Array[Byte]): Option[domain.BlockHeader] =
-    Try {
-      val (header, transactionCount, signature) = readHeaderOnly(bytes)
-
-      domain.BlockHeader(
-        header.timestamp,
-        header.version,
-        header.reference,
-        header.generator.toAddress.bytes,
-        header.generator.bytes,
-        signature,
-        header.baseTarget,
-        header.generationSignature,
-        transactionCount,
-        header.featureVotes.map(_.toLong).sorted
-      )
-    }.toOption
-
-  private def readHeaderOnly(bytes: Array[Byte]): (BlockHeader, Int, ByteStr) = {
-    val ndi = ByteStreams.newDataInput(bytes)
-
-    val version   = ndi.readByte()
-    val timestamp = ndi.readLong()
-
-    val referenceArr = new Array[Byte](crypto.SignatureLength)
-    ndi.readFully(referenceArr)
-
-    val baseTarget = ndi.readLong()
-
-    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig       = new Array[Byte](genSigLength)
-    ndi.readFully(genSig)
-
-    val transactionCount = {
-      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
-      else ndi.readInt()
-    }
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
-
-    val rewardVote = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
-
-    val generator = new Array[Byte](crypto.KeyLength)
-    ndi.readFully(generator)
-
-    val merkle = if (version > Block.RewardBlockVersion) {
-      val result = new Array[Byte](ndi.readInt())
-      ndi.readFully(result)
-      result
-    } else Array.emptyByteArray
-
-    val signature = new Array[Byte](crypto.SignatureLength)
-    ndi.readFully(signature)
-
-    val header = BlockHeader(
-      version,
-      timestamp,
-      ByteStr(referenceArr),
-      baseTarget,
-      ByteStr(genSig),
-      PublicKey(ByteStr(generator)),
-      featureVotes,
-      rewardVote,
-      ByteStr(merkle)
-    )
-    (header, transactionCount, ByteStr(signature))
   }
 }
