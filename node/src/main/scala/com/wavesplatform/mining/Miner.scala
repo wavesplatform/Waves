@@ -236,8 +236,7 @@ class MinerImpl(
                   generateBlockTask(account)
 
                 case Left(err) =>
-                  log.warn(s"Error mining Block: $err")
-                  Task.unit
+                  Task.raiseError(new RuntimeException(err.toString))
 
                 case Right(Some(score)) =>
                   log.debug(s"Forged and applied $block by ${account.stringRepr} with cumulative score $score")
@@ -264,8 +263,13 @@ class MinerImpl(
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
+
     val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasScript(_))
-    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
+    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
+      generateBlockTask(account)
+        .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
+        .runToFuture
+    }.toSet)
     microBlockAttempt := SerialCancelable()
 
     debugStateRef
