@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.transaction.transfer.TransferTransactionV1
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.util._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
@@ -43,8 +43,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
 
     def dumpBalances(node: Node, accounts: Seq[ByteString], label: String): Unit = {
       accounts.foreach(acc => {
-        val balance = miner.grpc.wavesBalance(acc).available
-        val eff = miner.grpc.wavesBalance(acc).effective
+        val balance = miner.wavesBalance(acc).available
+        val eff = miner.wavesBalance(acc).effective
 
         val formatted = s"$acc: balance = $balance, effective = $eff"
         log.debug(s"$label account balance:\n$formatted")
@@ -57,27 +57,27 @@ trait GrpcIntegrationSuiteWithThreeAddress
         node <- nodes
       } yield (node, txId)
 
-      txNodePairs.foreach({ case (node, tx) => node.grpc.waitForTransaction(tx) })
+      txNodePairs.foreach({ case (node, tx) => node.waitForTransaction(tx) })
     }
 
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>
       PBTransactions.vanilla(
-        sender.grpc.broadcastTransfer(sender.privateKey, Recipient().withAddress(acc), defaultBalance, sender.fee(TransferTransactionV1.typeId))
+        sender.broadcastTransfer(sender.privateKey, Recipient().withAddress(acc), defaultBalance, sender.fee(TransferTransactionV1.typeId))
       ).explicitGet().id().base58
     }
 
     def correctStartBalancesFuture(): Unit = {
-      nodes.foreach(n => n.grpc.waitForHeight(2))
+      nodes.foreach(n => n.waitForHeight(2))
       val accounts = Seq(firstAddress, secondAddress, thirdAddress)
 
       dumpBalances(sender, accounts, "initial")
       val txs = makeTransfers(accounts)
 
 
-      val height = nodes.map(_.grpc.height).max
+      val height = nodes.map(_.height).max
 
       withClue(s"waitForHeight(${height + 2})") {
-        nodes.foreach(n => n.grpc.waitForHeight(height + 2))
+        nodes.foreach(n => n.waitForHeight(height + 2))
       }
 
       withClue("waitForTxsToReachAllNodes") {
@@ -85,8 +85,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
       }
 
       dumpBalances(sender, accounts, "after transfer")
-      accounts.foreach(acc => miner.grpc.wavesBalance(acc).available shouldBe defaultBalance)
-      accounts.foreach(acc => miner.grpc.wavesBalance(acc).effective shouldBe defaultBalance)
+      accounts.foreach(acc => miner.wavesBalance(acc).available shouldBe defaultBalance)
+      accounts.foreach(acc => miner.wavesBalance(acc).effective shouldBe defaultBalance)
     }
 
     withClue("beforeAll") {

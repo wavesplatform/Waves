@@ -18,8 +18,8 @@ import com.wavesplatform.protobuf.api
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import io.swagger.annotations._
@@ -31,8 +31,15 @@ import scala.util.{Failure, Success, Try}
 
 @Path("/addresses")
 @Api(value = "/addresses/")
-case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
-    extends ApiRoute
+case class AddressApiRoute(
+    settings: RestAPISettings,
+    wallet: Wallet,
+    blockchain: Blockchain,
+    utxPoolSynchronizer: UtxPoolSynchronizer,
+    time: Time,
+    limitedScheduler: Scheduler
+) extends ApiRoute
+    with TimeLimitedRoute
     with BroadcastRoute
     with AuthRoute
     with AutoParamsDirective {
@@ -56,11 +63,10 @@ case class AddressApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain
     )
   )
   def scriptInfo: Route = (path("scriptInfo" / Segment) & get) { address =>
-    complete(
+    completeLimited(
       Address
         .fromString(address)
         .map(addressScriptInfoJson)
-        .map(ToResponseMarshallable(_))
     )
   }
 

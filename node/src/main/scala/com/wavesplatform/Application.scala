@@ -199,9 +199,16 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     rxExtensionLoaderShutdown = Some(sh)
 
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
     val timer = new HashedWheelTimer()
     val utxSynchronizerScheduler =
-      Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+      Schedulers.timeBoundedFixedPool(
+        timer,
+        5.seconds,
+        settings.synchronizationSettings.utxSynchronizer.maxThreads,
+        "utx-pool-synchronizer",
+        reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
+      )
     val utxSynchronizer =
       UtxPoolSynchronizer(
         utxStorage,
@@ -269,15 +276,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       }
 
+      val limitedScheduler =
+        Schedulers.timeBoundedFixedPool(
+          new HashedWheelTimer(),
+          5.seconds,
+          settings.restAPISettings.limitedPoolThreads,
+          "rest-time-limited",
+          reporter = log.trace("Uncaught exception in time limited pool", _)
+        )
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
         TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
-        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator),
+        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler),
         DebugApiRoute(
           settings,
           time,

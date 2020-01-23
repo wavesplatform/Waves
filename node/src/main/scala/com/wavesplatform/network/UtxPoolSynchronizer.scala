@@ -8,7 +8,7 @@ import com.wavesplatform.settings.SynchronizationSettings.UtxSynchronizerSetting
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{LastBlockInfo, Transaction}
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.Channel
 import io.netty.channel.group.ChannelGroup
@@ -73,19 +73,24 @@ class UtxPoolSynchronizerImpl(
     if (transactionIsNew(tx.id())) queue.tryOffer(tx -> source)
   }
 
-  private def validateFuture(tx: Transaction, allowRebroadcast: Boolean, source: Option[Channel]): Future[TracedResult[ValidationError, Boolean]] =
-    Future(putIfNew(tx))(timedScheduler)
+  private[this] def validateFuture(
+      tx: Transaction,
+      allowRebroadcast: Boolean,
+      source: Option[Channel]
+  ): Future[TracedResult[ValidationError, Boolean]] =
+    Schedulers
+      .executeCatchingInterruptedException(timedScheduler)(putIfNew(tx))
       .recover {
-        case t =>
-          log.warn(s"Error validating transaction ${tx.id()}", t)
-          TracedResult(Left(GenericError(t)))
+        case err =>
+          log.warn(s"Error validating transaction ${tx.id()}", err)
+          TracedResult(Left(GenericError(err)))
       }
       .andThen {
         case Success(TracedResult(Right(isNew), _)) if isNew || allowRebroadcast => broadcast(tx, source)
       }
 
   override def publish(tx: Transaction): TracedResult[ValidationError, Boolean] =
-    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), 10.seconds)
+    Await.result(validateFuture(tx, settings.allowTxRebroadcasting, None), Duration.Inf)
 
   override def close(): Unit = pollLoopCancelable.cancel()
 }
