@@ -46,7 +46,7 @@ object Types {
     )
   }
 
-  val blockInfo = CASETYPEREF(
+  def blockInfo(version: StdLibVersion) = CASETYPEREF(
     "BlockInfo",
     List(
       "timestamp"           -> LONG,
@@ -55,7 +55,7 @@ object Types {
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
-    )
+    ) ::: (if (version >= V4) List("vrf" -> BYTESTR) else Nil)
   )
 
   def optionAsset(version: StdLibVersion) =
@@ -185,7 +185,7 @@ object Types {
       scriptTransfer,
       invocationType(version),
       assetType(version),
-      blockInfo
+      blockInfo(version)
     ) ::: callableTypes(version)
 
   private val callableV3ReturnType =
