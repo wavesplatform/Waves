@@ -4,7 +4,7 @@ import java.nio.file.{Files, Paths}
 
 import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -65,8 +65,8 @@ object Preconditions {
                 .selfSigned(
                   TxVersion.V2,
                   issuer,
-                  Base64.encode(assetName.getBytes("utf-8")),
-                  Base64.encode(assetDescription.getBytes("utf-8")),
+                  assetName,
+                  assetDescription,
                   amount,
                   decimals.toByte,
                   reissuable,
