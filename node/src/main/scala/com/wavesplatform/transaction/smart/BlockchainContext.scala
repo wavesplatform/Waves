@@ -23,7 +23,8 @@ object BlockchainContext {
             blockchain: Blockchain,
             isTokenContext: Boolean,
             isContract: Boolean,
-            address: Coeval[ByteStr]): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
+            address: Coeval[ByteStr],
+            txId: ByteStr): Either[ExecutionError, EvaluationContext[Environment, Id]] = {
     DirectiveSet(
       version,
       ScriptType.isAssetScript(isTokenContext),
@@ -34,7 +35,7 @@ object BlockchainContext {
         CryptoContext.build(Global, version).withEnvironment[Environment] |+|
         WavesContext.build(ds)
 
-      ctx.evaluationContext(new WavesEnvironment(nByte, in, h, blockchain, address, ds))
+      ctx.evaluationContext(new WavesEnvironment(nByte, in, h, blockchain, address, ds, txId))
     }
   }
 }
