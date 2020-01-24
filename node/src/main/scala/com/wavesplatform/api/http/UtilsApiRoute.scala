@@ -179,7 +179,7 @@ case class UtilsApiRoute(
       new ApiImplicitParam(
         name = "code",
         required = true,
-        dataType = "com.wavesplatform.api.http.ScriptWithImportsRequest",
+        dataTypeClass = ScriptWithImportsRequest.getClass,
         paramType = "body",
         value = "Script code with imports"
       )

@@ -108,7 +108,7 @@ case class DebugApiRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.http.DebugMessage",
+        dataTypeClass = DebugMessage.getClass,
         defaultValue = "{\n\t\"message\": \"foo\"\n}"
       )
     )
@@ -224,7 +224,7 @@ case class DebugApiRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.http.RollbackParams",
+        dataTypeClass = RollbackParams.getClass,
         defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsToUTX\": false\n}"
       )
     )
