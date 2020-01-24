@@ -82,7 +82,7 @@ class MiningFailuresSuite
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)
-    generateBlock.runSyncUnsafe() shouldBe Unit
+    generateBlock.runSyncUnsafe() shouldBe ((): Unit)
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
