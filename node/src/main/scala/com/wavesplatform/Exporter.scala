@@ -126,10 +126,12 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
-                                                 outputFileNamePrefix: String = "blockchain",
-                                                 exportHeight: Option[Int] = None,
-                                                 format: String = Formats.Binary)
+  private[this] final case class ExporterOptions(
+      configFileName: File = new File("waves-testnet.conf"),
+      outputFileNamePrefix: String = "blockchain",
+      exportHeight: Option[Int] = None,
+      format: String = Formats.Binary
+  )
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -154,6 +156,10 @@ object Exporter extends ScorexLogging {
           case f if Formats.isSupported(f.toUpperCase) => success
           case f                                       => failure(s"Unsupported format: $f")
         },
+      opt[Int]('h', "height")
+        .text("Export to height")
+        .action((h, c) => c.copy(exportHeight = Some(h)))
+        .validate(h => if (h > 0) success else failure("Export height must be > 0")),
       help("help").hidden()
     )
   }
