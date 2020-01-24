@@ -4,7 +4,6 @@ import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
-import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -20,17 +19,9 @@ import monix.eval.Task
 import monix.execution.Scheduler
 import monix.execution.Scheduler.Implicits.global
 import org.scalamock.scalatest.PathMockFactory
-import org.scalatest.{AsyncFlatSpec, Matchers, PrivateMethodTester}
+import org.scalatest.{FlatSpec, Matchers, PrivateMethodTester}
 
-class MiningFailuresSuite
-    extends AsyncFlatSpec
-    with Matchers
-    with WithDB
-    with TransactionGen
-    with PrivateMethodTester
-    with DBCacheSettings
-    with PathMockFactory {
-
+class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTester with PathMockFactory with WithDB with TransactionGen {
   trait BlockchainUpdaterNG extends BlockchainUpdater with NG
 
   behavior of "Miner"
