@@ -142,13 +142,14 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     if (timeout > 0) Thread.sleep(timeout)
   }
 
-  def blockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData) = {
+  def blockInfo(height: Int): (Array[Byte], Long, NxtLikeConsensusBlockData, Option[ByteStr]) = {
     val lastBlock      = Json.parse(nodes.head.get(s"/blocks/at/$height").getResponseBody)
     val lastBlockId    = Base58.tryDecodeWithLimit((lastBlock \ "signature").as[String]).get
     val lastBlockTS    = (lastBlock \ "timestamp").as[Long]
     val lastBlockCData = (lastBlock \ "nxt-consensus").as[NxtLikeConsensusBlockData]
+    val lastBlockVRF   = (lastBlock \ "VRF").asOpt[String].map(str => ByteStr.decodeBase58(str).get)
 
-    (lastBlockId, lastBlockTS, lastBlockCData)
+    (lastBlockId, lastBlockTS, lastBlockCData, lastBlockVRF)
   }
 
   def blockTimestamp(h: Int): Long = {
@@ -166,16 +167,19 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
           nodes.head
             .get(s"/blocks/at/$h")
             .getResponseBody
-        ) \ "signature").as[String])
+        ) \ "signature").as[String]
+      )
       .get
   }
+
+  private val vrfActivationHeight = 100
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(3))
       .overrideBase(
         _.raw(
-          """
+          s"""
           |waves {
           |  blockchain {
           |    custom {
@@ -188,14 +192,15 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
           |          6 = 0
           |          7 = 0
           |          8 = 0
-          |          15 = 200
+          |          15 = $vrfActivationHeight
           |        }
           |      }
           |    }
           |  }
           |}
         """.stripMargin
-        ))
+        )
+      )
       .overrideBase(_.nonMiner)
       .withDefault(3)
       .withSpecial(_.raw("waves.miner.enable = yes"))
@@ -208,23 +213,29 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     crypto.fastHash(s)
   }
 
-  def forgeBlock(height: Int, signerPK: KeyPair)(updateDelay: Long => Long = identity,
-                                                        updateBaseTarget: Long => Long = identity,
-                                                        updateGenSig: ByteStr => ByteStr = identity): Block = {
+  def forgeBlock(
+      height: Int,
+      signerPK: KeyPair
+  )(updateDelay: Long => Long = identity, updateBaseTarget: Long => Long = identity, updateGenSig: ByteStr => ByteStr = identity): Block = {
 
     val ggParentTS =
       if (height >= 3)
         Some(
           (Json
-            .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long])
+            .parse(nodes.head.get(s"/blocks/at/${height - 2}").getResponseBody) \ "timestamp").as[Long]
+        )
       else None
 
-    val (lastBlockId, lastBlockTS, lastBlockCData) = blockInfo(height)
-
+    val (lastBlockId, lastBlockTS, lastBlockCData, lastBlockVRF) = blockInfo(height)
     val genSig: ByteStr =
-      updateGenSig(
-        ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK))
-      )
+      updateGenSig {
+        if (height < vrfActivationHeight)
+          ByteStr(generatorSignature(lastBlockCData.generationSignature.arr, signerPK))
+        else if (lastBlockVRF.isEmpty)
+          crypto.signVRF(signerPK, lastBlockCData.generationSignature)
+        else
+          crypto.signVRF(signerPK, lastBlockVRF.get)
+      }
 
     val validBlockDelay: Long = updateDelay(
       FairPoSCalculator
@@ -246,10 +257,10 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
           lastBlockTS + validBlockDelay
         )
     )
-
+    val version = if (height < vrfActivationHeight) 3.toByte else 5.toByte
     Block
       .buildAndSign(
-        version = 3: Byte,
+        version = version,
         timestamp = lastBlockTS + validBlockDelay,
         reference = ByteStr(lastBlockId),
         baseTarget = bastTarget,
