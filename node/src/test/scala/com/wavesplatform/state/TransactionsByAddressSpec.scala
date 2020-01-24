@@ -79,25 +79,18 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
       case (h, g: GenesisTransaction) if g.recipient == forAddress                                      => (h, g.id())
     }
 
-  private def transactionsFromBlockchain(
-      blockchain: Blockchain,
-      sender: Address,
-      types: Set[TransactionParser] = Set.empty,
-      fromId: Option[ByteStr] = None
-  ): Seq[(Int, ByteStr)] = ???
-
   "Transactions by address returns" - {
     "correct N txs on request" - {
-      "with `after`" in pendingUntilFixed(test { (sender, blocks, d) =>
+      "with `after`" in test { (sender, blocks, d) =>
         val senderTransactions                                  = collectTransactions(sender, blocks)
         def transactionsAfter(id: ByteStr): Seq[(Int, ByteStr)] = senderTransactions.dropWhile { case (_, txId) => txId != id }.tail
         forAll(Gen.oneOf(senderTransactions.map(_._2))) { id =>
-          transactionsAfter(id) shouldEqual transactionsFromBlockchain(d.blockchainUpdater, sender, fromId = Some(id))
+          transactionsAfter(id) shouldEqual d.addressTransactions(sender, Some(id)).map { case (h, tx) => h -> tx.id() }
         }
-      })
+      }
     }
     "all transactions" in test { (sender, blocks, d) =>
-      collectTransactions(sender, blocks) shouldEqual transactionsFromBlockchain(d.blockchainUpdater, sender)
+      collectTransactions(sender, blocks) shouldEqual d.addressTransactions(sender).map { case (h, tx) => h -> tx.id() }
     }
   }
 }

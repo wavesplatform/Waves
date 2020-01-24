@@ -267,7 +267,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     nodes.waitForHeightAriseAndTxPresent(tx.id().toString)
 
-    sender.nftAssetsBalance(buyerAddress, 1).head.assetId shouldBe assetId
+    sender.nftAssetsBalance(buyerAddress, 1, "").head.assetId shouldBe assetId
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + price - matcherFee
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - price - matcherFee
   }

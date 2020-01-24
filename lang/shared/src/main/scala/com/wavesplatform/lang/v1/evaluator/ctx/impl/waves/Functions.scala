@@ -370,21 +370,21 @@ object Functions {
       }
     }
 
-  val blockInfoByHeightF: BaseFunction[Environment] =
+  def blockInfoByHeightF(version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "blockInfoByHeight",
       100,
       BLOCKINFOBYHEIGHT,
-      UNION(UNIT, blockInfo),
+      UNION(UNIT, blockInfo(version)),
       ("height", LONG)
     ) {
-      new ContextfulNativeFunction[Environment]("blockInfoByHeight", UNION(UNIT, blockInfo), Seq(("height", LONG))) {
+      new ContextfulNativeFunction[Environment]("blockInfoByHeight", UNION(UNIT, blockInfo(version)), Seq(("height", LONG))) {
         override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, CONST_LONG(height: Long) :: Nil) =>
               env
                 .blockInfoByHeight(height.toInt)
-                .map(v => fromOptionCO(v.map(Bindings.buildLastBlockInfo)))
+                .map(v => fromOptionCO(v.map(bi => Bindings.buildLastBlockInfo(bi, version))))
                 .map(_.asRight[ExecutionError])
             case (_, xs) => notImplemented[F](s"blockInfoByHeight(u: Int)", xs)
           }

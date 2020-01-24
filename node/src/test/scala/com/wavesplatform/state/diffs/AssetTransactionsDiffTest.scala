@@ -3,16 +3,15 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -23,7 +22,7 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TransactionGen}
 import fastparse.core.Parsed
 import org.scalacheck.{Arbitrary, Gen}
-import org.scalatest.PropSpec
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class AssetTransactionsDiffTest
@@ -289,7 +288,7 @@ class AssetTransactionsDiffTest
                 issue.reissuable,
                 BigInt(issue.quantity),
                 Height @@ 2,
-                issue.script,
+                issue.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator).explicitGet()),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )

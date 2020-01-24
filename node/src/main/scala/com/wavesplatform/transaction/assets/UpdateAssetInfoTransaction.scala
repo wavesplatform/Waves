@@ -46,6 +46,8 @@ case class UpdateAssetInfoTransaction(
         "description" -> self.description
       )
     )
+
+  override def checkedAssets: Seq[IssuedAsset] = Seq(assetId)
 }
 
 object UpdateAssetInfoTransaction extends TransactionParser {

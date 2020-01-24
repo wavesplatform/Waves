@@ -12,8 +12,9 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
@@ -68,7 +69,7 @@ class CustomJsonMarshallerSpec
 
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
-      (blockchain.transactionInfo _).expects(lt.id()).returning(Some(1 -> lt)).twice()
+      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(Height(1) -> Left(lt))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
         .returning(Some(LeaseDetails(lt.sender, lt.recipient, 1, lt.amount, true)))
@@ -80,8 +81,9 @@ class CustomJsonMarshallerSpec
   property("/transactions/calculateFee") {
     (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
     (blockchain.assetScript _).expects(*).returning(None).anyNumberOfTimes()
-    (blockchain.hasAccountScript _).expects(*).returning(false).anyNumberOfTimes()
+
     forAll(transferV2Gen) { tx =>
+      (transactionsApi.calculateFee _).expects(*).returning(Right((Asset.Waves, 1, 1))).twice()
       checkRoute(Post("/transactions/calculateFee", tx.json()), transactionsRoute, "feeAmount")
     }
   }

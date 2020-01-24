@@ -6,7 +6,9 @@
         </encoder>
     </appender>
 
-    <root level="TRACE">
+    <logger name="scorex.crypto.signatures.Curve25519$" level="INFO"/>
+
+    <root level="${logback.test.level:-OFF}">
         <appender-ref ref="STDOUT" />
     </root>
 </configuration>

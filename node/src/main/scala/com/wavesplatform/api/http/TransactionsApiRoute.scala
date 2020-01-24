@@ -300,7 +300,7 @@ case class TransactionsApiRoute(
     encodedIds.traverse(ByteStr.decodeBase58) match {
       case Success(txIds) =>
         commonApi.transactionProofs(txIds) match {
-          case Nil    => CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+          case Nil    => CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
           case proofs => proofs
         }
       case _ => InvalidSignature

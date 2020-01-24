@@ -115,22 +115,24 @@ class WavesEnvironment(
     }
   }
 
-  override def lastBlockOpt(): Option[BlockInfo] = {
-    val height = blockchain.height
-    blockchain.blockHeader(height).map(signedHeader => toBlockInfo(signedHeader.header, height))
-  }
+  override def lastBlockOpt(): Option[BlockInfo] =
+    blockchain.lastBlockHeader
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockHeader(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight))
+    blockchain.blockHeader(blockHeight)
+      .map(blockHAndSize =>
+        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
-  private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
+  private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
       timestamp = blockH.timestamp,
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.generator)
+      generatorPublicKey = ByteStr(blockH.generator),
+      vrf
     )
   }
 }

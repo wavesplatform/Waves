@@ -4,8 +4,10 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
@@ -21,7 +23,6 @@ import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
 
 import scala.concurrent.duration._
@@ -247,7 +248,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
             val scriptUpd = upds.last.assets.head
 
             scriptUpd shouldBe issueUpd.copy(
-              script = setAssetScript.script,
+              script = setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator).explicitGet()),
               assetExistedBefore = !issueUpd.assetExistedBefore
             )
           }

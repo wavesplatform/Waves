@@ -22,7 +22,7 @@ trait GrpcIntegrationSuiteWithThreeAddress
     with ScorexLogging {
   this: Suite =>
 
-  def miner: Node    = nodes.init.last
+  def miner: Node    = nodes.head
   def notMiner: Node = nodes.last
 
   protected def sender: Node = miner

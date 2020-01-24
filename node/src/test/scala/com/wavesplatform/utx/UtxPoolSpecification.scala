@@ -31,9 +31,8 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
-import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
-import monix.reactive.subjects.{PublishSubject, Subject}
+import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -44,7 +43,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
-  private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
+  private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]
 
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("leveldb-test")

@@ -417,11 +417,24 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   }
 
   property("block info by height") {
+    pending
     val generatorSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
 
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
+    forAll(for {
+      (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
+      version   <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version) =>
+
+        val fs =
+          if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+          else smartEnabledFS
+
+        val (v4DeclOpt, v4CheckOpt) =
+          if (version >= V4) (s"let checkVrf = block.vrf == base58'$generatorSignature'", "&& checkVrf")
+          else ("", "")
+
+        assertDiffAndState(fs) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
@@ -429,7 +442,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           val script = ScriptCompiler
             .compile(
               s"""
-                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# STDLIB_VERSION ${version.id} #-}
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
@@ -443,8 +456,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
+                 | $v4DeclOpt
                  |
                  | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
+                 | $v4CheckOpt
                  |
               """.stripMargin,
               estimator
@@ -457,10 +472,12 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
         }
+
     }
   }
 
   property("blockInfoByHeight(height) is the same as lastBlock") {
+    pending
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, _) =>
         assertDiffAndState(smartEnabledFS) { append =>

@@ -195,7 +195,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     val nftIssueTx        = sender.issue(callerAcc.stringRepr, "TxNft", "TxNftDesc", 1, 0, fee = issueFee + smartFee, reissuable = false, waitForTx = true)
     val nftIssueTxAssetId = nftIssueTx.id
 
-    val info = sender.nftAssetsBalance(secondAddress, 100)
+    val info = sender.nftAssetsBalance(secondAddress, 100, "")
     info.size shouldBe 1
     info.head.assetId shouldBe nftIssueTxAssetId
 
@@ -220,7 +220,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
 
     val nftInvokeScriptAssetId = stateChanges.value.issues.head.assetId
 
-    val info = sender.nftAssetsBalance(firstAddress, 100)
+    val info = sender.nftAssetsBalance(firstAddress, 100, "")
     info.size shouldBe 1
     info.head.assetId shouldBe nftInvokeScriptAssetId
 

@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBase58, InvalidPublicKey, InvalidSignature, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBase58, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
@@ -31,7 +31,7 @@ import play.api.libs.json._
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 package object http extends ApiMarshallers with ScorexLogging {
   val versionReads: Reads[Byte] = {
@@ -103,10 +103,11 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   val TransactionId: PathMatcher1[ByteStr] = Segment.map { str =>
     ByteStr.decodeBase58(str) match {
-      case Success(value) if value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength => value
-      case other =>
-        log.warn(s"Error decoding $str: $other")
-        throw ApiException(InvalidBase58)
+      case Success(value) =>
+        if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
+        else throw ApiException(InvalidTransactionId(s"Transcaction ID $str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
+      case Failure(exception) =>
+        throw ApiException(InvalidTransactionId(exception.getMessage))
     }
   }
 

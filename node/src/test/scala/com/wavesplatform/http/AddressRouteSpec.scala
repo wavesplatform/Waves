@@ -34,7 +34,6 @@ class AddressRouteSpec
 
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.stringRepr)
-  private val address2account = (allAddresses zip allAccounts).toMap
   private val blockchain   = stub[Blockchain]("globalBlockchain")
   (blockchain.activatedFeatures _).when().returning(Map())
 

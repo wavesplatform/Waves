@@ -21,7 +21,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def removeAfter(blockId: ByteStr): DiscardedBlocks = blockchainUpdater.removeAfter(blockId).explicitGet()
 
-  def appendMicroBlock(b: MicroBlock) = blockchainUpdater.processMicroBlock(b).explicitGet()
+  def appendMicroBlock(b: MicroBlock): Unit = blockchainUpdater.processMicroBlock(b).explicitGet()
 
   def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.get
 
@@ -32,11 +32,11 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(_.nft), None)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, None, blockchainUpdater.assetDescription)
       .toSeq
   }
 
-  def addressTransactions(address: Address): Seq[(Height, Transaction)] = db.withResource { resource =>
+  def addressTransactions(address: Address, from: Option[ByteStr] = None): Seq[(Height, Transaction)] = db.withResource { resource =>
     AddressTransactions
       .allAddressTransactions(
         resource,
@@ -44,7 +44,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
         address,
         None,
         Set.empty,
-        None
+        from
       )
       .toSeq
   }

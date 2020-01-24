@@ -16,7 +16,7 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.protobuf.{AccountScriptInfo => PBAccountScriptInfo, AssetDetails => PBAssetDetails, BlockMeta => PBBlockMeta}
+import com.wavesplatform.database.protobuf.{StaticAssetInfo => PBStaticAssetInfo, AccountScriptInfo => PBAccountScriptInfo, AssetDetails => PBAssetDetails, BlockMeta => PBBlockMeta}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state._
@@ -281,8 +281,22 @@ package object database extends ScorexLogging {
     ).toByteArray
   }
 
-  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] = ???
-  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo   = ???
+  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] = PBStaticAssetInfo(
+    ByteString.copyFrom(sai.source.arr),
+    ByteString.copyFrom(sai.issuer.arr),
+    sai.decimals,
+    sai.nft
+  ).toByteArray
+
+  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo   = {
+    val sai = PBStaticAssetInfo.parseFrom(bb)
+    AssetStaticInfo(
+      TransactionId(ByteStr(sai.sourceId.toByteArray)),
+      PublicKey(sai.issuerPublicKey.toByteArray),
+      sai.decimals,
+      sai.isNft
+    )
+  }
 
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
     PBBlockMeta(

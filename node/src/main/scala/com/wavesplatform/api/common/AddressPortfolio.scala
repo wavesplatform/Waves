@@ -19,8 +19,8 @@ object AddressPortfolio {
       resource: DBResource,
       address: Address,
       diff: Diff,
-      isNFT: IssuedAsset => Boolean,
-      from: Option[IssuedAsset]
+      from: Option[IssuedAsset],
+      loadAssetDescription: IssuedAsset => Option[AssetDescription]
   ): Iterator[(IssuedAsset, AssetDescription)] = {
     val maybeAddressId = resource.get(Keys.addressId(address))
 
@@ -32,9 +32,9 @@ object AddressPortfolio {
       }
     }
 
-    new BalanceIterator(maybeAddressId, isNFT, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
-      .filter(_._2 != 0)
-      .flatMap { case (assetId, _) => loadAssetDescription(diff, resource, assetId).iterator }
+    new BalanceIterator(maybeAddressId, _ => true, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
+      .collect { case (issuedAsset, balance) if balance != 0 => issuedAsset -> loadAssetDescription(issuedAsset) }
+      .collect { case (id, Some(ad)) if ad.nft => id -> ad }
   }
 
   def assetBalanceIterator(
@@ -50,8 +50,6 @@ object AddressPortfolio {
     new BalanceIterator(maybeAddressId, includeAsset, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
       .filter(_._2 != 0)
   }
-
-  private def loadAssetDescription(diff: Diff, resource: DBResource, assetId: IssuedAsset): Option[(IssuedAsset, AssetDescription)] = ???
 
   class BalanceIterator(
       addressId: Option[BigInt],

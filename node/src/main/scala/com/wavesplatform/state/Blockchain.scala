@@ -143,5 +143,10 @@ object Blockchain {
     def lastBlockReward: Option[Long] = blockchain.blockReward(blockchain.height)
 
     def hasAssetScript(asset: IssuedAsset): Boolean = blockchain.assetScript(asset).isDefined
+
+    def vrf(atHeight: Int): Option[ByteStr] =
+      blockchain
+        .blockHeader(atHeight)
+        .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
   }
 }

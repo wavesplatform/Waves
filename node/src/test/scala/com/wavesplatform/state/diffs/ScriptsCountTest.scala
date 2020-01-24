@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
-import com.wavesplatform.common.state._
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures

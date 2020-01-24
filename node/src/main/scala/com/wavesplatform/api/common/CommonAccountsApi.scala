@@ -83,7 +83,7 @@ object CommonAccountsApi extends ScorexLogging {
 
     override def nftPortfolio(address: Address, from: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
       db.resourceObservable.flatMap { resource =>
-        Observable.fromIterator(Task(nftIterator(resource, address, diff, id => blockchain.assetDescription(id).exists(_.nft), from)))
+        Observable.fromIterator(Task(nftIterator(resource, address, diff, from, blockchain.assetDescription)))
       }
 
     override def script(address: Address): Option[AccountScriptInfo] = blockchain.accountScript(address)

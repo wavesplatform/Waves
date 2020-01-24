@@ -188,6 +188,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
           |          6 = 0
           |          7 = 0
           |          8 = 0
+          |          15 = 200
           |        }
           |      }
           |    }

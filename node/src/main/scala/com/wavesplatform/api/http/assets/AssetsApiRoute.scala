@@ -132,7 +132,7 @@ case class AssetsApiRoute(
                     }),
                     "sponsorBalance"   -> sponsorBalance,
                     "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-                    "issueTransaction" -> issueTransaction.json()
+                    "issueTransaction" -> issueTransaction.map(_.json())
                   )
               })
 

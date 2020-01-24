@@ -100,7 +100,7 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String])
+case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], name: Option[String], description: Option[String])
 object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
@@ -125,6 +125,8 @@ case class TransactionInfo(
     sender: Option[String],
     height: Int,
     minSponsoredAssetFee: Option[Long],
+    name: Option[String],
+    description: Option[String],
     recipient: Option[String],
     script: Option[String]
 ) extends TxInfo
@@ -266,7 +268,7 @@ case class Block(
     baseTarget: Option[Int],
     blocksize: Int,
     transactions: Seq[Transaction],
-    totalFee: Long,
+    fee: Long,
     totalFee: Option[Long],
     features: Option[Set[Short]],
     reward: Option[Long],
@@ -350,7 +352,7 @@ object BlockHeader {
         generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
         baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
-      } yield BlockHeaders(
+      } yield BlockHeader(
         signature,
         height,
         timestamp,
@@ -367,7 +369,7 @@ object BlockHeader {
         version
       )
     ),
-    Json.writes[BlockHeaders]
+    Json.writes[BlockHeader]
   )
 }
 

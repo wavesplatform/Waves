@@ -22,7 +22,7 @@ trait CommonAssetsApi {
 }
 
 object CommonAssetsApi {
-  final case class AssetInfo(description: AssetDescription, issueTransaction: IssueTransaction, sponsorBalance: Option[Long])
+  final case class AssetInfo(description: AssetDescription, issueTransaction: Option[IssueTransaction], sponsorBalance: Option[Long])
 
   def apply(diff: => Diff, db: DB, blockchain: Blockchain): CommonAssetsApi = new CommonAssetsApi {
     def description(assetId: IssuedAsset): Option[AssetDescription] = {
@@ -31,10 +31,9 @@ object CommonAssetsApi {
 
     def fullInfo(assetId: IssuedAsset): Option[AssetInfo] =
       for {
-        assetInfo                               <- blockchain.assetDescription(assetId)
-        (_, issueTransaction: IssueTransaction) <- blockchain.transactionInfo(assetId.id)
-        sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(issueTransaction.sender).spendableBalance) else None
-      } yield AssetInfo(assetInfo, issueTransaction, sponsorBalance)
+        assetInfo <- blockchain.assetDescription(assetId)
+        sponsorBalance = if (assetInfo.sponsorship != 0) Some(blockchain.wavesPortfolio(assetInfo.issuer).spendableBalance) else None
+      } yield AssetInfo(assetInfo, blockchain.transactionInfo(assetId.id).collect { case (_, it: IssueTransaction) => it }, sponsorBalance)
 
     override def wavesDistribution(height: Int, after: Option[Address]): Observable[(Address, Long)] =
       balanceDistribution(

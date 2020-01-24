@@ -3,7 +3,7 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidBase58, InvalidSignature, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidBase58, InvalidSignature, InvalidTransactionId, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.TransactionsRootSpec._
@@ -255,11 +255,11 @@ class TransactionsRouteSpec
   routePath("/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidBase58)
+        Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
       }
 
-      Get(routePath(s"/info/")) ~> route should produce(InvalidBase58)
-      Get(routePath(s"/info")) ~> route should produce(InvalidBase58)
+      Get(routePath(s"/info/")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
+      Get(routePath(s"/info")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
     }
 
     "working properly otherwise" in {
@@ -449,6 +449,8 @@ class TransactionsRouteSpec
 
         val queryParams = txIdsToBlock.keys.map(id => s"id=$id").mkString("?", "&", "")
         val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
+
+        println(s"\n\t$queryParams\n")
 
         Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
           validateSuccess(txIdsToBlock, response)

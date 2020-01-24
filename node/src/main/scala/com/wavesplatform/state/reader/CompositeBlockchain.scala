@@ -41,74 +41,8 @@ final case class CompositeBlockchain(
       .flatMap(_.assetScripts.get(asset))
       .getOrElse(inner.assetScript(asset))
 
-  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
-    val script = assetScript(asset)
-
-    val fromDiff = diff.issuedAssets
-      .get(asset)
-      .map {
-        case (static, info, volume) =>
-          val sponsorship = diff.sponsorship.get(asset).fold(0L) {
-            case SponsorshipValue(sp) => sp
-            case SponsorshipNoInfo    => 0L
-          }
-
-          AssetDescription(
-            static.source,
-            static.issuer,
-            info.name,
-            info.description,
-            static.decimals,
-            volume.isReissuable,
-            volume.volume,
-            info.lastUpdatedAt,
-            script,
-            sponsorship,
-            static.nft
-          )
-      }
-
-    val assetDescription =
-      inner
-        .assetDescription(asset)
-        .orElse(fromDiff)
-        .map { description =>
-          diff.updatedAssets
-            .get(asset)
-            .fold(description) {
-              case Ior.Left(info) =>
-                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
-              case Ior.Right(vol) =>
-                description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
-              case Ior.Both(info, vol) =>
-                description
-                  .copy(
-                    reissuable = description.reissuable && vol.isReissuable,
-                    totalVolume = description.totalVolume + vol.volume,
-                    name = info.name,
-                    description = info.description,
-                    lastUpdatedAt = info.lastUpdatedAt
-                  )
-            }
-        }
-        .map { description =>
-          diff.sponsorship
-            .get(asset)
-            .fold(description) {
-              case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
-              case SponsorshipValue(v) => description.copy(sponsorship = v)
-            }
-        }
-
-    assetDescription map { z =>
-      diff.transactions.values
-        .foldLeft(z.copy(script = script)) {
-          case (acc, (ut: UpdateAssetInfoTransaction, _)) if ut.assetId == asset =>
-            acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
-          case (acc, _)                                        => acc
-        }
-    }
-  }
+  override def assetDescription(asset: IssuedAsset): Option[AssetDescription] =
+    CompositeBlockchain.assetDescription(asset, maybeDiff.orEmpty, inner.assetDescription(asset), inner.assetScript(asset), height)
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
@@ -119,8 +53,7 @@ final case class CompositeBlockchain(
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = {
-    diff
-      .transactions
+    diff.transactions
       .get(id)
       .collect {
         case (tx: TransferTransaction, _) => (height, tx)
@@ -129,15 +62,13 @@ final case class CompositeBlockchain(
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
-    diff
-      .transactions
+    diff.transactions
       .get(id)
       .map(t => (this.height, t._1))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
-    diff
-      .transactions
+    diff.transactions
       .get(id)
       .map(_ => this.height)
       .orElse(inner.transactionHeight(id))
@@ -172,7 +103,7 @@ final case class CompositeBlockchain(
       inner.balanceOnlySnapshots(address, h, assetId)
     } else {
       val balance = this.balance(address, assetId)
-      val bs = height -> balance
+      val bs      = height -> balance
       Some(bs)
     }
   }
@@ -239,6 +170,80 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain {
+  def assetDescription(
+      asset: IssuedAsset,
+      diff: Diff,
+      innerAssetDescription: => Option[AssetDescription],
+      innerScript: => Option[(Script, Long)],
+      height: Int
+  ): Option[AssetDescription] = {
+    val script = diff.assetScripts.getOrElse(asset, innerScript)
+
+    val fromDiff = diff.issuedAssets
+      .get(asset)
+      .map {
+        case (static, info, volume) =>
+          val sponsorship = diff.sponsorship.get(asset).fold(0L) {
+            case SponsorshipValue(sp) => sp
+            case SponsorshipNoInfo    => 0L
+          }
+
+          AssetDescription(
+            static.source,
+            static.issuer,
+            info.name,
+            info.description,
+            static.decimals,
+            volume.isReissuable,
+            volume.volume,
+            info.lastUpdatedAt,
+            script,
+            sponsorship,
+            static.nft
+          )
+      }
+
+    val assetDescription =
+      innerAssetDescription
+        .orElse(fromDiff)
+        .map { description =>
+          diff.updatedAssets
+            .get(asset)
+            .fold(description) {
+              case Ior.Left(info) =>
+                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
+              case Ior.Right(vol) =>
+                description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
+              case Ior.Both(info, vol) =>
+                description
+                  .copy(
+                    reissuable = description.reissuable && vol.isReissuable,
+                    totalVolume = description.totalVolume + vol.volume,
+                    name = info.name,
+                    description = info.description,
+                    lastUpdatedAt = info.lastUpdatedAt
+                  )
+            }
+        }
+        .map { description =>
+          diff.sponsorship
+            .get(asset)
+            .fold(description) {
+              case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
+              case SponsorshipValue(v) => description.copy(sponsorship = v)
+            }
+        }
+
+    assetDescription map { z =>
+      diff.transactions.values
+        .foldLeft(z.copy(script = script)) {
+          case (acc, (ut: UpdateAssetInfoTransaction, _)) if ut.assetId == asset =>
+            acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
+          case (acc, _) => acc
+        }
+    }
+  }
+
   def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
     CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
 
