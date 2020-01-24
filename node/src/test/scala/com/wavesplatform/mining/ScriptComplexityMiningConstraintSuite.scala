@@ -2,13 +2,13 @@ package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.common.utils._
-import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.{Blockchain, LeaseBalance}
 import com.wavesplatform.transaction.{DataTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{FlatSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -19,8 +19,7 @@ class ScriptComplexityMiningConstraintSuite
     with ScalaCheckDrivenPropertyChecks
     with PathMockFactory
     with TransactionGen
-    with NoShrink
-    with WithDomain {
+    with NoShrink {
   val settings = WavesSettings.fromRootConfig(ConfigFactory.load())
 
   val complexity = OneDimensionalMiningConstraint(1000, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock")
@@ -56,12 +55,12 @@ class ScriptComplexityMiningConstraintSuite
 
   }
 
-  def preconditions =
+  private[this] def preconditions: Gen[(DataTransaction, DataTransaction, DataTransaction)] =
     for {
       acc1 <- accountGen
       acc2 <- accountGen
-      transfer1 = DataTransaction.selfSigned(acc1, Nil, 1000000, System.currentTimeMillis()).explicitGet()
-      transfer2 = DataTransaction.selfSigned(acc2, Nil, 1000000, System.currentTimeMillis()).explicitGet()
-      transfer3 = DataTransaction.selfSigned(acc2, Nil, 1000000, System.currentTimeMillis()).explicitGet()
-    } yield (transfer1, transfer2, transfer3)
+      tx1 = DataTransaction.selfSigned(acc1, Nil, 1000000, System.currentTimeMillis()).explicitGet()
+      tx2 = DataTransaction.selfSigned(acc2, Nil, 1000000, System.currentTimeMillis()).explicitGet()
+      tx3 = DataTransaction.selfSigned(acc2, Nil, 1000000, System.currentTimeMillis()).explicitGet()
+    } yield (tx1, tx2, tx3)
 }
