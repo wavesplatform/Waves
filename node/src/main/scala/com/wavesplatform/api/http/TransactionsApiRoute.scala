@@ -104,10 +104,11 @@ case class TransactionsApiRoute(
     protobufEntity(TransactionsByIdRequest) { request =>
       if (request.ids.length > settings.transactionsByAddressLimit)
         complete(TooBigArrayAllocation)
-      else
-        request.ids.map(ByteStr.decodeBase58).toList.sequence match {
-          case Success(ids) =>
-            val results = ids.map { id =>
+      else {
+        request.ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
+          case (Nil, Nil)  => complete(CustomValidationError("Empty request"))
+          case (Nil, ids) =>
+            val results = ids.toSet.map { id: ByteStr =>
               val statusJson = blockchain.transactionInfo(id) match {
                 case Some((height, _)) =>
                   Json.obj("status" -> "confirmed", "height" -> height, "confirmations" -> (blockchain.height - height).max(0))
@@ -118,12 +119,12 @@ case class TransactionsApiRoute(
                     case None    => Json.obj("status" -> "not_found")
                   }
               }
-              statusJson ++ Json.obj("id" -> id.toString)
-            }
-            complete(results)
-
-          case _ => complete(InvalidSignature)
+              id -> (statusJson ++ Json.obj("id" -> id.toString))
+            }.toMap
+            complete(ids.map(id => results(id)))
+          case (errors, _) => complete(InvalidIds(errors))
         }
+      }
     }
   }
 

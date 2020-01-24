@@ -218,6 +218,10 @@ object AsyncHttpApi extends Assertions {
 
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
 
+
+    def transactionsStatus(txIds:Seq[String]):Future[Seq[TransactionStatus]] =
+      postJson(s"/transactions/status", Json.obj("ids" -> txIds)).as[List[TransactionStatus]]
+
     def transactionsByAddress(address: String, limit: Int): Future[Seq[TransactionInfo]] =
       get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]].map(_.flatten)
 
