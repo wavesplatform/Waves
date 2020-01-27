@@ -9,7 +9,7 @@ import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{TransactionGen, crypto}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
@@ -147,9 +147,11 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("negative validation cases") {
-    forAll(dataTransactionGen) {
-      case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
-        val dataTooBig   = List.tabulate(100)(n => StringDataEntry((100 + n).toString, "a" * 1527))
+    val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
+    forAll(gen) {
+      case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs) =>
+        val dataSize     = if (tx.isProtobufVersion) 110 else 100
+        val dataTooBig   = List.tabulate(dataSize)(n => StringDataEntry((100 + n).toString, "a" * 1527))
         val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
 
@@ -157,7 +159,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
-        val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
+        val maxKeySize   = if (tx.isProtobufVersion) MaxPBKeySize else MaxKeySize
+        val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 

@@ -100,7 +100,7 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String])
+case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], name: Option[String], description: Option[String])
 object Transaction {
   implicit val transactionFormat: Format[Transaction] = Json.format
 }
@@ -125,6 +125,8 @@ case class TransactionInfo(
     sender: Option[String],
     height: Int,
     minSponsoredAssetFee: Option[Long],
+    name: Option[String],
+    description: Option[String],
     recipient: Option[String],
     script: Option[String]
 ) extends TxInfo

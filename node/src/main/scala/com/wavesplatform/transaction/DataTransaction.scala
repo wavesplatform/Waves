@@ -35,7 +35,7 @@ object DataTransaction extends TransactionParser {
   val MaxProtoBytes: Int = 165890
   val MaxEntryCount: Int = 100
 
-  override val typeId: TxType                    = 12
+  override val typeId: TxType                    = 12.toByte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[DataTransaction] = DataTxValidator

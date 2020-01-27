@@ -60,7 +60,7 @@ object WavesContext {
   }
 
   private def fromV3Funcs(v: StdLibVersion) =
-    extractedFuncs(v) ++ Array(assetInfoF(v), blockInfoByHeightF, stringFromAddressF)
+    extractedFuncs(v) ++ Array(assetInfoF(v), blockInfoByHeightF(v), stringFromAddressF)
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {
     val commonFuncs =
@@ -97,7 +97,7 @@ object WavesContext {
       case V3 | V4 =>
         val `this` = if (isTokenContext) assetThis(version) else accountThis
         val txO    = if (contentType == Expression) Map(txVal) else Map()
-        val common = Map(sell, buy, lastBlock, `this`)
+        val common = Map(sell, buy, lastBlock(version), `this`)
         common ++ txO
     }
   }

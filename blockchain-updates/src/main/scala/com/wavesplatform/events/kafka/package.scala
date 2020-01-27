@@ -3,7 +3,6 @@ import java.util
 
 import com.wavesplatform.events.protobuf.PBEvents
 import com.wavesplatform.events.settings.BlockchainUpdatesSettings
-import com.wavesplatform.state.{BlockAppended, BlockchainUpdated, MicroBlockAppended, MicroBlockRollbackCompleted, RollbackCompleted}
 import org.apache.kafka.clients.CommonClientConfigs
 import org.apache.kafka.clients.producer.{KafkaProducer, ProducerConfig, ProducerRecord}
 import org.apache.kafka.common.config.SaslConfigs

@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
-import java.net.InetSocketAddress
+import java.net.{InetSocketAddress, URLEncoder}
+import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
@@ -9,8 +10,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc._
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
 import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
@@ -29,6 +29,7 @@ import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactio
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
+import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
@@ -430,6 +431,17 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee, version)), waitForTx)
 
+    def updateAssetInfo(sender: KeyPair,
+                        assetId: String,
+                        updatedName: String,
+                        updatedDescription: String,
+                        fee: Long,
+                        feeAsset: Asset = Waves,
+                        version: TxVersion = TxVersion.V1,
+                        waitForTx: Boolean = false
+                       ): Transaction =
+      maybeWaitForTransaction(sync(async(n).updateAssetInfo(sender, assetId, updatedName, updatedDescription, fee, feeAsset, version)), waitForTx)
+
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, waitForTx: Boolean = false): Transaction =
       maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, fee)), waitForTx)
 
@@ -501,7 +513,7 @@ object SyncHttpApi extends Assertions {
       sync(async(n).rawTransactionInfo(txId))
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
-      sync(async(n).waitForTransaction(txId))
+      sync(async(n).waitForTransaction(txId), 2.minutes)
 
     def signAndBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)
@@ -732,6 +744,17 @@ object SyncHttpApi extends Assertions {
       )
     }
 
+    def updateAssetInfo(sender: KeyPair,
+                        assetId: String,
+                        updatedName: String,
+                        updatedDescription: String,
+                        fee: Long,
+                        feeAsset: Asset = Waves,
+                        version: TxVersion = TxVersion.V1,
+                        waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).grpc.updateAssetInfo(sender, assetId, updatedName, updatedDescription, fee, feeAsset, version)), waitForTx)
+    }
+
     def broadcastIssue(
         source: KeyPair,
         name: String,
@@ -819,7 +842,7 @@ object SyncHttpApi extends Assertions {
 
     def height: Int = sync(async(n).grpc.height)
 
-    def waitForHeight(expectedHeight: Int): Int = sync(async(n).grpc.waitForHeight(expectedHeight))
+    def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int = sync(async(n).grpc.waitForHeight(expectedHeight), requestAwaitTime)
 
     def broadcastBurn(sender: KeyPair,
                       assetId: String,
@@ -887,6 +910,8 @@ object SyncHttpApi extends Assertions {
         BlockRangeRequest.Filter.Generator.apply(ByteString.copyFrom(Base58.decode(address)))))
       blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
     }
+
+    def assetInfo(assetId: String): AssetInfoResponse = sync(async(n).grpc.assetInfo(assetId))
 
     def scriptInfo(address: ByteString): ScriptData = {
       accounts.getScript(AccountRequest.of(address))

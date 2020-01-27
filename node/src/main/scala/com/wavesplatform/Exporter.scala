@@ -5,6 +5,7 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.openDB
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.protobuf.block.PBBlocks
@@ -43,7 +44,7 @@ object Exporter extends ScorexLogging {
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val blockchain       = StorageFactory(settings, db, time, Observer.empty, Observer.empty)
+        val blockchain       = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
@@ -125,10 +126,12 @@ object Exporter extends ScorexLogging {
     }
   }
 
-  private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
-                                                 outputFileNamePrefix: String = "blockchain",
-                                                 exportHeight: Option[Int] = None,
-                                                 format: String = Formats.Binary)
+  private[this] final case class ExporterOptions(
+      configFileName: File = new File("waves-testnet.conf"),
+      outputFileNamePrefix: String = "blockchain",
+      exportHeight: Option[Int] = None,
+      format: String = Formats.Binary
+  )
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -153,6 +156,10 @@ object Exporter extends ScorexLogging {
           case f if Formats.isSupported(f.toUpperCase) => success
           case f                                       => failure(s"Unsupported format: $f")
         },
+      opt[Int]('h', "height")
+        .text("Export to height")
+        .action((h, c) => c.copy(exportHeight = Some(h)))
+        .validate(h => if (h > 0) success else failure("Export height must be > 0")),
       help("help").hidden()
     )
   }

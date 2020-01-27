@@ -71,6 +71,7 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   override def inputEntity: InputEntity                                   = ???
   override def transactionById(id: Array[Byte]): Future[Option[Tx]]       = ???
   override def multiPaymentAllowed: Boolean                               = ???
+  override def txId: ByteStr                                              = ???
 
   private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))

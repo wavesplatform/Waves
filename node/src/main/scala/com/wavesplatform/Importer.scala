@@ -10,13 +10,14 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
+import com.wavesplatform.events.{BlockchainUpdateTriggers, BlockchainUpdateTriggersImpl, BlockchainUpdated}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -102,11 +103,11 @@ object Importer extends ScorexLogging {
       time: NTP,
       settings: WavesSettings,
       importOptions: ImportOptions,
-      blockchainUpdated: Observer[BlockchainUpdated]
+      blockchainUpdateTriggers: BlockchainUpdateTriggers
   ): (Blockchain with BlockchainUpdater, AppendBlock, UtxPoolImpl) = {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
-      StorageFactory(settings, db, time, Observer.empty, blockchainUpdated)
+      StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
     val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
@@ -135,7 +136,7 @@ object Importer extends ScorexLogging {
         override def wallet: Wallet = ???
         override def utx: UtxPool   = utxPool
 
-        override def broadcastTransaction(tx: Transaction) = ???
+        override def broadcastTransaction(tx: Transaction)                 = ???
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
@@ -230,7 +231,8 @@ object Importer extends ScorexLogging {
       time      = new NTP(wavesSettings.ntpServer)
 
       blockchainUpdated                         = ConcurrentSubject.publish[BlockchainUpdated]
-      (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdated)
+      blockchainUpdateTriggers                  = new BlockchainUpdateTriggersImpl(blockchainUpdated)
+      (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdateTriggers)
       extensions                                = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
       _                                         = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield () => {
