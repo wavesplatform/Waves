@@ -317,23 +317,6 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def updateAssetInfo(sender: KeyPair, assetId: String, updatedName: String, updatedDescription: String, fee: Long, feeAsset: Asset = Waves, version: TxVersion = TxVersion.V1): Future[Transaction] = {
-      val signedTransaction = UpdateAssetInfoTransaction(
-        version,
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(assetId).get),
-        updatedName,
-        updatedDescription,
-        System.currentTimeMillis(),
-        fee,
-        feeAsset,
-        Proofs.empty
-      ).signWith(sender).json()
-
-      signedBroadcast(signedTransaction)
-    }
-
     def activeLeases(sourceAddress: String): Future[Seq[Transaction]] = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 
     def issue(

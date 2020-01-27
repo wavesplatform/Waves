@@ -38,7 +38,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val nextTerm = sender.transactionInfo(assetId).height + updateInterval + 1
     sender.waitForHeight(nextTerm, 3.minutes)
     val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
-    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee).id
+    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
     val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
@@ -66,7 +66,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update info of other asset after updating info of first asset") {
-    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee).id
+    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
     val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
@@ -175,7 +175,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update name/description of nft") {
-    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee).id
+    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
     checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
     val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
