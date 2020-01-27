@@ -47,7 +47,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     sender.waitForHeight(activationHeight, 2.minutes)
     assertApiError(sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include("Can't update asset info before")
+      error.message should include(s"Can't update info of asset with id=$otherAssetId")
     }
   }
 
