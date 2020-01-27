@@ -4,6 +4,8 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.protobuf.transaction.PBOrders
+import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order, OrderType}
@@ -29,11 +31,11 @@ object OrderSerializer {
       "matcherFee"       -> matcherFee,
       "signature"        -> proofs.toSignature.toString,
       "proofs"           -> proofs.proofs.map(_.toString)
-    ) ++ (if (version == Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty)
+    ) ++ (if (version >= Order.V3) Json.obj("matcherFeeAssetId" -> matcherFeeAssetId) else JsObject.empty)
   }
 
-  def bodyBytes(tx: Order): Array[Byte] = {
-    import tx._
+  def bodyBytes(order: Order): Array[Byte] = {
+    import order._
 
     version match {
       case Order.V1 =>
@@ -77,6 +79,9 @@ object OrderSerializer {
           Longs.toByteArray(matcherFee),
           matcherFeeAssetId.byteRepr
         )
+
+      case _ =>
+        PBUtils.encodeDeterministic(PBOrders.protobuf(order.copy(proofs = Proofs.empty)))
     }
   }
 

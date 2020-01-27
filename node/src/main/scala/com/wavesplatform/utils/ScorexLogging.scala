@@ -6,6 +6,11 @@ import monix.reactive.Observable
 import org.slf4j.{Logger, LoggerFactory}
 
 case class LoggerFacade(logger: Logger) {
+  def trace(message: => String, throwable: Throwable): Unit = {
+    if (logger.isTraceEnabled)
+      logger.trace(message, throwable)
+  }
+
   def trace(message: => String): Unit = {
     if (logger.isTraceEnabled)
       logger.trace(message)

@@ -14,7 +14,7 @@ import com.wavesplatform.utils._
 
 import scala.util.Try
 
-package object crypto extends ScorexLogging {
+package object crypto {
   // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
@@ -46,10 +46,7 @@ package object crypto extends ScorexLogging {
 
   def verifyVRF(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Either[ValidationError, ByteStr] =
     Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))).toEither.left
-      .map { e =>
-        log.warn("Generation signatures does not match", e)
-        GenericError("Generation signatures does not match")
-      }
+      .map(_ => GenericError("Could not verify VRF proof"))
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 

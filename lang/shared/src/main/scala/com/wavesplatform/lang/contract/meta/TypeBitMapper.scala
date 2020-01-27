@@ -3,7 +3,6 @@ package com.wavesplatform.lang.contract.meta
 import cats.implicits._
 import com.wavesplatform.lang.v1.compiler.Types.{FINAL, LIST, UNION}
 
-import scala.annotation.tailrec
 import scala.util.Try
 
 trait TypeBitMapper {

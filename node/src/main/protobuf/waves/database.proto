@@ -3,15 +3,8 @@ package waves.api;
 option java_package = "com.wavesplatform.database.protobuf";
 
 message AssetDetails {
-    message BytesOrString {
-        oneof value {
-            bytes bytes = 1;
-            string string = 2;
-        }
-    }
-
-    BytesOrString name = 1;
-    BytesOrString description = 2;
+    bytes name = 1;
+    bytes description = 2;
     int32 last_renamed_at = 3;
     bool reissuable = 4;
     bytes total_volume = 5;

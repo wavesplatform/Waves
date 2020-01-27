@@ -2,6 +2,7 @@ package com.wavesplatform.state.reader
 
 import cats.data.Ior
 import cats.implicits._
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -12,7 +13,7 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -109,7 +110,8 @@ final case class CompositeBlockchain(
     assetDescription map { z =>
       diff.transactions
         .foldLeft(z.copy(script = script)) {
-          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) => acc.copy(name = Right(ut.name), description = Right(ut.description), lastUpdatedAt = Height(height))
+          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) if ut.assetId == asset =>
+            acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _)                                        => acc
         }
     }
@@ -175,6 +177,16 @@ final case class CompositeBlockchain(
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
+
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+    if (maybeDiff.isEmpty || h < this.height) {
+      inner.balanceOnlySnapshots(address, h, assetId)
+    } else {
+      val balance = this.balance(address, assetId)
+      val bs = height -> balance
+      Some(bs)
+    }
+  }
 
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
@@ -277,6 +289,9 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
+  def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
+    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
+
   def addressTransactions(bu: CompositeBlockchain): AddressTransactions =
     new CompositeAddressTransactions(bu.inner, Height @@ bu.height, () => bu.maybeDiff)
 
