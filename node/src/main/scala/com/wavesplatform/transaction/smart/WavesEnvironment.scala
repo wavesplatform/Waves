@@ -1,12 +1,12 @@
 package com.wavesplatform.transaction.smart
 
-import com.google.common.io.ByteStreams
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
@@ -31,7 +31,8 @@ class WavesEnvironment(
     h: Coeval[Int],
     blockchain: Blockchain,
     address: Coeval[ByteStr],
-    ds: DirectiveSet
+    ds: DirectiveSet,
+    override val txId: ByteStr
 ) extends Environment[Id] {
 
   override def height: Long = h()
@@ -119,19 +120,23 @@ class WavesEnvironment(
   }
 
   override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock.map(block => toBlockInfo(block.header, height.toInt))
+    blockchain.lastBlock
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockInfo(blockHeight).map(blockHAndSize => toBlockInfo(blockHAndSize.header, blockHeight))
+    blockchain.blockInfo(blockHeight)
+      .map(blockHAndSize =>
+        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(blockHeight)))
 
-  private def toBlockInfo(blockH: BlockHeader, bHeight: Int) = {
+  private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
       timestamp = blockH.timestamp,
       height = bHeight,
       baseTarget = blockH.baseTarget,
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
-      generatorPublicKey = ByteStr(blockH.generator)
+      generatorPublicKey = ByteStr(blockH.generator),
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }
 }

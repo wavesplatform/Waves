@@ -7,7 +7,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.features.BlockchainFeatures.{FeeSponsorship, MultiPaymentInvokeScript}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, MultiPaymentInvokeScript}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
@@ -420,9 +420,30 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
   property("block info by height") {
     val generatorSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
 
-    forAll(preconditionsAndPayments) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
-        assertDiffAndState(smartEnabledFS) { append =>
+    forAll(for {
+      (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
+      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      withVrf <- Gen.oneOf(false, true)
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
+
+        val fs =
+          if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+          else smartEnabledFS
+
+        val fsWithVrf =
+          if (withVrf) fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockV5.id -> 0))
+          else fs
+
+        val (v4DeclOpt, v4CheckOpt) =
+          if (version >= V4)
+            if (withVrf)
+              (s"let checkVrf = block.vrf != unit", "&& checkVrf")
+            else
+              (s"let checkVrf = block.vrf == unit", "&& checkVrf")
+          else ("", "")
+
+        assertDiffAndState(fsWithVrf) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
@@ -430,7 +451,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           val script = ScriptCompiler
             .compile(
               s"""
-                 | {-# STDLIB_VERSION 3 #-}
+                 | {-# STDLIB_VERSION ${version.id} #-}
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
@@ -444,8 +465,10 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
+                 | $v4DeclOpt
                  |
                  | nonExistedBlockNeg && nonExistedBlockZero && nonExistedBlockNextPlus && checkHeight && checkBaseTarget && checkGenSignature && checkGenerator && checkGeneratorPublicKey
+                 | $v4CheckOpt
                  |
               """.stripMargin,
               estimator
@@ -458,6 +481,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
           append(Seq(setScriptTx)).explicitGet()
           append(Seq(transfer2)).explicitGet()
         }
+
     }
   }
 

@@ -178,6 +178,8 @@ case class TransactionInfo(
     sender: Option[String],
     height: Int,
     minSponsoredAssetFee: Option[Long],
+    name: Option[String],
+    description: Option[String],
     recipient: Option[String],
     script: Option[String]
 ) extends TxInfo

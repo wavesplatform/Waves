@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.util.Random
+import scala.util.Random._
 
 //noinspection ScalaStyle, TypeAnnotation
 class NarrowTransactionGenerator(
@@ -66,10 +67,8 @@ class NarrowTransactionGenerator(
         val tx: Option[Transaction] = typeGen.getRandom match {
           case IssueTransaction =>
             val sender      = randomFrom(accounts).get
-            val name        = new Array[Byte](10)
-            val description = new Array[Byte](10)
-            random.nextBytes(name)
-            random.nextBytes(description)
+            val name        = random.nextString(5)
+            val description = random.nextString(5)
             val reissuable = random.nextBoolean()
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
@@ -77,8 +76,8 @@ class NarrowTransactionGenerator(
                 .selfSigned(
                   TxVersion.V2,
                   sender,
-                  new String(name),
-                  new String(description),
+                  name,
+                  description,
                   amount,
                   Random.nextInt(9).toByte,
                   reissuable,

@@ -4,6 +4,7 @@ import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.lang.v1.CalculateAssetIdBenchmark.{CalculateAssetIdSt, CurveSt}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -35,7 +36,7 @@ class CalculateAssetIdBenchmark {
 
   @Benchmark
   def calculateAssetId(st: CalculateAssetIdSt, bh: Blackhole): Unit =
-    bh.consume(Issue.calculateId(Int.MaxValue, st.MaxAssetDescription, isReissuable = true, st.MaxAssetName, Long.MaxValue, Long.MaxValue))
+    bh.consume(Issue.calculateId(Int.MaxValue, st.MaxAssetDescription, isReissuable = true, st.MaxAssetName, Long.MaxValue, Long.MaxValue, ByteStr(new Array[Byte](64))))
 }
 
 object CalculateAssetIdBenchmark {
