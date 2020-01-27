@@ -94,13 +94,13 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val nextTermEnd = sender.transactionInfo(assetId).height + 2 * updateInterval
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include("Can't update asset info before")
+      error.message should include(s"Can't update info of asset with id=$assetId")
     }
     sender.waitForHeight(nextTermEnd)
 
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include("Can't update asset info before")
+      error.message should include(s"Can't update info of asset with id=$assetId")
     }
   }
 
