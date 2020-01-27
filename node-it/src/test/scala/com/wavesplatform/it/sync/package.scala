@@ -7,6 +7,7 @@ import com.wavesplatform.it.api.SyncHttpApi.AssertiveApiError
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.protobuf.transaction.{DataTransactionData, PBTransactions}
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -32,11 +33,16 @@ package object sync {
   val smartMatcherFee: Long            = 0.007.waves
   val smartMinFee: Long                = minFee + smartFee
 
-  def calcDataFee(data: List[DataEntry[_]]): Long = {
+  def calcDataFee(data: List[DataEntry[_]], txVersion: Byte): Long = {
+    if (txVersion < 2) {
     val dataSize = data.map(_.toBytes.length).sum + 128
     if (dataSize > 1024) {
       minFee * (dataSize / 1024 + 1)
     } else minFee
+    } else {
+      val dataBytes = data.map(d => d.toBytes).length
+//      minFee + (DataTransactionData.DataEntry()PBTransactions.toPBDataEntry(data).toByteArray.length - 1) / 1024
+    }
   }
 
   def calcMassTransferFee(numberOfRecipients: Int): Long = {
@@ -44,6 +50,7 @@ package object sync {
   }
 
   val supportedVersions: List[Byte] = List(1, 2, 3)
+  val dataTxSupportedVersions: List[Byte] = List(1, 2)
 
   val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String = script.bytes.value.base64

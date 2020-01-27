@@ -445,8 +445,8 @@ object SyncHttpApi extends Assertions {
                        ): Transaction =
       maybeWaitForTransaction(sync(async(n).updateAssetInfo(sender, assetId, updatedName, updatedDescription, fee, feeAsset, version)), waitForTx)
 
-    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, waitForTx: Boolean = false): Transaction =
-      maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, fee)), waitForTx)
+    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, version: Byte = 1, waitForTx: Boolean = false): Transaction =
+      maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, version, fee)), waitForTx)
 
     def removeData(sourceAddress: String, data: Seq[String], fee: Long): Transaction =
       sync(async(n).removeData(sourceAddress, data, fee))

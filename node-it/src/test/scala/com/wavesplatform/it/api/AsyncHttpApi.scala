@@ -530,8 +530,8 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long): Future[Transaction] = {
-      signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> 1, "data" -> data))
+    def putData(sourceAddress: String, data: List[DataEntry[_]], version: Byte = 1, fee: Long): Future[Transaction] = {
+      signAndBroadcast(Json.obj("type" -> DataTransaction.typeId, "sender" -> sourceAddress, "fee" -> fee, "version" -> version, "data" -> data))
     }
 
     def removeData(sourceAddress: String, data: Seq[String], fee: Long): Future[Transaction] = {

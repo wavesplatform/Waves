@@ -11,6 +11,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
+import com.wavesplatform.it.sync._
 import org.scalatest.{Assertion, Assertions}
 import play.api.libs.json._
 
@@ -47,13 +48,15 @@ class DataTransactionSuite extends BaseTransactionSuite {
   }
 
   test("sender's waves balance is decreased by fee.") {
-    val (balance1, eff1) = miner.accountBalances(firstAddress)
-    val entry            = IntegerDataEntry("int", 0xcafebabe)
-    val data             = List(entry)
-    val transferFee      = calcDataFee(data)
-    val txId             = sender.putData(firstAddress, data, transferFee).id
-    nodes.waitForHeightAriseAndTxPresent(txId)
-    miner.assertBalances(firstAddress, balance1 - transferFee, eff1 - transferFee)
+    for (v <- dataTxSupportedVersions) {
+      val (balance1, eff1) = miner.accountBalances(firstAddress)
+      val entry = IntegerDataEntry("int", 0xcafebabe)
+      val data = List(entry)
+      val dataFee = calcDataFee(data)
+      val txId = sender.putData(firstAddress, data, version = v, fee = dataFee).id
+      nodes.waitForHeightAriseAndTxPresent(txId)
+      miner.assertBalances(firstAddress, balance1 - dataFee, eff1 - dataFee)
+    }
   }
 
   test("cannot transact without having enough waves") {
