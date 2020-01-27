@@ -179,7 +179,7 @@ case class UtilsApiRoute(
       new ApiImplicitParam(
         name = "code",
         required = true,
-        dataTypeClass = ScriptWithImportsRequest.getClass,
+        dataTypeClass = classOf[ScriptWithImportsRequest],
         paramType = "body",
         value = "Script code with imports"
       )

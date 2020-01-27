@@ -108,7 +108,7 @@ case class DebugApiRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataTypeClass = DebugMessage.getClass,
+        dataTypeClass = classOf[DebugMessage],
         defaultValue = "{\n\t\"message\": \"foo\"\n}"
       )
     )
@@ -224,7 +224,7 @@ case class DebugApiRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataTypeClass = RollbackParams.getClass,
+        dataTypeClass = classOf[RollbackParams],
         defaultValue = "{\n\t\"rollbackTo\": 3,\n\t\"returnTransactionsToUTX\": false\n}"
       )
     )
