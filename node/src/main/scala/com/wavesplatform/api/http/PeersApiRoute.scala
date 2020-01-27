@@ -86,7 +86,7 @@ case class PeersApiRoute(settings: RestAPISettings,
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataType = "com.wavesplatform.api.http.ConnectReq"
+        dataTypeClass = classOf[ConnectReq]
       )
     ))
   def connect: Route = (path("connect") & withAuth) {
