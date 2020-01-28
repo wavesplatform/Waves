@@ -56,7 +56,7 @@ class UtxPoolImpl(
   // State
   private[this] val transactions              = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios     = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
-  @volatile private[this] var vipTransactions = Seq.empty[Transaction]
+  @volatile private[this] var headTransactions = Seq.empty[Transaction]
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
@@ -195,11 +195,11 @@ class UtxPoolImpl(
 
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
-  private[this] def nonVipTransactions: Seq[Transaction] =
+  private[this] def nonHeadTransactions: Seq[Transaction] =
     transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
 
   override def all: Seq[Transaction] =
-    vipTransactions ++ nonVipTransactions
+    headTransactions ++ nonHeadTransactions
 
   override def size: Int = transactions.size
 
@@ -226,7 +226,7 @@ class UtxPoolImpl(
     )
   }
 
-  private[this] def createTxEntrySeq(): Seq[TxEntry] =       vipTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
+  private[this] def createTxEntrySeq(): Seq[TxEntry] =       headTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
     .values()
     .asScala
     .toSeq
@@ -373,7 +373,7 @@ class UtxPoolImpl(
         var removed = Set.empty[ByteStr]
         try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, createTxEntrySeq, txId => removed += txId)
         finally {
-          vipTransactions = vipTransactions.filterNot(tx => removed(tx.id()))
+          headTransactions = headTransactions.filterNot(tx => removed(tx.id()))
           scheduled.set(false)
         }
       }
@@ -382,8 +382,8 @@ class UtxPoolImpl(
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
-    this.vipTransactions = (vipTransactions ++ transactions).distinct
-    vipTransactions.foreach(tx => remove(tx.id())) // Remove from ordinary pool
+    this.headTransactions = (headTransactions ++ transactions).distinct
+    headTransactions.foreach(tx => remove(tx.id())) // Remove from ordinary pool
     TxCleanup.runCleanupAsync()
   }
 
