@@ -26,11 +26,15 @@ object SetScriptTransactionDiff {
     } yield Diff(
       tx = tx,
       portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-      scripts    = Map(tx.sender.toAddress    -> scriptWithComplexities),
+      scripts    = Map(tx.sender.toAddress -> scriptWithComplexities),
       scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
     )
 
-  private def estimate(blockchain: Blockchain, version: StdLibVersion, dApp: DApp) = {
+  private def estimate(
+    blockchain: Blockchain,
+    version: StdLibVersion,
+    dApp: DApp
+  ): Either[GenericError, Map[Int, Map[String, Long]]] = {
     val callables = dApp.copy(verifierFuncOpt = None)
     val actualComplexities =
       for {
@@ -45,7 +49,11 @@ object SetScriptTransactionDiff {
     actualComplexities.leftMap(GenericError(_))
   }
 
-  private def estimateNext(blockchain: Blockchain, version: StdLibVersion, dApp: DApp) =
+  private def estimateNext(
+    blockchain: Blockchain,
+    version: StdLibVersion,
+    dApp: DApp
+  ): Either[String, List[(Long, Map[String, Long])]] =
     ScriptEstimator.all
       .drop(blockchain.estimator.version)
       .traverse(se => ContractScript.estimateComplexity(version, dApp, se, checkLimit = false))
