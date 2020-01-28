@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -13,15 +14,19 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV1}
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{NTPTime, RequestGen, WithDB}
+import com.wavesplatform.{BlocksTransactionsHelpers, NTPTime, RequestGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 
-class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings {
+class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with RequestGen with NTPTime with DBCacheSettings with BlocksTransactionsHelpers {
 
   def baseTest(gen: Time => Gen[(KeyPair, Seq[Block])])(f: (BlockchainUpdaterImpl, KeyPair) => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-    val settings      = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+    val settings      = {
+      val fs = TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(BlockchainFeatures.NG.id -> 0))
+      val defaultConfig = WavesSettings.default()
+      defaultConfig.copy(blockchainSettings = defaultConfig.blockchainSettings.copy(functionalitySettings = fs))
+    }
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, settings.blockchainSettings.functionalitySettings, dbSettings)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
@@ -136,6 +141,14 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       "after txs is in the middle of ngState" in paginationTest(3)
       "after txs is the last of ngState" in paginationTest(4)
       "after txs is in levelDb" in paginationTest(6)
+    }
+
+    "doesnt accept non-empty keyblock" in {
+      baseTest(time => preconditions(time.correctedTime())) { (updater, account) =>
+        val transfer = TransferTransactionV1.selfSigned(Waves, account, account, ENOUGH_AMT / 10, ntpTime.correctedTime(), Waves, 100000, Array.emptyByteArray).explicitGet()
+        val (keyBlock, _) = UnsafeBlocks.unsafeChainBaseAndMicro(updater.lastBlockId.get, Seq(transfer), Nil, account, Block.NgBlockVersion, ntpTime.correctedTime())
+        updater.processBlock(keyBlock) shouldBe 'right
+      }
     }
   }
 

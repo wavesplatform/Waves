@@ -503,7 +503,6 @@ object Application {
             Point
               .measurement("config")
               .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
-              .addField("miner-max-transactions-in-key-block", miner.maxTransactionsInKeyBlock)
               .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
               .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
               .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)

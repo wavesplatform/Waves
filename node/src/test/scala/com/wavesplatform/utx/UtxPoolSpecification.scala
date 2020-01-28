@@ -688,12 +688,12 @@ class UtxPoolSpecification
       "returning transactions in start of utx" - {
         "doesnt validate transactions which are removed" in {
           val gen = for {
-            acc  <- accountGen
-            acc1 <- accountGen
-            acc2 <- accountGen
-            tx1  <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
-            nonScripted  <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
-            scripted <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+            acc         <- accountGen
+            acc1        <- accountGen
+            acc2        <- accountGen
+            tx1         <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
+            nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+            scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
           } yield (tx1, nonScripted, scripted)
 
           val Right((testScript, testScriptComplexity)) = ScriptCompiler.compile(
