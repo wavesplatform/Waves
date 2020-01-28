@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.NodeConfigs
@@ -10,14 +11,14 @@ import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.{DataTransaction, TxVersion}
-import org.scalatest.{Assertion, Assertions}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
+import org.scalatest.{Assertion, Assertions, EitherValues}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
-class DataTransactionSuite extends BaseTransactionSuite {
+class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -32,18 +33,40 @@ class DataTransactionSuite extends BaseTransactionSuite {
     val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
     val boolData    = List(BooleanDataEntry(nonLatinKey, true))
     val boolDataFee = calcDataFee(boolData)
-    val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
-    nodes.waitForHeightAriseAndTxPresent(firstTx)
+    val createTx    = sender.putData(firstAddress, boolData, boolDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(createTx)
     sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
 
-    val removeData = List(EmptyDataEntry(nonLatinKey))
+    val removeData    = List(EmptyDataEntry(nonLatinKey))
     val removeDataFee = calcDataFee(removeData)
-    val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
-    nodes.waitForHeightAriseAndTxPresent(secondTx)
+    val removeTx      = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
+    nodes.waitForHeightAriseAndTxPresent(removeTx)
     assertApiError(sender.getDataByKey(firstAddress, nonLatinKey)) { error =>
       error.statusCode shouldBe 404
     }
+    val data = (Json.parse(sender.get(s"/transactions/info/$removeTx").getResponseBody) \ "data").as[JsArray].head.as[JsObject]
+    (data \ "key").as[String] shouldBe nonLatinKey
+    (data \ "value").asOpt[Boolean] shouldBe None
+
     sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
+
+    val addAndRemoveData = List(BooleanDataEntry(nonLatinKey, false), EmptyDataEntry(nonLatinKey))
+    val addAndRemoveTx =
+      DataTransaction(TxVersion.V2, sender.publicKey, addAndRemoveData, calcDataFee(addAndRemoveData), System.currentTimeMillis(), Proofs.empty)
+        .signWith(sender.privateKey)
+    assertApiError(
+      sender.signedBroadcast(addAndRemoveTx.json()),
+      CustomValidationError("Duplicated keys found")
+    )
+
+    val reuseData = List(BooleanDataEntry(nonLatinKey, false))
+    val reuseTx   = sender.putData(firstAddress, reuseData, calcDataFee(reuseData)).id
+    nodes.waitForHeightAriseAndTxPresent(reuseTx)
+
+    sender.getData(firstAddress).map(_.key) should contain(nonLatinKey)
+
+    val removeUnknownTx = sender.removeData(firstAddress, Seq("unknown"), calcDataFee(List(EmptyDataEntry("unknown")))).id
+    nodes.waitForHeightAriseAndTxPresent(removeUnknownTx)
   }
 
   test("sender's waves balance is decreased by fee.") {
@@ -168,8 +191,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("queries for multiple keys") {
     val tooBigKey = "toobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkey"
-    val keys   = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
-    val values = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal","BBBB")
+    val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
+    val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
 
     val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
     val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)
