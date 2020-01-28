@@ -142,14 +142,5 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       "after txs is the last of ngState" in paginationTest(4)
       "after txs is in levelDb" in paginationTest(6)
     }
-
-    "doesnt accept non-empty keyblock" in {
-      baseTest(time => preconditions(time.correctedTime())) { (updater, account) =>
-        val transfer = TransferTransactionV1.selfSigned(Waves, account, account, ENOUGH_AMT / 10, ntpTime.correctedTime(), Waves, 100000, Array.emptyByteArray).explicitGet()
-        val (keyBlock, _) = UnsafeBlocks.unsafeChainBaseAndMicro(updater.lastBlockId.get, Seq(transfer), Nil, account, Block.NgBlockVersion, ntpTime.correctedTime())
-        updater.processBlock(keyBlock) shouldBe 'right
-      }
-    }
   }
-
 }
