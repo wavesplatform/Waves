@@ -166,10 +166,13 @@ class UtxPoolImpl(
       .map(_.id())
       .foreach(remove)
 
-  private[this] def remove(txId: ByteStr): Unit = for (tx <- Option(transactions.remove(txId))) {
+  private[this] def remove(tx: Transaction): Unit = {
     PoolMetrics.removeTransaction(tx)
     pessimisticPortfolios.remove(tx.id())
   }
+
+  private[this] def remove(txId: ByteStr): Unit =
+    for (tx <- Option(transactions.remove(txId))) remove(tx)
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
@@ -373,7 +376,9 @@ class UtxPoolImpl(
         var removed = Set.empty[ByteStr]
         try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, createTxEntrySeq, txId => removed += txId)
         finally {
-          headTransactions = headTransactions.filterNot(tx => removed(tx.id()))
+          val (drop, keep) = headTransactions.partition(tx => removed(tx.id()))
+          headTransactions = keep
+          drop.foreach(remove)
           scheduled.set(false)
         }
       }
@@ -383,7 +388,7 @@ class UtxPoolImpl(
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
     this.headTransactions = (headTransactions ++ transactions).distinct
-    headTransactions.foreach(tx => remove(tx.id())) // Remove from ordinary pool
+    headTransactions.foreach(tx => this.transactions.remove(tx.id())) // Remove from ordinary pool
     TxCleanup.runCleanupAsync()
   }
 
