@@ -109,7 +109,7 @@ object InvokeScriptTransactionDiff {
                     complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName)
                   } yield complexity
 
-                val errorMessage =
+                lazy val errorMessage =
                   s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, " +
                   s"address = $dAppAddress, " +
                   s"estimator version = ${blockchain.estimator.version}"
