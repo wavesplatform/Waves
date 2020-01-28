@@ -54,8 +54,8 @@ class UtxPoolImpl(
   private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   // State
-  private[this] val transactions              = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios     = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
+  private[this] val transactions               = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val pessimisticPortfolios      = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
   @volatile private[this] var headTransactions = Seq.empty[Transaction]
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -225,21 +225,25 @@ class UtxPoolImpl(
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     packTransactions(
       initialConstraint,
-      maxPackTime, createTxEntrySeq, txId => remove(txId)
+      maxPackTime,
+      createTxEntrySeq,
+      txId => remove(txId)
     )
   }
 
-  private[this] def createTxEntrySeq(): Seq[TxEntry] =       headTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
-    .values()
-    .asScala
-    .toSeq
-    .sorted(TransactionsOrdering.InUTXPool)
-    .map(TxEntry(_, vip = false))
+  private[this] def createTxEntrySeq(): Seq[TxEntry] =
+    headTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
+      .values()
+      .asScala
+      .toSeq
+      .sorted(TransactionsOrdering.InUTXPool)
+      .map(TxEntry(_, vip = false))
 
   private[this] def packTransactions(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration,
-      createTxsList: () => Seq[TxEntry], delete: ByteStr => Unit
+      createTxsList: () => Seq[TxEntry],
+      delete: ByteStr => Unit
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
