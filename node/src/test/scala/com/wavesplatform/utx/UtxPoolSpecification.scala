@@ -74,9 +74,8 @@ class UtxPoolSpecification
   import UtxPoolSpecification._
 
   private def mkBlockchain(senderAccount: Address, senderBalance: Long) = {
-    val config          = ConfigFactory.load()
     val genesisSettings = TestHelpers.genesisSettings(Map(senderAccount -> senderBalance))
-    val origSettings    = WavesSettings.fromRootConfig(config)
+    val origSettings    = WavesSettings.default()
     val settings = origSettings.copy(
       blockchainSettings = BlockchainSettings(
         'T',
@@ -629,6 +628,41 @@ class UtxPoolSpecification
             utxPool.putIfNew(transfer).resultE.explicitGet()
             val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
             tx.get should contain(transfer)
+        }
+      }
+    }
+
+    "cleanup" - {
+      "doesnt validate transactions which are removed" in {
+        val gen = for {
+          acc <- accountGen
+          acc1<- accountGen
+          tx1 <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
+          txs <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+        } yield (tx1, txs)
+
+        forAll(gen) { case (tx1, rest) =>
+          val blockchain = stub[Blockchain]
+          (blockchain.settings _).when().returning(WavesSettings.default().blockchainSettings)
+          (blockchain.height _).when().returning(1)
+          (blockchain.activatedFeatures _).when().returning(Map.empty)
+
+          val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+          (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
+
+          (blockchain.balance _).when(*, *).onCall{ (_: Address, _: Asset) =>
+            utx.removeAll(rest)
+            ENOUGH_AMT
+          }
+          (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
+          (blockchain.accountScriptWithComplexity _).when(*).returning(None)
+          (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+
+          utx.putIfNew(tx1).resultE shouldBe 'right
+          all(rest.map(utx.putIfNew(_).resultE)) shouldBe 'right
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
+            case (Some(Seq(`tx1`)), _) => // Success
+          }
         }
       }
     }
