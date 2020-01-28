@@ -223,7 +223,7 @@ class UtxPoolImpl(
           .filterNot(tx => r.validatedTransactions(tx.id()))
           .foldLeft[PackResult](r) {
             case (r, tx) =>
-              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached))
+              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached) || !transactions.containsKey(tx.id()))
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
