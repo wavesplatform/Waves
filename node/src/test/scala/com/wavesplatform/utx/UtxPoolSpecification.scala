@@ -699,7 +699,7 @@ class UtxPoolSpecification
               utx.putIfNew(tx1).resultE shouldBe 'right
               utx.addAndCleanup(rest.reverse)
               utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
-                case (Some(first :+ `tx1`), _) if first == rest.reverse => // Success
+                case (Some(txs: Seq[_]), _) if txs.init == rest.reverse && txs.last == tx1 => // Success
               }
               utx.all shouldBe rest.reverse :+ tx1
           }
