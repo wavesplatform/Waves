@@ -363,7 +363,10 @@ class UtxPoolImpl(
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
     for (tx <- transactions) {
-      vipTransactions.computeIfAbsent(tx.id(), _ => vipTransactions.size())
+      vipTransactions.computeIfAbsent(tx.id(), { _ =>
+        try vipTransactions.values().asScala.max + 1
+        catch { case _: UnsupportedOperationException => 0 }
+      })
       addTransaction(tx, verify = false)
     }
     TxCleanup.runCleanupAsync()
