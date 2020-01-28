@@ -54,9 +54,9 @@ class UtxPoolImpl(
   private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   // State
-  private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
-  private[this] val vipTransactions       = new ConcurrentHashMap[ByteStr, Int]()
+  private[this] val transactions              = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val pessimisticPortfolios     = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
+  @volatile private[this] var vipTransactions = Seq.empty[Transaction]
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
@@ -169,7 +169,6 @@ class UtxPoolImpl(
   private[this] def remove(txId: ByteStr): Unit = for (tx <- Option(transactions.remove(txId))) {
     PoolMetrics.removeTransaction(tx)
     pessimisticPortfolios.remove(tx.id())
-    vipTransactions.remove(tx.id())
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -196,15 +195,11 @@ class UtxPoolImpl(
 
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
+  private[this] def nonVipTransactions: Seq[Transaction] =
+    transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
+
   override def all: Seq[Transaction] =
-    transactions.values.asScala.toSeq
-      .sorted((x: Transaction, y: Transaction) => {
-        val vipX = vipTransactions.getOrDefault(x.id(), Int.MaxValue)
-        val vipY = vipTransactions.getOrDefault(y.id(), Int.MaxValue)
-        if (vipX < vipY) -1
-        else if (vipY < vipX) 1
-        else TransactionsOrdering.InUTXPool.compare(x, y)
-      })
+    vipTransactions ++ nonVipTransactions
 
   override def size: Int = transactions.size
 
@@ -219,21 +214,42 @@ class UtxPoolImpl(
     case _                                                         => Set.empty
   }
 
+  case class TxEntry(tx: Transaction, vip: Boolean)
+
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
+    packTransactions(
+      initialConstraint,
+      maxPackTime, { () =>
+        vipTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
+          .values()
+          .asScala
+          .toSeq
+          .sorted(TransactionsOrdering.InUTXPool)
+          .map(TxEntry(_, vip = false))
+      }
+    )
+  }
+
+  private[this] def packTransactions(
+      initialConstraint: MultiDimensionalMiningConstraint,
+      maxPackTime: ScalaDuration,
+      createTxsList: () => Seq[TxEntry]
+  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
+
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
 
-      def packIteration(r: PackResult, sortedTransactions: Iterator[Transaction]): PackResult =
+      def packIteration(r: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
-          .filterNot(tx => r.validatedTransactions(tx.id()))
+          .filterNot(e => r.validatedTransactions(e.tx.id()))
           .foldLeft[PackResult](r) {
-            case (r, tx) =>
-              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached) || !transactions.containsKey(tx.id()))
+            case (r, TxEntry(tx, vip)) =>
+              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached) || (!vip && !transactions.containsKey(tx.id())))
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
@@ -241,7 +257,7 @@ class UtxPoolImpl(
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
-                if (r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
+                if (!vip && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, Some(r.totalDiff))
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
@@ -290,7 +306,7 @@ class UtxPoolImpl(
         else {
           val newSeed = packIteration(
             seed.copy(checkedAddresses = Set.empty),
-            this.all.iterator
+            createTxsList().iterator
           )
           if (newSeed.constraint.isFull) {
             log.trace(s"Block is full: ${newSeed.constraint}")
@@ -354,7 +370,7 @@ class UtxPoolImpl(
 
     def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupScheduler.execute { () =>
-        try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, () => nonVipTransactions.map(TxEntry(_, vip = false)))
         finally scheduled.set(false)
       }
     }
@@ -362,13 +378,8 @@ class UtxPoolImpl(
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
-    for (tx <- transactions) {
-      vipTransactions.computeIfAbsent(tx.id(), { _ =>
-        try vipTransactions.values().asScala.max + 1
-        catch { case _: UnsupportedOperationException => 0 }
-      })
-      addTransaction(tx, verify = false)
-    }
+    for (tx <- this.vipTransactions) addTransaction(tx, verify = false)
+    this.vipTransactions = transactions
     TxCleanup.runCleanupAsync()
   }
 

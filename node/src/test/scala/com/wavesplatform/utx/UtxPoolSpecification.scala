@@ -19,6 +19,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.mining._
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
@@ -28,6 +29,7 @@ import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
@@ -37,7 +39,7 @@ import monix.reactive.subjects.Subject
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.{FreeSpec, Matchers, PrivateMethodTester}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.duration._
@@ -65,7 +67,8 @@ class UtxPoolSpecification
     with TransactionGen
     with NoShrink
     with BlocksTransactionsHelpers
-    with WithDomain {
+    with WithDomain
+    with PrivateMethodTester {
   val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
@@ -104,6 +107,14 @@ class UtxPoolSpecification
       fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferTransaction")
+
+  private def transferV2(sender: KeyPair, maxAmount: Long, time: Time) =
+    (for {
+      amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
+      recipient <- accountGen
+      fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
+    } yield TransferTransactionV2.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
+      .label("transferTransactionV2")
 
   private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
     (for {
@@ -679,29 +690,45 @@ class UtxPoolSpecification
           val gen = for {
             acc  <- accountGen
             acc1 <- accountGen
-            tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
-            txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
-          } yield (tx1, txs)
+            acc2 <- accountGen
+            tx1  <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
+            nonScripted  <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+            scripted <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+          } yield (tx1, nonScripted, scripted)
+
+          val Right((testScript, testScriptComplexity)) = ScriptCompiler.compile(
+            """
+              |{-# STDLIB_VERSION 2 #-}
+              |{-# CONTENT_TYPE EXPRESSION #-}
+              |{-# SCRIPT_TYPE ACCOUNT #-}
+              |true
+              |""".stripMargin,
+            ScriptEstimatorV1
+          )
 
           forAll(gen) {
-            case (tx1, rest) =>
+            case (tx1, nonScripted, scripted) =>
               val blockchain = stub[Blockchain]
               (blockchain.settings _).when().returning(WavesSettings.default().blockchainSettings)
               (blockchain.height _).when().returning(1)
-              (blockchain.activatedFeatures _).when().returning(Map.empty)
+              (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
               val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
               (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
               (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
+
+              (blockchain.accountScriptWithComplexity _).when(scripted.head.sender.toAddress).returning(Some(testScript -> testScriptComplexity))
+              (blockchain.hasScript _).when(scripted.head.sender.toAddress).returning(true)
               (blockchain.accountScriptWithComplexity _).when(*).returning(None)
               (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
 
               utx.putIfNew(tx1).resultE shouldBe 'right
-              utx.addAndCleanup(rest.reverse)
+              val minedTxs = scripted ++ nonScripted
+              utx.addAndCleanup(minedTxs)
               utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
-                case (Some(txs: Seq[_]), _) if txs.init == rest.reverse && txs.last == tx1 => // Success
+                case (Some(txs: Seq[_]), _) if txs == (minedTxs :+ tx1) => // Success
               }
-              utx.all shouldBe rest.reverse :+ tx1
+              utx.all shouldBe minedTxs :+ tx1
           }
         }
       }
