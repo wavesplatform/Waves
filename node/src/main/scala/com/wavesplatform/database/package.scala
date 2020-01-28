@@ -506,7 +506,7 @@ package object database extends ScorexLogging {
   }
 
   def writeScript(script: AccountScriptInfo): Array[Byte] = {
-    val AccountScriptInfo(pk, expr, complexity, callableComplexities) = script
+    val AccountScriptInfo(pk, expr, complexity, complexitiesByEstimator) = script
     val pkb = pk.arr
     assert(pkb.size == KeyLength)
     val output = newDataOutput()
@@ -518,25 +518,36 @@ package object database extends ScorexLogging {
 
     output.writeLong(complexity)
 
-    output.writeInt(callableComplexities.size)
-    callableComplexities.foreach {
-      case (name, cost) =>
-        output.writeUTF(name)
-        output.writeLong(cost)
+    output.writeInt(complexitiesByEstimator.size)
+    complexitiesByEstimator.foreach {
+      case (version, complexitiesByCallable) =>
+        output.writeInt(version)
+
+        output.writeInt(complexitiesByCallable.size)
+        complexitiesByCallable.foreach {
+          case (name, cost) =>
+            output.writeUTF(name)
+            output.writeLong(cost)
+        }
     }
     output.toByteArray
   }
 
   def readScript(b: Array[Byte]): AccountScriptInfo = {
-    val input                     = newDataInput(b)
+    val input = newDataInput(b)
     val pk = PublicKey(input.readByteStr(KeyLength))
-    val scriptSize                = input.readInt()
-    val script                    = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
-    val complexity                = input.readLong()
-    val callableComplexitiesCount = input.readInt()
+    val scriptSize = input.readInt()
+    val script = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
+    val complexity = input.readLong()
+
     val callableComplexities =
-      (1 to callableComplexitiesCount)
-        .map(_ => (input.readUTF(), input.readLong()))
+      (1 to input.readInt())
+        .map(_ => (
+          input.readInt(),
+          (1 to input.readInt())
+            .map(_ => (input.readUTF(), input.readLong()))
+            .toMap
+        ))
         .toMap
 
     AccountScriptInfo(pk, script, complexity, callableComplexities)
