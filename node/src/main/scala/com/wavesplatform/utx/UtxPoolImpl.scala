@@ -56,6 +56,7 @@ class UtxPoolImpl(
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
+  private[this] val vipTransactions       = new ConcurrentHashMap[ByteStr, Int]()
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
@@ -168,6 +169,7 @@ class UtxPoolImpl(
   private[this] def remove(txId: ByteStr): Unit = for (tx <- Option(transactions.remove(txId))) {
     PoolMetrics.removeTransaction(tx)
     pessimisticPortfolios.remove(tx.id())
+    vipTransactions.remove(tx.id())
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -194,7 +196,15 @@ class UtxPoolImpl(
 
   override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
 
-  override def all: Seq[Transaction] = transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
+  override def all: Seq[Transaction] =
+    transactions.values.asScala.toSeq
+      .sorted((x: Transaction, y: Transaction) => {
+        val vipX = vipTransactions.getOrDefault(x.id(), Int.MaxValue)
+        val vipY = vipTransactions.getOrDefault(y.id(), Int.MaxValue)
+        if (vipX < vipY) -1
+        else if (vipY < vipX) 1
+        else TransactionsOrdering.InUTXPool.compare(x, y)
+      })
 
   override def size: Int = transactions.size
 
@@ -280,9 +290,7 @@ class UtxPoolImpl(
         else {
           val newSeed = packIteration(
             seed.copy(checkedAddresses = Set.empty),
-            transactions.values.asScala.toSeq
-              .sorted(TransactionsOrdering.InUTXPool)
-              .iterator
+            this.all.iterator
           )
           if (newSeed.constraint.isFull) {
             log.trace(s"Block is full: ${newSeed.constraint}")
@@ -354,7 +362,10 @@ class UtxPoolImpl(
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
-    for (tx <- transactions) addTransaction(tx, verify = false)
+    for (tx <- transactions) {
+      vipTransactions.computeIfAbsent(tx.id(), _ => vipTransactions.size())
+      addTransaction(tx, verify = false)
+    }
     TxCleanup.runCleanupAsync()
   }
 

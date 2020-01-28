@@ -672,6 +672,40 @@ class UtxPoolSpecification
         }
       }
     }
+
+    "vip lane" - {
+      "returning transactions in start of utx" - {
+        "doesnt validate transactions which are removed" in {
+          val gen = for {
+            acc  <- accountGen
+            acc1 <- accountGen
+            tx1  <- transfer(acc, ENOUGH_AMT / 3, ntpTime)
+            txs  <- Gen.nonEmptyListOf(transfer(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+          } yield (tx1, txs)
+
+          forAll(gen) {
+            case (tx1, rest) =>
+              val blockchain = stub[Blockchain]
+              (blockchain.settings _).when().returning(WavesSettings.default().blockchainSettings)
+              (blockchain.height _).when().returning(1)
+              (blockchain.activatedFeatures _).when().returning(Map.empty)
+
+              val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+              (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+              (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
+              (blockchain.accountScriptWithComplexity _).when(*).returning(None)
+              (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+
+              utx.putIfNew(tx1).resultE shouldBe 'right
+              utx.addAndCleanup(rest.reverse)
+              utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
+                case (Some(first :+ `tx1`), _) if first == rest.reverse => // Success
+              }
+              utx.all shouldBe rest.reverse :+ tx1
+          }
+        }
+      }
+    }
   }
 
   private def limitByNumber(n: Int): MultiDimensionalMiningConstraint = MultiDimensionalMiningConstraint(
