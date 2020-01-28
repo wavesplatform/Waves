@@ -684,52 +684,60 @@ class UtxPoolSpecification
       }
     }
 
-    "vip lane" - {
-      "returning transactions in start of utx" - {
-        "doesnt validate transactions which are removed" in {
-          val gen = for {
-            acc         <- accountGen
-            acc1        <- accountGen
-            acc2        <- accountGen
-            tx1         <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
-            nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
-            scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
-          } yield (tx1, nonScripted, scripted)
+    "head pool" - {
+      "returning transactions in start of utx" in {
+        val gen = for {
+          acc         <- accountGen
+          acc1        <- accountGen
+          acc2        <- accountGen
+          tx1         <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
+          nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+          scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+        } yield (tx1, nonScripted, scripted)
 
-          val Right((testScript, testScriptComplexity)) = ScriptCompiler.compile(
-            """
+        val Right((testScript, testScriptComplexity)) = ScriptCompiler.compile(
+          """
               |{-# STDLIB_VERSION 2 #-}
               |{-# CONTENT_TYPE EXPRESSION #-}
               |{-# SCRIPT_TYPE ACCOUNT #-}
               |true
               |""".stripMargin,
-            ScriptEstimatorV1
-          )
+          ScriptEstimatorV1
+        )
 
-          forAll(gen) {
-            case (tx1, nonScripted, scripted) =>
-              val blockchain = stub[Blockchain]
-              (blockchain.settings _).when().returning(WavesSettings.default().blockchainSettings)
-              (blockchain.height _).when().returning(1)
-              (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
+        forAll(gen) {
+          case (tx1, nonScripted, scripted) =>
+            val blockchain = stub[Blockchain]
+            (blockchain.settings _).when().returning(WavesSettings.default().blockchainSettings)
+            (blockchain.height _).when().returning(1)
+            (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-              val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
-              (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
-              (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
+            val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+            (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+            (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
 
-              (blockchain.accountScriptWithComplexity _).when(scripted.head.sender.toAddress).returning(Some(testScript -> testScriptComplexity))
-              (blockchain.hasScript _).when(scripted.head.sender.toAddress).returning(true)
-              (blockchain.accountScriptWithComplexity _).when(*).returning(None)
-              (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+            (blockchain.accountScriptWithComplexity _).when(scripted.head.sender.toAddress).returning(Some(testScript -> testScriptComplexity))
+            (blockchain.hasScript _).when(scripted.head.sender.toAddress).returning(true)
+            (blockchain.accountScriptWithComplexity _).when(*).returning(None)
+            (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
 
-              utx.putIfNew(tx1).resultE shouldBe 'right
-              val minedTxs = scripted ++ nonScripted
-              utx.addAndCleanup(minedTxs)
-              utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
-                case (Some(txs: Seq[_]), _) if txs == (minedTxs :+ tx1) => // Success
-              }
-              utx.all shouldBe minedTxs :+ tx1
-          }
+            utx.putIfNew(tx1).resultE shouldBe 'right
+            val minedTxs = scripted ++ nonScripted
+            utx.addAndCleanup(minedTxs)
+
+            // First microblock mined
+            utx.packUnconfirmed(
+              MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.one, ""))),
+              Duration.Inf
+            ) should matchPattern {
+              case (Some(txs: Seq[_]), _) if txs == Seq(minedTxs.head) => // Success
+            }
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
+              case (Some(txs: Seq[_]), _) if txs == (minedTxs :+ tx1) => // Success
+            }
+            utx.all shouldBe minedTxs :+ tx1
+            utx.addAndCleanup(Seq(tx1))
+            utx.all shouldBe minedTxs :+ tx1
         }
       }
     }

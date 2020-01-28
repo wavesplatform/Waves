@@ -222,21 +222,21 @@ class UtxPoolImpl(
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
     packTransactions(
       initialConstraint,
-      maxPackTime, { () =>
-        vipTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
-          .values()
-          .asScala
-          .toSeq
-          .sorted(TransactionsOrdering.InUTXPool)
-          .map(TxEntry(_, vip = false))
-      }
+      maxPackTime, createTxEntrySeq, txId => remove(txId)
     )
   }
+
+  private[this] def createTxEntrySeq(): Seq[TxEntry] =       vipTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
+    .values()
+    .asScala
+    .toSeq
+    .sorted(TransactionsOrdering.InUTXPool)
+    .map(TxEntry(_, vip = false))
 
   private[this] def packTransactions(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration,
-      createTxsList: () => Seq[TxEntry]
+      createTxsList: () => Seq[TxEntry], delete: ByteStr => Unit
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
@@ -289,7 +289,7 @@ class UtxPoolImpl(
                     case Left(error) =>
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       logValidationError(tx, error)
-                      remove(tx.id())
+                      delete(tx.id())
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
@@ -370,16 +370,20 @@ class UtxPoolImpl(
 
     def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupScheduler.execute { () =>
-        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, () => nonVipTransactions.map(TxEntry(_, vip = false)))
-        finally scheduled.set(false)
+        var removed = Set.empty[ByteStr]
+        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, createTxEntrySeq, txId => removed += txId)
+        finally {
+          vipTransactions = vipTransactions.filterNot(tx => removed(tx.id()))
+          scheduled.set(false)
+        }
       }
     }
   }
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
-    for (tx <- this.vipTransactions) addTransaction(tx, verify = false)
-    this.vipTransactions = transactions
+    this.vipTransactions = (vipTransactions ++ transactions).distinct
+    vipTransactions.foreach(tx => remove(tx.id())) // Remove from ordinary pool
     TxCleanup.runCleanupAsync()
   }
 
