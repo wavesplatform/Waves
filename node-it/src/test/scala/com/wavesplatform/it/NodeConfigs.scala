@@ -69,6 +69,8 @@ object NodeConfigs {
          ${f.map {case (id, height) => s"|  $id = $height"}.mkString("\n")}
          |}""".stripMargin
     }
+    def minAssetInfoUpdateInterval(blocks: Int): String =
+      s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $blocks"
 
     val nonMiner: String = "waves.miner.enable = no"
   }

@@ -14,6 +14,7 @@ import com.wavesplatform.api.grpc._
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.api.http.{AddressApiRoute, ConnectReq}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.features.api.ActivationStatus
@@ -316,23 +317,6 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
-    def updateAssetInfo(sender: KeyPair, assetId: String, updatedName: String, updatedDescription: String, fee: Long, feeAsset: Asset = Waves, version: TxVersion = TxVersion.V1): Future[Transaction] = {
-      val signedTransaction = UpdateAssetInfoTransaction(
-        version,
-        AddressScheme.current.chainId,
-        sender,
-        IssuedAsset(ByteStr.decodeBase58(assetId).get),
-        updatedName,
-        updatedDescription,
-        System.currentTimeMillis(),
-        fee,
-        feeAsset,
-        Proofs.empty
-      ).signWith(sender).json()
-
-      signedBroadcast(signedTransaction)
-    }
-
     def activeLeases(sourceAddress: String): Future[Seq[Transaction]] = get(s"/leasing/active/$sourceAddress").as[Seq[Transaction]]
 
     def issue(
@@ -418,6 +402,31 @@ object AsyncHttpApi extends Assertions {
           "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
         )
       )
+    }
+
+    def updateAssetInfo(
+                       sender: KeyPair,
+                       assetId: String,
+                       name: String,
+                       description: String,
+                       fee: Long,
+                       feeAssetId: Option[String] = None,
+                       version: TxVersion = TxVersion.V1,
+                       timestamp: Option[Long] = None
+                    ): Future[(Transaction, JsValue)] = {
+      val tx = UpdateAssetInfoTransaction(
+        version,
+        AddressScheme.current.chainId,
+        sender.publicKey,
+        IssuedAsset(ByteStr(Base58.decode(assetId))),
+        name,
+        description,
+        timestamp.getOrElse(System.currentTimeMillis()),
+        fee,
+        if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
+        Proofs.empty
+      ).signWith(sender.privateKey)
+      signedTraceBroadcast(tx.json())
     }
 
     def scriptCompile(code: String): Future[CompiledScript] = post("/utils/script/compileCode", code).as[CompiledScript]
