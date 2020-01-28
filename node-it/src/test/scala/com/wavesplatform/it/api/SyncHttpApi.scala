@@ -432,18 +432,6 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).lease(sourceAddress, recipient, leasingAmount, leasingFee, version)), waitForTx)
 
-    def updateAssetInfo(
-        sender: KeyPair,
-        assetId: String,
-        updatedName: String,
-        updatedDescription: String,
-        fee: Long,
-        feeAsset: Asset = Waves,
-        version: TxVersion = TxVersion.V1,
-        waitForTx: Boolean = false
-    ): Transaction =
-      maybeWaitForTransaction(sync(async(n).updateAssetInfo(sender, assetId, updatedName, updatedDescription, fee, feeAsset, version)), waitForTx)
-
     def putData(sourceAddress: String, data: List[DataEntry[_]], fee: Long, waitForTx: Boolean = false): Transaction =
       maybeWaitForTransaction(sync(async(n).putData(sourceAddress, data, fee)), waitForTx)
 
@@ -609,6 +597,22 @@ object SyncHttpApi extends Assertions {
         waitForTx: Boolean = false
     ): (Transaction, JsValue) = {
       sync(async(n).invokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version)) match {
+        case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
+      }
+    }
+
+    def updateAssetInfo(
+        caller: KeyPair,
+        assetId: String,
+        name: String,
+        description: String,
+        fee: Long = issueFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1,
+        timestamp: Option[Long] = None,
+        waitForTx: Boolean = false
+    ): (Transaction, JsValue) = {
+      sync(async(n).updateAssetInfo(caller, assetId, name, description, fee, feeAssetId, version, timestamp)) match {
         case (tx, js) => maybeWaitForTransaction(tx, waitForTx) -> js
       }
     }
