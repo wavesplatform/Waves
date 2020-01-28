@@ -199,7 +199,7 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = {
+  override def accountScriptWithComplexity(address: Address): Option[AccountScriptInfo] = {
     diff.scripts.get(address) match {
       case None            => inner.accountScriptWithComplexity(address)
       case Some(None)      => None

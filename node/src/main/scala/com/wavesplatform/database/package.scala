@@ -505,11 +505,11 @@ package object database extends ScorexLogging {
     )
   }
 
-  def writeScript(script: (PublicKey, Script, Long, Map[String, Long])): Array[Byte] = {
-    val (pk, expr, complexity, callableComplexities) = script
+  def writeScript(script: AccountScriptInfo): Array[Byte] = {
+    val AccountScriptInfo(pk, expr, complexity, callableComplexities) = script
     val pkb = pk.arr
     assert(pkb.size == KeyLength)
-    val output                                   = newDataOutput()
+    val output = newDataOutput()
 
     output.writeByteStr(pkb)
 
@@ -527,7 +527,7 @@ package object database extends ScorexLogging {
     output.toByteArray
   }
 
-  def readScript(b: Array[Byte]): (PublicKey, Script, Long, Map[String, Long]) = {
+  def readScript(b: Array[Byte]): AccountScriptInfo = {
     val input                     = newDataInput(b)
     val pk = PublicKey(input.readByteStr(KeyLength))
     val scriptSize                = input.readInt()
@@ -539,6 +539,6 @@ package object database extends ScorexLogging {
         .map(_ => (input.readUTF(), input.readLong()))
         .toMap
 
-    (pk, script, complexity, callableComplexities)
+    AccountScriptInfo(pk, script, complexity, callableComplexities)
   }
 }

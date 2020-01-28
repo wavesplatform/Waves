@@ -59,7 +59,7 @@ object InvokeScriptTransactionDiff {
     val functionCall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some((pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
+      case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -170,7 +170,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._3)
+          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_.maxComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
             .map(_._3)
