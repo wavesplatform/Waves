@@ -663,6 +663,7 @@ class UtxPoolSpecification
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
             case (Some(Seq(`tx1`)), _) => // Success
           }
+          utx.all shouldBe Seq(tx1)
         }
       }
     }
