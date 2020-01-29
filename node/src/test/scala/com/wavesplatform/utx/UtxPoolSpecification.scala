@@ -684,7 +684,7 @@ class UtxPoolSpecification
       }
     }
 
-    "head pool" - {
+    "priority pool" - {
       "returning transactions in start of utx" in {
         val gen = for {
           acc         <- accountGen
