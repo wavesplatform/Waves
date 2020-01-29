@@ -736,8 +736,11 @@ class UtxPoolSpecification
               case (Some(txs: Seq[_]), _) if txs == (minedTxs :+ tx1) => // Success
             }
             utx.all shouldBe minedTxs :+ tx1
-            utx.addAndCleanup(Seq(tx1))
-            utx.all shouldBe minedTxs :+ tx1
+
+            val minedTxs1 = Seq(scripted.head, tx1)
+            utx.removeAll(minedTxs1)
+            utx.addAndCleanup(scripted.tail ++ nonScripted)
+            utx.all shouldBe (scripted.tail ++ nonScripted)
         }
       }
     }

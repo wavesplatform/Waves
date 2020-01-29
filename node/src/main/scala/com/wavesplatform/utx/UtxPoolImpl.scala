@@ -210,10 +210,15 @@ class UtxPoolImpl(
         .getAggregated(addr)
         .spendableBalanceOf(assetId)
 
-  override def pessimisticPortfolio(addr: Address): Portfolio = pessimisticPortfolios.getAggregated(addr)
+  override def pessimisticPortfolio(addr: Address): Portfolio =
+    pessimisticPortfolios.getAggregated(addr)
 
-  private[this] def nonHeadTransactions: Seq[Transaction] =
-    transactions.values.asScala.toSeq.sorted(TransactionsOrdering.InUTXPool)
+  private[this] def nonHeadTransactions: Seq[Transaction] = {
+    val headTxsSet = headTransactions.map(_.id()).toSet
+    transactions.values.asScala.toSeq
+      .filterNot(tx => headTxsSet(tx.id()))
+      .sorted(TransactionsOrdering.InUTXPool)
+  }
 
   override def all: Seq[Transaction] =
     headTransactions ++ nonHeadTransactions
@@ -246,12 +251,7 @@ class UtxPoolImpl(
   }
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    headTransactions.map(TxEntry(_, vip = true)) ++ this.transactions
-      .values()
-      .asScala
-      .toSeq
-      .sorted(TransactionsOrdering.InUTXPool)
-      .map(TxEntry(_, vip = false))
+    headTransactions.map(TxEntry(_, vip = true)) ++ nonHeadTransactions.map(TxEntry(_, vip = false))
 
   private[this] def packTransactions(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -404,7 +404,6 @@ class UtxPoolImpl(
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
     this.headTransactions = (headTransactions ++ transactions).distinct
-    headTransactions.foreach(tx => this.transactions.remove(tx.id())) // Remove from ordinary pool
     TxCleanup.runCleanupAsync()
   }
 
