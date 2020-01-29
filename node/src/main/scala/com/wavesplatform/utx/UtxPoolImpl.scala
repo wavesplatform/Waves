@@ -43,7 +43,8 @@ class UtxPoolImpl(
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    nanoTimeSource: () => Long = () => System.nanoTime()
+    nanoTimeSource: () => Long = () => System.nanoTime(),
+    enablePriorityPool: Boolean
 ) extends ScorexLogging
     with AutoCloseable
     with UtxPool {
@@ -267,7 +268,7 @@ class UtxPoolImpl(
           .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
           .foldLeft[PackResult](prevResult) {
             case (r, TxEntry(tx, priority)) =>
-              def isLimitReached = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
+              def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
               def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
 
               if (r.constraint.isFull || isLimitReached || isAlreadyRemoved)
@@ -402,7 +403,7 @@ class UtxPoolImpl(
           removed += txId
         })
         finally {
-          removeIds(removed)
+          if (enablePriorityPool) removeIds(removed)
           scheduled.set(false)
         }
       }
@@ -414,8 +415,8 @@ class UtxPoolImpl(
     val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
-      addTransaction(tx, verify = false, priority)
-      if (priority) removeFromOrdPool(tx.id())
+      addTransaction(tx, verify = false, enablePriorityPool && priority)
+      if (enablePriorityPool && priority) removeFromOrdPool(tx.id())
     }
     TxCleanup.runCleanupAsync()
   }
