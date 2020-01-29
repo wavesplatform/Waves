@@ -19,7 +19,4 @@ trait ScriptEstimator {
 object ScriptEstimator {
   val all: List[ScriptEstimator] =
     List(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3)
-
-  val byVersion: Map[Int, ScriptEstimator] =
-    all.map(se => (se.version, se)).toMap
 }
