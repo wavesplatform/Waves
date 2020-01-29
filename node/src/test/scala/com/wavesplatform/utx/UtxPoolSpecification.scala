@@ -752,12 +752,12 @@ class UtxPoolSpecification
             utx.all shouldBe expectedTxs
             assertPortfolios(utx, expectedTxs)
 
-            val minedTxs1    = nonScripted :+ scripted.head
-            val expectedTxs1 = minedTxs1 :+ tx1
             utx.removeAll(minedTxs)
             all(minedTxs.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
             utx.pessimisticPortfolio(tx1.sender) should not be empty
 
+            val minedTxs1    = nonScripted :+ scripted.head
+            val expectedTxs1 = minedTxs1 :+ tx1
             utx.addAndCleanup(minedTxs1)
             all(minedTxs1.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) match {
@@ -769,6 +769,10 @@ class UtxPoolSpecification
 
             utx.removeAll(expectedTxs1)
             utx.all shouldBe empty
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) match {
+              case (Some(txs: Seq[_]), _) =>
+                txs shouldBe Nil
+            }
             all(expectedTxs1.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
         }
       }
