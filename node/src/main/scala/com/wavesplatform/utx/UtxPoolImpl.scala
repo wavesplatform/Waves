@@ -166,27 +166,19 @@ class UtxPoolImpl(
   }
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
-    val ids = txs.view.map { tx =>
-      val txId = tx.id()
-      remove(txId)
-      txId
-    }.toSet
+    val ids = txs.map(_.id()).toSet
     removeFromHeadPool(ids)
-  }
-
-  private[this] def remove(tx: Transaction): Unit = {
-    PoolMetrics.removeTransaction(tx)
-    pessimisticPortfolios.remove(tx.id())
+    ids.foreach(remove)
   }
 
   private[this] def remove(txId: ByteStr): Unit =
-    for (tx <- Option(transactions.remove(txId))) remove(tx)
+    for (tx <- Option(transactions.remove(txId))) {
+      PoolMetrics.removeTransaction(tx)
+      pessimisticPortfolios.remove(tx.id())
+    }
 
-  private[this] def removeFromHeadPool(removed: Set[ByteStr]): Unit = {
-    val (drop, keep) = headTransactions.partition(tx => removed(tx.id()))
-    headTransactions = keep
-    drop.foreach(remove)
-  }
+  private[this] def removeFromHeadPool(removed: Set[ByteStr]): Unit =
+    headTransactions =  headTransactions.filterNot(tx => removed(tx.id()))
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
@@ -245,18 +237,16 @@ class UtxPoolImpl(
     packTransactions(
       initialConstraint,
       maxPackTime,
-      createTxEntrySeq,
       txId => remove(txId)
     )
   }
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    headTransactions.map(TxEntry(_, vip = true)) ++ nonHeadTransactions.map(TxEntry(_, vip = false))
+    headTransactions.map(TxEntry(_, vip = true)).toVector ++ nonHeadTransactions.map(TxEntry(_, vip = false))
 
   private[this] def packTransactions(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration,
-      createTxsList: () => Seq[TxEntry],
       delete: ByteStr => Unit
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
@@ -274,7 +264,7 @@ class UtxPoolImpl(
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
-                remove(tx.id())
+                delete(tx.id())
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
@@ -322,12 +312,12 @@ class UtxPoolImpl(
           }
 
       @tailrec
-      def pack(seed: PackResult): PackResult =
-        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || transactions.isEmpty) seed
+      def pack(seed: PackResult): PackResult = {
+        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || (transactions.isEmpty && headTransactions.isEmpty)) seed
         else {
           val newSeed = packIteration(
             seed.copy(checkedAddresses = Set.empty),
-            createTxsList().iterator
+            this.createTxEntrySeq().iterator
           )
           if (newSeed.constraint.isFull) {
             log.trace(s"Block is full: ${newSeed.constraint}")
@@ -337,6 +327,7 @@ class UtxPoolImpl(
             newSeed
           } else pack(newSeed)
         }
+      }
 
       pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }
@@ -392,9 +383,10 @@ class UtxPoolImpl(
     def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupScheduler.execute { () =>
         var removed = Set.empty[ByteStr]
-        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, createTxEntrySeq, txId => removed += txId)
+        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, txId => removed += txId)
         finally {
           removeFromHeadPool(removed)
+          removed.foreach(remove)
           scheduled.set(false)
         }
       }

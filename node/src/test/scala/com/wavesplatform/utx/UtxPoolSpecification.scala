@@ -732,15 +732,20 @@ class UtxPoolSpecification
             ) should matchPattern {
               case (Some(txs: Seq[_]), _) if txs == Seq(minedTxs.head) => // Success
             }
+            val expectedTxs = minedTxs :+ tx1
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
-              case (Some(txs: Seq[_]), _) if txs == (minedTxs :+ tx1) => // Success
+              case (Some(txs: Seq[_]), _) if txs == expectedTxs => // Success
             }
-            utx.all shouldBe minedTxs :+ tx1
+            utx.all shouldBe expectedTxs
 
             val minedTxs1 = Seq(scripted.head, tx1)
+            val expectedTxs1 = scripted.tail ++ nonScripted
             utx.removeAll(minedTxs1)
-            utx.addAndCleanup(scripted.tail ++ nonScripted)
-            utx.all shouldBe (scripted.tail ++ nonScripted)
+            utx.addAndCleanup(expectedTxs1)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
+              case (Some(txs: Seq[_]), _) if txs == expectedTxs1 => // Success
+            }
+            utx.all shouldBe expectedTxs1
         }
       }
     }
