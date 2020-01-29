@@ -58,8 +58,12 @@ class UtxPoolImpl(
   private[this] val pessimisticPortfolios      = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
   @volatile private[this] var headTransactions = Seq.empty[Transaction]
 
+  private[this] def containsTx(tx: Transaction): Boolean = {
+    transactions.containsKey(tx.id()) || headTransactions.exists(_.id() == tx.id())
+  }
+
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
+    if (containsTx(tx)) TracedResult.wrapValue(false)
     else putNewTx(tx, verify)
   }
 
@@ -161,10 +165,14 @@ class UtxPoolImpl(
     tracedIsNew
   }
 
-  override def removeAll(txs: Traversable[Transaction]): Unit =
-    txs.view
-      .map(_.id())
-      .foreach(remove)
+  override def removeAll(txs: Traversable[Transaction]): Unit = {
+    val ids = txs.view.map { tx =>
+      val txId = tx.id()
+      remove(txId)
+      txId
+    }.toSet
+    removeFromHeadPool(ids)
+  }
 
   private[this] def remove(tx: Transaction): Unit = {
     PoolMetrics.removeTransaction(tx)
@@ -173,6 +181,12 @@ class UtxPoolImpl(
 
   private[this] def remove(txId: ByteStr): Unit =
     for (tx <- Option(transactions.remove(txId))) remove(tx)
+
+  private[this] def removeFromHeadPool(removed: Set[ByteStr]): Unit = {
+    val (drop, keep) = headTransactions.partition(tx => removed(tx.id()))
+    headTransactions = keep
+    drop.foreach(remove)
+  }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
@@ -380,9 +394,7 @@ class UtxPoolImpl(
         var removed = Set.empty[ByteStr]
         try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, createTxEntrySeq, txId => removed += txId)
         finally {
-          val (drop, keep) = headTransactions.partition(tx => removed(tx.id()))
-          headTransactions = keep
-          drop.foreach(remove)
+          removeFromHeadPool(removed)
           scheduled.set(false)
         }
       }
