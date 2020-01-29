@@ -54,12 +54,12 @@ class UtxPoolImpl(
   private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   // State
-  private[this] val transactions               = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios      = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
-  @volatile private[this] var headTransactions = Seq.empty[Transaction]
+  private[this] val transactions                   = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val pessimisticPortfolios          = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
+  @volatile private[this] var priorityTransactions = Seq.empty[Transaction]
 
   private[this] def containsTx(tx: Transaction): Boolean = {
-    transactions.containsKey(tx.id()) || headTransactions.exists(_.id() == tx.id())
+    transactions.containsKey(tx.id()) || priorityTransactions.exists(_.id() == tx.id())
   }
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
@@ -155,7 +155,7 @@ class UtxPoolImpl(
       } yield ()
     } else Right(())
 
-    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, head = false))
+    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, priority = false))
     tracedIsNew.resultE match {
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
@@ -177,25 +177,25 @@ class UtxPoolImpl(
     }
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = {
-    val removedFromOrdPool  = removed.flatMap(id => Option(transactions.remove(id)))
-    val (removedFromHeadPool, keepInHeadPool) = headTransactions.partition(tx => removed(tx.id()))
+    val removedFromOrdPool                            = removed.flatMap(id => Option(transactions.remove(id)))
+    val (removedFromPriorityPool, keepInPriorityPool) = priorityTransactions.partition(tx => removed(tx.id()))
 
     removedFromOrdPool.foreach(PoolMetrics.removeTransaction)
-    removedFromHeadPool.toSet.foreach(PoolMetrics.removeTransactionHead)
-    (removedFromOrdPool ++ removedFromHeadPool).foreach(tx => pessimisticPortfolios.remove(tx.id()))
-    headTransactions = keepInHeadPool
+    removedFromPriorityPool.toSet.foreach(PoolMetrics.removeTransactionPriority)
+    (removedFromOrdPool ++ removedFromPriorityPool).foreach(tx => pessimisticPortfolios.remove(tx.id()))
+    priorityTransactions = keepInPriorityPool
   }
 
-  private[this] def addTransaction(tx: Transaction, verify: Boolean, head: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
     val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
       .map { diff =>
         pessimisticPortfolios.add(tx.id(), diff); true
       }
 
     if (!verify || isNew.resultE.isRight) {
-      if (head) {
-        headTransactions :+= tx
-        PoolMetrics.addTransactionHead(tx)
+      if (priority) {
+        priorityTransactions :+= tx
+        PoolMetrics.addTransactionPriority(tx)
       } else
         transactions.computeIfAbsent(tx.id(), { _ =>
           PoolMetrics.addTransaction(tx)
@@ -216,15 +216,15 @@ class UtxPoolImpl(
   override def pessimisticPortfolio(addr: Address): Portfolio =
     pessimisticPortfolios.getAggregated(addr)
 
-  private[this] def nonHeadTransactions: Seq[Transaction] = {
-    val headTxsSet = headTransactions.map(_.id()).toSet
+  private[this] def nonPriorityTransactions: Seq[Transaction] = {
+    val priorityTxsSet = priorityTransactions.map(_.id()).toSet
     transactions.values.asScala.toSeq
-      .filterNot(tx => headTxsSet(tx.id()))
+      .filterNot(tx => priorityTxsSet(tx.id()))
       .sorted(TransactionsOrdering.InUTXPool)
   }
 
   override def all: Seq[Transaction] =
-    headTransactions ++ nonHeadTransactions
+    priorityTransactions ++ nonPriorityTransactions
 
   override def size: Int = transactions.size
 
@@ -239,7 +239,7 @@ class UtxPoolImpl(
     case _                                                         => Set.empty
   }
 
-  case class TxEntry(tx: Transaction, vip: Boolean)
+  case class TxEntry(tx: Transaction, priority: Boolean)
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -253,7 +253,7 @@ class UtxPoolImpl(
   }
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    headTransactions.map(TxEntry(_, vip = true)).toVector ++ nonHeadTransactions.map(TxEntry(_, vip = false))
+    priorityTransactions.map(TxEntry(_, priority = true)).toVector ++ nonPriorityTransactions.map(TxEntry(_, priority = false))
 
   private[this] def packTransactions(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -270,8 +270,10 @@ class UtxPoolImpl(
         sortedTransactions
           .filterNot(e => r.validatedTransactions(e.tx.id()))
           .foldLeft[PackResult](r) {
-            case (r, TxEntry(tx, vip)) =>
-              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached) || (!vip && !transactions.containsKey(tx.id())))
+            case (r, TxEntry(tx, priority)) =>
+              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached) || (!priority && !transactions.containsKey(
+                    tx.id()
+                  )))
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
@@ -279,7 +281,7 @@ class UtxPoolImpl(
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
-                if (!vip && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
+                if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
                 else {
                   val updatedBlockchain   = CompositeBlockchain(blockchain, Some(r.totalDiff))
                   val newCheckedAddresses = newScriptedAddresses ++ r.checkedAddresses
@@ -324,7 +326,7 @@ class UtxPoolImpl(
 
       @tailrec
       def pack(seed: PackResult): PackResult = {
-        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || (transactions.isEmpty && headTransactions.isEmpty)) seed
+        if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || (transactions.isEmpty && priorityTransactions.isEmpty)) seed
         else {
           val newSeed = packIteration(
             seed.copy(checkedAddresses = Set.empty),
@@ -405,11 +407,11 @@ class UtxPoolImpl(
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
-    val existing = this.headTransactions.map(_.id()).toSet
+    val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
       remove(tx.id())
-      addTransaction(tx, verify = false, head = true)
+      addTransaction(tx, verify = false, priority = true)
     }
     TxCleanup.runCleanupAsync()
   }
@@ -425,8 +427,8 @@ class UtxPoolImpl(
     private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval)
     private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval)
 
-    private[this] val headSizeStats  = Kamon.rangeSampler("utx.head-pool-size", MeasurementUnit.none, SampleInterval)
-    private[this] val headBytesStats = Kamon.rangeSampler("utx.head-pool-bytes", MeasurementUnit.information.bytes, SampleInterval)
+    private[this] val prioritySizeStats  = Kamon.rangeSampler("utx.priority-pool-size", MeasurementUnit.none, SampleInterval)
+    private[this] val priorityBytesStats = Kamon.rangeSampler("utx.priority-pool-bytes", MeasurementUnit.information.bytes, SampleInterval)
 
     val putTimeStats    = Kamon.timer("utx.put-if-new")
     val putRequestStats = Kamon.counter("utx.put-if-new.requests")
@@ -448,14 +450,14 @@ class UtxPoolImpl(
       bytesStats.decrement(tx.bytes().length)
     }
 
-    def addTransactionHead(tx: Transaction): Unit = {
-      headSizeStats.increment()
-      headBytesStats.increment(tx.bytes().length)
+    def addTransactionPriority(tx: Transaction): Unit = {
+      prioritySizeStats.increment()
+      priorityBytesStats.increment(tx.bytes().length)
     }
 
-    def removeTransactionHead(tx: Transaction): Unit = {
-      headSizeStats.decrement()
-      headBytesStats.decrement(tx.bytes().length)
+    def removeTransactionPriority(tx: Transaction): Unit = {
+      prioritySizeStats.decrement()
+      priorityBytesStats.decrement(tx.bytes().length)
     }
   }
 }
