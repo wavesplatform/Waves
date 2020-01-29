@@ -406,12 +406,12 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction]): Unit = {
+  def addAndCleanup(transactions: Seq[Transaction], priority: Boolean): Unit = {
     val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
-      remove(tx.id())
-      addTransaction(tx, verify = false, priority = true)
+      if (priority) remove(tx.id())
+      addTransaction(tx, verify = false, priority)
     }
     TxCleanup.runCleanupAsync()
   }
