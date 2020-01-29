@@ -102,7 +102,7 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction(
+case class Transaction (
                         _type: Int,
                         id: String,
                         fee: Long,

@@ -120,14 +120,16 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     }
   }
 
-  test("able to broadcast V3 transfer transaction") {
+  test("able to pass typed attachment to transfer transaction") {
 
-    val tx1 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("string"), attachmentValue = Some(JsString("somestring")))
-    val tx2 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("boolean"), attachmentValue = Some(JsBoolean(true)))
+    val txWithStringAtt = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3,
+      attachmentType = Some("string"), attachmentValue = Some(JsString("somestring")), waitForTx = true)
 
-    val tx4 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("integer"), attachmentValue = Some(JsNumber(123)))
+    val txWithBoolAtt = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("boolean"), attachmentValue = Some(JsBoolean(true)))
 
-    val tx5 = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V2, attachmentValue = Some(JsString("ddd")))
+    val txWithIntAtt = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V3, attachmentType = Some("integer"), attachmentValue = Some(JsNumber(123)))
+
+    val txWithBlobAtt = miner.transfer(firstAddress, secondAddress, transferAmount, minFee, version = TxVersion.V2, attachmentValue = Some(JsArray("ddd")))
 
   }
 }
