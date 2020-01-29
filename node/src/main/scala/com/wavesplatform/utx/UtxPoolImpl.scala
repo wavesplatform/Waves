@@ -155,7 +155,7 @@ class UtxPoolImpl(
       } yield ()
     } else Right(())
 
-    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify))
+    val tracedIsNew = TracedResult(checks).flatMap(_ => addTransaction(tx, verify, head = false))
     tracedIsNew.resultE match {
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
@@ -167,8 +167,7 @@ class UtxPoolImpl(
 
   override def removeAll(txs: Traversable[Transaction]): Unit = {
     val ids = txs.map(_.id()).toSet
-    removeFromHeadPool(ids)
-    ids.foreach(remove)
+    removeIds(ids)
   }
 
   private[this] def remove(txId: ByteStr): Unit =
@@ -177,20 +176,32 @@ class UtxPoolImpl(
       pessimisticPortfolios.remove(tx.id())
     }
 
-  private[this] def removeFromHeadPool(removed: Set[ByteStr]): Unit =
-    headTransactions =  headTransactions.filterNot(tx => removed(tx.id()))
+  private[this] def removeIds(removed: Set[ByteStr]): Unit = {
+    val removedFromOrdPool  = removed.flatMap(id => Option(transactions.remove(id)))
+    val (removedFromHeadPool, keepInHeadPool) = headTransactions.partition(tx => removed(tx.id()))
 
-  private[this] def addTransaction(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+    removedFromOrdPool.foreach(PoolMetrics.removeTransaction)
+    removedFromHeadPool.toSet.foreach(PoolMetrics.removeTransactionHead)
+    (removedFromOrdPool ++ removedFromHeadPool).foreach(tx => pessimisticPortfolios.remove(tx.id()))
+    headTransactions = keepInHeadPool
+  }
+
+  private[this] def addTransaction(tx: Transaction, verify: Boolean, head: Boolean): TracedResult[ValidationError, Boolean] = {
     val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
       .map { diff =>
         pessimisticPortfolios.add(tx.id(), diff); true
       }
 
-    if (!verify || isNew.resultE.isRight)
-      transactions.computeIfAbsent(tx.id(), { _ =>
-        PoolMetrics.addTransaction(tx)
-        tx
-      })
+    if (!verify || isNew.resultE.isRight) {
+      if (head) {
+        headTransactions :+= tx
+        PoolMetrics.addTransactionHead(tx)
+      } else
+        transactions.computeIfAbsent(tx.id(), { _ =>
+          PoolMetrics.addTransaction(tx)
+          tx
+        })
+    }
 
     isNew
   }
@@ -385,8 +396,7 @@ class UtxPoolImpl(
         var removed = Set.empty[ByteStr]
         try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, txId => removed += txId)
         finally {
-          removeFromHeadPool(removed)
-          removed.foreach(remove)
+          removeIds(removed)
           scheduled.set(false)
         }
       }
@@ -395,7 +405,12 @@ class UtxPoolImpl(
 
   /** DOES NOT verify transactions */
   def addAndCleanup(transactions: Seq[Transaction]): Unit = {
-    this.headTransactions = (headTransactions ++ transactions).distinct
+    val existing = this.headTransactions.map(_.id()).toSet
+    val newTxs   = transactions.filterNot(tx => existing(tx.id()))
+    newTxs.foreach { tx =>
+      remove(tx.id())
+      addTransaction(tx, verify = false, head = true)
+    }
     TxCleanup.runCleanupAsync()
   }
 
@@ -409,6 +424,9 @@ class UtxPoolImpl(
 
     private[this] val sizeStats  = Kamon.rangeSampler("utx.pool-size", MeasurementUnit.none, SampleInterval)
     private[this] val bytesStats = Kamon.rangeSampler("utx.pool-bytes", MeasurementUnit.information.bytes, SampleInterval)
+
+    private[this] val headSizeStats  = Kamon.rangeSampler("utx.head-pool-size", MeasurementUnit.none, SampleInterval)
+    private[this] val headBytesStats = Kamon.rangeSampler("utx.head-pool-bytes", MeasurementUnit.information.bytes, SampleInterval)
 
     val putTimeStats    = Kamon.timer("utx.put-if-new")
     val putRequestStats = Kamon.counter("utx.put-if-new.requests")
@@ -428,6 +446,16 @@ class UtxPoolImpl(
     def removeTransaction(tx: Transaction): Unit = {
       sizeStats.decrement()
       bytesStats.decrement(tx.bytes().length)
+    }
+
+    def addTransactionHead(tx: Transaction): Unit = {
+      headSizeStats.increment()
+      headBytesStats.increment(tx.bytes().length)
+    }
+
+    def removeTransactionHead(tx: Transaction): Unit = {
+      headSizeStats.decrement()
+      headBytesStats.decrement(tx.bytes().length)
     }
   }
 }

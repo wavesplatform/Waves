@@ -705,6 +705,19 @@ class UtxPoolSpecification
           ScriptEstimatorV1
         )
 
+        def assertPortfolios(utx: UtxPool, transactions: Seq[TransferTransactionV2]): Unit = {
+          val portfolios = transactions.groupBy(_.sender.toAddress).map {
+            case (addr, transactions) =>
+              val amt = transactions.map(tx => -(tx.amount + tx.fee)).sum
+              (addr, amt)
+          }
+          portfolios.foreach {
+            case (addr, balance) =>
+              val pf = utx.pessimisticPortfolio(addr)
+              pf.balance shouldBe balance
+          }
+        }
+
         forAll(gen) {
           case (tx1, nonScripted, scripted) =>
             val blockchain = stub[Blockchain]
@@ -720,32 +733,43 @@ class UtxPoolSpecification
             (blockchain.hasScript _).when(scripted.head.sender.toAddress).returning(true)
             (blockchain.accountScriptWithComplexity _).when(*).returning(None)
             (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+            (blockchain.transactionHeight _).when(*).returning(None)
 
             utx.putIfNew(tx1).resultE shouldBe 'right
-            val minedTxs = scripted ++ nonScripted
+            val minedTxs = scripted.tail ++ nonScripted
             utx.addAndCleanup(minedTxs)
 
-            // First microblock mined
             utx.packUnconfirmed(
               MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.one, ""))),
               Duration.Inf
-            ) should matchPattern {
-              case (Some(txs: Seq[_]), _) if txs == Seq(minedTxs.head) => // Success
+            ) match {
+              case (Some(txs: Seq[_]), _) => txs shouldBe Seq(minedTxs.head)
             }
             val expectedTxs = minedTxs :+ tx1
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
-              case (Some(txs: Seq[_]), _) if txs == expectedTxs => // Success
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) match {
+              case (Some(txs: Seq[_]), _) => txs shouldBe expectedTxs
             }
             utx.all shouldBe expectedTxs
+            assertPortfolios(utx, expectedTxs)
 
-            val minedTxs1 = Seq(scripted.head, tx1)
-            val expectedTxs1 = scripted.tail ++ nonScripted
-            utx.removeAll(minedTxs1)
-            utx.addAndCleanup(expectedTxs1)
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) should matchPattern {
-              case (Some(txs: Seq[_]), _) if txs == expectedTxs1 => // Success
+            val minedTxs1    = nonScripted :+ scripted.head
+            val expectedTxs1 = minedTxs1 :+ tx1
+            utx.removeAll(minedTxs)
+            all(minedTxs.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
+            utx.pessimisticPortfolio(tx1.sender) should not be empty
+
+            utx.addAndCleanup(minedTxs1)
+            all(minedTxs1.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) match {
+              case (Some(txs: Seq[_]), _) =>
+                txs shouldBe expectedTxs1
             }
             utx.all shouldBe expectedTxs1
+            assertPortfolios(utx, expectedTxs1)
+
+            utx.removeAll(expectedTxs1)
+            utx.all shouldBe empty
+            all(expectedTxs1.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
         }
       }
     }
