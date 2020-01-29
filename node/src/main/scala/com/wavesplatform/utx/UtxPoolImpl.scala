@@ -58,12 +58,8 @@ class UtxPoolImpl(
   private[this] val pessimisticPortfolios          = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
   @volatile private[this] var priorityTransactions = Seq.empty[Transaction]
 
-  private[this] def containsTx(tx: Transaction): Boolean = {
-    transactions.containsKey(tx.id()) || priorityTransactions.exists(_.id() == tx.id())
-  }
-
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
-    if (containsTx(tx)) TracedResult.wrapValue(false)
+    if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
     else putNewTx(tx, verify)
   }
 
@@ -170,7 +166,7 @@ class UtxPoolImpl(
     removeIds(ids)
   }
 
-  private[this] def remove(txId: ByteStr): Unit =
+  private[this] def removeFromOrdPool(txId: ByteStr): Unit =
     for (tx <- Option(transactions.remove(txId))) {
       PoolMetrics.removeTransaction(tx)
       pessimisticPortfolios.remove(tx.id())
@@ -248,7 +244,7 @@ class UtxPoolImpl(
     packTransactions(
       initialConstraint,
       maxPackTime,
-      txId => remove(txId)
+      txId => removeFromOrdPool(txId)
     )
   }
 
@@ -266,19 +262,24 @@ class UtxPoolImpl(
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
 
-      def packIteration(r: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
+      def packIteration(prevResult: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
-          .filterNot(e => r.validatedTransactions(e.tx.id()))
-          .foldLeft[PackResult](r) {
+          .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
+          .foldLeft[PackResult](prevResult) {
             case (r, TxEntry(tx, priority)) =>
-              if (r.constraint.isFull || (r.transactions.exists(_.nonEmpty) && isTimeLimitReached) || (!priority && !transactions.containsKey(
-                    tx.id()
-                  )))
+              def isLimitReached = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
+              def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
+
+              if (r.constraint.isFull || isLimitReached || isAlreadyRemoved)
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
                 delete(tx.id())
                 r.copy(iterations = r.iterations + 1)
+              } else if (r.validatedTransactions.contains(tx.id())) {
+                log.trace(s"Transaction ${tx.id()} already validated in priority pool")
+                removeFromOrdPool(tx.id())
+                r
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
@@ -396,7 +397,10 @@ class UtxPoolImpl(
     def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupScheduler.execute { () =>
         var removed = Set.empty[ByteStr]
-        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, txId => removed += txId)
+        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf, { txId =>
+          removeFromOrdPool(txId)
+          removed += txId
+        })
         finally {
           removeIds(removed)
           scheduled.set(false)
@@ -410,8 +414,8 @@ class UtxPoolImpl(
     val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
-      if (priority) remove(tx.id())
       addTransaction(tx, verify = false, priority)
+      if (priority) removeFromOrdPool(tx.id())
     }
     TxCleanup.runCleanupAsync()
   }
