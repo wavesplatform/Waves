@@ -752,18 +752,25 @@ class UtxPoolSpecification
             utx.all shouldBe expectedTxs
             assertPortfolios(utx, expectedTxs)
 
-            utx.removeAll(minedTxs)
-            all(minedTxs.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
+            val (left, right) = {
+              val (left, right) = minedTxs.zipWithIndex.partition(kv => kv._2 % 2 == 0)
+              (left.map(_._1), right.map(_._1))
+            }
+
+            utx.removeAll(left)
+            all(left.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
             utx.pessimisticPortfolio(tx1.sender) should not be empty
 
-            val minedTxs1    = nonScripted :+ scripted.head
-            val expectedTxs1 = minedTxs1 :+ tx1
-            utx.addAndCleanup(minedTxs1)
-            all(minedTxs1.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
+            val expectedTxs1 = right :+ tx1
+            all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf) match {
               case (Some(txs: Seq[_]), _) =>
                 txs shouldBe expectedTxs1
             }
+            utx.all shouldBe expectedTxs1
+            assertPortfolios(utx, expectedTxs1)
+
+            utx.addAndCleanup(right) // Should be ignored
             utx.all shouldBe expectedTxs1
             assertPortfolios(utx, expectedTxs1)
 
