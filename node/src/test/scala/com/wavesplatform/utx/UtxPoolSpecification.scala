@@ -736,7 +736,7 @@ class UtxPoolSpecification
             (blockchain.transactionHeight _).when(*).returning(None)
 
             utx.putIfNew(tx1).resultE shouldBe 'right
-            val minedTxs = scripted.tail ++ nonScripted
+            val minedTxs = scripted ++ nonScripted
             utx.addAndCleanup(minedTxs, priority = true)
 
             utx.packUnconfirmed(
@@ -768,14 +768,17 @@ class UtxPoolSpecification
             utx.all shouldBe expectedTxs1
             assertPortfolios(utx, expectedTxs1)
 
-            utx.addAndCleanup(right, priority = true) // Should be ignored
-            utx.all shouldBe expectedTxs1
-            assertPortfolios(utx, expectedTxs1)
+            val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool)
+            utx.removeAll(expectedTxs2)
+            utx.addAndCleanup(left, priority = false)
+            utx.addAndCleanup(expectedTxs1, priority = true)
+            utx.all shouldBe expectedTxs2
+            assertPortfolios(utx, expectedTxs2)
 
-            utx.removeAll(expectedTxs1)
+            utx.removeAll(expectedTxs2)
             utx.all shouldBe empty
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe empty
-            all(expectedTxs1.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
+            all(expectedTxs2.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
         }
       }
     }
