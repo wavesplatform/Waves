@@ -5,7 +5,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}
 
-class UTXSettingsSpecification extends FlatSpec with Matchers {
+class UtxSettingsSpecification extends FlatSpec with Matchers {
   "UTXSettings" should "read values" in {
     val config = ConfigFactory.parseString("""waves {
         |  utx {
@@ -16,6 +16,7 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
         |    allow-blacklisted-transfer-to = ["b"]
         |    allow-transactions-from-smart-accounts = false
         |    allow-skip-checks = false
+        |    priority-pool-size = 1000
         |  }
         |}""".stripMargin).resolve()
 
@@ -27,5 +28,6 @@ class UTXSettingsSpecification extends FlatSpec with Matchers {
     settings.allowBlacklistedTransferTo shouldBe Set("b")
     settings.allowTransactionsFromSmartAccounts shouldBe false
     settings.allowSkipChecks shouldBe false
+    settings.priorityPoolSize shouldBe 1000
   }
 }

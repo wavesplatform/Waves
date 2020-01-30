@@ -349,7 +349,7 @@ class UtxPoolImpl(
 
     log.trace(
       s"Validated ${packResult.validatedTransactions.size} transactions, " +
-        s"of which ${packResult.transactions.fold(0)(_.size)} were packed, ${transactions.size()} transactions remaining"
+        s"of which ${packResult.transactions.fold(0)(_.size)} were packed, ${transactions.size() + priorityTransactions.length} transactions remaining"
     )
 
     packResult.transactions.map(_.reverse) -> packResult.constraint
@@ -415,8 +415,9 @@ class UtxPoolImpl(
     val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
-      addTransaction(tx, verify = false, enablePriorityPool && priority)
-      if (enablePriorityPool && priority) removeFromOrdPool(tx.id())
+      val canAddToPriorityPool = priority && enablePriorityPool && priorityTransactions.length < utxSettings.priorityPoolSize
+      addTransaction(tx, verify = false, canAddToPriorityPool)
+      if (canAddToPriorityPool) removeFromOrdPool(tx.id())
     }
     TxCleanup.runCleanupAsync()
   }
