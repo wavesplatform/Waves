@@ -123,6 +123,13 @@ class UtxPoolSpecification
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferWithRecipient")
 
+  private def transferV2WithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
+    (for {
+      amount <- chooseNum(1, (maxAmount * 0.9).toLong)
+      fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
+    } yield TransferTransactionV2.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
+      .label("transferWithRecipient")
+
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
     val amount    = maxAmount / (recipients.size + 1)
     val transfers = recipients.map(r => ParsedTransfer(r.toAddress, amount))
@@ -762,13 +769,13 @@ class UtxPoolSpecification
         scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
       } yield (tx1, nonScripted, scripted)
 
-      def createState(scripted: Address, settings: WavesSettings = WavesSettings.default()): Blockchain = {
+      def createState(scripted: Address, settings: WavesSettings = WavesSettings.default(), setBalance: Boolean = true): Blockchain = {
         val blockchain = stub[Blockchain]
         (blockchain.settings _).when().returning(settings.blockchainSettings)
         (blockchain.height _).when().returning(1)
         (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
 
-        (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+        if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
 
         (blockchain.accountScriptWithComplexity _).when(scripted).returning(Some(testScript -> testScriptComplexity))
@@ -886,6 +893,26 @@ class UtxPoolSpecification
           val expectedTxs = nonScripted.sorted(TransactionsOrdering.InUTXPool)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe expectedTxs
+      }
+
+      val genDependent = for {
+        acc         <- accountGen
+        acc1        <- accountGen
+        tx1         <- transferV2WithRecipient(acc, acc1, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount > 20000000L)
+        tx2         <- transferV2(acc1, 10000000L, ntpTime)
+      } yield (tx1, tx2)
+
+      "takes into account priority txs when pack" in forAll(genDependent) { case (tx1, tx2) =>
+        val blockchain = createState(tx1.sender, setBalance = false)
+        (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
+        (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0) // Should be overriden in composite blockchain
+
+        val utx =
+          new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+        utx.addAndCleanup(Seq(tx1), priority = true)
+        utx.addAndCleanup(Seq(tx2), priority = false)
+        utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
+        utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
     }
   }
