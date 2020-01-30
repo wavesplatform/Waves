@@ -24,7 +24,7 @@ import com.wavesplatform.mining._
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
-import com.wavesplatform.state.appender.ExtensionAppender
+import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.utils.TestLevelDB
@@ -886,31 +886,35 @@ class UtxPoolSpecification
           ntpTime.correctedTime()
         )
         txs2 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
+        txs4 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
         (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(
           mbs1.head.totalResBlockSig,
           Nil,
-          Seq(txs2),
+          Seq(txs2, txs4),
           acc,
           Block.NgBlockVersion,
           ntpTime.correctedTime()
         )
-        block3 = UnsafeBlocks.unsafeBlock(genBlock.uniqueId, Nil, acc, Block.NgBlockVersion, ntpTime.correctedTime())
-      } yield (genBlock, (block1, mbs1), (block2, mbs2), block3)
+        txs3 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
+        block3 = UnsafeBlocks.unsafeBlock(mbs2.last.totalResBlockSig, txs3, acc, Block.NgBlockVersion, ntpTime.correctedTime())
+        block4 = UnsafeBlocks.unsafeBlock(genBlock.uniqueId, txs4, acc, Block.NgBlockVersion, ntpTime.correctedTime())
+      } yield (genBlock, (block1, mbs1), (block2, mbs2), block3, block4)
 
       val settingsWithNG = wavesplatform.history.settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)
 
       "applies chains correctly" in forAll(genChain) {
-        case (genBlock, (block1, mbs1), (block2, mbs2), block3) =>
+        case (genBlock, (block1, mbs1), (block2, mbs2), block3, block4) =>
           withDomain(settingsWithNG) { d =>
-            implicit val sheduler = Scheduler.singleThread("ext-appender")
+            implicit val scheduler = Scheduler.singleThread("ext-appender")
             val blockchain        = d.blockchainUpdater
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+
             val pos    = stub[PoSSelector]
-            val value1 = Right((): Unit)
-            (pos.validateBaseTarget _).when(*, *, *, *).returning(value1)
-            (pos.validateBlockDelay _).when(*, *, *, *).returning(value1)
-            (pos.validateGeneratorSignature _).when(*, *).returning(value1)
+            (pos.validateBaseTarget _).when(*, *, *, *).returning(Right((): Unit))
+            (pos.validateBlockDelay _).when(*, *, *, *).returning(Right((): Unit))
+            (pos.validateGeneratorSignature _).when(*, *).returning(Right((): Unit))
+
             val extAppender = ExtensionAppender(
               blockchain,
               utx,
@@ -919,22 +923,28 @@ class UtxPoolSpecification
               stub[InvalidBlockStorage],
               stub[PeerDatabase],
               stub[Miner],
-              sheduler
+              scheduler
             )(null, _)
+
+            val microBlockAppender = MicroblockAppender(blockchain, utx, scheduler) _
+
             d.appendBlock(genBlock) shouldBe Some(Nil)
             d.appendBlock(block1) shouldBe Some(Nil)
-            all(mbs1.map(blockchain.processMicroBlock(_))) shouldBe 'right
+            all(mbs1.map(microBlockAppender(_).runSyncUnsafe())) shouldBe 'right
 
             all(mbs2.head.transactionData.map(utx.putIfNew(_).resultE)) shouldBe 'right
             extAppender(Seq(block2)).runSyncUnsafe() shouldBe 'right
-            val expectedTxs1 = mbs1(1).transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool)
+            val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool)
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs1)
 
-            all(mbs2.map(blockchain.processMicroBlock(_))) shouldBe 'right
-            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1(1).transactionData)
+            all(mbs2.map(microBlockAppender(_).runSyncUnsafe())) shouldBe 'right
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1.last.transactionData)
 
             extAppender(Seq(block3)).runSyncUnsafe() shouldBe 'right
-            val expectedTxs2 = mbs1(1).transactionData ++ mbs2.head.transactionData
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1.last.transactionData)
+
+            extAppender(Seq(block4)).runSyncUnsafe() shouldBe 'right
+            val expectedTxs2 = mbs1.flatMap(_.transactionData) ++ mbs2.head.transactionData ++ block3.transactionData
             utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs2)
           }
       }
