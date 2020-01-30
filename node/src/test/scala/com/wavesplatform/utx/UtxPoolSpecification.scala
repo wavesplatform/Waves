@@ -848,6 +848,8 @@ class UtxPoolSpecification
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxsPU)
       }
 
+      val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
+
       "removes vip transactions from ordinary pool on pack" in forAll(gen) {
         case (_, nonScripted, scripted) =>
           val blockchain = createState(scripted.head.sender)
@@ -862,9 +864,8 @@ class UtxPoolSpecification
 
           utx.addAndCleanup(nonScripted, priority = true)
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe 'right
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe nonScripted.sorted(TransactionsOrdering.InUTXPool)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(nonScripted)
-
-          val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
       }
 
@@ -884,8 +885,6 @@ class UtxPoolSpecification
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
           val expectedTxs = nonScripted.sorted(TransactionsOrdering.InUTXPool)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
-
-          val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe expectedTxs
       }
     }
