@@ -415,9 +415,9 @@ class UtxPoolImpl(
     val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
-      val canAddToPriorityPool = priority && enablePriorityPool && priorityTransactions.length < utxSettings.priorityPoolSize
-      addTransaction(tx, verify = false, canAddToPriorityPool)
-      if (canAddToPriorityPool) removeFromOrdPool(tx.id())
+      val usePriorityPool = this.enablePriorityPool && priority
+      addTransaction(tx, verify = false, usePriorityPool)
+      if (usePriorityPool) removeFromOrdPool(tx.id())
     }
     TxCleanup.runCleanupAsync()
   }
