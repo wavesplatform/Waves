@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.Alias
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.NodeConfigs
@@ -9,7 +10,9 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
+import com.wavesplatform.lang.v1.traits.domain.Recipient.Address
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.transfer.{TransferTransaction, TransferTransactionV2}
 import org.scalatest.EitherValues._
 
 import scala.concurrent.Await
@@ -131,32 +134,38 @@ class RideReplBlockchainFunctionsSuite extends BaseTransactionSuite {
   }
 
   test("transferTransactionById()") {
+    val tx = sender.transactionInfo(transferTxId)
     execute(s"let transferTx = transferTransactionById(base58'$transferTxId').value()")
-    //TODO Left because recipient alias can't be parsed
-    execute(s"transferTx").right.value should endWith("""TransferTransaction(
-        |	feeAssetId = ""
-        |	amount = ""
-        |	assetId = ""
-        |	recipient = ""
-        |	attachment = ""
-        |	id = ""
-        |	fee = ""
-        |	timestamp = ""
-        |	version = ""
-        |	sender = ""
-        |	senderPublicKey = ""
-        |	bodyBytes = ""
-        |	proofs = ""
-        |""".stripMargin)
+    execute(s"transferTx").right.value should fullyMatch regex(
+      s"""
+         |.+TransferTransaction\\(
+         | recipient = Alias\\(
+         |  alias = "nickname"
+         | \\)
+         | timestamp = ${tx.timestamp}
+         | bodyBytes = base58'.+'
+         | assetId = base58'$assetId'
+         | feeAssetId = Unit
+         | amount = 100
+         | version = 2
+         | id = base58'$transferTxId'
+         | senderPublicKey = base58'${alice.publicKey.base58}'
+         | attachment = base58''
+         | sender = Address\\(
+         |  bytes = base58'${tx.sender.get}'
+         | \\)
+         | proofs = \\[base58'.+', base58'', base58'', base58'', base58'', base58'', base58'', base58''\\]
+         | fee = ${tx.fee}
+         |\\).*
+       """.trim.stripMargin
+    )
   }
 
   test("addressFromPublicKey()") {
-    //TODO possibly using wrong chain Id
     execute(s"addressFromPublicKey(base58'${alice.publicKey.stringRepr}').value().toString()").right.value should endWith(s""""${alice.stringRepr}"""")
   }
   test("addressFromRecipient() with alias") {
-    //TODO Left because recipient alias can't be parsed
-    execute(s"addressFromRecipient(transferTx.recipient).toString()").right.value should endWith(bob.stringRepr)
+    execute(s"addressFromRecipient(transferTx.recipient).toString()").right.value should endWith(s""""${bob.stringRepr}"""")
   }
   test("addressFromString()") {
     execute(s"""addressFromString("${alice.stringRepr}").value().toString()""").right.value should endWith(s""""${alice.stringRepr}"""")

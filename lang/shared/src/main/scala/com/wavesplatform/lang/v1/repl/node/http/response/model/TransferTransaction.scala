@@ -1,11 +1,13 @@
 package com.wavesplatform.lang.v1.repl.node.http.response.model
 
+import com.wavesplatform.lang.v1.traits.domain.Recipient
+import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
 import io.circe.generic.auto._
 import io.circe.{Decoder, DecodingFailure, HCursor}
 
 private[node] trait TransferTransaction {
   def id: ByteString
-  def recipient: ByteString
+  def recipient: Recipient
   def amount: Long
   def assetId: Option[ByteString]
   def feeAssetId: Option[ByteString]
@@ -21,7 +23,7 @@ private[node] trait TransferTransaction {
 
 private[node] case class TransferTransactionV1(
   id: ByteString,
-  recipient: ByteString,
+  recipient: Recipient,
   amount: Long,
   assetId: Option[ByteString],
   feeAssetId: Option[ByteString],
@@ -39,7 +41,7 @@ private[node] case class TransferTransactionV1(
 
 private[node] case class TransferTransactionV2(
   id: ByteString,
-  recipient: ByteString,
+  recipient: Recipient,
   amount: Long,
   assetId: Option[ByteString],
   feeAssetId: Option[ByteString],
@@ -63,4 +65,13 @@ private[node] object TransferTransaction {
        case n => Left(DecodingFailure(s"Illegal transfer transaction version: $n", Nil))
      }
    } yield result
+
+  implicit val recipientDecoder: Decoder[Recipient] = {
+    val aliasRegex = "alias:\\w+:(\\w+)".r
+    c =>
+      c.value.asString.get match {
+        case aliasRegex(alias) => Right(Alias(alias))
+        case _                 => c.value.as[ByteString].map(b => Address(b.byteStr))
+      }
+  }
 }
