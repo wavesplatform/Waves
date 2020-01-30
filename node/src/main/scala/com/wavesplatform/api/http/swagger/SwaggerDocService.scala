@@ -5,7 +5,9 @@ import akka.stream.ActorMaterializer
 import com.github.swagger.akka.SwaggerHttpService
 import com.github.swagger.akka.model.{Info, License}
 import com.wavesplatform.Version
+import com.wavesplatform.http.`X-Api-Key`
 import com.wavesplatform.settings.RestAPISettings
+import io.swagger.models.auth.{ApiKeyAuthDefinition, In}
 import io.swagger.models.{Scheme, Swagger}
 
 class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMaterializer, val apiClasses: Set[Class[_]], settings: RestAPISettings)
@@ -27,4 +29,9 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
     .info(info)
     .scheme(Scheme.HTTP)
     .scheme(Scheme.HTTPS)
+    .securityDefinition(SwaggerDocService.apiKeyDefinitionName, new ApiKeyAuthDefinition(`X-Api-Key`.name, In.HEADER))
+}
+
+object SwaggerDocService {
+  final val apiKeyDefinitionName = "API Key"
 }
