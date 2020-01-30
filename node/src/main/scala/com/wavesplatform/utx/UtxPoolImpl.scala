@@ -168,10 +168,8 @@ class UtxPoolImpl(
   }
 
   private[this] def removeFromOrdPool(txId: ByteStr): Unit =
-    for (tx <- Option(transactions.remove(txId))) {
+    for (tx <- Option(transactions.remove(txId)))
       PoolMetrics.removeTransaction(tx)
-      pessimisticPortfolios.remove(tx.id())
-    }
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = {
     val removedFromOrdPool                            = removed.flatMap(id => Option(transactions.remove(id)))

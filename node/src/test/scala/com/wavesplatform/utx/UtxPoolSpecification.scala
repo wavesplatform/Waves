@@ -964,7 +964,7 @@ class UtxPoolSpecification
       "applies chains correctly" in forAll(genChain) {
         case (genBlock, (block1, mbs1), (block2, mbs2), block3) =>
           withDomain(settingsWithNG) { d =>
-            import Scheduler.Implicits.global
+            implicit val sheduler = Scheduler.singleThread("ext-appender")
             val blockchain = d.blockchainUpdater
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
@@ -980,7 +980,7 @@ class UtxPoolSpecification
               stub[InvalidBlockStorage],
               stub[PeerDatabase],
               stub[Miner],
-              Scheduler.singleThread("extension")
+              sheduler
             )(null, _)
             d.appendBlock(genBlock) shouldBe Some(Nil)
             d.appendBlock(block1) shouldBe Some(Nil)
