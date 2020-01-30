@@ -214,14 +214,14 @@ class UtxPoolImpl(
     pessimisticPortfolios.getAggregated(addr)
 
   private[this] def nonPriorityTransactions: Seq[Transaction] = {
-    val priorityTxsSet = priorityTransactions.map(_.id()).toSet
     transactions.values.asScala.toSeq
-      .filterNot(tx => priorityTxsSet(tx.id()))
       .sorted(TransactionsOrdering.InUTXPool)
   }
 
-  override def all: Seq[Transaction] =
-    priorityTransactions ++ nonPriorityTransactions
+  override def all: Seq[Transaction] = {
+    val priorityTxsSet = priorityTransactions.map(_.id()).toSet
+    priorityTransactions ++ nonPriorityTransactions.filterNot(tx => priorityTxsSet(tx.id()))
+  }
 
   override def size: Int = transactions.size
 

@@ -178,7 +178,16 @@ class UtxPoolSpecification
             time,
             bcu,
             ignoreSpendableBalanceChanged,
-            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, 1000),
+            UtxSettings(
+              10,
+              PoolDefaultMaxBytes,
+              1000,
+              Set.empty,
+              Set.empty,
+              allowTransactionsFromSmartAccounts = true,
+              allowSkipChecks = false,
+              1000
+            ),
             enablePriorityPool = true
           )
         (sender, bcu, utxPool)
@@ -217,7 +226,16 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(10, PoolDefaultMaxBytes, 1000, Set(sender.stringRepr), Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, 1000)
+      UtxSettings(
+        10,
+        PoolDefaultMaxBytes,
+        1000,
+        Set(sender.stringRepr),
+        Set.empty,
+        allowTransactionsFromSmartAccounts = true,
+        allowSkipChecks = false,
+        1000
+      )
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
@@ -229,7 +247,16 @@ class UtxPoolSpecification
     txs <- Gen.nonEmptyListOf(transferWithRecipient(sender, recipient, senderBalance / 10, time)) // @TODO: Random transactions
   } yield {
     val settings =
-      UtxSettings(txs.length, PoolDefaultMaxBytes, 1000, Set(sender.stringRepr), Set(recipient.stringRepr), allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, 1000)
+      UtxSettings(
+        txs.length,
+        PoolDefaultMaxBytes,
+        1000,
+        Set(sender.stringRepr),
+        Set(recipient.stringRepr),
+        allowTransactionsFromSmartAccounts = true,
+        allowSkipChecks = false,
+        1000
+      )
     val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
@@ -244,7 +271,16 @@ class UtxPoolSpecification
     } yield {
       val whitelist: Set[String] = if (allowRecipients) recipients.map(_.stringRepr).toSet else Set.empty
       val settings =
-        UtxSettings(txs.length, PoolDefaultMaxBytes, 1000, Set(sender.stringRepr), whitelist, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, 1000)
+        UtxSettings(
+          txs.length,
+          PoolDefaultMaxBytes,
+          1000,
+          Set(sender.stringRepr),
+          whitelist,
+          allowTransactionsFromSmartAccounts = true,
+          allowSkipChecks = false,
+          1000
+        )
       val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
@@ -308,7 +344,16 @@ class UtxPoolSpecification
         new TestTime(),
         bcu,
         ignoreSpendableBalanceChanged,
-        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false, 1000),
+        UtxSettings(
+          10,
+          PoolDefaultMaxBytes,
+          1000,
+          Set.empty,
+          Set.empty,
+          allowTransactionsFromSmartAccounts = scEnabled,
+          allowSkipChecks = false,
+          1000
+        ),
         enablePriorityPool = true
       )
 
@@ -443,7 +488,16 @@ class UtxPoolSpecification
           ntpTime,
           d.blockchainUpdater,
           ignoreSpendableBalanceChanged,
-          UtxSettings(9999999, PoolDefaultMaxBytes, 999999, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, 1000),
+          UtxSettings(
+            9999999,
+            PoolDefaultMaxBytes,
+            999999,
+            Set.empty,
+            Set.empty,
+            allowTransactionsFromSmartAccounts = true,
+            allowSkipChecks = false,
+            1000
+          ),
           enablePriorityPool = true
         )
         all((scripted ++ unscripted).map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
@@ -613,7 +667,16 @@ class UtxPoolSpecification
                 0L
               }
             val settings =
-              UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false, 1000)
+              UtxSettings(
+                10,
+                PoolDefaultMaxBytes,
+                1000,
+                Set.empty,
+                Set.empty,
+                allowTransactionsFromSmartAccounts = true,
+                allowSkipChecks = false,
+                1000
+              )
             val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource(), true)
 
             utxPool.putIfNew(transfer).resultE.explicitGet()
@@ -775,12 +838,55 @@ class UtxPoolSpecification
             )
 
           val expectedTxs = scripted.head +: (tx1 :: scripted.tail ::: nonScripted).sorted(TransactionsOrdering.InUTXPool)
-          val expectedTxsPU = scripted.head :: (tx1 :: nonScripted).sorted(TransactionsOrdering.InUTXPool) ::: scripted.tail.sorted(TransactionsOrdering.InUTXPool)
+          val expectedTxsPU = scripted.head :: (tx1 :: nonScripted).sorted(TransactionsOrdering.InUTXPool) ::: scripted.tail.sorted(
+            TransactionsOrdering.InUTXPool
+          )
           utx.putIfNew(tx1).resultE shouldBe 'right
           utx.addAndCleanup(scripted, priority = true)
           utx.addAndCleanup(nonScripted, priority = true)
           utx.all shouldBe expectedTxs
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxsPU)
+      }
+
+      "removes vip transactions from ordinary pool on pack" in forAll(gen) {
+        case (_, nonScripted, scripted) =>
+          val blockchain = createState(scripted.head.sender)
+          val utx =
+            new UtxPoolImpl(
+              ntpTime,
+              blockchain,
+              ignoreSpendableBalanceChanged,
+              WavesSettings.default().utxSettings,
+              enablePriorityPool = true
+            )
+
+          utx.addAndCleanup(nonScripted, priority = true)
+          all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe 'right
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(nonScripted)
+
+          val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
+      }
+
+      "disables priority pool when miner disabled" in forAll(gen) {
+        case (_, nonScripted, scripted) =>
+          val blockchain = createState(scripted.head.sender)
+          val utx =
+            new UtxPoolImpl(
+              ntpTime,
+              blockchain,
+              ignoreSpendableBalanceChanged,
+              WavesSettings.default().utxSettings,
+              enablePriorityPool = false
+            )
+
+          utx.addAndCleanup(nonScripted, priority = true)
+          all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
+          val expectedTxs = nonScripted.sorted(TransactionsOrdering.InUTXPool)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
+
+          val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe expectedTxs
       }
     }
   }
