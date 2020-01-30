@@ -15,6 +15,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
+import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -28,6 +29,7 @@ import com.wavesplatform.state.diffs.smart.smartEnabledFS
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
@@ -664,6 +666,50 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | checkAddressToStrRight && checkAddressToStr
                  |
               """.stripMargin,
+              estimator
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
+            .explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("transactionFromProtoBytes") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+
+        val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+
+        assertDiffAndState(fs) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val txBytesBase58 = Base58.encode(PBTransactionSerializer.bytes(transferTx))
+          val script = ScriptCompiler.compile(
+              s"""
+                 |
+                 | {-# STDLIB_VERSION 4 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let transferTx  = transactionFromProtoBytes(base58'$txBytesBase58').value()
+                 | let incorrectTx = transactionFromProtoBytes(base58'aaaa')
+                 |
+                 | incorrectTx          == unit                                                  &&
+                 | transferTx.id        == base58'${transferTx.id.value()}'                      &&
+                 | transferTx.amount    == ${transferTx.amount}                                  &&
+                 | transferTx.sender    == Address(base58'${transferTx.sender.toAddress.bytes}') &&
+                 | transferTx.recipient == Address(base58'${transferTx.recipient}')
+                 |
+               """.stripMargin,
               estimator
             )
             .explicitGet()
