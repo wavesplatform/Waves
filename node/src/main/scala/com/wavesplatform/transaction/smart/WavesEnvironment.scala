@@ -12,10 +12,13 @@ import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
 import com.wavesplatform.lang.v1.traits.domain.Recipient._
 import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, ProvenTransaction, Transaction}
 import monix.eval.Coeval
 import shapeless._
 
@@ -139,4 +142,12 @@ class WavesEnvironment(
       if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }
+
+  override def transactionFromProtoBytes(b: Array[Byte]): Option[Tx.Transfer] =
+    PBTransactionSerializer.parseBytes(b)
+      .toOption
+      .flatMap {
+        case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
+        case _                       => None
+      }
 }

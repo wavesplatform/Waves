@@ -26,4 +26,5 @@ trait Environment[F[_]] {
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): F[Either[String, Long]]
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
+  def transactionFromProtoBytes(b: Array[Byte]): Option[Tx.Transfer]
 }

@@ -88,6 +88,7 @@ object Common {
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
     override def txId: ByteStr                                                                                   = ???
+    override def transactionFromProtoBytes(b: Array[Byte]): Option[Tx.Transfer]                                  = ???
   }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
