@@ -55,9 +55,9 @@ class UtxPoolImpl(
   private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
 
   // State
-  private[this] val transactions                   = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios          = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
-  @volatile private[this] var priorityTransactions = Seq.empty[Transaction]
+  private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
+  private[this] var priorityTransactions  = Seq.empty[Transaction]
 
   override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id())) TracedResult.wrapValue(false)
@@ -171,7 +171,7 @@ class UtxPoolImpl(
     for (tx <- Option(transactions.remove(txId)))
       PoolMetrics.removeTransaction(tx)
 
-  private[this] def removeIds(removed: Set[ByteStr]): Unit = {
+  private[this] def removeIds(removed: Set[ByteStr]): Unit = synchronized {
     val removedFromOrdPool                            = removed.flatMap(id => Option(transactions.remove(id)))
     val (removedFromPriorityPool, keepInPriorityPool) = priorityTransactions.partition(tx => removed(tx.id()))
 
@@ -411,13 +411,13 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction], priority: Boolean): Unit = {
+  def addAndCleanup(transactions: Seq[Transaction], priority: Boolean): Unit = synchronized {
     val existing = this.priorityTransactions.map(_.id()).toSet
     val newTxs   = transactions.filterNot(tx => existing(tx.id()))
     newTxs.foreach { tx =>
       val canAddToPriorityPool = priority && enablePriorityPool && priorityTransactions.length < utxSettings.priorityPoolSize
-      if (canAddToPriorityPool) removeFromOrdPool(tx.id())
       addTransaction(tx, verify = false, canAddToPriorityPool)
+      if (canAddToPriorityPool) removeFromOrdPool(tx.id())
     }
     TxCleanup.runCleanupAsync()
   }
