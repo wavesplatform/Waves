@@ -781,7 +781,7 @@ class UtxPoolSpecification
           utx.removeAll(left)
           val expectedTxs1 = right :+ tx1
           assertPortfolios(utx, expectedTxs1)
-          all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(true)
+          all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs1)
           utx.all shouldBe expectedTxs1
           assertPortfolios(utx, expectedTxs1)
@@ -815,7 +815,7 @@ class UtxPoolSpecification
 
           utx.addAndCleanup(nonScripted, priority = true)
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe 'right
-          utx.invokePrivate(nonPriorityTransactions()) shouldBe nonScripted.sorted(TransactionsOrdering.InUTXPool)
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(nonScripted)
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
       }
