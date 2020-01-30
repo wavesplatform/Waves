@@ -969,9 +969,10 @@ class UtxPoolSpecification
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
             val pos = stub[PoSSelector]
-            (pos.validateBaseTarget _).when(*, *, *, *).returning(Right())
-            (pos.validateBlockDelay _).when(*, *, *, *).returning(Right())
-            (pos.validateGeneratorSignature _).when(*, *).returning(Right())
+            val value1 = Right((): Unit)
+            (pos.validateBaseTarget _).when(*, *, *, *).returning(value1)
+            (pos.validateBlockDelay _).when(*, *, *, *).returning(value1)
+            (pos.validateGeneratorSignature _).when(*, *).returning(value1)
             val extAppender = ExtensionAppender(
               blockchain,
               utx,
