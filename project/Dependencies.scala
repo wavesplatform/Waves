@@ -141,7 +141,7 @@ object Dependencies {
       "com.google.code.findbugs"     % "jsr305"             % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"            %% "play-json"         % "2.7.1",
       "org.ethereum"                 % "leveldbjni-all"     % "1.18.3",
-      "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
+      "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.1",
       "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
       akkaHttp,
       "org.bitlet"        % "weupnp" % "0.1.4",
