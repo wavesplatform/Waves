@@ -18,7 +18,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{GenericError, SenderIsBlacklisted}
+import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, GenericError, SenderIsBlacklisted}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
@@ -275,10 +275,6 @@ class UtxPoolImpl(
                 log.debug(s"Transaction ${tx.id()} expired")
                 delete(tx.id())
                 r.copy(iterations = r.iterations + 1)
-              } else if (r.validatedTransactions.contains(tx.id())) {
-                log.trace(s"Transaction ${tx.id()} already validated in priority pool")
-                removeFromOrdPool(tx.id())
-                r
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
                 if (!priority && r.checkedAddresses.intersect(newScriptedAddresses).nonEmpty) r
@@ -310,6 +306,12 @@ class UtxPoolImpl(
                           r.validatedTransactions + tx.id()
                         )
                       }
+
+                    case Left(TransactionValidationError(AlreadyInTheState(txId, _), tx)) if r.validatedTransactions.contains(tx.id()) =>
+                      log.trace(s"Transaction $txId already validated in priority pool")
+                      removeFromOrdPool(tx.id())
+                      r
+
                     case Left(error) =>
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       logValidationError(tx, error)
