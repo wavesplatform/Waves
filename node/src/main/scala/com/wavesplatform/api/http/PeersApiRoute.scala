@@ -5,6 +5,7 @@ import java.util.concurrent.ConcurrentMap
 import java.util.stream.Collectors
 
 import akka.http.scaladsl.server.Route
+import com.wavesplatform.api.http.swagger.SwaggerDocService.apiKeyDefinitionName
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
@@ -16,11 +17,12 @@ import scala.collection.JavaConverters._
 
 @Path("/peers")
 @Api(value = "/peers")
-case class PeersApiRoute(settings: RestAPISettings,
-                         connectToPeer: InetSocketAddress => Unit,
-                         peerDatabase: PeerDatabase,
-                         establishedConnections: ConcurrentMap[Channel, PeerInfo])
-    extends ApiRoute
+case class PeersApiRoute(
+    settings: RestAPISettings,
+    connectToPeer: InetSocketAddress => Unit,
+    peerDatabase: PeerDatabase,
+    establishedConnections: ConcurrentMap[Channel, PeerInfo]
+) extends ApiRoute
     with AuthRoute {
 
   import PeersApiRoute._
@@ -35,21 +37,26 @@ case class PeersApiRoute(settings: RestAPISettings,
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with peer list or error")
-    ))
+    )
+  )
   def allPeers: Route = (path("all") & get) {
     complete(
       Json.obj(
         "peers" ->
-          JsArray(peerDatabase.knownPeers
-            .take(MaxPeersInResponse)
-            .map {
-              case (address, timestamp) =>
-                Json.obj(
-                  "address"  -> address.toString,
-                  "lastSeen" -> timestamp
-                )
-            }
-            .toList)))
+          JsArray(
+            peerDatabase.knownPeers
+              .take(MaxPeersInResponse)
+              .map {
+                case (address, timestamp) =>
+                  Json.obj(
+                    "address"  -> address.toString,
+                    "lastSeen" -> timestamp
+                  )
+              }
+              .toList
+          )
+      )
+    )
   }
 
   @Path("/connected")
@@ -57,20 +64,23 @@ case class PeersApiRoute(settings: RestAPISettings,
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with connected peers or error")
-    ))
+    )
+  )
   def connectedPeers: Route = (path("connected") & get) {
     val peers = establishedConnections
       .values()
       .stream()
-      .map[JsValue](pi =>
-        Json.obj(
-          "address"            -> pi.remoteAddress.toString,
-          "declaredAddress"    -> pi.declaredAddress.fold("N/A")(_.toString),
-          "peerName"           -> pi.nodeName,
-          "peerNonce"          -> pi.nodeNonce,
-          "applicationName"    -> pi.applicationName,
-          "applicationVersion" -> s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}"
-      ))
+      .map[JsValue](
+        pi =>
+          Json.obj(
+            "address"            -> pi.remoteAddress.toString,
+            "declaredAddress"    -> pi.declaredAddress.fold("N/A")(_.toString),
+            "peerName"           -> pi.nodeName,
+            "peerNonce"          -> pi.nodeNonce,
+            "applicationName"    -> pi.applicationName,
+            "applicationVersion" -> s"${pi.applicationVersion._1}.${pi.applicationVersion._2}.${pi.applicationVersion._3}"
+          )
+      )
       .collect(Collectors.toList())
       .asScala
 
@@ -78,7 +88,12 @@ case class PeersApiRoute(settings: RestAPISettings,
   }
 
   @Path("/connect")
-  @ApiOperation(value = "Connect to peer", notes = "Connect to peer", httpMethod = "POST")
+  @ApiOperation(
+    value = "Connect to peer",
+    notes = "Connect to peer",
+    httpMethod = "POST",
+    authorizations = Array(new Authorization(apiKeyDefinitionName))
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(
@@ -88,7 +103,8 @@ case class PeersApiRoute(settings: RestAPISettings,
         paramType = "body",
         dataTypeClass = classOf[ConnectReq]
       )
-    ))
+    )
+  )
   def connect: Route = (path("connect") & withAuth) {
     jsonPost[ConnectReq] { req =>
       val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
@@ -103,14 +119,17 @@ case class PeersApiRoute(settings: RestAPISettings,
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Json with blacklisted peers or error")
-    ))
+    )
+  )
   def blacklistedPeers: Route = (path("blacklisted") & get) {
     complete(
       JsArray(
         peerDatabase.detailedBlacklist
           .take(MaxPeersInResponse)
           .map { case (h, (t, r)) => Json.obj("hostname" -> h.toString, "timestamp" -> t, "reason" -> r) }
-          .toList))
+          .toList
+      )
+    )
   }
 
   @Path("/suspended")
@@ -118,19 +137,28 @@ case class PeersApiRoute(settings: RestAPISettings,
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "JSON with suspended peers or error")
-    ))
+    )
+  )
   def suspendedPeers: Route = (path("suspended") & get) {
     complete(
       JsArray(
-        peerDatabase.detailedSuspended.take(MaxPeersInResponse).map { case (h, t) => Json.obj("hostname" -> h.toString, "timestamp" -> t) }.toList))
+        peerDatabase.detailedSuspended.take(MaxPeersInResponse).map { case (h, t) => Json.obj("hostname" -> h.toString, "timestamp" -> t) }.toList
+      )
+    )
   }
 
   @Path("/clearblacklist")
-  @ApiOperation(value = "Remove all blacklisted peers", notes = "Clear blacklist", httpMethod = "POST")
+  @ApiOperation(
+    value = "Remove all blacklisted peers",
+    notes = "Clear blacklist",
+    httpMethod = "POST",
+    authorizations = Array(new Authorization(apiKeyDefinitionName))
+  )
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "200")
-    ))
+    )
+  )
   def clearBlacklist: Route = (path("clearblacklist") & post & withAuth) {
     peerDatabase.clearBlacklist()
     complete(Json.obj("result" -> "blacklist cleared"))
