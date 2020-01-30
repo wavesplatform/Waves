@@ -24,7 +24,7 @@ import com.wavesplatform.mining._
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
-import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
+import com.wavesplatform.state.appender.ExtensionAppender
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.utils.TestLevelDB
@@ -37,8 +37,6 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
-import io.netty.channel.Channel
-import io.netty.util.{Attribute, AttributeKey}
 import monix.execution.Scheduler
 import monix.reactive.subjects.Subject
 import org.scalacheck.Gen
@@ -938,12 +936,26 @@ class UtxPoolSpecification
 
       val genChain = for {
         acc <- accountGen
-        genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ntpTime.correctedTime()).explicitGet()
+        genesis  = GenesisTransaction.create(acc, ENOUGH_AMT, ntpTime.correctedTime()).explicitGet()
         genBlock = TestBlock.create(Seq(genesis))
         txs1 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
-        (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(genBlock.uniqueId, Nil, Seq(Nil, txs1), acc, Block.NgBlockVersion, ntpTime.correctedTime())
+        (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(
+          genBlock.uniqueId,
+          Nil,
+          Seq(Nil, txs1),
+          acc,
+          Block.NgBlockVersion,
+          ntpTime.correctedTime()
+        )
         txs2 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
-        (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(mbs1.head.totalResBlockSig, Nil, Seq(txs2), acc, Block.NgBlockVersion, ntpTime.correctedTime())
+        (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(
+          mbs1.head.totalResBlockSig,
+          Nil,
+          Seq(txs2),
+          acc,
+          Block.NgBlockVersion,
+          ntpTime.correctedTime()
+        )
         block3 = UnsafeBlocks.unsafeBlock(genBlock.uniqueId, Nil, acc, Block.NgBlockVersion, ntpTime.correctedTime())
       } yield (genBlock, (block1, mbs1), (block2, mbs2), block3)
 
@@ -952,14 +964,24 @@ class UtxPoolSpecification
       "applies chains correctly" in forAll(genChain) {
         case (genBlock, (block1, mbs1), (block2, mbs2), block3) =>
           withDomain(settingsWithNG) { d =>
-          import Scheduler.Implicits.global
+            import Scheduler.Implicits.global
             val blockchain = d.blockchainUpdater
-            val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+            val utx =
+              new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
             val pos = stub[PoSSelector]
             (pos.validateBaseTarget _).when(*, *, *, *).returning(Right())
             (pos.validateBlockDelay _).when(*, *, *, *).returning(Right())
             (pos.validateGeneratorSignature _).when(*, *).returning(Right())
-            val extAppender = ExtensionAppender(blockchain, utx, pos, ntpTime, stub[InvalidBlockStorage], stub[PeerDatabase], stub[Miner], Scheduler.singleThread("extension"))(null, _)
+            val extAppender = ExtensionAppender(
+              blockchain,
+              utx,
+              pos,
+              ntpTime,
+              stub[InvalidBlockStorage],
+              stub[PeerDatabase],
+              stub[Miner],
+              Scheduler.singleThread("extension")
+            )(null, _)
             d.appendBlock(genBlock) shouldBe Some(Nil)
             d.appendBlock(block1) shouldBe Some(Nil)
             all(mbs1.map(blockchain.processMicroBlock(_))) shouldBe 'right
