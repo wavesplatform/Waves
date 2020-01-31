@@ -46,6 +46,7 @@ case class AddressApiRoute(
     with AutoParamsDirective {
 
   import AddressApiRoute._
+  import SwaggerDefinitions._
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   val MaxAddressesPerRequest         = 1000
@@ -93,7 +94,7 @@ case class AddressApiRoute(
     notes = "Remove the account with address {address} from the wallet",
     httpMethod = "DELETE",
     authorizations = Array(new Authorization(apiKeyDefinitionName)),
-    response = classOf[AddressDeleted]
+    response = classOf[DeletedDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -157,7 +158,7 @@ case class AddressApiRoute(
     notes = "Check a signature of a message signed by an account",
     httpMethod = "POST",
     authorizations = Array(new Authorization(apiKeyDefinitionName)),
-    response = classOf[SignedValid]
+    response = classOf[ValidityCheckDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -183,7 +184,7 @@ case class AddressApiRoute(
     notes = "Check a signature of a message signed by an account",
     httpMethod = "POST",
     authorizations = Array(new Authorization(apiKeyDefinitionName)),
-    response = classOf[SignedValid]
+    response = classOf[ValidityCheckDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -246,7 +247,12 @@ case class AddressApiRoute(
   }
 
   @Path("/balance/{address}/{confirmations}")
-  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET", response = classOf[Balance])
+  @ApiOperation(
+    value = "Confirmed balance",
+    notes = "Balance of {address} after {confirmations}",
+    httpMethod = "GET",
+    response = classOf[Balance]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
@@ -274,7 +280,12 @@ case class AddressApiRoute(
   }
 
   @Path("/effectiveBalance/{address}/{confirmations}")
-  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET", response = classOf[Balance])
+  @ApiOperation(
+    value = "Confirmed balance",
+    notes = "Balance of {address} after {confirmations}",
+    httpMethod = "GET",
+    response = classOf[Balance]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
@@ -296,7 +307,7 @@ case class AddressApiRoute(
     notes = "Export seed value for the {address}",
     httpMethod = "GET",
     authorizations = Array(new Authorization(apiKeyDefinitionName)),
-    response = classOf[AddressSeed]
+    response = classOf[SeedDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -313,14 +324,19 @@ case class AddressApiRoute(
   }
 
   @Path("/validate/{address}")
-  @ApiOperation(value = "Validate", notes = "Check whether address {address} is valid or not", httpMethod = "GET", response = classOf[Validity])
+  @ApiOperation(
+    value = "Validate",
+    notes = "Check whether address {address} is valid or not",
+    httpMethod = "GET",
+    response = classOf[AddressValidity]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
   def validate: Route = (path("validate" / Segment) & get) { address =>
-    complete(Validity(address, Address.fromString(address).isRight))
+    complete(AddressValidity(address, Address.fromString(address).isRight))
   }
 
   // TODO: Remove from API
@@ -430,7 +446,7 @@ case class AddressApiRoute(
     notes = "Create a new account in the wallet(if it exists)",
     httpMethod = "POST",
     authorizations = Array(new Authorization(apiKeyDefinitionName)),
-    response = classOf[AddressDescription]
+    response = classOf[AddressDesc]
   )
   def create: Route = (path("addresses") & post & withAuth) {
     wallet.generateNewAccount() match {
@@ -595,7 +611,7 @@ case class AddressApiRoute(
     value = "Address from Public Key",
     notes = "Generate a address from public key",
     httpMethod = "GET",
-    response = classOf[AddressDescription]
+    response = classOf[AddressDesc]
   )
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.tryDecodeWithLimit(publicKey) match {
@@ -619,13 +635,16 @@ object AddressApiRoute {
   implicit val signedFormat: Format[Signed] = Json.format
 
   case class Balance(address: String, confirmations: Int, balance: Long)
+
   implicit val balanceFormat: Format[Balance] = Json.format
 
   case class BalanceDetails(address: String, regular: Long, generating: Long, available: Long, effective: Long)
+
   implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
 
-  case class Validity(address: String, valid: Boolean)
-  implicit val validityFormat: Format[Validity] = Json.format
+  case class AddressValidity(address: String, valid: Boolean)
+
+  implicit val validityFormat: Format[AddressValidity] = Json.format
 
   case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String], complexity: Long, extraFee: Long)
 
@@ -634,17 +653,4 @@ object AddressApiRoute {
   case class AccountScriptMeta(address: String, meta: Option[Dic])
   implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
   implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
-
-  case class AddressDeleted(deleted: Boolean)
-  implicit val addressDeletedFormat: Format[AddressDeleted] = Json.format
-
-  case class SignedValid(isValid: Boolean)
-  implicit val signedValidFormat: Format[SignedValid] = Json.format
-
-  case class AddressSeed(address: String, seed: String)
-  implicit val addressSeedFormat: Format[AddressSeed] = Json.format
-
-  @ApiModel("Address")
-  case class AddressDescription(address: String)
-  implicit val createdAddressFormat: Format[AddressDescription] = Json.format
 }

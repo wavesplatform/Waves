@@ -95,7 +95,7 @@ class AddressRouteSpec
 
     forAll(t) { (a, v) =>
       Get(routePath(s"/validate/$a")) ~> route ~> check {
-        val r = responseAs[AddressApiRoute.Validity]
+        val r = responseAs[AddressApiRoute.AddressValidity]
         r.address shouldEqual a
         r.valid shouldBe v
       }
