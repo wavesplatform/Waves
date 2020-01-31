@@ -26,19 +26,15 @@ case class PeersApiRoute(
     with AuthRoute {
 
   import PeersApiRoute._
+  import SwaggerDefinitions._
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("peers") {
       allPeers ~ connectedPeers ~ blacklistedPeers ~ suspendedPeers ~ connect ~ clearBlacklist
     }
 
   @Path("/all")
-  @ApiOperation(value = "Peer list", notes = "Peer list", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json with peer list or error")
-    )
-  )
+  @ApiOperation(value = "Peer list", notes = "Peer list", httpMethod = "GET", response = classOf[PeerDesc], responseContainer = "List")
   def allPeers: Route = (path("all") & get) {
     complete(
       Json.obj(
@@ -60,11 +56,11 @@ case class PeersApiRoute(
   }
 
   @Path("/connected")
-  @ApiOperation(value = "Connected peers list", notes = "Connected peers list", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json with connected peers or error")
-    )
+  @ApiOperation(
+    value = "Connected peers list",
+    notes = "Connected peers list",
+    httpMethod = "GET",
+    response = classOf[ConnectedPeersDesc]
   )
   def connectedPeers: Route = (path("connected") & get) {
     val peers = establishedConnections
@@ -92,7 +88,8 @@ case class PeersApiRoute(
     value = "Connect to peer",
     notes = "Connect to peer",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(apiKeyDefinitionName)),
+    response = classOf[ConnectionStatusDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -115,11 +112,12 @@ case class PeersApiRoute(
   }
 
   @Path("/blacklisted")
-  @ApiOperation(value = "Blacklisted peers list", notes = "Blacklisted peers list", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json with blacklisted peers or error")
-    )
+  @ApiOperation(
+    value = "Blacklisted peers list",
+    notes = "Blacklisted peers list",
+    httpMethod = "GET",
+    response = classOf[BlacklistedPeerDesc],
+    responseContainer = "List"
   )
   def blacklistedPeers: Route = (path("blacklisted") & get) {
     complete(
@@ -133,11 +131,12 @@ case class PeersApiRoute(
   }
 
   @Path("/suspended")
-  @ApiOperation(value = "Suspended peers list", notes = "Suspended peers list", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "JSON with suspended peers or error")
-    )
+  @ApiOperation(
+    value = "Suspended peers list",
+    notes = "Suspended peers list",
+    httpMethod = "GET",
+    response = classOf[SuspendedPeerDesc],
+    responseContainer = "List"
   )
   def suspendedPeers: Route = (path("suspended") & get) {
     complete(
@@ -152,12 +151,8 @@ case class PeersApiRoute(
     value = "Remove all blacklisted peers",
     notes = "Clear blacklist",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "200")
-    )
+    authorizations = Array(new Authorization(apiKeyDefinitionName)),
+    response = classOf[ResultDesc]
   )
   def clearBlacklist: Route = (path("clearblacklist") & post & withAuth) {
     peerDatabase.clearBlacklist()

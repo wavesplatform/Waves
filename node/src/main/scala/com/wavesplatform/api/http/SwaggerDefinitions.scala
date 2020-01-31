@@ -19,7 +19,8 @@ object SwaggerDefinitions {
   class NxtConsensusDataDesc(
       @(ApiModelProperty @field)(name = "base-target", required = true)
       val baseTarget: Long,
-      @(ApiModelProperty @field)(name = "generation-signature", required = true) val generationSignature: String
+      @(ApiModelProperty @field)(name = "generation-signature", required = true)
+      val generationSignature: String
   )
 
   @ApiModel("BlockHeader")
@@ -90,4 +91,27 @@ object SwaggerDefinitions {
   case class DelayDesc(delay: Long)
   @ApiModel("Height")
   case class HeightDesc(height: Int)
+  @ApiModel("Peer")
+  case class PeerDesc(address: String, lastSeen: Long)
+
+  @ApiModel("ConnectedPeer")
+  case class ConnectedPeerDesc(
+      address: String,
+      declaredAddress: String,
+      peerName: String,
+      peerNonce: Long,
+      applicationName: String,
+      applicationVersion: String
+  )
+
+  @ApiModel("ConnectedPeers")
+  case class ConnectedPeersDesc(peers: List[ConnectedPeerDesc])
+  @ApiModel("ConnectionStatus")
+  case class ConnectionStatusDesc(hostname: String, status: String)
+  @ApiModel("BlacklistedPeer")
+  case class BlacklistedPeerDesc(hostname: String, timestamp: Long, reason: String)
+  @ApiModel("SuspendedPeer")
+  case class SuspendedPeerDesc(hostname: String, timestamp: Long, reason: String)
+  @ApiModel("Result")
+  case class ResultDesc(result: String)
 }

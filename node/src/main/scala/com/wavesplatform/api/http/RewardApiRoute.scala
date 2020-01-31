@@ -20,26 +20,16 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   }
 
   @Path("/")
-  @ApiOperation(value = "Current reward status", notes = "Get current miner’s reward status", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json reward status")
-    )
-  )
+  @ApiOperation(value = "Current reward status", notes = "Get current miner’s reward status", httpMethod = "GET", response = classOf[RewardStatus])
   def rewards(): Route = (get & pathEndOrSingleSlash) {
     complete(getRewards(blockchain.height))
   }
 
   @Path("/{height}")
-  @ApiOperation(value = "Reward status", notes = "Get miner’s reward status at height", httpMethod = "GET")
+  @ApiOperation(value = "Reward status", notes = "Get miner’s reward status at height", httpMethod = "GET", response = classOf[RewardStatus])
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "height", value = "Target block height", required = true, dataType = "integer", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Json reward status")
     )
   )
   def rewardsAtHeight(): Route = (get & path(IntNumber)) { height =>
