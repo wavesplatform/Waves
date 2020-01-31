@@ -158,7 +158,7 @@ class UtxPoolImpl(
       case Right(isNew) => log.trace(s"UTX putIfNew(${tx.id()}) succeeded, isNew = $isNew")
       case Left(err) =>
         log.debug(s"UTX putIfNew(${tx.id()}) failed with ${extractErrorMessage(err)}")
-        logValidationError(tx, err)
+        traceLogger.trace(err.toString)
     }
     tracedIsNew
   }
@@ -260,14 +260,6 @@ class UtxPoolImpl(
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
-    var deleted = Set.empty[ByteStr]
-
-    @inline
-    def delete(txId: ByteStr): Unit = {
-      deleted += txId
-      this.removeFromBothPools(txId)
-    }
-
     val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height) _
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
@@ -285,7 +277,7 @@ class UtxPoolImpl(
                 r // don't run any checks here to speed up mining
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
-                delete(tx.id())
+                this.removeFromBothPools(tx.id())
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
@@ -326,8 +318,8 @@ class UtxPoolImpl(
 
                     case Left(error) =>
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
-                      logValidationError(tx, error)
-                      delete(tx.id())
+                      traceLogger.trace(error.toString)
+                      this.removeFromBothPools(tx.id())
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
@@ -376,10 +368,6 @@ class UtxPoolImpl(
     case _: TxValidationError.TransactionNotAllowedByScript => "TransactionNotAllowedByScript"
     case TransactionValidationError(cause, _)               => extractErrorMessage(cause)
     case other                                              => other.toString
-  }
-
-  private def logValidationError(tx: Transaction, error: ValidationError): Unit = if (traceLogger.logger.isTraceEnabled) {
-    traceLogger.trace(error.toString)
   }
 
   //noinspection ScalaStyle
