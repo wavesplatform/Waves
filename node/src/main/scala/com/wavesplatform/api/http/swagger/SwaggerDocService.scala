@@ -30,6 +30,8 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
     .scheme(Scheme.HTTP)
     .scheme(Scheme.HTTPS)
     .securityDefinition(SwaggerDocService.apiKeyDefinitionName, new ApiKeyAuthDefinition(`X-Api-Key`.name, In.HEADER))
+
+  override def unwantedDefinitions: Seq[String] = Seq("Function1", "Function1RequestContextFutureRouteResult")
 }
 
 object SwaggerDocService {

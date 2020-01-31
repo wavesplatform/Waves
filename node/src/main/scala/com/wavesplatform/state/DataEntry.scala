@@ -15,7 +15,7 @@ sealed abstract class DataEntry[T](
     @(ApiModelProperty @field)(required = true, dataType = "java.lang.String", value = "integer", allowableValues = "integer,boolean,binary,string")
     val `type`: String,
     val key: String,
-    val value: T)(implicit val dataBytesOpt: DataBytesOpt) {
+    val value: T)(@ApiModelProperty(hidden = true) implicit val dataBytesOpt: DataBytesOpt) {
   def valueBytes: Array[Byte]
 
   def toBytes: Array[Byte] = {
