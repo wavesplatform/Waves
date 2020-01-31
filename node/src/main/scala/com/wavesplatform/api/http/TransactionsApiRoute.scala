@@ -38,10 +38,11 @@ case class TransactionsApiRoute(
     with BroadcastRoute
     with AuthRoute
     with AutoParamsDirective {
+  import SwaggerDefinitions._
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("transactions") {
       unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast
     }
@@ -50,7 +51,9 @@ case class TransactionsApiRoute(
   @ApiOperation(
     value = "List of transactions by address",
     notes = "Get list of transactions where specified address has been involved",
-    httpMethod = "GET"
+    httpMethod = "GET",
+    response = classOf[TransactionDesc],
+    responseContainer = "List"
   )
   @ApiImplicitParams(
     Array(
@@ -72,7 +75,7 @@ case class TransactionsApiRoute(
   }
 
   @Path("/info/{id}")
-  @ApiOperation(value = "Transaction info", notes = "Get a transaction by its ID", httpMethod = "GET")
+  @ApiOperation(value = "Transaction info", notes = "Get a transaction by its ID", httpMethod = "GET", response = classOf[TransactionDesc])
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
@@ -95,7 +98,12 @@ case class TransactionsApiRoute(
   }
 
   @Path("/status")
-  @ApiOperation(value = "Transaction status", notes = "Get a transaction status by its ID", httpMethod = "GET")
+  @ApiOperation(
+    value = "Transaction status",
+    notes = "Get a transaction status by its ID",
+    httpMethod = "GET",
+    response = classOf[TransactionStatusDesc]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "query", allowMultiple = true)
@@ -107,7 +115,7 @@ case class TransactionsApiRoute(
         complete(TooBigArrayAllocation)
       else {
         request.ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
-          case (Nil, Nil)  => complete(CustomValidationError("Empty request"))
+          case (Nil, Nil) => complete(CustomValidationError("Empty request"))
           case (Nil, ids) =>
             val results = ids.toSet.map { id: ByteStr =>
               val statusJson = blockchain.transactionInfo(id) match {
@@ -130,7 +138,13 @@ case class TransactionsApiRoute(
   }
 
   @Path("/unconfirmed")
-  @ApiOperation(value = "Unconfirmed transactions", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
+  @ApiOperation(
+    value = "Unconfirmed transactions",
+    notes = "Get list of unconfirmed transactions",
+    httpMethod = "GET",
+    response = classOf[TransactionDesc],
+    responseContainer = "List"
+  )
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
       complete(JsArray(commonApi.unconfirmedTransactions().map(txToExtendedJson)))
@@ -141,14 +155,20 @@ case class TransactionsApiRoute(
   @ApiOperation(
     value = "Number of unconfirmed transactions",
     notes = "Get the number of unconfirmed transactions in the UTX pool",
-    httpMethod = "GET"
+    httpMethod = "GET",
+    response = classOf[SizeDesc]
   )
   def utxSize: Route = (pathPrefix("size") & get) {
     complete(Json.obj("size" -> JsNumber(utx.size)))
   }
 
   @Path("/unconfirmed/info/{id}")
-  @ApiOperation(value = "Unconfirmed transaction info", notes = "Get an unconfirmed transaction by its ID", httpMethod = "GET")
+  @ApiOperation(
+    value = "Unconfirmed transaction info",
+    notes = "Get an unconfirmed transaction by its ID",
+    httpMethod = "GET",
+    response = classOf[TransactionDesc]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
@@ -173,7 +193,12 @@ case class TransactionsApiRoute(
   }
 
   @Path("/calculateFee")
-  @ApiOperation(value = "Calculate transaction fee", notes = "Calculates minimal fee for a transaction", httpMethod = "POST")
+  @ApiOperation(
+    value = "Calculate transaction fee",
+    notes = "Calculates minimal fee for a transaction",
+    httpMethod = "POST",
+    response = classOf[FeeDesc]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "json", required = true, dataType = "string", paramType = "body", value = "Transaction data including type")
@@ -200,7 +225,8 @@ case class TransactionsApiRoute(
     value = "Sign a transaction",
     notes = "Sign a transaction with the sender's private key",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(apiKeyDefinitionName)),
+    response = classOf[TransactionDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -223,7 +249,8 @@ case class TransactionsApiRoute(
   @ApiOperation(
     value = "Sign a transaction with a non-default private key",
     notes = "Sign a transaction with the private key corresponding to the given address",
-    httpMethod = "POST"
+    httpMethod = "POST",
+    response = classOf[TransactionDesc]
   )
   @ApiImplicitParams(
     Array(
@@ -242,7 +269,12 @@ case class TransactionsApiRoute(
   }
 
   @Path("/broadcast")
-  @ApiOperation(value = "Broadcast a signed transaction", notes = "Broadcast a signed transaction", httpMethod = "POST")
+  @ApiOperation(
+    value = "Broadcast a signed transaction",
+    notes = "Broadcast a signed transaction",
+    httpMethod = "POST",
+    response = classOf[TransactionDesc]
+  )
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(

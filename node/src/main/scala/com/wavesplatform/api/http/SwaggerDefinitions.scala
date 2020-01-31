@@ -36,11 +36,11 @@ object SwaggerDefinitions {
       val consensusData: NxtConsensusDataDesc,
       val blocksize: Int,
       val transactionCount: Int,
-      @(ApiModelProperty @field)(allowEmptyValue = true, dataType = "[Ljava.lang.Short;")
+      @(ApiModelProperty @field)(required = false, dataType = "[Ljava.lang.Short;")
       val features: Set[Short],
-      @(ApiModelProperty @field)(allowEmptyValue = true)
+      @(ApiModelProperty @field)(required = false)
       val reward: Long,
-      @(ApiModelProperty @field)(allowEmptyValue = true)
+      @(ApiModelProperty @field)(required = false)
       val desiredReward: Long
   )
 
@@ -114,4 +114,20 @@ object SwaggerDefinitions {
   case class SuspendedPeerDesc(hostname: String, timestamp: Long, reason: String)
   @ApiModel("Result")
   case class ResultDesc(result: String)
+
+  @ApiModel("TransactionStatus")
+  case class TransactionStatusDesc(
+      id: String,
+      @(ApiModelProperty @field)(required = true, allowableValues = "confirmed,unconfirmed,not_found")
+      status: String,
+      @(ApiModelProperty @field)(required = false)
+      height: Int,
+      @(ApiModelProperty @field)(required = false)
+      confirmations: Int
+  )
+
+  @ApiModel("Size")
+  case class SizeDesc(size: Int)
+  @ApiModel("Fee")
+  case class FeeDesc(feeAssetId: String, feeAmount: Long)
 }
