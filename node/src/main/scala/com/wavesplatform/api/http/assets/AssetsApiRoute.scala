@@ -55,7 +55,7 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     Scheduler(executor)
   }
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("assets") {
       balance ~ balances ~ nft ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ deprecatedRoute
     }
@@ -66,6 +66,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Balance")
     )
   )
   def balance: Route =
@@ -100,6 +105,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Distribution")
     )
   )
   def balanceDistribution: Route =
@@ -140,6 +150,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "after", value = "address to paginate after", required = false, dataType = "string", paramType = "query")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Distribution")
+    )
+  )
   def balanceDistributionAtHeight: Route =
     (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
       (assetParam, heightParam, limitParam, afterParam) =>
@@ -173,6 +188,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Balances")
+    )
+  )
   def balances: Route =
     (get & path("balance" / Segment)) { address =>
       complete(fullAccountAssetsInfo(address))
@@ -184,6 +204,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     Array(
       new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Asset details")
     )
   )
   def details: Route =
@@ -200,6 +225,11 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "NFTs balance")
     )
   )
   def nft: Route =

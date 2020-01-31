@@ -50,7 +50,7 @@ case class AddressApiRoute(
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
   val MaxAddressesPerRequest         = 1000
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("addresses") {
       validate ~ seed ~ balanceWithConfirmations ~ balanceDetails ~ balance ~ balances ~ balancesPost ~ balanceWithConfirmations ~ verify ~ sign ~ deleteAddress ~ verifyText ~
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
@@ -61,6 +61,11 @@ case class AddressApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Script info")
     )
   )
   def scriptInfo: Route = (path("scriptInfo" / Segment) & get) { address =>
@@ -76,6 +81,11 @@ case class AddressApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Script meta")
     )
   )
   def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
@@ -97,6 +107,11 @@ case class AddressApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Deletion result")
     )
   )
   def deleteAddress: Route = path(Segment) { address =>
@@ -186,6 +201,11 @@ case class AddressApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Verification result")
+    )
+  )
   def verify: Route = path("verify" / Segment) { address =>
     verifyPath(address, decode = true)
   }
@@ -211,6 +231,11 @@ case class AddressApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Verification result")
+    )
+  )
   def verifyText: Route = path("verifyText" / Segment) { address =>
     verifyPath(address, decode = false)
   }
@@ -220,6 +245,11 @@ case class AddressApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Balance")
     )
   )
   def balance: Route = (path("balance" / Segment) & get) { address =>
@@ -245,6 +275,11 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Balance details")
+    )
+  )
   def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
     complete(
       Address
@@ -265,6 +300,11 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Balance after confirmations")
+    )
+  )
   def balanceWithConfirmations: Route = {
     (path("balance" / Segment / IntNumber) & get) {
       case (address, confirmations) =>
@@ -279,6 +319,11 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Effective balance")
+    )
+  )
   def effectiveBalance: Route = {
     path("effectiveBalance" / Segment) { address =>
       complete(effectiveBalanceJson(address, 0))
@@ -291,6 +336,11 @@ case class AddressApiRoute(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
       new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Effective balance after confirmations")
     )
   )
   def effectiveBalanceWithConfirmations: Route = {
@@ -314,6 +364,11 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Seed")
+    )
+  )
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
       complete(for {
@@ -328,6 +383,11 @@ case class AddressApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Validation result")
     )
   )
   def validate: Route = (path("validate" / Segment) & get) { address =>
@@ -361,6 +421,11 @@ case class AddressApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "All data")
+    )
+  )
   def getData: Route =
     extractScheduler(
       implicit sc =>
@@ -389,6 +454,11 @@ case class AddressApiRoute(
       new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Data by key")
+    )
+  )
   def getDataItem: Route = (path("data" / Segment / Segment) & get) {
     case (address, key) =>
       complete(accountData(address, key))
@@ -396,6 +466,11 @@ case class AddressApiRoute(
 
   @Path("/")
   @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Addresses")
+    )
+  )
   def root: Route = (path("addresses") & get) {
     val accounts = wallet.privateKeyAccounts
     val json     = JsArray(accounts.map(a => JsString(a.stringRepr)))
@@ -408,6 +483,11 @@ case class AddressApiRoute(
     Array(
       new ApiImplicitParam(name = "from", value = "Start address", required = true, dataType = "integer", paramType = "path"),
       new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "integer", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Accounts addresses")
     )
   )
   def seq: Route = {
@@ -429,6 +509,11 @@ case class AddressApiRoute(
     notes = "Create a new account in the wallet(if it exists)",
     httpMethod = "POST",
     authorizations = Array(new Authorization(apiKeyDefinitionName))
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Creation result")
+    )
   )
   def create: Route = (path("addresses") & post & withAuth) {
     wallet.generateNewAccount() match {
@@ -590,6 +675,11 @@ case class AddressApiRoute(
     )
   )
   @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Address")
+    )
+  )
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.tryDecodeWithLimit(publicKey) match {
       case Success(pubKeyBytes) =>

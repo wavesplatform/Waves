@@ -12,9 +12,7 @@ import play.api.libs.json.Json
 
 @Path("/consensus")
 @Api(value = "/consensus")
-case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain)
-    extends ApiRoute
-    with CommonApiFunctions {
+case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute with CommonApiFunctions {
 
   override val route: Route =
     pathPrefix("consensus") {
@@ -26,7 +24,13 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Generating balance")
+    )
+  )
   def generatingBalance: Route = (path("generatingbalance" / Segment) & get) { address =>
     Address.fromString(address) match {
       case Left(_) => complete(ApiError.InvalidAddress)
@@ -40,7 +44,13 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Generation signature")
+    )
+  )
   def generationSignatureId: Route = (path("generationsignature" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
       complete(Json.obj("generationSignature" -> block.consensusData.generationSignature.base58))
@@ -49,6 +59,11 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
 
   @Path("/generationsignature")
   @ApiOperation(value = "Generation signature last", notes = "Generation signature of a last block", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Generation signature")
+    )
+  )
   def generationSignature: Route = (path("generationsignature") & get) {
     complete(Json.obj("generationSignature" -> blockchain.lastBlock.get.consensusData.generationSignature.base58))
   }
@@ -58,7 +73,13 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
-    ))
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Base target")
+    )
+  )
   def baseTargetId: Route = (path("basetarget" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
       complete(Json.obj("baseTarget" -> block.consensusData.baseTarget))
@@ -67,16 +88,27 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
 
   @Path("/basetarget")
   @ApiOperation(value = "Base target last", notes = "Base target of a last block", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Base target")
+    )
+  )
   def basetarget: Route = (path("basetarget") & get) {
     complete(
       Json.obj(
         "baseTarget" -> blockchain.lastBlock.get.consensusData.baseTarget,
         "score"      -> blockchain.score.toString()
-      ))
+      )
+    )
   }
 
   @Path("/algo")
   @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Consensus algo")
+    )
+  )
   def algo: Route = (path("algo") & get) {
     complete(
       if (blockchain.activatedFeatures.contains(BlockchainFeatures.FairPoS.id))

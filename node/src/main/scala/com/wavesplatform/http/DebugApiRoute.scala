@@ -20,7 +20,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
-import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
@@ -73,7 +73,7 @@ case class DebugApiRoute(
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
 
-  override val settings = ws.restAPISettings
+  override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ withAuth {
       blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
@@ -90,6 +90,11 @@ case class DebugApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "howMany", value = "How many last blocks to take", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Sizes and full hashes")
     )
   )
   def blocks: Route = {
@@ -183,6 +188,11 @@ case class DebugApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Balance history")
+    )
+  )
   def balanceHistory: Route = (path("balances" / "history" / AddrSegment) & get) { address =>
     complete(Json.toJson(loadBalanceHistory(address).map {
       case (h, b) => Json.obj("height" -> h, "balance" -> b)
@@ -210,6 +220,11 @@ case class DebugApiRoute(
     notes = "Get state at specified height",
     httpMethod = "GET",
     authorizations = Array(new Authorization(apiKeyDefinitionName))
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "State")
+    )
   )
   @ApiImplicitParams(
     Array(
@@ -381,6 +396,11 @@ case class DebugApiRoute(
       new ApiImplicitParam(name = "signature", value = "Base58-encoded block signature", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Rollback result")
+    )
+  )
   def rollbackTo: Route = path("rollback-to" / Segment) { signature =>
     (delete & extractScheduler) { implicit sc =>
       val signatureEi: Either[ValidationError, ByteStr] =
@@ -445,6 +465,11 @@ case class DebugApiRoute(
       new ApiImplicitParam(name = "transaction", value = "Signed transaction", required = true, dataType = "string", paramType = "body")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Validation result")
+    )
+  )
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
       val h  = blockchain.height
@@ -473,6 +498,11 @@ case class DebugApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "State changes")
     )
   )
   def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment)) { id =>
@@ -509,6 +539,11 @@ case class DebugApiRoute(
         paramType = "path"
       ),
       new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "State changes")
     )
   )
   def stateChangesByAddress: Route =

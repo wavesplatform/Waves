@@ -25,7 +25,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
 
-  override val route = pathPrefix("leasing") {
+  override val route: Route = pathPrefix("leasing") {
     active ~ deprecatedRoute
   }
 
@@ -44,6 +44,11 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Lease transactions")
     )
   )
   def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>

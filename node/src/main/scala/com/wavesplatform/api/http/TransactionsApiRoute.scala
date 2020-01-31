@@ -41,7 +41,7 @@ case class TransactionsApiRoute(
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("transactions") {
       unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast
     }
@@ -65,6 +65,11 @@ case class TransactionsApiRoute(
       new ApiImplicitParam(name = "after", value = "Id of transaction to paginate after", required = false, dataType = "string", paramType = "query")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transactions")
+    )
+  )
   def addressLimit: Route = {
     (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
       extractScheduler(implicit sc => complete(transactionsByAddress(address, limit, maybeAfter)))
@@ -76,6 +81,11 @@ case class TransactionsApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transaction")
     )
   )
   def info: Route = (pathPrefix("info") & get) {
@@ -101,13 +111,18 @@ case class TransactionsApiRoute(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "query", allowMultiple = true)
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transaction status")
+    )
+  )
   def status: Route = path("status") {
     protobufEntity(TransactionsByIdRequest) { request =>
       if (request.ids.length > settings.transactionsByAddressLimit)
         complete(TooBigArrayAllocation)
       else {
         request.ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).toList.separate match {
-          case (Nil, Nil)  => complete(CustomValidationError("Empty request"))
+          case (Nil, Nil) => complete(CustomValidationError("Empty request"))
           case (Nil, ids) =>
             val results = ids.toSet.map { id: ByteStr =>
               val statusJson = blockchain.transactionInfo(id) match {
@@ -131,6 +146,11 @@ case class TransactionsApiRoute(
 
   @Path("/unconfirmed")
   @ApiOperation(value = "Unconfirmed transactions", notes = "Get list of unconfirmed transactions", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transactions")
+    )
+  )
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
       complete(JsArray(commonApi.unconfirmedTransactions().map(txToExtendedJson)))
@@ -143,6 +163,11 @@ case class TransactionsApiRoute(
     notes = "Get the number of unconfirmed transactions in the UTX pool",
     httpMethod = "GET"
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Size")
+    )
+  )
   def utxSize: Route = (pathPrefix("size") & get) {
     complete(Json.obj("size" -> JsNumber(utx.size)))
   }
@@ -152,6 +177,11 @@ case class TransactionsApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transaction")
     )
   )
   def utxTransactionInfo: Route = (pathPrefix("info") & get) {
@@ -177,6 +207,11 @@ case class TransactionsApiRoute(
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "json", required = true, dataType = "string", paramType = "body", value = "Transaction data including type")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transaction fee")
     )
   )
   def calculateFee: Route =
@@ -213,6 +248,11 @@ case class TransactionsApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Signed transaction")
+    )
+  )
   def sign: Route = (pathPrefix("sign") & withAuth) {
     pathEndOrSingleSlash(jsonPost[JsObject] { jsv =>
       TransactionFactory.parseRequestAndSign(wallet, (jsv \ "sender").as[String], time, jsv)
@@ -237,6 +277,11 @@ case class TransactionsApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Signed transaction")
+    )
+  )
   def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
     jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, signerAddress, time, _))
   }
@@ -252,6 +297,11 @@ case class TransactionsApiRoute(
         dataType = "string",
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Transaction")
     )
   )
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))

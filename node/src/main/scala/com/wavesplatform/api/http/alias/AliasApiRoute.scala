@@ -22,7 +22,7 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     with BroadcastRoute
     with AuthRoute {
 
-  override val route = pathPrefix("alias") {
+  override val route: Route = pathPrefix("alias") {
     addressOfAlias ~ aliasOfAddress ~ deprecatedRoute
   }
 
@@ -44,6 +44,11 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
       new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Address")
+    )
+  )
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     complete {
       Alias
@@ -59,6 +64,11 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
   @ApiImplicitParams(
     Array(
       new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Aliases")
     )
   )
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>

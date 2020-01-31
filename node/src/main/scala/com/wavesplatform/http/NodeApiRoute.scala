@@ -20,7 +20,7 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
     with AuthRoute
     with ScorexLogging {
 
-  override lazy val route = pathPrefix("node") {
+  override lazy val route: Route = pathPrefix("node") {
     stop ~ status ~ version
   }
 
@@ -37,6 +37,11 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
 
   @Path("/stop")
   @ApiOperation(value = "Stop", notes = "Stop the node", httpMethod = "POST", authorizations = Array(new Authorization(apiKeyDefinitionName)))
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Stopping result")
+    )
+  )
   def stop: Route = (post & path("stop") & withAuth) {
     log.info("Request to stop application")
     application.shutdown()
@@ -45,6 +50,11 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
 
   @Path("/status")
   @ApiOperation(value = "Status", notes = "Get status of the running core", httpMethod = "GET")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Status")
+    )
+  )
   def status: Route = (get & path("status")) {
     val lastUpdated = blockchain.lastBlock.get.timestamp
     complete(

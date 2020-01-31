@@ -27,7 +27,7 @@ case class PeersApiRoute(
 
   import PeersApiRoute._
 
-  override lazy val route =
+  override lazy val route: Route =
     pathPrefix("peers") {
       allPeers ~ connectedPeers ~ blacklistedPeers ~ suspendedPeers ~ connect ~ clearBlacklist
     }
@@ -105,6 +105,11 @@ case class PeersApiRoute(
       )
     )
   )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Connection status")
+    )
+  )
   def connect: Route = (path("connect") & withAuth) {
     jsonPost[ConnectReq] { req =>
       val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
@@ -156,7 +161,7 @@ case class PeersApiRoute(
   )
   @ApiResponses(
     Array(
-      new ApiResponse(code = 200, message = "200")
+      new ApiResponse(code = 200, message = "Clearing result")
     )
   )
   def clearBlacklist: Route = (path("clearblacklist") & post & withAuth) {

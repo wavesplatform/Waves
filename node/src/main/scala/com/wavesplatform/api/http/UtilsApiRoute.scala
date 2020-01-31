@@ -31,7 +31,8 @@ case class UtilsApiRoute(
     estimator: ScriptEstimator,
     limitedScheduler: Scheduler
 ) extends ApiRoute
-    with AuthRoute with TimeLimitedRoute {
+    with AuthRoute
+    with TimeLimitedRoute {
 
   import UtilsApiRoute._
 
@@ -302,7 +303,7 @@ case class UtilsApiRoute(
   @ApiOperation(value = "Seed", notes = "Generate random seed", httpMethod = "GET")
   @ApiResponses(
     Array(
-      new ApiResponse(code = 200, message = "Json with peer list or error")
+      new ApiResponse(code = 200, message = "Seed")
     )
   )
   def seedRoute: Route = (path("seed") & get) {
@@ -316,7 +317,11 @@ case class UtilsApiRoute(
       new ApiImplicitParam(name = "length", value = "Seed length ", required = true, dataType = "integer", paramType = "path")
     )
   )
-  @ApiResponse(code = 200, message = "Json with error message")
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Seed")
+    )
+  )
   def length: Route = (path("seed" / IntNumber) & get) { length =>
     if (length <= MaxSeedSize) complete(seed(length))
     else complete(TooBigArrayAllocation)
@@ -418,6 +423,11 @@ case class UtilsApiRoute(
         dataType = "string",
         value = "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs"
       )
+    )
+  )
+  @ApiResponses(
+    Array(
+      new ApiResponse(code = 200, message = "Serialized transaction")
     )
   )
   def transactionSerialize: Route =
