@@ -43,7 +43,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   @ApiOperation(value = "Generation signature", notes = "Generation signature of a block with specified id", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "blockId", value = "Block id", required = true, dataType = "string", paramType = "path")
     )
   )
   @ApiResponses(
@@ -72,7 +72,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
   @ApiOperation(value = "Base target", notes = "base target of a block with specified id", httpMethod = "GET")
   @ApiImplicitParams(
     Array(
-      new ApiImplicitParam(name = "blockId", value = "Block id ", required = true, dataType = "string", paramType = "path")
+      new ApiImplicitParam(name = "blockId", value = "Block id", required = true, dataType = "string", paramType = "path")
     )
   )
   @ApiResponses(
