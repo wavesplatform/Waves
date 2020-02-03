@@ -3,7 +3,7 @@ package com.wavesplatform.api.http
 import java.security.SecureRandom
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
-import akka.http.scaladsl.server.{Directive1, ExceptionHandler, Route}
+import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.common.utils._
@@ -14,14 +14,11 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.utils.{Schedulers, Time}
-import io.netty.util.HashedWheelTimer
+import com.wavesplatform.utils.Time
 import io.swagger.annotations._
 import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
-
-import scala.concurrent.duration._
 
 @Path("/utils")
 @Api(value = "/utils", description = "Useful functions", position = 3, produces = "application/json")

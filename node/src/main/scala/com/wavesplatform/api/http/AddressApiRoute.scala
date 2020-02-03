@@ -195,7 +195,7 @@ case class AddressApiRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataTypeClass = classOf[SignedMessage],
+        dataTypeClass = classOf[Signed],
         defaultValue =
           "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
       )
@@ -225,7 +225,7 @@ case class AddressApiRoute(
         value = "Json with data",
         required = true,
         paramType = "body",
-        dataTypeClass = classOf[SignedMessage],
+        dataTypeClass = classOf[Signed],
         defaultValue =
           "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
       )
@@ -645,7 +645,7 @@ case class AddressApiRoute(
   }
 
   private def verifyPath(address: String, decode: Boolean): Route = withAuth {
-    jsonPost[SignedMessage] { m =>
+    jsonPost[Signed] { m =>
       if (Address.fromString(address).isLeft) {
         InvalidAddress
       } else {
@@ -653,7 +653,7 @@ case class AddressApiRoute(
         val msg: Try[Array[Byte]] =
           if (decode) if (m.message.startsWith("base64:")) Base64.tryDecode(m.message) else Base58.tryDecodeWithLimit(m.message, 2048)
           else Success(m.message.getBytes("UTF-8"))
-        verifySigned(msg, m.signature, m.publickey, address)
+        verifySigned(msg, m.signature, m.publicKey, address)
       }
     }
   }
@@ -691,28 +691,49 @@ case class AddressApiRoute(
 }
 
 object AddressApiRoute {
-
   case class Signed(message: String, publicKey: String, signature: String)
 
-  implicit val signedFormat: Format[Signed] = Json.format
+  object Signed {
+    import play.api.libs.functional.syntax._
+
+    implicit val signedFormat: Format[Signed] = Format(
+      ((JsPath \ "message").read[String] and
+        ((JsPath \ "publickey")
+          .read[String]
+          .orElse((JsPath \ "publicKey").read[String]))
+        and (JsPath \ "signature").read[String])(Signed.apply _),
+      Json.writes[Signed]
+    )
+  }
 
   case class Balance(address: String, confirmations: Int, balance: Long)
 
-  implicit val balanceFormat: Format[Balance] = Json.format
+  object Balance {
+    implicit val balanceFormat: Format[Balance] = Json.format
+  }
 
   case class BalanceDetails(address: String, regular: Long, generating: Long, available: Long, effective: Long)
 
-  implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
+  object BalanceDetails {
+    implicit val balanceDetailsFormat: Format[BalanceDetails] = Json.format
+  }
 
   case class Validity(address: String, valid: Boolean)
 
-  implicit val validityFormat: Format[Validity] = Json.format
+  object Validity {
+    implicit val validityFormat: Format[Validity] = Json.format
+  }
 
   case class AddressScriptInfo(address: String, script: Option[String], scriptText: Option[String], complexity: Long, extraFee: Long)
 
-  implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
+  object AddressScriptInfo {
+    implicit val accountScriptInfoFormat: Format[AddressScriptInfo] = Json.format
+  }
 
   case class AccountScriptMeta(address: String, meta: Option[Dic])
-  implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
-  implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
+
+  object AccountScriptMeta {
+    implicit lazy val dicFormat: Writes[Dic]                             = metaConverter.foldRoot
+    implicit lazy val accountScriptMetaWrites: Writes[AccountScriptMeta] = Json.writes[AccountScriptMeta]
+  }
 }
