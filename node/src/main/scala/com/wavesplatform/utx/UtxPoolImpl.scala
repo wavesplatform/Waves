@@ -169,11 +169,9 @@ class UtxPoolImpl(
   }
 
   private[this] def removeFromBothPools(txId: ByteStr): Unit = synchronized {
-    val removedFromOrd      = Option(transactions.remove(txId))
     val removedFromPriority = priorityTransactions.remove(txId)
-    removedFromOrd.foreach(PoolMetrics.removeTransaction)
     removedFromPriority.foreach(PoolMetrics.removeTransactionPriority)
-    removedFromOrd.orElse(removedFromPriority).foreach(tx => pessimisticPortfolios.remove(tx.id()))
+    removeFromOrdPool(txId)
   }
 
   private[this] def removeFromOrdPool(txId: ByteStr): Unit = synchronized {
