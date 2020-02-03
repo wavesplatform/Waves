@@ -222,10 +222,8 @@ class UtxPoolImpl(
       .sorted(TransactionsOrdering.InUTXPool)
   }
 
-  override def all: Seq[Transaction] = {
-    val priorityTxsSet = priorityTransactions.keySet
-    priorityTransactions.values.toVector ++ nonPriorityTransactions.filterNot(tx => priorityTxsSet(tx.id()))
-  }
+  override def all: Seq[Transaction] =
+    (priorityTransactions.values ++ nonPriorityTransactions).toVector.distinct
 
   override def size: Int = transactions.size
 
