@@ -5,6 +5,7 @@ import akka.stream.ActorMaterializer
 import com.github.swagger.akka.SwaggerHttpService
 import com.github.swagger.akka.model.{Info, License}
 import com.wavesplatform.Version
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.http.`X-Api-Key`
 import com.wavesplatform.settings.RestAPISettings
 import io.swagger.models.auth.{ApiKeyAuthDefinition, In}
@@ -14,14 +15,20 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
     extends SwaggerHttpService {
 
   override val host: String = settings.bindAddress + ":" + settings.port
-  override val info: Info = Info(
-    "The Web Interface to the Waves Full Node API",
-    Version.VersionString,
-    "Waves Full Node",
-    "License: MIT License",
-    None,
-    Some(License("MIT License", "https://github.com/wavesplatform/Waves/blob/master/LICENSE"))
-  )
+  override lazy val info: Info = {
+    def chainIdString: String =
+      if (Character.isAlphabetic(AddressScheme.current.chainId)) AddressScheme.current.chainId.toChar.toString
+      else "#" + AddressScheme.current.chainId.toInt
+
+    Info(
+      "The Web Interface to the Waves Full Node API",
+      Version.VersionString,
+      s"Waves Full Node ($chainIdString)",
+      "",
+      None,
+      Some(License("MIT License", "https://github.com/wavesplatform/Waves/blob/master/LICENSE"))
+    )
+  }
 
   //Let swagger-ui determine the host and port
   override val swaggerConfig: Swagger = new Swagger()
@@ -29,11 +36,11 @@ class SwaggerDocService(val actorSystem: ActorSystem, val materializer: ActorMat
     .info(info)
     .scheme(Scheme.HTTP)
     .scheme(Scheme.HTTPS)
-    .securityDefinition(SwaggerDocService.apiKeyDefinitionName, new ApiKeyAuthDefinition(`X-Api-Key`.name, In.HEADER))
+    .securityDefinition(SwaggerDocService.ApiKeyDefName, new ApiKeyAuthDefinition(`X-Api-Key`.name, In.HEADER))
 
   override def unwantedDefinitions: Seq[String] = Seq("Function1RequestContextFutureRouteResult", "Function1")
 }
 
 object SwaggerDocService {
-  final val apiKeyDefinitionName = "API Key"
+  final val ApiKeyDefName = "API Key"
 }

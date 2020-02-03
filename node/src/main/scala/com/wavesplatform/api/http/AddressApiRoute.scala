@@ -8,7 +8,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http.swagger.SwaggerDocService.apiKeyDefinitionName
+import com.wavesplatform.api.http.swagger.SwaggerDocService.ApiKeyDefName
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
@@ -102,7 +102,7 @@ case class AddressApiRoute(
     value = "Delete",
     notes = "Remove the account with address {address} from the wallet",
     httpMethod = "DELETE",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -130,7 +130,7 @@ case class AddressApiRoute(
     value = "Sign",
     notes = "Sign a message with a private key associated with {address}",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -158,7 +158,7 @@ case class AddressApiRoute(
     value = "Sign",
     notes = "Sign a message with a private key associated with {address}",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -185,7 +185,7 @@ case class AddressApiRoute(
     value = "Verify",
     notes = "Check a signature of a message signed by an account",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -215,7 +215,7 @@ case class AddressApiRoute(
     value = "Verify text",
     notes = "Check a signature of a message signed by an account",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -357,7 +357,7 @@ case class AddressApiRoute(
     value = "Seed",
     notes = "Export seed value for the {address}",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -508,7 +508,7 @@ case class AddressApiRoute(
     value = "Create",
     notes = "Create a new account in the wallet(if it exists)",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiResponses(
     Array(

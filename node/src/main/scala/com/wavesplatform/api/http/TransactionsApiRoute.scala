@@ -5,7 +5,7 @@ import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http.swagger.SwaggerDocService.apiKeyDefinitionName
+import com.wavesplatform.api.http.swagger.SwaggerDocService.ApiKeyDefName
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
@@ -235,7 +235,7 @@ case class TransactionsApiRoute(
     value = "Sign a transaction",
     notes = "Sign a transaction with the sender's private key",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(

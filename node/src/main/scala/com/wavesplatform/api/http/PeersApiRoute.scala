@@ -5,7 +5,7 @@ import java.util.concurrent.ConcurrentMap
 import java.util.stream.Collectors
 
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.swagger.SwaggerDocService.apiKeyDefinitionName
+import com.wavesplatform.api.http.swagger.SwaggerDocService.ApiKeyDefName
 import com.wavesplatform.network.{PeerDatabase, PeerInfo}
 import com.wavesplatform.settings.RestAPISettings
 import io.netty.channel.Channel
@@ -92,7 +92,7 @@ case class PeersApiRoute(
     value = "Connect to peer",
     notes = "Connect to peer",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -157,7 +157,7 @@ case class PeersApiRoute(
     value = "Remove all blacklisted peers",
     notes = "Clear blacklist",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiResponses(
     Array(

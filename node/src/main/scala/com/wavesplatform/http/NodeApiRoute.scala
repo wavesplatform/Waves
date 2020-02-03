@@ -4,7 +4,7 @@ import java.time.Instant
 
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.Shutdownable
-import com.wavesplatform.api.http.swagger.SwaggerDocService.apiKeyDefinitionName
+import com.wavesplatform.api.http.swagger.SwaggerDocService.ApiKeyDefName
 import com.wavesplatform.api.http.{ApiRoute, AuthRoute}
 import com.wavesplatform.settings.{Constants, RestAPISettings}
 import com.wavesplatform.state.Blockchain
@@ -36,7 +36,7 @@ case class NodeApiRoute(settings: RestAPISettings, blockchain: Blockchain, appli
   }
 
   @Path("/stop")
-  @ApiOperation(value = "Stop", notes = "Stop the node", httpMethod = "POST", authorizations = Array(new Authorization(apiKeyDefinitionName)))
+  @ApiOperation(value = "Stop", notes = "Stop the node", httpMethod = "POST", authorizations = Array(new Authorization(ApiKeyDefName)))
   @ApiResponses(
     Array(
       new ApiResponse(code = 200, message = "Stopping result")

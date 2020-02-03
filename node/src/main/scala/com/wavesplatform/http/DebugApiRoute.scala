@@ -12,7 +12,7 @@ import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.http.ApiError.InvalidAddress
 import com.wavesplatform.api.http._
-import com.wavesplatform.api.http.swagger.SwaggerDocService.apiKeyDefinitionName
+import com.wavesplatform.api.http.swagger.SwaggerDocService.ApiKeyDefName
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -85,7 +85,7 @@ case class DebugApiRoute(
     value = "Blocks",
     notes = "Get sizes and full hashes for last blocks",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -111,7 +111,7 @@ case class DebugApiRoute(
     value = "Print",
     notes = "Prints a string at DEBUG level, strips to 100 chars",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -137,7 +137,7 @@ case class DebugApiRoute(
     value = "Portfolio",
     notes = "Get current portfolio considering pessimistic transactions in the UTX pool",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -208,7 +208,7 @@ case class DebugApiRoute(
     }
 
   @Path("/state")
-  @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET", authorizations = Array(new Authorization(apiKeyDefinitionName)))
+  @ApiOperation(value = "State", notes = "Get current state", httpMethod = "GET", authorizations = Array(new Authorization(ApiKeyDefName)))
   @ApiResponses(Array(new ApiResponse(code = 200, message = "Json state")))
   def state: Route = (path("state") & get) {
     wavesDistribution(ng.height)
@@ -219,7 +219,7 @@ case class DebugApiRoute(
     value = "State at block",
     notes = "Get state at specified height",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiResponses(
     Array(
@@ -248,7 +248,7 @@ case class DebugApiRoute(
     value = "Rollback to height",
     notes = "Removes all blocks after given height",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -283,7 +283,7 @@ case class DebugApiRoute(
     value = "State",
     notes = "All info you need to debug",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiResponses(
     Array(
@@ -308,7 +308,7 @@ case class DebugApiRoute(
     value = "State",
     notes = "All miner info you need to debug",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiResponses(
     Array(
@@ -342,7 +342,7 @@ case class DebugApiRoute(
     value = "State",
     notes = "All history info you need to debug",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiResponses(
     Array(
@@ -361,7 +361,7 @@ case class DebugApiRoute(
     value = "Config",
     notes = "Currently running node config",
     httpMethod = "GET",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -389,7 +389,7 @@ case class DebugApiRoute(
     value = "Block signature",
     notes = "Rollback the state to the block with a given signature",
     httpMethod = "DELETE",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -421,7 +421,7 @@ case class DebugApiRoute(
     value = "Blacklist given peer",
     notes = "Moving peer to blacklist",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
@@ -458,7 +458,7 @@ case class DebugApiRoute(
     value = "Validate Transaction",
     notes = "Validates a transaction and measures time spent in milliseconds",
     httpMethod = "POST",
-    authorizations = Array(new Authorization(apiKeyDefinitionName))
+    authorizations = Array(new Authorization(ApiKeyDefName))
   )
   @ApiImplicitParams(
     Array(
