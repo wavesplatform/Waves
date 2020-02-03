@@ -240,20 +240,10 @@ class UtxPoolImpl(
 
   case class TxEntry(tx: Transaction, priority: Boolean)
 
-  override def packUnconfirmed(
-      initialConstraint: MultiDimensionalMiningConstraint,
-      maxPackTime: ScalaDuration
-  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    packTransactions(
-      initialConstraint,
-      maxPackTime
-    )
-  }
-
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
     synchronized(priorityTransactions.values.map(TxEntry(_, priority = true)).toVector) ++ nonPriorityTransactions.map(TxEntry(_, priority = false))
 
-  private[this] def packTransactions(
+  override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
@@ -395,7 +385,7 @@ class UtxPoolImpl(
 
     def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
       cleanupScheduler.execute { () =>
-        try packTransactions(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+        try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
         finally scheduled.set(false)
       }
     }
