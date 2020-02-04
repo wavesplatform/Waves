@@ -8,21 +8,17 @@ import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.RouteResult.Complete
 import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
-import akka.stream.ActorMaterializer
-import com.wavesplatform.api.http.swagger.SwaggerDocService
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
 
-case class CompositeHttpService(apiTypes: Set[Class[_]], routes: Seq[ApiRoute], settings: RestAPISettings)(implicit system: ActorSystem)
-    extends ScorexLogging {
+case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings)(system: ActorSystem) extends ScorexLogging {
 
-  private val swaggerService    = new SwaggerDocService(system, ActorMaterializer()(system), apiTypes, settings)
   private val redirectToSwagger = redirect("/api-docs/index.html", StatusCodes.PermanentRedirect)
-  private val swaggerRoute: Route = swaggerService.routes ~
+  private val swaggerRoute: Route =
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~
-    pathPrefix("api-docs") {
-      pathEndOrSingleSlash(redirectToSwagger) ~ getFromResourceDirectory("swagger-ui")
-    }
+      pathPrefix("api-docs") {
+        pathEndOrSingleSlash(redirectToSwagger) ~ getFromResourceDirectory("swagger-ui")
+      }
 
   val compositeRoute: Route        = extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)
   val loggingCompositeRoute: Route = DebuggingDirectives.logRequestResult(LoggingMagnet(_ => logRequestResponse))(compositeRoute)

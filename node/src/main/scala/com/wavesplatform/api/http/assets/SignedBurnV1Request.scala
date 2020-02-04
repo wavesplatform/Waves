@@ -5,7 +5,6 @@ import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.assets.BurnTransactionV1
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -22,17 +21,11 @@ object SignedBurnV1Request {
   implicit val writes: Writes[SignedBurnV1Request] = Json.writes[SignedBurnV1Request]
 }
 
-case class SignedBurnV1Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                               senderPublicKey: String,
-                               @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+case class SignedBurnV1Request(senderPublicKey: String,
                                assetId: String,
-                               @ApiModelProperty(required = true, example = "1000000")
                                quantity: Long,
-                               @ApiModelProperty(required = true)
                                fee: Long,
-                               @ApiModelProperty(required = true)
                                timestamp: Long,
-                               @ApiModelProperty(required = true)
                                signature: String)
     extends BroadcastRequest {
 

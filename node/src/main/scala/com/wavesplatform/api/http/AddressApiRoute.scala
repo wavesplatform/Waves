@@ -8,7 +8,6 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.common.CommonAccountApi
 import com.wavesplatform.api.http.ApiError._
-import com.wavesplatform.api.http.swagger.SwaggerDocService.ApiKeyDefName
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
 import com.wavesplatform.http.BroadcastRoute
@@ -23,15 +22,11 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.{Asset, TransactionFactory}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import monix.execution.Scheduler
 import play.api.libs.json._
 
 import scala.util.{Failure, Success, Try}
 
-@Path("/addresses")
-@Api(value = "/addresses/")
 case class AddressApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
@@ -56,18 +51,6 @@ case class AddressApiRoute(
         signText ~ seq ~ publicKey ~ effectiveBalance ~ effectiveBalanceWithConfirmations ~ getData ~ getDataItem ~ postData ~ scriptInfo ~ scriptMeta
     } ~ root ~ create
 
-  @Path("/scriptInfo/{address}")
-  @ApiOperation(value = "Details for account", notes = "Account's script", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Script info")
-    )
-  )
   def scriptInfo: Route = (path("scriptInfo" / Segment) & get) { address =>
     completeLimited(
       Address
@@ -76,18 +59,6 @@ case class AddressApiRoute(
     )
   }
 
-  @Path("/scriptInfo/{address}/meta")
-  @ApiOperation(value = "Meta by address", notes = "Account's script meta", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Script meta")
-    )
-  )
   def scriptMeta: Route = (path("scriptInfo" / Segment / "meta") & get) { address =>
     complete(
       Address
@@ -97,23 +68,6 @@ case class AddressApiRoute(
     )
   }
 
-  @Path("/{address}")
-  @ApiOperation(
-    value = "Delete",
-    notes = "Remove the account with address {address} from the wallet",
-    httpMethod = "DELETE",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Deletion result")
-    )
-  )
   def deleteAddress: Route = path(Segment) { address =>
     (delete & withAuth) {
       if (Address.fromString(address).isLeft) {
@@ -125,133 +79,26 @@ case class AddressApiRoute(
     }
   }
 
-  @Path("/sign/{address}")
-  @ApiOperation(
-    value = "Sign",
-    notes = "Sign a message with a private key associated with {address}",
-    httpMethod = "POST",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "string"),
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(
-        code = 200,
-        message =
-          "Json with error or json like {\"message\": \"Base58-encoded\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}"
-      )
-    )
-  )
   def sign: Route = {
     path("sign" / Segment) { address =>
       signPath(address, encode = true)
     }
   }
 
-  @Path("/signText/{address}")
-  @ApiOperation(
-    value = "Sign",
-    notes = "Sign a message with a private key associated with {address}",
-    httpMethod = "POST",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "message", value = "Message to sign as a plain string", required = true, paramType = "body", dataType = "string"),
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(
-        code = 200,
-        message = "Json with error or json like {\"message\": \"plain text\",\"publickey\": \"Base58-encoded\", \"signature\": \"Base58-encoded\"}"
-      )
-    )
-  )
   def signText: Route = {
     path("signText" / Segment) { address =>
       signPath(address, encode = false)
     }
   }
 
-  @Path("/verify/{address}")
-  @ApiOperation(
-    value = "Verify",
-    notes = "Check a signature of a message signed by an account",
-    httpMethod = "POST",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataTypeClass = classOf[Signed],
-        defaultValue =
-          "{\n\t\"message\":\"Base58-encoded message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
-      )
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Verification result")
-    )
-  )
   def verify: Route = path("verify" / Segment) { address =>
     verifyPath(address, decode = true)
   }
 
-  @Path("/verifyText/{address}")
-  @ApiOperation(
-    value = "Verify text",
-    notes = "Check a signature of a message signed by an account",
-    httpMethod = "POST",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(
-        name = "body",
-        value = "Json with data",
-        required = true,
-        paramType = "body",
-        dataTypeClass = classOf[Signed],
-        defaultValue =
-          "{\n\t\"message\":\"Plain message\",\n\t\"signature\":\"Base58-encoded signature\",\n\t\"publickey\":\"Base58-encoded public key\"\n}"
-      )
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Verification result")
-    )
-  )
   def verifyText: Route = path("verifyText" / Segment) { address =>
     verifyPath(address, decode = false)
   }
 
-  @Path("/balance/{address}")
-  @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Balance")
-    )
-  )
   def balance: Route = (path("balance" / Segment) & get) { address =>
     complete(balanceJson(address))
   }
@@ -268,18 +115,6 @@ case class AddressApiRoute(
     complete(balancesJson(height.getOrElse(blockchain.height), addresses, assetId.fold(Waves: Asset)(a => IssuedAsset(Base58.decode(a)))))
   }
 
-  @Path("/balance/details/{address}")
-  @ApiOperation(value = "Details for balance", notes = "Account's balances", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Balance details")
-    )
-  )
   def balanceDetails: Route = (path("balance" / "details" / Segment) & get) { address =>
     complete(
       Address
@@ -292,19 +127,6 @@ case class AddressApiRoute(
     )
   }
 
-  @Path("/balance/{address}/{confirmations}")
-  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Balance after confirmations")
-    )
-  )
   def balanceWithConfirmations: Route = {
     (path("balance" / Segment / IntNumber) & get) {
       case (address, confirmations) =>
@@ -312,37 +134,12 @@ case class AddressApiRoute(
     }
   }
 
-  @Path("/effectiveBalance/{address}")
-  @ApiOperation(value = "Balance", notes = "Account's balance", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Effective balance")
-    )
-  )
   def effectiveBalance: Route = {
     path("effectiveBalance" / Segment) { address =>
       complete(effectiveBalanceJson(address, 0))
     }
   }
 
-  @Path("/effectiveBalance/{address}/{confirmations}")
-  @ApiOperation(value = "Confirmed balance", notes = "Balance of {address} after {confirmations}", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "confirmations", value = "0", required = true, dataType = "integer", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Effective balance after confirmations")
-    )
-  )
   def effectiveBalanceWithConfirmations: Route = {
     path("effectiveBalance" / Segment / IntNumber) {
       case (address, confirmations) =>
@@ -352,23 +149,6 @@ case class AddressApiRoute(
     }
   }
 
-  @Path("/seed/{address}")
-  @ApiOperation(
-    value = "Seed",
-    notes = "Export seed value for the {address}",
-    httpMethod = "GET",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Seed")
-    )
-  )
   def seed: Route = {
     (path("seed" / Segment) & get & withAuth) { address =>
       complete(for {
@@ -378,18 +158,6 @@ case class AddressApiRoute(
     }
   }
 
-  @Path("/validate/{address}")
-  @ApiOperation(value = "Validate", notes = "Check whether address {address} is valid or not", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Validation result")
-    )
-  )
   def validate: Route = (path("validate" / Segment) & get) { address =>
     complete(Validity(address, Address.fromString(address).isRight))
   }
@@ -399,33 +167,6 @@ case class AddressApiRoute(
     broadcast[DataRequest](data => TransactionFactory.data(data, wallet, time))
   }
 
-  @Path("/data/{address}")
-  @ApiOperation(value = "Complete Data", notes = "Read all data posted by an account", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(
-        name = "matches",
-        value = "URL encoded (percent-encoded) regular expression to filter keys (https://www.tutorialspoint.com/scala/scala_regular_expressions.htm)",
-        required = false,
-        dataType = "string",
-        paramType = "query"
-      ),
-      new ApiImplicitParam(
-        name = "key",
-        value = "Exact keys to query",
-        required = false,
-        dataType = "string",
-        paramType = "query",
-        allowMultiple = true
-      )
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "All data")
-    )
-  )
   def getData: Route =
     extractScheduler(
       implicit sc =>
@@ -446,50 +187,17 @@ case class AddressApiRoute(
         }
     )
 
-  @Path("/data/{address}/{key}")
-  @ApiOperation(value = "Data by Key", notes = "Read data associated with an account and a key", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "key", value = "Data key", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Data by key")
-    )
-  )
   def getDataItem: Route = (path("data" / Segment / Segment) & get) {
     case (address, key) =>
       complete(accountData(address, key))
   }
 
-  @Path("/")
-  @ApiOperation(value = "Addresses", notes = "Get wallet accounts addresses", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Addresses")
-    )
-  )
   def root: Route = (path("addresses") & get) {
     val accounts = wallet.privateKeyAccounts
     val json     = JsArray(accounts.map(a => JsString(a.stringRepr)))
     complete(json)
   }
 
-  @Path("/seq/{from}/{to}")
-  @ApiOperation(value = "Seq", notes = "Get wallet accounts addresses", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "from", value = "Start address", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "to", value = "address", required = true, dataType = "integer", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Accounts addresses")
-    )
-  )
   def seq: Route = {
     (path("seq" / IntNumber / IntNumber) & get) {
       case (start, end) =>
@@ -503,18 +211,6 @@ case class AddressApiRoute(
     }
   }
 
-  @Path("/")
-  @ApiOperation(
-    value = "Create",
-    notes = "Create a new account in the wallet(if it exists)",
-    httpMethod = "POST",
-    authorizations = Array(new Authorization(ApiKeyDefName))
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Creation result")
-    )
-  )
   def create: Route = (path("addresses") & post & withAuth) {
     wallet.generateNewAccount() match {
       case Some(pka) => complete(Json.obj("address" -> pka.stringRepr))
@@ -668,18 +364,6 @@ case class AddressApiRoute(
     }
   }
 
-  @Path("/publicKey/{publicKey}")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "publicKey", value = "Public key Base58-encoded", required = true, paramType = "path", dataType = "string")
-    )
-  )
-  @ApiOperation(value = "Address from Public Key", notes = "Generate a address from public key", httpMethod = "GET")
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Address")
-    )
-  )
   def publicKey: Route = (path("publicKey" / Segment) & get) { publicKey =>
     Base58.tryDecodeWithLimit(publicKey) match {
       case Success(pubKeyBytes) =>

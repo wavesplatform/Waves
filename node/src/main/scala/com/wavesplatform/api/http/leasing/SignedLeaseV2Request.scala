@@ -6,20 +6,13 @@ import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.lease.LeaseTransactionV2
 import com.wavesplatform.transaction.Proofs
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
-case class SignedLeaseV2Request(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                senderPublicKey: String,
-                                @ApiModelProperty(required = true)
+case class SignedLeaseV2Request(senderPublicKey: String,
                                 amount: Long,
-                                @ApiModelProperty(required = true)
                                 fee: Long,
-                                @ApiModelProperty(value = "Recipient address", required = true)
                                 recipient: String,
-                                @ApiModelProperty(required = true)
                                 timestamp: Long,
-                                @ApiModelProperty(required = true)
                                 proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, LeaseTransactionV2] =

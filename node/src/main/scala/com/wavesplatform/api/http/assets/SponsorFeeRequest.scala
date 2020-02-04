@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs}
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json.Json
 
 object SponsorFeeRequest {
@@ -15,30 +14,16 @@ object SponsorFeeRequest {
   implicit val signedSponsorRequestFormat   = Json.format[SignedSponsorFeeRequest]
 }
 
-case class SponsorFeeRequest(@ApiModelProperty(value = "Sender address", required = true)
-                             sender: String,
-                             @ApiModelProperty(value = "Asset to be sponsored", required = true)
-                             assetId: String,
-                             @ApiModelProperty(value = "Asset amount per fee unit", required = true)
-                             minSponsoredAssetFee: Option[Long],
-                             @ApiModelProperty(required = true)
-                             fee: Long,
-                             timestamp: Option[Long] = None)
+case class SponsorFeeRequest(sender: String, assetId: String, minSponsoredAssetFee: Option[Long], fee: Long, timestamp: Option[Long] = None)
 
-@ApiModel(value = "Signed Sponsorship Transaction")
-case class SignedSponsorFeeRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                   senderPublicKey: String,
-                                   @ApiModelProperty(value = "Asset to be sponsored", required = true)
-                                   assetId: String,
-                                   @ApiModelProperty(required = true)
-                                   minSponsoredAssetFee: Option[Long],
-                                   @ApiModelProperty(required = true)
-                                   fee: Long,
-                                   @ApiModelProperty(required = true)
-                                   timestamp: Long,
-                                   @ApiModelProperty(required = true)
-                                   proofs: List[String])
-    extends BroadcastRequest {
+case class SignedSponsorFeeRequest(
+    senderPublicKey: String,
+    assetId: String,
+    minSponsoredAssetFee: Option[Long],
+    fee: Long,
+    timestamp: Long,
+    proofs: List[String]
+) extends BroadcastRequest {
   def toTx: Either[ValidationError, SponsorFeeTransaction] =
     for {
       _sender     <- PublicKey.fromBase58String(senderPublicKey)

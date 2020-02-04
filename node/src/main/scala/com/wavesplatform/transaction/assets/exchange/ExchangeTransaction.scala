@@ -5,7 +5,6 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
-import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -24,7 +23,6 @@ trait ExchangeTransaction extends FastHashId with ProvenTransaction {
 
   override val assetFee: (Asset, Long) = (Waves, fee)
 
-  @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]]

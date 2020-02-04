@@ -8,7 +8,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.{IssueTransaction, IssueTransactionV2}
 import com.wavesplatform.transaction.Proofs
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -36,26 +35,15 @@ object SignedIssueV2Request {
             + ("type"          -> JsNumber(IssueTransaction.typeId.toInt)))
 }
 
-@ApiModel(value = "Signed Smart issue transaction")
-case class SignedIssueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                senderPublicKey: String,
-                                @ApiModelProperty(required = true)
+case class SignedIssueV2Request(senderPublicKey: String,
                                 name: String,
-                                @ApiModelProperty(required = true)
                                 description: String,
-                                @ApiModelProperty(required = true, example = "1000000")
                                 quantity: Long,
-                                @ApiModelProperty(allowableValues = "range[0,8]", example = "8", dataType = "integer", required = true)
                                 decimals: Byte,
-                                @ApiModelProperty(required = true)
                                 reissuable: Boolean,
-                                @ApiModelProperty(required = true)
                                 fee: Long,
-                                @ApiModelProperty(required = true)
                                 timestamp: Long,
-                                @ApiModelProperty(required = true)
                                 proofs: List[String],
-                                @ApiModelProperty(value = "Base58 encoded compiled asset script")
                                 script: Option[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, IssueTransactionV2] =

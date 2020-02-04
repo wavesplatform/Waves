@@ -7,21 +7,14 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.lease.LeaseCancelTransactionV2
 import com.wavesplatform.transaction.Proofs
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
-case class SignedLeaseCancelV2Request(@ApiModelProperty(required = true)
-                                      chainId: Byte,
-                                      @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+case class SignedLeaseCancelV2Request(chainId: Byte,
                                       senderPublicKey: String,
-                                      @ApiModelProperty(value = "Base58 encoded lease transaction id", required = true)
                                       leaseId: String,
-                                      @ApiModelProperty(required = true)
                                       timestamp: Long,
-                                      @ApiModelProperty(required = true)
                                       proofs: List[String],
-                                      @ApiModelProperty(required = true)
                                       fee: Long)
     extends BroadcastRequest {
   def toTx: Either[ValidationError, LeaseCancelTransactionV2] =

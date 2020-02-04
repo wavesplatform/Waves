@@ -11,12 +11,8 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.Json
 
-@Path("/alias")
-@Api(value = "/alias")
 case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time, blockchain: Blockchain)
     extends ApiRoute
     with BroadcastRoute
@@ -33,22 +29,6 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
       broadcast[CreateAliasV1Request](TransactionFactory.aliasV1(_, wallet, time))
     }
 
-  @Path("/by-alias/{alias}")
-  @ApiOperation(
-    value = "Address by alias",
-    notes = "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.",
-    httpMethod = "GET"
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Address")
-    )
-  )
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     complete {
       Alias
@@ -59,18 +39,6 @@ case class AliasApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynch
     }
   }
 
-  @Path("/by-address/{address}")
-  @ApiOperation(value = "Aliases by address", notes = "Returns a collection of aliases associated with an address", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
-  @ApiResponses(
-    Array(
-      new ApiResponse(code = 200, message = "Aliases")
-    )
-  )
   def aliasOfAddress: Route = (get & path("by-address" / Segment)) { addressString =>
     complete {
       com.wavesplatform.account.Address

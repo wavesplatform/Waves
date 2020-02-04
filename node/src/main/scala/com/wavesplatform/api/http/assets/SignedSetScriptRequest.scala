@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.Proofs
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -24,16 +23,10 @@ object SignedSetScriptRequest {
     Json.writes[SignedSetScriptRequest].transform((request: JsObject) => request + ("version" -> JsNumber(1)))
 }
 
-@ApiModel(value = "Proven SetScript transaction")
-case class SignedSetScriptRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                  senderPublicKey: String,
-                                  @ApiModelProperty(value = "Base64 encoded script(including version and checksum)", required = true)
+case class SignedSetScriptRequest(senderPublicKey: String,
                                   script: Option[String],
-                                  @ApiModelProperty(required = true)
                                   fee: Long,
-                                  @ApiModelProperty(required = true)
                                   timestamp: Long,
-                                  @ApiModelProperty(required = true)
                                   proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, SetScriptTransaction] =
