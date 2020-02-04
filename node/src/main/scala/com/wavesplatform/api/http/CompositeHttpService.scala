@@ -10,7 +10,6 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
-import play.api.libs.json.{JsObject, Json}
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings)(system: ActorSystem) extends ScorexLogging {
 
@@ -56,6 +55,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     import com.google.common.io.ByteStreams
     import com.wavesplatform.Version
     import com.wavesplatform.account.AddressScheme
+    import play.api.libs.json.{JsObject, Json}
 
     def chainIdString: String =
       if (Character.isAlphabetic(AddressScheme.current.chainId)) AddressScheme.current.chainId.toChar.toString
