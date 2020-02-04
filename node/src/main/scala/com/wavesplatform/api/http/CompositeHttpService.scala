@@ -51,7 +51,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
     } else base
   }
 
-  private[this] lazy val patchedSwaggerJson: JsObject = {
+  private[this] lazy val patchedSwaggerJson = {
     import com.google.common.io.ByteStreams
     import com.wavesplatform.Version
     import com.wavesplatform.account.AddressScheme
