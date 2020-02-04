@@ -2,8 +2,8 @@
   "swagger" : "2.0",
   "info" : {
     "description" : "The Web Interface to the Waves Full Node API",
-    "version" : "1.1.7-52-g6bd284e-DIRTY",
-    "title" : "Waves Full Node (S)",
+    "version" : "???",
+    "title" : "Waves Full Node (???)",
     "termsOfService" : "",
     "license" : {
       "name" : "MIT License",

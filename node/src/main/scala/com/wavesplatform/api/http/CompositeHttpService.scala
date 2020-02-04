@@ -10,6 +10,7 @@ import akka.http.scaladsl.server._
 import akka.http.scaladsl.server.directives.{DebuggingDirectives, LoggingMagnet}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils.ScorexLogging
+import play.api.libs.json.{JsObject, Json}
 
 case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings)(system: ActorSystem) extends ScorexLogging {
 
@@ -17,7 +18,9 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
   private val swaggerRoute: Route =
     (pathEndOrSingleSlash | path("swagger"))(redirectToSwagger) ~
       pathPrefix("api-docs") {
-        pathEndOrSingleSlash(redirectToSwagger) ~ getFromResourceDirectory("swagger-ui")
+        pathEndOrSingleSlash(redirectToSwagger) ~
+          path("swagger.json")(complete(patchedSwaggerJson)) ~
+          getFromResourceDirectory("swagger-ui")
       }
 
   val compositeRoute: Route        = extendRoute(routes.map(_.route).reduce(_ ~ _)) ~ swaggerRoute ~ complete(StatusCodes.NotFound)
@@ -47,5 +50,22 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
 
       extendedRoute(ctx)
     } else base
+  }
+
+  private[this] lazy val patchedSwaggerJson: JsObject = {
+    import com.google.common.io.ByteStreams
+    import com.wavesplatform.Version
+    import com.wavesplatform.account.AddressScheme
+
+    def chainIdString: String =
+      if (Character.isAlphabetic(AddressScheme.current.chainId)) AddressScheme.current.chainId.toChar.toString
+      else s"#${AddressScheme.current.chainId}"
+
+    val json = Json.parse(ByteStreams.toByteArray(getClass.getClassLoader.getResourceAsStream("swagger-ui/swagger.json"))).as[JsObject]
+    val patchedInfo = (json \ "info").as[JsObject] ++ Json.obj(
+      "version" -> Version.VersionString,
+      "title"   -> s"Waves Full Node ($chainIdString)"
+    )
+    json ++ Json.obj("info" -> patchedInfo)
   }
 }
