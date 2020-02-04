@@ -15,6 +15,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -32,6 +33,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
@@ -542,10 +544,10 @@ class UtxPoolSpecification
           pessimisticAssetIds shouldBe empty
       }
 
-      "takes into account added txs" in forAll(for (pc <- withValidPaymentsNotAdded; verify <- Gen.choose(0, 1).map(_ == 1)) yield (pc, verify)) {
-        case ((sender, _, utxPool, txs, _, _), verify) =>
+      "takes into account added txs" in forAll(withValidPaymentsNotAdded) {
+        case (sender, _, utxPool, txs, _, _) =>
           val emptyPf = utxPool.pessimisticPortfolio(sender)
-          all(txs.map(utxPool.putIfNew(_, verify).resultE)) shouldBe 'right
+          all(txs.map(utxPool.putIfNew(_).resultE)) shouldBe 'right
           utxPool.pessimisticPortfolio(sender) should not be emptyPf
       }
 
@@ -760,7 +762,7 @@ class UtxPoolSpecification
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
           utx.putIfNew(tx1).resultE shouldBe 'right
           val minedTxs = scripted ++ nonScripted
-          utx.addAndCleanup(minedTxs, priority = true)
+          utx.addAndCleanup(minedTxs)
 
           utx
             .packUnconfirmed(
@@ -788,8 +790,8 @@ class UtxPoolSpecification
 
           val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool)
           utx.removeAll(expectedTxs2)
-          utx.addAndCleanup(left, priority = false)
-          utx.addAndCleanup(expectedTxs1, priority = true)
+          all(left.map(utx.putIfNew(_).resultE)) shouldBe 'right
+          utx.addAndCleanup(expectedTxs1)
           utx.all shouldBe expectedTxs2
           assertPortfolios(utx, expectedTxs2)
 
@@ -800,6 +802,7 @@ class UtxPoolSpecification
       }
 
       val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
+      val putNewTx                = PrivateMethod[TracedResult[ValidationError, Boolean]]('putNewTx)
 
       "removes priority transactions from ordinary pool on pack" in forAll(gen) {
         case (_, nonScripted, scripted) =>
@@ -813,7 +816,7 @@ class UtxPoolSpecification
               enablePriorityPool = true
             )
 
-          utx.addAndCleanup(nonScripted, priority = true)
+          utx.addAndCleanup(nonScripted)
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe 'right
           utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(nonScripted)
@@ -832,7 +835,7 @@ class UtxPoolSpecification
               enablePriorityPool = false
             )
 
-          utx.addAndCleanup(nonScripted, priority = true)
+          utx.addAndCleanup(nonScripted)
           all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
           val expectedTxs = nonScripted.sorted(TransactionsOrdering.InUTXPool)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
@@ -854,8 +857,8 @@ class UtxPoolSpecification
 
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
-          utx.addAndCleanup(Seq(tx1), priority = true)
-          utx.addAndCleanup(Seq(tx2), priority = false)
+          utx.addAndCleanup(Seq(tx1))
+          utx.invokePrivate(putNewTx(tx2, false)).resultE shouldBe 'right
           utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
           utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(tx1 :: tx2 :: Nil)
       }
@@ -867,7 +870,7 @@ class UtxPoolSpecification
 
           val utx =
             new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
-          utx.addAndCleanup(Seq(tx1, tx2), priority = true)
+          utx.addAndCleanup(Seq(tx1, tx2))
 
           eventually(Timeout(5 seconds), Interval(50 millis))(utx.all shouldBe empty)
       }
@@ -906,11 +909,11 @@ class UtxPoolSpecification
         case (genBlock, (block1, mbs1), (block2, mbs2), block3, block4) =>
           withDomain(settingsWithNG) { d =>
             implicit val scheduler = Scheduler.singleThread("ext-appender")
-            val blockchain        = d.blockchainUpdater
+            val blockchain         = d.blockchainUpdater
             val utx =
               new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
 
-            val pos    = stub[PoSSelector]
+            val pos = stub[PoSSelector]
             (pos.validateBaseTarget _).when(*, *, *, *).returning(Right((): Unit))
             (pos.validateBlockDelay _).when(*, *, *, *).returning(Right((): Unit))
             (pos.validateGeneratorSignature _).when(*, *).returning(Right((): Unit))

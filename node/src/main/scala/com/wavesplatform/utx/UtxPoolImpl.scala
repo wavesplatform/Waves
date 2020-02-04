@@ -60,12 +60,12 @@ class UtxPoolImpl(
   private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
   private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
 
-  override def putIfNew(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
     if (transactions.containsKey(tx.id()) || priorityTransactions.contains(tx.id())) TracedResult.wrapValue(false)
-    else putNewTx(tx, verify)
+    else putNewTx(tx, verify = true)
   }
 
-  private def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
+  private[this] def putNewTx(tx: Transaction, verify: Boolean): TracedResult[ValidationError, Boolean] = {
     PoolMetrics.putRequestStats.increment()
 
     val checks = if (verify) PoolMetrics.putTimeStats.measure {
@@ -168,41 +168,39 @@ class UtxPoolImpl(
     removeIds(ids)
   }
 
-  private[this] def removeFromBothPools(txId: ByteStr): Unit = synchronized {
+  private[this] def removeFromBothPools(txId: ByteStr): Unit = priorityTransactions.synchronized {
     val removedFromPriority = priorityTransactions.remove(txId)
     removedFromPriority.foreach(PoolMetrics.removeTransactionPriority)
     removeFromOrdPool(txId)
   }
 
-  private[this] def removeFromOrdPool(txId: ByteStr): Unit = synchronized {
-    for (tx <- Option(transactions.remove(txId))) {
-      PoolMetrics.removeTransaction(tx)
-      if (!priorityTransactions.contains(txId)) pessimisticPortfolios.remove(txId)
-    }
+  private[this] def removeFromOrdPool(txId: ByteStr): Unit = priorityTransactions.synchronized {
+    for (tx <- Option(transactions.remove(txId))) PoolMetrics.removeTransaction(tx)
+    if (!priorityTransactions.contains(txId)) pessimisticPortfolios.remove(txId)
   }
 
-  private[this] def removeIds(removed: Set[ByteStr]): Unit = synchronized {
+  private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityTransactions.synchronized {
     removed.foreach(removeFromBothPools)
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val isNew = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
-      .map { diff =>
-        pessimisticPortfolios.add(tx.id(), diff); true
-      }
+    val diffEi               = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), blockchain.height, verify)(blockchain, tx)
+    def addPortfolio(): Unit = diffEi.map(pessimisticPortfolios.add(tx.id(), _))
 
-    if (!verify || isNew.resultE.isRight) {
-      if (priority) synchronized {
+    if (!verify || diffEi.resultE.isRight) {
+      if (priority) priorityTransactions.synchronized {
         priorityTransactions += tx.id() -> tx
         PoolMetrics.addTransactionPriority(tx)
+        addPortfolio()
       } else
         transactions.computeIfAbsent(tx.id(), { _ =>
           PoolMetrics.addTransaction(tx)
+          addPortfolio()
           tx
         })
     }
 
-    isNew
+    diffEi.map(_ => true)
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
@@ -239,7 +237,9 @@ class UtxPoolImpl(
   case class TxEntry(tx: Transaction, priority: Boolean)
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
-    synchronized(priorityTransactions.values.map(TxEntry(_, priority = true)).toVector) ++ nonPriorityTransactions.map(TxEntry(_, priority = false))
+    priorityTransactions.synchronized(priorityTransactions.values.map(TxEntry(_, priority = true)).toVector) ++ nonPriorityTransactions.map(
+      TxEntry(_, priority = false)
+    )
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
@@ -390,11 +390,10 @@ class UtxPoolImpl(
   }
 
   /** DOES NOT verify transactions */
-  def addAndCleanup(transactions: Seq[Transaction], priority: Boolean): Unit = synchronized {
+  def addAndCleanup(transactions: Seq[Transaction]): Unit = priorityTransactions.synchronized {
     transactions.foreach { tx =>
-      val usePriorityPool = this.enablePriorityPool && priority
-      addTransaction(tx, verify = false, usePriorityPool)
-      if (usePriorityPool) removeFromOrdPool(tx.id())
+      addTransaction(tx, verify = false, this.enablePriorityPool)
+      if (this.enablePriorityPool) removeFromOrdPool(tx.id())
     }
     TxCleanup.runCleanupAsync()
   }

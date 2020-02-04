@@ -120,7 +120,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, enablePriorityPool = settings.minerSettings.enable)
+    val utxStorage =
+      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, enablePriorityPool = settings.minerSettings.enable)
     maybeUtx = Some(utxStorage)
 
     val knownInvalidBlocks = new InvalidBlockStorageImpl(settings.synchronizationSettings.invalidBlocksStorage)
@@ -200,7 +201,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     rxExtensionLoaderShutdown = Some(sh)
 
     val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
-    val timer = new HashedWheelTimer()
+    val timer                 = new HashedWheelTimer()
     val utxSynchronizerScheduler =
       Schedulers.timeBoundedFixedPool(
         timer,
@@ -309,7 +310,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
               .map {
                 case Right(discardedBlocks) =>
                   allChannels.broadcast(LocalScoreChanged(blockchainUpdater.score))
-                  if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData), priority = false)
+                  if (returnTxsToUtx) utxStorage.addAndCleanup(discardedBlocks.view.flatMap(_.transactionData))
                   miner.scheduleMining()
                   Right(())
                 case Left(error) => Left(error)
