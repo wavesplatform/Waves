@@ -130,11 +130,11 @@ object BlockStats {
     measurement(Type.Micro)
       .tag("id", id(m.totalResBlockSig))
 
-  private def measurement(t: Type): Point.Builder = Point.measurement("block").tag("type", t.toString)
+  private def measurement(t: Type): Point.Builder =
+    Point.measurement("block").tag("type", t.toString)
 
-  private def nodeName(ch: Channel): String = {
-    Option(ch.attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
-  }
+  private def nodeName(ch: Channel): String =
+    if (ch == null) "???" else Option(ch.attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
 
   private def id(x: ByteStr): String = x.toString.take(StringIdLength)
 

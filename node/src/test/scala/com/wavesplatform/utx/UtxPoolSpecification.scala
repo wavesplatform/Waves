@@ -9,35 +9,44 @@ import com.wavesplatform.account.{Address, KeyPair, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
 import com.wavesplatform.database.openDB
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilerContext, ExpressionCompiler}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.mining._
+import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase}
 import com.wavesplatform.settings._
 import com.wavesplatform.state._
+import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
 import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
+import monix.execution.Scheduler
 import monix.reactive.subjects.Subject
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
 import org.scalamock.scalatest.MockFactory
-import org.scalatest.{FreeSpec, Matchers}
+import org.scalatest.concurrent.Eventually
+import org.scalatest.concurrent.PatienceConfiguration.{Interval, Timeout}
+import org.scalatest.{FreeSpec, Matchers, PrivateMethodTester}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.concurrent.duration._
@@ -65,7 +74,9 @@ class UtxPoolSpecification
     with TransactionGen
     with NoShrink
     with BlocksTransactionsHelpers
-    with WithDomain {
+    with WithDomain
+    with PrivateMethodTester
+    with Eventually {
   val PoolDefaultMaxBytes = 50 * 1024 * 1024 // 50 MB
 
   import FeeValidation.{ScriptExtraFee => extraFee}
@@ -105,11 +116,26 @@ class UtxPoolSpecification
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferTransaction")
 
+  private def transferV2(sender: KeyPair, maxAmount: Long, time: Time) =
+    (for {
+      amount    <- chooseNum(1, (maxAmount * 0.9).toLong)
+      recipient <- accountGen
+      fee       <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
+    } yield TransferTransactionV2.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
+      .label("transferTransactionV2")
+
   private def transferWithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
     (for {
       amount <- chooseNum(1, (maxAmount * 0.9).toLong)
       fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
     } yield TransferTransactionV1.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
+      .label("transferWithRecipient")
+
+  private def transferV2WithRecipient(sender: KeyPair, recipient: PublicKey, maxAmount: Long, time: Time) =
+    (for {
+      amount <- chooseNum(1, (maxAmount * 0.9).toLong)
+      fee    <- chooseNum(extraFee, (maxAmount * 0.1).toLong)
+    } yield TransferTransactionV2.selfSigned(Waves, sender, recipient, amount, time.getTimestamp(), Waves, fee, Array.empty[Byte]).explicitGet())
       .label("transferWithRecipient")
 
   private def massTransferWithRecipients(sender: KeyPair, recipients: List[PublicKey], maxAmount: Long, time: Time) = {
@@ -150,7 +176,8 @@ class UtxPoolSpecification
         time,
         bcu,
         ignoreSpendableBalanceChanged,
-        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false),
+        enablePriorityPool = true
       )
     val amountPart = (senderBalance - fee) / 2 - fee
     val txs        = for (_ <- 1 to n) yield createWavesTransfer(sender, recipient, amountPart, fee, time.getTimestamp()).explicitGet()
@@ -166,7 +193,8 @@ class UtxPoolSpecification
             time,
             bcu,
             ignoreSpendableBalanceChanged,
-            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+            UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false),
+            enablePriorityPool = true
           )
         (sender, bcu, utxPool)
     }
@@ -180,7 +208,7 @@ class UtxPoolSpecification
   } yield {
     val settings =
       UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
     txs.foreach(utxPool.putIfNew(_))
     (sender, bcu, utxPool, time, settings)
   }).label("withValidPayments")
@@ -193,7 +221,7 @@ class UtxPoolSpecification
   } yield {
     val settings =
       UtxSettings(txs.size, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
     (sender, bcu, utxPool, txs, time, settings)
   }).label("withValidPayments")
 
@@ -213,7 +241,7 @@ class UtxPoolSpecification
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false
       )
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
     (sender, utxPool, txs)
   }).label("withBlacklisted")
 
@@ -233,7 +261,7 @@ class UtxPoolSpecification
         allowTransactionsFromSmartAccounts = true,
         allowSkipChecks = false
       )
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
     (sender, utxPool, txs)
   }).label("withBlacklistedAndAllowedByRule")
 
@@ -256,7 +284,7 @@ class UtxPoolSpecification
           allowTransactionsFromSmartAccounts = true,
           allowSkipChecks = false
         )
-      val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings)
+      val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
       (sender, utxPool, txs)
     }).label("massTransferWithBlacklisted")
 
@@ -266,7 +294,7 @@ class UtxPoolSpecification
         val time = new TestTime()
 
         forAll(listOfN(count, transfer(sender, senderBalance / 2, time))) { txs =>
-          val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings)
+          val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings, enablePriorityPool = true)
           f(txs, utx, time)
         }
     }
@@ -284,7 +312,8 @@ class UtxPoolSpecification
         time,
         bcu,
         ignoreSpendableBalanceChanged,
-        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false),
+        enablePriorityPool = true
       )
       (utx, time, tx1, tx2)
     }
@@ -318,7 +347,8 @@ class UtxPoolSpecification
         new TestTime(),
         bcu,
         ignoreSpendableBalanceChanged,
-        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false)
+        UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = scEnabled, allowSkipChecks = false),
+        enablePriorityPool = true
       )
 
       (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.timestamp))
@@ -361,7 +391,7 @@ class UtxPoolSpecification
             case ((headTransaction, vipTransaction), allowSkipChecks) =>
               val utxSettings =
                 UtxSettings(1, 152, 1, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = allowSkipChecks == 1)
-              val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings)
+              val utx = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, utxSettings, enablePriorityPool = true)
 
               utx.putIfNew(headTransaction).resultE shouldBe 'right
               utx.putIfNew(vipTransaction).resultE shouldBe (if (allowSkipChecks == 1) 'right else 'left)
@@ -452,7 +482,8 @@ class UtxPoolSpecification
           ntpTime,
           d.blockchainUpdater,
           ignoreSpendableBalanceChanged,
-          UtxSettings(9999999, PoolDefaultMaxBytes, 999999, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
+          UtxSettings(9999999, PoolDefaultMaxBytes, 999999, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false),
+          enablePriorityPool = true
         )
         all((scripted ++ unscripted).map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
 
@@ -513,10 +544,10 @@ class UtxPoolSpecification
           pessimisticAssetIds shouldBe empty
       }
 
-      "takes into account added txs" in forAll(for (pc <- withValidPaymentsNotAdded; verify <- Gen.choose(0, 1).map(_ == 1)) yield (pc, verify)) {
-        case ((sender, _, utxPool, txs, _, _), verify) =>
+      "takes into account added txs" in forAll(withValidPaymentsNotAdded) {
+        case (sender, _, utxPool, txs, _, _) =>
           val emptyPf = utxPool.pessimisticPortfolio(sender)
-          all(txs.map(utxPool.putIfNew(_, verify).resultE)) shouldBe 'right
+          all(txs.map(utxPool.putIfNew(_).resultE)) shouldBe 'right
           utxPool.pessimisticPortfolio(sender) should not be emptyPf
       }
 
@@ -622,7 +653,7 @@ class UtxPoolSpecification
               }
             val settings =
               UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
-            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource())
+            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource(), true)
 
             utxPool.putIfNew(transfer).resultE.explicitGet()
             val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)
@@ -647,7 +678,8 @@ class UtxPoolSpecification
             (blockchain.height _).when().returning(1)
             (blockchain.activatedFeatures _).when().returning(Map.empty)
 
-            val utx = new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings)
+            val utx =
+              new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
             (blockchain.balance _).when(*, *).returning(ENOUGH_AMT).repeat((rest.length + 1) * 2)
 
             (blockchain.balance _)
@@ -670,6 +702,254 @@ class UtxPoolSpecification
             }
             utx.all shouldBe Seq(tx1)
         }
+      }
+    }
+
+    "priority pool" - {
+      val Right((testScript, testScriptComplexity)) = ScriptCompiler.compile(
+        """
+          |{-# STDLIB_VERSION 2 #-}
+          |{-# CONTENT_TYPE EXPRESSION #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |true
+          |""".stripMargin,
+        ScriptEstimatorV1
+      )
+
+      def assertPortfolios(utx: UtxPool, transactions: Seq[TransferTransactionV2]): Unit = {
+        val portfolios = transactions.groupBy(_.sender.toAddress).map {
+          case (addr, transactions) =>
+            val amt = transactions.map(tx => -(tx.amount + tx.fee)).sum
+            (addr, amt)
+        }
+        portfolios.foreach {
+          case (addr, balance) =>
+            val pf = utx.pessimisticPortfolio(addr)
+            pf.balance shouldBe balance
+        }
+      }
+
+      val gen = for {
+        acc         <- accountGen
+        acc1        <- accountGen
+        acc2        <- accountGen
+        tx1         <- transferV2(acc, ENOUGH_AMT / 3, ntpTime)
+        nonScripted <- Gen.nonEmptyListOf(transferV2(acc1, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+        scripted    <- Gen.nonEmptyListOf(transferV2(acc2, 10000000L, ntpTime).suchThat(_.fee < tx1.fee))
+      } yield (tx1, nonScripted, scripted)
+
+      def createState(scripted: Address, settings: WavesSettings = WavesSettings.default(), setBalance: Boolean = true): Blockchain = {
+        val blockchain = stub[Blockchain]
+        (blockchain.settings _).when().returning(settings.blockchainSettings)
+        (blockchain.height _).when().returning(1)
+        (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.SmartAccounts.id -> 0))
+
+        if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
+        (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
+
+        (blockchain.accountScriptWithComplexity _).when(scripted).returning(Some(testScript -> testScriptComplexity))
+        (blockchain.hasScript _).when(scripted).returning(true)
+        (blockchain.accountScriptWithComplexity _).when(*).returning(None)
+        (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+        (blockchain.transactionHeight _).when(*).returning(None)
+        blockchain
+      }
+
+      "preserves correct order of transactions" in forAll(gen) {
+        case (tx1, nonScripted, scripted) =>
+          val blockchain = createState(scripted.head.sender)
+          val utx =
+            new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+          utx.putIfNew(tx1).resultE shouldBe 'right
+          val minedTxs = scripted ++ nonScripted
+          utx.addAndCleanup(minedTxs)
+
+          utx
+            .packUnconfirmed(
+              MultiDimensionalMiningConstraint(NonEmptyList.of(OneDimensionalMiningConstraint(1, TxEstimators.one, ""))),
+              Duration.Inf
+            )
+            ._1 shouldBe Some(minedTxs.head +: Nil)
+          val expectedTxs = minedTxs :+ tx1
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
+          utx.all shouldBe expectedTxs
+          assertPortfolios(utx, expectedTxs)
+
+          val (left, right) = {
+            val (left, right) = minedTxs.zipWithIndex.partition(kv => kv._2 % 2 == 0)
+            (left.map(_._1), right.map(_._1))
+          }
+
+          utx.removeAll(left)
+          val expectedTxs1 = right :+ tx1
+          assertPortfolios(utx, expectedTxs1)
+          all(right.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs1)
+          utx.all shouldBe expectedTxs1
+          assertPortfolios(utx, expectedTxs1)
+
+          val expectedTxs2 = expectedTxs1 ++ left.sorted(TransactionsOrdering.InUTXPool)
+          utx.removeAll(expectedTxs2)
+          all(left.map(utx.putIfNew(_).resultE)) shouldBe 'right
+          utx.addAndCleanup(expectedTxs1)
+          utx.all shouldBe expectedTxs2
+          assertPortfolios(utx, expectedTxs2)
+
+          utx.removeAll(expectedTxs2)
+          utx.all shouldBe empty
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe empty
+          all(expectedTxs2.map(tx => utx.pessimisticPortfolio(tx.sender))) shouldBe empty
+      }
+
+      val nonPriorityTransactions = PrivateMethod[Seq[Transaction]]('nonPriorityTransactions)
+      val putNewTx                = PrivateMethod[TracedResult[ValidationError, Boolean]]('putNewTx)
+
+      "removes priority transactions from ordinary pool on pack" in forAll(gen) {
+        case (_, nonScripted, scripted) =>
+          val blockchain = createState(scripted.head.sender)
+          val utx =
+            new UtxPoolImpl(
+              ntpTime,
+              blockchain,
+              ignoreSpendableBalanceChanged,
+              WavesSettings.default().utxSettings,
+              enablePriorityPool = true
+            )
+
+          utx.addAndCleanup(nonScripted)
+          all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe 'right
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(nonScripted)
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe empty
+      }
+
+      "disables priority pool when miner disabled" in forAll(gen) {
+        case (_, nonScripted, scripted) =>
+          val blockchain = createState(scripted.head.sender)
+          val utx =
+            new UtxPoolImpl(
+              ntpTime,
+              blockchain,
+              ignoreSpendableBalanceChanged,
+              WavesSettings.default().utxSettings,
+              enablePriorityPool = false
+            )
+
+          utx.addAndCleanup(nonScripted)
+          all(nonScripted.map(utx.putIfNew(_).resultE)) shouldBe Right(false)
+          val expectedTxs = nonScripted.sorted(TransactionsOrdering.InUTXPool)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs)
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe expectedTxs
+      }
+
+      val genDependent = for {
+        acc  <- accountGen
+        acc1 <- accountGen
+        tx1  <- transferV2WithRecipient(acc, acc1, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount > 20000000L)
+        tx2  <- transferV2(acc1, 10000000L, ntpTime)
+      } yield (tx1, tx2)
+
+      "takes into account priority txs when pack" in forAll(genDependent) {
+        case (tx1, tx2) =>
+          val blockchain = createState(tx1.sender, setBalance = false)
+          (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
+          (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0) // Should be overriden in composite blockchain
+
+          val utx =
+            new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+          utx.addAndCleanup(Seq(tx1))
+          utx.invokePrivate(putNewTx(tx2, false)).resultE shouldBe 'right
+          utx.invokePrivate(nonPriorityTransactions()) shouldBe Seq(tx2)
+          utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(tx1 :: tx2 :: Nil)
+      }
+
+      "runs cleanup on priority pool" in forAll(genDependent) {
+        case (tx1, tx2) =>
+          val blockchain = createState(tx1.sender, setBalance = false)
+          (blockchain.balance _).when(*, *).returning(0) // All invalid
+
+          val utx =
+            new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+          utx.addAndCleanup(Seq(tx1, tx2))
+
+          eventually(Timeout(5 seconds), Interval(50 millis))(utx.all shouldBe empty)
+      }
+
+      val genChain = for {
+        acc <- accountGen
+        genesis  = GenesisTransaction.create(acc, ENOUGH_AMT, ntpTime.correctedTime()).explicitGet()
+        genBlock = TestBlock.create(Seq(genesis))
+        txs1 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
+        (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(
+          genBlock.uniqueId,
+          Nil,
+          Seq(Nil, txs1),
+          acc,
+          Block.NgBlockVersion,
+          ntpTime.correctedTime()
+        )
+        txs2 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
+        txs4 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
+        (block2, mbs2) = UnsafeBlocks.unsafeChainBaseAndMicro(
+          mbs1.head.totalResBlockSig,
+          Nil,
+          Seq(txs2, txs4),
+          acc,
+          Block.NgBlockVersion,
+          ntpTime.correctedTime()
+        )
+        txs3 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
+        block3 = UnsafeBlocks.unsafeBlock(mbs2.last.totalResBlockSig, txs3, acc, Block.NgBlockVersion, ntpTime.correctedTime())
+        block4 = UnsafeBlocks.unsafeBlock(genBlock.uniqueId, txs4, acc, Block.NgBlockVersion, ntpTime.correctedTime())
+      } yield (genBlock, (block1, mbs1), (block2, mbs2), block3, block4)
+
+      val settingsWithNG = wavesplatform.history.settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)
+
+      "applies chains correctly" in forAll(genChain) {
+        case (genBlock, (block1, mbs1), (block2, mbs2), block3, block4) =>
+          withDomain(settingsWithNG) { d =>
+            implicit val scheduler = Scheduler.singleThread("ext-appender")
+            val blockchain         = d.blockchainUpdater
+            val utx =
+              new UtxPoolImpl(ntpTime, blockchain, ignoreSpendableBalanceChanged, WavesSettings.default().utxSettings, enablePriorityPool = true)
+
+            val pos = stub[PoSSelector]
+            (pos.validateBaseTarget _).when(*, *, *, *).returning(Right((): Unit))
+            (pos.validateBlockDelay _).when(*, *, *, *).returning(Right((): Unit))
+            (pos.validateGeneratorSignature _).when(*, *).returning(Right((): Unit))
+
+            val extAppender = ExtensionAppender(
+              blockchain,
+              utx,
+              pos,
+              ntpTime,
+              stub[InvalidBlockStorage],
+              stub[PeerDatabase],
+              stub[Miner],
+              scheduler
+            )(null, _)
+
+            val microBlockAppender = MicroblockAppender(blockchain, utx, scheduler) _
+
+            d.appendBlock(genBlock) shouldBe Some(Nil)
+            d.appendBlock(block1) shouldBe Some(Nil)
+            all(mbs1.map(microBlockAppender(_).runSyncUnsafe())) shouldBe 'right
+
+            all(mbs2.head.transactionData.map(utx.putIfNew(_).resultE)) shouldBe 'right
+            extAppender(Seq(block2)).runSyncUnsafe() shouldBe 'right
+            val expectedTxs1 = mbs1.last.transactionData ++ mbs2.head.transactionData.sorted(TransactionsOrdering.InUTXPool)
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs1)
+
+            all(mbs2.map(microBlockAppender(_).runSyncUnsafe())) shouldBe 'right
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1.last.transactionData)
+
+            extAppender(Seq(block3)).runSyncUnsafe() shouldBe 'right
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(mbs1.last.transactionData)
+
+            extAppender(Seq(block4)).runSyncUnsafe() shouldBe 'right
+            val expectedTxs2 = mbs1.flatMap(_.transactionData) ++ mbs2.head.transactionData ++ block3.transactionData
+            utx.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)._1 shouldBe Some(expectedTxs2)
+          }
       }
     }
   }

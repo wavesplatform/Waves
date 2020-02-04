@@ -5,7 +5,7 @@ import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 import org.scalatest.{FlatSpec, Matchers}
 
-class UTXSettingsSpecification extends FlatSpec with Matchers {
+class UtxSettingsSpecification extends FlatSpec with Matchers {
   "UTXSettings" should "read values" in {
     val config = ConfigFactory.parseString("""waves {
         |  utx {
