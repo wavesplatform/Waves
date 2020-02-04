@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.{Id, Show}
 import cats.implicits._
+import cats.{Id, Show}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.CompilationError._
@@ -93,31 +93,40 @@ object ExpressionCompiler {
 
   def compileExprWithCtx(expr: Expressions.EXPR, saveExprContext: Boolean = false): CompileM[CompilationStepResultExpr] = {
     get[Id, CompilerContext, CompilationError].flatMap { ctx =>
-      // TODO MAP ERROR TO RESULT
       def adjustByteStr(expr: Expressions.CONST_BYTESTR, b: ByteStr) =
         CONST_BYTESTR(b)
           .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
           .map(CompilationStepResultExpr(ctx, _, BYTESTR, expr))
+          .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
 
-      // TODO MAP ERROR TO RESULT
-      def adjustStr(expr: Expressions.CONST_STRING, str: String) =
+      def adjustStr(expr: Expressions.CONST_STRING, str: String): Either[CompilationError, CompilationStepResultExpr] =
         CONST_STRING(str)
           .leftMap(CompilationError.Generic(expr.position.start, expr.position.end, _))
           .map(CompilationStepResultExpr(ctx, _, STRING, expr))
+          .recover { case err => CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, expr, List(err)) }
 
       expr match {
-        case x: Expressions.CONST_LONG                      => CompilationStepResultExpr(ctx, CONST_LONG(x.value): EXPR, LONG: FINAL, x: Expressions.EXPR).pure[CompileM]
-        case x: Expressions.CONST_BYTESTR                   => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
-        case x: Expressions.CONST_STRING                    => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
-        case x: Expressions.TRUE                            => CompilationStepResultExpr(ctx, TRUE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
-        case x: Expressions.FALSE                           => CompilationStepResultExpr(ctx, FALSE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.CONST_LONG    => CompilationStepResultExpr(ctx, CONST_LONG(x.value): EXPR, LONG: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.CONST_BYTESTR => handlePart(x.value).flatMap(b => liftEither(adjustByteStr(x, b)))
+        case x: Expressions.CONST_STRING  => handlePart(x.value).flatMap(s => liftEither(adjustStr(x, s)))
+        case x: Expressions.TRUE          => CompilationStepResultExpr(ctx, TRUE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
+        case x: Expressions.FALSE         => CompilationStepResultExpr(ctx, FALSE: EXPR, BOOLEAN: FINAL, x: Expressions.EXPR).pure[CompileM]
+
+        case x: Expressions.INVALID =>
+          CompilationStepResultExpr(
+            ctx,
+            FAILED_EXPR(): EXPR,
+            NOTHING,
+            x: Expressions.EXPR,
+            List(Generic(x.position.start, x.position.end, x.message))
+          ).pure[CompileM]
+
         case Expressions.GETTER(p, ref, field, _, _)        => compileGetter(p, field, ref, saveExprContext)
         case Expressions.BLOCK(p, dec, body, _, _)          => compileBlock(p, dec, body, saveExprContext)
         case Expressions.IF(p, cond, ifTrue, ifFalse, _, _) => compileIf(p, cond, ifTrue, ifFalse, saveExprContext)
         case Expressions.REF(p, key, _, _)                  => compileRef(p, key, saveExprContext)
         case Expressions.FUNCTION_CALL(p, name, args, _, _) => compileFunctionCall(p, name, args, saveExprContext)
         case Expressions.MATCH(p, ex, cases, _, _)          => compileMatch(p, ex, cases.toList, saveExprContext)
-        case Expressions.INVALID(p, message, _, _)          => raiseError(Generic(p.start, p.end, message))
         case Expressions.BINARY_OP(p, a, op, b, _, _) =>
           op match {
             case AND_OP => compileIf(p, a, b, Expressions.FALSE(p), saveExprContext)
@@ -128,7 +137,6 @@ object ExpressionCompiler {
     }
   }
 
-  // TODO check context
   private def compileIf(
       p: Pos,
       condExpr: Expressions.EXPR,
@@ -260,7 +268,11 @@ object ExpressionCompiler {
         p,
         Expressions.LET(p, PART.VALID(p, refTmpKey), expr, Seq.empty),
         ifCasesWithErr._1.getOrElse(
-          Expressions.INVALID(p, ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"), ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+          Expressions.INVALID(
+            p,
+            ifCasesWithErr._2.map(e => Show[CompilationError].show(e)).mkString_("\n"),
+            ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
+          )
         ),
         saveExprContext
       )
@@ -510,13 +522,18 @@ object ExpressionCompiler {
           }
       }).toCompileM.handleError()
 
-      errorList     = nameWithErr._2 ++ funcCallWithErr._2
-      argErrorList  = compiledArgs.flatMap(_.errors)
-      parseNodeExpr = Expressions.FUNCTION_CALL(p, namePart, compiledArgs.map(_.parseNodeExpr), ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+      errorList    = nameWithErr._2 ++ funcCallWithErr._2
+      argErrorList = compiledArgs.flatMap(_.errors)
+      parseNodeExpr = Expressions.FUNCTION_CALL(
+        p,
+        namePart,
+        compiledArgs.map(_.parseNodeExpr),
+        ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())
+      )
 
       result = if (errorList.isEmpty) {
         val (expr, t) = funcCallWithErr._1.get
-        CompilationStepResultExpr(ctx, expr, t, parseNodeExpr.copy(resultType = Some(t)), argErrorList)
+        CompilationStepResultExpr(ctx, expr, t, parseNodeExpr, argErrorList)
       } else {
         CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, parseNodeExpr, errorList ++ argErrorList)
       }
@@ -539,10 +556,16 @@ object ExpressionCompiler {
           ctx,
           REF(keyWithErr._1.get),
           typeWithErr._1.get,
-          Expressions.REF(p, keyPart, Some(typeWithErr._1.get), ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
+          Expressions.REF(p, keyPart, None, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext()))
         )
       } else {
-        CompilationStepResultExpr(ctx, FAILED_EXPR(), NOTHING, Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())), errorList)
+        CompilationStepResultExpr(
+          ctx,
+          FAILED_EXPR(),
+          NOTHING,
+          Expressions.REF(p, keyPart, ctxOpt = saveExprContext.toOption(ctx.getSimpleContext())),
+          errorList
+        )
       }
     } yield result
 

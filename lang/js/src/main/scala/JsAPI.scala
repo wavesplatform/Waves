@@ -114,9 +114,6 @@ object JsAPI {
     )
   }
 
-
-
-
   @JSExportTopLevel("parseAndCompile")
   def parseAndCompile(
       input: String,
@@ -177,12 +174,6 @@ object JsAPI {
           }
     }
   }
-
-
-
-
-
-
 
   @JSExportTopLevel("compile")
   def compile(
@@ -291,6 +282,5 @@ object JsAPI {
         )
       )
       .toJSPromise
-
-
+  
 }

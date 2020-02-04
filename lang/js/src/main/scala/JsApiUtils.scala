@@ -1,8 +1,8 @@
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
-import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext}
+import com.wavesplatform.lang.v1.compiler.CompilationError
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, LIST, NOTHING, TYPE, UNION}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL, LIST, NOTHING, TYPE, UNION}
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.{PART, Pos, Type}
 
@@ -65,11 +65,28 @@ package object JsApiUtils {
 
   def serExpr(expr: Expressions.EXPR): js.Object = {
 
+    def serType(t: FINAL): js.Object = {
+      t match {
+        case ut: UNION =>
+          jObj.applyDynamic("apply")(
+            "unionTypes" -> ut.typeList.map(serType(_)).toJSArray
+          )
+        case lt: LIST =>
+          jObj.applyDynamic("apply")(
+            "listOf" -> serType(lt.innerType)
+          )
+        case someT =>
+          jObj.applyDynamic("apply")(
+            "type" -> someT.toString()
+          )
+      }
+    }
+
     val commonDataObj = jObj.applyDynamic("apply")(
       "type"       -> expr.getName,
       "posStart"   -> expr.position.start,
       "posEnd"     -> expr.position.end,
-      "resultType" -> expr.resultType.getOrElse(NOTHING).toString,
+      "resultType" -> serType(expr.resultType.getOrElse(NOTHING)),
       "ctx"        -> serCtx(expr.ctxOpt.getOrElse(Map.empty))
     )
 
@@ -173,9 +190,9 @@ package object JsApiUtils {
   def serCtx(simpleCtx: Map[String, Pos]): js.Object = {
     simpleCtx.map { ctxEl =>
       jObj.applyDynamic("apply")(
-        "name" -> ctxEl._1,
-        "posStart"   -> ctxEl._2.start,
-        "posEnd"     -> ctxEl._2.end
+        "name"     -> ctxEl._1,
+        "posStart" -> ctxEl._2.start,
+        "posEnd"   -> ctxEl._2.end
       )
     }.toJSArray
   }

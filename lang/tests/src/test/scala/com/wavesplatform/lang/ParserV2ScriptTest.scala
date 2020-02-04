@@ -1219,7 +1219,7 @@ class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with
     )
   }
 
-  property("comments - getter - after dot") {
+  ignore("comments - getter - after dot") {
     val code =
       """x. # foo
                 |y""".stripMargin

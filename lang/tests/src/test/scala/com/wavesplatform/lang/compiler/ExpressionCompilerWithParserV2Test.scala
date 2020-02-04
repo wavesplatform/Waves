@@ -62,13 +62,13 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
                 FUNCTION_CALL(
                   AnyPos,
                   PART.VALID(AnyPos, "+"),
-                  List(REF(AnyPos, PART.VALID(AnyPos, "foo"), Some(LONG), None), REF(AnyPos, PART.VALID(AnyPos, "bar"), Some(LONG), None)),
-                  Some(LONG),
+                  List(REF(AnyPos, PART.VALID(AnyPos, "foo"), None, None), REF(AnyPos, PART.VALID(AnyPos, "bar"), None, None)),
+                  None,
                   None
                 ),
                 CONST_LONG(AnyPos, 123456, Some(LONG), None)
               ),
-              Some(BOOLEAN),
+              None,
               None
             ),
             TRUE(AnyPos, Some(BOOLEAN), None),
@@ -82,6 +82,35 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
         Some(BOOLEAN),
         None
       )
+  }
+
+  property("simple test 2") {
+    val script = """
+                   |{-# STDLIB_VERSION 3 #-}
+                   |{-# CONTENT_TYPE EXPRESSION #-}
+                   |{-# SCRIPT_TYPE ACCOUNT #-}
+                   |
+                   |#define public keys
+                   |let alicePubKey  = base58'5AzfA9UfpWVYiwFwvdr77k6LWupSTGLb14b24oVdEpMM'
+                   |let bobPubKey    = base58'2KwU4vzdgPmKyf7q354H9kSyX9NZjNiq4qbnH2wi2VDF'
+                   |let cooperPubKey = base58'GbrUeGaBfmyFJjSQb9Z8uTCej5GzjXfRDVGJGrmgt5cD'
+                   |
+                   |#check whoever provided the valid proof
+                   |let aliceSigned  = if(sigVerify(tx.bodyBytes, tx.proofs[0], alicePubKey  )) then 1 else 0
+                   |let bobSigned    = if(sigVerify(tx.bodyBytes, tx.proofs[1], bobPubKey    )) then 1 else 0
+                   |func cooperSigned() = if(sigVerify(tx.bodyBytes, tx.proofs[2], cooperPubKey))then 1 else 0
+                   |
+                   |let n = tx.bodyBytes
+                   |let a = sigVerify(tx.bodyBytes, tx.proofs[2], cooperPubKey)
+                   |
+                   |#sum up every valid proof to get at least 2
+                   |aliceSigned + bobSigned + cooperSigned() >= 2
+                   |
+                   |""".stripMargin
+
+    val result = compile(script, true)
+
+    result shouldBe 'right
   }
 
   /*property("simple test 2") {

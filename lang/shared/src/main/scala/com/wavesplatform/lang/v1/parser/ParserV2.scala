@@ -4,7 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.parser.Expressions._
 import com.wavesplatform.lang.v1.parser.UnaryOperation._
-import org.parboiled2._
+import org.parboiled2.{Rule1, _}
 
 import scala.collection.mutable
 
@@ -74,7 +74,7 @@ class ParserV2(val input: ParserInput) extends Parser {
     push(cursor) ~ AtomExpr ~ zeroOrMore(WS ~ MULT_GROUP_OP ~ WS ~ AtomExpr ~> BinaryOpWithExpr) ~ push(cursor) ~> parseBinaryOperationAtom _
   }
   def AtomExpr: Rule1[EXPR] = rule {
-    push(cursor) ~ optional(UNARY_OP) ~ WS ~ (Fold | GettableExpr | If | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _
+    push(cursor) ~ optional(UNARY_OP) ~ WS ~ (Fold | GettableExpr | IfWithError | Match | ConstAtom) ~ push(cursor) ~> parseAtomExpr _
   }
 
   def Fold: Rule1[EXPR] = rule {
@@ -84,7 +84,7 @@ class ParserV2(val input: ParserInput) extends Parser {
   }
 
   def GettableExpr: Rule1[EXPR] = rule {
-    (ParExpr | Block | FunctionCall | ReferenceAtom) ~ zeroOrMore(WS ~ (ListAccess | ("." ~ WS ~ (FunctionCallAccess | IdentifierAtomAccess)))) ~ push(
+    (ParExpr | Block | FunctionCall | ReferenceAtom) ~ zeroOrMore(WS ~ (ListAccess | ("." ~ WSO ~ (FunctionCallAccess | IdentifierAtomAccess)))) ~ push(
       cursor
     ) ~> parseGettableExpr _
   }
@@ -102,7 +102,9 @@ class ParserV2(val input: ParserInput) extends Parser {
     push(cursor) ~ "[" ~ WS ~ zeroOrMore(Expr).separatedBy(WS ~ "," ~ WS) ~ WS ~ "]" ~ push(cursor) ~> parseListAtom _
   } //~ optional(WS ~ ListAccess)
 
+  def IfWithError: Rule1[EXPR] = rule { If | FailedIfWithoutElse }
   def If: Rule1[EXPR] = rule { push(cursor) ~ "if" ~ WS ~ Expr ~ WS ~ "then" ~ WS ~ Expr ~ WS ~ "else" ~ WS ~ Expr ~ push(cursor) ~> parseIf _ }
+  def FailedIfWithoutElse: Rule1[EXPR] = rule { push(cursor) ~ "if" ~ WS ~ Expr ~ WS ~ "then" ~ WS ~ Expr ~ push(cursor) ~> parseFailedIf _ }
 
   def Match: Rule1[EXPR] = rule {
     push(cursor) ~ "match" ~ WS ~ Expr ~ WS ~ "{" ~ oneOrMore(WS ~ MatchCase) ~ WS ~ "}" ~ push(cursor) ~> parseMatch _
@@ -177,9 +179,10 @@ class ParserV2(val input: ParserInput) extends Parser {
   def Digits: Rule0            = rule { oneOrMore(CharPredicate.Digit) }
   def Digit: Rule0             = rule { CharPredicate.Digit }
 
-  def Comment: Rule0 = rule { "#" ~ noneOf("-") ~ noneOf("}") ~ zeroOrMore(noneOf("\n")) ~ "\n" }
+  def Comment: Rule0 = rule { "#" ~ noneOf("-") ~ noneOf("}") ~ zeroOrMore(noneOf("\n")) ~ ("\n" | EOI) }
   def WhiteSpace: Rule0 = rule { zeroOrMore(anyOf(" \n\r\t\f") | Comment) }
   def WS: Rule0         = WhiteSpace
+  def WSO: Rule0         = rule { zeroOrMore(" ") }
 
   def ReservedWords: Rule0 = rule { "let" | "base16" | "base58" | "base64" | "true" | "false" | "if" | "then" | "else" | "match" | "case" | "func" }
 
@@ -267,6 +270,10 @@ class ParserV2(val input: ParserInput) extends Parser {
 
   def parseIf(startPos: Int, cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, endPos: Int): EXPR = {
     IF(Pos(startPos, endPos), cond, ifTrue, ifFalse)
+  }
+
+  def parseFailedIf(startPos: Int, cond: EXPR, ifTrue: EXPR, endPos: Int): EXPR = {
+    INVALID(Pos(startPos, endPos), "Incomplete if-then-else statement.")
   }
 
   def parseMatch(startPos: Int, expr: EXPR, cases: Seq[MATCH_CASE], endPos: Int): EXPR = {
@@ -489,17 +496,22 @@ object ParserV2 {
       .flatMap {
         case ex: ParseError => {
           val errorLastPos = ex.position.index
-          //TODO remove debug code
-          //val tmpStr = (new ParserV2(source.toString())).formatError(ex, new ErrorFormatter(showTraces = true))
-          //println(tmpStr)
-          val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
-          val posList = Set(errorLastPos, lastRemovedCharPos)
-          if (lastRemovedCharPos > 0) {
+          val errorMsg = (new ParserV2(source.toString())).formatError(ex, new ErrorFormatter(showTraces = false))
+          if (errorMsg.contains("Unexpected end of input")) {
+            source.append("\nfalse")
             parseWithError(source, parse, defaultResult)
-              .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, posList ++ dAppAndErrorIndexes._2.toList))
+              .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, errorLastPos :: dAppAndErrorIndexes._2.toList))
           } else {
-            Right((defaultResult, posList))
+            val lastRemovedCharPos = clearChar(source, errorLastPos - 1)
+            val posList = Set(errorLastPos, lastRemovedCharPos)
+            if (lastRemovedCharPos > 0) {
+              parseWithError(source, parse, defaultResult)
+                .map(dAppAndErrorIndexes => (dAppAndErrorIndexes._1, posList ++ dAppAndErrorIndexes._2.toList))
+            } else {
+              Right((defaultResult, posList))
+            }
           }
+
         }
         case ex: Throwable => Left(ex)
       }
