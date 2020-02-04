@@ -234,7 +234,7 @@ class UtxPoolImpl(
     case _                                                         => Set.empty
   }
 
-  private[this] final case class TxEntry(tx: Transaction, priority: Boolean)
+  private[this] case class TxEntry(tx: Transaction, priority: Boolean)
 
   private[this] def createTxEntrySeq(): Seq[TxEntry] =
     priorityTransactions.synchronized(priorityTransactions.values.map(TxEntry(_, priority = true)).toVector) ++ nonPriorityTransactions.map(
