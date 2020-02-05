@@ -18,10 +18,10 @@ object PBRecipients {
     case Address.HashLength => // Compressed address
       val withHeader = Bytes.concat(Array(Address.AddressVersion, chainId), bytes)
       val checksum   = Address.calcCheckSum(withHeader)
-      Address.fromBytes(Bytes.concat(withHeader, checksum))
+      Address.fromBytes(Bytes.concat(withHeader, checksum), chainId)
 
     case Address.AddressLength => // Regular address
-      Address.fromBytes(bytes)
+      Address.fromBytes(bytes, chainId)
 
     case crypto.KeyLength => // Public key
       Right(PublicKey(bytes).toAddressWithChainId(chainId))

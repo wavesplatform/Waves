@@ -73,6 +73,9 @@ object Address extends ScorexLogging {
 
               (for {
                 _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
+                _ <- Either.cond(network == chainId,
+                                 (),
+                                 s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
                 checkSum          = addressBytes.takeRight(ChecksumLength)
                 checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
                 _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")

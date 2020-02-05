@@ -117,8 +117,10 @@ object CommonValidation {
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
+  def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: ChainId): Either[ValidationError, T] =
+    Either.cond(tx.chainByte == currentChainId, tx, GenericError(s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainByte}(${tx.chainByte.toChar})"))
 
+  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
         blockchain.isFeatureActivated(b, blockchain.height),
@@ -158,9 +160,6 @@ object CommonValidation {
     }
 
     tx match {
-      case _ if tx.chainByte != ChainId.current =>
-        Left(GenericError(s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainByte}(${tx.chainByte.toChar})"))
-
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 

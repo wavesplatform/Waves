@@ -53,11 +53,12 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       chainId <- invalidChainIdGen
-      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient.toAddressWithChainId(chainId))
+      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient.toAddressWithChainId(chainId)).suchThat(_.chainByte != ChainId.current)
     } yield (genesis, transfer)
 
     forAll(preconditionsAndPayment) {
       case (genesis, transfer) =>
+        transfer.chainByte should not be ChainId.current
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
           blockDiffEi should produce("Data from other network")
         }
@@ -69,7 +70,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       fee <- smallFeeGen
       chainId <- invalidChainIdGen
-      alias = CreateAliasTransaction.selfSigned(TxVersion.V1, master, Alias.createWithChainId("Test", chainId).explicitGet(), fee, ts).explicitGet()
+      alias = CreateAliasTransaction.selfSigned(TxVersion.V1, master, Alias.createWithChainId("test", chainId).explicitGet(), fee, ts).explicitGet()
     } yield (genesis, alias)
 
     forAll(preconditionsAndAlias) {
