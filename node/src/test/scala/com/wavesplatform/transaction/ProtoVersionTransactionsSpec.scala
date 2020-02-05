@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{AddressScheme, ChainId, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -20,8 +20,9 @@ import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransacti
 import com.wavesplatform.utils.StringBytes
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
+import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Matchers {
+class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Matchers with ScalaCheckDrivenPropertyChecks {
 
   val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   val DataTxFee: Long         = 15000000
@@ -51,8 +52,19 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val decimals    = 2.toByte
       val reissuable  = true
 
-      val issueTx = IssueTransaction(TxVersion.V3, Account, name.toByteString, description.toByteString, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty)
-        .signWith(Account)
+      val issueTx = IssueTransaction(
+        TxVersion.V3,
+        Account,
+        name.toByteString,
+        description.toByteString,
+        quantity,
+        decimals,
+        reissuable,
+        script = None,
+        MinIssueFee,
+        Now,
+        Proofs.empty
+      ).signWith(Account)
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
       val reissueTx = ReissueTransaction
@@ -131,7 +143,9 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val transferTx =
-        TransferTransaction.selfSigned(TxVersion.V3, Account, recipient, asset, 100, Asset.Waves, MinFee, Some(Attachment.Bin(attachment)), Now).explicitGet()
+        TransferTransaction
+          .selfSigned(TxVersion.V3, Account, recipient, asset, 100, Asset.Waves, MinFee, Some(Attachment.Bin(attachment)), Now)
+          .explicitGet()
 
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(transferTx)))
 
@@ -143,10 +157,16 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val attachment = genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get
 
       val massTransferTx =
-        MassTransferTransaction.selfSigned(TxVersion.V2, Account, Asset.Waves, transfers, MassTransferTxFee, Now, Some(Attachment.Bin(attachment))).explicitGet()
+        MassTransferTransaction
+          .selfSigned(TxVersion.V2, Account, Asset.Waves, transfers, MassTransferTxFee, Now, Some(Attachment.Bin(attachment)))
+          .explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(massTransferTx)))
 
       decode(base64Str) shouldBe massTransferTx
+
+      import com.wavesplatform.common.state.diffs.ProduceError._
+      val proto = PBTransactions.protobuf(massTransferTx).update(_.transaction.chainId := invalidChainIdGen.sample.get)
+      PBTransactions.vanilla(proto) should produce("One of chain ids not match")
     }
 
     "SetScriptTransaction" in {
@@ -175,6 +195,22 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val base64Str     = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(sponsorshipTx)))
 
       decode(base64Str) shouldBe sponsorshipTx
+    }
+
+    "ChainId" in forAll(randomTransactionGen, invalidChainIdGen) { (tx, randomByte) =>
+      val oldScheme = AddressScheme.current
+
+      val pbTransaction = PBTransactions.protobuf(tx)
+
+      AddressScheme.current = new AddressScheme {
+        override val chainId: ChainId = randomByte
+      }
+
+      val vanilla = PBTransactions.vanilla(pbTransaction).explicitGet()
+      vanilla.chainByte shouldBe tx.chainByte
+      vanilla shouldBe tx
+
+      AddressScheme.current = oldScheme
     }
 
     def decode(base64Str: String): Transaction = {

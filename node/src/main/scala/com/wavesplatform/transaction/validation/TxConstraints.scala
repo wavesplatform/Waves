@@ -4,7 +4,9 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.ChainId
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
@@ -69,6 +71,10 @@ object TxConstraints {
         _.validNel
       )
   }
+
+  def chainIds(ids: ChainId*): ValidatedV[ChainId] =
+    if (ids.distinct.length <= 1) Valid(ids.headOption.getOrElse(0: Byte))
+    else GenericError(s"One of chain ids not match: $ids").invalidNel
 
   // Transaction specific
   def transferAttachment(allowTyped: Boolean, attachment: Option[Attachment]): ValidatedV[Option[Attachment]] = {

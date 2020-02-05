@@ -2,7 +2,8 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import cats.implicits._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, ChainId}
+import com.wavesplatform.api.http.ApiError.InvalidChainId
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -157,6 +158,9 @@ object CommonValidation {
     }
 
     tx match {
+      case _ if tx.chainByte != ChainId.current =>
+        Left(GenericError(s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainByte}(${tx.chainByte.toChar})"))
+
       case _: PaymentTransaction => Right(tx)
       case _: GenesisTransaction => Right(tx)
 

@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.wavesplatform.account.{Alias, ChainId}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -13,12 +14,14 @@ import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+import scala.util.Random
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
 
@@ -39,6 +42,40 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
           blockDiffEi should produce("AlreadyInTheState")
+        }
+    }
+  }
+
+  property("disallows other network") {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransaction)] = for {
+      master    <- accountGen
+      recipient <- otherAccountGen(candidate = master)
+      ts        <- positiveIntGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      chainId <- invalidChainIdGen
+      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient.toAddressWithChainId(chainId))
+    } yield (genesis, transfer)
+
+    forAll(preconditionsAndPayment) {
+      case (genesis, transfer) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
+          blockDiffEi should produce("Data from other network")
+        }
+    }
+
+    val preconditionsAndAlias: Gen[(GenesisTransaction, CreateAliasTransaction)] = for {
+      master    <- accountGen
+      ts        <- positiveIntGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      fee <- smallFeeGen
+      chainId <- invalidChainIdGen
+      alias = CreateAliasTransaction.selfSigned(TxVersion.V1, master, Alias.createWithChainId("Test", chainId).explicitGet(), fee, ts).explicitGet()
+    } yield (genesis, alias)
+
+    forAll(preconditionsAndAlias) {
+      case (genesis, alias) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(alias))) { blockDiffEi =>
+          blockDiffEi should produce("Data from other network")
         }
     }
   }

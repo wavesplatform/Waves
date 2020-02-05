@@ -1,7 +1,7 @@
 package com.wavesplatform.api.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, PrivateKey, PublicKey}
+import com.wavesplatform.account._
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
@@ -13,31 +13,32 @@ import com.wavesplatform.{crypto, block => vb}
 //noinspection ScalaStyle
 trait PBImplicitConversions {
   implicit class VanillaTransactionConversions(tx: VanillaTransaction) {
-    def toPB = PBTransactions.protobuf(tx)
+    def toPB: PBSignedTransaction = PBTransactions.protobuf(tx)
   }
 
   implicit class PBSignedTransactionConversions(tx: PBSignedTransaction) {
-    def toVanilla = PBTransactions.vanilla(tx).explicitGet()
+    def toVanilla: VanillaTransaction = PBTransactions.vanilla(tx).explicitGet()
   }
 
   implicit class PBTransactionConversions(tx: PBTransaction) {
-    def toVanilla = PBSignedTransaction(Some(tx)).toVanilla
-    def sender    = PublicKey(tx.senderPublicKey.toByteArray)
+    def toVanilla: VanillaTransaction = PBSignedTransaction(Some(tx)).toVanilla
+    def sender: PublicKey             = PublicKey(tx.senderPublicKey.toByteArray)
 
     def signed(signer: PrivateKey): PBSignedTransaction = {
       import com.wavesplatform.common.utils._
       PBSignedTransaction(
         Some(tx),
-        Proofs.create(Seq(ByteStr(crypto.sign(signer, toVanilla.bodyBytes())))).explicitGet().map(bs => ByteString.copyFrom(bs.arr)))
+        Proofs.create(Seq(ByteStr(crypto.sign(signer, toVanilla.bodyBytes())))).explicitGet().map(bs => ByteString.copyFrom(bs.arr))
+      )
     }
   }
 
   implicit class VanillaBlockConversions(block: VanillaBlock) {
-    def toPB = PBBlocks.protobuf(block)
+    def toPB: PBBlock = PBBlocks.protobuf(block)
   }
 
   implicit class PBBlockConversions(block: PBBlock) {
-    def toVanilla = PBBlocks.vanilla(block).get
+    def toVanilla: VanillaBlock = PBBlocks.vanilla(block).get
   }
 
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
@@ -70,20 +71,21 @@ trait PBImplicitConversions {
   }
 
   implicit class PBRecipientConversions(r: Recipient) {
-    def toAddress        = PBRecipients.toAddress(r).explicitGet()
-    def toAlias          = PBRecipients.toAlias(r).explicitGet()
-    def toAddressOrAlias = PBRecipients.toAddressOrAlias(r).explicitGet()
+    def toAddress: Address               = PBRecipients.toAddress(r, ChainId.current).explicitGet()
+    def toAlias: Alias                   = PBRecipients.toAlias(r, ChainId.current).explicitGet()
+    def toAddressOrAlias: AddressOrAlias = PBRecipients.toAddressOrAlias(r, ChainId.current).explicitGet()
   }
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
-    def toPBByteString = ByteString.copyFrom(bytes.arr)
-    def toPublicKey    = PublicKey(bytes)
+    def toPBByteString: ByteString = ByteString.copyFrom(bytes.arr)
+    def toPublicKey: PublicKey     = PublicKey(bytes)
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
-    def toByteStr          = ByteStr(bytes.toByteArray)
-    def toPublicKey        = PublicKey(bytes.toByteArray)
-    def toAddress: Address = PBRecipients.toAddress(this.toByteStr).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
+    def toByteStr: ByteStr     = ByteStr(bytes.toByteArray)
+    def toPublicKey: PublicKey = PublicKey(bytes.toByteArray)
+    def toAddress: Address =
+      PBRecipients.toAddress(this.toByteStr, ChainId.current).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString

@@ -19,7 +19,8 @@ object KeyPair {
   }
 
   implicit class KeyPairImplicitOps(private val kp: KeyPair) extends AnyVal {
-    def toAddress: Address = PublicKey.toAddress(kp)
+    def toAddress: Address = kp.publicKey.toAddress
+    def toAddressWithChainId(chainId: ChainId): Address = kp.publicKey.toAddressWithChainId(chainId)
   }
 
   implicit def toPublicKey(kp: KeyPair): PublicKey   = kp.publicKey

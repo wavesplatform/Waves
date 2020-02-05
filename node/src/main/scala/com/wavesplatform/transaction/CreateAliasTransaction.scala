@@ -31,6 +31,8 @@ final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, a
     }
     crypto.fastHash(payload)
   }
+
+  override def chainByte: TxVersion = alias.chainId
 }
 
 object CreateAliasTransaction extends TransactionParser {

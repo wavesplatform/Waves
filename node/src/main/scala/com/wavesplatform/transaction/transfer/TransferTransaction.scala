@@ -44,6 +44,7 @@ case class TransferTransaction(
   }
 
   override def builder: TransactionParser = TransferTransaction
+  override def chainByte: TxVersion = recipient.chainId
 }
 
 object TransferTransaction extends TransactionParser {

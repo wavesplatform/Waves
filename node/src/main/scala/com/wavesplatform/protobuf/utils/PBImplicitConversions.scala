@@ -1,6 +1,6 @@
 package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{ChainId, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.Amount
@@ -19,9 +19,9 @@ object PBImplicitConversions {
   implicit def fromAddress(address: VAddress): PBByteString                  = PBByteString.copyFrom(address.bytes)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)
-    def toAlias: Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient)
-    def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient)
+    def toAddress(chainId: ChainId): Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient, chainId)
+    def toAlias(chainId: ChainId): Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient, chainId)
+    def toAddressOrAlias(chainId: ChainId): Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {

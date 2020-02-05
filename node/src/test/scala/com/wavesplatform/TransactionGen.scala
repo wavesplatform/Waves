@@ -955,6 +955,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       reissuable = if (forceReissuable) true else generatedReissuable
     } yield IssueTransaction(2.toByte, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .signWith(sender)
+
+  val invalidChainIdGen = Arbitrary.arbitrary[Byte].suchThat(_ != ChainId.current)
 }
 
 trait TransactionGen extends TransactionGenBase { _: Suite =>

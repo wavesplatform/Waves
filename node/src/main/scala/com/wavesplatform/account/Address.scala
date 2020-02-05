@@ -12,7 +12,6 @@ import com.wavesplatform.utils.{ScorexLogging, base58Length}
 import play.api.libs.json._
 
 sealed trait Address extends AddressOrAlias {
-  val bytes: ByteStr
   lazy val stringRepr: String = bytes.toString
 }
 
@@ -74,9 +73,6 @@ object Address extends ScorexLogging {
 
               (for {
                 _ <- Either.cond(version == AddressVersion, (), s"Unknown address version: $version")
-                _ <- Either.cond(network == chainId,
-                                 (),
-                                 s"Data from other network: expected: $chainId(${chainId.toChar}), actual: $network(${network.toChar})")
                 checkSum          = addressBytes.takeRight(ChecksumLength)
                 checkSumGenerated = calcCheckSum(addressBytes.dropRight(ChecksumLength))
                 _ <- Either.cond(java.util.Arrays.equals(checkSum, checkSumGenerated), (), s"Bad address checksum")
@@ -112,7 +108,9 @@ object Address extends ScorexLogging {
 
   // Optimization, should not be used externally
   private[wavesplatform] def createUnsafe(address: ByteStr): Address = {
-    final case class AddressImpl(bytes: ByteStr) extends Address
+    final case class AddressImpl(bytes: ByteStr) extends Address {
+      override def chainId: ChainId = bytes.arr(1)
+    }
     AddressImpl(address)
   }
 }

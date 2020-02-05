@@ -47,8 +47,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       ),
       checkAmounts(payments),
       V.fee(fee),
-      Try(checkLength)
-        .toEither
+      Try(checkLength).toEither
         .leftMap(err => GenericError(err.getMessage))
         .filterOrElse(identity, TooBigArray)
         .toValidatedNel
