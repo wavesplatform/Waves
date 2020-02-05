@@ -160,15 +160,19 @@ class BlockV5TestSuite
 
       all(headersBeforeV5.map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(h => ByteStr.decodeBase58(h.vrf.value).get.length)) shouldBe Block.HitSourceLength
 
       all(headersBeforeV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(h => ByteStr.decodeBase58(h.vrf.value).get.length)) shouldBe Block.HitSourceLength
 
       all(headersBeforeV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
 
       all(headersBeforeV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
 
       nodes
         .map(n => n.address)
@@ -178,15 +182,18 @@ class BlockV5TestSuite
           case (addressBlocksBeforeV5, addressBlocksAfterV5) =>
             all(addressBlocksBeforeV5.map(_.vrf)) shouldBe 'empty
             all(addressBlocksAfterV5.map(_.vrf)) shouldBe 'defined
+            all(addressBlocksAfterV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
         }
 
       nodes.head.lastBlock.vrf shouldBe 'defined
+      ByteStr.decodeBase58(nodes.head.lastBlock.vrf.value).get.length shouldBe Block.HitSourceLength
 
       val (blocksBeforeV5, blocksV5) =
         nodes.head.blockSeq(1, nodes.head.height).partition(b => b.height < ActivationHeight)
 
       all(blocksBeforeV5.map(_.vrf)) shouldBe 'empty
       all(blocksV5.map(_.vrf)) shouldBe 'defined
+      all(blocksV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
     }
   }
 }
