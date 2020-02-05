@@ -75,13 +75,13 @@ object ContractScript {
     for {
       cbf <- estimateComplexityByFunction(version, contract, estimator)
       max = cbf.maximumOption(_._2 compareTo _._2)
-      _   <- max.fold(().asRight[String])(m =>
-        Either.cond(
-          m._2 <= MaxComplexityByVersion(version),
-          (),
-          s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
-        )
-      )
+//      _   <- max.fold(().asRight[String])(m =>
+//        Either.cond(
+//          m._2 <= MaxComplexityByVersion(version),
+//          (),
+//          s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
+//        )
+//      )
     } yield (max.map(_._2).getOrElse(0L), cbf.toMap)
 
   private def constructExprFromFuncAndContext(dec: List[DECLARATION], annotationArgName: String, funcExpr: FUNC): EXPR = {

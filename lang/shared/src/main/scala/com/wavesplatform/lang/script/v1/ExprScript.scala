@@ -40,11 +40,11 @@ object ExprScript {
   ): Either[String, Long] =
     for {
       scriptComplexity <- estimator(varNames(version, Expression), functionCosts(version), expr)
-      _ <- Either.cond(
-        scriptComplexity <= MaxComplexityByVersion(version),
-        (),
-        s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}"
-      )
+//      _ <- Either.cond(
+//        scriptComplexity <= MaxComplexityByVersion(version),
+//        (),
+//        s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}"
+//      )
     } yield scriptComplexity
 
   private case class ExprScriptImpl(stdLibVersion: StdLibVersion, expr: EXPR) extends ExprScript {
