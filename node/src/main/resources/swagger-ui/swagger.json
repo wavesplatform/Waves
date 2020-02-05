@@ -4,7 +4,7 @@
     "description": "The Web Interface to the Waves Full Node API",
     "version": "???",
     "title": "Waves Full Node (???)",
-    "termsOfService": "https://wavesplatform.com/files/docs/Waves_terms_and_conditions.pdf",
+    "termsOfService": "",
     "license": {
       "name": "MIT License",
       "url": "https://github.com/wavesplatform/Waves/blob/master/LICENSE"
@@ -22,7 +22,7 @@
       "name": "peers"
     },
     {
-      "name": "rewards"
+      "name": "blockchain"
     },
     {
       "name": "transactions"
@@ -1513,7 +1513,7 @@
     "/blockchain/rewards": {
       "get": {
         "tags": [
-          "rewards"
+          "blockchain"
         ],
         "summary": "Current reward status",
         "description": "Get current miner’s reward status",
@@ -1533,7 +1533,7 @@
     "/blockchain/rewards/{height}": {
       "get": {
         "tags": [
-          "rewards"
+          "blockchain"
         ],
         "summary": "Reward status",
         "description": "Get miner’s reward status at height",
