@@ -26,6 +26,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
       case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
       case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
+      case BLOCK(_: FAILED_DEC, _)     => const(0)
       case REF(str)                    => markRef(str)
       case _: EVALUATED                => const(1L)
       case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
