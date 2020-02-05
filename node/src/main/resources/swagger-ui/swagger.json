@@ -1645,31 +1645,62 @@
           "200": {
             "description": "successful operation",
             "schema": {
+              "$ref": "#/definitions/TransactionStatus"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Transaction status",
+        "description": "Get a transaction status by its ID",
+        "operationId": "status_4",
+        "consumes": [
+          "application/json",
+          "application/x-www-form-urlencoded"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "body",
+            "description": "Transaction IDs",
+            "required": false,
+            "schema": {
               "type": "object",
-              "required": [
-                "id",
-                "status"
-              ],
               "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string",
-                  "enum": [
-                    "confirmed",
-                    "unconfirmed",
-                    "not_found"
-                  ]
-                },
-                "height": {
-                  "type": "integer",
-                  "format": "int32"
-                },
-                "confirmations": {
-                  "type": "integer",
-                  "format": "int32"
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
                 }
+              },
+              "required": [
+                "ids"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "formData",
+            "description": "Transaction IDs",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TransactionStatus"
               }
             }
           }
@@ -4712,6 +4743,34 @@
         "timestamp": 0,
         "version": 2,
         "...": "..."
+      }
+    },
+    "TransactionStatus": {
+      "type": "object",
+      "required": [
+        "id",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "unconfirmed",
+            "not_found"
+          ]
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmations": {
+          "type": "integer",
+          "format": "int32"
+        }
       }
     }
   }
