@@ -98,7 +98,7 @@ class RemoveEntrySuite extends BaseSuite {
       invokeScript(address, "delete", "nonexistent-key")
     }
 
-    "Could remove more 100 entries" in {
+    "Could remove 100 entries" in {
       val address = createDapp(script + deleteEntriesFunc.replaceAll("%s", "100"))
 
       miner.waitForTransaction((0 to 99).map(i => invokeScript(address, s"write", s"key-$i", "value", wait = false)).last)
