@@ -31,6 +31,7 @@ object ScriptEstimatorV3 extends ScriptEstimator {
       case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
       case GETTER(expr, _)             => evalGetter(expr)
       case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
+      case _: FAILED_EXPR              => const(0)
     }
 
   private def evalHoldingFuncs(expr: EXPR): EvalM[Long] =
