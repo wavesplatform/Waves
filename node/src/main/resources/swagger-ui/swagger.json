@@ -387,6 +387,69 @@
             }
           }
         }
+      },
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Complete Data",
+        "description": "Read all data posted by an account",
+        "operationId": "postData_1",
+        "consumes": [
+          "application/json",
+          "application/x-www-form-urlencoded"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "keys",
+            "in": "body",
+            "description": "Exact keys to query",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "keys"
+              ]
+            }
+          },
+          {
+            "name": "key",
+            "in": "formData",
+            "description": "Exact keys to query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/DataEntry"
+              }
+            }
+          }
+        }
       }
     },
     "/addresses/sign/{address}": {
@@ -1652,7 +1715,7 @@
           {
             "in": "body",
             "name": "json",
-            "description": "Transaction data including <a href='transaction-types.html'>type</a>",
+            "description": "Transaction data including type",
             "required": true,
             "schema": {
               "type": "string"
@@ -1891,7 +1954,7 @@
           {
             "in": "body",
             "name": "json",
-            "description": "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs",
+            "description": "Transaction data including type and signature/proofs",
             "required": true,
             "schema": {
               "type": "string"
@@ -2354,7 +2417,7 @@
           {
             "in": "body",
             "name": "json",
-            "description": "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs",
+            "description": "Transaction data including type and signature/proofs",
             "required": true,
             "schema": {
               "type": "string"
