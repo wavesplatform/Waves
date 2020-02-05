@@ -13,7 +13,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   private val errorMessage = "Reason: Cannot lease more than own"
 
   test("leasing waves decreases lessor's eff.b. and increases lessee's eff.b.; lessor pays fee") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
@@ -26,7 +26,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("cannot lease non-own waves") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = v).id
       nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
 
@@ -37,7 +37,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("can not make leasing without having enough balance") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
@@ -66,7 +66,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       (Json.parse(r.getResponseBody) \ "status").as[String]
     }
 
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
@@ -102,7 +102,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("lease cancellation can be done only once") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
@@ -123,7 +123,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("only sender can cancel lease transaction") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
@@ -138,7 +138,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
   }
 
   test("can not make leasing to yourself") {
-    for (v <- supportedVersions) {
+    for (v <- leaseTxSupportedVersions) {
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       assertBadRequestAndResponse(sender.lease(firstAddress, firstAddress, balance1 + 1.waves, minFee, v), "Transaction to yourself")
       nodes.waitForHeightArise()

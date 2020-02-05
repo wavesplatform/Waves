@@ -8,6 +8,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Proofs}
@@ -16,36 +17,13 @@ import play.api.libs.json.JsNumber
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val contract = pkByAddress(firstAddress)
-  private val caller   = pkByAddress(secondAddress)
+  private val firstContract = pkByAddress(firstAddress)
+  private val secondContract = pkByAddress(secondAddress)
+  private val thirdContract = pkByAddress(sender.createAddress())
+  private val caller   = pkByAddress(thirdAddress)
 
-  test("setup contract account with waves") {
-    sender
-      .transfer(
-        sender.address,
-        recipient = contract.stringRepr,
-        assetId = None,
-        amount = 5.waves,
-        fee = minFee,
-        waitForTx = true
-      )
-      .id
-  }
-
-  test("setup caller account with waves") {
-    sender
-      .transfer(
-        sender.address,
-        recipient = contract.stringRepr,
-        assetId = None,
-        amount = 5.waves,
-        fee = minFee,
-        waitForTx = true
-      )
-      .id
-  }
-
-  test("set contract to contract account") {
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
     val scriptText =
       """
         |{-# STDLIB_VERSION 3 #-}
@@ -54,6 +32,10 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | @Callable(inv)
         | func foo(a:ByteVector) = {
         |  WriteSet([DataEntry("a", a), DataEntry("sender", inv.caller.bytes)])
+        | }
+        | @Callable(inv)
+        | func emptyKey() = {
+        |  WriteSet([DataEntry("", "a")])
         | }
         |
         | @Callable(inv)
@@ -68,60 +50,119 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         |
         |
         """.stripMargin
+    val scriptTextV4 =
+      """
+        |{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |
+        | @Callable(inv)
+        |func foo() = [IntegerEntry("", 1)]
+        |
+        | @Callable(inv)
+        |func bar() = [IntegerEntry("", 2)]
+        |
+        """.stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
-    val setScriptId = sender.setScript(contract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
+    val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+    sender.transfer(firstAddress, thirdContract.stringRepr, 10.waves, minFee, waitForTx = true)
+    val setScriptId = sender.setScript(firstContract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId2 = sender.setScript(secondContract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(thirdContract.stringRepr, Some(script2), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(contract.stringRepr)
+    val acc0ScriptInfo = sender.addressScriptInfo(firstContract.stringRepr)
+    val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract.stringRepr)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
     acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
+    acc0ScriptInfo2.script.isEmpty shouldBe false
+    acc0ScriptInfo2.scriptText.isEmpty shouldBe false
+    acc0ScriptInfo2.script.get.startsWith("base64:") shouldBe true
 
     sender.transactionInfo(setScriptId).script.get.startsWith("base64:") shouldBe true
+    sender.transactionInfo(setScriptId2).script.get.startsWith("base64:") shouldBe true
   }
 
   test("contract caller invokes a function on a contract") {
     val arg               = ByteStr(Array(42: Byte))
+    for (v <- invokeScrTxSupportedVersions) {
+      val contract = if (v < 2) firstContract else secondContract
+      val invokeScriptTx = sender.invokeScript(
+        caller.stringRepr,
+        contract.stringRepr,
+        func = Some("foo"),
+        args = List(CONST_BYTESTR(arg).explicitGet()),
+        payment = Seq(),
+        fee = 1.waves,
+        waitForTx = true
+      )
 
-    val _ = sender.invokeScript(
-      caller.stringRepr,
-      contract.stringRepr,
-      func = Some("foo"),
-      args = List(CONST_BYTESTR(arg).explicitGet()),
-      payment = Seq(),
-      fee = 1.waves,
-      waitForTx = true
-    )
+      nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
-    sender.getDataByKey(contract.stringRepr, "a") shouldBe BinaryDataEntry("a", arg)
-    sender.getDataByKey(contract.stringRepr, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+      sender.getDataByKey(contract.stringRepr, "a") shouldBe BinaryDataEntry("a", arg)
+      sender.getDataByKey(contract.stringRepr, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+    }
   }
 
   test("contract caller invokes a default function on a contract") {
-    val _ = sender.invokeScript(
-      caller.stringRepr,
-      contract.stringRepr,
-      func = None,
-      payment = Seq(),
-      fee = 1.waves,
-      waitForTx = true
-    )
-    sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "b")
-    sender.getDataByKey(contract.stringRepr, "sender") shouldBe StringDataEntry("sender", "senderId")
+    for (v <- invokeScrTxSupportedVersions) {
+      val contract = if (v < 2) firstContract else secondContract
+      val _ = sender.invokeScript(
+        caller.stringRepr,
+        contract.stringRepr,
+        func = None,
+        payment = Seq(),
+        fee = 1.waves,
+        waitForTx = true
+      )
+      sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "b")
+      sender.getDataByKey(contract.stringRepr, "sender") shouldBe StringDataEntry("sender", "senderId")
+    }
   }
 
   test("verifier works") {
-    val tx =
-      DataTransaction
-        .create(1.toByte, sender = contract, data = List(StringDataEntry("a", "OOO")), fee = 1.waves, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
-        .explicitGet()
+    for (v <- invokeScrTxSupportedVersions) {
+      val contract = if (v < 2) firstContract else secondContract
+      val tx =
+        DataTransaction
+          .create(1.toByte, sender = contract, data = List(StringDataEntry("a", "OOO")), fee = 1.waves, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
+          .explicitGet()
 
-    val dataTxId = sender
-      .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
-      .id
+      val dataTxId = sender
+        .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
+        .id
 
-    nodes.waitForHeightAriseAndTxPresent(dataTxId)
+      nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-    sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "OOO")
+      sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "OOO")
+    }
+  }
+
+  test("not able to set an empty key by invoking script") {
+    //TODO: must fail for transaction V3(protobuf) after https://jira.wavesplatform.com/browse/NODE-2046 will be done
+    for (v <- invokeScrTxSupportedVersions) {
+      val contract = if (v < 2) firstContract else secondContract
+      sender.invokeScript(
+        caller.stringRepr,
+        contract.stringRepr,
+        func = Some("emptyKey"),
+        payment = Seq(),
+        fee = 1.waves,
+        waitForTx = true
+      )
+
+      sender.getData(contract.stringRepr)
+
+      sender.invokeScript(
+        caller.stringRepr,
+        thirdContract.stringRepr,
+        func = if (v < 2) Some("foo") else Some("bar"),
+        payment = Seq(),
+        fee = 1.waves,
+        waitForTx = true
+      )
+
+      sender.getData(thirdContract.stringRepr)
+    }
   }
 }

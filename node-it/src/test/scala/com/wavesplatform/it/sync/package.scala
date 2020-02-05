@@ -33,16 +33,17 @@ package object sync {
   val smartMatcherFee: Long            = 0.007.waves
   val smartMinFee: Long                = minFee + smartFee
 
-  def calcDataFee(data: List[DataEntry[_]]/*, txVersion: Byte*/): Long = {
-//    if (txVersion < 2) {
-    val dataSize = data.map(_.toBytes.length).sum + 128
-    if (dataSize > 1024) {
-      minFee * (dataSize / 1024 + 1)
-    } else minFee
-//    } else {
-//      val dataBytes = data.map(d => d.toBytes).length
-//      minFee + (DataTransactionData.DataEntry()PBTransactions.toPBDataEntry(data).toByteArray.length - 1) / 1024
-//    }
+  def calcDataFee(data: List[DataEntry[_]], txVersion: Byte): Long = {
+    if (txVersion < 2) {
+      val dataSize = data.map(_.toBytes.length).sum + 128
+      if (dataSize > 1024) {
+        minFee * (dataSize / 1024 + 1)
+      } else minFee
+    } else {
+      val payload = DataTransactionData(data.map(dataEntry => PBTransactions.toPBDataEntry(dataEntry))).toByteArray
+      val feeInUnit = 1 + (payload.length - 1) / 1024
+      feeInUnit * 100000
+    }
   }
 
   def calcMassTransferFee(numberOfRecipients: Int): Long = {
@@ -50,7 +51,16 @@ package object sync {
   }
 
   val supportedVersions: List[Byte] = List(1, 2, 3)
+  val burnTxsupportedVersions: List[Byte] = List(1, 2, 3)
+  val leaseTxSupportedVersions: List[Byte] = List(1, 2, 3)
   val dataTxSupportedVersions: List[Byte] = List(1, 2)
+  val massTransferTxSupportedVersions: List[Byte] = List(1, 2)
+  val sponsorshipTxSupportedVersions: List[Byte] = List(1, 2)
+  val setAssetScrTxSupportedVersions: List[Byte] = List(1, 2)
+  val issueTxSupportedVersions: List[Byte] = List(1, 2, 3)
+  val transferTxSupportedVersions: List[Byte] = List(1, 2, 3)
+  val aliasTxSupportedVersions: List[Byte] = List(1, 2, 3)
+  val reissueTxSupportedVersions: List[Byte] = List(1, 2, 3)
 
   val script: Script       = ScriptCompiler(s"""true""".stripMargin, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
   val scriptBase64: String = script.bytes.value.base64

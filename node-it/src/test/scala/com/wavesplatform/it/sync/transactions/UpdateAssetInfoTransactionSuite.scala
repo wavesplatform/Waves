@@ -207,7 +207,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   def checkUpdateAssetInfoTxInfo(transactionInfo: TransactionInfo, updatedName: String, updatedDescription: String): Unit = {
-    transactionInfo.`type` shouldBe 17
+    transactionInfo._type shouldBe 17
     transactionInfo.name.get shouldBe updatedName
     transactionInfo.description.get shouldBe updatedDescription
   }

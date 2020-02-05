@@ -110,16 +110,11 @@ case class Transaction (
                         sender: Option[String],
                         version: Byte,
                         name: Option[String],
+                        amount: Option[Long],
                         description: Option[String],
                         attachmentType: Option[String],
                         attachmentValue: Option[JsValue]
                       )
-//{
-//  def attachmentString: Option[String] = attachmentValue.map(value => value.validate[String] match {
-//    case JsSuccess(v, _) => v
-//    case JsError(err) => Assertions.fail("expected ")
-//  })
-//}
 
 object Transaction {
   implicit val transactionFormat: Format[Transaction] = Format( //Json.format
@@ -132,6 +127,7 @@ object Transaction {
         sender <- (jsv \ "sender").validateOpt[String]
         version <- (jsv \ "version").validate[Byte]
         name <- (jsv \ "name").validateOpt[String]
+        amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
         attachmentType <- version match {
           case v if v > 2 => (jsv \ "attachment" \ "type").validateOpt[String]
@@ -150,6 +146,7 @@ object Transaction {
           sender,
           version,
           name,
+          amount,
           description,
           attachmentType,
           attachmentValue
@@ -159,7 +156,7 @@ object Transaction {
 }
 
 trait TxInfo {
-  def `type`: Int
+  def _type: Int
   def id: String
   def fee: Long
   def timestamp: Long
@@ -171,7 +168,7 @@ trait TxInfo {
 }
 
 case class TransactionInfo(
-    `type`: Int,
+    _type: Int,
     id: String,
     fee: Long,
     timestamp: Long,
@@ -179,12 +176,59 @@ case class TransactionInfo(
     height: Int,
     minSponsoredAssetFee: Option[Long],
     name: Option[String],
+    amount: Option[Long],
     description: Option[String],
     recipient: Option[String],
-    script: Option[String]
+    script: Option[String],
+    version: Option[Byte],
+    attachmentType: Option[String],
+    attachmentValue: Option[JsValue]
 ) extends TxInfo
 object TransactionInfo {
-  implicit val format: Format[TransactionInfo] = Json.format
+  implicit val format: Format[TransactionInfo] = Format(
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        height <- (jsv \ "height").validate[Int]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        name <- (jsv \ "name").validateOpt[String]
+        amount <- (jsv \ "amount").validateOpt[Long]
+        description <- (jsv \ "description").validateOpt[String]
+        recipient <- (jsv \ "recipient").validateOpt[String]
+        script <- (jsv \ "script").validateOpt[String]
+        version <- (jsv \ "version").validateOpt[Byte]
+        attachmentType <- version match {
+          case Some(v) if v > 2 => (jsv \ "attachment" \ "type").validateOpt[String]
+          case _ => JsSuccess(None)
+        }
+        attachmentValue <- version match {
+          case Some(v) if v > 2 => (jsv \ "attachment" \ "value").validateOpt[JsValue]
+          case _ => (jsv \ "attachment").validateOpt[JsValue]
+        }
+      }
+        yield TransactionInfo(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender,
+          height,
+          minSponsoredAssetFee,
+          name,
+          amount,
+          description,
+          recipient,
+          script,
+          version,
+          attachmentType,
+          attachmentValue
+        )),
+    Json.writes[TransactionInfo]
+  )
 }
 
 case class TransactionStatus(
@@ -234,7 +278,7 @@ object StateChangesDetails {
 }
 
 case class DebugStateChanges(
-    `type`: Int,
+    _type: Int,
     id: String,
     fee: Long,
     timestamp: Long,

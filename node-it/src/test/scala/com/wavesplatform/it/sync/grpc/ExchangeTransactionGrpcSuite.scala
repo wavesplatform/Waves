@@ -19,7 +19,8 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   val transactionV2versions = for {
     o1ver <- 1 to 3
     o2ver <- 1 to 3
-  } yield (o1ver.toByte, o2ver.toByte, 2.toByte)
+    txVer <- 2 to 3
+  } yield (o1ver.toByte, o2ver.toByte, txVer.toByte)
 
   val (buyer, buyerAddress)     = (firstAcc, firstAddress)
   val (seller, sellerAddress)   = (secondAcc, secondAddress)
