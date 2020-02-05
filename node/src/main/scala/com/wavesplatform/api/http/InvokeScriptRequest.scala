@@ -8,10 +8,7 @@ import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.json._
-
-import scala.annotation.meta.field
 
 object InvokeScriptRequest {
 
@@ -38,7 +35,8 @@ object InvokeScriptRequest {
         case JsDefined(JsString("binary")) =>
           jv \ "value" match {
             case JsDefined(JsString(n)) =>
-              ByteStr.decodeBase64(n)
+              ByteStr
+                .decodeBase64(n)
                 .toEither
                 .leftMap(_.getMessage)
                 .flatMap(CONST_BYTESTR(_))
@@ -58,33 +56,26 @@ object InvokeScriptRequest {
     FUNCTION_CALL(FunctionHeader.User(fc.function), fc.args)
 }
 
-case class InvokeScriptRequest(sender: String,
-                               @(ApiModelProperty @field)(required = true, value = "1000") fee: Long,
-                               @(ApiModelProperty @field)(
-                                 dataType = "string",
-                                 example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
-                                 required = false
-                               ) feeAssetId: Option[String],
-                               @(ApiModelProperty @field)(required = false) call: Option[InvokeScriptRequest.FunctionCallPart],
-                               @(ApiModelProperty @field)(required = true) payment: Seq[InvokeScriptTransaction.Payment],
-                               @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dApp: String,
-                               timestamp: Option[Long] = None)
+case class InvokeScriptRequest(
+    sender: String,
+    fee: Long,
+    feeAssetId: Option[String],
+    call: Option[InvokeScriptRequest.FunctionCallPart],
+    payment: Seq[InvokeScriptTransaction.Payment],
+    dApp: String,
+    timestamp: Option[Long] = None
+)
 
-@ApiModel(value = "Signed Invoke script transaction")
 case class SignedInvokeScriptRequest(
-    @(ApiModelProperty @field)(value = "Base58 encoded sender public key", required = true) senderPublicKey: String,
-    @(ApiModelProperty @field)(required = true) fee: Long,
-    @(ApiModelProperty @field)(
-      dataType = "string",
-      example = "3Z7T9SwMbcBuZgcn3mGu7MMp619CTgSWBT7wvEkPwYXGnoYzLeTyh3EqZu1ibUhbUHAsGK5tdv9vJL9pk4fzv9Gc",
-      required = false
-    ) feeAssetId: Option[String],
-    @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk") dApp: String,
-    @(ApiModelProperty @field)(required = false) call: Option[InvokeScriptRequest.FunctionCallPart],
-    @(ApiModelProperty @field)(required = true) payment: Option[Seq[InvokeScriptTransaction.Payment]],
-    @(ApiModelProperty @field)(required = true, value = "1000") timestamp: Long,
-    @(ApiModelProperty @field)(required = true) proofs: List[String])
-    extends BroadcastRequest {
+    senderPublicKey: String,
+    fee: Long,
+    feeAssetId: Option[String],
+    dApp: String,
+    call: Option[InvokeScriptRequest.FunctionCallPart],
+    payment: Option[Seq[InvokeScriptTransaction.Payment]],
+    timestamp: Long,
+    proofs: List[String]
+) extends BroadcastRequest {
   def toTx: Either[ValidationError, InvokeScriptTransaction] =
     for {
       _sender      <- PublicKey.fromBase58String(senderPublicKey)

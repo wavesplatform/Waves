@@ -5,7 +5,6 @@
 
     <logger name="io.grpc.netty" level="ERROR"/>
     <logger name="io.netty" level="INFO"/>
-    <logger name="io.swagger" level="INFO"/>
 
     <logger name="kamon.influxdb.InfluxDBReporter" level="INFO"/>
     <logger name="org.apache.kafka" level="INFO"/>

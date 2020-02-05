@@ -3,7 +3,6 @@ package com.wavesplatform.consensus
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.Blockchain
 
@@ -27,7 +26,7 @@ object GeneratingBalanceProvider {
 
   def balance(blockchain: Blockchain, account: Address, blockId: Option[BlockId] = None): Long = {
     val height = blockId.flatMap(blockchain.heightOf).getOrElse(blockchain.height)
-    val depth = if (height >= blockchain.settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
+    val depth  = if (height >= blockchain.settings.functionalitySettings.generationBalanceDepthFrom50To1000AfterHeight) SecondDepth else FirstDepth
     blockchain.effectiveBalance(account, depth, blockId)
   }
 }

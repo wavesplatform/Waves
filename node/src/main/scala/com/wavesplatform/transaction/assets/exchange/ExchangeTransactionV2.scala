@@ -11,21 +11,21 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction._
 import com.wavesplatform.transaction.description._
-import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 
 import scala.util.Try
 
-case class ExchangeTransactionV2(buyOrder: Order,
-                                 sellOrder: Order,
-                                 amount: Long,
-                                 price: Long,
-                                 buyMatcherFee: Long,
-                                 sellMatcherFee: Long,
-                                 fee: Long,
-                                 timestamp: Long,
-                                 proofs: Proofs)
-    extends ExchangeTransaction {
+case class ExchangeTransactionV2(
+    buyOrder: Order,
+    sellOrder: Order,
+    amount: Long,
+    price: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    fee: Long,
+    timestamp: Long,
+    proofs: Proofs
+) extends ExchangeTransaction {
 
   import ExchangeTransactionV2._
 
@@ -34,7 +34,6 @@ case class ExchangeTransactionV2(buyOrder: Order,
   override val builder                 = ExchangeTransactionV2
   override val assetFee: (Asset, Long) = (Waves, fee)
 
-  @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]] =
@@ -62,29 +61,33 @@ object ExchangeTransactionV2 extends TransactionParserFor[ExchangeTransactionV2]
   override val typeId: Byte                 = ExchangeTransaction.typeId
   override val supportedVersions: Set[Byte] = Set(2)
 
-  def create(matcher: PrivateKey,
-             buyOrder: Order,
-             sellOrder: Order,
-             amount: Long,
-             price: Long,
-             buyMatcherFee: Long,
-             sellMatcherFee: Long,
-             fee: Long,
-             timestamp: Long): Either[ValidationError, TransactionT] = {
+  def create(
+      matcher: PrivateKey,
+      buyOrder: Order,
+      sellOrder: Order,
+      amount: Long,
+      price: Long,
+      buyMatcherFee: Long,
+      sellMatcherFee: Long,
+      fee: Long,
+      timestamp: Long
+  ): Either[ValidationError, TransactionT] = {
     create(buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty).map { unverified =>
       unverified.copy(proofs = Proofs(List(ByteStr(crypto.sign(matcher, unverified.bodyBytes())))))
     }
   }
 
-  def create(buyOrder: Order,
-             sellOrder: Order,
-             amount: Long,
-             price: Long,
-             buyMatcherFee: Long,
-             sellMatcherFee: Long,
-             fee: Long,
-             timestamp: Long,
-             proofs: Proofs): Either[ValidationError, TransactionT] = {
+  def create(
+      buyOrder: Order,
+      sellOrder: Order,
+      amount: Long,
+      price: Long,
+      buyMatcherFee: Long,
+      sellMatcherFee: Long,
+      fee: Long,
+      timestamp: Long,
+      proofs: Proofs
+  ): Either[ValidationError, TransactionT] = {
     validateExchangeParams(
       buyOrder,
       sellOrder,

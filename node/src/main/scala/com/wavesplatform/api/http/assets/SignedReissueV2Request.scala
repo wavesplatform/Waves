@@ -6,23 +6,15 @@ import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.ReissueTransactionV2
 import com.wavesplatform.transaction.Proofs
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads}
 
-case class SignedReissueV2Request(@ApiModelProperty(value = "Base58 encoded Issuer public key", required = true)
-                                  senderPublicKey: String,
-                                  @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
+case class SignedReissueV2Request(senderPublicKey: String,
                                   assetId: String,
-                                  @ApiModelProperty(required = true, example = "1000000")
                                   quantity: Long,
-                                  @ApiModelProperty(required = true)
                                   reissuable: Boolean,
-                                  @ApiModelProperty(required = true)
                                   fee: Long,
-                                  @ApiModelProperty(required = true)
                                   timestamp: Long,
-                                  @ApiModelProperty(required = true)
                                   proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, ReissueTransactionV2] =

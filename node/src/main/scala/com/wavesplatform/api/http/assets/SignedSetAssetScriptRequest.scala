@@ -8,7 +8,6 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.{AssetIdStringLength, Proofs}
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{JsPath, Reads}
 
@@ -24,20 +23,14 @@ object SignedSetAssetScriptRequest {
   )(SignedSetAssetScriptRequest.apply _)
 }
 
-@ApiModel(value = "Proven SetAssetScript transaction")
-case class SignedSetAssetScriptRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                       senderPublicKey: String,
-                                       @ApiModelProperty(value = "Base58 encoded Asset ID", required = true)
-                                       assetId: String,
-                                       @ApiModelProperty(value = "Base64 encoded script(including version and checksum)", required = true)
-                                       script: Option[String],
-                                       @ApiModelProperty(required = true)
-                                       fee: Long,
-                                       @ApiModelProperty(required = true)
-                                       timestamp: Long,
-                                       @ApiModelProperty(required = true)
-                                       proofs: List[String])
-    extends BroadcastRequest {
+case class SignedSetAssetScriptRequest(
+    senderPublicKey: String,
+    assetId: String,
+    script: Option[String],
+    fee: Long,
+    timestamp: Long,
+    proofs: List[String]
+) extends BroadcastRequest {
   def toTx: Either[ValidationError, SetAssetScriptTransaction] =
     for {
       _sender <- PublicKey.fromBase58String(senderPublicKey)

@@ -331,24 +331,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val apiTypes: Set[Class[_]] = Set(
-        classOf[NodeApiRoute],
-        classOf[BlocksApiRoute],
-        classOf[TransactionsApiRoute],
-        classOf[NxtConsensusApiRoute],
-        classOf[WalletApiRoute],
-        classOf[UtilsApiRoute],
-        classOf[PeersApiRoute],
-        classOf[AddressApiRoute],
-        classOf[DebugApiRoute],
-        classOf[AssetsApiRoute],
-        classOf[ActivationApiRoute],
-        classOf[LeaseApiRoute],
-        classOf[AliasApiRoute],
-        classOf[RewardApiRoute]
-      )
-
-      val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
+      val combinedRoute = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")

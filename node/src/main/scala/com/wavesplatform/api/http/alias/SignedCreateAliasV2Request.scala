@@ -5,18 +5,12 @@ import com.wavesplatform.account.{Alias, PublicKey}
 import com.wavesplatform.api.http.BroadcastRequest
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.{CreateAliasTransaction, CreateAliasTransactionV2, Proofs}
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
-case class SignedCreateAliasV2Request(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                      senderPublicKey: String,
-                                      @ApiModelProperty(required = true)
+case class SignedCreateAliasV2Request(senderPublicKey: String,
                                       fee: Long,
-                                      @ApiModelProperty(value = "Alias", required = true)
                                       alias: String,
-                                      @ApiModelProperty(required = true)
                                       timestamp: Long,
-                                      @ApiModelProperty(required = true)
                                       proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, CreateAliasTransaction] =

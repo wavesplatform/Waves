@@ -1,15 +1,9 @@
 package com.wavesplatform.api.http
 
-import io.swagger.annotations.ApiModelProperty
-import play.api.libs.json.{Json, Reads, Writes}
+import play.api.libs.json.Json
 
-import scala.annotation.meta.field
+case class ScriptWithImportsRequest(script: String, imports: Map[String, String] = Map.empty)
 
 object ScriptWithImportsRequest {
-  implicit val reads: Reads[ScriptWithImportsRequest] = Json.reads[ScriptWithImportsRequest]
-  implicit val writes: Writes[ScriptWithImportsRequest] = Json.writes[ScriptWithImportsRequest]
+  implicit val jsonFormat = Json.format[ScriptWithImportsRequest]
 }
-case class ScriptWithImportsRequest(
-    @(ApiModelProperty @field)(required = true)script: String,
-    imports: Map[String, String] = Map()
-)

@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.Proofs
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
@@ -23,20 +22,12 @@ object SignedMassTransferRequest {
   )(SignedMassTransferRequest.apply _)
 }
 
-@ApiModel(value = "Signed Asset transfer transaction")
-case class SignedMassTransferRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                     senderPublicKey: String,
-                                     @ApiModelProperty(value = "Base58 encoded Asset ID")
+case class SignedMassTransferRequest(senderPublicKey: String,
                                      assetId: Option[String],
-                                     @ApiModelProperty(value = "List of (recipient, amount) pairs", required = true)
                                      transfers: List[Transfer],
-                                     @ApiModelProperty(required = true)
                                      fee: Long,
-                                     @ApiModelProperty(required = true)
                                      timestamp: Long,
-                                     @ApiModelProperty(value = "Base58 encoded attachment")
                                      attachment: Option[String],
-                                     @ApiModelProperty(required = true)
                                      proofs: List[String])
     extends BroadcastRequest {
   def toTx: Either[ValidationError, MassTransferTransaction] =

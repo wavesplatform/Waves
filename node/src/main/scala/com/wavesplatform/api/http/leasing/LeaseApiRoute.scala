@@ -12,12 +12,8 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.JsNumber
 
-@Path("/leasing")
-@Api(value = "/leasing")
 case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: Blockchain, utxPoolSynchronizer: UtxPoolSynchronizer, time: Time)
     extends ApiRoute
     with BroadcastRoute
@@ -25,7 +21,7 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
 
   private[this] val commonAccountApi = new CommonAccountApi(blockchain)
 
-  override val route = pathPrefix("leasing") {
+  override val route: Route = pathPrefix("leasing") {
     active ~ deprecatedRoute
   }
 
@@ -39,13 +35,6 @@ case class LeaseApiRoute(settings: RestAPISettings, wallet: Wallet, blockchain: 
         path("cancel")(broadcast[SignedLeaseCancelV1Request](_.toTx))
     }
 
-  @Path("/active/{address}")
-  @ApiOperation(value = "Get all active leases for an address", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Wallet address ", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def active: Route = (pathPrefix("active") & get & extractScheduler) { implicit sc =>
     pathPrefix(Segment) { address =>
       complete(Address.fromString(address) match {

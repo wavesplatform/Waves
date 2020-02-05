@@ -6,7 +6,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TransactionParsers.SignatureStringLength
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.exchange._
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
 object SignedExchangeRequest {
@@ -14,27 +13,18 @@ object SignedExchangeRequest {
   implicit val signedExchangeRequestFormat: Format[SignedExchangeRequest] = Json.format
 }
 
-case class SignedExchangeRequest(@ApiModelProperty(value = "Base58 encoded sender public key", required = true)
-                                 senderPublicKey: String,
-                                 @ApiModelProperty(value = "Buy Order")
-                                 order1: Order,
-                                 @ApiModelProperty(value = "Sell Order")
-                                 order2: Order,
-                                 @ApiModelProperty(required = true, example = "1000000")
-                                 amount: Long,
-                                 @ApiModelProperty(required = true)
-                                 price: Long,
-                                 @ApiModelProperty(required = true)
-                                 fee: Long,
-                                 @ApiModelProperty(required = true)
-                                 buyMatcherFee: Long,
-                                 @ApiModelProperty(required = true)
-                                 sellMatcherFee: Long,
-                                 @ApiModelProperty(required = true)
-                                 timestamp: Long,
-                                 @ApiModelProperty(required = true)
-                                 signature: String)
-    extends BroadcastRequest {
+case class SignedExchangeRequest(
+    senderPublicKey: String,
+    order1: Order,
+    order2: Order,
+    amount: Long,
+    price: Long,
+    fee: Long,
+    buyMatcherFee: Long,
+    sellMatcherFee: Long,
+    timestamp: Long,
+    signature: String
+) extends BroadcastRequest {
   def toTx: Either[ValidationError, ExchangeTransaction] =
     for {
       _sender    <- PublicKey.fromBase58String(senderPublicKey)
