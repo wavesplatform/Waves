@@ -52,7 +52,6 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
   }
 
   private[this] lazy val patchedSwaggerJson = {
-    import com.google.common.io.ByteStreams
     import com.wavesplatform.Version
     import com.wavesplatform.account.AddressScheme
     import play.api.libs.json.{JsObject, Json}
@@ -61,7 +60,7 @@ case class CompositeHttpService(routes: Seq[ApiRoute], settings: RestAPISettings
       if (Character.isAlphabetic(AddressScheme.current.chainId)) AddressScheme.current.chainId.toChar.toString
       else s"#${AddressScheme.current.chainId}"
 
-    val json = Json.parse(ByteStreams.toByteArray(getClass.getClassLoader.getResourceAsStream("swagger-ui/swagger.json"))).as[JsObject]
+    val json = Json.parse(getClass.getClassLoader.getResourceAsStream("swagger-ui/swagger.json")).as[JsObject]
     val patchedInfo = (json \ "info").as[JsObject] ++ Json.obj(
       "version" -> Version.VersionString,
       "title"   -> s"Waves Full Node ($chainIdString)"
