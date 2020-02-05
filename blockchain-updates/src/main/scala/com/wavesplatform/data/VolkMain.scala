@@ -27,7 +27,7 @@ object VolkMain extends App with ScorexLogging {
 
     val json = Json.obj(
       "text"        -> msg,
-      "attachments" -> Json.arr(text)
+      "attachments" -> Json.arr(Json.obj("text" -> text))
     )
 
     val request = new Request.Builder()
