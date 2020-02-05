@@ -4643,6 +4643,12 @@
       "description": "Transaction's json representation (see https://docs.wavesplatform.com/en/blockchain/transaction/)",
       "additionalProperties": {
         "type": "object"
+      },
+      "example": {
+        "id": "string",
+        "timestamp": 0,
+        "version": 2,
+        "...": "..."
       }
     }
   }
