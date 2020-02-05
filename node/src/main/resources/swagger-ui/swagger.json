@@ -1652,7 +1652,7 @@
           {
             "in": "body",
             "name": "json",
-            "description": "Transaction data including <a href='transaction-types.html'>type</a>",
+            "description": "Transaction data including type",
             "required": true,
             "schema": {
               "type": "string"
@@ -1891,7 +1891,7 @@
           {
             "in": "body",
             "name": "json",
-            "description": "Transaction data including <a href='transaction-types.html'>type</a> and signature/proofs",
+            "description": "Transaction data including type and signature/proofs",
             "required": true,
             "schema": {
               "type": "string"
