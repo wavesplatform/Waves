@@ -40,9 +40,7 @@ package object data {
         import scala.collection.JavaConverters._
         val partitions = consumer.partitionsFor(topic).asScala.map(pi => new TopicPartition(pi.topic(), pi.partition())).asJava
         consumer.assign(partitions)
-        val ts = LocalDate.now().minusMonths(1).atStartOfDay().toInstant(ZoneOffset.UTC).toEpochMilli
-        val offsets = consumer.offsetsForTimes(partitions.asScala.map(_ -> java.lang.Long.valueOf(ts)).toMap.asJava)
-        offsets.asScala.foreach { case (tp, offset) => consumer.seek(tp, offset.offset()) }
+        consumer.seekToBeginning(partitions)
       } else consumer.subscribe(util.Arrays.asList(topic))
       consumer
     }
