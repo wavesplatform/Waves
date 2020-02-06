@@ -47,6 +47,9 @@ case class MassTransferTransaction(
     case Waves          => Seq()
     case a: IssuedAsset => Seq(a)
   }
+
+  override def chainByte: ChainId =
+    transfers.headOption.fold(ChainId.current)(_.address.chainId)
 }
 
 object MassTransferTransaction extends TransactionParser {

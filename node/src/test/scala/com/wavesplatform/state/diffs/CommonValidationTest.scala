@@ -13,7 +13,8 @@ import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctio
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.lease.LeaseTransaction
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{ChainId, CreateAliasTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils._
@@ -49,16 +50,25 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
     val preconditionsAndPayment: Gen[(GenesisTransaction, Transaction)] = for {
       master    <- accountGen
       recipient <- accountGen
-      ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      chainId <- invalidChainIdGen
-      amount  <- smallFeeGen
+      timestamp <- positiveIntGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, timestamp).explicitGet()
+
+      invChainId <- invalidChainIdGen
+      invChainAddr = recipient.toAddressWithChainId(invChainId)
+      amount <- smallFeeGen
+
       tx <- Gen.oneOf(
         TransferTransaction
-          .selfSigned(TxVersion.V1, master, recipient.toAddressWithChainId(chainId), Waves, amount, Waves, amount, None, ts)
+          .selfSigned(TxVersion.V3, master, invChainAddr, Waves, amount, Waves, amount, None, timestamp)
           .explicitGet(),
-        CreateAliasTransaction.selfSigned(TxVersion.V1, master, Alias.createWithChainId("test", chainId).explicitGet(), amount, ts).explicitGet(),
-        LeaseTransaction.selfSigned(TxVersion.V1, master, recipient.toAddressWithChainId(chainId), amount, amount, ts).explicitGet()
+        CreateAliasTransaction
+          .selfSigned(TxVersion.V3, master, Alias.createWithChainId("test", invChainId).explicitGet(), amount, timestamp)
+          .explicitGet(),
+        LeaseTransaction.selfSigned(TxVersion.V3, master, invChainAddr, amount, amount, timestamp).explicitGet(),
+        MassTransferTransaction
+          .selfSigned(TxVersion.V2, master, Waves, Seq(ParsedTransfer(invChainAddr, amount)), amount, timestamp, None)
+          .explicitGet(),
+        InvokeScriptTransaction.selfSigned(TxVersion.V2, master, invChainAddr, None, Nil, amount, Waves, timestamp).explicitGet()
       )
     } yield (genesis, tx)
 
