@@ -1,12 +1,12 @@
 package com.wavesplatform.protobuf.utils
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{ChainId, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction._
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.{Asset, ChainId}
 
 object PBImplicitConversions {
   import com.google.protobuf.{ByteString => PBByteString}

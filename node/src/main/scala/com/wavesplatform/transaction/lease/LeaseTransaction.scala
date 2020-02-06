@@ -6,6 +6,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.LeaseTxSerializer
 import com.wavesplatform.transaction.validation.impl.LeaseTxValidator
 import com.wavesplatform.transaction.{
+  ChainId,
   FastHashId,
   LegacyPBSwitch,
   Proofs,
@@ -41,6 +42,8 @@ final case class LeaseTransaction(
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(LeaseTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTransaction.serializer.toJson(this))
+
+  override def chainByte: ChainId = recipient.chainId
 }
 
 object LeaseTransaction extends TransactionParser {

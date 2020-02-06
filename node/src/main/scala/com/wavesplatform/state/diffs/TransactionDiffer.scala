@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.account.ChainId
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._

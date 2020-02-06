@@ -4,6 +4,7 @@ import com.google.common.collect.Interners
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto._
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.transaction.TxValidationError.InvalidAddress
 import com.wavesplatform.utils.base58Length
 import play.api.libs.json.{Format, Writes}
@@ -14,7 +15,7 @@ object PublicKey extends TaggedType[ByteStr] {
 
   val KeyStringLength: Int = base58Length(KeyLength)
 
-  val empty = apply(ByteStr.empty)
+  val empty: PublicKey = apply(ByteStr.empty)
 
   def apply(publicKey: ByteStr): PublicKey =
     interner.intern(publicKey @@ this)
@@ -35,12 +36,12 @@ object PublicKey extends TaggedType[ByteStr] {
     pk.toAddress
 
   implicit class PublicKeyImplicitOps(private val pk: PublicKey) extends AnyVal {
-    def toAddress: Address = Address.fromPublicKey(pk)
+    def toAddress: Address                              = Address.fromPublicKey(pk)
     def toAddressWithChainId(chainId: ChainId): Address = Address.fromPublicKey(pk, chainId)
   }
 
-  implicit lazy val jsonFormat: Format[PublicKey] = Format[PublicKey](
+  implicit val jsonFormat: Format[PublicKey] = Format(
     com.wavesplatform.utils.byteStrFormat.map(this.apply),
-    Writes(pk => com.wavesplatform.utils.byteStrFormat.writes(pk))
+    Writes(com.wavesplatform.utils.byteStrFormat.writes(_))
   )
 }

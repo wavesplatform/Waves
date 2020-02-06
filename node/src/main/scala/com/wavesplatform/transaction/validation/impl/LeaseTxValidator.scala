@@ -13,8 +13,7 @@ object LeaseTxValidator extends TxValidator[LeaseTransaction] {
       V.fee(fee),
       V.cond(amount > 0, TxValidationError.NonPositiveAmount(amount, "waves")),
       V.noOverflow(amount, fee),
-      V.cond(sender.toAddress != recipient, TxValidationError.ToSelf),
-      V.chainIds(chainByte, recipient.chainId)
+      V.cond(sender.toAddress != recipient, TxValidationError.ToSelf)
     )
   }
 }

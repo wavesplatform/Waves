@@ -2,6 +2,7 @@ package com.wavesplatform.account
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{crypto, utils}
 import play.api.libs.json.{Format, Json, Writes}

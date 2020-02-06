@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.account.{AddressScheme, ChainId, KeyPair}
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.v1.FunctionHeader.User
@@ -198,19 +198,12 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
     }
 
     "ChainId" in forAll(randomTransactionGen, invalidChainIdGen) { (tx, randomByte) =>
-      val oldScheme = AddressScheme.current
-
       val pbTransaction = PBTransactions.protobuf(tx)
-
-      AddressScheme.current = new AddressScheme {
-        override val chainId: ChainId = randomByte
+      ChainId.withGlobal(randomByte) {
+        val vanilla = PBTransactions.vanilla(pbTransaction).explicitGet()
+        vanilla.chainByte shouldBe tx.chainByte
+        vanilla shouldBe tx
       }
-
-      val vanilla = PBTransactions.vanilla(pbTransaction).explicitGet()
-      vanilla.chainByte shouldBe tx.chainByte
-      vanilla shouldBe tx
-
-      AddressScheme.current = oldScheme
     }
 
     def decode(base64Str: String): Transaction = {

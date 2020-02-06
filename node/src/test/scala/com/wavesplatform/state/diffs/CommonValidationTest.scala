@@ -1,6 +1,6 @@
 package com.wavesplatform.state.diffs
 
-import com.wavesplatform.account.{Alias, ChainId}
+import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -12,16 +12,15 @@ import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{ChainId, CreateAliasTransaction, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalacheck.{Arbitrary, Gen}
+import org.scalacheck.Gen
 import org.scalatest.{Assertion, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-
-import scala.util.Random
 
 class CommonValidationTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithState with NoShrink {
 
@@ -47,35 +46,26 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("disallows other network") {
-    val preconditionsAndPayment: Gen[(GenesisTransaction, TransferTransaction)] = for {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, Transaction)] = for {
       master    <- accountGen
-      recipient <- otherAccountGen(candidate = master)
+      recipient <- accountGen
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       chainId <- invalidChainIdGen
-      transfer: TransferTransaction <- wavesTransferGeneratorP(master, recipient.toAddressWithChainId(chainId)).suchThat(_.chainByte != ChainId.current)
-    } yield (genesis, transfer)
+      amount  <- smallFeeGen
+      tx <- Gen.oneOf(
+        TransferTransaction
+          .selfSigned(TxVersion.V1, master, recipient.toAddressWithChainId(chainId), Waves, amount, Waves, amount, None, ts)
+          .explicitGet(),
+        CreateAliasTransaction.selfSigned(TxVersion.V1, master, Alias.createWithChainId("test", chainId).explicitGet(), amount, ts).explicitGet(),
+        LeaseTransaction.selfSigned(TxVersion.V1, master, recipient.toAddressWithChainId(chainId), amount, amount, ts).explicitGet()
+      )
+    } yield (genesis, tx)
 
     forAll(preconditionsAndPayment) {
       case (genesis, transfer) =>
         transfer.chainByte should not be ChainId.current
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
-          blockDiffEi should produce("Data from other network")
-        }
-    }
-
-    val preconditionsAndAlias: Gen[(GenesisTransaction, CreateAliasTransaction)] = for {
-      master    <- accountGen
-      ts        <- positiveIntGen
-      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-      fee <- smallFeeGen
-      chainId <- invalidChainIdGen
-      alias = CreateAliasTransaction.selfSigned(TxVersion.V1, master, Alias.createWithChainId("test", chainId).explicitGet(), fee, ts).explicitGet()
-    } yield (genesis, alias)
-
-    forAll(preconditionsAndAlias) {
-      case (genesis, alias) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(alias))) { blockDiffEi =>
           blockDiffEi should produce("Data from other network")
         }
     }
@@ -136,30 +126,30 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       val issueTx =
         if (smartToken)
           IssueTransaction(
-              TxVersion.V2,
-              richAcc,
-              "test".utf8Bytes,
-              "desc".utf8Bytes,
-              Long.MaxValue,
-              2,
-              reissuable = false,
-              Some(script),
-              Constants.UnitsInWave,
-              ts
-            ).signWith(richAcc)
+            TxVersion.V2,
+            richAcc,
+            "test".utf8Bytes,
+            "desc".utf8Bytes,
+            Long.MaxValue,
+            2,
+            reissuable = false,
+            Some(script),
+            Constants.UnitsInWave,
+            ts
+          ).signWith(richAcc)
         else
           IssueTransaction(
-              TxVersion.V1,
-              richAcc,
-              "test".utf8Bytes,
-              "desc".utf8Bytes,
-              Long.MaxValue,
-              2,
-              reissuable = false,
-              script = None,
-              Constants.UnitsInWave,
-              ts
-            ).signWith(richAcc)
+            TxVersion.V1,
+            richAcc,
+            "test".utf8Bytes,
+            "desc".utf8Bytes,
+            Long.MaxValue,
+            2,
+            reissuable = false,
+            script = None,
+            Constants.UnitsInWave,
+            ts
+          ).signWith(richAcc)
 
       val transferWavesTx = TransferTransaction
         .selfSigned(1.toByte, richAcc, recipientAcc, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, None, ts)

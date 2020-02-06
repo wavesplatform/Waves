@@ -13,14 +13,14 @@ import play.api.libs.json._
 import scala.annotation.tailrec
 
 package object utils extends ScorexLogging {
+  private[this] val BytesMaxValue  = 256
+  private[this] val Base58MaxValue = 58
 
-  private val BytesMaxValue  = 256
-  private val Base58MaxValue = 58
+  private[this] val BytesLog = math.log(BytesMaxValue)
+  private[this] val BaseLog  = math.log(Base58MaxValue)
 
-  private val BytesLog = math.log(BytesMaxValue)
-  private val BaseLog  = math.log(Base58MaxValue)
-
-  def base58Length(byteArrayLength: Int): Int = math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
+  def base58Length(byteArrayLength: Int): Int =
+    math.ceil(BytesLog / BaseLog * byteArrayLength).toInt
 
   def forceStopApplication(reason: ApplicationStopReason = Default): Unit =
       System.exit(reason.code)

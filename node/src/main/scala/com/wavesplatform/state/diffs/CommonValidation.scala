@@ -2,8 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import cats.implicits._
-import com.wavesplatform.account.{Address, ChainId}
-import com.wavesplatform.api.http.ApiError.InvalidChainId
+import com.wavesplatform.account.Address
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -31,12 +30,12 @@ object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(
-        sender: Address,
-        assetId: Asset,
-        amount: Long,
-        feeAssetId: Asset,
-        feeAmount: Long,
-        allowFeeOverdraft: Boolean = false
+          sender: Address,
+          assetId: Asset,
+          amount: Long,
+          feeAssetId: Asset,
+          feeAmount: Long,
+          allowFeeOverdraft: Boolean = false
       ) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -90,15 +89,14 @@ object CommonValidation {
           val foldPayments: Iterable[Payment] => Iterable[Payment] =
             if (blockchain.useCorrectPaymentCheck)
               _.groupBy(_.assetId)
-                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
-            else
+                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) } else
               identity
 
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(ContractScriptImpl(version, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
-              case _ => false
+              case _                                                                                          => false
             }
             check <- foldPayments(citx.payments)
               .map(p => checkTransfer(citx.sender, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
@@ -118,7 +116,13 @@ object CommonValidation {
   }
 
   def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: ChainId): Either[ValidationError, T] =
-    Either.cond(tx.chainByte == currentChainId, tx, GenericError(s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainByte}(${tx.chainByte.toChar})"))
+    Either.cond(
+      tx.chainByte == currentChainId,
+      tx,
+      GenericError(
+        s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainByte}(${tx.chainByte.toChar})"
+      )
+    )
 
   def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =

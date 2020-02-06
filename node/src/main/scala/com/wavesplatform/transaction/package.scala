@@ -1,7 +1,8 @@
 package com.wavesplatform
 
 import cats.data.ValidatedNel
-import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.account.AddressScheme.current
+import com.wavesplatform.account.{AddressScheme, PrivateKey}
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
@@ -36,5 +37,23 @@ package object transaction {
 
   implicit class TransactionSignOps[T](tx: T)(implicit sign: (T, PrivateKey) => T) {
     def signWith(privateKey: PrivateKey): T = sign(tx, privateKey)
+  }
+
+
+  type ChainId = Byte
+  object ChainId {
+    def current: ChainId = AddressScheme.current.chainId
+
+    def setGlobal(chainId: ChainId): Unit = AddressScheme.current = new AddressScheme {
+      override val chainId: ChainId = chainId
+    }
+
+    def withGlobal[T](chainId: ChainId)(f: => T): Unit = synchronized {
+      val oldValue = current
+      setGlobal(chainId)
+      val result = f
+      setGlobal(oldValue)
+      result
+    }
   }
 }

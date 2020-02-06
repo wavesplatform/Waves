@@ -4,12 +4,11 @@ import cats.data.Validated
 import cats.data.Validated.{Invalid, Valid}
 import cats.syntax.validated._
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.ChainId
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
-import com.wavesplatform.transaction.{Asset, TxValidationError, TxVersion, VersionedTransaction}
+import com.wavesplatform.transaction.{Asset, ChainId, TxValidationError, TxVersion, VersionedTransaction}
 
 import scala.util.Try
 

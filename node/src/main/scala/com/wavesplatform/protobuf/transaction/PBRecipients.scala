@@ -5,6 +5,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object PBRecipients {
