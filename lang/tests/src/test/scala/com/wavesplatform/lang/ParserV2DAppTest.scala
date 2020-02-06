@@ -28,14 +28,14 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
     throw new TestFailedException("Test failed", 0)
   }*/
 
-  private def escapedCode(s: String): String =
+  /*private def escapedCode(s: String): String =
     s.flatMap {
       case '"' => "\\\""
       case '\n' => "\\n"
       case '\r' => "\\r"
       case '\t' => "\\t"
       case x => x.toChar.toString
-    }.mkString
+    }.mkString*/
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
