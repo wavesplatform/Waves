@@ -22,7 +22,7 @@ import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
-class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Matchers with ScalaCheckDrivenPropertyChecks {
+class ProtoTransactionsSpec extends FreeSpec with TransactionGen with Matchers with ScalaCheckDrivenPropertyChecks {
 
   val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
   val DataTxFee: Long         = 15000000
@@ -52,19 +52,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val decimals    = 2.toByte
       val reissuable  = true
 
-      val issueTx = IssueTransaction(
-        TxVersion.V3,
-        Account,
-        name.toByteString,
-        description.toByteString,
-        quantity,
-        decimals,
-        reissuable,
-        script = None,
-        MinIssueFee,
-        Now,
-        Proofs.empty
-      ).signWith(Account)
+      val issueTx = IssueTransaction(TxVersion.V3, Account, name.toByteString, description.toByteString, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty, ChainId.current).signWith(Account)
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
       val reissueTx = ReissueTransaction
@@ -129,7 +117,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val recipient = accountOrAliasGen.sample.get
 
       val leaseTx              = LeaseTransaction.selfSigned(TxVersion.V3, Account, recipient, 100, MinFee, Now).explicitGet()
-      val leaseCancelTx        = LeaseCancelTransaction(TxVersion.V3, Account, leaseTx.id(), MinFee, Now, Proofs.empty).signWith(Account)
+      val leaseCancelTx        = LeaseCancelTransaction(TxVersion.V3, Account, leaseTx.id(), MinFee, Now, Proofs.empty, ChainId.current).signWith(Account)
       val base64LeaseStr       = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseTx)))
       val base64CancelLeaseStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseCancelTx)))
 
@@ -201,7 +189,7 @@ class ProtoVersionTransactionsSpec extends FreeSpec with TransactionGen with Mat
       val pbTransaction = PBTransactions.protobuf(tx)
       ChainId.withGlobal(randomByte) {
         val vanilla = PBTransactions.vanilla(pbTransaction).explicitGet()
-        vanilla.chainByte shouldBe tx.chainByte
+        vanilla.chainId shouldBe tx.chainId
         vanilla shouldBe tx
       }
     }

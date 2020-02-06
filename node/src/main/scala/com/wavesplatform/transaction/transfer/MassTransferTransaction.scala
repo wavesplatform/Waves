@@ -48,7 +48,7 @@ case class MassTransferTransaction(
     case a: IssuedAsset => Seq(a)
   }
 
-  override def chainByte: ChainId =
+  override def chainId: ChainId =
     transfers.headOption.fold(ChainId.current)(_.address.chainId)
 }
 

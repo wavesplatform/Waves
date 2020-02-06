@@ -13,7 +13,7 @@ trait Transaction {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
-  def chainByte: ChainId = ChainId.current
+  def chainId: ChainId
 
   def bytesSize: Int = bytes().length
   val bytes: Coeval[Array[Byte]]

@@ -65,7 +65,7 @@ class SignedRequestsTest extends FunSuite with Matchers {
     req.reissuable shouldBe true
 
     val tx = req.toTx.explicitGet()
-    tx.asset.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
+    tx.assetId.id.toString shouldBe "Ha35nwsnmYxHRF8UmKG3S523BycBLZFU4FZnjXryKd4L"
     tx.reissuable shouldBe true
     tx.fee shouldBe 100000L
     tx.quantity shouldBe 100000L

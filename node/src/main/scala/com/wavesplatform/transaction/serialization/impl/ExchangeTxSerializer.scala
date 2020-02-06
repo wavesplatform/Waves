@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Ints, Longs}
 import com.wavesplatform.serialization.ByteBufferOps
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{ChainId, Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -87,7 +87,7 @@ object ExchangeTxSerializer {
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V1, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty)
+      ExchangeTransaction(TxVersion.V1, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, ChainId.current)
     }
 
     def parseV2(buf: ByteBuffer): ExchangeTransaction = {
@@ -99,7 +99,7 @@ object ExchangeTxSerializer {
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V2, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty)
+      ExchangeTransaction(TxVersion.V2, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, ChainId.current)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

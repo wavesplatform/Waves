@@ -179,7 +179,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts).signWith(acc.privateKey)
-      minFee <- Gen.choose(1, issue.quantity)
+      minFee <- Gen.choose(1L, issue.quantity)
       sponsor  = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer = TransferTransaction.selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee, None, ts).explicitGet()
     } yield (acc, genesis, issue, sponsor, transfer)
@@ -202,7 +202,7 @@ class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks wi
       (acc, name, desc, quantity, decimals, reissuable, fee, ts) <- issueParamGen
       genesis = GenesisTransaction.create(acc, ENOUGH_AMT, ts).explicitGet()
       issue   = IssueTransaction(TxVersion.V1, acc.publicKey, name, desc, quantity, decimals, reissuable, script = None, fee, ts).signWith(acc.privateKey)
-      minFee <- Gen.choose(1000000, issue.quantity)
+      minFee <- Gen.choose(1000000L, issue.quantity)
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, acc, IssuedAsset(issue.id()), Some(minFee), One, ts).explicitGet()
       transfer1 = TransferTransaction
         .selfSigned(1.toByte, acc, acc, Waves, 1, feeAsset = IssuedAsset(issue.id()), minFee + 7, None, ts)

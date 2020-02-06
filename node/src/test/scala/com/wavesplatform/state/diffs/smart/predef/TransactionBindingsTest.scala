@@ -151,7 +151,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            | case t : ReissueTransaction =>
            |   ${provenPart(t)}
            |   let quantity = t.quantity == ${t.quantity}
-           |   let assetId = t.assetId == base58'${t.asset.id.toString}'
+           |   let assetId = t.assetId == base58'${t.assetId.id.toString}'
            |   let reissuable = t.reissuable == ${t.reissuable}
            |   ${assertProvenPart("t")} && quantity && assetId && reissuable
            | case other => throw()
@@ -232,7 +232,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |match tx {
            | case t : SponsorFeeTransaction =>
            |   ${provenPart(t)}
-           |   let assetId = t.assetId == base58'${t.asset.id.toString}'
+           |   let assetId = t.assetId == base58'${t.assetId.id.toString}'
            |   let minSponsoredAssetFee = if (${t.minSponsoredAssetFee.isDefined}) then extract(t.minSponsoredAssetFee) == ${t.minSponsoredAssetFee
              .getOrElse(0)} else isDefined(t.minSponsoredAssetFee) == false
            |   ${assertProvenPart("t")} && assetId && minSponsoredAssetFee

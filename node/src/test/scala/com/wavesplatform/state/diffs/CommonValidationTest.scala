@@ -1,5 +1,6 @@
 package com.wavesplatform.state.diffs
 
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -11,12 +12,13 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
-import com.wavesplatform.transaction.lease.LeaseTransaction
+import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{ChainId, CreateAliasTransaction, GenesisTransaction, PaymentTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{ChainId, CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -51,31 +53,61 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       master    <- accountGen
       recipient <- accountGen
       timestamp <- positiveIntGen
-      amount <- smallFeeGen
+      amount    <- smallFeeGen
+      script    <- scriptGen
+      asset     <- bytes32gen.map(IssuedAsset(_))
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, timestamp).explicitGet()
 
       invChainId <- invalidChainIdGen
-      invChainAddr = recipient.toAddressWithChainId(invChainId)
+      invChainAddr  = recipient.toAddressWithChainId(invChainId)
       invChainAlias = Alias.createWithChainId("test", invChainId).explicitGet()
       invChainAddrOrAlias <- Gen.oneOf(invChainAddr, invChainAlias)
 
-      tx <- Gen.oneOf(
-        GenesisTransaction.create(invChainAddr, amount, timestamp),
-        PaymentTransaction.selfSigned(master, invChainAddr, amount, amount, timestamp),
-        TransferTransaction
-          .selfSigned(TxVersion.V3, master, invChainAddrOrAlias, Waves, amount, Waves, amount, None, timestamp),
-        CreateAliasTransaction
-          .selfSigned(TxVersion.V3, master, invChainAlias, amount, timestamp),
-        LeaseTransaction.selfSigned(TxVersion.V3, master, invChainAddrOrAlias, amount, amount, timestamp),
-        MassTransferTransaction
-          .selfSigned(TxVersion.V2, master, Waves, Seq(ParsedTransfer(invChainAddrOrAlias, amount)), amount, timestamp, None),
-        InvokeScriptTransaction.selfSigned(TxVersion.V2, master, invChainAddrOrAlias, None, Nil, amount, Waves, timestamp)
-      ).map(_.explicitGet())
+      txWithImplicitChainId <- Gen
+        .oneOf(
+          GenesisTransaction.create(invChainAddr, amount, timestamp),
+          PaymentTransaction.selfSigned(master, invChainAddr, amount, amount, timestamp),
+          TransferTransaction.selfSigned(TxVersion.V3, master, invChainAddrOrAlias, Waves, amount, Waves, amount, None, timestamp),
+          CreateAliasTransaction.selfSigned(TxVersion.V3, master, invChainAlias, amount, timestamp),
+          LeaseTransaction.selfSigned(TxVersion.V3, master, invChainAddrOrAlias, amount, amount, timestamp),
+          MassTransferTransaction.selfSigned(TxVersion.V2, master, Waves, Seq(ParsedTransfer(invChainAddrOrAlias, amount)), amount, timestamp, None),
+          InvokeScriptTransaction.selfSigned(TxVersion.V2, master, invChainAddrOrAlias, None, Nil, amount, Waves, timestamp)
+        )
+        .map(_.explicitGet())
+
+      exchangeTransaction <- exchangeV1GeneratorP(master, recipient, asset, Waves, None, invChainId)
+      txWithExplicitChainId <- Gen.oneOf(
+        exchangeTransaction,
+        IssueTransaction(
+          TxVersion.V2,
+          master.publicKey,
+          ByteString.copyFrom(asset.id),
+          ByteString.copyFrom(asset.id),
+          amount,
+          8,
+          reissuable = true,
+          None,
+          amount,
+          timestamp,
+          Proofs.empty,
+          invChainId
+        ).signWith(master),
+        LeaseCancelTransaction(TxVersion.V3, master, asset.id, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        SetScriptTransaction(TxVersion.V2, master, Some(script), amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        SetAssetScriptTransaction(TxVersion.V2, master, asset, Some(script), amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        BurnTransaction(TxVersion.V2, master, asset, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        ReissueTransaction(TxVersion.V2, master, asset, amount, reissuable = false, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        SponsorFeeTransaction(TxVersion.V2, master, asset, Some(amount), amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        UpdateAssetInfoTransaction(TxVersion.V2, master, asset, "1", "2", Waves, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        DataTransaction(TxVersion.V2, master, Nil, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+      )
+
+      tx <- Gen.oneOf(txWithImplicitChainId, txWithExplicitChainId)
     } yield (genesis, tx)
 
     forAll(preconditionsAndPayment) {
       case (genesis, transfer) =>
-        transfer.chainByte should not be ChainId.current
+        transfer.chainId should not be ChainId.current
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
           blockDiffEi should produce("Data from other network")
         }

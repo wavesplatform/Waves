@@ -14,7 +14,7 @@ object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
       V.transferAttachment(isProtobufVersion, attachment),
       V.cond(transfers.forall(_.amount >= 0), GenericError("One of the transfers has negative amount")),
       V.fee(fee),
-      V.chainIds(chainByte +: transfers.map(_.address.chainId): _*)
+      V.chainIds(transfers.map(_.address.chainId): _*)
     )
   }
 }

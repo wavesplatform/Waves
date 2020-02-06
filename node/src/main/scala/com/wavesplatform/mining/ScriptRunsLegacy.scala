@@ -36,8 +36,8 @@ private[mining] object ScriptRunsLegacy extends ScorexLogging {
       case x: TransferTransaction     => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
       case x: MassTransferTransaction => x.assetId.fold[Seq[IssuedAsset]](Nil)(Seq(_))
       case x: BurnTransaction         => Seq(x.asset)
-      case x: ReissueTransaction      => Seq(x.asset)
-      case x: SponsorFeeTransaction   => Seq(x.asset)
+      case x: ReissueTransaction      => Seq(x.assetId)
+      case x: SponsorFeeTransaction   => Seq(x.assetId)
       case x: ExchangeTransaction =>
         Seq(
           x.buyOrder.assetPair.amountAsset.fold[Seq[IssuedAsset]](Nil)(Seq(_)),

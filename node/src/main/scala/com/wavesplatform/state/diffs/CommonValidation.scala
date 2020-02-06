@@ -117,10 +117,10 @@ object CommonValidation {
 
   def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: ChainId): Either[ValidationError, T] =
     Either.cond(
-      tx.chainByte == currentChainId,
+      tx.chainId == currentChainId,
       tx,
       GenericError(
-        s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainByte}(${tx.chainByte.toChar})"
+        s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
       )
     )
 

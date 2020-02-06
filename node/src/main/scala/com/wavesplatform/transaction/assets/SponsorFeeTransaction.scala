@@ -16,11 +16,12 @@ import scala.util.Try
 case class SponsorFeeTransaction(
     version: TxVersion,
     sender: PublicKey,
-    asset: IssuedAsset,
+    assetId: IssuedAsset,
     minSponsoredAssetFee: Option[TxAmount],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: ChainId
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -33,7 +34,7 @@ case class SponsorFeeTransaction(
   override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]     = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override val checkedAssets: Seq[IssuedAsset] = Seq(asset)
+  override val checkedAssets: Seq[IssuedAsset] = Seq(assetId)
 }
 
 object SponsorFeeTransaction extends TransactionParser {
@@ -53,32 +54,32 @@ object SponsorFeeTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      asset: IssuedAsset,
-      minSponsoredAssetFee: Option[TxTimestamp],
+      assetId: IssuedAsset,
+      minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, SponsorFeeTransaction] =
-    SponsorFeeTransaction(version, sender, asset, minSponsoredAssetFee, fee, timestamp, proofs).validatedEither
+    SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      asset: IssuedAsset,
-      minSponsoredAssetFee: Option[TxTimestamp],
+      assetId: IssuedAsset,
+      minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
   ): Either[ValidationError, SponsorFeeTransaction] =
-    create(version, sender, asset, minSponsoredAssetFee, fee, timestamp, Proofs.empty).map(_.signWith(signer))
+    create(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      asset: IssuedAsset,
-      minSponsoredAssetFee: Option[TxTimestamp],
+      assetId: IssuedAsset,
+      minSponsoredAssetFee: Option[TxAmount],
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, SponsorFeeTransaction] =
-    signed(version, sender, asset, minSponsoredAssetFee, fee, timestamp, sender)
+    signed(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, sender)
 }

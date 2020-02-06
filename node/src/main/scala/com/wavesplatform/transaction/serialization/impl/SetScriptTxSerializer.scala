@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{ChainId, TxVersion}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -16,7 +16,7 @@ object SetScriptTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "script" -> script.map(_.bytes().base64)
-    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> chainByte) else Json.obj())
+    ) ++ (if (tx.version == TxVersion.V1) Json.obj("chainId" -> chainId) else Json.obj())
   }
 
   def bodyBytes(tx: SetScriptTransaction): Array[Byte] = {
@@ -24,7 +24,7 @@ object SetScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte),
+          Array(builder.typeId, version, chainId),
           sender,
           Deser.serializeOptionOfArrayWithLength(script)(s => s.bytes()),
           Longs.toByteArray(fee),
@@ -46,13 +46,13 @@ object SetScriptTxSerializer {
 
     val buf = ByteBuffer.wrap(bytes)
     require(buf.getByte == 0 && buf.getByte == SetScriptTransaction.typeId && buf.getByte == TxVersion.V1, "transaction type mismatch")
-    require(buf.getByte == AddressScheme.current.chainId, "transaction chainId mismatch")
+    val _ = buf.getByte // chainId
 
     val sender    = buf.getPublicKey
     val script    = buf.getScript
     val fee       = buf.getLong
     val timestamp = buf.getLong
     val proofs    = buf.getProofs
-    SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs)
+    SetScriptTransaction(TxVersion.V1, sender, script, fee, timestamp, proofs, ChainId.current)
   }
 }

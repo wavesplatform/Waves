@@ -53,10 +53,10 @@ class AssetTransactionsDiffTest
 
             totalPortfolioDiff.balance shouldBe 0
             totalPortfolioDiff.effectiveBalance shouldBe 0
-            totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity - burn.quantity))
+            totalPortfolioDiff.assets shouldBe Map(reissue.assetId -> (reissue.quantity - burn.quantity))
 
             val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
-            newState.portfolio(issue.sender).assets shouldBe Map(reissue.asset -> totalAssetVolume)
+            newState.portfolio(issue.sender).assets shouldBe Map(reissue.assetId -> totalAssetVolume)
         }
     }
   }
@@ -451,17 +451,7 @@ class AssetTransactionsDiffTest
         .signWith(accountA)
       assetId = IssuedAsset(issue.id())
       update = UpdateAssetInfoTransaction
-        .selfSigned(
-          TxVersion.V1,
-          AddressScheme.current.chainId,
-          accountA,
-          assetId.id,
-          updName,
-          updDescription,
-          timestamp,
-          smallFee,
-          Waves
-        )
+        .selfSigned(TxVersion.V1, accountA, assetId.id, updName, updDescription, Waves, smallFee, timestamp)
         .explicitGet()
 
     } yield (Seq(genesisTx1, genesisTx2), issue, update)
@@ -485,17 +475,7 @@ class AssetTransactionsDiffTest
       )
       .explicitGet()
     update1 = UpdateAssetInfoTransaction
-      .selfSigned(
-        TxVersion.V1,
-        AddressScheme.current.chainId,
-        accountС,
-        issue1.assetId,
-        "Invalid",
-        "Invalid",
-        issue1.timestamp + 1,
-        10,
-        Waves
-      )
+      .selfSigned(TxVersion.V1, accountС, issue1.assetId, "Invalid", "Invalid", Waves, 10, issue1.timestamp + 1)
       .explicitGet()
   } yield (gen :+ genesisTx3, Seq(issue, issue1), accountС, update1)
 }

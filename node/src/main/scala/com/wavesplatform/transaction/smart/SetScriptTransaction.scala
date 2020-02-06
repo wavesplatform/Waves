@@ -20,7 +20,8 @@ case class SetScriptTransaction(
     script: Option[Script],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: ChainId
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -58,7 +59,7 @@ object SetScriptTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, SetScriptTransaction] =
-    SetScriptTransaction(version, sender, script, fee, timestamp, proofs).validatedEither
+    SetScriptTransaction(version, sender, script, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def signed(
       version: TxVersion,

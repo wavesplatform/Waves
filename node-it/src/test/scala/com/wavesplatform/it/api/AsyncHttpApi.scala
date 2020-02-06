@@ -414,18 +414,7 @@ object AsyncHttpApi extends Assertions {
                        version: TxVersion = TxVersion.V1,
                        timestamp: Option[Long] = None
                     ): Future[(Transaction, JsValue)] = {
-      val tx = UpdateAssetInfoTransaction(
-        version,
-        AddressScheme.current.chainId,
-        sender.publicKey,
-        IssuedAsset(ByteStr(Base58.decode(assetId))),
-        name,
-        description,
-        timestamp.getOrElse(System.currentTimeMillis()),
-        fee,
-        if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
-        Proofs.empty
-      ).signWith(sender.privateKey)
+      val tx = UpdateAssetInfoTransaction(version, sender.publicKey, IssuedAsset(ByteStr(Base58.decode(assetId))), name, description, if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves, fee, timestamp.getOrElse(System.currentTimeMillis()), Proofs.empty, AddressScheme.current.chainId).signWith(sender.privateKey)
       signedTraceBroadcast(tx.json())
     }
 

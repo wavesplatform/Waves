@@ -16,12 +16,13 @@ import scala.util._
 case class ReissueTransaction(
     version: TxVersion,
     sender: PublicKey,
-    asset: IssuedAsset,
-    quantity: Long,
+    assetId: IssuedAsset,
+    quantity: TxAmount,
     reissuable: Boolean,
-    fee: Long,
-    timestamp: Long,
-    proofs: Proofs
+    fee: TxAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: ChainId
 ) extends VersionedTransaction
     with ProvenTransaction
     with SigProofsSwitch
@@ -36,7 +37,7 @@ case class ReissueTransaction(
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override def checkedAssets: Seq[IssuedAsset] = Seq(asset)
+  override def checkedAssets: Seq[IssuedAsset] = Seq(assetId)
 }
 
 object ReissueTransaction extends TransactionParser {
@@ -55,35 +56,35 @@ object ReissueTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      asset: IssuedAsset,
+      assetId: IssuedAsset,
       quantity: Long,
       reissuable: Boolean,
       fee: Long,
       timestamp: Long,
       proofs: Proofs
   ): Either[ValidationError, ReissueTransaction] =
-    ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, proofs).validatedEither
+    ReissueTransaction(version, sender, assetId, quantity, reissuable, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      asset: IssuedAsset,
+      assetId: IssuedAsset,
       quantity: Long,
       reissuable: Boolean,
       fee: Long,
       timestamp: Long,
       signer: PrivateKey
   ): Either[ValidationError, ReissueTransaction] =
-    create(version, sender, asset, quantity, reissuable, fee, timestamp, Nil).map(_.signWith(signer))
+    create(version, sender, assetId, quantity, reissuable, fee, timestamp, Nil).map(_.signWith(signer))
 
   def selfSigned(
       version: TxVersion,
       sender: KeyPair,
-      asset: IssuedAsset,
+      assetId: IssuedAsset,
       quantity: Long,
       reissuable: Boolean,
       fee: Long,
       timestamp: Long
   ): Either[ValidationError, ReissueTransaction] =
-    signed(version, sender, asset, quantity, reissuable, fee, timestamp, sender)
+    signed(version, sender, assetId, quantity, reissuable, fee, timestamp, sender)
 }

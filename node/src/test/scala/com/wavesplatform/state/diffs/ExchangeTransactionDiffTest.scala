@@ -29,6 +29,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
+//noinspection NameBooleanParameters,NameBooleanParameters
 class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
@@ -203,6 +204,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
   property("Preserves assets invariant (matcher's fee in separately issued asset), stores match info, rewards matcher (Orders V3 are used)") {
 
+    //noinspection ScalaStyle
     val preconditionsAndExchange: Gen[
       (
           GenesisTransaction,
@@ -748,14 +750,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(exchangeWithV2Tx) {
       case (gen1, gen2, issue1, issue2, exchange) =>
-        val exchangeWithResignedOrder = (exchange: @unchecked) match {
-          case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _) =>
-            val newSig = ByteStr(crypto.sign(PrivateKey(so.senderPublicKey), bo.bodyBytes()))
-            e1.copy(buyOrder = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[Order])
-          case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _) =>
-            val newSig = ByteStr(crypto.sign(PrivateKey(bo.senderPublicKey), so.bodyBytes()))
-            e2.copy(sellOrder = so.updateProofs(Proofs(Seq(newSig))))
-        }
+        val newSig                    = ByteStr(crypto.sign(PrivateKey(exchange.buyOrder.senderPublicKey), exchange.sellOrder.bodyBytes()))
+        val exchangeWithResignedOrder = exchange.copy(sellOrder = exchange.sellOrder.updateProofs(Proofs(Seq(newSig))))
 
         val preconBlocks = Seq(
           TestBlock.create(Seq(gen1, gen2)),
@@ -782,20 +778,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
           )
         )
 
-        val exchangeWithResignedOrder = (exchange: @unchecked) match {
-          case e1 @ ExchangeTransaction(TxVersion.V1, _, so, _, _, _, _, _, _, _) =>
-            e1.copy(buyOrder = so.updateProofs(newProofs).asInstanceOf[Order])
-          case e2 @ ExchangeTransaction(TxVersion.V2, _, so, _, _, _, _, _, _, _) =>
-            e2.copy(buyOrder = so.updateProofs(newProofs))
-        }
-
         val preconBlocks = Seq(
           TestBlock.create(Seq(gen1, gen2)),
           TestBlock.create(Seq(issue1, issue2))
         )
 
-        val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
-
+        val blockWithExchange = TestBlock.create(Seq(exchange.copy(buyOrder = exchange.buyOrder.updateProofs(newProofs))))
         assertLeft(preconBlocks, blockWithExchange, fs)("Proof doesn't validate as signature")
     }
   }

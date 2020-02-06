@@ -80,7 +80,7 @@ object AssetTransactionsDiff {
         tx.sender,
         blockTime,
         tx.fee,
-        Reissue(tx.asset.id, tx.reissuable, tx.quantity)
+        Reissue(tx.assetId.id, tx.reissuable, tx.quantity)
       )
       .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
 
@@ -95,13 +95,13 @@ object AssetTransactionsDiff {
       .map(Diff(tx = tx, scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)) |+| _)
 
   def sponsor(blockchain: Blockchain, blockTime: Long)(tx: SponsorFeeTransaction): Either[ValidationError, Diff] =
-    DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender, issuerOnly = true).flatMap { _ =>
+    DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender, issuerOnly = true).flatMap { _ =>
       Either.cond(
-        !blockchain.hasAssetScript(tx.asset),
+        !blockchain.hasAssetScript(tx.assetId),
         Diff(
           tx = tx,
           portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-          sponsorship = Map(tx.asset           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
+          sponsorship = Map(tx.assetId           -> SponsorshipValue(tx.minSponsoredAssetFee.getOrElse(0))),
           scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
         ),
         GenericError("Sponsorship smart assets is disabled.")
@@ -110,9 +110,9 @@ object AssetTransactionsDiff {
 
   def updateInfo(blockchain: Blockchain)(tx: UpdateAssetInfoTransaction): Either[ValidationError, Diff] =
     DiffsCommon.validateAsset(blockchain, tx.assetId, tx.sender, issuerOnly = true) >> {
-      lazy val portfolioUpdate = tx.feeAsset match {
-        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.feeAmount))
-        case Asset.Waves         => Portfolio(balance = -tx.feeAmount, LeaseBalance.empty, Map.empty)
+      lazy val portfolioUpdate = tx.feeAssetId match {
+        case ia @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(ia -> -tx.fee))
+        case Asset.Waves         => Portfolio(balance = -tx.fee, LeaseBalance.empty, Map.empty)
       }
 
       val minUpdateInfoInterval = blockchain.settings.functionalitySettings.minAssetInfoUpdateInterval

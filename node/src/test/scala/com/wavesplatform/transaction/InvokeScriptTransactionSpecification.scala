@@ -45,7 +45,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
   property("protobuf roundtrip") {
     forAll(invokeScriptGen(paymentListGen), accountGen) { (tx, caller) =>
       val unsigned = transaction.PBTransaction(
-        tx.chainByte,
+        tx.chainId,
         ByteString.copyFrom(caller.publicKey),
         Some(Amount.of(PBAmounts.toPBAssetId(tx.feeAssetId), tx.fee)),
         tx.timestamp,
@@ -77,7 +77,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       "ABABRFnfcU6tj7ELaOMRU60BmUEXZSyzyWDG4yxX597CilhGAUSJ/UXOr7T3dYRD2dI6xLKS+XNccQNSaToBCQEAAAADZm9vAAAAAQEAAAAFYWxpY2UAAQApAAAAAAAAAAcBWd9xTq2PsQto4xFTrQGZQRdlLLPJYMbjLFfn3sKKWEYAAAAAAAGGoAAAAAFjgvl7hQEAAQBAL4aaBFut6sRjmJqyUMSsW344/xjKn74k0tXmtbAMnZhCIysagYHWE578HZUBuKPxN/3v8OxBmN3lSChpsYrsCg=="
     )
     AddressScheme.current = new AddressScheme {
-      override val chainId: TxVersion = 'D'.toByte
+      override val chainId: ChainId = 'D'.toByte
     }
     val json = Json.parse(s"""{
                          "type": 16,

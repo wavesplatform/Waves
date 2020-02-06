@@ -4,7 +4,7 @@ import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.{ChainId, TxVersion}
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import play.api.libs.json.{JsObject, Json}
 
@@ -14,7 +14,7 @@ object SponsorFeeTxSerializer {
   def toJson(tx: SponsorFeeTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "assetId"              -> asset.id.toString,
+      "assetId"              -> assetId.id.toString,
       "minSponsoredAssetFee" -> minSponsoredAssetFee
     )
   }
@@ -26,7 +26,7 @@ object SponsorFeeTxSerializer {
         Bytes.concat(
           Array(builder.typeId, version),
           sender,
-          asset.id,
+          assetId.id,
           Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)
@@ -55,6 +55,6 @@ object SponsorFeeTxSerializer {
     val fee                  = buf.getLong
     val timestamp            = buf.getLong
     val proofs               = buf.getProofs
-    SponsorFeeTransaction(TxVersion.V1, sender, asset, Some(minSponsoredAssetFee).filterNot(_ == 0), fee, timestamp, proofs)
+    SponsorFeeTransaction(TxVersion.V1, sender, asset, Some(minSponsoredAssetFee).filterNot(_ == 0), fee, timestamp, proofs, ChainId.current)
   }
 }

@@ -71,7 +71,7 @@ object RealTransactionWrapper {
       case t: TransferTransaction => mapTransferTx(t, stdLibVersion).asRight
       case i: IssueTransaction =>
         Tx.Issue(proven(i), i.quantity, i.name.toByteArray, i.description.toByteArray, i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
-      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
+      case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.assetId.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
       case b: LeaseCancelTransaction => Tx.LeaseCancel(proven(b), b.leaseId).asRight
@@ -90,7 +90,7 @@ object RealTransactionWrapper {
       case ss: SetAssetScriptTransaction => Tx.SetAssetScript(proven(ss), ss.asset.id, ss.script.map(_.bytes())).asRight
       case p: PaymentTransaction         => Tx.Payment(proven(p), p.amount, p.recipient).asRight
       case e: ExchangeTransaction        => Tx.Exchange(proven(e), e.amount, e.price, e.buyMatcherFee, e.sellMatcherFee, e.buyOrder, e.sellOrder).asRight
-      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.asset.id, s.minSponsoredAssetFee).asRight
+      case s: SponsorFeeTransaction      => Tx.Sponsorship(proven(s), s.assetId.id, s.minSponsoredAssetFee).asRight
       case d: DataTransaction =>
         Tx.Data(
             proven(d),

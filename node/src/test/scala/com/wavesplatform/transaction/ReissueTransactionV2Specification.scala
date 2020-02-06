@@ -23,7 +23,7 @@ class ReissueTransactionV2Specification extends GenericTransactionSpecification[
       first.version shouldEqual second.version
       first.quantity shouldEqual second.quantity
       first.reissuable shouldEqual second.reissuable
-      first.asset shouldEqual second.asset
+      first.assetId shouldEqual second.assetId
       first.proofs shouldEqual second.proofs
       first.bytes() shouldEqual second.bytes()
   }

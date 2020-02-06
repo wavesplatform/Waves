@@ -20,13 +20,14 @@ case class IssueTransaction(
     sender: PublicKey,
     name: ByteString,
     description: ByteString,
-    quantity: Long,
+    quantity: TxAmount,
     decimals: Byte,
     reissuable: Boolean,
     script: Option[Script],
-    fee: Long,
-    timestamp: Long,
-    proofs: Proofs
+    fee: TxAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: ChainId
 ) extends VersionedTransaction
     with ProvenTransaction
     with FastHashId
@@ -82,7 +83,8 @@ object IssueTransaction extends TransactionParser {
       script,
       fee,
       timestamp,
-      proofs
+      proofs,
+      ChainId.current
     )
   }
 
@@ -110,7 +112,8 @@ object IssueTransaction extends TransactionParser {
       script,
       fee,
       timestamp,
-      proofs
+      proofs,
+      ChainId.current
     ).validatedEither
 
   def signed(

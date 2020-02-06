@@ -23,7 +23,7 @@ case class GenesisTransaction(recipient: Address, amount: Long, timestamp: Long,
   override val bytes: Coeval[Array[Byte]]     = bodyBytes
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override def chainByte: ChainId = recipient.chainId
+  override def chainId: ChainId = recipient.chainId
 }
 
 object GenesisTransaction extends TransactionParser {

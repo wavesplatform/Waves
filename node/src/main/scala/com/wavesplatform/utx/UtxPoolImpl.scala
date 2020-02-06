@@ -72,7 +72,7 @@ class UtxPoolImpl(
       object LimitChecks {
         def canReissue(tx: Transaction): Either[GenericError, Unit] =
           PoolMetrics.checkCanReissue.measure(tx match {
-            case r: ReissueTransaction if !TxCheck.canReissue(r.asset) => Left(GenericError(s"Asset is not reissuable"))
+            case r: ReissueTransaction if !TxCheck.canReissue(r.assetId) => Left(GenericError(s"Asset is not reissuable"))
             case _                                                     => Right(())
           })
 

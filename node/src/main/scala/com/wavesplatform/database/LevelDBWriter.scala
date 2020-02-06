@@ -595,11 +595,11 @@ class LevelDBWriter(
                 case tx: UpdateAssetInfoTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
                 case tx: ReissueTransaction =>
-                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
+                  assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.assetId, currentHeight)
                 case tx: BurnTransaction =>
                   assetDetailsToInvalidate += rollbackAssetInfo(rw, tx.asset, currentHeight)
                 case tx: SponsorFeeTransaction =>
-                  assetDetailsToInvalidate += rollbackSponsorship(rw, tx.asset, currentHeight)
+                  assetDetailsToInvalidate += rollbackSponsorship(rw, tx.assetId, currentHeight)
                 case tx: LeaseTransaction =>
                   rollbackLeaseStatus(rw, tx.id(), currentHeight)
                 case tx: LeaseCancelTransaction =>

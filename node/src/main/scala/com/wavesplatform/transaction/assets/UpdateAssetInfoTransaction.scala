@@ -8,7 +8,22 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
-import com.wavesplatform.transaction.{Asset, ChainSpecific, FastHashId, Proofs, ProvenTransaction, Transaction, TransactionParser, TxAmount, TxTimestamp, TxType, TxVersion, UnexpectedTransaction, VersionedTransaction, _}
+import com.wavesplatform.transaction.{
+  Asset,
+  ChainSpecific,
+  FastHashId,
+  Proofs,
+  ProvenTransaction,
+  Transaction,
+  TransactionParser,
+  TxAmount,
+  TxTimestamp,
+  TxType,
+  TxVersion,
+  UnexpectedTransaction,
+  VersionedTransaction,
+  _
+}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -16,21 +31,22 @@ import scala.util.{Failure, Success, Try}
 
 case class UpdateAssetInfoTransaction(
     version: TxVersion,
-    chainId: Byte,
     sender: PublicKey,
     assetId: IssuedAsset,
     name: String,
     description: String,
+    feeAssetId: Asset,
+    fee: TxAmount,
     timestamp: TxTimestamp,
-    feeAmount: TxAmount,
-    feeAsset: Asset,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: ChainId
 ) extends VersionedTransaction
     with ChainSpecific
     with FastHashId
-    with ProvenTransaction { self =>
+    with ProvenTransaction
+    with TxWithFee.InCustomAsset { self =>
 
-  override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
+  override def assetFee: (Asset, TxAmount) = (feeAssetId, fee)
 
   override def builder: UpdateAssetInfoTransaction.type = UpdateAssetInfoTransaction
 
@@ -51,8 +67,8 @@ case class UpdateAssetInfoTransaction(
 }
 
 object UpdateAssetInfoTransaction extends TransactionParser {
-  override val typeId: TxType                                 = 17: Byte
-  override val supportedVersions: Set[TxVersion]              = Set(1)
+  override val typeId: TxType                    = 17: Byte
+  override val supportedVersions: Set[TxVersion] = Set(1)
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
@@ -68,41 +84,27 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       }
 
   def create(
-      version: Byte,
-      chainId: Byte,
+      version: ChainId,
       sender: PublicKey,
       assetId: ByteStr,
       name: String,
       description: String,
+      feeAssetId: Asset,
+      fee: TxAmount,
       timestamp: TxTimestamp,
-      feeAmount: TxAmount,
-      feeAsset: Asset,
       proofs: Proofs
-  ): Either[ValidationError, UpdateAssetInfoTransaction] = {
-    UpdateAssetInfoTransaction(
-      version,
-      chainId,
-      sender,
-      IssuedAsset(assetId),
-      name,
-      description,
-      timestamp,
-      feeAmount,
-      feeAsset,
-      proofs
-    ).validatedEither
-  }
+  ): Either[ValidationError, UpdateAssetInfoTransaction] =
+    UpdateAssetInfoTransaction(version, sender, IssuedAsset(assetId), name, description, feeAssetId, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def selfSigned(
-      version: Byte,
-      chainId: Byte,
+      version: ChainId,
       sender: KeyPair,
       assetId: ByteStr,
       name: String,
       description: String,
-      timestamp: TxTimestamp,
-      feeAmount: TxAmount,
-      feeAsset: Asset
+      feeAssetId: Asset,
+      fee: TxAmount,
+      timestamp: TxTimestamp
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, chainId, sender, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender))
+    create(version, sender, assetId, name, description, feeAssetId, fee, timestamp, Proofs.empty).map(_.signWith(sender))
 }

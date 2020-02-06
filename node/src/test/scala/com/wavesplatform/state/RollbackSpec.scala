@@ -428,7 +428,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithSponsor = d.lastBlockId
 
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
           d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
 
           d.appendBlock(
@@ -439,11 +439,11 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           )
 
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe 0
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe 0
 
           d.removeAfter(blockIdWithSponsor)
 
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
           d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
 
           d.appendBlock(
@@ -455,11 +455,11 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           )
 
           d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
 
           d.removeAfter(blockIdWithIssue)
 
-          d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe 0
+          d.blockchainUpdater.assetDescription(sponsor1.assetId).get.sponsorship shouldBe 0
         }
     }
 

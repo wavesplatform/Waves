@@ -23,7 +23,7 @@ case class PaymentTransaction(sender: PublicKey, recipient: Address, amount: Lon
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
-  override def chainByte: ChainId = recipient.chainId
+  override def chainId: ChainId = recipient.chainId
 }
 
 object PaymentTransaction extends TransactionParser {

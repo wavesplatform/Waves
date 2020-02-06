@@ -17,10 +17,11 @@ final case class BurnTransaction(
     version: TxVersion,
     sender: PublicKey,
     asset: IssuedAsset,
-    quantity: Long,
-    fee: Long,
-    timestamp: Long,
-    proofs: Proofs
+    quantity: TxAmount,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: ChainId
 ) extends ProvenTransaction
     with VersionedTransaction
     with SigProofsSwitch
@@ -60,7 +61,7 @@ object BurnTransaction extends TransactionParser {
       timestamp: Long,
       proofs: Proofs
   ): Either[ValidationError, BurnTransaction] =
-    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs).validatedEither
+    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def signed(
       version: TxVersion,

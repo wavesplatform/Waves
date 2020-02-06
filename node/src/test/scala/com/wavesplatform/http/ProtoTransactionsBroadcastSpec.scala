@@ -31,7 +31,7 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
 import play.api.libs.json._
 
-class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with TransactionGen with Matchers {
+class ProtoTransactionsBroadcastSpec extends RouteSpec("/transactions") with RestAPISettingsHelper with MockFactory with TransactionGen with Matchers {
   import com.wavesplatform.http.ApiMarshallers._
 
   private val MinFee: Long            = (0.001 * Constants.UnitsInWave).toLong
@@ -398,17 +398,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
       val updateAssetInfoTx = UpdateAssetInfoTransaction
-        .selfSigned(
-          TxVersion.V1,
-          AddressScheme.current.chainId,
-          account,
-          asset.id,
-          "Test",
-          "Test",
-          ntpNow,
-          MinFee,
-          Asset.Waves
-        )
+        .selfSigned(TxVersion.V1, account, asset.id, "Test", "Test", Asset.Waves, MinFee, ntpNow)
         .explicitGet()
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(updateAssetInfoTx)))
 

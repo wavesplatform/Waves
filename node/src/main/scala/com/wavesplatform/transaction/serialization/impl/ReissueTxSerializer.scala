@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.ReissueTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{ChainId, Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
 
 import scala.util.Try
@@ -14,17 +14,17 @@ object ReissueTxSerializer {
   def toJson(tx: ReissueTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "assetId"    -> asset.id.toString,
+      "assetId"    -> assetId.id.toString,
       "quantity"   -> quantity,
       "reissuable" -> reissuable
-    ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainByte) else Json.obj())
+    ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainId) else Json.obj())
   }
 
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
     import tx._
     lazy val baseBytes = Bytes.concat(
       sender,
-      asset.id.arr,
+      assetId.id.arr,
       Longs.toByteArray(quantity),
       if (reissuable) Array(1: Byte) else Array(0: Byte),
       Longs.toByteArray(fee),
@@ -37,7 +37,7 @@ object ReissueTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte),
+          Array(builder.typeId, version, chainId),
           baseBytes
         )
 
@@ -62,7 +62,7 @@ object ReissueTxSerializer {
       val reissuable = buf.getBoolean
       val fee        = buf.getLong
       val timestamp  = buf.getLong
-      ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil)
+      ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, ChainId.current)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

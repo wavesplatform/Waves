@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import com.google.common.primitives.{Bytes, Longs}
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.BurnTransaction
-import com.wavesplatform.transaction.{Proofs, TxVersion}
+import com.wavesplatform.transaction.{ChainId, Proofs, TxVersion}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -16,7 +16,7 @@ object BurnTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++
       Json.obj("assetId" -> asset.id.toString, (if (version < TxVersion.V3) "amount" else "quantity") -> quantity) ++
-      (if (version == TxVersion.V2) Json.obj("chainId" -> chainByte) else JsObject.empty)
+      (if (version == TxVersion.V2) Json.obj("chainId" -> chainId) else JsObject.empty)
   }
 
   def bodyBytes(tx: BurnTransaction): Coeval[Array[Byte]] = Coeval.evalOnce {
@@ -31,7 +31,7 @@ object BurnTxSerializer {
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(builder.typeId, version, chainId), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
@@ -49,7 +49,7 @@ object BurnTxSerializer {
       val quantity  = buf.getLong
       val fee       = buf.getLong
       val timestamp = buf.getLong
-      BurnTransaction(version, sender, asset, quantity, fee, timestamp, Nil)
+      BurnTransaction(version, sender, asset, quantity, fee, timestamp, Nil, ChainId.current)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

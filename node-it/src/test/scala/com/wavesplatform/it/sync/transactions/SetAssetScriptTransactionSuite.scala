@@ -337,20 +337,12 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    val nonIssuerUnsignedTx = SetAssetScriptTransaction(
-      1.toByte,
-      accountA,
-      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
-      Some(unchangeableScript),
-      setAssetScriptFee + 0.004.waves,
-      System.currentTimeMillis,
-      Proofs.empty
-    )
+    val nonIssuerUnsignedTx = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(unchangeableScript), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty, ChainId.current)
 
     val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
 
     val signedTxByB =
-      nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)))
+      nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)), chainId = ChainId.current)
 
     val tx =
       sender.signedBroadcast(signedTxByB.json()).id
@@ -358,15 +350,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(tx)
 
     //try to change unchangeable script
-    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
-      1.toByte,
-      accountA,
-      IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
-      Some(script),
-      setAssetScriptFee + 0.004.waves,
-      System.currentTimeMillis,
-      Proofs.empty
-    )
+    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(script), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty, ChainId.current)
 
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 

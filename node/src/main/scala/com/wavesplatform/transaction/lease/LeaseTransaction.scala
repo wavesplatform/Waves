@@ -43,7 +43,7 @@ final case class LeaseTransaction(
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(LeaseTransaction.serializer.toBytes(this))
   override val json: Coeval[JsObject]              = Coeval.evalOnce(LeaseTransaction.serializer.toJson(this))
 
-  override def chainByte: ChainId = recipient.chainId
+  override def chainId: ChainId = recipient.chainId
 }
 
 object LeaseTransaction extends TransactionParser {

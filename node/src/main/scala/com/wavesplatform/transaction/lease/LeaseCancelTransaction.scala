@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.lease
 
-import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -20,7 +20,8 @@ final case class LeaseCancelTransaction(
     leaseId: ByteStr,
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: ChainId
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -54,7 +55,7 @@ object LeaseCancelTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
-    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs).validatedEither
+    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def signed(
       version: TxVersion,
@@ -65,4 +66,13 @@ object LeaseCancelTransaction extends TransactionParser {
       signer: PrivateKey
   ): Either[ValidationError, TransactionT] =
     create(version, sender, leaseId, fee, timestamp, Nil).map(_.signWith(signer))
+
+  def selfSigned(
+      version: TxVersion,
+      sender: KeyPair,
+      leaseId: ByteStr,
+      fee: TxAmount,
+      timestamp: TxTimestamp
+  ): Either[ValidationError, TransactionT] =
+    signed(version, sender, leaseId, fee, timestamp, sender)
 }

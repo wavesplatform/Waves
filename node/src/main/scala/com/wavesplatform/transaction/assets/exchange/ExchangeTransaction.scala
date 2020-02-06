@@ -17,13 +17,14 @@ case class ExchangeTransaction(
     version: TxVersion,
     buyOrder: Order,
     sellOrder: Order,
-    amount: Long,
-    price: Long,
-    buyMatcherFee: Long,
-    sellMatcherFee: Long,
-    fee: Long,
-    timestamp: Long,
-    proofs: Proofs
+    amount: TxAmount,
+    price: TxTimestamp,
+    buyMatcherFee: TxAmount,
+    sellMatcherFee: TxAmount,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: ChainId
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
@@ -72,7 +73,7 @@ object ExchangeTransaction extends TransactionParser {
       timestamp: Long,
       proofs: Proofs = Proofs.empty
   ): Either[ValidationError, ExchangeTransaction] =
-    ExchangeTransaction(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs).validatedEither
+    ExchangeTransaction(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, ChainId.current).validatedEither
 
   def signed(
       version: TxVersion,

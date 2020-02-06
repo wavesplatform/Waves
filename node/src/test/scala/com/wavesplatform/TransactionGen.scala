@@ -433,7 +433,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val updateAssetInfoTxGen: Gen[UpdateAssetInfoTransaction] =
     for {
-      chainId     <- Gen.chooseNum[Byte](Byte.MinValue, Byte.MaxValue)
       account     <- accountGen
       assetId     <- bytes32gen
       assetName   <- genBoundedString(IssueTransaction.MinAssetNameLength, IssueTransaction.MaxAssetNameLength)
@@ -441,7 +440,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fee         <- smallFeeGen
       timestamp   <- positiveLongGen
       tx = UpdateAssetInfoTransaction
-        .selfSigned(1.toByte, chainId, account, assetId, new String(assetName), new String(description), timestamp, fee, Waves)
+        .selfSigned(1.toByte, account, assetId, assetName, description, Waves, fee, timestamp)
         .explicitGet()
     } yield tx
 
@@ -685,7 +684,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       seller: KeyPair,
       amountAssetId: Asset,
       priceAssetId: Asset,
-      fixedMatcherFee: Option[Long] = None
+      fixedMatcherFee: Option[TxTimestamp] = None,
+      chainId: ChainId = ChainId.current
   ): Gen[ExchangeTransaction] =
     for {
       (_, matcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
@@ -699,9 +699,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
-        ExchangeTransaction
-          .signed(1.toByte, matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
-          .explicitGet()
+        ExchangeTransaction(1.toByte, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
+          .signWith(matcher)
 
       trans
     }
