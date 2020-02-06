@@ -17,7 +17,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
     case _ => throw new TestFailedException("Test failed", 0)
   }
 
-  private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
+  /*private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
     import e.{index => i}
     println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
     println(s"""val code2 = "${escapedCode(x)}"""")
@@ -26,7 +26,7 @@ class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with S
         .mkString("\n")
     }")
     throw new TestFailedException("Test failed", 0)
-  }
+  }*/
 
   private def escapedCode(s: String): String =
     s.flatMap {
