@@ -309,7 +309,9 @@ object ContractCompiler {
       .map(
         _._2
           .leftMap(e => s"Compilation failed. ${Show[CompilationError].show(e)}")
-          .flatMap(res => Either.cond(res._3.isEmpty, res._1.get, s"Compilation failed: ${res._3.map(e => Show[CompilationError].show(e))}"))
+          .flatMap(
+            res => Either.cond(res._3.isEmpty, res._1.get, s"Compilation failed: [${res._3.map(e => Show[CompilationError].show(e)).mkString("; ")}]")
+          )
       )
       .value
   }

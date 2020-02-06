@@ -16,6 +16,8 @@ import com.wavesplatform.lang.v1.parser.{BinaryOperation, Expressions, Parser, P
 import com.wavesplatform.lang.v1.task.TaskM
 import com.wavesplatform.lang.v1.task.imports._
 
+import scala.util.Try
+
 object ExpressionCompiler {
 
   case class CompilationStepResultExpr(
@@ -587,8 +589,9 @@ object ExpressionCompiler {
       for {
         resolvedTypeParams <- TypeInferrer(typePairs, predefTypes).leftMap(Generic(p.start, p.end, _))
         args = typedExpressionArgumentsAndTypedPlaceholders.map(_._1.expr)
+        resultType <- Try(toFinal(f.result, resolvedTypeParams)).toEither
+          .leftMap(e => CompilationError.Generic(0, 0, s"Base error: ${e.getMessage}"))
       } yield {
-        val resultType = toFinal(f.result, resolvedTypeParams)
         (FUNCTION_CALL(f.header, args): EXPR, resultType)
       }
     }
@@ -713,6 +716,10 @@ object ExpressionCompiler {
       .leftMap(e => s"Compilation failed. ${Show[CompilationError].show(e)}")
       .flatMap(
         res =>
-          Either.cond(res.errors.isEmpty, (res.ctx, res.expr, res.t), s"Compilation failed: ${res.errors.map(e => Show[CompilationError].show(e))}")
+          Either.cond(
+            res.errors.isEmpty,
+            (res.ctx, res.expr, res.t),
+            s"Compilation failed: [${res.errors.map(e => Show[CompilationError].show(e)).mkString("; ")}]"
+          )
       )
 }
