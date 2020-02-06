@@ -84,7 +84,8 @@ object InvokeScriptTransactionDiff {
                 Coeval(blockchain.height),
                 blockchain,
                 Coeval(tx.dAppAddressOrAlias.bytes),
-                directives
+                directives,
+                tx.id()
               )
               evaluator <- ContractEvaluator(
                 Monoid
@@ -397,7 +398,7 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-        if (issue.name.length < IssueTransaction.MinAssetNameLength || issue.name.length > IssueTransaction.MaxAssetNameLength) {
+        if (issue.name.getBytes("UTF-8").length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
           TracedResult(Left(InvalidName), List())
         } else if(issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(TooBigArray), List())

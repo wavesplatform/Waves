@@ -48,7 +48,8 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       b.`nxt-consensus`.`base-target`,
       b.`nxt-consensus`.`generation-signature`.byteStr,
       pkToAddress(b.generator),
-      b.generator.byteStr
+      b.generator.byteStr,
+      b.VRF.map(_.byteStr)
     )
 
 

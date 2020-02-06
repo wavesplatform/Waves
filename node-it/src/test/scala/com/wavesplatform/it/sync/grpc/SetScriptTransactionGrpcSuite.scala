@@ -9,6 +9,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient, SetScriptTransactionData, SignedTransaction, TransferTransactionData, Transaction => PBTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -31,7 +32,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       """.stripMargin
 
     val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-    val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV2).explicitGet()
+    val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3).explicitGet()
     val setScriptTx = sender.grpc.setScript(firstAcc, Some(script), setScriptFee, waitForTx = true)
     val setScriptTxId = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
 

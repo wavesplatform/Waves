@@ -10,6 +10,7 @@ import com.wavesplatform.block.{Block, BlockHeader, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -36,7 +37,7 @@ class BlockchainUpdaterImpl(
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time,
-    blockchainUpdated: Observer[BlockchainUpdated]
+    blockchainUpdateTriggers: BlockchainUpdateTriggers
 ) extends BlockchainUpdater
     with NG
     with ScorexLogging {
@@ -199,7 +200,7 @@ class BlockchainUpdaterImpl(
                     val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                     val miningConstraints = MiningConstraints(blockchain, height)
 
-                    BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, block.header.reference, height)
+                    blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
 
                     BlockDiffer
                       .fromBlock(
@@ -224,8 +225,7 @@ class BlockchainUpdaterImpl(
                       val height            = blockchain.unsafeHeightOf(ng.base.header.reference)
                       val miningConstraints = MiningConstraints(blockchain, height)
 
-                      BlockchainUpdateNotifier
-                        .notifyMicroBlockRollback(blockchainUpdated, block.header.reference, height)
+                      blockchainUpdateTriggers.onMicroBlockRollback(block.header.reference, this.height)
 
                       BlockDiffer
                         .fromBlock(
@@ -253,8 +253,7 @@ class BlockchainUpdaterImpl(
                         val height = blockchain.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                         if (discarded.nonEmpty) {
-                          BlockchainUpdateNotifier
-                            .notifyMicroBlockRollback(blockchainUpdated, referencedForgedBlock.uniqueId, height)
+                          blockchainUpdateTriggers.onMicroBlockRollback(referencedForgedBlock.uniqueId, this.height)
                           metrics.microBlockForkStats.increment()
                           metrics.microBlockForkHeightStats.record(discarded.size)
                         }
@@ -319,7 +318,7 @@ class BlockchainUpdaterImpl(
                     log.info(s"New height: $newHeight")
                   }
 
-                  BlockchainUpdateNotifier.notifyProcessBlock(blockchainUpdated, block, detailedDiff, blockchain)
+                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, blockchain)
 
                   discarded
               }
@@ -356,7 +355,7 @@ class BlockchainUpdaterImpl(
     val prevNgState = ngState
     val result = if (prevNgState.exists(_.contains(blockId))) {
       log.trace("Resetting liquid block, no rollback is necessary")
-      BlockchainUpdateNotifier.notifyMicroBlockRollback(blockchainUpdated, blockId, blockchain.height)
+      blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
       Right(Seq.empty)
     } else {
       val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
@@ -364,7 +363,7 @@ class BlockchainUpdaterImpl(
       blockchain
         .rollbackTo(blockId)
         .map { bs =>
-          BlockchainUpdateNotifier.notifyRollback(blockchainUpdated, blockId, blockchain.height)
+          blockchainUpdateTriggers.onRollback(blockId, blockchain.height)
           bs ++ discardedNgBlock
         }
         .leftMap(err => GenericError(err))
@@ -415,7 +414,8 @@ class BlockchainUpdaterImpl(
                 .toRight(GenericError(s"No referenced block exists: $microBlock"))
                 .map {
                   case (accumulatedBlock, _, _, _, _) =>
-                    Block.create(accumulatedBlock, accumulatedBlock.transactionData ++ microBlock.transactionData, microBlock.totalResBlockSig)
+                    Block
+                      .create(accumulatedBlock, accumulatedBlock.transactionData ++ microBlock.transactionData, microBlock.totalResBlockSig)
                       .signatureValid()
                 }
               _ <- Either
@@ -429,7 +429,7 @@ class BlockchainUpdaterImpl(
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
-              BlockchainUpdateNotifier.notifyProcessMicroBlock(blockchainUpdated, microBlock, detailedDiff, blockchain)
+              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this)
               restTotalConstraint = updatedMdConstraint
               ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
               log.info(s"$microBlock appended")
@@ -518,9 +518,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def blockBytes(height: Int): Option[Array[Byte]] = readLock {
-    blockchain
-      .blockBytes(height)
-      .orElse(ngState.collect { case ng if height == blockchain.height + 1 => ng.bestLiquidBlock.bytes() })
+    compositeBlockchain.blockBytes(height)
   }
 
   override def heightOf(blockId: BlockId): Option[Int] = readLock {
@@ -619,67 +617,35 @@ class BlockchainUpdaterImpl(
   }
 
   override def blockInfo(height: Int): Option[BlockInfo] = readLock {
-    if (height == blockchain.height + 1) ngState.map { x =>
-      BlockInfo(x.bestLiquidBlock.header, x.bestLiquidBlock.bytes().length, x.bestLiquidBlock.transactionData.size, x.bestLiquidBlock.signature)
-    }
-    else blockchain.blockInfo(height)
+    compositeBlockchain.blockInfo(height)
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
-    ngState
-      .fold(Diff.empty)(_.bestLiquidDiff)
-      .transactions
-      .get(id)
-      .collect {
-        case (tx: TransferTransaction, _) => (height, tx)
-      }
-      .orElse(blockchain.transferById(id))
+    compositeBlockchain.transferById(id)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
-    ngState
-      .fold(Diff.empty)(_.bestLiquidDiff)
-      .transactions
-      .get(id)
-      .map(t => (this.height, t._1))
-      .orElse(blockchain.transactionInfo(id))
+    compositeBlockchain.transactionInfo(id)
   }
 
   override def containsTransaction(tx: Transaction): Boolean = readLock {
-    ngState.fold(blockchain.containsTransaction(tx)) { ng =>
-      ng.bestLiquidDiff.transactions.contains(tx.id()) || blockchain.containsTransaction(tx)
-    }
+    compositeBlockchain.containsTransaction(tx)
   }
 
   override def assetDescription(id: IssuedAsset): Option[AssetDescription] = readLock {
-    ngState.fold(blockchain.assetDescription(id)) { ng =>
-      CompositeBlockchain(blockchain, Some(ng.bestLiquidDiff)).assetDescription(id)
-    }
+    compositeBlockchain.assetDescription(id)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readLock {
-    ngState.fold(blockchain.resolveAlias(alias)) { ng =>
-      CompositeBlockchain(blockchain, Some(ng.bestLiquidDiff)).resolveAlias(alias)
-    }
+    compositeBlockchain.resolveAlias(alias)
   }
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readLock {
-    ngState match {
-      case Some(ng) =>
-        blockchain.leaseDetails(leaseId).map(ld => ld.copy(isActive = ng.bestLiquidDiff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
-          ng.bestLiquidDiff.transactions.get(leaseId).collect {
-            case (lt: LeaseTransaction, _) =>
-              LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, ng.bestLiquidDiff.leaseState(lt.id()))
-          }
-      case None =>
-        blockchain.leaseDetails(leaseId)
-    }
+    compositeBlockchain.leaseDetails(leaseId)
   }
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = readLock {
-    ngState.fold(blockchain.filledVolumeAndFee(orderId))(
-      _.bestLiquidDiff.orderFills.get(orderId).orEmpty.combine(blockchain.filledVolumeAndFee(orderId))
-    )
+    compositeBlockchain.filledVolumeAndFee(orderId)
   }
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
@@ -693,66 +659,31 @@ class BlockchainUpdaterImpl(
   }
 
   override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = readLock {
-    ngState.fold(blockchain.accountScriptWithComplexity(address)) { ng =>
-      ng.bestLiquidDiff.scripts.get(address) match {
-        case None      => blockchain.accountScriptWithComplexity(address)
-        case Some(scr) => scr
-      }
-    }
+    compositeBlockchain.accountScriptWithComplexity(address)
   }
 
   override def hasScript(address: Address): Boolean = readLock {
-    ngState
-      .flatMap(
-        _.bestLiquidDiff.scripts
-          .get(address)
-          .map(_.nonEmpty)
-      )
-      .getOrElse(blockchain.hasScript(address))
+    compositeBlockchain.hasScript(address)
   }
 
   override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = readLock {
-    ngState.fold(blockchain.assetScriptWithComplexity(asset)) { ng =>
-      ng.bestLiquidDiff.assetScripts.get(asset) match {
-        case None      => blockchain.assetScriptWithComplexity(asset)
-        case Some(scr) => scr
-      }
-    }
+    compositeBlockchain.assetScriptWithComplexity(asset)
   }
 
   override def hasAssetScript(asset: IssuedAsset): Boolean = readLock {
-    ngState.fold(blockchain.hasAssetScript(asset)) { ng =>
-      ng.bestLiquidDiff.assetScripts.get(asset) match {
-        case None    => blockchain.hasAssetScript(asset)
-        case Some(x) => x.nonEmpty
-      }
-    }
+    compositeBlockchain.hasAssetScript(asset)
   }
 
   override def accountDataKeys(address: Address): Set[String] = {
-    ngState.fold(blockchain.accountDataKeys(address)) { ng =>
-      val fromInner = blockchain.accountDataKeys(address)
-      val fromDiff = ng.bestLiquidDiff.accountData
-        .getOrElse(address, AccountDataInfo.accountDataInfoMonoid.empty)
-        .data
-
-      (fromInner ++ fromDiff.keySet).filterNot(key => fromDiff.get(key).exists(_.isEmpty))
-    }
+    compositeBlockchain.accountDataKeys(address)
   }
 
   override def accountData(acc: Address): AccountDataInfo = readLock {
-    ngState.fold(blockchain.accountData(acc)) { ng =>
-      val fromInner = blockchain.accountData(acc)
-      val fromDiff  = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      fromInner.combine(fromDiff).filterEmpty
-    }
+    compositeBlockchain.accountData(acc)
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = readLock {
-    ngState.fold(blockchain.accountData(acc, key)) { ng =>
-      val diffData = ng.bestLiquidDiff.accountData.get(acc).orEmpty
-      diffData.data.get(key).orElse(blockchain.accountData(acc, key)).filterNot(_.isEmpty)
-    }
+    compositeBlockchain.accountData(acc, key)
   }
 
   def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] =
@@ -773,36 +704,19 @@ class BlockchainUpdaterImpl(
   }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = readLock {
-    ngState.fold(blockchain.invokeScriptResult(txId)) { ng =>
-      ng.bestLiquidDiff.scriptResults
-        .get(txId)
-        .toRight(GenericError("InvokeScript result not found"))
-        .orElse(blockchain.invokeScriptResult(txId))
-    }
+    compositeBlockchain.invokeScriptResult(txId)
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readLock {
-    ngState flatMap { ng =>
-      ng.bestLiquidDiff.transactions.get(id).map(_ => this.height)
-    } orElse blockchain.transactionHeight(id)
+    compositeBlockchain.transactionHeight(id)
   }
 
   override def balance(address: Address, mayBeAssetId: Asset): Long = readLock {
-    ngState match {
-      case Some(ng) =>
-        blockchain.balance(address, mayBeAssetId) + ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).balanceOf(mayBeAssetId)
-      case None =>
-        blockchain.balance(address, mayBeAssetId)
-    }
+    compositeBlockchain.balance(address, mayBeAssetId)
   }
 
   override def leaseBalance(address: Address): LeaseBalance = readLock {
-    ngState match {
-      case Some(ng) =>
-        cats.Monoid.combine(blockchain.leaseBalance(address), ng.bestLiquidDiff.portfolios.getOrElse(address, Portfolio.empty).lease)
-      case None =>
-        blockchain.leaseBalance(address)
-    }
+    compositeBlockchain.leaseBalance(address)
   }
 
   override def hitSourceAtHeight(height: Int): Option[ByteStr] = readLock {
@@ -810,6 +724,10 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height => ng.hitSource.some
       case _                                 => blockchain.hitSourceAtHeight(height)
     }
+  }
+
+  private[this] def compositeBlockchain = {
+    ngState.fold(blockchain: Blockchain)(CompositeBlockchain(blockchain, _))
   }
 
   private[this] object metrics {

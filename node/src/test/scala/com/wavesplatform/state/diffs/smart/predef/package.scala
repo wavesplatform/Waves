@@ -36,7 +36,8 @@ package object predef {
                                              blockchain,
                                              isTokenContext = false,
                                              isContract = false,
-                                             Coeval(???))
+                                             Coeval(???),
+                                             ByteStr.empty)
       r <- EvaluatorV1().apply[T](evalContext, typedExpr)
     } yield r
   }
