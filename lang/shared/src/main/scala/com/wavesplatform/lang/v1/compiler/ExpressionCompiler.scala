@@ -295,7 +295,7 @@ object ExpressionCompiler {
         .handleError()
       _ <- set[Id, CompilerContext, CompilationError](ctx.copy(tmpArgsIdx = tmpArgId))
 
-      errorList = exprTypesWithErr._2 ++ ifCasesWithErr._2 ++ checkWithErr._2
+      errorList = exprTypesWithErr._2 ++ ifCasesWithErr._2 ++ compiledMatch.errors ++ checkWithErr._2
 
       result = if (errorList.isEmpty) {
         compiledMatch.copy(errors = compiledMatch.errors ++ typedExpr.errors)
@@ -713,7 +713,7 @@ object ExpressionCompiler {
       .run(c)
       .value
       ._2
-      .leftMap(e => s"Compilation failed. ${Show[CompilationError].show(e)}")
+      .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
       .flatMap(
         res =>
           Either.cond(

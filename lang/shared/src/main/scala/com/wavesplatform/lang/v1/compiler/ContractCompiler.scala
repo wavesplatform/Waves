@@ -31,17 +31,17 @@ object ContractCompiler {
     def getCompiledAnnotatedFunc(
         annListWithErr: (Option[Iterable[Annotation]], Iterable[CompilationError]),
         compiledBody: CompilationStepResultDec
-    ): CompileM[AnnotatedFunction] = annListWithErr._1 match {
-      case Some(List(c: CallableAnnotation)) =>
+    ): CompileM[AnnotatedFunction] = (annListWithErr._1, compiledBody.dec) match {
+      case (Some(List(c: CallableAnnotation)), func: Terms.FUNC) =>
         callableReturnType(version)
           .ensureOr(expectedType => callableResultError(expectedType, compiledBody.t))(compiledBody.t <= _)
           .bimap(
             Generic(0, 0, _),
-            _ => CallableFunction(c, compiledBody.dec.asInstanceOf[Terms.FUNC]): AnnotatedFunction
+            _ => CallableFunction(c, func): AnnotatedFunction
           )
           .toCompileM
 
-      case Some(List(c: VerifierAnnotation)) =>
+      case (Some(List(c: VerifierAnnotation)), func: Terms.FUNC) =>
         for {
           _ <- Either
             .cond(
@@ -53,10 +53,10 @@ object ContractCompiler {
               Generic(0, 0, s"VerifierFunction must return BOOLEAN or it super type, but got '${compiledBody.t}'")
             )
             .toCompileM
-        } yield VerifierFunction(c, compiledBody.dec.asInstanceOf[Terms.FUNC])
+        } yield VerifierFunction(c, func)
 
-      case None =>
-        raiseError(annListWithErr._2.head)
+      case _ =>
+        raiseError(CompilationError.Generic(0, 0, "Annotated function compilation failed"))
     }
 
     val annotationsWithErrM = af.anns.toList
@@ -83,7 +83,7 @@ object ContractCompiler {
       }
       annotatedFuncWithErr <- getCompiledAnnotatedFunc(annotationsWithErr, compiledBody._1).handleError()
 
-      errorList     = annotatedFuncWithErr._2 ++ compiledBody._1.errors
+      errorList     = annotatedFuncWithErr._2 ++ annotationsWithErr._2 ++ compiledBody._1.errors
       typedParams   = compiledBody._2
       parseNodeExpr = af.copy(f = compiledBody._1.parseNodeExpr.asInstanceOf[Expressions.FUNC])
       resultAnnFunc = if (annotatedFuncWithErr._2.isEmpty && !compiledBody._1.dec.isItFailed) {
@@ -308,7 +308,7 @@ object ContractCompiler {
       .run(c)
       .map(
         _._2
-          .leftMap(e => s"Compilation failed. ${Show[CompilationError].show(e)}")
+          .leftMap(e => s"Compilation failed: ${Show[CompilationError].show(e)}")
           .flatMap(
             res => Either.cond(res._3.isEmpty, res._1.get, s"Compilation failed: [${res._3.map(e => Show[CompilationError].show(e)).mkString("; ")}]")
           )
