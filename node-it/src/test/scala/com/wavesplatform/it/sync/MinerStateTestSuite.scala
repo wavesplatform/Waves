@@ -34,6 +34,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     val minerInfoBefore = last.debugMinerInfo()
     all(minerInfoBefore) shouldNot matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
 
+    miner.waitForPeers(1)
     val txId = miner.transfer(miner.address, newAddress, transferAmount, minFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 
@@ -48,6 +49,7 @@ class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFro
     val minerInfoAfter = last.debugMinerInfo()
     atMost(1, minerInfoAfter) should matchPattern { case State(`newAddress`, _, ts) if ts > 0 => }
 
+    last.waitForPeers(1)
     val leaseBack = last.lease(newAddress, miner.address, (transferAmount - minFee), minFee).id
     nodes.waitForHeightAriseAndTxPresent(leaseBack)
 

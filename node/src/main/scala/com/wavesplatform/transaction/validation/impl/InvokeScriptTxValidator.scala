@@ -1,9 +1,8 @@
 package com.wavesplatform.transaction.validation.impl
 
-import cats.implicits._
 import cats.data.NonEmptyList
 import cats.data.Validated.{Invalid, Valid}
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED}
+import cats.implicits._
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.TxValidationError.{GenericError, NonPositiveAmount, TooBigArray}

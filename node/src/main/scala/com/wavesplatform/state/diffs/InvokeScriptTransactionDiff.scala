@@ -4,10 +4,10 @@ import cats.Id
 import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
+import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
@@ -84,7 +84,8 @@ object InvokeScriptTransactionDiff {
                 Coeval(blockchain.height),
                 blockchain,
                 Coeval(tx.dAppAddressOrAlias.bytes),
-                directives
+                directives,
+                tx.id()
               )
               evaluator <- ContractEvaluator(
                 Monoid
@@ -397,19 +398,19 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-        if (issue.name.length < IssueTransaction.MinAssetNameLength || issue.name.length > IssueTransaction.MaxAssetNameLength) {
+        if (issue.name.getBytes("UTF-8").length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
           TracedResult(Left(InvalidName), List())
         } else if(issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(TooBigArray), List())
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
           val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
-          val info       = AssetInfo(Right(issue.name), Right(issue.description), Height @@ blockchain.height)
+          val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
 
           val asset = IssuedAsset(issue.id)
 
           DiffsCommon
-            .countScriptComplexity(None /*issue.compiledScript*/, blockchain)
+            .countVerifierComplexity(None /*issue.compiledScript*/, blockchain)
             .map(
               script =>
                 Diff(

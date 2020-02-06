@@ -8,12 +8,14 @@ import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperS
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
 import com.wavesplatform.lang.directives.values.{Expression, StdLibVersion, DApp => DAppType}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.utils
 import com.wavesplatform.lang.v1.compiler.CompilationError.Generic
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.lang.v1.compiler.{CompilationError, CompilerContext, ContractCompiler, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.{ScriptEstimator, ScriptEstimatorV1}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA.DigestAlgorithm
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
@@ -102,18 +104,6 @@ trait BaseGlobal {
       .map(Array(0: Byte, DAppType.id.toByte, stdLibVersion.id.toByte) ++ _)
       .map(r => r ++ checksum(r))
 
-
-
-
-
-
-
-
-
-
-
-
-
   def parseAndCompileExpression(
       input: String,
       context: CompilerContext,
@@ -124,7 +114,7 @@ trait BaseGlobal {
     (for {
       compRes <- ExpressionCompiler.compileWithParseResult(input, context)
       (compExpr, exprScript, compErrorList) = compRes
-      illegalBlockVersionUsage = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
+      illegalBlockVersionUsage              = letBlockOnly && com.wavesplatform.lang.v1.compiler.containsBlockV2(compExpr)
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       bytes = if (compErrorList.isEmpty) serializeExpression(compExpr, stdLibVersion) else Array.empty[Byte]
 
@@ -146,7 +136,8 @@ trait BaseGlobal {
     (for {
       compRes <- ContractCompiler.compileWithParseResult(input, ctx, stdLibVersion)
       (compDAppOpt, exprDApp, compErrorList) = compRes
-      complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
+      complexityWithMap <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty)
+        ContractScript.estimateComplexity(stdLibVersion, compDAppOpt.get, estimator)
       else Right((0L, Map.empty[String, Long]))
       bytes <- if (compDAppOpt.nonEmpty && compErrorList.isEmpty) serializeContract(compDAppOpt.get, stdLibVersion) else Right(Array.empty[Byte])
     } yield (bytes, complexityWithMap, exprDApp, compErrorList))
@@ -154,9 +145,6 @@ trait BaseGlobal {
         case e => (Array.empty, (0, Map.empty), Expressions.DAPP(AnyPos, List.empty, List.empty), List(Generic(0, 0, e)))
       }
   }
-
-
-
 
   val compileExpression =
     compile(_, _, _, _, _, ExpressionCompiler.compile)
@@ -178,9 +166,8 @@ trait BaseGlobal {
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
 
-      vars  = utils.varNames(stdLibVersion, Expression)
-      costs = utils.functionCosts(stdLibVersion)
-      complexity <- estimator(vars, costs, ex)
+      _          <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV1)
+      complexity <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV2)
     } yield (x, ex, complexity)
 
   type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])
@@ -193,7 +180,8 @@ trait BaseGlobal {
   ): Either[String, ContractInfo] =
     for {
       dapp       <- ContractCompiler.compile(input, ctx, stdLibVersion)
-      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, estimator)
+      _          <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV1)
+      complexity <- ContractScript.estimateComplexity(stdLibVersion, dapp, ScriptEstimatorV2)
       bytes      <- serializeContract(dapp, stdLibVersion)
     } yield (bytes, dapp, complexity._1, complexity._2)
 

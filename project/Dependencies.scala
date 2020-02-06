@@ -14,7 +14,7 @@ object Dependencies {
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
 
   private val kindProjector = compilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.6")
   private val paradise      = compilerPlugin("org.scalamacros" % "paradise"        % "2.1.1" cross CrossVersion.full)
@@ -22,10 +22,11 @@ object Dependencies {
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core", "1.1.5")
+  private val kamonCore          = kamonModule("core", "1.1.6")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
 
   private val catsEffect = catsModule("effect")
   private val catsCore   = catsModule("core")
@@ -117,8 +118,8 @@ object Dependencies {
     // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
     ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.asynchttpclient" % "async-http-client" % "2.7.0",
-    "org.scalacheck"      %% "scalacheck"       % "1.14.0"
+    asyncHttpClient,
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
@@ -141,8 +142,8 @@ object Dependencies {
       "com.iheart"           %% "ficus" % "1.4.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
-      kamonModule("system-metrics", "1.0.0"),
-      kamonModule("influxdb", "1.0.2"),
+      kamonModule("system-metrics", "1.0.1"),
+      kamonModule("influxdb", "1.0.3"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
       "com.google.code.findbugs"     % "jsr305"             % "3.0.2" % Compile, // javax.annotation stubs

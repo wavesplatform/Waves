@@ -1,14 +1,14 @@
 package com.wavesplatform.lang.v1.estimator.v2
 
-import cats.{Id, Monad}
 import cats.implicits._
+import cats.{Id, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses._
+import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
 object ScriptEstimatorV2 extends ScriptEstimator {
@@ -23,18 +23,21 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   }
 
   private def evalExpr(t: EXPR): EvalM[Long] =
-    t match {
-      case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
-      case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
-      case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
-      case BLOCK(_: FAILED_DEC, _)     => const(0)
-      case REF(str)                    => evalRef(str)
-      case _: EVALUATED                => const(1)
-      case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
-      case GETTER(expr, _)             => evalGetter(expr)
-      case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
-      case _: FAILED_EXPR              => const(0)
-    }
+    if (Thread.currentThread().isInterrupted)
+      raiseError("Script estimation was interrupted")
+    else
+      t match {
+        case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
+        case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
+        case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
+        case BLOCK(_: FAILED_DEC, _)     => const(0)
+        case REF(str)                    => evalRef(str)
+        case _: EVALUATED                => const(1)
+        case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
+        case GETTER(expr, _)             => evalGetter(expr)
+        case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
+        case _: FAILED_EXPR              => const(0)
+      }
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
     local {

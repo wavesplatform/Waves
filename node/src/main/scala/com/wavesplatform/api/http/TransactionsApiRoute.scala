@@ -11,9 +11,10 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
+import com.wavesplatform.protobuf.api.TransactionsByIdRequest
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
@@ -40,14 +41,15 @@ case class TransactionsApiRoute(
     time: Time
 ) extends ApiRoute
     with BroadcastRoute
-    with AuthRoute {
+    with AuthRoute
+    with AutoParamsDirective {
   import TransactionsApiRoute._
 
   private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
 
   override lazy val route: Route =
     pathPrefix("transactions") {
-      unconfirmed ~ addressLimit ~ info ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
+      unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   @Path("/address/{address}/limit/{limit}")
@@ -96,6 +98,40 @@ case class TransactionsApiRoute(
           case _ => complete(InvalidSignature)
         }
       }
+  }
+
+  @Path("/status")
+  @ApiOperation(value = "Transaction status", notes = "Get a transaction status by its ID", httpMethod = "GET")
+  @ApiImplicitParams(
+    Array(
+      new ApiImplicitParam(name = "id", value = "Transaction ID", required = true, dataType = "string", paramType = "query", allowMultiple = true)
+    )
+  )
+  def status: Route = path("status") {
+    protobufEntity(TransactionsByIdRequest) { request =>
+      if (request.ids.length > settings.transactionsByAddressLimit)
+        complete(TooBigArrayAllocation)
+      else
+        request.ids.map(ByteStr.decodeBase58).toList.sequence match {
+          case Success(ids) =>
+            val results = ids.map { id =>
+              val statusJson = blockchain.transactionInfo(id) match {
+                case Some((height, _)) =>
+                  Json.obj("status" -> "confirmed", "height" -> height, "confirmations" -> (blockchain.height - height).max(0))
+
+                case None =>
+                  utx.transactionById(id) match {
+                    case Some(_) => Json.obj("status" -> "unconfirmed")
+                    case None    => Json.obj("status" -> "not_found")
+                  }
+              }
+              statusJson ++ Json.obj("id" -> id.toString)
+            }
+            complete(results)
+
+          case _ => complete(InvalidSignature)
+        }
+    }
   }
 
   @Path("/unconfirmed")
@@ -334,13 +370,10 @@ object TransactionsApiRoute {
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
-    def proofBytes(levels: Seq[Array[Byte]]): List[String] =
-      (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
-
     Json.obj(
       "id"               -> mi.id.toString,
       "transactionIndex" -> mi.transactionIndex,
-      "merkleProof"      -> proofBytes(mi.digests)
+      "merkleProof"      -> mi.digests.map(d => s"${Base58.encode(d)}")
     )
   }
 
@@ -349,7 +382,7 @@ object TransactionsApiRoute {
       encoded          <- (jsv \ "id").validate[String]
       id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
       transactionIndex <- (jsv \ "transactionIndex").validate[Int]
-      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base64.decode))
+      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base58.decode))
     } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 }

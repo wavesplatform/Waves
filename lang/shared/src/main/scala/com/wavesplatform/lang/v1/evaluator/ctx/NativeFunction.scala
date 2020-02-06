@@ -55,11 +55,11 @@ object NativeFunction {
     )
 
   def apply[C[_[_]]](name: String, cost: Long, internalName: Short, resultType: TYPE, args: (String, TYPE)*)(
-    ev: List[EVALUATED] => Either[ExecutionError, EVALUATED]
+    evl: List[EVALUATED] => Either[ExecutionError, EVALUATED]
   ): NativeFunction[C] =
-    withEnvironment[C](name, cost, internalName, resultType, args: _*)(new ContextfulNativeFunction[C] {
-      override def apply[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-        ev(a._2).pure[F]
+    withEnvironment[C](name, cost, internalName, resultType, args: _*)(new ContextfulNativeFunction[C](name, resultType, args.toSeq) {
+      override def ev[F[_]: Monad](a: (C[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+        evl(a._2).pure[F]
     })
 
   def apply[C[_[_]]](name: String,

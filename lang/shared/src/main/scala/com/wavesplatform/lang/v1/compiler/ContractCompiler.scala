@@ -1,12 +1,11 @@
 package com.wavesplatform.lang.v1.compiler
 
-import cats.{Id, Show}
 import cats.implicits._
+import cats.{Id, Show}
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.meta.{MetaMapper, V1, V2}
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3}
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.CompilationError.{AlreadyDefined, Generic, WrongArgumentType}
 import com.wavesplatform.lang.v1.compiler.CompilerContext.{VariableInfo, vars}
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler._
@@ -326,6 +325,7 @@ object ContractCompiler {
       case f @ fastparse.core.Parsed.Failure(_, _, _) => Left(f.toString)
     }
   }
+
   def compileWithParseResult(
       input: String,
       ctx: CompilerContext,
