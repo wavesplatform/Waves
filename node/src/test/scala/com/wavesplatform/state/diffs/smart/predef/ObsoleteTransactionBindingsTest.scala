@@ -72,7 +72,7 @@ class ObsoleteTransactionBindingsTest extends PropSpec with PropertyChecks with 
     ts        <- positiveIntGen
     fee       <- smallFeeGen
     genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT * 3, ts).explicitGet()
-    payment                     = PaymentTransaction.create(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
+    payment                     = PaymentTransaction.selfSigned(master, recipient, ENOUGH_AMT * 2, fee, ts).explicitGet()
     untypedScript               = Parser.parseExpr(script(genesis, payment)).get.value
     typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
       .explicitGet()

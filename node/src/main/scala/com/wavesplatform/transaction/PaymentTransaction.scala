@@ -12,7 +12,7 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class PaymentTransaction private (sender: PublicKey, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
+case class PaymentTransaction(sender: PublicKey, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
     extends SignedTransaction
     with TxWithFee.InWaves {
 
@@ -22,6 +22,8 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[Byte]]     = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+
+  override def chainByte: ChainId = recipient.chainId
 }
 
 object PaymentTransaction extends TransactionParser {
@@ -36,8 +38,8 @@ object PaymentTransaction extends TransactionParser {
 
   implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
 
-  def create(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
-    create(sender, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
+  def selfSigned(sender: KeyPair, recipient: Address, amount: Long, fee: Long, timestamp: Long): Either[ValidationError, PaymentTransaction] = {
+    create(sender.publicKey, recipient, amount, fee, timestamp, ByteStr.empty).right.map(unsigned => {
       unsigned.copy(signature = ByteStr(crypto.sign(sender, unsigned.bodyBytes())))
     })
   }

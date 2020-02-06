@@ -14,7 +14,7 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class GenesisTransaction private (recipient: Address, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
+case class GenesisTransaction(recipient: Address, amount: Long, timestamp: Long, signature: ByteStr) extends Transaction {
   override val builder                 = GenesisTransaction
   override val assetFee: (Asset, Long) = (Waves, 0)
   override val id: Coeval[ByteStr]     = Coeval.evalOnce(signature)
@@ -22,6 +22,8 @@ case class GenesisTransaction private (recipient: Address, amount: Long, timesta
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(builder.serializer.toBytes(this))
   override val bytes: Coeval[Array[Byte]]     = bodyBytes
   override val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
+
+  override def chainByte: ChainId = recipient.chainId
 }
 
 object GenesisTransaction extends TransactionParser {

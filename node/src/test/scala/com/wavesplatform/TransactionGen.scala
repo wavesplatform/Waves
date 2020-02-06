@@ -188,7 +188,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     for {
       amount: Long <- positiveLongGen
       fee: Long    <- smallFeeGen
-    } yield PaymentTransaction.create(sender, recipient, amount, fee, timestamp).explicitGet()
+    } yield PaymentTransaction.selfSigned(sender, recipient, amount, fee, timestamp).explicitGet()
 
   private val leaseParamGen = for {
     sender    <- accountGen
