@@ -12,7 +12,7 @@ import com.wavesplatform.lang.v1.traits.DataType
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Authorized, CreateAliasTransaction, DataTransaction, Transaction}
+import com.wavesplatform.transaction.{Authorized, ChainId, CreateAliasTransaction, DataTransaction, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
@@ -40,9 +40,7 @@ object ExtractInfo extends App with ScorexLogging {
     WavesSettings.fromRootConfig(config)
   }
 
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
-  }
+  ChainId.setGlobal(wavesSettings.blockchainSettings.addressSchemeCharacter)
 
   val db: DB = {
     val dir = new File(wavesSettings.dbSettings.directory)

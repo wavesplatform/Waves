@@ -49,7 +49,7 @@ case class MassTransferTransaction(
   }
 
   override def chainId: ChainId =
-    transfers.headOption.fold(ChainId.current)(_.address.chainId)
+    transfers.headOption.fold(ChainId.global)(_.address.chainId)
 }
 
 object MassTransferTransaction extends TransactionParser {

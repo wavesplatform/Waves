@@ -685,7 +685,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       amountAssetId: Asset,
       priceAssetId: Asset,
       fixedMatcherFee: Option[TxTimestamp] = None,
-      chainId: ChainId = ChainId.current
+      chainId: ChainId = ChainId.global
   ): Gen[ExchangeTransaction] =
     for {
       (_, matcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
@@ -955,7 +955,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield IssueTransaction(2.toByte, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .signWith(sender)
 
-  val invalidChainIdGen = Arbitrary.arbitrary[Byte].filterNot(_ == ChainId.current)
+  val invalidChainIdGen = Arbitrary.arbitrary[Byte].filterNot(_ == ChainId.global)
 }
 
 trait TransactionGen extends TransactionGenBase { _: Suite =>

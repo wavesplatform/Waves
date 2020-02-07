@@ -52,7 +52,7 @@ class ProtoTransactionsSpec extends FreeSpec with TransactionGen with Matchers w
       val decimals    = 2.toByte
       val reissuable  = true
 
-      val issueTx = IssueTransaction(TxVersion.V3, Account, name.toByteString, description.toByteString, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty, ChainId.current).signWith(Account)
+      val issueTx = IssueTransaction(TxVersion.V3, Account, name.toByteString, description.toByteString, quantity, decimals, reissuable, script = None, MinIssueFee, Now, Proofs.empty, ChainId.global).signWith(Account)
       val base64IssueStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(issueTx)))
 
       val reissueTx = ReissueTransaction
@@ -117,7 +117,7 @@ class ProtoTransactionsSpec extends FreeSpec with TransactionGen with Matchers w
       val recipient = accountOrAliasGen.sample.get
 
       val leaseTx              = LeaseTransaction.selfSigned(TxVersion.V3, Account, recipient, 100, MinFee, Now).explicitGet()
-      val leaseCancelTx        = LeaseCancelTransaction(TxVersion.V3, Account, leaseTx.id(), MinFee, Now, Proofs.empty, ChainId.current).signWith(Account)
+      val leaseCancelTx        = LeaseCancelTransaction(TxVersion.V3, Account, leaseTx.id(), MinFee, Now, Proofs.empty, ChainId.global).signWith(Account)
       val base64LeaseStr       = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseTx)))
       val base64CancelLeaseStr = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(leaseCancelTx)))
 

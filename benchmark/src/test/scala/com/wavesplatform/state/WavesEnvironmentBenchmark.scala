@@ -15,6 +15,7 @@ import com.wavesplatform.lang.v1.traits.domain.Recipient
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.WavesEnvironmentBenchmark._
 import com.wavesplatform.state.bench.DataTestData
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
 import monix.execution.UncaughtExceptionReporter
@@ -115,9 +116,7 @@ object WavesEnvironmentBenchmark {
       WavesSettings.fromRootConfig(config)
     }
 
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
-    }
+    ChainId.setGlobal(wavesSettings.blockchainSettings.addressSchemeCharacter)
 
     private val db: DB = {
       val dir = new File(wavesSettings.dbSettings.directory)

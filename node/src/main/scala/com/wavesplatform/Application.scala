@@ -37,7 +37,7 @@ import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{Asset, ChainId, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -438,9 +438,7 @@ object Application {
     val settings = WavesSettings.fromRootConfig(config)
 
     // Initialize global var with actual address scheme
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
-    }
+    ChainId.setGlobal(settings.blockchainSettings.addressSchemeCharacter)
 
     // IMPORTANT: to make use of default settings for histograms and timers, it's crucial to reconfigure Kamon with
     //            our merged config BEFORE initializing any metrics, including in settings-related companion objects

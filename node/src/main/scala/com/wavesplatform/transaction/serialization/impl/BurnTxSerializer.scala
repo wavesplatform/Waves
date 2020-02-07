@@ -49,7 +49,7 @@ object BurnTxSerializer {
       val quantity  = buf.getLong
       val fee       = buf.getLong
       val timestamp = buf.getLong
-      BurnTransaction(version, sender, asset, quantity, fee, timestamp, Nil, ChainId.current)
+      BurnTransaction(version, sender, asset, quantity, fee, timestamp, Nil, ChainId.global)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

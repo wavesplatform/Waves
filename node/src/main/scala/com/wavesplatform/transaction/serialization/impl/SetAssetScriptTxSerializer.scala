@@ -3,7 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.{ChainId, TxVersion}
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
@@ -55,6 +55,6 @@ object SetAssetScriptTxSerializer {
     val timestamp = buf.getLong
     val script    = buf.getScript
     val proofs    = buf.getProofs
-    SetAssetScriptTransaction(TxVersion.V1, sender, asset, script, fee, timestamp, proofs, ChainId.current)
+    SetAssetScriptTransaction(TxVersion.V1, sender, asset, script, fee, timestamp, proofs, ChainId.global)
   }
 }

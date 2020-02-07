@@ -672,7 +672,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
-  val chainId   = AddressScheme.current.chainId
+  val chainId   = ChainId.global
   val enoughFee = FeeValidation.ScriptExtraFee + FeeValidation.FeeConstants(IssueTransaction.typeId) * FeeValidation.FeeUnit
 
   property("invoking contract receive payment") {

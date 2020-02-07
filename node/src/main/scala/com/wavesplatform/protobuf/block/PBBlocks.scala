@@ -5,6 +5,7 @@ import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.transaction.PBTransactions
+import com.wavesplatform.transaction.ChainId
 
 import scala.util.Try
 
@@ -38,7 +39,7 @@ object PBBlocks {
     new PBBlock(
       Some(
         PBBlock.Header(
-          AddressScheme.current.chainId,
+          ChainId.global,
           ByteString.copyFrom(reference),
           baseTarget,
           ByteString.copyFrom(generationSignature),
@@ -63,7 +64,7 @@ object PBBlocks {
   }
 
   def addChainId(block: PBBlock): PBBlock = {
-    val chainId = AddressScheme.current.chainId
+    val chainId = ChainId.global
 
     block.update(
       _.header.chainId := chainId,

@@ -5,14 +5,14 @@ import cats.implicits._
 import cats.kernel.Monoid
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
+import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
-import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -35,12 +35,12 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, ChainId, Transaction}
 import com.wavesplatform.utils._
 import monix.eval.Coeval
 import shapeless.Coproduct
@@ -67,7 +67,7 @@ object InvokeScriptTransactionDiff {
               directives <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               input      <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
               payments   <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
-              _                    <- checkCall(functionCall, blockchain).leftMap((_, List.empty[LogItem[Id]]))
+              _          <- checkCall(functionCall, blockchain).leftMap((_, List.empty[LogItem[Id]]))
               invocation = ContractEvaluator.Invocation(
                 functionCall,
                 Recipient.Address(invoker),
@@ -79,7 +79,7 @@ object InvokeScriptTransactionDiff {
                 tx.feeAssetId.compatId
               )
               environment = new WavesEnvironment(
-                AddressScheme.current.chainId,
+                ChainId.global,
                 Coeval.evalOnce(input),
                 Coeval(blockchain.height),
                 blockchain,
@@ -398,9 +398,11 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-        if (issue.name.getBytes("UTF-8").length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
+        if (issue.name
+              .getBytes("UTF-8")
+              .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
           TracedResult(Left(InvalidName), List())
-        } else if(issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+        } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(TooBigArray), List())
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
@@ -417,7 +419,7 @@ object InvokeScriptTransactionDiff {
                   tx = itx,
                   portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
                   issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                  assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2))),
+                  assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2)))
                 )
             )
         }

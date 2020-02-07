@@ -84,7 +84,7 @@ object IssueTransaction extends TransactionParser {
       fee,
       timestamp,
       proofs,
-      ChainId.current
+      ChainId.global
     )
   }
 
@@ -113,7 +113,7 @@ object IssueTransaction extends TransactionParser {
       fee,
       timestamp,
       proofs,
-      ChainId.current
+      ChainId.global
     ).validatedEither
 
   def signed(

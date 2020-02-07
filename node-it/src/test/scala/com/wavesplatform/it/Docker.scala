@@ -24,6 +24,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.util.GlobalTimer.{instance => timer}
 import com.wavesplatform.settings._
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import net.ceedubs.ficus.Ficus._
@@ -545,9 +546,7 @@ object Docker {
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }
 
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0).toByte
-  }
+  ChainId.setGlobal(configTemplate.as[String]("waves.blockchain.custom.address-scheme-character").charAt(0))
 
   def apply(owner: Class[_]): Docker = new Docker(tag = owner.getSimpleName)
 

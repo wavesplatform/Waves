@@ -41,7 +41,7 @@ object LeaseCancelTxSerializer {
       val fee       = buf.getLong
       val timestamp = buf.getLong
       val leaseId   = buf.getByteArray(crypto.DigestLength)
-      LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil, ChainId.current)
+      LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil, ChainId.global)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

@@ -26,7 +26,7 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
     sender.grpc.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
     sender.grpc.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
 
-    sender.grpc.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray), ChainId.current).explicitGet()
+    sender.grpc.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray), ChainId.global).explicitGet()
 
     sender.grpc.broadcastTransfer(aliasCreator, Recipient().withAlias(alias), transferAmount, minFee, waitForTx = true)
 
@@ -67,7 +67,7 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
   ValidAliases.foreach { alias =>
     test(s"create alias named $alias") {
       sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
-      sender.grpc.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray), ChainId.current).explicitGet()
+      sender.grpc.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray), ChainId.global).explicitGet()
     }
   }
 

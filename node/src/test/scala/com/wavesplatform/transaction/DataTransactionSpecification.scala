@@ -131,7 +131,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
       case (DataTransaction(version, sender, _, fee, timestamp, proofs, _), _) =>
         def check(data: List[DataEntry[_]]): Assertion = {
           val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
-          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, ChainId.current))
+          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, ChainId.global))
           checkSerialization(txEi.explicitGet())
         }
 

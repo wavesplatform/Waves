@@ -93,7 +93,7 @@ object Address extends ScorexLogging {
     .maximumSize(200000)
     .build()
 
-  def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
+  def fromPublicKey(publicKey: PublicKey, chainId: Byte = ChainId.global): Address = {
     publicKeyBytesCache.get(
       publicKey, { () =>
         val withoutChecksum = ByteBuffer
@@ -114,7 +114,7 @@ object Address extends ScorexLogging {
     )
   }
 
-  def fromBytes(addressBytes: ByteStr, chainId: Byte = scheme.chainId): Either[InvalidAddress, Address] = {
+  def fromBytes(addressBytes: ByteStr, chainId: Byte = ChainId.global): Either[InvalidAddress, Address] = {
     bytesCache.get(
       addressBytes, { () =>
         Either
@@ -167,9 +167,6 @@ object Address extends ScorexLogging {
     Writes(addr => JsString(addr.stringRepr))
   )
 
-  @inline
-  private[this] def scheme: AddressScheme = AddressScheme.current
-
   // Optimization, should not be used externally
   private[wavesplatform] def createUnsafe(address: ByteStr): Address = {
     final case class AddressImpl(bytes: ByteStr) extends Address {
@@ -196,7 +193,7 @@ object Alias {
   val AliasAlphabet = "-.0123456789@_abcdefghijklmnopqrstuvwxyz"
 
   def create(name: String): Either[ValidationError, Alias] = {
-    createWithChainId(name, ChainId.current)
+    createWithChainId(name, ChainId.global)
   }
 
   def fromString(str: String): Either[ValidationError, Alias] = {

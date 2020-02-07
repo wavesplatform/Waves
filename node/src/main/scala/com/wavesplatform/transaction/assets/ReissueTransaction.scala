@@ -63,7 +63,7 @@ object ReissueTransaction extends TransactionParser {
       timestamp: Long,
       proofs: Proofs
   ): Either[ValidationError, ReissueTransaction] =
-    ReissueTransaction(version, sender, assetId, quantity, reissuable, fee, timestamp, proofs, ChainId.current).validatedEither
+    ReissueTransaction(version, sender, assetId, quantity, reissuable, fee, timestamp, proofs, ChainId.global).validatedEither
 
   def signed(
       version: TxVersion,

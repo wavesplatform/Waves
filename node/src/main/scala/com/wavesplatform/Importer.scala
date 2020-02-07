@@ -18,7 +18,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.Blockchain
-import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
+import com.wavesplatform.transaction.{Asset, BlockchainUpdater, ChainId, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
@@ -220,9 +220,7 @@ object Importer extends ScorexLogging {
     for {
       importOptions <- parseOptions(args)
       wavesSettings = loadSettings(importOptions.configFile)
-      _ = AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
-      }
+      _ = ChainId.setGlobal(wavesSettings.blockchainSettings.addressSchemeCharacter)
 
       fis <- initFileStream(importOptions.blockchainFile)
       bis = new BufferedInputStream(fis)

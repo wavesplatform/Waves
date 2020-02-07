@@ -55,6 +55,6 @@ object SponsorFeeTxSerializer {
     val fee                  = buf.getLong
     val timestamp            = buf.getLong
     val proofs               = buf.getProofs
-    SponsorFeeTransaction(TxVersion.V1, sender, asset, Some(minSponsoredAssetFee).filterNot(_ == 0), fee, timestamp, proofs, ChainId.current)
+    SponsorFeeTransaction(TxVersion.V1, sender, asset, Some(minSponsoredAssetFee).filterNot(_ == 0), fee, timestamp, proofs, ChainId.global)
   }
 }

@@ -10,7 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings}
-import com.wavesplatform.transaction.GenesisTransaction
+import com.wavesplatform.transaction.{ChainId, GenesisTransaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.wallet.Wallet
 import net.ceedubs.ficus.Ficus._
@@ -76,9 +76,7 @@ object GenesisBlockGenerator extends App {
     ConfigFactory.parseFile(inputConfFile).as[Settings]("genesis-generator")
   }
 
-  com.wavesplatform.account.AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = settings.chainId
-  }
+  ChainId.setGlobal(settings.chainId)
 
   val shares: Seq[(AccountName, FullAddressInfo, Share)] = settings.distributions
     .map {

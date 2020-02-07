@@ -87,7 +87,7 @@ object ExchangeTxSerializer {
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V1, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, ChainId.current)
+      ExchangeTransaction(TxVersion.V1, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, ChainId.global)
     }
 
     def parseV2(buf: ByteBuffer): ExchangeTransaction = {
@@ -99,7 +99,7 @@ object ExchangeTxSerializer {
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V2, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, ChainId.current)
+      ExchangeTransaction(TxVersion.V2, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty, ChainId.global)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

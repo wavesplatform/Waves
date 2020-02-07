@@ -3,6 +3,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.order.AssetPair
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.{transaction => vt}
 
 object PBOrders {
@@ -32,7 +33,7 @@ object PBOrders {
 
   def protobuf(order: VanillaOrder): PBOrder = {
     PBOrder(
-      AddressScheme.current.chainId,
+      ChainId.global,
       ByteString.copyFrom(order.senderPublicKey),
       ByteString.copyFrom(order.matcherPublicKey),
       Some(AssetPair(PBAmounts.toPBAssetId(order.assetPair.amountAsset), PBAmounts.toPBAssetId(order.assetPair.priceAsset))),

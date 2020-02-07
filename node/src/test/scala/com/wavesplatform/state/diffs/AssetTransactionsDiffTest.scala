@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures

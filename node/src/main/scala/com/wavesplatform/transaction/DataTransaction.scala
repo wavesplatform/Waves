@@ -56,7 +56,7 @@ object DataTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, DataTransaction] =
-    DataTransaction(version, sender, data, fee, timestamp, proofs, ChainId.current).validatedEither
+    DataTransaction(version, sender, data, fee, timestamp, proofs, ChainId.global).validatedEither
 
   def signed(
       version: TxVersion,

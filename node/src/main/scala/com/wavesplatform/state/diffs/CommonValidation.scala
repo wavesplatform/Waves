@@ -120,7 +120,7 @@ object CommonValidation {
       tx.chainId == currentChainId,
       tx,
       GenericError(
-        s"Data from other network: expected: ${ChainId.current}(${ChainId.current.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
+        s"Data from other network: expected: ${ChainId.global}(${ChainId.global.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
       )
     )
 

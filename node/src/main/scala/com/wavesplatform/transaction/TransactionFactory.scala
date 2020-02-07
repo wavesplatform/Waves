@@ -372,8 +372,8 @@ object TransactionFactory {
     }
 
     TransactionParsers.by(typeId, version) match {
-      case _ if chainId.exists(_ != AddressScheme.current.chainId) =>
-        Left(WrongChain(AddressScheme.current.chainId, chainId.get))
+      case _ if chainId.exists(_ != ChainId.global) =>
+        Left(WrongChain(ChainId.global, chainId.get))
       case Some(txType) if pf.isDefinedAt(txType) => pf(txType)
       case _                                      => Left(UnsupportedTypeAndVersion(typeId, version))
     }

@@ -60,7 +60,7 @@ object SponsorFeeTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, SponsorFeeTransaction] =
-    SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs, ChainId.current).validatedEither
+    SponsorFeeTransaction(version, sender, assetId, minSponsoredAssetFee, fee, timestamp, proofs, ChainId.global).validatedEither
 
   def signed(
       version: TxVersion,

@@ -54,6 +54,6 @@ object DataTxSerializer {
     val data      = parseDataEntries(buf)
     val timestamp = buf.getLong // Timestamp before fee
     val fee       = buf.getLong
-    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, ChainId.current)
+    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, ChainId.global)
   }
 }

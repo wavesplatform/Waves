@@ -10,7 +10,7 @@ import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.Asset
+import com.wavesplatform.transaction.{Asset, ChainId}
 import com.wavesplatform.utils.Implicits.SubjectOps
 import monix.reactive.subjects.Subject
 import org.iq80.leveldb.{DB, Options}
@@ -83,9 +83,7 @@ object LevelDBWriterBenchmark {
       WavesSettings.fromRootConfig(config)
     }
 
-    AddressScheme.current = new AddressScheme {
-      override val chainId: Byte = wavesSettings.blockchainSettings.addressSchemeCharacter.toByte
-    }
+    ChainId.setGlobal(wavesSettings.blockchainSettings.addressSchemeCharacter)
 
     private val rawDB: DB = {
       val dir = new File(wavesSettings.dbSettings.directory)

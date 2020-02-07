@@ -44,7 +44,7 @@ object TransactionDiffer {
         stats.commonValidation
           .measureForType(tx.typeId) {
             for {
-              _ <- CommonValidation.disallowFromAnotherNetwork(tx, ChainId.current)
+              _ <- CommonValidation.disallowFromAnotherNetwork(tx, ChainId.global)
               _ <- CommonValidation.disallowTxFromFuture(blockchain.settings.functionalitySettings, currentBlockTimestamp, tx)
               _ <- CommonValidation.disallowTxFromPast(blockchain.settings.functionalitySettings, prevBlockTimestamp, tx)
               _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)

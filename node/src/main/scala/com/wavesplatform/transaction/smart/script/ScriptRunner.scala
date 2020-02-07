@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart.script
 
 import cats.Id
 import cats.implicits._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.contract.DApp
@@ -15,7 +15,7 @@ import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Authorized, Proven}
+import com.wavesplatform.transaction.{Authorized, ChainId, Proven}
 import monix.eval.Coeval
 
 object ScriptRunner {
@@ -35,7 +35,7 @@ object ScriptRunner {
           mi <- buildThisValue(in, blockchain, ds, Some(scriptContainerAddress))
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
-            AddressScheme.current.chainId,
+            ChainId.global,
             Coeval.evalOnce(mi),
             Coeval.evalOnce(blockchain.height),
             blockchain,
@@ -59,7 +59,7 @@ object ScriptRunner {
           )
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
-            AddressScheme.current.chainId,
+            ChainId.global,
             Coeval.evalOnce(mi),
             Coeval.evalOnce(blockchain.height),
             blockchain,

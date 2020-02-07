@@ -13,7 +13,7 @@ import com.wavesplatform.generator.config.FicusImplicits
 import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{ChainId, Transaction}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import monix.execution.Scheduler
@@ -153,10 +153,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
     case None => parser.failure("Failed to parse command line parameters")
     case Some(finalConfig) =>
       log.info(show"The final configuration: \n$finalConfig")
-
-      AddressScheme.current = new AddressScheme {
-        override val chainId: Byte = finalConfig.addressScheme.toByte
-      }
+      ChainId.setGlobal(finalConfig.addressScheme)
 
       val time = new NTP("pool.ntp.org")
 

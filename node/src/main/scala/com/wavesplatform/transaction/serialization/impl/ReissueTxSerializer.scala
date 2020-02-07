@@ -62,7 +62,7 @@ object ReissueTxSerializer {
       val reissuable = buf.getBoolean
       val fee        = buf.getLong
       val timestamp  = buf.getLong
-      ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, ChainId.current)
+      ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, ChainId.global)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

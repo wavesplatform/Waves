@@ -107,7 +107,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
     forAll(preconditionsAndPayment) {
       case (genesis, transfer) =>
-        transfer.chainId should not be ChainId.current
+        transfer.chainId should not be ChainId.global
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer))) { blockDiffEi =>
           blockDiffEi should produce("Data from other network")
         }

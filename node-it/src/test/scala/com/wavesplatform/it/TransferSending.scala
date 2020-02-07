@@ -23,14 +23,10 @@ object TransferSending {
   case class Req(senderSeed: String, targetAddress: String, amount: Long, fee: Long)
 }
 
-trait TransferSending extends ScorexLogging {
+trait TransferSending extends ScorexLogging with IntegrationTestsScheme {
   this: Suite with Nodes =>
 
   import scala.concurrent.ExecutionContext.Implicits.global
-
-  AddressScheme.current = new AddressScheme {
-    override val chainId: Byte = 'I'.toByte
-  }
 
   def generateTransfersFromAccount(n: Int, accountAddress: String): Seq[Req] = {
     val fee      = 100000 + 400000 // + 400000 for scripted accounts

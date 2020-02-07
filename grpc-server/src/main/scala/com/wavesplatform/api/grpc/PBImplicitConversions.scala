@@ -71,9 +71,9 @@ trait PBImplicitConversions {
   }
 
   implicit class PBRecipientConversions(r: Recipient) {
-    def toAddress: Address               = PBRecipients.toAddress(r, ChainId.current).explicitGet()
-    def toAlias: Alias                   = PBRecipients.toAlias(r, ChainId.current).explicitGet()
-    def toAddressOrAlias: AddressOrAlias = PBRecipients.toAddressOrAlias(r, ChainId.current).explicitGet()
+    def toAddress: Address               = PBRecipients.toAddress(r, ChainId.global).explicitGet()
+    def toAlias: Alias                   = PBRecipients.toAlias(r, ChainId.global).explicitGet()
+    def toAddressOrAlias: AddressOrAlias = PBRecipients.toAddressOrAlias(r, ChainId.global).explicitGet()
   }
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
@@ -85,7 +85,7 @@ trait PBImplicitConversions {
     def toByteStr: ByteStr     = ByteStr(bytes.toByteArray)
     def toPublicKey: PublicKey = PublicKey(bytes.toByteArray)
     def toAddress: Address =
-      PBRecipients.toAddress(this.toByteStr, ChainId.current).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
+      PBRecipients.toAddress(this.toByteStr, ChainId.global).fold(ve => throw new IllegalArgumentException(ve.toString), identity)
   }
 
   implicit def vanillaByteStrToPBByteString(bs: ByteStr): ByteString = bs.toPBByteString
