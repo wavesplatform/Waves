@@ -7,9 +7,9 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
+import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
@@ -85,6 +85,5 @@ object SmartGenerator {
          | assets = $assets
       """.stripMargin
     }
-
   }
 }

@@ -359,7 +359,11 @@ class AssetTransactionsDiffTest
         val blocks = Seq.fill(blocksCount)(TestBlock.create(Seq.empty))
 
         assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
-          ei should produce(s"Can't update asset info before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block")
+          ei should produce(
+            s"Can't update info of asset with id=${issue.id.value} " +
+            s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
+            s"current height=${blocks.size + 2}, minUpdateInfoInterval=${assetInfoUpdateEnabled.minAssetInfoUpdateInterval}"
+          )
         }
     }
   }

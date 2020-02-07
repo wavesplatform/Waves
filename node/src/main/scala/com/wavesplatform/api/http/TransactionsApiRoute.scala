@@ -11,7 +11,7 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api.TransactionsByIdRequest
@@ -370,13 +370,10 @@ object TransactionsApiRoute {
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>
-    def proofBytes(levels: Seq[Array[Byte]]): List[String] =
-      (levels foldRight List.empty[String]) { case (d, acc) => s"${Base64.Prefix}${Base64.encode(d)}" :: acc }
-
     Json.obj(
       "id"               -> mi.id.toString,
       "transactionIndex" -> mi.transactionIndex,
-      "merkleProof"      -> proofBytes(mi.digests)
+      "merkleProof"      -> mi.digests.map(d => s"${Base58.encode(d)}")
     )
   }
 
@@ -385,7 +382,7 @@ object TransactionsApiRoute {
       encoded          <- (jsv \ "id").validate[String]
       id               <- ByteStr.decodeBase58(encoded).fold(_ => JsError(InvalidSignature.message), JsSuccess(_))
       transactionIndex <- (jsv \ "transactionIndex").validate[Int]
-      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base64.decode))
+      merkleProof      <- (jsv \ "merkleProof").validate[List[String]].map(_.map(Base58.decode))
     } yield TransactionProof(id, transactionIndex, merkleProof)
   }
 }
