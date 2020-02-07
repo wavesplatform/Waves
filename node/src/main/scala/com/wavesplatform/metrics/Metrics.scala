@@ -9,76 +9,28 @@ import monix.execution.schedulers.SchedulerService
 import org.influxdb.dto.Point
 import org.influxdb.{InfluxDB, InfluxDBFactory}
 
-import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+import scala.util.Try
 import scala.util.control.NonFatal
 
 object Metrics extends ScorexLogging {
 
-  case class InfluxDbSettings(uri: URI,
-                              db: String,
-                              username: Option[String],
-                              password: Option[String],
-                              batchActions: Int,
-                              batchFlashDuration: FiniteDuration)
+  case class InfluxDbSettings(
+      uri: URI,
+      db: String,
+      username: Option[String],
+      password: Option[String],
+      batchActions: Int,
+      batchFlashDuration: FiniteDuration
+  )
 
   case class Settings(enable: Boolean, nodeId: Int, influxDb: InfluxDbSettings)
 
-  private implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
+  private[this] implicit val scheduler: SchedulerService = Schedulers.singleThread("metrics")
 
-  private var settings: Settings   = _
-  private var time: Time           = _
-  private var db: Option[InfluxDB] = None
-
-  def start(config: Settings, thatTime: Time): Future[Boolean] =
-    Task {
-      db.foreach { dbc =>
-        try {
-          db = None
-          dbc.close()
-        } catch {
-          case e: Throwable => log.warn(s"Failed to close InfluxDB (${e.getMessage})")
-        }
-      }
-      settings = config
-      time = thatTime
-      if (settings.enable) {
-        import config.{influxDb => dbSettings}
-
-        log.info(s"Precise metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
-        try {
-          val x = if (dbSettings.username.nonEmpty && dbSettings.password.nonEmpty) {
-            InfluxDBFactory.connect(
-              dbSettings.uri.toString,
-              dbSettings.username.getOrElse(""),
-              dbSettings.password.getOrElse("")
-            )
-          } else {
-            InfluxDBFactory.connect(dbSettings.uri.toString)
-          }
-          x.setDatabase(dbSettings.db)
-          x.enableBatch(dbSettings.batchActions, dbSettings.batchFlashDuration.toSeconds.toInt, TimeUnit.SECONDS)
-
-          try {
-            val pong = x.ping()
-            log.info(s"Metrics will be sent to ${dbSettings.uri}/${dbSettings.db}. Connected in ${pong.getResponseTime}ms.")
-            db = Some(x)
-          } catch {
-            case NonFatal(e) =>
-              log.warn("Can't connect to InfluxDB", e)
-          }
-        } catch {
-          case e: Throwable => log.warn(s"Failed to connect to InfluxDB (${e.getMessage})")
-        }
-      }
-
-      db.nonEmpty
-    }.runAsyncLogErr
-
-  def shutdown(): Unit =
-    Task {
-      db.foreach(_.close())
-    }.runAsyncLogErr
+  private[this] var settings: Settings   = _
+  private[this] var time: Time           = _
+  private[this] var db: Option[InfluxDB] = None
 
   def write(b: Point.Builder): Unit = {
     db.foreach { db =>
@@ -92,9 +44,10 @@ object Metrics extends ScorexLogging {
               .addField("node", settings.nodeId)
               .tag("node", settings.nodeId.toString)
               .time(ts, TimeUnit.MILLISECONDS)
-              .build())
+              .build()
+          )
         } catch {
-          case e: Throwable => log.warn(s"Failed to send data to InfluxDB (${e.getMessage})")
+          case NonFatal(e) => log.warn(s"Failed to send data to InfluxDB (${e.getMessage})")
         }
       }.runAsyncLogErr
     }
@@ -102,4 +55,46 @@ object Metrics extends ScorexLogging {
 
   def writeEvent(name: String): Unit = write(Point.measurement(name))
 
+  def start(config: Settings, thatTime: Time): Boolean = synchronized {
+    this.shutdown()
+    settings = config
+    time = thatTime
+    if (settings.enable) {
+      import config.{influxDb => dbSettings}
+
+      log.info(s"Precise metrics are enabled and will be sent to ${dbSettings.uri}/${dbSettings.db}")
+      try {
+        val x = if (dbSettings.username.nonEmpty && dbSettings.password.nonEmpty) {
+          InfluxDBFactory.connect(
+            dbSettings.uri.toString,
+            dbSettings.username.getOrElse(""),
+            dbSettings.password.getOrElse("")
+          )
+        } else {
+          InfluxDBFactory.connect(dbSettings.uri.toString)
+        }
+        x.setDatabase(dbSettings.db)
+        x.enableBatch(dbSettings.batchActions, dbSettings.batchFlashDuration.toSeconds.toInt, TimeUnit.SECONDS)
+
+        try {
+          val pong = x.ping()
+          log.info(s"Metrics will be sent to ${dbSettings.uri}/${dbSettings.db}. Connected in ${pong.getResponseTime}ms.")
+          db = Some(x)
+        } catch {
+          case NonFatal(e) =>
+            log.warn("Can't connect to InfluxDB", e)
+        }
+      } catch {
+        case NonFatal(e) => log.warn(s"Failed to connect to InfluxDB (${e.getMessage})")
+      }
+    }
+
+    db.nonEmpty
+  }
+
+  def shutdown(): Unit = synchronized {
+    val dbValue = this.db
+    this.db = None
+    Try(dbValue.foreach(_.close()))
+  }
 }

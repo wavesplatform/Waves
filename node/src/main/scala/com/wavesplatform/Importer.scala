@@ -239,7 +239,7 @@ object Importer extends ScorexLogging {
       Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
       bis.close()
       fis.close()
-      Await.result(Kamon.stopAllReporters(), 10.seconds)
+      Await.result(Kamon.stopModules(), 10.seconds)
       time.close()
       utxPool.close()
       blockchainUpdated.onComplete()

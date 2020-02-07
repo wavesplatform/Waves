@@ -246,7 +246,7 @@ class BlockchainUpdaterImpl(
                       )
                     )
                 } else
-                  metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.header.reference)) match {
+                  metrics.forgeBlockTimeStats.measureOptional(ng.totalDiffOf(block.header.reference)) match {
                     case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                     case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
                       if (!verify || referencedForgedBlock.signaturesValid().isRight) {
@@ -731,10 +731,10 @@ class BlockchainUpdaterImpl(
   }
 
   private[this] object metrics {
-    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork")
-    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork")
-    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork")
-    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height")
+    val blockMicroForkStats       = Kamon.counter("blockchain-updater.block-micro-fork").withoutTags()
+    val microMicroForkStats       = Kamon.counter("blockchain-updater.micro-micro-fork").withoutTags()
+    val microBlockForkStats       = Kamon.counter("blockchain-updater.micro-block-fork").withoutTags()
+    val microBlockForkHeightStats = Kamon.histogram("blockchain-updater.micro-block-fork-height").withoutTags()
     val forgeBlockTimeStats       = Kamon.timer("blockchain-updater.forge-block-time")
   }
 }

@@ -71,9 +71,9 @@ object Exporter extends ScorexLogging {
           case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
         }
 
-        Await.result(Kamon.stopAllReporters(), 10.seconds)
+        Await.result(Kamon.stopModules(), 10.seconds)
         time.close()
-        Await.ready(Kamon.stopAllReporters(), 20.seconds)
+        Await.ready(Kamon.stopModules(), 20.seconds)
         Metrics.shutdown()
     }
   }
