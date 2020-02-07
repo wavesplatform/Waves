@@ -105,6 +105,7 @@ object AssetInfo {
 case class Transaction (
                         _type: Int,
                         id: String,
+                        chainId: Option[Byte],
                         fee: Long,
                         timestamp: Long,
                         sender: Option[String],
@@ -112,8 +113,8 @@ case class Transaction (
                         name: Option[String],
                         amount: Option[Long],
                         description: Option[String],
-                        attachmentType: Option[String],
-                        attachmentValue: Option[JsValue]
+                        typedAttachment: Option[Attachment],
+                        attachment: Option[String]
                       )
 
 object Transaction {
@@ -126,21 +127,28 @@ object Transaction {
         timestamp <- (jsv \ "timestamp").validate[Long]
         sender <- (jsv \ "sender").validateOpt[String]
         version <- (jsv \ "version").validate[Byte]
+        chainId <- version match {
+          case v if v > 2 => (jsv \ "chainId").validateOpt[Byte]
+          case _ => JsSuccess(None)
+        }
         name <- (jsv \ "name").validateOpt[String]
         amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
-        attachmentType <- version match {
-          case v if v > 2 => (jsv \ "attachment" \ "type").validateOpt[String]
+        typedAttachment <- version match {
+          case v if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
+          case v if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
           case _ => JsSuccess(None)
         }
-        attachmentValue <- version match {
-          case v if v > 2 => (jsv \ "attachment" \ "value").validateOpt[JsValue]
-          case _ => (jsv \ "attachment").validateOpt[JsValue]
+        attachment <- version match {
+          case v if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
+          case v if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case _ => JsSuccess(None)
         }
       }
         yield Transaction(
           _type,
           id,
+          chainId,
           fee,
           timestamp,
           sender,
@@ -148,8 +156,8 @@ object Transaction {
           name,
           amount,
           description,
-          attachmentType,
-          attachmentValue
+          typedAttachment,
+          attachment
         )),
     Json.writes[Transaction]
   )
@@ -180,9 +188,9 @@ case class TransactionInfo(
     description: Option[String],
     recipient: Option[String],
     script: Option[String],
-    version: Option[Byte],
-    attachmentType: Option[String],
-    attachmentValue: Option[JsValue]
+    version: Byte,
+    typedAttachment: Option[Attachment],
+    attachment: Option[String]
 ) extends TxInfo
 object TransactionInfo {
   implicit val format: Format[TransactionInfo] = Format(
@@ -200,14 +208,16 @@ object TransactionInfo {
         description <- (jsv \ "description").validateOpt[String]
         recipient <- (jsv \ "recipient").validateOpt[String]
         script <- (jsv \ "script").validateOpt[String]
-        version <- (jsv \ "version").validateOpt[Byte]
-        attachmentType <- version match {
-          case Some(v) if v > 2 => (jsv \ "attachment" \ "type").validateOpt[String]
+        version <- (jsv \ "version").validate[Byte]
+        typedAttachment <- version match {
+          case v if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
+          case v if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
           case _ => JsSuccess(None)
         }
-        attachmentValue <- version match {
-          case Some(v) if v > 2 => (jsv \ "attachment" \ "value").validateOpt[JsValue]
-          case _ => (jsv \ "attachment").validateOpt[JsValue]
+        attachment <- version match {
+          case v if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
+          case v if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case _ => JsSuccess(None)
         }
       }
         yield TransactionInfo(
@@ -224,8 +234,8 @@ object TransactionInfo {
           recipient,
           script,
           version,
-          attachmentType,
-          attachmentValue
+          typedAttachment,
+          attachment
         )),
     Json.writes[TransactionInfo]
   )

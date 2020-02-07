@@ -274,7 +274,8 @@ object AsyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: TxVersion = TxVersion.V2,
-        attachment: Option[Attachment] = None
+        typedAttachment: Option[Attachment] = None,
+        attachment: Option[String] = None
     ): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -291,7 +292,11 @@ object AsyncHttpApi extends Assertions {
             if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull
           },
           "attachment" -> {
-            if (attachment.isDefined) Json.toJson(attachment.get) else JsNull
+            if (attachment.isDefined || typedAttachment.isDefined) {
+              if (version < 3) {
+                attachment.get
+              } else Json.toJson(typedAttachment.get)
+            } else JsNull
           }
         )
       )
@@ -515,8 +520,8 @@ object AsyncHttpApi extends Assertions {
                      transfers: List[Transfer],
                      fee: Long,
                      version: TxVersion = TxVersion.V2,
-                     attachmentType: Option[String] = None,
-                     attachmentValue: Option[JsValue] = None,
+                     typedAttachment: Option[Attachment] = None,
+                     attachment: Option[String] = None,
                      assetId: Option[String] = None): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -527,13 +532,10 @@ object AsyncHttpApi extends Assertions {
           "version"   -> version,
           "transfers" -> Json.toJson(transfers),
           "attachment" -> {
-            if (attachmentValue.isDefined) {
-              version match {
-                case TxVersion.V3 => {
-                  Json.obj("type" -> attachmentType.get, "value" -> attachmentValue.get)
-                }
-                case _ => attachmentValue.get
-              }
+            if (attachment.isDefined || typedAttachment.isDefined) {
+              if (version < 2) {
+                attachment.get
+              } else Json.toJson(typedAttachment.get)
             } else JsNull
           }
         )

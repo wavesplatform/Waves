@@ -388,10 +388,11 @@ object SyncHttpApi extends Assertions {
         assetId: Option[String] = None,
         feeAssetId: Option[String] = None,
         version: Byte = TxVersion.V2,
-        attachment: Option[Attachment] = None,
+        typedAttachment: Option[Attachment] = None,
+        attachment: Option[String] = None,
         waitForTx: Boolean = false
     ): Transaction = {
-      maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, attachment)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).transfer(sourceAddress, recipient, amount, fee, assetId, feeAssetId, version, typedAttachment, attachment)), waitForTx)
     }
 
     def massTransfer(
@@ -399,12 +400,12 @@ object SyncHttpApi extends Assertions {
         transfers: List[Transfer],
         fee: Long,
         version: TxVersion = TxVersion.V2,
-        attachmentType: Option[String] = None,
-        attachmentValue: Option[JsValue] = None,
+        typedAttachment: Option[Attachment] = None,
+        attachment: Option[String] = None,
         assetId: Option[String] = None,
         waitForTx: Boolean = false
     ): Transaction = {
-      maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, version, attachmentType, attachmentValue, assetId)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).massTransfer(sourceAddress, transfers, fee, version, typedAttachment, attachment, assetId)), waitForTx)
     }
 
     def broadcastLease(

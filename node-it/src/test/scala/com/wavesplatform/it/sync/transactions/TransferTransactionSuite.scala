@@ -1,16 +1,17 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.{Block, Transaction}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.transfer._
-import org.scalatest.CancelAfterFailure
+import org.scalatest.{Assertion, Assertions, CancelAfterFailure}
 import play.api.libs.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, Json}
 
 import scala.concurrent.duration._
@@ -123,6 +124,22 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     }
   }
 
+  test("check transfer transaction in blocks api") {
+    for(v <- transferTxSupportedVersions) {
+      val tx = if (v < 3) {
+        sender.transfer(firstAddress, secondAddress, 1000, version = v, attachment = Some("somestring"), waitForTx = true)
+      } else {
+        sender.transfer(firstAddress, secondAddress, 1000, version = v, typedAttachment = Some(Attachment.Str("somestring")), waitForTx = true)
+      }
+      val currHeight = sender.height
+      sender.lastBlock.transactions.filter(_.id == tx.id).head shouldBe tx
+      sender.blockAt(currHeight).transactions.filter(_.id == tx.id).head shouldBe tx
+      sender.blockSeqByAddress(tx.sender.get, currHeight, currHeight).head.transactions.filter(_.id == tx.id).head shouldBe tx
+      sender.blockSeq(currHeight, currHeight).head.transactions.filter(_.id == tx.id).head shouldBe tx
+      sender.blockBySignature(sender.blockAt(currHeight).signature).transactions.filter(_.id == tx.id).head shouldBe tx
+    }
+  }
+
   test("able to pass typed attachment to transfer transaction V3") {
 
     val txWithStringAtt =
@@ -132,12 +149,11 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         transferAmount,
         minFee,
         version = TxVersion.V3,
-        attachment = Some(Attachment.Str("somestring")),
+        typedAttachment = Some(Attachment.Str("somestring")),
         waitForTx = true
       )
     val txWithStringAttInfo = sender.transactionInfo(txWithStringAtt.id)
-    txWithStringAttInfo.attachmentType shouldBe Some("string")
-    txWithStringAttInfo.attachmentValue shouldBe Some(JsString("somestring"))
+    txWithStringAttInfo.typedAttachment shouldBe Some(Attachment.Str("somestring"))
 
     val txWithBoolAtt =
       sender.transfer(
@@ -146,12 +162,11 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         transferAmount,
         minFee,
         version = TxVersion.V3,
-        attachment = Some(Attachment.Bool(false)),
+        typedAttachment = Some(Attachment.Bool(false)),
         waitForTx = true
       )
     val txWithBoolAttInfo = sender.transactionInfo(txWithBoolAtt.id)
-    txWithBoolAttInfo.attachmentType shouldBe Some("boolean")
-    txWithBoolAttInfo.attachmentValue shouldBe Some(JsBoolean(true))
+    txWithBoolAttInfo.typedAttachment shouldBe Some(Attachment.Bool(false))
 
     val txWithIntAtt =
       sender.transfer(
@@ -160,12 +175,11 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         transferAmount,
         minFee,
         version = TxVersion.V3,
-        attachment = Some(Attachment.Num(123)),
+        typedAttachment = Some(Attachment.Num(123)),
         waitForTx = true
       )
     val txWithIntAttInfo = sender.transactionInfo(txWithIntAtt.id)
-    txWithIntAttInfo.attachmentType shouldBe Some("integer")
-    txWithIntAttInfo.attachmentValue shouldBe Some(JsNumber(123))
+    txWithIntAttInfo.typedAttachment shouldBe Some(Attachment.Num(123))
 
     val txWithBinaryAtt =
       sender.transfer(
@@ -174,12 +188,11 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         transferAmount,
         minFee,
         version = TxVersion.V3,
-        attachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
+        typedAttachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
         waitForTx = true
       )
     val txWithBinaryAttInfo = sender.transactionInfo(txWithBinaryAtt.id)
-    txWithBinaryAttInfo.attachmentType shouldBe Some("binary")
-    txWithBinaryAttInfo.attachmentValue shouldBe Some(JsString(Base64.encode(Array[Byte](127.toByte, 0, 1, 1))))
+    txWithBinaryAttInfo.typedAttachment shouldBe Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)))
   }
 
   test("not able to pass typed attachment to transfer transaction V1,2") {
@@ -191,10 +204,33 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
           transferAmount,
           minFee,
           version = v,
-          attachment = Some(Attachment.Num(123))
+          typedAttachment = Some(Attachment.Num(123))
         )
       ) { error =>
         error.id shouldBe 199
+        error.message shouldBe "Too big sequences requested"
+      }
+    }
+  }
+
+  test("not able to pass not typed attachment to transfer transaction V3") {
+    for (v <- transferTxSupportedVersions if v < 3) {
+      assertApiError(
+        sender.signAndBroadcast(
+          Json.obj(
+            "type"       -> TransferTransaction.typeId,
+            "sender"     -> firstAddress,
+            "amount"     -> 1000,
+            "recipient"  -> secondAddress,
+            "fee"        -> minFee,
+            "version" -> 3,
+            "assetId" -> JsNull,
+            "feeAssetId" -> JsNull,
+            "attachment" -> "somestring"
+          )
+        )
+      ) { error =>
+        error.id shouldBe 10
         error.message shouldBe "Too big sequences requested"
       }
     }

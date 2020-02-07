@@ -328,61 +328,93 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
     }
   }
 
-  test("able to pass typed attachment to transfer transaction V3") {
+  test("able to pass typed attachment to transfer transaction V2") {
     val transfers = List(Transfer(firstAddress, transferAmount))
-//    val txWithStringAtt =
-//      miner.massTransfer(
-//        firstAddress,
-//        transfers,
-//        calcMassTransferFee(1),
-//        version = TxVersion.V3,
-//        attachment = Some(List(Attachment.Str("qwe"))),
-//        waitForTx = true
-//      )
-//    val txWithStringAttInfo = sender.transactionInfo(txWithStringAtt.id)
-//    txWithStringAttInfo.attachmentType shouldBe Some("string")
-//    txWithStringAttInfo.attachmentValue shouldBe Some(JsString("somestring"))
+    val txWithStringAtt =
+      miner.massTransfer(
+        firstAddress,
+        transfers,
+        calcMassTransferFee(1),
+        version = TxVersion.V2,
+        typedAttachment = Some(Attachment.Str("qwe")),
+        waitForTx = true
+      )
+    val txWithStringAttInfo = sender.transactionInfo(txWithStringAtt.id)
+    txWithStringAttInfo.typedAttachment shouldBe Some(Attachment.Str("qwe"))
+    txWithStringAtt.typedAttachment shouldBe Some(Attachment.Str("qwe"))
 
-//    val txWithBoolAtt =
-//      miner.massTransfer(
-//        firstAddress,
-//        transfers,
-//        calcMassTransferFee(1),
-//        version = TxVersion.V3,
-//        attachmentType = Some("boolean"),
-//        attachmentValue = Some(JsBoolean(true)),
-//        waitForTx = true
-//      )
-//    val txWithBoolAttInfo = sender.transactionInfo(txWithBoolAtt.id)
-//    txWithBoolAttInfo.attachmentType shouldBe Some("boolean")
-//    txWithBoolAttInfo.attachmentValue shouldBe Some(JsBoolean(true))
-//
-//    val txWithIntAtt =
-//      miner.massTransfer(
-//        firstAddress,
-//        transfers,
-//        calcMassTransferFee(1),
-//        version = TxVersion.V3,
-//        attachmentType = Some("integer"),
-//        attachmentValue = Some(JsNumber(123)),
-//        waitForTx = true
-//      )
-//    val txWithIntAttInfo = sender.transactionInfo(txWithIntAtt.id)
-//    txWithIntAttInfo.attachmentType shouldBe Some("integer")
-//    txWithIntAttInfo.attachmentValue shouldBe Some(JsNumber(123))
-//
-//    val txWithBinaryAtt =
-//      miner.massTransfer(
-//        firstAddress,
-//        transfers,
-//        calcMassTransferFee(1),
-//        version = TxVersion.V3,
-//        attachmentType = Some("binary"),
-//        attachmentValue = Some(JsString("base64:aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1kUXc0dzlXZ1hjUQ==")),
-//        waitForTx = true
-//      )
-//    val txWithBinaryAttInfo = sender.transactionInfo(txWithBinaryAtt.id)
-//    txWithBinaryAttInfo.attachmentType shouldBe Some("binary")
-//    txWithBinaryAttInfo.attachmentValue shouldBe Some(JsString("aHR0cHM6Ly93d3cueW91dHViZS5jb20vd2F0Y2g/dj1kUXc0dzlXZ1hjUQ=="))
+
+    val txWithBoolAtt =
+      miner.massTransfer(
+        firstAddress,
+        transfers,
+        calcMassTransferFee(1),
+        version = TxVersion.V2,
+        typedAttachment = Some(Attachment.Bool(true)),
+        waitForTx = true
+      )
+    val txWithBoolAttInfo = sender.transactionInfo(txWithBoolAtt.id)
+    txWithBoolAttInfo.typedAttachment shouldBe Some(Attachment.Bool(true))
+
+    val txWithIntAtt =
+      miner.massTransfer(
+        firstAddress,
+        transfers,
+        calcMassTransferFee(1),
+        version = TxVersion.V2,
+        typedAttachment = Some(Attachment.Num(123)),
+        waitForTx = true
+      )
+    val txWithIntAttInfo = sender.transactionInfo(txWithIntAtt.id)
+    txWithIntAttInfo.typedAttachment shouldBe Some(Attachment.Num(123))
+
+    val txWithBinaryAtt =
+      miner.massTransfer(
+        firstAddress,
+        transfers,
+        calcMassTransferFee(1),
+        version = TxVersion.V2,
+        typedAttachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
+        waitForTx = true
+      )
+    val txWithBinaryAttInfo = sender.transactionInfo(txWithBinaryAtt.id)
+    txWithBinaryAttInfo.typedAttachment shouldBe Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)))
+  }
+  test("not able to pass typed attachment to mass transfer transaction V1") {
+      assertApiError(
+        sender.signAndBroadcast(
+          Json.obj(
+            "type" -> MassTransferTransaction.typeId,
+            "assetId" -> JsNull,
+            "sender" -> firstAddress,
+            "fee" -> calcMassTransferFee(1),
+            "version" -> 1,
+            "transfers" -> Json.toJson(List(Transfer(firstAddress, 1000))),
+            "attachment" -> Json.toJson(Attachment.Str("somestring"))
+          )
+        )
+      ) { error =>
+        error.id shouldBe 10
+        error.message shouldBe "Too big sequences requested"
+      }
+    }
+
+  test("not able to pass not typed attachment to mass transfer transaction V2") {
+    assertApiError(
+      sender.signAndBroadcast(
+        Json.obj(
+          "type" -> MassTransferTransaction.typeId,
+          "assetId" -> JsNull,
+          "sender" -> firstAddress,
+          "fee" -> calcMassTransferFee(1),
+          "version" -> 2,
+          "transfers" -> Json.toJson(List(Transfer(firstAddress, 1000))),
+          "attachment" -> "somestring"
+        )
+      )
+    ) { error =>
+      error.id shouldBe 199
+      error.message shouldBe "Too big sequences requested"
+    }
   }
 }
