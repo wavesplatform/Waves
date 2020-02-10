@@ -13,10 +13,6 @@ object SetAssetScriptTxValidator extends TxValidator[SetAssetScriptTransaction] 
         script.forall(_.isInstanceOf[ExprScript]),
         GenericError(s"Asset can only be assigned with Expression script, not Contract")
       ),
-      V.cond(
-        script.isDefined,
-        GenericError("Cannot set empty script")
-      ),
       V.fee(fee)
     )
   }
