@@ -17,7 +17,7 @@ package object utils {
     @inline
     private[this] def makeException(value: Any): Throwable = value match {
       case err: Throwable => err
-      case _              => new IllegalArgumentException(value.toString)
+      case _              => new RuntimeException(value.toString)
     }
   }
 }

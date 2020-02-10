@@ -63,7 +63,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     assertGrpcError(
       sender.grpc.setAssetScript(firstAcc, assetWOScript, None, setAssetScriptFee),
       "Cannot set empty script",
-      Code.INVALID_ARGUMENT
+      Code.INTERNAL
     )
 
     sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance
