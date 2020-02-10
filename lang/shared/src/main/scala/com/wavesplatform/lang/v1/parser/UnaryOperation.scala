@@ -18,9 +18,9 @@ object UnaryOperation {
 
   case object POSITIVE_OP extends UnaryOperation {
     val func = "+"
-    override val parser: P[Any] = P("-" ~ !CharIn('0' to '9'))
+    override val parser: P[Any] = P("+" ~ !CharIn('0' to '9'))
     override def expr(start: Int, end: Int, op: EXPR): EXPR = {
-      FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "-"), List(op))
+      FUNCTION_CALL(Pos(start, end), PART.VALID(Pos(start, end), "+"), List(op))
     }
   }
 
