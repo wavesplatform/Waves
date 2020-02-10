@@ -110,11 +110,11 @@ object Keys {
   def blockInfoAt(height: Height): Key[Option[BlockInfo]] =
     Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo, writeBlockInfo)
 
-  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] = // TODO: Store protobuf block header
+  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
       "block-header-bytes-at-height",
       h(BlockHeaderPrefix, height),
-      _.drop(4),
+      _.drop(16),
       _ => throw new Exception("Key \"block-header-bytes-at-height\" - is read only!")
     )
 

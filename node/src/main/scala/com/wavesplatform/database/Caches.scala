@@ -65,21 +65,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     }
   }
 
-  def loadBlockBytes(height: Int): Option[Array[Byte]]
-  override def blockBytes(height: Int): Option[Array[Byte]] = {
+  def loadBlockBytes(height: Int): Option[(Array[Byte], Byte)]
+  override def blockBytes(height: Int): Option[(Array[Byte], Byte)] = {
     val c = current
     if (height == c._1) {
-      c._3.map(_.bytes())
+      c._3.map(b => (b.bytes(), b.header.version))
     } else {
       loadBlockBytes(height)
     }
   }
 
-  def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]]
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+  def loadBlockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)]
+  override def blockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)] = {
     val c = current
     if (c._3.exists(_.uniqueId == blockId)) {
-      c._3.map(_.bytes())
+      c._3.map(b => (b.bytes(), b.header.version))
     } else {
       loadBlockBytes(blockId)
     }

@@ -5,7 +5,7 @@ import java.nio.ByteBuffer
 import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
+import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -16,7 +16,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -57,7 +56,6 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
   private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
     v.takeWhile(_ <= h).lastOption // Should we use binary search?
   }
-
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -267,7 +265,6 @@ class LevelDBWriter(
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
-
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -753,15 +750,15 @@ class LevelDBWriter(
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
-            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
-              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+            val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+            (wh, b)
+          }
         case asset @ IssuedAsset(_) =>
-            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
-              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+            val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+            (wh, b)
+          }
       }
     }
   }
@@ -869,65 +866,19 @@ class LevelDBWriter(
       .flatMap(loadBlockInfo)
   }
 
-  override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
-    import com.wavesplatform.crypto._
+  override def loadBlockBytes(h: Int): Option[(Array[Byte], Byte)] = readOnly { db =>
+    val height  = Height(h)
+    val infoKey = Keys.blockInfoAt(height)
 
-    val height = Height(h)
-
-    val headerKey = Keys.blockHeaderBytesAt(height)
-
-    def readTransactionBytes(version: Byte, count: Int) = {
-      (0 until count).toArray.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-          .map { tx =>
-            val txBytes = version match {
-              case Block.ProtoBlockVersion => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
-              case _ => tx.bytes()
-            }
-            Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)
-          }
-          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
-      }
-    }
-
-    db.get(headerKey)
-      .map { headerBytes => // TODO: Only protobuf serialization
-        val version             = headerBytes.head
-        val consensusDataOffset = 1 + Longs.BYTES + SignatureLength // version + timestamp + reference
-        val genSigLength        = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-        val txCountOffset       = consensusDataOffset + Longs.BYTES + genSigLength // baseTarget + genSig
-        val bytesBeforeCData    = headerBytes.take(consensusDataOffset)
-        val consensusDataBytes  = headerBytes.slice(consensusDataOffset, consensusDataOffset + Longs.BYTES + genSigLength)
-
-        val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
-          val byte = headerBytes(txCountOffset)
-          (byte.toInt, Array[Byte](byte))
-        } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + Ints.BYTES)
-          (Ints.fromByteArray(bytes), bytes)
-        }
-
-        val bytesAfterTxs =
-          if (version > Block.PlainBlockVersion) {
-            headerBytes.drop(txCountOffset + txCountBytes.length)
-          } else {
-            headerBytes.takeRight(SignatureLength + KeyLength) // featureVotes dropped
-          }
-
-        val txBytes = txCountBytes ++ readTransactionBytes(version, txCount)
-
-        val bytes = bytesBeforeCData ++
-          Ints.toByteArray(consensusDataBytes.length) ++
-          consensusDataBytes ++
-          Ints.toByteArray(txBytes.length) ++
-          txBytes ++
-          bytesAfterTxs
-
-        bytes
+    db.get(infoKey)
+      .map {
+        case BlockInfo(header, _, transactionCount, signature) =>
+          val txs = (0 until transactionCount).flatMap(n => db.get(Keys.transactionAt(height, TxNum(n.toShort))))
+          (Block(header, signature, txs).bytes(), header.version)
       }
   }
 
-  override def loadBlockBytes(blockId: ByteStr): Option[Array[Byte]] = {
+  override def loadBlockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)] = {
     readOnly(db => db.get(Keys.heightOf(blockId))).flatMap(h => loadBlockBytes(h))
   }
 

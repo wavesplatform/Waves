@@ -25,8 +25,11 @@ trait Blockchain {
 
   def lastBlock: Option[Block]
   def carryFee: Long
-  def blockBytes(height: Int): Option[Array[Byte]]
-  def blockBytes(blockId: ByteStr): Option[Array[Byte]]
+
+  /** Returns block bytes and block version */
+  def blockBytes(height: Int): Option[(Array[Byte], Byte)]
+  /** Returns block bytes and block version */
+  def blockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)]
 
   def heightOf(blockId: ByteStr): Option[Int]
 

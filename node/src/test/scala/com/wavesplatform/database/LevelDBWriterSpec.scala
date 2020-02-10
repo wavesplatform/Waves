@@ -232,10 +232,10 @@ class LevelDBWriterSpec
         db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
       }
 
-      bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
-      bcu.blockBytes(2).get shouldBe block1.bytes()
-      bcu.blockBytes(3).get shouldBe block2.bytes()
-      bcu.blockBytes(4).get shouldBe block3.bytes()
+      bcu.blockBytes(1).get._1 shouldBe genesisBlock.bytes()
+      bcu.blockBytes(2).get._1 shouldBe block1.bytes()
+      bcu.blockBytes(3).get._1 shouldBe block2.bytes()
+      bcu.blockBytes(4).get._1 shouldBe block3.bytes()
 
     } finally {
       bcu.shutdown()

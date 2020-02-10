@@ -18,11 +18,11 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
 import com.wavesplatform.database.protobuf.{AssetDetails => PBAssetDetails}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.protobuf.block.{PBBlockHeader, PBBlockHeaders}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import org.iq80.leveldb.{DB, Options, ReadOptions}
-
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -296,93 +296,36 @@ package object database extends ScorexLogging {
     val source   = TransactionId @@ ndi.readByteStr(DigestLength)
     val issuer   = ndi.readPublicKey
     val decimals = ndi.readInt()
-    val nft = ndi.readBoolean()
+    val nft      = ndi.readBoolean()
 
     AssetStaticInfo(source, issuer, decimals, nft)
   }
 
   def writeBlockInfo(data: BlockInfo): Array[Byte] = {
-    val BlockInfo(bh, size, transactionCount, signature) = data
+    import data._
 
     val ndo = newDataOutput()
 
     ndo.writeInt(size)
-
-    ndo.writeByte(bh.version)
-    ndo.writeLong(bh.timestamp)
-    ndo.write(bh.reference)
-    ndo.writeLong(bh.baseTarget)
-    ndo.write(bh.generationSignature)
-
-    if (bh.version == Block.GenesisBlockVersion | bh.version == Block.PlainBlockVersion)
-      ndo.writeByte(transactionCount)
-    else
-      ndo.writeInt(transactionCount)
-
-    ndo.writeInt(bh.featureVotes.size)
-    bh.featureVotes.foreach(s => ndo.writeShort(s))
-
-    if (bh.version > Block.NgBlockVersion)
-      ndo.writeLong(bh.rewardVote)
-
-    ndo.write(bh.generator)
-
-    if (bh.version > Block.RewardBlockVersion) {
-      ndo.writeInt(bh.transactionsRoot.arr.length)
-      ndo.writeByteStr(bh.transactionsRoot)
-    }
-
+    ndo.writeInt(transactionCount)
     ndo.write(signature)
+    ndo.write(PBBlockHeaders.protobuf(header).toByteArray)
 
     ndo.toByteArray
   }
 
   def readBlockInfo(bs: Array[Byte]): BlockInfo = {
-    val ndi = newDataInput(bs)
+    val infoSize = Ints.BYTES + Ints.BYTES + SignatureLength // size + transactionCount + signature
+    val ndi      = newDataInput(bs.take(Ints.BYTES + Ints.BYTES + SignatureLength))
 
-    val size      = ndi.readInt()
-    val version   = ndi.readByte()
-    val timestamp = ndi.readLong()
-
-    val referenceArr = new Array[Byte](SignatureLength)
-    ndi.readFully(referenceArr)
-
-    val baseTarget = ndi.readLong()
-
-    val genSigLength = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-    val genSig       = new Array[Byte](genSigLength)
-    ndi.readFully(genSig)
-
-    val transactionCount = {
-      if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) ndi.readByte()
-      else ndi.readInt()
-    }
-
-    val featureVotesCount = ndi.readInt()
-    val featureVotes      = List.fill(featureVotesCount)(ndi.readShort())
-    val rewardVote        = if (version > Block.NgBlockVersion) ndi.readLong() else -1L
-
-    val generator = new Array[Byte](KeyLength)
-    ndi.readFully(generator)
-
-    val transactionsRoot = if (version < Block.ProtoBlockVersion) ByteStr.empty else ndi.readByteStr(ndi.readInt())
-
-    val signature = new Array[Byte](SignatureLength)
+    val size             = ndi.readInt()
+    val transactionCount = ndi.readInt()
+    val signature        = new Array[Byte](SignatureLength)
     ndi.readFully(signature)
 
-    val header = BlockHeader(
-      version,
-      timestamp,
-      ByteStr(referenceArr),
-      baseTarget,
-      ByteStr(genSig),
-      PublicKey(ByteStr(generator)),
-      featureVotes,
-      rewardVote,
-      transactionsRoot
-    )
+    val header = PBBlockHeaders.vanilla(PBBlockHeader.parseFrom(bs.drop(infoSize)))
 
-    BlockInfo(header, size, transactionCount, ByteStr(signature))
+    BlockInfo(header, size, transactionCount, signature)
   }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
@@ -496,7 +439,7 @@ package object database extends ScorexLogging {
   }
 
   def readAssetScript(b: Array[Byte]): (PublicKey, Script, Long) = {
-    val pkb = b.take(KeyLength)
+    val pkb    = b.take(KeyLength)
     val script = b.slice(KeyLength, b.length - 8)
     (
       PublicKey(pkb),
@@ -507,9 +450,9 @@ package object database extends ScorexLogging {
 
   def writeScript(script: (PublicKey, Script, Long, Map[String, Long])): Array[Byte] = {
     val (pk, expr, complexity, callableComplexities) = script
-    val pkb = pk.arr
+    val pkb                                          = pk.arr
     assert(pkb.size == KeyLength)
-    val output                                   = newDataOutput()
+    val output = newDataOutput()
 
     output.writeByteStr(pkb)
 
@@ -529,7 +472,7 @@ package object database extends ScorexLogging {
 
   def readScript(b: Array[Byte]): (PublicKey, Script, Long, Map[String, Long]) = {
     val input                     = newDataInput(b)
-    val pk = PublicKey(input.readByteStr(KeyLength))
+    val pk                        = PublicKey(input.readByteStr(KeyLength))
     val scriptSize                = input.readInt()
     val script                    = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
     val complexity                = input.readLong()

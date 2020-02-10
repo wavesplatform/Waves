@@ -37,14 +37,14 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     "VRF"      -> testBlock2.uniqueId.toString
   )
 
-  (blockchain.blockBytes(_: Int)).when(1).returning(Some(testBlock1.bytes()))
-  (blockchain.blockBytes(_: Int)).when(2).returning(Some(testBlock2.bytes()))
+  (blockchain.blockBytes(_: Int)).when(1).returning(Some((testBlock1.bytes(), testBlock1.header.version)))
+  (blockchain.blockBytes(_: Int)).when(2).returning(Some((testBlock2.bytes(), testBlock2.header.version)))
 
   (blockchain.blockInfo(_: Int)).when(1).returning(Some(BlockInfo(testBlock1.header, testBlock1.bytes().size, 0, testBlock1.signature)))
   (blockchain.blockInfo(_: Int)).when(2).returning(Some(BlockInfo(testBlock2.header, testBlock2.bytes().size, 0, testBlock2.signature)))
 
-  (blockchain.blockBytes(_: ByteStr)).when(testBlock1.uniqueId).returning(Some(testBlock1.bytes()))
-  (blockchain.blockBytes(_: ByteStr)).when(testBlock2.uniqueId).returning(Some(testBlock2.bytes()))
+  (blockchain.blockBytes(_: ByteStr)).when(testBlock1.uniqueId).returning(Some((testBlock1.bytes(), testBlock1.header.version)))
+  (blockchain.blockBytes(_: ByteStr)).when(testBlock2.uniqueId).returning(Some((testBlock2.bytes(), testBlock2.header.version)))
 
   (blockchain.heightOf(_: ByteStr)).when(testBlock1.uniqueId).returning(Some(1))
   (blockchain.heightOf(_: ByteStr)).when(testBlock2.uniqueId).returning(Some(2))

@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
@@ -145,8 +146,12 @@ package object state {
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
-    def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap(bb => Block.parseBytes(bb).toOption)
-    def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap(bb => Block.parseBytes(bb).toOption)
+    def blockById(blockId: ByteStr): Option[Block] = blockchain.blockBytes(blockId).flatMap { case (bs, v) => parseBlock(bs, v).toOption }
+    def blockAt(height: Int): Option[Block]        = blockchain.blockBytes(height).flatMap { case (bs, v)  => parseBlock(bs, v).toOption }
+
+    private def parseBlock(bs: Array[Byte], version: Byte): Try[Block] =
+      if (version < Block.ProtoBlockVersion) Block.parseBytes(bs)
+      else PBBlocks.vanilla(PBBlock.parseFrom(bs))
 
     def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
     def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.header.timestamp)

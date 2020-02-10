@@ -32,9 +32,9 @@ case object EmptyBlockchain extends Blockchain {
 
   override def carryFee: Long = 0
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = None
+  override def blockBytes(height: Int): Option[(Array[Byte], Byte)] = None
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = None
+  override def blockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)] = None
 
   override def heightOf(blockId: ByteStr): Option[Int] = None
 

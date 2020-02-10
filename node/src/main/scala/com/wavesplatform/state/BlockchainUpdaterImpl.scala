@@ -517,7 +517,7 @@ class BlockchainUpdaterImpl(
     blockchain.height + ngState.fold(0)(_ => 1)
   }
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = readLock {
+  override def blockBytes(height: Int): Option[(Array[Byte], Byte)] = readLock {
     compositeBlockchain.blockBytes(height)
   }
 
@@ -583,11 +583,11 @@ class BlockchainUpdaterImpl(
     ngState.map(_.carryFee).getOrElse(blockchain.carryFee)
   }
 
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = readLock {
+  override def blockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)] = readLock {
     (for {
       ng                  <- ngState
       (block, _, _, _, _) <- ng.totalDiffOf(blockId)
-    } yield block.bytes()).orElse(blockchain.blockBytes(blockId))
+    } yield (block.bytes(), block.header.version)).orElse(blockchain.blockBytes(blockId))
   }
 
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = readLock {

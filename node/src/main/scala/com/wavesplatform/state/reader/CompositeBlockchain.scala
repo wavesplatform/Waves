@@ -112,7 +112,7 @@ final case class CompositeBlockchain(
         .foldLeft(z.copy(script = script)) {
           case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) if ut.assetId == asset =>
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
-          case (acc, _)                                        => acc
+          case (acc, _) => acc
         }
     }
   }
@@ -183,7 +183,7 @@ final case class CompositeBlockchain(
       inner.balanceOnlySnapshots(address, h, assetId)
     } else {
       val balance = this.balance(address, assetId)
-      val bs = height -> balance
+      val bs      = height -> balance
       Some(bs)
     }
   }
@@ -249,8 +249,10 @@ final case class CompositeBlockchain(
   override def blockInfo(blockId: ByteStr): Option[BlockInfo] =
     filterById(blockId).map(blockInfo) orElse inner.blockInfo(blockId)
 
-  override def blockBytes(height: Int): Option[Array[Byte]]      = filterByHeight(height).map(_.bytes()) orElse inner.blockBytes(height)
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = filterById(blockId).map(_.bytes()) orElse inner.blockBytes(blockId)
+  override def blockBytes(height: Int): Option[(Array[Byte], Byte)] =
+    filterByHeight(height).map(b => (b.bytes(), b.header.version)) orElse inner.blockBytes(height)
+  override def blockBytes(blockId: ByteStr): Option[(Array[Byte], Byte)] =
+    filterById(blockId).map(b => (b.bytes(), b.header.version)) orElse inner.blockBytes(blockId)
 
   override def heightOf(blockId: ByteStr): Option[Int] = filterById(blockId).map(_ => height) orElse inner.heightOf(blockId)
 

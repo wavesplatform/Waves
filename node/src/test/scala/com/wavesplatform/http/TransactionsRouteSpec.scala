@@ -505,7 +505,7 @@ class TransactionsRouteSpec
       val heightToBlock     = blocks.zipWithIndex.map { case (b, h) => (h + 1, b) }.toMap
       val txIdToHeightAndTx = heightToBlock.flatMap { case (h, b) => b.transactionData.map(tx => (tx.id(), (h, tx))) }
       (blockchain.transactionInfo _).expects(*).onCall((x: ByteStr) => txIdToHeightAndTx.get(x)).anyNumberOfTimes()
-      (blockchain.blockBytes(_: Int)).expects(*).onCall((h: Int) => heightToBlock.get(h).map(_.bytes())).anyNumberOfTimes()
+      (blockchain.blockBytes(_: Int)).expects(*).onCall((h: Int) => heightToBlock.get(h).map(b => (b.bytes(), b.header.version))).anyNumberOfTimes()
       blockchain
     }
 
