@@ -197,7 +197,7 @@ object CommonValidation {
       case sast: SetAssetScriptTransaction =>
         activationBarrier(BlockchainFeatures.SmartAssets).flatMap { _ =>
           sast.script match {
-            case None     => Left(GenericError("Cannot set empty script"))
+            case None     => Right(tx)
             case Some(sc) => scriptActivation(sc)
           }
         }

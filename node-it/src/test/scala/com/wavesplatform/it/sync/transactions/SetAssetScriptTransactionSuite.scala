@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -79,11 +79,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
     assertApiError(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
-      AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set empty script"))
+      AssertiveApiError(CustomValidationError.Id, StateCheckFailed.message("Cannot set empty script"))
     )
     assertApiError(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
-      AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set empty script"))
+      AssertiveApiError(CustomValidationError.Id, StateCheckFailed.message("Cannot set empty script"))
     )
     miner.assertBalances(firstAddress, balance, eff)
   }
@@ -121,8 +121,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
     }
     assertApiError(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(""))) { error =>
-      error.id shouldBe StateCheckFailed.Id
-      error.message shouldBe StateCheckFailed.message("Cannot set empty script")
+      error.id shouldBe CustomValidationError.Id
+      error.message shouldBe "Cannot set empty script"
     }
   }
 
@@ -134,12 +134,12 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
     }
     assertApiError(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee)) { error =>
-      error.id shouldBe StateCheckFailed.Id
-      error.message shouldBe StateCheckFailed.message("Cannot set empty script")
+      error.id shouldBe CustomValidationError.Id
+      error.message shouldBe "Cannot set empty script"
     }
     assertApiError(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(""))) { error =>
-      error.id shouldBe StateCheckFailed.Id
-      error.message shouldBe StateCheckFailed.message("Cannot set empty script")
+      error.id shouldBe CustomValidationError.Id
+      error.message shouldBe "Cannot set empty script"
     }
 
     miner.assertBalances(firstAddress, balance1, eff1)
@@ -274,10 +274,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   test("try to update script to null") {
     assertApiError(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee)) { error =>
-      error.message should include regex "Reason: Cannot set empty script"
+      error.message should include regex "Cannot set empty script"
     }
     assertApiError(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(""))) { error =>
-      error.message should include regex "Reason: Cannot set empty script"
+      error.message should include regex "Cannot set empty script"
     }
   }
 
