@@ -79,11 +79,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     )
     assertApiError(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee),
-      AssertiveApiError(CustomValidationError.Id, StateCheckFailed.message("Cannot set empty script"))
+      AssertiveApiError(CustomValidationError.Id, "Cannot set empty script")
     )
     assertApiError(
       sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some("")),
-      AssertiveApiError(CustomValidationError.Id, StateCheckFailed.message("Cannot set empty script"))
+      AssertiveApiError(CustomValidationError.Id, "Cannot set empty script")
     )
     miner.assertBalances(firstAddress, balance, eff)
   }
