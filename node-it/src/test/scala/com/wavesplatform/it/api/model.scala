@@ -178,6 +178,7 @@ trait TxInfo {
 case class TransactionInfo(
     _type: Int,
     id: String,
+    chainId: Option[Byte],
     fee: Long,
     timestamp: Long,
     sender: Option[String],
@@ -209,6 +210,10 @@ object TransactionInfo {
         recipient <- (jsv \ "recipient").validateOpt[String]
         script <- (jsv \ "script").validateOpt[String]
         version <- (jsv \ "version").validate[Byte]
+        chainId <- version match {
+          case v if v > 2 => (jsv \ "chainId").validateOpt[Byte]
+          case _ => JsSuccess(None)
+        }
         typedAttachment <- version match {
           case v if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
           case v if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
@@ -223,6 +228,7 @@ object TransactionInfo {
         yield TransactionInfo(
           _type,
           id,
+          chainId,
           fee,
           timestamp,
           sender,

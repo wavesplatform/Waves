@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -121,8 +121,12 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       val entry            = IntegerDataEntry("int", 0xcafebabe)
       val data             = List(entry)
       val dataFee          = calcDataFee(data, v)
-      val txId             = sender.putData(firstAddress, data, version = v, fee = dataFee).id
-      nodes.waitForHeightAriseAndTxPresent(txId)
+      val dataTx           = sender.putData(firstAddress, data, version = v, fee = dataFee)
+      nodes.waitForHeightAriseAndTxPresent(dataTx.id)
+      if (v > 2) {
+        dataTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(dataTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
       miner.assertBalances(firstAddress, balance1 - dataFee, eff1 - dataFee)
     }
   }

@@ -10,6 +10,7 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.transfer.Attachment.Bin
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.{Assertion, Assertions, CancelAfterFailure}
 import play.api.libs.json.{JsArray, JsBoolean, JsNull, JsNumber, JsObject, JsString, Json}
@@ -30,8 +31,12 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       miner.assertBalances(firstAddress, firstBalance - issueFee, firstEffBalance - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-      val transferTransactionId = sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(transferTransactionId)
+      val transferTransaction = sender.transfer(firstAddress, secondAddress, someAssetAmount, minFee, Some(issuedAssetId), version = v)
+      nodes.waitForHeightAriseAndTxPresent(transferTransaction.id)
+      if (v > 2) {
+        transferTransaction.chainId shouldBe Some(AddressScheme.current.chainId)
+        miner.transactionInfo(transferTransaction.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, firstBalance - minFee - issueFee, firstEffBalance - minFee - issueFee)
       miner.assertBalances(secondAddress, secondBalance, secondEffBalance)
@@ -124,22 +129,6 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
     }
   }
 
-  test("check transfer transaction in blocks api") {
-    for(v <- transferTxSupportedVersions) {
-      val tx = if (v < 3) {
-        sender.transfer(firstAddress, secondAddress, 1000, version = v, attachment = Some("somestring"), waitForTx = true)
-      } else {
-        sender.transfer(firstAddress, secondAddress, 1000, version = v, typedAttachment = Some(Attachment.Str("somestring")), waitForTx = true)
-      }
-      val currHeight = sender.height
-      sender.lastBlock.transactions.filter(_.id == tx.id).head shouldBe tx
-      sender.blockAt(currHeight).transactions.filter(_.id == tx.id).head shouldBe tx
-      sender.blockSeqByAddress(tx.sender.get, currHeight, currHeight).head.transactions.filter(_.id == tx.id).head shouldBe tx
-      sender.blockSeq(currHeight, currHeight).head.transactions.filter(_.id == tx.id).head shouldBe tx
-      sender.blockBySignature(sender.blockAt(currHeight).signature).transactions.filter(_.id == tx.id).head shouldBe tx
-    }
-  }
-
   test("able to pass typed attachment to transfer transaction V3") {
 
     val txWithStringAtt =
@@ -192,7 +181,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         waitForTx = true
       )
     val txWithBinaryAttInfo = sender.transactionInfo(txWithBinaryAtt.id)
-    txWithBinaryAttInfo.typedAttachment shouldBe Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)))
+    txWithBinaryAttInfo.typedAttachment.get.asInstanceOf[Bin].value shouldBe Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)).value
   }
 
   test("not able to pass typed attachment to transfer transaction V1,2") {

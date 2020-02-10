@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.account.Alias
+import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
@@ -33,8 +33,12 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
       nodes.waitForHeightAriseAndTxPresent(assetId)
 
       val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-      val transferId = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee, assetId = Some(assetId), version = v).id
-      nodes.waitForHeightAriseAndTxPresent(transferId)
+      val massTransferTx = sender.massTransfer(firstAddress, transfers, massTransferTransactionFee, assetId = Some(assetId), version = v)
+      nodes.waitForHeightAriseAndTxPresent(massTransferTx.id)
+      if (v > 1) {
+        massTransferTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(massTransferTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - issueFee, eff1 - massTransferTransactionFee - issueFee)
       miner.assertAssetBalance(firstAddress, assetId, issueAmount - 1000)

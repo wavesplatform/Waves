@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import cats.implicits._
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueAmount, issueFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -11,7 +12,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
   private val decimals: Byte = 2
 
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
-    for (v <- burnTxsupportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val (balance, effectiveBalance) = miner.accountBalances(firstAddress)
       val issuedAssetId               = sender.issue(firstAddress, s"name+$v", "description", issueAmount, decimals, reissuable = false, fee = issueFee).id
 
@@ -24,10 +25,14 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       assert(details1.minSponsoredAssetFee.isEmpty)
 
       // burn half of the coins and check balance
-      val burnId = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, minFee, version = v).id
+      val burnTx = sender.burn(firstAddress, issuedAssetId, issueAmount / 2, minFee, version = v)
 
-      miner.waitForTransaction(burnId)
-      sender.transactionInfo(burnId).amount shouldBe issueAmount / 2
+      miner.waitForTransaction(burnTx.id)
+      if (v > 2) {
+        burnTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(burnTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
+      sender.transactionInfo(burnTx.id).amount shouldBe issueAmount / 2
       miner.assertBalances(firstAddress, balance - minFee - issueFee, effectiveBalance - minFee - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount / 2)
       val details2 = miner.assetsDetails(issuedAssetId)
@@ -53,7 +58,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
   }
 
   test("can burn non-owned asset; issuer asset balance decreased by transfer amount; burner balance decreased by burned amount") {
-    for (v <- burnTxsupportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
 
@@ -84,7 +89,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
   }
 
   test("issuer can't burn more tokens than he own") {
-    for (v <- burnTxsupportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity = issueAmount
       val burnedQuantity = issuedQuantity * 2
 
@@ -98,7 +103,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
   }
 
   test("user can't burn more tokens than he own") {
-    for (v <- burnTxsupportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
       val burnedQuantity      = transferredQuantity * 2
@@ -119,7 +124,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
   }
 
   test("non-owner can burn asset after reissue") {
-    for (v <- burnTxsupportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
 

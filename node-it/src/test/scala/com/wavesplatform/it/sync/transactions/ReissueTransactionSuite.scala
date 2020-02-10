@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -19,8 +20,12 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       miner.assertBalances(firstAddress, balance - issueFee, effectiveBalance - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
 
-      val reissueTxId = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee, version = v).id
-      nodes.waitForHeightAriseAndTxPresent(reissueTxId)
+      val reissueTx = sender.reissue(firstAddress, issuedAssetId, someAssetAmount, reissuable = true, fee = reissueReducedFee, version = v)
+      nodes.waitForHeightAriseAndTxPresent(reissueTx.id)
+      if (v > 2) {
+        reissueTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(reissueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
       miner.assertBalances(firstAddress, balance - issueFee - reissueReducedFee, effectiveBalance - issueFee - reissueReducedFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)
     }

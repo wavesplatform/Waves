@@ -14,7 +14,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
   val (reissuer, reissuerAddress) = (firstAcc, firstAddress)
 
   test("asset reissue changes issuer's asset balance; issuer's waves balance is decreased by fee") {
-    for (v <- supportedVersions) {
+    for (v <- reissueTxSupportedVersions) {
       val reissuerBalance = sender.grpc.wavesBalance(reissuerAddress).available
       val reissuerEffBalance = sender.grpc.wavesBalance(reissuerAddress).effective
 
@@ -30,7 +30,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
   }
 
   test("can't reissue not reissuable asset") {
-    for (v <- supportedVersions) {
+    for (v <- reissueTxSupportedVersions) {
       val reissuerBalance = sender.grpc.wavesBalance(reissuerAddress).available
       val reissuerEffBalance = sender.grpc.wavesBalance(reissuerAddress).effective
 
@@ -48,7 +48,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
   }
 
   test("not able to reissue if cannot pay fee - insufficient funds") {
-    for (v <- supportedVersions) {
+    for (v <- reissueTxSupportedVersions) {
       val reissuerBalance = sender.grpc.wavesBalance(reissuerAddress).available
       val reissuerEffBalance = sender.grpc.wavesBalance(reissuerAddress).effective
       val hugeReissueFee = reissuerEffBalance + 1.waves
@@ -67,7 +67,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
   }
 
   test("asset becomes non-reissuable after reissue with reissuable=false") {
-    for (v <- supportedVersions) {
+    for (v <- reissueTxSupportedVersions) {
       val reissuerBalance = sender.grpc.wavesBalance(reissuerAddress).available
       val reissuerEffBalance = sender.grpc.wavesBalance(reissuerAddress).effective
 
@@ -87,7 +87,7 @@ class ReissueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime 
   }
 
   test("able to transfer new reissued amount of assets") {
-    for (v <- supportedVersions) {
+    for (v <- reissueTxSupportedVersions) {
       val reissuerBalance = sender.grpc.wavesBalance(reissuerAddress).available
       val reissuerEffBalance = sender.grpc.wavesBalance(reissuerAddress).effective
 

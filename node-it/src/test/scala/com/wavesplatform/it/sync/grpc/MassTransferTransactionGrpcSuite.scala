@@ -14,28 +14,30 @@ import org.scalatest.Ignore
 class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
-    val firstBalance = sender.grpc.wavesBalance(firstAddress)
-    val secondBalance = sender.grpc.wavesBalance(secondAddress)
-    val attachment = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
+    for (v <- massTransferTxSupportedVersions) {
+      val firstBalance = sender.grpc.wavesBalance(firstAddress)
+      val secondBalance = sender.grpc.wavesBalance(secondAddress)
+      val attachment = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
 
-    val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
-    val assetId   = PBTransactions.vanilla(
-      sender.grpc.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
-    ).explicitGet().id().toString
-    nodes.waitForHeightAriseAndTxPresent(assetId)
+      val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
+      val assetId = PBTransactions.vanilla(
+        sender.grpc.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
+      ).explicitGet().id().toString
+      nodes.waitForHeightAriseAndTxPresent(assetId)
 
-    val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-    sender.grpc.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
+      val massTransferTransactionFee = calcMassTransferFee(transfers.size)
+      sender.grpc.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
 
-    val firstBalanceAfter = sender.grpc.wavesBalance(firstAddress)
-    val secondBalanceAfter = sender.grpc.wavesBalance(secondAddress)
+      val firstBalanceAfter = sender.grpc.wavesBalance(firstAddress)
+      val secondBalanceAfter = sender.grpc.wavesBalance(secondAddress)
 
-    firstBalanceAfter.regular shouldBe firstBalance.regular - issueFee - massTransferTransactionFee
-    firstBalanceAfter.effective shouldBe firstBalance.effective - issueFee - massTransferTransactionFee
-    sender.grpc.assetsBalance(firstAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe issueAmount - transferAmount
-    secondBalanceAfter.regular shouldBe secondBalance.regular
-    secondBalanceAfter.effective shouldBe secondBalance.effective
-    sender.grpc.assetsBalance(secondAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe transferAmount
+      firstBalanceAfter.regular shouldBe firstBalance.regular - issueFee - massTransferTransactionFee
+      firstBalanceAfter.effective shouldBe firstBalance.effective - issueFee - massTransferTransactionFee
+      sender.grpc.assetsBalance(firstAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe issueAmount - transferAmount
+      secondBalanceAfter.regular shouldBe secondBalance.regular
+      secondBalanceAfter.effective shouldBe secondBalance.effective
+      sender.grpc.assetsBalance(secondAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe transferAmount
+    }
   }
 
   test("waves mass transfer changes waves balances") {

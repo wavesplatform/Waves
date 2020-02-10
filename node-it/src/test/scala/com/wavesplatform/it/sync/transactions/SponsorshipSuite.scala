@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
@@ -111,6 +112,7 @@ class SponsorshipSuite
     "make assets sponsored" in {
       nodes.waitForHeightAriseAndTxPresent(firstSponsorTxId)
       nodes.waitForHeightAriseAndTxPresent(secondSponsorTxId)
+      sender.transactionInfo(secondSponsorTxId).chainId shouldBe Some(AddressScheme.current.chainId)
 
       assertSponsorship(firstSponsorAssetId, 1 * Token)
       assertSponsorship(secondSponsorAssetId, 1 * Token)

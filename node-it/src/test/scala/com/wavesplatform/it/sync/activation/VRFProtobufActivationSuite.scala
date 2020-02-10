@@ -34,18 +34,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     otherAssetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
   }
 
-  test("not able to broadcast txs of new versions before activation") {
+  test("not able to broadcast tx of new versions before activation") {
     assertApiError(sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)) { error =>
-      error.statusCode shouldBe 400
-      error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
-      error.id shouldBe 112
-    }
-    assertApiError(sender.issue(senderAcc.stringRepr, version = TxVersion.V3)) { error =>
-      error.statusCode shouldBe 400
-      error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
-      error.id shouldBe 112
-    }
-    assertApiError(sender.burn(senderAcc.stringRepr, "8Yw4QmskrQauQeNjgh2fTQ4swmkNm85GTQzdHEf6QdUU", someAssetAmount, version = TxVersion.V3)) { error =>
       error.statusCode shouldBe 400
       error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
       error.id shouldBe 112
@@ -76,5 +66,14 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val nextTerm = sender.transactionInfo(otherAssetId).height + updateInterval + 1
     sender.waitForHeight(nextTerm, 2.minutes)
     sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
+  }
+
+  test("able to broadcast tx of new versions before activation") {
+    val senderWavesBalance = sender.balanceDetails(senderAcc.stringRepr)
+    val recipientWavesBalance = sender.balanceDetails(senderAcc.stringRepr)
+    sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)
+
+    senderWavesBalance.available shouldBe sender.balanceDetails(senderAcc.stringRepr).available - transferAmount - minFee
+    recipientWavesBalance.available shouldBe sender.balanceDetails(recipientAcc.stringRepr).available + transferAmount
   }
 }

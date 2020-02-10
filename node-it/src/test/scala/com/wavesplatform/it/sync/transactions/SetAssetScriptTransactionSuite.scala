@@ -78,14 +78,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64), version = v),
         AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set script on an asset issued without a script"))
       )
-      assertApiError(
-        sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, version = v),
-        AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set empty script"))
-      )
-      assertApiError(
-        sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(""), version = v),
-        AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set empty script"))
-      )
       miner.assertBalances(firstAddress, balance, eff)
     }
   }
@@ -123,10 +115,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         error.id shouldBe StateCheckFailed.Id
         error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
       }
-      assertApiError(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(""), version = v)) { error =>
-        error.id shouldBe StateCheckFailed.Id
-        error.message shouldBe StateCheckFailed.message("Cannot set empty script")
-      }
     }
   }
 
@@ -138,14 +126,6 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         error.id shouldBe StateCheckFailed.Id
         error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
       }
-      assertApiError(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, version = v)) { error =>
-        error.id shouldBe StateCheckFailed.Id
-        error.message shouldBe StateCheckFailed.message("Cannot set empty script")
-      }
-      assertApiError(sender.setAssetScript(assetWOScript, secondAddress, setAssetScriptFee, Some(""), version = v)) { error =>
-        error.id shouldBe StateCheckFailed.Id
-        error.message shouldBe StateCheckFailed.message("Cannot set empty script")
-      }
 
       miner.assertBalances(firstAddress, balance1, eff1)
       miner.assertBalances(secondAddress, balance2, eff2)
@@ -153,24 +133,23 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   }
 
   test("sender's waves balance is decreased by fee") {
-    for (v <- setAssetScrTxSupportedVersions) {
-      val script2 = ScriptCompiler(
-        s"""
+    val script2 = ScriptCompiler(
+      s"""
            |match tx {
            |  case s : SetAssetScriptTransaction => true
            |  case _ => false
            |}
          """.stripMargin,
-        isAssetScript = true,
-        estimator
-      ).explicitGet()._1.bytes.value.base64
+      isAssetScript = true,
+      estimator
+    ).explicitGet()._1.bytes.value.base64
 
+    val details        = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
+    assert(details.scriptComplexity == 1)
+    assert(details.scriptText == "true")
+    assert(details.script == scriptBase64)
+    for (v <- setAssetScrTxSupportedVersions) {
       val (balance, eff) = miner.accountBalances(firstAddress)
-      val details = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
-      assert(details.scriptComplexity == 1)
-      assert(details.scriptText == "true")
-      assert(details.script == scriptBase64)
-
       val txId = sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(script2), version = v).id
       nodes.waitForHeightAriseAndTxPresent(txId)
       miner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
@@ -208,10 +187,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   test("invalid transaction should not be in UTX or blockchain") {
     for (v <- setAssetScrTxSupportedVersions) {
       def sastx(
-                 fee: Long = setAssetScriptFee,
-                 timestamp: Long = System.currentTimeMillis,
-                 assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
-               ): SetAssetScriptTransaction =
+          fee: Long = setAssetScriptFee,
+          timestamp: Long = System.currentTimeMillis,
+          assetId: IssuedAsset = IssuedAsset(ByteStr.decodeBase58(assetWScript).get)
+      ): SetAssetScriptTransaction =
         SetAssetScriptTransaction
           .signed(version = v, sender.privateKey, assetId, Some(script), fee, timestamp, sender.privateKey)
           .right
@@ -255,11 +234,11 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
           "/transactions/sign",
           Json.obj(
             "version" -> v,
-            "type" -> SetAssetScriptTransaction.typeId,
-            "sender" -> firstAddress,
-            "fee" -> setAssetScriptFee,
+            "type"    -> SetAssetScriptTransaction.typeId,
+            "sender"  -> firstAddress,
+            "fee"     -> setAssetScriptFee,
             "assetId" -> assetWScript,
-            "script" -> Some(scriptBase64)
+            "script"  -> Some(scriptBase64)
           )
         )
         Json.parse(rs.getResponseBody).as[JsObject]

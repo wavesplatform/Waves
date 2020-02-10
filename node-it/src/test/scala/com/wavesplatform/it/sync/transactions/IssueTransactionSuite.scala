@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -14,14 +15,17 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       val assetDescription = "my asset description"
       val (balance1, eff1) = miner.accountBalances(firstAddress)
 
-      val issuedAssetId =
+      val issueTx =
         sender
           .issue(firstAddress, assetName, assetDescription, someAssetAmount, 2, reissuable = true, issueFee, version = v, script = scriptText(v))
-          .id
-      nodes.waitForHeightAriseAndTxPresent(issuedAssetId)
+      nodes.waitForHeightAriseAndTxPresent(issueTx.id)
+      if (v > 2) {
+        issueTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(issueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, balance1 - issueFee, eff1 - issueFee)
-      miner.assertAssetBalance(firstAddress, issuedAssetId, someAssetAmount)
+      miner.assertAssetBalance(firstAddress, issueTx.id, someAssetAmount)
     }
   }
 

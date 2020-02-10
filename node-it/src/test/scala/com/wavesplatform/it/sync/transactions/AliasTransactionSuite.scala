@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -12,18 +13,20 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
   var version: Byte = 1
   test("Able to send money to an alias") {
     for (v <- aliasTxSupportedVersions) {
-      version = v
       val alias = randomAlias()
       val (balance1, eff1) = miner.accountBalances(firstAddress)
 
-      val aliasFee = createAlias(firstAddress, alias)
-      miner.assertBalances(firstAddress, balance1 - aliasFee, eff1 - aliasFee)
+      val aliasTx = sender.createAlias(firstAddress, alias, minFee, version = v)
+      nodes.waitForHeightAriseAndTxPresent(aliasTx.id)
+      aliasTx.chainId shouldBe Some(AddressScheme.current.chainId)
+      sender.transactionInfo(aliasTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      miner.assertBalances(firstAddress, balance1 - minFee, eff1 - minFee)
 
       val aliasFull = fullAliasByAddress(firstAddress, alias)
 
       val transferId = sender.transfer(firstAddress, aliasFull, transferAmount, minFee).id
       nodes.waitForHeightAriseAndTxPresent(transferId)
-      miner.assertBalances(firstAddress, balance1 - minFee - aliasFee, eff1 - minFee - aliasFee)
+      miner.assertBalances(firstAddress, balance1 - minFee - minFee, eff1 - minFee - minFee)
     }
   }
 

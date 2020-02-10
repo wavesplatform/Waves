@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -17,8 +18,12 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       val (balance1, eff1) = miner.accountBalances(firstAddress)
       val (balance2, eff2) = miner.accountBalances(secondAddress)
 
-      val createdLeaseTxId = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = v).id
-      nodes.waitForHeightAriseAndTxPresent(createdLeaseTxId)
+      val createdLeaseTx = sender.lease(firstAddress, secondAddress, leasingAmount, leasingFee = minFee, version = v)
+      nodes.waitForHeightAriseAndTxPresent(createdLeaseTx.id)
+      if (v > 2) {
+        createdLeaseTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(createdLeaseTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
       miner.assertBalances(secondAddress, balance2, eff2 + leasingAmount)
@@ -85,8 +90,12 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       val leases1 = sender.activeLeases(firstAddress)
       assert(leases1.exists(_.id == createdLeaseTxId))
 
-      val createdCancelLeaseTxId = sender.cancelLease(firstAddress, createdLeaseTxId, minFee).id
-      nodes.waitForHeightAriseAndTxPresent(createdCancelLeaseTxId)
+      val createdCancelLeaseTx = sender.cancelLease(firstAddress, createdLeaseTxId, minFee)
+      nodes.waitForHeightAriseAndTxPresent(createdCancelLeaseTx.id)
+      if (v > 2) {
+        createdCancelLeaseTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(createdCancelLeaseTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
 
       miner.assertBalances(firstAddress, balance1 - 2 * minFee, eff1 - 2 * minFee)
       miner.assertBalances(secondAddress, balance2, eff2)
