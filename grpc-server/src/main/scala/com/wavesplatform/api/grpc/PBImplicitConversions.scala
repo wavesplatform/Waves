@@ -17,7 +17,8 @@ trait PBImplicitConversions {
   }
 
   implicit class PBSignedTransactionConversions(tx: PBSignedTransaction) {
-    def toVanilla = PBTransactions.vanilla(tx).explicitGet()
+    def toVanillaSafe = PBTransactions.vanilla(tx)
+    def toVanilla = toVanillaSafe.explicitGet()
   }
 
   implicit class PBTransactionConversions(tx: PBTransaction) {
