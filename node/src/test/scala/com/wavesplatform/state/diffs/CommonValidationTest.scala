@@ -10,10 +10,10 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.assets.{IssueTransaction, SetAssetScriptTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{GenesisTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -39,6 +39,28 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(transfer, transfer))) { blockDiffEi =>
           blockDiffEi should produce("AlreadyInTheState")
+        }
+    }
+  }
+
+  property("disallows empty set asset script") {
+    val preconditionsAndScript: Gen[(GenesisTransaction, SetAssetScriptTransaction)] = for {
+      master <- accountGen
+      ts     <- positiveIntGen
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      asset <- bytes32gen
+      fee   <- smallFeeGen
+      setScript = SetAssetScriptTransaction(TxVersion.V2, master, IssuedAsset(asset), None, fee, ts, Proofs.empty).signWith(master)
+    } yield (genesis, setScript)
+
+    val functionalitySettings = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Map(BlockchainFeatures.BlockV5.id -> 0)
+    )
+
+    forAll(preconditionsAndScript) {
+      case (genesis, setScript) =>
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), functionalitySettings) { blockDiffEi =>
+          blockDiffEi should produce("Cannot set empty script")
         }
     }
   }
@@ -98,30 +120,30 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       val issueTx =
         if (smartToken)
           IssueTransaction(
-              TxVersion.V2,
-              richAcc,
-              "test".utf8Bytes,
-              "desc".utf8Bytes,
-              Long.MaxValue,
-              2,
-              reissuable = false,
-              Some(script),
-              Constants.UnitsInWave,
-              ts
-            ).signWith(richAcc)
+            TxVersion.V2,
+            richAcc,
+            "test".utf8Bytes,
+            "desc".utf8Bytes,
+            Long.MaxValue,
+            2,
+            reissuable = false,
+            Some(script),
+            Constants.UnitsInWave,
+            ts
+          ).signWith(richAcc)
         else
           IssueTransaction(
-              TxVersion.V1,
-              richAcc,
-              "test".utf8Bytes,
-              "desc".utf8Bytes,
-              Long.MaxValue,
-              2,
-              reissuable = false,
-              script = None,
-              Constants.UnitsInWave,
-              ts
-            ).signWith(richAcc)
+            TxVersion.V1,
+            richAcc,
+            "test".utf8Bytes,
+            "desc".utf8Bytes,
+            Long.MaxValue,
+            2,
+            reissuable = false,
+            script = None,
+            Constants.UnitsInWave,
+            ts
+          ).signWith(richAcc)
 
       val transferWavesTx = TransferTransaction
         .selfSigned(1.toByte, richAcc, recipientAcc, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, None, ts)
