@@ -125,9 +125,9 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
   property(" block with txs bytes/parse roundtrip version 3") {
     val version = 3.toByte
 
-    val faetureSetGen: Gen[Seq[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.distinct)
+    val featureSetGen: Gen[Seq[Short]] = Gen.choose(0, Block.MaxFeaturesInBlock).flatMap(fc => Gen.listOfN(fc, arbitrary[Short])).map(_.distinct)
 
-    forAll(blockGen, faetureSetGen) {
+    forAll(blockGen, featureSetGen) {
       case ((baseTarget, reference, generationSignature, recipient, transactionData), featureVotes) =>
         val block = Block
           .buildAndSign(
