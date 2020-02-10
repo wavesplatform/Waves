@@ -135,10 +135,10 @@ trait ScriptGen {
   }
 
   def toString(expr: EXPR): Gen[String] = expr match {
-    case CONST_LONG(_, x, _, _)    => withWhitespaces(s"$x")
+    case CONST_LONG(_, x, _)    => withWhitespaces(s"$x")
     case REF(_, x, _, _)           => withWhitespaces(toString(x))
-    case CONST_STRING(_, x, _, _)  => withWhitespaces(s"""\"${toString(x)}\"""")
-    case CONST_BYTESTR(_, x, _, _) => withWhitespaces(s"""base58'${toString(x)}'""")
+    case CONST_STRING(_, x, _)  => withWhitespaces(s"""\"${toString(x)}\"""")
+    case CONST_BYTESTR(_, x, _) => withWhitespaces(s"""base58'${toString(x)}'""")
     case _: TRUE             => withWhitespaces("true")
     case _: FALSE            => withWhitespaces("false")
     case BINARY_OP(_, x, op: BinaryOperation, y, _, _) =>
@@ -160,7 +160,7 @@ trait ScriptGen {
         sep       <- if (isNewLine) Gen.const("\n") else withWhitespaces(";")
       } yield s"let ${toString(let.name)} = $v$sep$b"
 
-    case FUNCTION_CALL(_, PART.VALID(_, "-"), List(CONST_LONG(_, v, _, _)), _, _) if v >= 0 =>
+    case FUNCTION_CALL(_, PART.VALID(_, "-"), List(CONST_LONG(_, v, _)), _, _) if v >= 0 =>
       s"-($v)"
     case FUNCTION_CALL(_, op, List(e), _, _) => toString(e).map(e => s"${toString(op)}$e")
 

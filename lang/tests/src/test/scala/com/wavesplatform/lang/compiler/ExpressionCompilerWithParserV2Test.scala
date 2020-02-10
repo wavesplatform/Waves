@@ -49,10 +49,10 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
     result.explicitGet() shouldBe
       BLOCK(
         AnyPos,
-        LET(AnyPos, PART.VALID(AnyPos, "foo"), CONST_LONG(AnyPos, 1234567, Some(LONG), None), List(), false),
+        LET(AnyPos, PART.VALID(AnyPos, "foo"), CONST_LONG(AnyPos, 1234567, None), List(), false),
         BLOCK(
           AnyPos,
-          LET(AnyPos, PART.VALID(AnyPos, "bar"), CONST_LONG(AnyPos, 987654, Some(LONG), None), List(), false),
+          LET(AnyPos, PART.VALID(AnyPos, "bar"), CONST_LONG(AnyPos, 987654, None), List(), false),
           IF(
             AnyPos,
             FUNCTION_CALL(
@@ -66,13 +66,13 @@ class ExpressionCompilerWithParserV2Test extends PropSpec with PropertyChecks wi
                   None,
                   None
                 ),
-                CONST_LONG(AnyPos, 123456, Some(LONG), None)
+                CONST_LONG(AnyPos, 123456, None)
               ),
               None,
               None
             ),
-            TRUE(AnyPos, Some(BOOLEAN), None),
-            FALSE(AnyPos, Some(BOOLEAN), None),
+            TRUE(AnyPos, None),
+            FALSE(AnyPos, None),
             Some(BOOLEAN),
             None
           ),
