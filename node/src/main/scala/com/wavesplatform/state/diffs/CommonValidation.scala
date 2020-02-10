@@ -30,12 +30,12 @@ object CommonValidation {
   def disallowSendingGreaterThanBalance[T <: Transaction](blockchain: Blockchain, blockTime: Long, tx: T): Either[ValidationError, T] =
     if (blockTime >= blockchain.settings.functionalitySettings.allowTemporaryNegativeUntil) {
       def checkTransfer(
-        sender: Address,
-        assetId: Asset,
-        amount: Long,
-        feeAssetId: Asset,
-        feeAmount: Long,
-        allowFeeOverdraft: Boolean = false
+          sender: Address,
+          assetId: Asset,
+          amount: Long,
+          feeAssetId: Asset,
+          feeAmount: Long,
+          allowFeeOverdraft: Boolean = false
       ) = {
         val amountDiff = assetId match {
           case aid @ IssuedAsset(_) => Portfolio(0, LeaseBalance.empty, Map(aid -> -amount))
@@ -89,15 +89,14 @@ object CommonValidation {
           val foldPayments: Iterable[Payment] => Iterable[Payment] =
             if (blockchain.useCorrectPaymentCheck)
               _.groupBy(_.assetId)
-                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) }
-            else
+                .map { case (assetId, p) => Payment(p.map(_.amount).sum, assetId) } else
               identity
 
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
               case Some(ContractScriptImpl(version, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
-              case _ => false
+              case _                                                                                          => false
             }
             check <- foldPayments(citx.payments)
               .map(p => checkTransfer(citx.sender, p.assetId, p.amount, citx.feeAssetId, citx.fee, allowFeeOverdraft))
@@ -156,15 +155,20 @@ object CommonValidation {
       else Left(GenericError(s"Unknown version of $name transaction: ${t.version}"))
     }
 
-    tx match {
-      case _: PaymentTransaction => Right(tx)
-      case _: GenesisTransaction => Right(tx)
+    val versionsBarrier = tx match {
+      case p: LegacyPBSwitch if p.isProtobufVersion =>
+        activationBarrier(BlockchainFeatures.BlockV5)
 
       case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
         Left(GenericError(s"Invalid tx version: $v"))
 
-      case p: LegacyPBSwitch if p.isProtobufVersion =>
-        activationBarrier(BlockchainFeatures.BlockV5)
+      case _ =>
+        Right(tx)
+    }
+
+    val typedBarrier = tx match {
+      case _: PaymentTransaction => Right(tx)
+      case _: GenesisTransaction => Right(tx)
 
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
@@ -212,6 +216,11 @@ object CommonValidation {
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
+
+    for {
+      _ <- versionsBarrier
+      _ <- typedBarrier
+    } yield tx
   }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {
