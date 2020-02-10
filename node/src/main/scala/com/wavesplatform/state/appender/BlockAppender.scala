@@ -1,5 +1,7 @@
 package com.wavesplatform.state.appender
 
+import java.time.Instant
+
 import cats.data.EitherT
 import com.wavesplatform.block.Block
 import com.wavesplatform.consensus.PoSSelector
@@ -31,14 +33,12 @@ object BlockAppender extends ScorexLogging {
       verify: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      metrics.blockProcessingTimeStats.measureSuccessful {
-        if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-          appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-        else if (blockchainUpdater.contains(newBlock.uniqueId) || blockchainUpdater.isLastBlockId(newBlock.uniqueId))
-          Right(None)
-        else
-          Left(BlockAppendError("Block is not a child of the last block", newBlock))
-      }
+      if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
+        appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+      else if (blockchainUpdater.contains(newBlock.uniqueId) || blockchainUpdater.isLastBlockId(newBlock.uniqueId))
+        Right(None)
+      else
+        Left(BlockAppendError("Block is not a child of the last block", newBlock))
     }.executeOn(scheduler)
 
   def apply(
@@ -52,15 +52,13 @@ object BlockAppender extends ScorexLogging {
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block): Task[Unit] = {
     val span = metrics.createApplySpan(newBlock)
+    span.mark("block.forged", Instant.ofEpochMilli(newBlock.header.timestamp))
     span.mark("block.received")
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
 
-    val blockReceiveLag = time.correctedTime() - newBlock.header.timestamp
-    if (blockReceiveLag >= 0) metrics.blockReceivingLag.record(blockReceiveLag)
-
     val append =
       (for {
-        _ <- EitherT(Task(metrics.blockSignaturesValidation.measureSuccessful(newBlock.signaturesValid())))
+        _ <- EitherT(Task(newBlock.signaturesValid()))
         _ = span.mark("block.signatures-validated")
         validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
       } yield validApplication).value
@@ -94,10 +92,6 @@ object BlockAppender extends ScorexLogging {
 
   //noinspection TypeAnnotation,ScalaStyle
   private[this] object metrics {
-    val blockSignaturesValidation = Kamon.timer("block-appender.block-signatures-validation")
-    val blockReceivingLag         = Kamon.histogram("block-appender.receiving-lag").withoutTags()
-    val blockProcessingTimeStats  = Kamon.timer("block-appender.processing-time")
-
     def createApplySpan(block: Block) = {
       Kamon
         .spanBuilder("block-appender")
