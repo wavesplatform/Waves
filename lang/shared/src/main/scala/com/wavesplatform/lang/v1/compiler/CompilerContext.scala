@@ -6,16 +6,24 @@ import com.wavesplatform.lang.v1.compiler.CompilerContext._
 import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
 import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, FunctionTypeSignature}
+import com.wavesplatform.lang.v1.parser.Expressions.Pos
+import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import shapeless._
 
 case class CompilerContext(predefTypes: Map[String, FINAL], varDefs: VariableTypes, functionDefs: FunctionTypes, tmpArgsIdx: Int = 0) {
-  private lazy val allFuncDefs: FunctionTypes = predefTypes.collect {
-    case (_, t @ CASETYPEREF(typeName, fields, false)) =>
-      typeName -> List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName)))
-  } ++ functionDefs
+  private lazy val allFuncDefs: FunctionTypes =
+    predefTypes.collect {
+      case (_, t @ CASETYPEREF(typeName, fields, false)) =>
+        typeName ->
+          FunctionInfo(AnyPos, List(FunctionTypeSignature(CASETYPEREF(typeName, fields), fields, FunctionHeader.User(typeName))))
+    } ++ functionDefs
 
-  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, List.empty)
+  def functionTypeSignaturesByName(name: String): List[FunctionTypeSignature] = allFuncDefs.getOrElse(name, FunctionInfo(AnyPos, List.empty)).fSigList
 
+  def getSimpleContext(): Map[String, Pos] = {
+    (varDefs.map(el => el._1 -> el._2.pos) ++ functionDefs.map(el => el._1 -> el._2.pos))
+      .filter(_._2.start != -1)
+  }
 }
 
 object CompilerContext {
@@ -23,11 +31,14 @@ object CompilerContext {
   def build(predefTypes: Seq[FINAL], varDefs: VariableTypes, functions: Seq[BaseFunction[NoContext]]) = new CompilerContext(
     predefTypes = predefTypes.map(t => t.name -> t).toMap,
     varDefs = varDefs,
-    functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> v.map(_.signature).toList }
+    functionDefs = functions.groupBy(_.name).map { case (k, v) => k -> FunctionInfo(AnyPos, v.map(_.signature).toList) }
   )
 
-  type VariableTypes = Map[String, FINAL]
-  type FunctionTypes = Map[String, List[FunctionTypeSignature]]
+  case class VariableInfo(pos: Pos, vType: FINAL)
+  case class FunctionInfo(pos: Pos, fSigList: List[FunctionTypeSignature])
+
+  type VariableTypes = Map[String, VariableInfo]
+  type FunctionTypes = Map[String, FunctionInfo]
 
   val empty = CompilerContext(Map.empty, Map.empty, Map.empty, 0)
 

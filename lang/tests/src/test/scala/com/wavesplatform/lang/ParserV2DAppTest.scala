@@ -1,23 +1,23 @@
 package com.wavesplatform.lang
 
-import com.wavesplatform.lang.Common._
+import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
+import com.wavesplatform.lang.v1.parser.{Expressions, Parser, ParserV2}
 import com.wavesplatform.lang.v1.parser.Expressions._
-import com.wavesplatform.lang.v1.parser.{Expressions, Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGenParser
 import fastparse.core.Parsed.{Failure, Success}
 import org.scalatest.exceptions.TestFailedException
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
+class ParserV2DAppTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
-  private def parse(x: String): DAPP = Parser.parseContract(x) match {
-    case Success(r, _) => r
-    case e: Failure[Char, String] => catchParseError(x, e)
+  private def parse(x: String): DAPP = ParserV2.parseDAPP(x) match {
+    case Right((parsedScript, _)) => parsedScript
+    case _ => throw new TestFailedException("Test failed", 0)
   }
 
-  private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
+  /*private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
     import e.{index => i}
     println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
     println(s"""val code2 = "${escapedCode(x)}"""")
@@ -26,16 +26,16 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         .mkString("\n")
     }")
     throw new TestFailedException("Test failed", 0)
-  }
+  }*/
 
-  private def escapedCode(s: String): String =
+  /*private def escapedCode(s: String): String =
     s.flatMap {
       case '"' => "\\\""
       case '\n' => "\\n"
       case '\r' => "\\r"
       case '\t' => "\\t"
       case x => x.toChar.toString
-    }.mkString
+    }.mkString*/
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))
