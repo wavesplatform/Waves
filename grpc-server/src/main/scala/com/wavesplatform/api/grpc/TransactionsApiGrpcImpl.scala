@@ -94,7 +94,7 @@ class TransactionsApiGrpcImpl(
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
     val result = for {
-      txv <- tx.toVanillaSafe
+      txv <- tx.toVanilla
       _   <- commonApi.broadcastTransaction(txv).resultE
     } yield tx
     result.explicitGetErr()
