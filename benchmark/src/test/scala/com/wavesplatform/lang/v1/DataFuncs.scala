@@ -97,6 +97,55 @@ class DataFuncs {
     bh.consume("q" ++ st.message)
 
 
+  @Benchmark
+  def decode58_16b(st: StrSt16b, bh: Blackhole): Unit =
+    bh.consume(Base58.decode(st.message))
+
+  @Benchmark
+  def decode58_128bb(st: StrSt128b, bh: Blackhole): Unit =
+    bh.consume(Base58.decode(st.message))
+
+  @Benchmark
+  def decode58_256Kb(st: StrSt256b, bh: Blackhole): Unit =
+    bh.consume(Base58.decode(st.message))
+
+  @Benchmark
+  def decode58_512b(st: StrSt512b, bh: Blackhole): Unit =
+    bh.consume(Base58.decode(st.message))
+
+  @Benchmark
+  def decode58_768b(st: StrSt768b, bh: Blackhole): Unit =
+    bh.consume(Base58.decode(st.message))
+
+  @Benchmark
+  def decode58_896b(st: StrSt896b, bh: Blackhole): Unit =
+    bh.consume(Base58.decode(st.message))
+
+  @Benchmark
+  def encode58_16b(st: StrSt16b, bh: Blackhole): Unit =
+    bh.consume(Base58.encode(st.bmessage))
+
+  @Benchmark
+  def encode58_128bb(st: StrSt128b, bh: Blackhole): Unit =
+    bh.consume(Base58.encode(st.bmessage))
+
+  @Benchmark
+  def encode58_256Kb(st: StrSt256b, bh: Blackhole): Unit =
+    bh.consume(Base58.encode(st.bmessage))
+
+  @Benchmark
+  def encode58_512b(st: StrSt512b, bh: Blackhole): Unit =
+    bh.consume(Base58.encode(st.bmessage))
+
+  @Benchmark
+  def encode58_768b(st: StrSt768b, bh: Blackhole): Unit =
+    bh.consume(Base58.encode(st.bmessage))
+
+  @Benchmark
+  def encode58_896b(st: StrSt896b, bh: Blackhole): Unit =
+    bh.consume(Base58.encode(st.bmessage))
+
+
 }
 
 object DataFuncs {
@@ -113,6 +162,24 @@ object DataFuncs {
 
   class StrSt(size: Int) {
     val message   = "B" * (size * 1024)
+  }
+
+  @State(Scope.Benchmark)
+  class StrSt16b extends StrStS(16)
+  @State(Scope.Benchmark)
+  class StrSt128b extends StrStS(128)
+  @State(Scope.Benchmark)
+  class StrSt256b extends StrStS(256)
+  @State(Scope.Benchmark)
+  class StrSt512b extends StrStS(512)
+  @State(Scope.Benchmark)
+  class StrSt768b extends StrStS(768)
+  @State(Scope.Benchmark)
+  class StrSt896b extends StrStS(896)
+
+  class StrStS(size: Int) {
+    val message   = "B" * size
+    val bmessage   = randomBytes(size)
   }
 
   @State(Scope.Benchmark)
