@@ -146,7 +146,7 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     val tooBigKey = "a" * (MaxKeySize + 1)
     val tooBigKeyDataEntry     = List(DataEntry(tooBigKey, DataEntry.Value.BoolValue(false)))
 
-    assertGrpcError(sender.grpc.putData(firstAcc, tooBigKeyDataEntry, calcDataFee(tooBigKeyDataEntry)), s"$TooBigArray", Code.INVALID_ARGUMENT)
+    assertGrpcError(sender.grpc.putData(firstAcc, tooBigKeyDataEntry, calcDataFee(tooBigKeyDataEntry)), s"Too big sequences requested", Code.INVALID_ARGUMENT)
     assertGrpcError(sender.grpc.putData(firstAcc, List(DataEntry("", DataEntry.Value.BoolValue(false))), 1.waves), "Empty key found", Code.INVALID_ARGUMENT)
     assertGrpcError(
       sender.grpc.putData(firstAcc, List(DataEntry("abc", DataEntry.Value.BoolValue(false)), DataEntry("abc", DataEntry.Value.BoolValue(false))), 1.waves),

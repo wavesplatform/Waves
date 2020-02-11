@@ -149,7 +149,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       assertGrpcError(
         sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Some(script)),
         error,
-        Code.INVALID_ARGUMENT
+        Code.INTERNAL
       )
     }
   }
@@ -157,10 +157,10 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   val invalidAssetValue =
     Table(
       ("assetVal", "decimals", "message"),
-      (0L, 2, "NonPositiveAmount"),
-      (1L, IssueTransaction.MaxAssetDecimals + 1, "TooBigArray"),
-      (-1L, 1, "NonPositiveAmount"),
-      (1L, -1, "TooBigArray")
+      (0L, 2, "non-positive amount"),
+      (1L, IssueTransaction.MaxAssetDecimals + 1, "Too big sequences requested"),
+      (-1L, 1, "non-positive amount"),
+      (1L, -1, "Too big sequences requested")
     )
 
   forAll(invalidAssetValue) { (assetVal: Long, decimals: Int, error: String) =>
@@ -187,7 +187,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     test(s"Not able to create asset named $invalidAssetName") {
       assertGrpcError(
         sender.grpc.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee),
-        s"$InvalidName",
+        "invalid name",
         Code.INVALID_ARGUMENT
       )
     }

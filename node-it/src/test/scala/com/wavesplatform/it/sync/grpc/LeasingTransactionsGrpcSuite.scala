@@ -156,7 +156,7 @@ class LeasingTransactionsGrpcSuite extends GrpcBaseTransactionSuite {
       val firstBalance = sender.grpc.wavesBalance(firstAddress)
       assertGrpcError(
         sender.grpc.broadcastLease(firstAcc, PBRecipients.create(firstAcc.toAddress), leasingAmount, minFee, v),
-        "ToSelf",
+        "Transaction to yourself",
         Code.INVALID_ARGUMENT
       )
       sender.grpc.wavesBalance(firstAddress).regular shouldBe firstBalance.regular
