@@ -197,7 +197,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     val tooBigDescription = Random.nextString(IssueTransaction.MaxAssetDescriptionLength + 1)
     assertGrpcError(
       sender.grpc.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
-      s"$TooBigArray",
+      "Too big sequences requested",
       Code.INVALID_ARGUMENT
     )
   }
