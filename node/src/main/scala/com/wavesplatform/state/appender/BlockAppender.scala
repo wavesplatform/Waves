@@ -53,7 +53,6 @@ object BlockAppender extends ScorexLogging {
   )(ch: Channel, newBlock: Block): Task[Unit] = {
     val span = metrics.createApplySpan(newBlock)
     span.mark("block.forged", Instant.ofEpochMilli(newBlock.header.timestamp))
-    span.mark("block.received")
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
 
     val append =

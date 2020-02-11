@@ -32,9 +32,8 @@ object Metrics extends ScorexLogging {
   private[this] var time: Time           = _
   private[this] var db: Option[InfluxDB] = None
 
-  def write(b: Point.Builder): Unit = {
+  def write(b: Point.Builder, ts: Long = time.getTimestamp()): Unit = {
     db.foreach { db =>
-      val ts = time.getTimestamp()
       Task {
         try {
           db.write(
