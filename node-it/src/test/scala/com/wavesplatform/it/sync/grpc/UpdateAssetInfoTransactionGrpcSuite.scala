@@ -103,7 +103,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
       assertGrpcError(
         sender.grpc.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
         "InvalidName",
-        Code.INTERNAL
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -113,7 +113,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     assertGrpcError(
       sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
       "TooBigArray",
-      Code.INTERNAL
+      Code.INVALID_ARGUMENT
     )
   }
 

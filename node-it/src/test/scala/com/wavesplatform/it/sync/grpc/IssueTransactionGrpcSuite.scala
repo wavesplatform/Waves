@@ -149,7 +149,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       assertGrpcError(
         sender.grpc.broadcastIssue(issuer, assetName, someAssetAmount, 2, reissuable = true, issueFee, script = Some(script)),
         error,
-        Code.INTERNAL
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -170,7 +170,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       assertGrpcError(
         sender.grpc.broadcastIssue(issuer, assetName, assetVal, decimalBytes, reissuable = false, issueFee),
         s"$error",
-        Code.INTERNAL
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -188,7 +188,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
       assertGrpcError(
         sender.grpc.broadcastIssue(issuer, invalidAssetName, someAssetAmount, 2, reissuable = false, issueFee),
         s"$InvalidName",
-        Code.INTERNAL
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -198,7 +198,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
     assertGrpcError(
       sender.grpc.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
       s"$TooBigArray",
-      Code.INTERNAL
+      Code.INVALID_ARGUMENT
     )
   }
 
