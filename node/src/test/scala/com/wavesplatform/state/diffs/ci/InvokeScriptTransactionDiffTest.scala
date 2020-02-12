@@ -1,8 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
-import com.wavesplatform.utils._
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
+import com.wavesplatform.account.{Address, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -37,6 +36,7 @@ import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, Inv
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
+import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}

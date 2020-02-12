@@ -12,7 +12,7 @@ import akka.stream.ActorMaterializer
 import cats.instances.all._
 import cats.syntax.option._
 import com.typesafe.config._
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.actor.RootActorSystem
 import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
@@ -34,8 +34,8 @@ import com.wavesplatform.mining.{Miner, MinerImpl}
 import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, ChainId, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._

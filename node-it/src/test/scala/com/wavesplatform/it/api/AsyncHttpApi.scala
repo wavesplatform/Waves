@@ -7,7 +7,7 @@ import java.util.{NoSuchElementException, UUID}
 
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
-import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
+import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
@@ -31,8 +31,8 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{Attachment => PBAttachment, Recipient => PBRecipient, Script => _, _}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -412,7 +412,18 @@ object AsyncHttpApi extends Assertions {
         version: TxVersion = TxVersion.V1,
         timestamp: Option[Long] = None
     ): Future[(Transaction, JsValue)] = {
-      val tx = UpdateAssetInfoTransaction(version, sender.publicKey, IssuedAsset(ByteStr(Base58.decode(assetId))), name, description, if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves, fee, timestamp.getOrElse(System.currentTimeMillis()), Proofs.empty, AddressScheme.current.chainId).signWith(sender.privateKey)
+      val tx = UpdateAssetInfoTransaction(
+        version,
+        sender.publicKey,
+        IssuedAsset(ByteStr(Base58.decode(assetId))),
+        name,
+        description,
+        if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
+        fee,
+        timestamp.getOrElse(System.currentTimeMillis()),
+        Proofs.empty,
+        ChainId.global
+      ).signWith(sender.privateKey)
       signedTraceBroadcast(tx.json())
     }
 
@@ -862,8 +873,6 @@ object AsyncHttpApi extends Assertions {
     private[this] lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
     private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
 
-    val chainId: Byte = AddressScheme.current.chainId
-
     def blockAt(height: Int): Future[Block] = {
       blocks
         .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height(height)))
@@ -882,7 +891,7 @@ object AsyncHttpApi extends Assertions {
         version: Int = 2
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis(),
@@ -929,7 +938,7 @@ object AsyncHttpApi extends Assertions {
         timestamp: Long = System.currentTimeMillis
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(if (feeAssetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(feeAssetId)), fee)),
         timestamp,
@@ -957,7 +966,7 @@ object AsyncHttpApi extends Assertions {
         version: Int = 2
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis(),
@@ -978,7 +987,7 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastCreateAlias(source: KeyPair, alias: String, fee: Long, version: Int = 2): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis,
@@ -1001,7 +1010,7 @@ object AsyncHttpApi extends Assertions {
         timestamp: Long = System.currentTimeMillis()
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         timestamp,
@@ -1031,7 +1040,7 @@ object AsyncHttpApi extends Assertions {
     ): Future[PBSignedTransaction] = {
 
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(matcher.publicKey),
         Some(Amount.of(if (matcherFeeAssetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(matcherFeeAssetId)), fee)),
         timestamp,
@@ -1063,7 +1072,7 @@ object AsyncHttpApi extends Assertions {
         version: TxVersion = TxVersion.V1
     ): Future[SignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(sender.publicKey),
         Some(Amount.of(if (feeAsset == Waves) ByteString.EMPTY else ByteString.copyFrom(Base58.decode(feeAsset.maybeBase58Repr.get)), fee)),
         System.currentTimeMillis(),
@@ -1091,7 +1100,7 @@ object AsyncHttpApi extends Assertions {
         version: Int = 1
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(sender.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         timestamp,
@@ -1173,7 +1182,7 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastBurn(source: KeyPair, assetId: String, amount: Long, fee: Long, version: Int = 2): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis(),
@@ -1195,7 +1204,7 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastSponsorFee(sender: KeyPair, minFee: Option[Amount], fee: Long, version: Int = 1): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(sender.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis,
@@ -1215,7 +1224,7 @@ object AsyncHttpApi extends Assertions {
         version: Int = 1
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(sender.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis(),
@@ -1234,7 +1243,7 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastLease(source: KeyPair, recipient: PBRecipient, amount: Long, fee: Long, version: Int = 2): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis,
@@ -1247,7 +1256,7 @@ object AsyncHttpApi extends Assertions {
 
     def broadcastLeaseCancel(source: KeyPair, leaseId: String, fee: Long, version: Int = 2): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(source.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         System.currentTimeMillis,
@@ -1267,7 +1276,7 @@ object AsyncHttpApi extends Assertions {
         version: Int = 1
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
-        chainId,
+        ChainId.global,
         ByteString.copyFrom(sender.publicKey),
         Some(Amount.of(ByteString.EMPTY, fee)),
         timestamp,

@@ -5,7 +5,7 @@ import java.util.concurrent.Executors
 
 import cats.implicits.showInterpolator
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.generator.GeneratorSettings.NodeAddress
 import com.wavesplatform.generator.Preconditions.{PGenSettings, UniverseHolder}
 import com.wavesplatform.generator.cli.ScoptImplicits
@@ -14,7 +14,6 @@ import com.wavesplatform.generator.utils.Universe
 import com.wavesplatform.network.client.NetworkSender
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.transaction.{ChainId, Transaction}
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.utils.{LoggerFacade, NTP}
 import monix.execution.Scheduler
 import net.ceedubs.ficus.Ficus._

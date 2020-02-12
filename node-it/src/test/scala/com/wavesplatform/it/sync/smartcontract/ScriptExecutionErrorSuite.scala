@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.account.{AddressScheme, Alias}
+import com.wavesplatform.account.Alias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
@@ -13,7 +13,7 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{CreateAliasTransaction, Transaction}
+import com.wavesplatform.transaction.{ChainId, CreateAliasTransaction, Transaction}
 import org.scalatest.CancelAfterFailure
 
 class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFailure {
@@ -39,7 +39,7 @@ class ScriptExecutionErrorSuite extends BaseTransactionSuite with CancelAfterFai
     val tx = sender.signedBroadcast(SetScriptTransaction.selfSigned(1.toByte, acc2, Some(compiled), setScriptFee, ts).explicitGet().json())
     nodes.waitForHeightAriseAndTxPresent(tx.id)
 
-    val alias = Alias.fromString(s"alias:${AddressScheme.current.chainId.toChar}:asdasdasdv").explicitGet()
+    val alias = Alias.fromString(s"alias:${ChainId.global.toChar}:asdasdasdv").explicitGet()
     assertBadRequestAndResponse(
       sender.signedBroadcast(CreateAliasTransaction.selfSigned(Transaction.V2, acc2, alias, minFee, ts).explicitGet().json()),
       "Your transaction has incorrect type."

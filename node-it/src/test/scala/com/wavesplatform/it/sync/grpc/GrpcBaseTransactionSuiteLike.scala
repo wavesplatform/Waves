@@ -6,17 +6,16 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import monix.eval.Coeval
-import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
+import org.scalatest.{FunSuite, Suite}
 
 import scala.collection.JavaConverters._
 import scala.concurrent.ExecutionContext
 
 trait GrpcBaseTransactionSuiteLike
-    extends GrpcWaitForHeight
+    extends IntegrationTestsScheme
+    with GrpcWaitForHeight
     with GrpcIntegrationSuiteWithThreeAddress
-    with BeforeAndAfterAll
-    with NodesFromDocker
-    with IntegrationTestsScheme { this: Suite =>
+    with NodesFromDocker { this: Suite =>
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 

@@ -4,7 +4,6 @@ import java.io.{File, PrintWriter}
 import java.util.concurrent.ThreadLocalRandom
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}

@@ -5,7 +5,7 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 
 import cats.Id
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AddressOrAlias, AddressScheme, Alias}
+import com.wavesplatform.account.{AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
@@ -128,7 +128,7 @@ object WavesEnvironmentBenchmark {
       val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
       val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
       new WavesEnvironment(
-        AddressScheme.current.chainId,
+        ChainId.global,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),
         Coeval(state.height),
         state,

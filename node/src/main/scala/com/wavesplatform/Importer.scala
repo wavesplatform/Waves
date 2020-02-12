@@ -5,7 +5,7 @@ import java.io._
 import akka.actor.ActorSystem
 import com.google.common.primitives.Ints
 import com.wavesplatform.Exporter.Formats
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
@@ -16,8 +16,8 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, ChainId, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -29,8 +29,8 @@ import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
