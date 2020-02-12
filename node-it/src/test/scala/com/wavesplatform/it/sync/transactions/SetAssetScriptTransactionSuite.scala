@@ -11,10 +11,10 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{ChainId, Proofs}
 import play.api.libs.json._
 import scorex.crypto.encode.Base58
 
@@ -337,12 +337,12 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
     nodes.waitForHeightAriseAndTxPresent(setScriptId)
 
-    val nonIssuerUnsignedTx = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(unchangeableScript), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty, ChainId.current)
+    val nonIssuerUnsignedTx = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(unchangeableScript), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty, ChainId.global)
 
     val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
 
     val signedTxByB =
-      nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)), chainId = ChainId.current)
+      nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)), chainId = ChainId.global)
 
     val tx =
       sender.signedBroadcast(signedTxByB.json()).id
@@ -350,7 +350,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     nodes.waitForHeightAriseAndTxPresent(tx)
 
     //try to change unchangeable script
-    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(script), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty, ChainId.current)
+    val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(1.toByte, accountA, IssuedAsset(ByteStr.decodeBase58(assetWScript).get), Some(script), setAssetScriptFee + 0.004.waves, System.currentTimeMillis, Proofs.empty, ChainId.global)
 
     val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 

@@ -9,7 +9,6 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.api.grpc._
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
@@ -33,19 +32,12 @@ import com.wavesplatform.protobuf.transaction.{Attachment => PBAttachment, Recip
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.assets.{
-  BurnTransaction,
-  IssueTransaction,
-  SetAssetScriptTransaction,
-  SponsorFeeTransaction,
-  UpdateAssetInfoTransaction
-}
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
-import com.wavesplatform.transaction.serialization.impl.BaseTxJson
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.transaction.{Asset, ChainId, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
@@ -534,7 +526,8 @@ object AsyncHttpApi extends Assertions {
         data,
         fee,
         timestamp.getOrElse(System.currentTimeMillis()),
-        Proofs.empty
+        Proofs.empty,
+        ChainId.global
       ).signWith(sender.privateKey)
       signedBroadcast(tx.json())
     }

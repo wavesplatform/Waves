@@ -1,6 +1,7 @@
 package com.wavesplatform.account
 
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.transaction.ChainId
 import com.wavesplatform.{NoShrink, crypto}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
