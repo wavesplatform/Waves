@@ -48,7 +48,7 @@ class CommonAccountApi(blockchain: Blockchain) {
     val script: Option[(PublicKey, Script, Long, Map[String, Long])] = blockchain.accountScriptWithComplexity(address)
 
     AddressScriptInfo(
-      script = script.map(_._2.bytes()),
+      script = script.map(_._2),
       scriptText = script.map(_._2.expr.toString), // [WAIT] script.map(Script.decompile),
       complexity = script.map(_._3).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
@@ -79,5 +79,5 @@ class CommonAccountApi(blockchain: Blockchain) {
 
 object CommonAccountApi {
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
-  final case class AddressScriptInfo(script: Option[ByteStr], scriptText: Option[String], complexity: Long, extraFee: Long)
+  final case class AddressScriptInfo(script: Option[Script], scriptText: Option[String], complexity: Long, extraFee: Long)
 }
