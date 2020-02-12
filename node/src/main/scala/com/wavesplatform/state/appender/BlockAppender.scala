@@ -52,7 +52,7 @@ object BlockAppender extends ScorexLogging {
       scheduler: Scheduler
   )(ch: Channel, newBlock: Block): Task[Unit] = {
     val span = metrics.createApplySpan(newBlock)
-    span.mark("block.forged", Instant.ofEpochMilli(newBlock.header.timestamp))
+    span.mark("block.received")
     BlockStats.received(newBlock, BlockStats.Source.Broadcast, ch)
 
     val append =
@@ -98,7 +98,7 @@ object BlockAppender extends ScorexLogging {
         .spanBuilder("block-appender")
         .tag("id", block.uniqueId.toString.take(6))
         .tag("parent-id", block.header.reference.toString.take(6))
-        .start()
+        .start(Instant.ofEpochMilli(block.header.timestamp))
     }
   }
 }
