@@ -3,19 +3,20 @@ package com.wavesplatform.it.sync.grpc
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{ExternalNode, GrpcIntegrationSuiteWithThreeAddress, GrpcWaitForHeight, Node, NodeConfigs}
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
-import scala.concurrent.ExecutionContext
 import scala.collection.JavaConverters._
+import scala.concurrent.ExecutionContext
 
 trait GrpcBaseTransactionSuiteLike
-  extends GrpcWaitForHeight
-  with GrpcIntegrationSuiteWithThreeAddress
-  with BeforeAndAfterAll
-  with NodesFromDocker { this: Suite =>
+    extends GrpcWaitForHeight
+    with GrpcIntegrationSuiteWithThreeAddress
+    with BeforeAndAfterAll
+    with NodesFromDocker
+    with IntegrationTestsScheme { this: Suite =>
 
   protected implicit val ec: ExecutionContext = ExecutionContext.Implicits.global
 
