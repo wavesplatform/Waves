@@ -35,8 +35,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{AssetIdStringLength, TransactionFactory}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observable
@@ -45,8 +43,6 @@ import play.api.libs.json._
 import scala.concurrent.Future
 import scala.util.Success
 
-@Path("/assets")
-@Api(value = "assets")
 case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSynchronizer: UtxPoolSynchronizer, blockchain: Blockchain, time: Time)
     extends ApiRoute
     with BroadcastRoute
@@ -65,14 +61,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       balance ~ balances ~ nft ~ balanceDistributionAtHeight ~ balanceDistribution ~ details ~ deprecatedRoute
     }
 
-  @Path("/balance/{address}/{assetId}")
-  @ApiOperation(value = "Asset's balance", notes = "Account's balance by given asset", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def balance: Route =
     (get & path("balance" / Segment / Segment)) { (address, assetId) =>
       complete(balanceJson(address, assetId))
@@ -99,14 +87,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
     }
   }
 
-  @Deprecated
-  @Path("/{assetId}/distribution")
-  @ApiOperation(value = "Asset balance distribution", notes = "Asset balance distribution by account", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def balanceDistribution: Route =
     (get & path(Segment / "distribution")) { assetParam =>
       val assetEi = AssetsApiRoute
@@ -131,20 +111,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       }
     }
 
-  @Path("/{assetId}/distribution/{height}/limit/{limit}")
-  @ApiOperation(
-    value = "Asset balance distribution at height",
-    notes = "Asset balance distribution by account at specified height",
-    httpMethod = "GET"
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of addresses to be returned", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "after", value = "address to paginate after", required = false, dataType = "string", paramType = "query")
-    )
-  )
   def balanceDistributionAtHeight: Route =
     (get & path(Segment / "distribution" / IntNumber / "limit" / IntNumber) & parameter('after.?)) {
       (assetParam, heightParam, limitParam, afterParam) =>
@@ -171,13 +137,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
         }
     }
 
-  @Path("/balance/{address}")
-  @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def balances: Route =
     (get & path("balance" / Segment)) { address =>
       complete(fullAccountAssetsInfo(address))
@@ -187,14 +146,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
 
   private val fullDetails = parameters('full.as[Boolean].?)
 
-  @Path("/details/{assetId}")
-  @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    )
-  )
   def singleDetails: Route =
     (get & path(Segment) & fullDetails) { (id, full) =>
       complete {
@@ -208,14 +159,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
 
   def multipleDetails: Route = pathEndOrSingleSlash(multipleDetailsGet ~ multipleDetailsPost)
 
-  @Path("/details")
-  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "id", value = "IDs of the asset", required = true, dataType = "string", paramType = "query"),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    )
-  )
   def multipleDetailsGet: Route =
     (get & parameters('id.*) & fullDetails) { (ids, full) =>
       ids.toList.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
@@ -225,21 +168,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       }
     }
 
-  @Path("/details")
-  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "json",
-        value = "IDs of the asset",
-        required = true,
-        dataType = "string",
-        paramType = "body",
-        example = """{"ids": ["some1", "some2"]}"""
-      ),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    )
-  )
   def multipleDetailsPost: Route =
     fullDetails { full =>
       jsonPost[JsObject] { jsv =>
@@ -255,15 +183,6 @@ case class AssetsApiRoute(settings: RestAPISettings, wallet: Wallet, utxPoolSync
       }
     }
 
-  @Path("/nft/{address}/limit/{limit}")
-  @ApiOperation(value = "NFTs", notes = "Account's NFTs balance", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
-    )
-  )
   def nft: Route =
     extractScheduler(
       implicit sc =>
