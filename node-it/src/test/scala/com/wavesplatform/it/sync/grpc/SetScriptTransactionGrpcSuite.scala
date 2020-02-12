@@ -38,7 +38,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
     val scriptInfo = sender.grpc.scriptInfo(firstAddress)
 
-    scriptInfo.scriptBytes shouldBe ByteString.copyFrom(Base64.decode(script.bytes().base64))
+    scriptInfo.script.map(PBTransactions.toVanillaScript) should contain(script)
     scriptInfo.scriptText shouldBe script.expr.toString
     scriptInfo.complexity shouldBe scriptComplexity
 
@@ -94,7 +94,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.grpc.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 
     val scriptInfo = sender.grpc.scriptInfo(firstAddress)
-    scriptInfo.scriptBytes shouldBe ByteString.EMPTY
+    scriptInfo.script shouldBe empty
     scriptInfo.scriptText shouldBe ""
     scriptInfo.complexity shouldBe 0L
 
