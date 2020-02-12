@@ -214,35 +214,52 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val sellerAddress = secondAddress
     val buyerAddress  = firstAddress
 
-    val nft = IssueTransaction(
-      TxVersion.V1,
-      seller,
-      "myNft".utf8Bytes,
-      "myNftDescription".utf8Bytes,
-      quantity = 1,
-      decimals = 0,
-      reissuable = false,
-      script = None,
-      fee = 1.waves,
-      timestamp = System.currentTimeMillis()
-    ).signWith(seller)
+    val nftAsset = sender
+      .issue(
+        seller.toAddress.stringRepr,
+        "myNft",
+        "myNftDescription",
+        quantity = 1L,
+        decimals = 0,
+        reissuable = false,
+        script = None,
+        fee = 0.001.waves,
+        waitForTx = true
+      )
+      .id
 
-    val assetId = nft.id().toString
-
-    sender.postJson("/transactions/broadcast", nft.json())
-
-    nodes.waitForHeightAriseAndTxPresent(assetId.toString)
+    val dec6AssetId = sender
+      .issue(
+        seller.toAddress.stringRepr,
+        "some",
+        "6 decimals asset",
+        quantity = 100L,
+        decimals = 6,
+        reissuable = false,
+        script = None,
+        fee = 1.waves,
+        waitForTx = true
+      )
+      .id
 
     val matcher             = pkByAddress(thirdAddress)
     val ts                  = ntpTime.correctedTime()
     val expirationTimestamp = ts + Order.MaxLiveTime
     val amount              = 1
-    val price               = 1000 * math.pow(10, 8).toLong
+    val nftWavesPrice       = 1000 * math.pow(10, 8).toLong
+    val nftForAssetPrice    = 1 * math.pow(10, 8).toLong
 
-    val assetPair = AssetPair.createAssetPair(assetId, "WAVES").get
+    val nftWavesPair      = AssetPair.createAssetPair(nftAsset, "WAVES").get
+    val nftOtherAssetPair = AssetPair.createAssetPair(nftAsset, dec6AssetId).get
 
-    val sell          = Order.sell(4.toByte, seller, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, Waves)
-    val buy           = Order.buy(4.toByte, buyer, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, Waves)
+    val sellNftForWaves = Order.sell(4.toByte, seller, matcher, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+    val buyNftForWaves  = Order.buy(4.toByte, buyer, matcher, nftWavesPair, amount, nftWavesPrice, ts, expirationTimestamp, matcherFee, Waves)
+
+    val sellNftForOtherAsset =
+      Order.sell(4.toByte, buyer, matcher, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+    val buyNftForOtherAsset =
+      Order.buy(4.toByte, seller, matcher, nftOtherAssetPair, amount, nftForAssetPrice, ts, expirationTimestamp, matcherFee, Waves)
+
     val sellerBalance = sender.balanceDetails(sellerAddress).regular
     val buyerBalance  = sender.balanceDetails(buyerAddress).regular
 
@@ -251,25 +268,58 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         .signed(
           3.toByte,
           matcher = matcher,
-          buyOrder = buy,
-          sellOrder = sell,
+          buyOrder = buyNftForWaves,
+          sellOrder = sellNftForWaves,
           amount = amount,
-          price = price,
-          buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
-          sellMatcherFee = (BigInt(matcherFee) * amount / sell.amount).toLong,
+          price = nftWavesPrice,
+          buyMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount).toLong,
+          sellMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount).toLong,
           fee = matcherFee,
           timestamp = ntpTime.correctedTime()
         )
         .right
         .get
 
-    sender.postJson("/transactions/broadcast", tx.json())
+    sender.signedBroadcast(tx.json(), waitForTx = true)
 
-    nodes.waitForHeightAriseAndTxPresent(tx.id().toString)
+    sender.nftAssetsBalance(sellerAddress, limit = 1) shouldBe empty
+    sender.nftAssetsBalance(buyerAddress, 1).head.assetId shouldBe nftAsset
+    sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + nftWavesPrice - matcherFee
+    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - nftWavesPrice - matcherFee
 
-    sender.nftAssetsBalance(buyerAddress, 1).head.assetId shouldBe assetId
-    sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + price - matcherFee
-    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - price - matcherFee
+
+    val sellerBalanceAfterFirstExchange = sender.balanceDetails(sellerAddress).regular
+    val buyerBalanceAfgerFirstExchange  = sender.balanceDetails(buyerAddress).regular
+    val bal = sender.assetBalance(buyerAddress, dec6AssetId).balance
+    val bal2 = sender.assetBalance(sellerAddress, dec6AssetId)
+
+    val tx2 =
+      ExchangeTransaction
+        .signed(
+          3.toByte,
+          matcher = matcher,
+          buyOrder = buyNftForOtherAsset,
+          sellOrder = sellNftForOtherAsset,
+          amount = amount,
+          price = nftForAssetPrice,
+          buyMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount).toLong,
+          sellMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount).toLong,
+          fee = matcherFee,
+          timestamp = ntpTime.correctedTime()
+        )
+        .right
+        .get
+
+    sender.signedBroadcast(tx2.json(), waitForTx = true)
+
+    sender.nftAssetsBalance(buyerAddress, limit = 1) shouldBe empty
+    sender.nftAssetsBalance(sellerAddress, 1).head.assetId shouldBe nftAsset
+    sender.assetBalance(buyerAddress, dec6AssetId) shouldBe 0
+    sender.assetBalance(sellerAddress, dec6AssetId) shouldBe 100
+    sender.balanceDetails(sellerAddress).regular shouldBe sellerBalanceAfterFirstExchange - matcherFee
+    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfgerFirstExchange - matcherFee
+
+
   }
 
   override protected def nodeConfigs: Seq[Config] =
