@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -111,6 +112,10 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
         val negativeFeeEi = create(1.toByte, sender, assetId, feeOverflow, -100, timestamp, attachment, proofs)
         negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+
+        val differentChainIds = Seq(ParsedTransfer(sender.toAddress, 100), ParsedTransfer(sender.toAddressWithChainId('?'.toByte), 100))
+        val invalidChainIdEi = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
+        invalidChainIdEi should produce("One of chain ids not match")
     }
   }
 

@@ -14,7 +14,7 @@ import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.utils.{ScorexLogging, base58Length}
 import play.api.libs.json._
 
-trait AddressOrAlias {
+sealed trait AddressOrAlias {
   def stringRepr: String
   def bytes: ByteStr
   def chainId: ChainId
@@ -81,13 +81,13 @@ object Address extends ScorexLogging {
   val AddressLength        = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength  = base58Length(AddressLength)
 
-  private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = CacheBuilder
+  private[this] val publicKeyBytesCache: Cache[(ByteStr, ChainId), Address] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
     .build()
 
-  private[this] val bytesCache: Cache[ByteStr, Either[InvalidAddress, Address]] = CacheBuilder
+  private[this] val bytesCache: Cache[(ByteStr, ChainId), Either[InvalidAddress, Address]] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
@@ -95,7 +95,7 @@ object Address extends ScorexLogging {
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = ChainId.global): Address = {
     publicKeyBytesCache.get(
-      publicKey, { () =>
+      (publicKey, chainId), { () =>
         val withoutChecksum = ByteBuffer
           .allocate(1 + 1 + HashLength)
           .put(AddressVersion)
@@ -116,7 +116,7 @@ object Address extends ScorexLogging {
 
   def fromBytes(addressBytes: ByteStr, chainId: Byte = ChainId.global): Either[InvalidAddress, Address] = {
     bytesCache.get(
-      addressBytes, { () =>
+      (addressBytes, chainId), { () =>
         Either
           .cond(
             addressBytes.length == Address.AddressLength,

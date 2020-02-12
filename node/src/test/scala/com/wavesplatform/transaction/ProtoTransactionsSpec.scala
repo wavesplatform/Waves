@@ -151,10 +151,6 @@ class ProtoTransactionsSpec extends FreeSpec with TransactionGen with Matchers w
       val base64Str = Base64.encode(PBUtils.encodeDeterministic(PBTransactions.protobuf(massTransferTx)))
 
       decode(base64Str) shouldBe massTransferTx
-
-      import com.wavesplatform.common.state.diffs.ProduceError._
-      val proto = PBTransactions.protobuf(massTransferTx).update(_.transaction.chainId := invalidChainIdGen.sample.get)
-      PBTransactions.vanilla(proto) should produce("One of chain ids not match")
     }
 
     "SetScriptTransaction" in {
