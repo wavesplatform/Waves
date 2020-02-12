@@ -30,7 +30,7 @@ class InfluxDBSpanReporter extends SpanReporter with ScorexLogging {
           timeOffset + math.max(0L, operationTimeDiff)
         )
     }
-    log.info(s"Span written: $span")
+    // log.info(s"Span written: $span")
     Metrics.write(pointWithMarks, span.from.toEpochMilli)
   }
 
