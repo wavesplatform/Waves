@@ -2,6 +2,7 @@ package com.wavesplatform.it.account.storage
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
@@ -12,29 +13,14 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class RemoveEntrySuite extends BaseSuite {
 
-  val writeEntry =
-    """
-      |@Callable(i)
-      |func write%f(k: String, v: %t) = {
-      |  [%fEntry(k, v)]
-      |}
-      |""".stripMargin
+  def writeEntry(t: String, v: String) =
+    s"""
+       |@Callable(i) func write$t(k: String, v: ${if (t.contains("Int")) "Int" else t}) = [${t}Entry(k, v${if (t.equals("Binary")) ".toBytes" else ""})]
+       """.stripMargin
 
-  val writeEntriesFunc =
-    """
-      |@Callable(i)
-      |func write%sEntries() = {
-      |    FOLD<%s>(a, [], writeEntry)
-      |}
-    """.stripMargin
+  val writeEntriesFunc = s"@Callable(i) func write%sEntries() = FOLD<%s>(a, [], writeEntry)"
 
-  val deleteEntriesFunc =
-    """
-      |@Callable(i)
-      |func delete%sEntries() = {
-      |    FOLD<%s>(a, [], deleteEntry)
-      |}
-    """.stripMargin
+  def deleteEntriesFunc(c: Int) = s"@Callable(i) func delete${c}Entries() = FOLD<$c>(a, [], deleteEntry)"
 
   val script = """
                  |{-# STDLIB_VERSION 4 #-}
@@ -49,36 +35,28 @@ class RemoveEntrySuite extends BaseSuite {
                  |  81, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92, 93, 94, 95, 96, 97, 98, 99
                  |]
                  |
-                 |func writeEntry(acc: List[StringEntry], e: Int) = {
-                 |    StringEntry(e.toString(), "value") :: acc
-                 |}
+                 |func writeEntry(acc: List[StringEntry], e: Int) = StringEntry(e.toString(), "value") :: acc
                  |
-                 |func deleteEntry(acc: List[DeleteEntry], e: Int) = {
-                 |    DeleteEntry(e.toString()) :: acc
-                 |}
+                 |func deleteEntry(acc: List[DeleteEntry], e: Int) = DeleteEntry(e.toString()) :: acc
                  |
-                 |@Callable(i)
-                 |func write(k: String, v: String) = {
-                 |  [StringEntry(k, v)]
-                 |}
+                 |@Callable(i) func write(k: String, v: String) = [StringEntry(k, v)]
                  |
-                 |@Callable(i)
-                 |func delete(k: String) = {
-                 |  [DeleteEntry(k)]
-                 |}
+                 |@Callable(i) func delete(k: String) = [DeleteEntry(k)]
+                 |
        """.stripMargin
 
   "Remove entry from account storage" - {
     val stringTestData  = "String"  -> "someValue"
     val integerTestData = "Integer" -> 1
     val booleanTestData = "Boolean" -> true
+    val binaryTestData  = "Binary"  -> ""
 
-    for (data <- Seq(stringTestData, integerTestData, booleanTestData)) s"${data._1} entry could be removed from account storage" in {
+    for (data <- Seq(stringTestData, integerTestData, booleanTestData, binaryTestData)) s"${data._1} entry could be removed from account storage" in {
       val t = data._1
       val k = "someKey"
       val v = data._2
       val address =
-        createDapp(script + writeEntry.replaceAll("%f", t).replaceAll("%t", if (t.contains("Int")) "Int" else t))
+        createDapp(script, writeEntry(t, v.toString))
 
       invokeScript(address, s"write$t", k, v.toString)
 
@@ -99,7 +77,7 @@ class RemoveEntrySuite extends BaseSuite {
     }
 
     "Could remove 100 entries" in {
-      val address = createDapp(script + deleteEntriesFunc.replaceAll("%s", "100"))
+      val address = createDapp(script, deleteEntriesFunc(100))
 
       miner.waitForTransaction((0 to 99).map(i => invokeScript(address, s"write", s"key-$i", "value", wait = false)).last)
       miner.getData(address) should have size 100
@@ -110,7 +88,7 @@ class RemoveEntrySuite extends BaseSuite {
     }
 
     "Removing more than 100 entries should produce an error" in {
-      val address = createDapp(script + deleteEntriesFunc.replaceAll("%s", "101"))
+      val address = createDapp(script, deleteEntriesFunc(101))
 
       miner.waitForTransaction((0 to 100).map(i => invokeScript(address, s"write", s"key-$i", "value", wait = false)).last)
       miner.getData(address) should have size 101
@@ -123,19 +101,19 @@ class RemoveEntrySuite extends BaseSuite {
       miner.getData(address) should have size 0
     }
 
-    "Trying of writing key longer than 400 bytes should produce an error" in {
-      val address    = createDapp(script + deleteEntriesFunc.replaceAll("%s", "101"))
+    "Trying of writing key longer than 400 bytes and removing it should produce an error" in {
+      val address    = createDapp(script, deleteEntriesFunc(101))
       val tooLongKey = new scala.util.Random().nextString(401)
 
       assertBadRequestAndMessage(
         miner.waitForTransaction(invokeScript(address, s"write", tooLongKey, "value", wait = false)),
         "State check failed. Reason: Key size must be less than 100"
       )
-
     }
   }
 
-  def createDapp(script: String): String = {
+  def createDapp(scriptParts: String*): String = {
+    val script  = scriptParts.mkString(" ")
     val address = miner.createAddress()
     val compiledScript = ScriptCompiler
       .compile(

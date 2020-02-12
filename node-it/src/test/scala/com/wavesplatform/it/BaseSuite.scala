@@ -1,10 +1,9 @@
-package com.wavesplatform.it.account.storage
+package com.wavesplatform.it
 
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{ExternalNode, Node, NodeConfigs}
 import monix.eval.Coeval
 import org.scalatest._
 
