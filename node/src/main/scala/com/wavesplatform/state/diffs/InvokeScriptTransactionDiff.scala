@@ -345,7 +345,7 @@ object InvokeScriptTransactionDiff {
 
       def applyTransfer(transfer: AssetTransfer): TracedResult[ValidationError, Diff] = {
         val AssetTransfer(addressRepr, amount, asset) = transfer
-        val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+        val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet() // Enforces global ChainId
         Asset.fromCompatId(asset) match {
           case Waves =>
             val r = Diff.stateOps(
