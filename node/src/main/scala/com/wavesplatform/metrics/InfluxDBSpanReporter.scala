@@ -24,10 +24,10 @@ class InfluxDBSpanReporter extends SpanReporter with ScorexLogging {
     val (pointWithMarks, _) = span.marks.foldLeft((pointWithTags, 0L)) {
       case ((bp, timeOffset), m) =>
         val currentTime       = m.instant.toEpochMilli
-        val operationTimeDiff = currentTime - span.from.toEpochMilli
+        val timeDiff = math.max(0L, currentTime - span.from.toEpochMilli - timeOffset)
         (
-          bp.addField(m.key, if (operationTimeDiff >= timeOffset) operationTimeDiff - timeOffset else operationTimeDiff),
-          timeOffset + math.max(0L, operationTimeDiff)
+          bp.addField(m.key, timeDiff),
+          timeOffset + timeDiff
         )
     }
     // log.info(s"Span written: $span")
