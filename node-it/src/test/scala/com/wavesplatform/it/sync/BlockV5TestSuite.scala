@@ -3,11 +3,11 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.it.NodesFromDocker
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 import scorex.crypto.hash.Blake2b256
 

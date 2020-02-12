@@ -1,9 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.it.Node
+import com.wavesplatform.it.{BaseTransactionSuite, Node}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.state.AssetDistributionPage
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import org.scalatest.CancelAfterFailure

@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
 import com.wavesplatform.it.NodeConfigs.Miners
@@ -12,6 +11,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.BaseTransactionSuite
 
 import scala.concurrent.duration._
 import scala.util.Random

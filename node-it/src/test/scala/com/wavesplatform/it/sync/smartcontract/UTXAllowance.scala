@@ -5,9 +5,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
+import com.wavesplatform.it.{NodesFromDocker, ReportingTestName, WaitForHeight2}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}

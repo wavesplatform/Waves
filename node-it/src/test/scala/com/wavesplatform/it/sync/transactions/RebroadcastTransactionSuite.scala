@@ -4,11 +4,10 @@ import com.typesafe.config.Config
 import com.typesafe.config.ConfigFactory.parseString
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.Node
+import com.wavesplatform.it.{BaseTransactionSuite, Node, NodesFromDocker}
 import com.wavesplatform.it.NodeConfigs._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.{BaseTransactionSuite, NodesFromDocker}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 

@@ -2,8 +2,8 @@ package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.NodesFromDocker
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}

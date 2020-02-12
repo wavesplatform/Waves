@@ -1,11 +1,12 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.NodesFromDocker
 import com.wavesplatform.it.api.State
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
+
 import scala.concurrent.duration._
 
 class MinerStateTestSuite extends FunSuite with CancelAfterFailure with NodesFromDocker with Matchers {

@@ -1,9 +1,8 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.{NodeConfigs, NodesFromDocker}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.state.Sponsorship
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.utils.ScorexLogging

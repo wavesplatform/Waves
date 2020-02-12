@@ -3,8 +3,7 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.Config
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
+import com.wavesplatform.it.{NodeConfigs, NodesFromDocker, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 import com.wavesplatform.it.api.SyncHttpApi._
 

@@ -56,8 +56,16 @@ import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
 
+/**
+  * @deprecated replaced by [[com.wavesplatform.it.NodesRestApi]]
+  */
+@Deprecated
 object AsyncHttpApi extends Assertions {
 
+  /**
+    * @deprecated replaced by [[com.wavesplatform.it.NodesRestApi.RestApi]]
+    */
+  @Deprecated
   //noinspection ScalaStyle
   implicit class NodeAsyncHttpApi(val n: Node) extends Assertions with Matchers {
 

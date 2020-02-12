@@ -1,9 +1,10 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.{Config, ConfigFactory}
+import com.wavesplatform.it.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FunSuite}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
+
 import scala.concurrent.duration._
 
 class FairPoSTestSuite extends FunSuite with CancelAfterFailure with NodesFromDocker {

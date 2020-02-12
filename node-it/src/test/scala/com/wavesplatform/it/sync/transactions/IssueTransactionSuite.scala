@@ -3,8 +3,8 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
 import com.wavesplatform.it.api.IssueTransactionInfo
+import com.wavesplatform.it.BaseTransactionSuite
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.sync._
 import org.scalatest.prop.TableDrivenPropertyChecks

@@ -2,9 +2,8 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.{Docker, ReportingTestName}
+import com.wavesplatform.it.{Docker, NodesFromDocker, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 class PreActivatedFeaturesTestSuite
     extends FreeSpec

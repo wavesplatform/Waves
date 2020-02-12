@@ -5,11 +5,10 @@ import java.nio.charset.StandardCharsets
 import com.typesafe.config.Config
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.{BaseTransactionSuite, NodeConfigs}
 import com.wavesplatform.it.api.AsyncNetworkApi._
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer._

@@ -5,9 +5,8 @@ import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{ReportingTestName, WaitForHeight2}
+import com.wavesplatform.it.{NodesFromDocker, ReportingTestName, WaitForHeight2}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}

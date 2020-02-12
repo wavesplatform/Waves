@@ -3,9 +3,8 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{Node, NodeConfigs}
+import com.wavesplatform.it.{BaseTransactionSuite, Node, NodeConfigs}
 import org.scalatest.prop.TableDrivenPropertyChecks
 
 class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks {

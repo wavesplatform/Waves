@@ -1,9 +1,8 @@
-package com.wavesplatform.it.transactions
+package com.wavesplatform.it
 
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it._
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 
@@ -46,4 +45,8 @@ trait BaseTransactionSuiteLike extends WaitForHeight2 with IntegrationSuiteWithT
   }
 }
 
+/**
+  * @deprecated replaced by [[com.wavesplatform.it.BaseSuite]]
+  */
+@Deprecated
 abstract class BaseTransactionSuite extends FunSuite with BaseTransactionSuiteLike

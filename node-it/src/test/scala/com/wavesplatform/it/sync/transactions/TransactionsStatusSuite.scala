@@ -3,11 +3,10 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.http.ApiError.InvalidIds
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NTPTime
+import com.wavesplatform.it.{BaseTransactionSuite, NTPTime}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction

@@ -3,8 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import java.io.File
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{ExternalNode, GrpcIntegrationSuiteWithThreeAddress, GrpcWaitForHeight, Node, NodeConfigs}
+import com.wavesplatform.it.{ExternalNode, GrpcIntegrationSuiteWithThreeAddress, GrpcWaitForHeight, Node, NodeConfigs, NodesFromDocker}
 import monix.eval.Coeval
 import org.scalatest.{BeforeAndAfterAll, FunSuite, Suite}
 

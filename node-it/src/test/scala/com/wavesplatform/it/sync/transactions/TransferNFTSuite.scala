@@ -3,11 +3,10 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NTPTime
+import com.wavesplatform.it.{BaseTransactionSuite, NTPTime}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.sync.{calcMassTransferFee, setScriptFee, _}
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2

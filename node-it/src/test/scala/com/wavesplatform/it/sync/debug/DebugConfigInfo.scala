@@ -1,9 +1,8 @@
 package com.wavesplatform.it.sync.debug
 
 import com.typesafe.config.Config
-import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.{NodeConfigs, NodesFromDocker}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.FunSuite
 
 class DebugConfigInfo extends FunSuite with NodesFromDocker {

@@ -1,12 +1,11 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.wavesplatform.it.BaseTransactionSuite
 import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Block, Transaction, TransferTransactionInfo}
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxVersion

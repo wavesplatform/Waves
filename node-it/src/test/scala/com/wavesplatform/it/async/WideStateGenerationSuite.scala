@@ -3,9 +3,8 @@ package com.wavesplatform.it.async
 import java.util.concurrent.TimeoutException
 
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.it._
+import com.wavesplatform.it.{NodesFromDocker, _}
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
 import org.scalatest._
 

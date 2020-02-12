@@ -4,8 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import com.wavesplatform.it.{Node, NodeConfigs, NodesFromDocker, TransferSending}
 import org.scalatest._
 
 import scala.concurrent.duration._

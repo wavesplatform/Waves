@@ -49,6 +49,10 @@ import scala.concurrent.{Await, Awaitable, Future}
 import scala.util._
 import scala.util.control.NonFatal
 
+/**
+  * @deprecated replaced by [[com.wavesplatform.it.NodesRestApi]]
+  */
+@Deprecated
 object SyncHttpApi extends Assertions {
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
@@ -152,6 +156,11 @@ object SyncHttpApi extends Assertions {
       case NonFatal(cause)                     => throw new Exception(cause)
     }
 
+  /**
+    * @deprecated replaced by [[com.wavesplatform.it.NodesRestApi.RestApi]]
+    */
+  @Deprecated
+  //noinspection ScalaStyle
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
@@ -679,6 +688,11 @@ object SyncHttpApi extends Assertions {
       activationStatus.features.find(_.id == featureNum).get
   }
 
+  /**
+    * @deprecated replaced by [[com.wavesplatform.it.NodesRestApi.RestApi]]
+    */
+  @Deprecated
+  //noinspection ScalaStyle
   implicit class NodesExtSync(nodes: Seq[Node]) {
 
     import com.wavesplatform.it.api.AsyncHttpApi.{NodesAsyncHttpApi => async}

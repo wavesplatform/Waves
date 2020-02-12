@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus
+import com.wavesplatform.it.BaseTransactionSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json
 

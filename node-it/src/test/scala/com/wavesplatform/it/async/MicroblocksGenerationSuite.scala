@@ -2,8 +2,7 @@ package com.wavesplatform.it.async
 
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.AsyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, TransferSending}
+import com.wavesplatform.it.{NodeConfigs, NodesFromDocker, TransferSending}
 import org.scalatest._
 
 import scala.concurrent.Await.result

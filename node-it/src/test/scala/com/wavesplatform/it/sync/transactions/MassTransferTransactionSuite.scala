@@ -4,10 +4,10 @@ import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.BaseTransactionSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{MassTransferTransactionInfo, TransactionInfo}
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.Attachment.Bin

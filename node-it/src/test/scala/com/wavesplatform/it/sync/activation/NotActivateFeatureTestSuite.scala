@@ -5,8 +5,7 @@ import com.wavesplatform.features.BlockchainFeatureStatus
 import com.wavesplatform.features.api.{FeatureActivationStatus, NodeFeatureStatus}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.BlockHeaders
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, ReportingTestName}
+import com.wavesplatform.it.{NodeConfigs, NodesFromDocker, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 class NotActivateFeatureTestSuite

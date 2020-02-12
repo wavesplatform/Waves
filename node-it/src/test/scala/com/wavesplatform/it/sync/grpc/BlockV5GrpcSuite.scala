@@ -3,10 +3,9 @@ package com.wavesplatform.it.sync.grpc
 import com.google.protobuf.ByteString
 import com.typesafe.config.Config
 import com.wavesplatform.block.Block
-import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs, ReportingTestName}
+import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodesFromDocker, NodeConfigs, ReportingTestName}
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.api.SyncGrpcApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 
 import scala.concurrent.duration._

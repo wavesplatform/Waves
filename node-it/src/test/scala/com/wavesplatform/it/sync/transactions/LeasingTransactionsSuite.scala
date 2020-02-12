@@ -3,10 +3,10 @@ package com.wavesplatform.it.sync.transactions
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus
+import com.wavesplatform.it.BaseTransactionSuite
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.Json

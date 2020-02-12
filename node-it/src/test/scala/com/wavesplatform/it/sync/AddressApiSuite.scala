@@ -5,8 +5,7 @@ import java.net.URLDecoder
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
+import com.wavesplatform.it.{BaseTransactionSuite, NTPTime, NodeConfigs}
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.TxVersion
 import play.api.libs.json._

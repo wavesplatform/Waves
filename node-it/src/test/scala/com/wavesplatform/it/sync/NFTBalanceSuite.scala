@@ -3,10 +3,9 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils._
-import com.wavesplatform.it._
+import com.wavesplatform.it.{BaseTransactionSuiteLike, _}
 import com.wavesplatform.it.api.AsyncHttpApi._
 import com.wavesplatform.it.api._
-import com.wavesplatform.it.transactions.BaseTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxVersion

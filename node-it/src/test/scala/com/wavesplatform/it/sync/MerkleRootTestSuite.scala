@@ -5,10 +5,9 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidSignat
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.ReportingTestName
+import com.wavesplatform.it.{NodesFromDocker, ReportingTestName}
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 import scorex.crypto.hash.Blake2b256
 

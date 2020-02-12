@@ -4,10 +4,9 @@ import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.CustomValidationError
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.NodeConfigs.Default
-import com.wavesplatform.it.ReportingTestName
+import com.wavesplatform.it.{NodesFromDocker, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.settings.Constants
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 

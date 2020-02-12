@@ -3,8 +3,7 @@ package com.wavesplatform.it.sync.network
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{issueAmount, issueFee, minFee}
-import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Node, ReportingTestName, WaitForHeight2}
+import com.wavesplatform.it.{Node, NodesFromDocker, ReportingTestName, WaitForHeight2}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 
 import scala.concurrent.Await

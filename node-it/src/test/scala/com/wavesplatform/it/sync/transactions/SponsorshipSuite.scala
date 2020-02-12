@@ -6,9 +6,8 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, NodeConfigs, ReportingTestName}
+import com.wavesplatform.it.{IntegrationSuiteWithThreeAddresses, NodeConfigs, NodesFromDocker, ReportingTestName}
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
