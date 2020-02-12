@@ -36,15 +36,16 @@ object Metrics extends ScorexLogging {
     db.foreach { db =>
       Task {
         try {
-          db.write(
-            b
+          val point = b
             // Should be a tag, but tags are the strings now
             // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
-              .addField("node", settings.nodeId)
-              .tag("node", settings.nodeId.toString)
-              .time(ts, TimeUnit.MILLISECONDS)
-              .build()
-          )
+            .addField("node", settings.nodeId)
+            .tag("node", settings.nodeId.toString)
+            .time(ts, TimeUnit.MILLISECONDS)
+            .build()
+
+          // log.trace(s"Point written: $point")
+          db.write(point)
         } catch {
           case NonFatal(e) => log.warn(s"Failed to send data to InfluxDB (${e.getMessage})")
         }
