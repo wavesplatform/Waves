@@ -32,14 +32,16 @@ object Metrics extends ScorexLogging {
   private[this] var time: Time           = _
   private[this] var db: Option[InfluxDB] = None
 
-  def write(b: Point.Builder, ts: Long = time.getTimestamp()): Unit = {
+  private[this] def currentTimestamp: Long =
+    if (time == null) System.currentTimeMillis()
+    else time.getTimestamp()
+
+  def write(b: Point.Builder, ts: Long = currentTimestamp): Unit = {
     db.foreach { db =>
       Task {
         try {
           val point = b
-            // Should be a tag, but tags are the strings now
-            // https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
-            .addField("node", settings.nodeId)
+            .addField("node", settings.nodeId) // Should be a tag, but tags are the strings now: https://docs.influxdata.com/influxdb/v1.3/concepts/glossary/#tag-value
             .tag("node", settings.nodeId.toString)
             .time(ts, TimeUnit.MILLISECONDS)
             .build()
