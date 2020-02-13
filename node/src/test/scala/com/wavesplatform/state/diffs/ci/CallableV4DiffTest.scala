@@ -1,12 +1,10 @@
 package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.{Address, KeyPair}
-import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Asset, V4}
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -27,7 +25,7 @@ import org.scalacheck.Gen
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState {
+class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain {
   property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
@@ -422,13 +420,19 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   property("issue action results state") {
     forAll(issuePreconditions(feeMultiplier = 7)) {
       case (genesis, invoke, master, invoker, amount) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(genesis)),
-          TestBlock.create(Seq(invoke)),
-          features
-        ) {
-          case (_, blockchain) =>
-            pending
+        withDomain() { d =>
+          val tb1 = TestBlock.create(genesis)
+          d.blockchainUpdater.processBlock(tb1, new Array[Byte](32), false).explicitGet()
+          val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
+          d.blockchainUpdater.processBlock(tb2, new Array[Byte](32), false).explicitGet()
+
+          d.portfolio(master).map(_._2) shouldEqual Seq(amount)
+          d.portfolio(invoker) shouldEqual Seq()
+
+          d.blockchainUpdater.processBlock(TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty), new Array[Byte](32), verify = false)
+
+          d.portfolio(master).map(_._2) shouldEqual Seq(amount)
+          d.portfolio(invoker) shouldEqual Seq()
         }
     }
   }

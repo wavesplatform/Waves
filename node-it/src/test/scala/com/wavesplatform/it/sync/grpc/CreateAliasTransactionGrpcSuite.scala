@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.{minFee, transferAmount}
 import com.wavesplatform.it.util._
 import com.wavesplatform.protobuf.transaction.{PBRecipients, Recipient}
@@ -17,47 +17,47 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
   val (aliasCreator, aliasCreatorAddr) = (firstAcc, firstAddress)
   test("Able to send money to an alias") {
     val alias             = randomAlias()
-    val creatorBalance    = sender.grpc.wavesBalance(aliasCreatorAddr).available
-    val creatorEffBalance = sender.grpc.wavesBalance(aliasCreatorAddr).effective
+    val creatorBalance    = sender.wavesBalance(aliasCreatorAddr).available
+    val creatorEffBalance = sender.wavesBalance(aliasCreatorAddr).effective
 
-    sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
+    sender.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
 
-    sender.grpc.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
-    sender.grpc.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
+    sender.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
+    sender.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
 
-    sender.grpc.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray)).explicitGet()
+    sender.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray)).explicitGet()
 
-    sender.grpc.broadcastTransfer(aliasCreator, Recipient().withAlias(alias), transferAmount, minFee, waitForTx = true)
+    sender.broadcastTransfer(aliasCreator, Recipient().withAlias(alias), transferAmount, minFee, waitForTx = true)
 
-    sender.grpc.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - 2 * minFee
-    sender.grpc.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - 2 * minFee
+    sender.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - 2 * minFee
+    sender.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - 2 * minFee
   }
 
   test("Not able to create same aliases to same address") {
     val alias             = randomAlias()
-    val creatorBalance    = sender.grpc.wavesBalance(aliasCreatorAddr).available
-    val creatorEffBalance = sender.grpc.wavesBalance(aliasCreatorAddr).effective
+    val creatorBalance    = sender.wavesBalance(aliasCreatorAddr).available
+    val creatorEffBalance = sender.wavesBalance(aliasCreatorAddr).effective
 
-    sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
-    sender.grpc.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
-    sender.grpc.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
+    sender.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
+    sender.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
+    sender.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
 
-    assertGrpcError(sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee), "Alias already claimed", Code.INVALID_ARGUMENT)
+    assertGrpcError(sender.broadcastCreateAlias(aliasCreator, alias, minFee), "Alias already claimed", Code.INVALID_ARGUMENT)
 
-    sender.grpc.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
-    sender.grpc.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
+    sender.wavesBalance(aliasCreatorAddr).available shouldBe creatorBalance - minFee
+    sender.wavesBalance(aliasCreatorAddr).effective shouldBe creatorEffBalance - minFee
   }
 
   test("Not able to create aliases to other addresses") {
     val alias            = randomAlias()
-    val secondBalance    = sender.grpc.wavesBalance(secondAddress).available
-    val secondEffBalance = sender.grpc.wavesBalance(secondAddress).effective
+    val secondBalance    = sender.wavesBalance(secondAddress).available
+    val secondEffBalance = sender.wavesBalance(secondAddress).effective
 
-    sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
-    assertGrpcError(sender.grpc.broadcastCreateAlias(secondAcc, alias, minFee), "Alias already claimed", Code.INVALID_ARGUMENT)
+    sender.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
+    assertGrpcError(sender.broadcastCreateAlias(secondAcc, alias, minFee), "Alias already claimed", Code.INVALID_ARGUMENT)
 
-    sender.grpc.wavesBalance(secondAddress).available shouldBe secondBalance
-    sender.grpc.wavesBalance(secondAddress).effective shouldBe secondEffBalance
+    sender.wavesBalance(secondAddress).available shouldBe secondBalance
+    sender.wavesBalance(secondAddress).effective shouldBe secondEffBalance
   }
 
   val aliases_names =
@@ -65,8 +65,8 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
 
   aliases_names.foreach { alias =>
     test(s"create alias named $alias") {
-      sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
-      sender.grpc.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray)).explicitGet()
+      sender.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
+      sender.resolveAlias(alias) shouldBe PBRecipients.toAddress(ByteStr(aliasCreatorAddr.toByteArray)).explicitGet()
     }
   }
 
@@ -83,7 +83,7 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
 
   forAll(invalid_aliases_names) { (alias: String, message: String) =>
     test(s"Not able to create alias named $alias") {
-      assertGrpcError(sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee), message, Code.INTERNAL)
+      assertGrpcError(sender.broadcastCreateAlias(aliasCreator, alias, minFee), message, Code.INTERNAL)
     }
   }
 
@@ -91,26 +91,26 @@ class CreateAliasTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPT
     val (leaser, leaserAddr) = (thirdAcc, thirdAddress)
     val alias                = randomAlias()
 
-    val aliasCreatorBalance    = sender.grpc.wavesBalance(aliasCreatorAddr).available
-    val aliasCreatorEffBalance = sender.grpc.wavesBalance(aliasCreatorAddr).effective
-    val leaserBalance          = sender.grpc.wavesBalance(leaserAddr).available
-    val leaserEffBalance       = sender.grpc.wavesBalance(leaserAddr).effective
+    val aliasCreatorBalance    = sender.wavesBalance(aliasCreatorAddr).available
+    val aliasCreatorEffBalance = sender.wavesBalance(aliasCreatorAddr).effective
+    val leaserBalance          = sender.wavesBalance(leaserAddr).available
+    val leaserEffBalance       = sender.wavesBalance(leaserAddr).effective
 
-    sender.grpc.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
+    sender.broadcastCreateAlias(aliasCreator, alias, minFee, waitForTx = true)
     val leasingAmount = 1.waves
 
-    sender.grpc.broadcastLease(leaser, Recipient().withAlias(alias), leasingAmount, minFee, waitForTx = true)
+    sender.broadcastLease(leaser, Recipient().withAlias(alias), leasingAmount, minFee, waitForTx = true)
 
-    sender.grpc.wavesBalance(aliasCreatorAddr).available shouldBe aliasCreatorBalance - minFee
-    sender.grpc.wavesBalance(aliasCreatorAddr).effective shouldBe aliasCreatorEffBalance + leasingAmount - minFee
-    sender.grpc.wavesBalance(leaserAddr).available shouldBe leaserBalance - leasingAmount - minFee
-    sender.grpc.wavesBalance(leaserAddr).effective shouldBe leaserEffBalance - leasingAmount - minFee
+    sender.wavesBalance(aliasCreatorAddr).available shouldBe aliasCreatorBalance - minFee
+    sender.wavesBalance(aliasCreatorAddr).effective shouldBe aliasCreatorEffBalance + leasingAmount - minFee
+    sender.wavesBalance(leaserAddr).available shouldBe leaserBalance - leasingAmount - minFee
+    sender.wavesBalance(leaserAddr).effective shouldBe leaserEffBalance - leasingAmount - minFee
   }
 
   test("Not able to create alias when insufficient funds") {
-    val balance = sender.grpc.wavesBalance(aliasCreatorAddr).available
+    val balance = sender.wavesBalance(aliasCreatorAddr).available
     val alias   = randomAlias()
-    assertGrpcError(sender.grpc.broadcastCreateAlias(aliasCreator, alias, balance + minFee), "Accounts balance errors", Code.INVALID_ARGUMENT)
+    assertGrpcError(sender.broadcastCreateAlias(aliasCreator, alias, balance + minFee), "Accounts balance errors", Code.INVALID_ARGUMENT)
   }
 
   private def randomAlias(): String = {

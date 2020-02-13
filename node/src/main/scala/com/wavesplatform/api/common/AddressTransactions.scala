@@ -90,7 +90,7 @@ object AddressTransactions {
       seqNr                    <- (resource.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
       (height, transactionIds) <- resource.get(Keys.addressTransactionHN(addressId, seqNr)).view
       if height <= maxHeight
-      (txType, txNum) <- transactionIds.reverse.view
+      (txType, txNum) <- transactionIds.view
     } yield (height, txNum, txType))
       .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
       .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
@@ -111,6 +111,7 @@ object AddressTransactions {
       if addresses(subject)
     } yield h -> tx)
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
+      .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
       .filter { case (_, tx) => types.isEmpty || types.contains(tx.typeId) }
       .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
 }

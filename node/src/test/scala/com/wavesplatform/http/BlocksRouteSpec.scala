@@ -7,33 +7,38 @@ import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.{NoShrink, TestWallet}
+import monix.reactive.Observable
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
 
 class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with PropertyChecks with RestAPISettingsHelper with TestWallet with NoShrink {
   private val blocksApi = mock[CommonBlocksApi]
-  private val route = BlocksApiRoute(restAPISettings, blocksApi).route
+  private val route     = BlocksApiRoute(restAPISettings, blocksApi).route
 
   val testBlock1 = TestBlock.create(Nil)
   val testBlock2 = TestBlock.create(Nil)
 
-  val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 10L)
-  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 10L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)
+  val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
+  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)
 
-  val testBlock1HeaderJson = BlockHeaderSerializer.toJson(testBlock1.header, testBlock1.bytes().length, 0, testBlock1.signature) ++ Json.obj(
+  private val testBlock1HeaderJson = BlockHeaderSerializer.toJson(testBlock1.header, testBlock1.bytes().length, 0, testBlock1.signature) ++ Json.obj(
     "height"   -> 1,
-    "totalFee" -> 10L
+    "totalFee" -> 0L
   )
-  val testBlock2HeaderJson = BlockHeaderSerializer.toJson(testBlock2.header, testBlock2.bytes().length, 0, testBlock2.signature) ++ Json.obj(
+
+  private val testBlock2HeaderJson = BlockHeaderSerializer.toJson(testBlock2.header, testBlock2.bytes().length, 0, testBlock2.signature) ++ Json.obj(
     "height"   -> 2,
-    "totalFee" -> 10L,
+    "totalFee" -> 0L,
     "reward"   -> 5,
     "VRF"      -> testBlock2.uniqueId.toString
   )
 
+  private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, None, None)
+  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, Some(5), Some(testBlock2.uniqueId))
+
   routePath("/first") in {
-    (blocksApi.blockAtHeight _).when(1).returns(Some(BlockMeta))
+    (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
     Get(routePath("/first")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
@@ -42,6 +47,8 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/last") in {
+    (blocksApi.currentHeight _).expects().returning(2).once()
+    (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
@@ -49,13 +56,15 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     }
   }
 
-  routePath("/at") in {
+  routePath("/at/{height}") in {
+    (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
     Get(routePath("/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
       response
     }
 
+    (blocksApi.blockAtHeight _).expects(2).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath("/at/2")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
@@ -63,7 +72,9 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     }
   }
 
-  routePath("/signature") in {
+  routePath("/signature/{signature}") in {
+    (blocksApi.block _).expects(testBlock1.uniqueId).returning(Some(testBlock1Meta -> Seq.empty)).once()
+    (blocksApi.block _).expects(testBlock2.uniqueId).returning(Some(testBlock2Meta -> Seq.empty)).once()
     Get(routePath(s"/signature/${testBlock1.uniqueId}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
@@ -77,7 +88,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     }
   }
 
-  routePath("/seq/1/2") in {
+  routePath("/seq/{from}/{to}") in {
+    (blocksApi.blocksRange(_: Int, _: Int)).expects(1, 2).returning(Observable.fromIterable(Seq(
+      testBlock1Meta -> Seq.empty,
+      testBlock2Meta -> Seq.empty
+    )))
     Get(routePath("/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1Json, testBlock2Json)
@@ -86,6 +101,8 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/headers/last") in {
+    (blocksApi.currentHeight _).expects().returning(2).once()
+    (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
     Get(routePath("/headers/last")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2HeaderJson
@@ -93,7 +110,10 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     }
   }
 
-  routePath("/headers/at") in {
+  routePath("/headers/at/{height}") in {
+    (blocksApi.metaAtHeight _).expects(1).returning(Some(testBlock1Meta)).once()
+    (blocksApi.metaAtHeight _).expects(2).returning(Some(testBlock2Meta)).once()
+
     Get(routePath("/headers/at/1")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1HeaderJson
@@ -107,7 +127,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     }
   }
 
-  routePath("/headers/seq/1/2") in {
+  routePath("/headers/seq/{from}/{to}") in {
+    (blocksApi.metaRange _).expects(1, 2).returning(Observable.fromIterable(Seq(
+      testBlock1Meta,
+      testBlock2Meta
+    )))
     Get(routePath("/headers/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1HeaderJson, testBlock2HeaderJson)

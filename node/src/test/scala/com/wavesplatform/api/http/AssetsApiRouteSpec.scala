@@ -51,7 +51,7 @@ class AssetsApiRouteSpec
     )
   )
 
-  routePath(s"/details/{id}") in forAll(smartIssueAndDetailsGen) {
+  routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) {
     case (smartAssetTx, smartAssetDesc) =>
       (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
       (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
@@ -89,7 +89,7 @@ class AssetsApiRouteSpec
     )
   )
 
-  routePath(s"/details/{id}") in forAll(sillyIssueAndDetailsGen) {
+  routePath(s"/details/{id} - non-smart asset") in forAll(sillyIssueAndDetailsGen) {
     case (sillyAssetTx, sillyAssetDesc) =>
       (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
       (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))

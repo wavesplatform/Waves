@@ -8,12 +8,9 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.Blockchain
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.{JsObject, Json}
 
-@Path("/consensus")
-@Api(value = "/consensus")
+
 case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchain) extends ApiRoute {
 
   override val route: Route =
@@ -55,11 +52,8 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
         .map(m => Json.obj("baseTarget" -> m.header.baseTarget))
         .toRight(BlockDoesNotExist)
     )
-
   }
 
-  @Path("/algo")
-  @ApiOperation(value = "Consensus algo", notes = "Shows which consensus algo being using", httpMethod = "GET")
   def algo: Route = (path("algo") & get) {
     complete(
       if (blockchain.activatedFeatures.contains(BlockchainFeatures.FairPoS.id))

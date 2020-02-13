@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.activation
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
-import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -11,21 +11,20 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 
 import scala.concurrent.duration._
 
-
-
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
   val activationHeight = 9
-  val updateInterval = 3
+  val updateInterval   = 3
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.Builder(Default, 1, Seq.empty)
+    NodeConfigs
+      .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, activationHeight)))
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private val issuer  = pkByAddress(firstAddress)
-  var assetId = ""
-  var otherAssetId = ""
+  private val issuer = pkByAddress(firstAddress)
+  var assetId        = ""
+  var otherAssetId   = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -47,7 +46,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     sender.waitForHeight(activationHeight, 2.minutes)
     assertApiError(sender.updateAssetInfo(issuer, otherAssetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include("Can't update asset info before")
+      error.message should include(s"Can't update info of asset with id=$otherAssetId")
     }
   }
 

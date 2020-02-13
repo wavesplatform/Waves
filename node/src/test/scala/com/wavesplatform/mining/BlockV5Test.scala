@@ -285,7 +285,7 @@ class BlockV5Test
     val pos               = new PoSSelector(blockchain, settings.blockchainSettings, settings.synchronizationSettings)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings)
+    val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings, enablePriorityPool = false)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)

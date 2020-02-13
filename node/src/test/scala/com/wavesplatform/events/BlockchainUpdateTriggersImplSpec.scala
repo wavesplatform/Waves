@@ -195,7 +195,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
           decimals shouldBe tx.decimals
           reissuable shouldBe tx.reissuable
           volume.toLong shouldBe tx.quantity
-          script shouldBe tx.script
+          script.map(_._1) shouldBe tx.script
           nft shouldBe isNFT(tx)
           sponsorship shouldBe None
           assetExistedBefore shouldBe false

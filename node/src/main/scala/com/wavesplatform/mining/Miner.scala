@@ -3,16 +3,19 @@ package com.wavesplatform.mining
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.block.Block._
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics.{BlockStats, Instrumented, _}
 import com.wavesplatform.mining.microblocks.MicroBlockMiner
 import com.wavesplatform.network._
 import com.wavesplatform.settings.{FunctionalitySettings, WavesSettings}
 import com.wavesplatform.state._
+import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPoolImpl
@@ -23,8 +26,6 @@ import kamon.metric.TimerMetric
 import monix.eval.Task
 import monix.execution.cancelables.{CompositeCancelable, SerialCancelable}
 import monix.execution.schedulers.{CanBlock, SchedulerService}
-import com.wavesplatform.features.FeatureProvider._
-import com.wavesplatform.state.appender.BlockAppender
 
 import scala.concurrent.duration._
 
@@ -240,15 +241,23 @@ class MinerImpl(
           case Right((estimators, block, totalConstraint)) =>
             BlockAppender(blockchainUpdater, timeService, utx, pos, appenderScheduler)(block)
               .asyncBoundary(minerScheduler)
-              .map {
-                case Left(err) => log.warn("Error mining Block: " + err.toString)
+              .flatMap {
+                case Left(BlockFromFuture(_)) => // Time was corrected, retry
+                  generateBlockTask(account)
+
+                case Left(err) =>
+                  Task.raiseError(new RuntimeException(err.toString))
+
                 case Right(Some(score)) =>
                   log.debug(s"Forged and applied $block by ${account.stringRepr} with cumulative score $score")
                   BlockStats.mined(block, blockchainUpdater.height)
                   allChannels.broadcast(BlockForged(block))
                   scheduleMining()
                   if (ngEnabled && !totalConstraint.isFull) startMicroBlockMining(account, block, estimators, totalConstraint)
-                case Right(None) => log.warn("Newly created block has already been appended, should not happen")
+                  Task.unit
+
+                case Right(None) =>
+                  Task.raiseError(new RuntimeException("Newly created block has already been appended, should not happen"))
               }
 
           case Left(err) =>
@@ -264,8 +273,13 @@ class MinerImpl(
 
   def scheduleMining(): Unit = {
     Miner.blockMiningStarted.increment()
+
     val nonScriptedAccounts = wallet.privateKeyAccounts.filterNot(blockchainUpdater.hasAccountScript(_))
-    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map(generateBlockTask).map(_.runAsyncLogErr).toSet)
+    scheduledAttempts := CompositeCancelable.fromSet(nonScriptedAccounts.map { account =>
+      generateBlockTask(account)
+        .onErrorHandle(err => log.warn(s"Error mining Block: $err"))
+        .runToFuture
+    }.toSet)
     microBlockAttempt := SerialCancelable()
 
     debugStateRef

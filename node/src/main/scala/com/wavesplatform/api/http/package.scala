@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBase58, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._

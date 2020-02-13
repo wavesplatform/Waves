@@ -26,6 +26,7 @@ object Dependencies {
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
 
   private val catsEffect = catsModule("effect")
   private val catsCore   = catsModule("core")
@@ -91,6 +92,7 @@ object Dependencies {
       catsCore.value.exclude("org.scala-js", "scalajs-library_2.12"),
       ("org.rudogma" %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
       ("com.lihaoyi" %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.parboiled" %%% "parboiled" % "2.1.8").exclude("org.scala-js", "scalajs-library_2.12"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.12"),
       machinist.exclude("org.scala-js", "scalajs-library_2.12"),
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
@@ -113,11 +115,10 @@ object Dependencies {
 
   lazy val it = scalaTest +: Seq(
     logback,
-    // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
-    ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
+    "com.spotify" % "docker-client" % "8.15.1",
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.asynchttpclient" % "async-http-client" % "2.7.0",
-    "org.scalacheck"      %% "scalacheck"       % "1.14.0"
+    asyncHttpClient,
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
@@ -129,28 +130,29 @@ object Dependencies {
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
-    logback                % Runtime,
-    janino                 % Runtime,
+    logback             % Runtime,
+    janino              % Runtime,
     akkaModule("slf4j") % Runtime
   )
 
   lazy val node = Def.setting(
     Seq(
-      "commons-net"          % "commons-net" % "3.6",
-      "com.iheart"           %% "ficus" % "1.4.2",
+      "commons-net"          % "commons-net"              % "3.6",
+      "org.apache.commons"   % "commons-lang3"            % "3.9",
+      "com.iheart"           %% "ficus"                   % "1.4.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
       kamonModule("system-metrics", "1.0.1"),
       kamonModule("influxdb", "1.0.3"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
-      "com.google.code.findbugs"     % "jsr305"             % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"            %% "play-json"         % "2.7.1",
-      "org.ethereum"                 % "leveldbjni-all"     % "1.18.3",
-      "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
-      "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
+      "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"        %% "play-json"     % "2.7.1",
+      "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      akkaModule("actor"),
+      akkaModule("stream"),
       akkaHttp,
-      "org.bitlet"        % "weupnp" % "0.1.4",
+      "org.bitlet" % "weupnp" % "0.1.4",
       kindProjector,
       paradise,
       monixModule("reactive").value,
@@ -170,7 +172,7 @@ object Dependencies {
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
-      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
+      "com.thesamet.scalapb" %% "scalapb-json4s"   % "0.7.0"
     )
   }
 

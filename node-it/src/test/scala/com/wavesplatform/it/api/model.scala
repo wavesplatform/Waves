@@ -273,6 +273,7 @@ case class Block(
     features: Option[Set[Short]],
     reward: Option[Long],
     desiredReward: Option[Long],
+    vrf: Option[String],
     version: Option[Byte] = None
 )
 object Block {
@@ -295,6 +296,7 @@ object Block {
         generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
         baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
+        vrf <- (jsv \ "VRF").validateOpt[String]
       } yield Block(
         signature,
         height,
@@ -311,6 +313,7 @@ object Block {
         features,
         reward,
         desiredReward,
+        vrf,
         version
       )
     ),
@@ -332,6 +335,7 @@ case class BlockHeader(
     reward: Option[Long],
     desiredReward: Option[Long],
     totalFee: Long,
+    vrf: Option[String],
     version: Option[Byte] = None
 )
 object BlockHeader {
@@ -352,6 +356,7 @@ object BlockHeader {
         generationSignature <- (jsv \ "nxt-consensus" \ "generation-signature").validateOpt[String]
         baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
+        vrf <- (jsv \ "VRF").validateOpt[String]
       } yield BlockHeader(
         signature,
         height,
@@ -366,6 +371,7 @@ object BlockHeader {
         reward,
         desiredReward,
         totalFee,
+        vrf,
         version
       )
     ),

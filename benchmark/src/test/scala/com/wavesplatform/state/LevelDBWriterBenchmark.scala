@@ -14,8 +14,7 @@ import com.wavesplatform.history.History
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
 import com.wavesplatform.transaction.Asset
-import com.wavesplatform.utils.Implicits.SubjectOps
-import monix.reactive.subjects.Subject
+import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -93,7 +92,7 @@ object LevelDBWriterBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
+    private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
 
     val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
     val history = History(db, _ => None, _ => None, rawDB)

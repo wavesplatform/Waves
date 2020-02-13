@@ -6,6 +6,9 @@ import akka.http.scaladsl.common.EntityStreamingSupport
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
+import cats.instances.either._
+import cats.instances.list._
+import cats.syntax.alternative._
 import cats.syntax.either._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
@@ -28,16 +31,12 @@ import com.wavesplatform.transaction.assets.exchange.OrderJson._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
 
 import scala.concurrent.Future
 
-@Path("/assets")
-@Api(value = "assets")
 case class AssetsApiRoute(
     settings: RestAPISettings,
     wallet: Wallet,
@@ -101,17 +100,22 @@ case class AssetsApiRoute(
             }
         }
       } ~ post {
-        deprecatedRoute
+        (path("details") & parameter('full.as[Boolean] ? false)) { full =>
+          jsonPost[JsObject] { jsv =>
+            (jsv \ "ids").validate[List[String]] match {
+              case JsSuccess(ids, _) =>
+                ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
+                  case (Nil, Nil) => CustomValidationError("Empty request")
+                  case (Nil, assetIds) => assetIds.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity))
+                  case (errors, _) => InvalidIds(errors)
+                }
+              case JsError(err) => WrongJson(errors = err)
+            }
+          }
+        } ~ deprecatedRoute
       }
     }
 
-  @Path("/balance/{address}")
-  @ApiOperation(value = "Account's balance", notes = "Account's balances for all assets", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def balances(address: Address): Route = extractScheduler { implicit s =>
     implicit val jsonStreamingSupport: EntityStreamingSupport = jsonStream(s"""{"address":"$address","balances":[""", ",", "]}")
     complete(
@@ -142,14 +146,6 @@ case class AssetsApiRoute(
     )
   }
 
-  @Path("/balance/{address}/{assetId}")
-  @ApiOperation(value = "Asset's balance", notes = "Account's balance by given asset", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def balance(address: Address, assetId: IssuedAsset): Route = complete(balanceJson(address, assetId))
 
   private def balanceDistribution(assetId: IssuedAsset, height: Int, limit: Int, after: Option[Address])(f: List[(Address, Long)] => JsValue) =
@@ -173,20 +169,6 @@ case class AssetsApiRoute(
       Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
     }
 
-  @Path("/{assetId}/distribution/{height}/limit/{limit}")
-  @ApiOperation(
-    value = "Asset balance distribution at height",
-    notes = "Asset balance distribution by account at specified height",
-    httpMethod = "GET"
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "assetId", value = "Asset ID", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "height", value = "Height", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of addresses to be returned", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "after", value = "address to paginate after", required = false, dataType = "string", paramType = "query")
-    )
-  )
   def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route = {
     val paramsEi: Either[ValidationError, DistributionParams] =
       AssetsApiRoute
@@ -205,42 +187,11 @@ case class AssetsApiRoute(
     }
   }
 
-  @Path("/details/{assetId}")
-  @ApiOperation(value = "Information about an asset", notes = "Provides detailed information about given asset", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "assetId", value = "ID of the asset", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    )
-  )
   def singleDetails(assetId: IssuedAsset, full: Boolean): Route = complete(assetDetails(assetId, full))
 
-  @Path("/details")
-  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "id", value = "IDs of the asset", required = true, dataType = "string", paramType = "query"),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    )
-  )
   def multipleDetailsGet(ids: Seq[String], full: Boolean): Route =
     complete(ids.toList.map(id => assetDetails(IssuedAsset(ByteStr.decodeBase58(id).get), full).fold(_.json, identity)))
 
-  @Path("/details")
-  @ApiOperation(value = "Information about assets", notes = "Provides detailed information about given assets", httpMethod = "POST")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(
-        name = "json",
-        value = "IDs of the asset",
-        required = true,
-        dataType = "string",
-        paramType = "body",
-        example = """{"ids": ["some1", "some2"]}"""
-      ),
-      new ApiImplicitParam(name = "full", value = "false", required = false, dataType = "boolean", paramType = "query")
-    )
-  )
   def multipleDetailsPost(full: Boolean): Route =
     entity(as[JsObject]) { jsv =>
       complete(
@@ -251,15 +202,6 @@ case class AssetsApiRoute(
       )
     }
 
-  @Path("/nft/{address}/limit/{limit}")
-  @ApiOperation(value = "NFTs", notes = "Account's NFTs balance", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path"),
-      new ApiImplicitParam(name = "limit", value = "Number of tokens to be returned", required = true, dataType = "integer", paramType = "path"),
-      new ApiImplicitParam(name = "after", value = "Id of token to paginate after", required = false, dataType = "string", paramType = "query")
-    )
-  )
   def nft(address: Address, limit: Int, maybeAfter: Option[String]): Route = {
     val after = maybeAfter.map(s => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))))
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
@@ -362,7 +304,7 @@ object AssetsApiRoute {
       desc                = description.description.toStringUtf8
     } yield JsObject(
       Seq(
-        "assetId"        -> JsString(id.toString),
+        "assetId"        -> JsString(id.id.toString),
         "issueHeight"    -> JsNumber(height),
         "issueTimestamp" -> JsNumber(timestamp),
         "issuer"         -> JsString(description.issuer.stringRepr),

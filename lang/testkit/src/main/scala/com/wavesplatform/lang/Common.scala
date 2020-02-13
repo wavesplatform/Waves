@@ -2,8 +2,8 @@ package com.wavesplatform.lang
 
 import cats.Id
 import cats.kernel.Monoid
-import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
 import com.wavesplatform.lang.v1.compiler.Terms._

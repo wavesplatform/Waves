@@ -1,9 +1,8 @@
 package com.wavesplatform.state.diffs
 
 import com.wavesplatform.TransactionGen
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.db.WithState
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}

@@ -16,12 +16,8 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import io.swagger.annotations._
-import javax.ws.rs.Path
 import play.api.libs.json.{JsString, JsValue, Json}
 
-@Path("/alias")
-@Api(value = "/alias")
 case class AliasApiRoute(
     settings: RestAPISettings,
     commonApi: CommonTransactionsApi,
@@ -33,7 +29,7 @@ case class AliasApiRoute(
     with BroadcastRoute
     with AuthRoute {
 
-  override val route = pathPrefix("alias") {
+  override val route: Route = pathPrefix("alias") {
     addressOfAlias ~ aliasOfAddress ~ deprecatedRoute
   }
 
@@ -44,17 +40,6 @@ case class AliasApiRoute(
       broadcast[CreateAliasRequest](TransactionFactory.createAlias(_, wallet, time))
     }
 
-  @Path("/by-alias/{alias}")
-  @ApiOperation(
-    value = "Address by alias",
-    notes = "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.",
-    httpMethod = "GET"
-  )
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "alias", value = "Alias", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def addressOfAlias: Route = (get & path("by-alias" / Segment)) { aliasName =>
     complete {
       Alias
@@ -67,13 +52,6 @@ case class AliasApiRoute(
 
   private implicit val ess: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
-  @Path("/by-address/{address}")
-  @ApiOperation(value = "Aliases by address", notes = "Returns a collection of aliases associated with an address", httpMethod = "GET")
-  @ApiImplicitParams(
-    Array(
-      new ApiImplicitParam(name = "address", value = "Address", required = true, dataType = "string", paramType = "path")
-    )
-  )
   def aliasOfAddress: Route = (get & path("by-address" / AddrSegment)) { address =>
     extractScheduler { implicit s =>
       val value: Source[JsValue, NotUsed] =

@@ -3,25 +3,30 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidBase58, InvalidSignature, InvalidTransactionId, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{
+  CustomValidationError,
+  InvalidAddress,
+  InvalidIds,
+  InvalidSignature,
+  InvalidTransactionId,
+  TooBigArrayAllocation
+}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.TransactionsRootSpec._
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
-import com.wavesplatform.common.utils.{Base58, Base64}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_LONG, FUNCTION_CALL}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.settings.WalletSettings
 import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
-import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{BlockGen, NoShrink, TestTime, TransactionGen}
+import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.eval.Coeval
 import monix.reactive.Observable
 import org.scalacheck.Gen
@@ -42,9 +47,9 @@ class TransactionsRouteSpec
     with BlockGen
     with PropertyChecks
     with OptionValues
+    with TestWallet
     with NoShrink {
 
-  private val wallet              = Wallet(WalletSettings(None, Some("qwerty"), None))
   private val blockchain          = mock[Blockchain]
   private val utxPoolSynchronizer = mock[UtxPoolSynchronizer]
   private val addressTransactions = mock[CommonTransactionsApi]
@@ -55,7 +60,7 @@ class TransactionsRouteSpec
       new TransactionsApiRoute(
         restAPISettings,
         addressTransactions,
-        wallet,
+        testWallet,
         blockchain,
         Coeval(utxPoolSize.apply()),
         utxPoolSynchronizer,
@@ -166,11 +171,11 @@ class TransactionsRouteSpec
 
         (addressTransactions.calculateFee _).expects(*).returning(Right((assetId, 5L, 0L))).once()
 
-          Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
-            (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
-          }
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 5
+        }
       }
 
       "with sponsorship, smart token and smart account" in {
@@ -187,11 +192,11 @@ class TransactionsRouteSpec
 
         (addressTransactions.calculateFee _).expects(*).returning(Right((assetId, 45L, 0L))).once()
 
-          Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
-            (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
-          }
+        Post(routePath("/calculateFee"), transferTx) ~> route ~> check {
+          status shouldEqual StatusCodes.OK
+          (responseAs[JsObject] \ "feeAssetId").as[String] shouldBe assetId.id.toString
+          (responseAs[JsObject] \ "feeAmount").as[Long] shouldEqual 45
+        }
       }
     }
   }
@@ -258,8 +263,8 @@ class TransactionsRouteSpec
         Get(routePath(s"/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
       }
 
-      Get(routePath(s"/info/")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
-      Get(routePath(s"/info")) ~> route should produce(InvalidTransactionId("Wrong char"), matchMsg = true)
+      Get(routePath(s"/info/")) ~> route should produce(InvalidTransactionId("Transaction ID was not specified"))
+      Get(routePath(s"/info")) ~> route should produce(InvalidTransactionId("Transaction ID was not specified"))
     }
 
     "working properly otherwise" in {
@@ -275,6 +280,38 @@ class TransactionsRouteSpec
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
             responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
+          }
+      }
+    }
+  }
+
+  routePath("/status/{signature}") - {
+    "handles invalid signature" in {
+      forAll(invalidBase58Gen) { invalidBase58 =>
+        Get(routePath(s"/status?id=$invalidBase58")) ~> route should produce(InvalidIds(Seq(invalidBase58)))
+      }
+    }
+
+    "handles empty request" in {
+      Get(routePath(s"/status?")) ~> route should produce(CustomValidationError("Empty request"))
+    }
+
+    "working properly otherwise" in {
+      val txAvailability = for {
+        tx     <- randomTransactionGen
+        height <- Gen.chooseNum(1, 1000)
+      } yield (tx, height)
+
+      forAll(txAvailability) {
+        case (tx, height) =>
+          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).anyNumberOfTimes()
+          (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
+
+          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> route ~> check {
+            status shouldEqual StatusCodes.OK
+            val obj =
+              Json.obj("id" -> tx.id().toString, "status" -> "confirmed", "height" -> JsNumber(height), "confirmations" -> JsNumber(1000 - height))
+            responseAs[JsValue] shouldEqual Json.arr(obj, obj)
           }
       }
     }
@@ -323,7 +360,7 @@ class TransactionsRouteSpec
   routePath("/unconfirmed/info/{id}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidBase58)
+        Get(routePath(s"/unconfirmed/info/$invalidBase58")) ~> route should produce(InvalidTransactionId("Wrong char"), true)
       }
 
       Get(routePath(s"/unconfirmed/info/")) ~> route should produce(InvalidSignature)
@@ -343,8 +380,8 @@ class TransactionsRouteSpec
 
   routePath("/sign") - {
     "function call without args" in {
-      val acc1 = wallet.generateNewAccount().get
-      val acc2 = wallet.generateNewAccount().get
+      val acc1 = testWallet.generateNewAccount().get
+      val acc2 = testWallet.generateNewAccount().get
 
       val funcName          = "func"
       val funcWithoutArgs   = Json.obj("function" -> funcName)
@@ -389,12 +426,6 @@ class TransactionsRouteSpec
       txs     <- Gen.listOfN(txsSize, randomTransactionGen)
     } yield txs
 
-    val validBlockGen = for {
-      txs    <- transactionsGen
-      signer <- accountGen
-      block  <- versionedBlockGen(txs, signer, Block.ProtoBlockVersion)
-    } yield block
-
     val invalidBlockGen = for {
       txs     <- transactionsGen
       signer  <- accountGen
@@ -402,92 +433,58 @@ class TransactionsRouteSpec
       block   <- versionedBlockGen(txs, signer, version)
     } yield block
 
-    val validBlocksGen =
-      for {
-        blockchainHeight <- Gen.choose(1, 20)
-        blocks           <- Gen.listOfN(blockchainHeight, validBlockGen)
-      } yield blocks
-
     val invalidBlocksGen =
       for {
         blockchainHeight <- Gen.choose(1, 10)
         blocks           <- Gen.listOfN(blockchainHeight, invalidBlockGen)
       } yield blocks
 
-    def validateSuccess(txIdsToBlock: Map[String, Block], response: HttpResponse): Unit = {
+    val merkleProofs = for {
+      index        <- Gen.choose(0, 50)
+      tx           <- randomTransactionGen
+      proofsLength <- Gen.choose(1, 5)
+      proofBytes   <- Gen.listOfN(proofsLength, bytes32gen)
+    } yield (tx, TransactionProof(tx.id(), index, proofBytes))
+
+    def validateSuccess(expectedProofs: Seq[TransactionProof], response: HttpResponse): Unit = {
       response.status shouldBe StatusCodes.OK
 
       val proofs = responseAs[List[JsObject]]
 
-      proofs.size shouldBe txIdsToBlock.size
+      proofs.size shouldBe expectedProofs.size
 
-      proofs.foreach { p =>
-        val transactionId    = (p \ "id").as[String]
-        val transactionIndex = (p \ "transactionIndex").as[Int]
-        val digests          = (p \ "merkleProof").as[List[String]].map(Base64.decode)
+      proofs.zip(expectedProofs).foreach {
+        case (p, e) =>
+          val transactionId    = (p \ "id").as[String]
+          val transactionIndex = (p \ "transactionIndex").as[Int]
+          val digests          = (p \ "merkleProof").as[List[String]].map(s => ByteStr.decodeBase58(s).get)
 
-        val block       = txIdsToBlock(transactionId)
-        val transaction = block.transactionData.find(_.id().toString == transactionId)
-
-        transaction shouldBe 'defined
-        txIdsToBlock.keySet should contain(transactionId)
-        transactionIndex shouldBe block.transactionData.indexOf(transaction.value)
-
-        block.verifyTransactionProof(TransactionProof(transaction.value.id(), transactionIndex, digests)) shouldBe true
+          transactionId shouldEqual e.id.toString
+          transactionIndex shouldEqual e.transactionIndex
+          digests shouldEqual e.digests.map(ByteStr(_))
       }
     }
 
     def validateFailure(response: HttpResponse): Unit = {
       response.status shouldEqual StatusCodes.BadRequest
-      (responseAs[JsObject] \ "message").as[String] shouldEqual s"transactions do not exists or block version < ${Block.ProtoBlockVersion}"
+      (responseAs[JsObject] \ "message").as[String] shouldEqual s"transactions do not exist or block version < ${Block.ProtoBlockVersion}"
     }
 
     "returns merkle proofs" in {
-      forAll(validBlocksGen) { blocks =>
-        val txIdsToBlock = blocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
-        (addressTransactions.transactionProofs _).expects(*).returning(Nil).anyNumberOfTimes()
+      forAll(Gen.choose(10, 20).flatMap(n => Gen.listOfN(n, merkleProofs))) { transactionsAndProofs =>
+        val (transactions, proofs) = transactionsAndProofs.unzip
+        (addressTransactions.transactionProofs _).expects(transactions.map(_.id())).returning(proofs).twice()
 
-        val queryParams = txIdsToBlock.keys.map(id => s"id=$id").mkString("?", "&", "")
-        val requestBody = Json.obj("ids" -> txIdsToBlock.keySet)
-
-        println(s"\n\t$queryParams\n")
+        val queryParams = transactions.map(t => s"id=${t.id()}").mkString("?", "&", "")
+        val requestBody = Json.obj("ids" -> transactions.map(_.id().toString))
 
         Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
-          validateSuccess(txIdsToBlock, response)
+          validateSuccess(proofs, response)
         }
 
         Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
-          validateSuccess(txIdsToBlock, response)
+          validateSuccess(proofs, response)
         }
-      }
-    }
-
-    "filters non-existing and 'old'-block transactions" in {
-      val gen = validBlocksGen.flatMap(bs => invalidBlocksGen.flatMap(ibs => transactionsGen.map(txs => (bs, ibs, txs))))
-      forAll(gen) {
-        case (validBlocks, invalidBlocks, unknownTransactions) =>
-          val txIdsToBlock = validBlocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
-
-          val requestedIds = ((validBlocks ++ invalidBlocks).flatMap(_.transactionData) ++ unknownTransactions).map(_.id().toString)
-
-          val queryParams = requestedIds.map(id => s"id=$id").mkString("?", "&", "")
-          val requestBody = Json.obj("ids" -> requestedIds)
-
-          def validate(response: HttpResponse): Unit = {
-            val proofsSize = responseAs[List[JsObject]].size
-            proofsSize shouldBe (requestedIds.size - invalidBlocks.map(_.transactionData.size).sum - unknownTransactions.size)
-            validateSuccess(txIdsToBlock, response)
-          }
-
-          (addressTransactions.transactionProofs _).expects(*).returning(Nil).anyNumberOfTimes()
-
-          Get(routePath(s"/merkleProof$queryParams")) ~> route ~> check {
-            validate(response)
-          }
-
-          Post(routePath("/merkleProof"), requestBody) ~> route ~> check {
-            validate(response)
-          }
       }
     }
 

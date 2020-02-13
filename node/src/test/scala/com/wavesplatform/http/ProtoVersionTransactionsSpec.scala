@@ -55,18 +55,18 @@ class ProtoVersionTransactionsSpec
   private val blockchain: Blockchain = mock[Blockchain]
   private val utx: UtxPool           = mock[UtxPool]
 
-  private val utxPoolSynchronizer: UtxPoolSynchronizer = {
-    val utx = mock[UtxPoolSynchronizer]
-    (utx.publish _).expects(*).anyNumberOfTimes().returning(TracedResult(Right(true)))
-    utx
-  }
+  private val utxPoolSynchronizer: UtxPoolSynchronizer = mock[UtxPoolSynchronizer]
 
   private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
     TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, Coeval(utx.size), utxPoolSynchronizer, ntpTime).route
 
+  private def test(f: => Any): Unit = {
+    (utxPoolSynchronizer.publish _).expects(*).anyNumberOfTimes().returning(TracedResult(Right(true)))
+  }
+
   "Proto transactions should be able to broadcast " - {
-    "CreateAliasTransaction" in {
+    "CreateAliasTransaction" in test {
       val alias = aliasGen.sample.get
 
       val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias, MinFee, Now, Proofs.empty).explicitGet()
@@ -86,7 +86,7 @@ class ProtoVersionTransactionsSpec
       decode(base64Tx) shouldBe aliasTx
     }
 
-    "IssueTransaction/ReissueTransaction/BurnTransaction" in {
+    "IssueTransaction/ReissueTransaction/BurnTransaction" in test {
       val quantity   = 1000
       val decimals   = 2.toByte
       val reissuable = true
@@ -160,7 +160,7 @@ class ProtoVersionTransactionsSpec
       burnTx.isProtobufVersion shouldBe true
     }
 
-    "DataTransaction" in {
+    "DataTransaction" in test {
       val data = dataEntryGen(10).sample.get
 
       val dataTxUnsigned = DataTransaction.create(TxVersion.V2, account, Seq(data), DataTxFee, Now, Proofs.empty).explicitGet()
@@ -183,7 +183,7 @@ class ProtoVersionTransactionsSpec
       dataTx.isProtobufVersion shouldBe true
     }
 
-    "ExchangeTransaction" in {
+    "ExchangeTransaction" in test {
       val buyer     = accountGen.sample.get
       val seller    = accountGen.sample.get
       val assetPair = assetPairGen.sample.get
@@ -206,7 +206,7 @@ class ProtoVersionTransactionsSpec
       exchangeTx.isProtobufVersion shouldBe true
     }
 
-    "InvokeScriptTransaction" in {
+    "InvokeScriptTransaction" in test {
       val dapp       = accountOrAliasGen.sample.get
       val feeAssetId = bytes32gen.map(ByteStr(_)).sample.get
 
@@ -242,7 +242,7 @@ class ProtoVersionTransactionsSpec
       invokeScriptTx.isProtobufVersion shouldBe true
     }
 
-    "LeaseTransaction/LeaseCancelTransaction" in {
+    "LeaseTransaction/LeaseCancelTransaction" in test {
       val recipient = accountOrAliasGen.sample.get
 
       val leaseTxUnsigned = LeaseTransaction.create(TxVersion.V3, account, recipient, 100, MinFee, Now, Proofs.empty).explicitGet()
@@ -282,7 +282,7 @@ class ProtoVersionTransactionsSpec
       leaseCancelTx.isProtobufVersion shouldBe true
     }
 
-    "TransferTransaction" in {
+    "TransferTransaction" in test {
       val recipient  = accountOrAliasGen.sample.get
       val asset      = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
       val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
@@ -308,7 +308,7 @@ class ProtoVersionTransactionsSpec
       transferTx.isProtobufVersion shouldBe true
     }
 
-    "MassTransferTransaction" in {
+    "MassTransferTransaction" in test {
       val transfers  = Gen.listOfN(10, accountOrAliasGen).map(accounts => accounts.map(ParsedTransfer(_, 100))).sample.get
       val attachment = Some(Attachment.Bin(genBoundedBytes(0, TransferTransaction.MaxAttachmentSize).sample.get))
 
@@ -333,7 +333,7 @@ class ProtoVersionTransactionsSpec
       massTransferTx.isProtobufVersion shouldBe true
     }
 
-    "SetScriptTransaction" in {
+    "SetScriptTransaction" in test {
       val script = scriptGen.sample.get
 
       val setScriptTxUnsigned = SetScriptTransaction.create(TxVersion.V2, account, Some(script), SetScriptFee, Now, Proofs.empty).explicitGet()
@@ -354,7 +354,7 @@ class ProtoVersionTransactionsSpec
       (setScriptTx.json() \ "chainId").asOpt[Byte] shouldBe 'defined
     }
 
-    "SetAssetScriptTransaction" in {
+    "SetAssetScriptTransaction" in test {
       val asset  = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
       val script = scriptGen.sample.get
 
@@ -377,7 +377,7 @@ class ProtoVersionTransactionsSpec
       setAssetScriptTx.isProtobufVersion shouldBe true
     }
 
-    "SponsorshipTransaction" in {
+    "SponsorshipTransaction" in test {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
       val sponsorshipTxUnsigned =
@@ -402,7 +402,7 @@ class ProtoVersionTransactionsSpec
       sponsorshipTx.isProtobufVersion shouldBe true
     }
 
-    "UpdateAssetInfoTransaction" in {
+    "UpdateAssetInfoTransaction" in test {
       val asset = IssuedAsset(bytes32gen.map(ByteStr(_)).sample.get)
 
       val updateAssetInfoTx = UpdateAssetInfoTransaction

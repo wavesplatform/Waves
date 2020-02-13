@@ -1,7 +1,8 @@
 package com.wavesplatform.http
 
+import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.api.http.AddressApiRoute
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
@@ -15,13 +16,17 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
 import com.wavesplatform.state.diffs.FeeValidation
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain}
+import com.wavesplatform.utils.Schedulers
 import com.wavesplatform.{NoShrink, TestTime, TestWallet, WithDB, crypto}
+import io.netty.util.HashedWheelTimer
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
+
+import scala.concurrent.duration._
 
 class AddressRouteSpec
     extends RouteSpec("/addresses")
@@ -32,6 +37,7 @@ class AddressRouteSpec
     with NoShrink
     with WithDB {
 
+  testWallet.generateNewAccounts(10)
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.stringRepr)
   private val blockchain   = stub[Blockchain]("globalBlockchain")
@@ -42,7 +48,12 @@ class AddressRouteSpec
   private val commonAccountApi = mock[CommonAccountsApi]("globalAccountApi")
 
   private val route =
-    seal(AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, commonAccountApi).route)
+    seal(AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime, Schedulers.timeBoundedFixedPool(
+      new HashedWheelTimer(),
+      5.seconds,
+      1,
+      "rest-time-limited"
+    ), commonAccountApi).route)
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -242,6 +253,17 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(4)
       (response \ "meta" \ "version").as[String] shouldBe "0"
+    }
+
+    (blockchain.accountScript _)
+      .when(allAccounts(5).toAddress)
+      .onCall((_: Address) => Thread.sleep(100000).asInstanceOf[Nothing])
+
+    implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
+    implicit val timeout          = routeTestTimeout.duration
+    Get(routePath(s"/scriptInfo/${allAddresses(5)}")) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "message").as[String] shouldBe "The request took too long to complete"
     }
   }
 

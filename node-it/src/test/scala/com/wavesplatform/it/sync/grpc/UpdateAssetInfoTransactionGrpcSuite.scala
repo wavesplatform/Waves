@@ -70,14 +70,14 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val nextTermEnd = sender.transactionInfo(assetId).height + 2 * updateInterval
     assertGrpcError(
       sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
-      "Can't update asset info before",
+      s"Can't update info of asset with id=$assetId",
       Code.INVALID_ARGUMENT
     )
     sender.waitForHeight(nextTermEnd)
 
     assertGrpcError(
       sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
-      "Can't update asset info before",
+      s"Can't update info of asset with id=$assetId",
       Code.INVALID_ARGUMENT
     )
   }

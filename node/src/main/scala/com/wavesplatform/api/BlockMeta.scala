@@ -20,7 +20,9 @@ case class BlockMeta(
 
   val json = Coeval.evalOnce {
     BlockHeaderSerializer.toJson(header, size, transactionCount, signature) ++
-      Json.obj("height" -> height, "totalFee" -> totalFeeInWaves) ++ reward.fold(Json.obj())(r => Json.obj("reward" -> r))
+      Json.obj("height" -> height, "totalFee" -> totalFeeInWaves) ++
+      reward.fold(Json.obj())(r => Json.obj("reward" -> r)) ++
+      vrf.fold(Json.obj())(v => Json.obj("VRF" -> v.toString))
   }
 }
 

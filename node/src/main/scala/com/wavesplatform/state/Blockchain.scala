@@ -81,7 +81,10 @@ object Blockchain {
     def isEmpty: Boolean = blockchain.height == 0
 
     def parentHeader(block: BlockHeader, back: Int = 1): Option[BlockHeader] =
-      blockchain.heightOf(block.reference).map(_ - (back - 1).max(0)).flatMap(h => blockchain.blockHeader(h).map(_.header))
+      blockchain
+        .heightOf(block.reference)
+        .map(_ - (back - 1).max(0))
+        .flatMap(h => blockchain.blockHeader(h).map(_.header))
 
     def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined

@@ -9,7 +9,7 @@ import org.iq80.leveldb.DB
 
 trait History {
   def loadBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])]
-  def loadMicroBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])]
+  def loadMicroBlock(id: ByteStr): Option[MicroBlock]
   def blockIdsAfter(candidates: Seq[ByteStr], count: Int): Seq[ByteStr]
 }
 
@@ -26,8 +26,7 @@ object History {
         })
         .map(versionedBytes)
 
-    override def loadMicroBlockBytes(id: ByteStr): Option[(Byte, Array[Byte])] =
-      microBlock(id).map(mb => mb.version -> mb.bytes())
+    override def loadMicroBlock(id: ByteStr): Option[MicroBlock] = microBlock(id)
 
     override def blockIdsAfter(candidates: Seq[ByteStr], count: Int): Seq[ByteStr] =
       candidates.view.flatMap(blockchain.heightOf).headOption.fold[Seq[ByteStr]](Seq.empty) { firstCommonHeight =>

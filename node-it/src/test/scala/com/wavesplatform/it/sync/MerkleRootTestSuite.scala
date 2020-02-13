@@ -29,11 +29,11 @@ class MerkleRootTestSuite
     val txId = nodes.head.broadcastTransfer(nodes.head.privateKey, nodes.head.address, transferAmount, minFee, None, None).id
     assertApiError(
       nodes.head.getMerkleProof(txId),
-      CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+      CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
     assertApiError(
       nodes.head.getMerkleProofPost(txId),
-      CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+      CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
   }
   "able to get merkle proof after activation" in {
@@ -49,11 +49,11 @@ class MerkleRootTestSuite
   "error raised if transaction id is not valid" in {
     assertApiError(
       nodes.head.getMerkleProof("FCymvrY43ddiKKTkznawWasoMbWd1LWyX8DUrwAAbcUA"),
-      CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+      CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
     assertApiError(
       nodes.head.getMerkleProofPost("FCymvrY43ddiKKTkznawWasoMbWd1LWyX8DUrwAAbcUA"),
-      CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+      CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
     )
 
     val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 can not contain "0"

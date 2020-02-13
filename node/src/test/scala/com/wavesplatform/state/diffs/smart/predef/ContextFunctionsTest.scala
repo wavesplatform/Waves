@@ -6,7 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures.{FeeSponsorship, MultiPaymentInvokeScript}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, MultiPaymentInvokeScript}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -422,19 +422,28 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
     forAll(for {
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
-      version   <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version)) {
-      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version) =>
+      version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
+      withVrf <- Gen.oneOf(false, true)
+    } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
 
         val fs =
           if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
           else smartEnabledFS
 
+        val fsWithVrf =
+          if (withVrf) fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockV5.id -> 0))
+          else fs
+
         val (v4DeclOpt, v4CheckOpt) =
-          if (version >= V4) (s"let checkVrf = block.vrf == base58'$generatorSignature'", "&& checkVrf")
+          if (version >= V4)
+            if (withVrf)
+              (s"let checkVrf = block.vrf != unit", "&& checkVrf")
+            else
+              (s"let checkVrf = block.vrf == unit", "&& checkVrf")
           else ("", "")
 
-        assertDiffAndState(fs) { append =>
+        assertDiffAndState(fsWithVrf) { append =>
           append(genesis).explicitGet()
           append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
           append(Seq(transferTx)).explicitGet()
