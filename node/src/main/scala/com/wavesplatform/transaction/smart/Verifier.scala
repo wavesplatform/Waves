@@ -206,11 +206,7 @@ object Verifier extends ScorexLogging {
       }
     }
 
-    val estimate: TracedResult[GenericError, Option[Long]] =
-      matcherScriptOpt.traverse(Script.estimate(_, blockchain.estimator).leftMap(GenericError(_)))
-
     for {
-      _ <- estimate
       _ <- matcherTxVerification
       _ <- orderVerification(sellOrder)
       _ <- orderVerification(buyOrder)
