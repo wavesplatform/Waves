@@ -11,7 +11,7 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import scala.concurrent.duration.Duration
 
 trait UtxPool extends AutoCloseable {
-  def putIfNew(tx: Transaction, verify: Boolean = true): TracedResult[ValidationError, Boolean]
+  def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean]
 
   def removeAll(txs: Traversable[Transaction]): Unit
 

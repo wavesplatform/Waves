@@ -1,6 +1,8 @@
 package com.wavesplatform.it.sync.transactions
 
+import com.google.common.primitives.Ints
 import com.typesafe.config.Config
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.NodeConfigs
@@ -11,13 +13,13 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
-import org.scalatest.{Assertion, Assertions}
+import org.scalatest.{Assertion, Assertions, EitherValues}
 import play.api.libs.json._
 
 import scala.concurrent.duration._
 import scala.util.{Failure, Random, Try}
 
-class DataTransactionSuite extends BaseTransactionSuite {
+class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
   override def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))
@@ -28,22 +30,80 @@ class DataTransactionSuite extends BaseTransactionSuite {
       .withSpecial(3, _.nonMiner)
       .buildNonConflicting()
 
-  test("remove keys") {
-    val nonLatinKey = "\u05EA\u05E8\u05D1\u05D5\u05EA, \u05E1\u05E4\u05D5\u05E8\u05D8 \u05D5\u05EA\u05D9\u05D9\u05E8\u05D5\u05EA"
-    val boolData    = List(BooleanDataEntry(nonLatinKey, true))
-    val boolDataFee = calcDataFee(boolData)
-    val firstTx     = sender.putData(firstAddress, boolData, boolDataFee).id
-    nodes.waitForHeightAriseAndTxPresent(firstTx)
-    sender.getDataByKey(firstAddress, nonLatinKey) shouldBe boolData.head
+  test("put and remove keys") {
+    val address = sender.privateKey.toAddress.stringRepr
 
-    val removeData = List(EmptyDataEntry(nonLatinKey))
-    val removeDataFee = calcDataFee(removeData)
-    val secondTx    = sender.removeData(firstAddress, Seq(nonLatinKey), removeDataFee).id
-    nodes.waitForHeightAriseAndTxPresent(secondTx)
-    assertApiError(sender.getDataByKey(firstAddress, nonLatinKey)) { error =>
-      error.statusCode shouldBe 404
+    def dataEntries(i: Int): List[DataEntry[_]] =
+      List(
+        BooleanDataEntry(s"bool-key-$i", i % 2 == 0),
+        IntegerDataEntry(s"int-key-$i", i),
+        BinaryDataEntry(s"binary-key-$i", ByteStr(Ints.toByteArray(i))),
+        StringDataEntry(s"string-key-$i", s"$i-value")
+      )
+
+    def updateDataEntry(de: DataEntry[_]): DataEntry[_] = de match {
+      case BooleanDataEntry(k, v) => BooleanDataEntry(k, !v)
+      case IntegerDataEntry(k, v) => IntegerDataEntry(k, v + 100)
+      case BinaryDataEntry(k, v)  => BinaryDataEntry(k, ByteStr(v.arr :+ v.arr.length.toByte))
+      case StringDataEntry(k, v)  => StringDataEntry(k, v.reverse)
+      case e                      => e
     }
-    sender.getData(firstAddress).map(_.key) should not contain nonLatinKey
+
+    // can put data
+    val putDataEntries = (1 to 25).flatMap(i => dataEntries(i)).toList
+    val putTxId        = sender.putData(address, putDataEntries, calcDataFee(putDataEntries)).id
+    nodes.waitForHeightAriseAndTxPresent(putTxId)
+
+    // can put new, update and remove existed in the same transaction
+    val updatedDatEntries = putDataEntries.take(25).map(updateDataEntry)
+    val newDataEntries    = (26 to 30).flatMap(i => dataEntries(i))
+    val updateAndRemoveDataEntries =
+      updatedDatEntries ++                                                // 25 keys to update
+        newDataEntries ++                                                 // 20 new keys
+        putDataEntries.takeRight(25).map(kv => EmptyDataEntry(kv.key)) ++ // 25 keys to remove
+        (1 to 25).map(k => EmptyDataEntry(s"unknown-$k"))                 // 20 unknown keys to remove
+
+    assertApiError(
+      sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries), version = TxVersion.V1),
+      CustomValidationError("Empty data is not allowed in V1")
+    )
+
+    val updateAndRemoveTxId =
+      sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries)).id
+
+    nodes.waitForHeightAriseAndTxPresent(updateAndRemoveTxId)
+
+    sender.getData(address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ newDataEntries
+
+    // can reuse removed keys
+    val reusedData = putDataEntries.takeRight(25).map(updateDataEntry)
+    val reuseTxId =
+      sender.broadcastData(sender.privateKey, reusedData, calcDataFee(reusedData), version = 1.toByte).id
+
+    nodes.waitForHeightAriseAndTxPresent(reuseTxId)
+
+    sender.getData(address) should contain theSameElementsAs updatedDatEntries ++ putDataEntries.slice(25, 75) ++ reusedData ++ newDataEntries
+
+    // can't update and remove keys in the same transaction
+    val sameKeyEntries = updateAndRemoveDataEntries.tail :+ EmptyDataEntry(updateAndRemoveDataEntries(1).key)
+    assertApiError(
+      sender.broadcastData(sender.privateKey, sameKeyEntries, calcDataFee(sameKeyEntries)),
+      CustomValidationError("Duplicated keys found")
+    )
+
+    // max number of data entries is 100
+    val tooLargeSizeDataEntries = updateAndRemoveDataEntries ++ (1 to 11).map(k => EmptyDataEntry(s"another-unknown-$k"))
+    assertApiError(
+      sender.broadcastData(sender.privateKey, tooLargeSizeDataEntries, calcDataFee(tooLargeSizeDataEntries)),
+      TooBigArrayAllocation
+    )
+
+    // max key size is 400 byte
+    val tooLargeKeyDataEntries = List(BinaryDataEntry("a" * 401, "value".getBytes("utf-8")))
+    assertApiError(
+      sender.broadcastData(sender.privateKey, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries)),
+      TooBigArrayAllocation
+    )
   }
 
   test("sender's waves balance is decreased by fee.") {
@@ -168,8 +228,8 @@ class DataTransactionSuite extends BaseTransactionSuite {
 
   test("queries for multiple keys") {
     val tooBigKey = "toobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkeytoobigkey"
-    val keys   = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
-    val values = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal","BBBB")
+    val keys      = Seq("int", "bool", "int", "blob", "?&$#^123\\/.a:;'\"\r\n\t\u0000|%è&", "str", "inexisted_key", tooBigKey)
+    val values    = Seq[Any](-127, false, -127, ByteStr(Array[Byte](127.toByte, 0, 1, 1)), "specïal", "BBBB")
 
     val list     = sender.getDataList(secondAddress, keys: _*).map(_.value)
     val jsonList = sender.getDataListJson(secondAddress, keys: _*).map(_.value)

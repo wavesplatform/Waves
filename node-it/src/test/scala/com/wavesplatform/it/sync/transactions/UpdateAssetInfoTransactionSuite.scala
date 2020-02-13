@@ -123,13 +123,13 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val (firstUpdatedName, firstUpdatedDescription) = ("updatedName", "updatedDescription")
     val (secondUpdatedName, secondUpdatedDescription) = ("updatedName2", "updatedDescription2")
 
-    sender.waitForHeight(sender.height + updateInterval + 1)
+    sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     sender.updateAssetInfo(issuer, assetId, firstUpdatedName, firstUpdatedDescription, waitForTx = true)._1.id
     sender.rollback(issueHeight - 1, returnToUTX = true)
 
     sender.waitForTransaction(assetId)
     val newIssueHeight = sender.transactionInfo(assetId).height
-    sender.waitForHeight(newIssueHeight + updateInterval + 1)
+    sender.waitForHeight(newIssueHeight + updateInterval + 1, 3.minutes)
     sender.updateAssetInfo(issuer, assetId, secondUpdatedName, secondUpdatedDescription, waitForTx = true)
 
     sender.assetsDetails(assetId).name shouldBe secondUpdatedName
