@@ -7,12 +7,15 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
 import org.asynchttpclient.Response
+import org.scalatest
+import org.scalatest.Assertion
 import play.api.libs.json.{JsValue, Json}
 
 class AmountAsStringSuite extends BaseTransactionSuite {
@@ -23,39 +26,29 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val assetId = sender.issue(firstAddress, "assetName", "description", someAssetAmount, 8, fee = issueFee, waitForTx = true).id
     sender.issue(firstAddress, "assetName", "description", quantity = 1, decimals = 0, reissuable = false, fee = issueFee, waitForTx = true).id
     val currentHeight   = sender.height
-    val assetDetails    = sender.getWithCustomHeader(s"/assets/details/$assetId", headerName, headerValue)
-    val assetBalance    = sender.getWithCustomHeader(s"/assets/balance/$firstAddress/$assetId", headerName, headerValue)
-    val assetsBalance   = sender.getWithCustomHeader(s"/assets/balance/$firstAddress", headerName, headerValue)
-    val nftBalance      = sender.getWithCustomHeader(s"/assets/nft/${firstAddress}/limit/1", headerName, headerValue)
-    val assetBalanceInt = sender.assetBalance(firstAddress, assetId).balance
+    sender.assetsDetails(assetId, amountsAsStrings = true).quantity shouldBe someAssetAmount
+    sender.assetBalance(firstAddress, assetId, amountsAsStrings = true).balance shouldBe someAssetAmount
+    sender.assetsBalance(firstAddress, amountsAsStrings = true).balances.head.balance shouldBe someAssetAmount
+    sender.nftAssetsBalance(firstAddress,1, amountsAsStrings = true).head.quantity shouldBe 1
 
     sender.waitForHeight(currentHeight + 1)
     val assetDistribution = sender.getWithCustomHeader(s"/assets/$assetId/distribution/$currentHeight/limit/1", headerName, headerValue)
-
-    (parseResponse(assetBalance) \ "balance").as[String] shouldBe s"$assetBalanceInt"
-    (parseResponse(assetsBalance) \ "balances" \ 0 \ "balance").as[String] shouldBe s"$assetBalanceInt"
-    (parseResponse(nftBalance) \ 0 \ "quantity").as[String] shouldBe "1"
     (parseResponse(assetDistribution) \ "items" \ 0 \ 1).as[String] shouldBe s"$someAssetAmount"
-    (parseResponse(assetDetails) \ "quantity").as[String] shouldBe s"$someAssetAmount"
   }
 
   test("amount as string in addresses api") {
     val firstBalance = sender.balanceDetails(firstAddress)
-    val balance      = sender.getWithCustomHeader(s"/addresses/balance/$firstAddress", headerName, headerValue)
-    (parseResponse(balance) \ "balance").as[String] shouldBe s"${firstBalance.regular}"
-    val balanceWithConfirmations = sender.getWithCustomHeader(s"/addresses/balance/$firstAddress/1", headerName, headerValue)
-    (parseResponse(balanceWithConfirmations) \ "balance").as[String] shouldBe s"${firstBalance.regular}"
+    sender.balance(firstAddress, amountsAsStrings = true).balance shouldBe firstBalance.regular
+    sender.balance(firstAddress, confirmations = Some(1), amountsAsStrings = true).balance shouldBe firstBalance.regular
 
-    val balanceDetails = sender.getWithCustomHeader(s"/addresses/balance/details/$firstAddress", headerName, headerValue)
-    (parseResponse(balanceDetails) \ "regular").as[String] shouldBe s"${firstBalance.regular}"
-    (parseResponse(balanceDetails) \ "generating").as[String] shouldBe s"${firstBalance.generating}"
-    (parseResponse(balanceDetails) \ "available").as[String] shouldBe s"${firstBalance.available}"
-    (parseResponse(balanceDetails) \ "effective").as[String] shouldBe s"${firstBalance.effective}"
+    val balanceDetails = sender.balanceDetails(firstAddress, amountsAsStrings = true)
+    balanceDetails.regular shouldBe firstBalance.regular
+    balanceDetails.generating shouldBe firstBalance.generating
+    balanceDetails.available shouldBe firstBalance.available
+    balanceDetails.effective shouldBe firstBalance.effective
 
-    val effectiveBalance                  = sender.getWithCustomHeader(s"/addresses/effectiveBalance/$firstAddress", headerName, headerValue)
-    val effectiveBalanceWithConfirmations = sender.getWithCustomHeader(s"/addresses/effectiveBalance/$firstAddress/1", headerName, headerValue)
-    (parseResponse(effectiveBalance) \ "balance").as[String] shouldBe s"${firstBalance.effective}"
-    (parseResponse(effectiveBalanceWithConfirmations) \ "balance").as[String] shouldBe s"${firstBalance.effective}"
+    sender.effectiveBalance(firstAddress, amountsAsStrings = true).balance shouldBe firstBalance.effective
+    sender.effectiveBalance(firstAddress, confirmations = Some(1), amountsAsStrings = true).balance shouldBe firstBalance.effective
   }
 
   test("amount as string in exchange transaction") {
@@ -67,6 +60,15 @@ class AmountAsStringSuite extends BaseTransactionSuite {
 
     val amount = 1000000
     val price  = 1000
+    def checkExchangeTx(exchangeTx: Transaction): scalatest.Assertion = {
+      exchangeTx.amount shouldBe Some(amount)
+      exchangeTx.price shouldBe Some(price)
+      exchangeTx.sellMatcherFee shouldBe Some(matcherFee)
+      exchangeTx.buyMatcherFee shouldBe Some(matcherFee)
+      exchangeTx.sellOrderMatcherFee shouldBe Some(matcherFee)
+      exchangeTx.buyOrderMatcherFee shouldBe Some(matcherFee)
+      exchangeTx.fee shouldBe matcherFee
+    }
     val exchAssetId = sender
       .broadcastIssue(exchanger, "exchange asset", "", someAssetAmount, 8, fee = issueFee, reissuable = true, script = None, waitForTx = true)
       .id
@@ -94,251 +96,185 @@ class AmountAsStringSuite extends BaseTransactionSuite {
       matcherFee
     )
     nodes.waitForHeightArise()
-    val exchangeTx =
-      ExchangeTransaction.signed(TxVersion.V2, exchanger, buyOrder, sellOrder, amount, price, matcherFee, matcherFee, matcherFee, ts).explicitGet()
-    val exchangeTxId            = Base58.encode(exchangeTx.id())
-    val exchangeTxFromBroadcast = sender.postJsObjectWithCustomHeader("/transactions/broadcast", exchangeTx.json(), headerName, headerValue)
-    (parseResponse(exchangeTxFromBroadcast) \ "amount").as[String] shouldBe s"$amount"
-    (parseResponse(exchangeTxFromBroadcast) \ "price").as[String] shouldBe s"$price"
-    (parseResponse(exchangeTxFromBroadcast) \ "sellMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxFromBroadcast) \ "buyMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxFromBroadcast) \ "order1" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxFromBroadcast) \ "order2" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxFromBroadcast) \ "fee").as[String] shouldBe s"$matcherFee"
+    val exchangeTx = sender.broadcastExchange(exchanger, buyOrder, sellOrder, amount, price, matcherFee, matcherFee, matcherFee, amountsAsStrings = true)
+    checkExchangeTx(exchangeTx)
 
-    val utxExchangeTxInfo = sender.getWithCustomHeader(s"/transactions/unconfirmed/info/$exchangeTxId", headerName, headerValue)
-    (parseResponse(utxExchangeTxInfo) \ "amount").as[String] shouldBe s"$amount"
-    (parseResponse(utxExchangeTxInfo) \ "price").as[String] shouldBe s"$price"
-    (parseResponse(utxExchangeTxInfo) \ "sellMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utxExchangeTxInfo) \ "buyMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utxExchangeTxInfo) \ "order1" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utxExchangeTxInfo) \ "order2" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utxExchangeTxInfo) \ "fee").as[String] shouldBe s"$matcherFee"
-    val utx = sender.getWithCustomHeader(s"/transactions/unconfirmed", headerName, headerValue)
-    (parseResponse(utx) \ 0 \ "amount").as[String] shouldBe s"$amount"
-    (parseResponse(utx) \ 0 \ "price").as[String] shouldBe s"$price"
-    (parseResponse(utx) \ 0 \ "sellMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utx) \ 0 \ "buyMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utx) \ 0 \ "order1" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utx) \ 0 \ "order2" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(utx) \ 0 \ "fee").as[String] shouldBe s"$matcherFee"
-    val exchangeTxHeight    = sender.waitForTransaction(exchangeTxId).height
-    val exchangeTxBlockLast = sender.getWithCustomHeader("/blocks/last", headerName, headerValue)
-    val exchangeTxBlockAt   = sender.getWithCustomHeader(s"/blocks/at/$exchangeTxHeight", headerName, headerValue)
-    val exchangeTxBlockBySignature =
-      sender.getWithCustomHeader(s"/blocks/signature/${sender.blockAt(exchangeTxHeight).signature}", headerName, headerValue)
-    for (block <- Seq(exchangeTxBlockLast, exchangeTxBlockAt, exchangeTxBlockBySignature)) {
-      (parseResponse(block) \ "transactions" \ 0 \ "amount").as[String] shouldBe s"$amount"
-      (parseResponse(block) \ "transactions" \ 0 \ "price").as[String] shouldBe s"$price"
-      (parseResponse(block) \ "transactions" \ 0 \ "sellMatcherFee").as[String] shouldBe s"$matcherFee"
-      (parseResponse(block) \ "transactions" \ 0 \ "buyMatcherFee").as[String] shouldBe s"$matcherFee"
-      (parseResponse(block) \ "transactions" \ 0 \ "order1" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-      (parseResponse(block) \ "transactions" \ 0 \ "order2" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-      (parseResponse(block) \ "transactions" \ 0 \ "fee").as[String] shouldBe s"$matcherFee"
-    }
-    val blockSeq = sender.getWithCustomHeader(s"/blocks/seq/$exchangeTxHeight/$exchangeTxHeight", headerName, headerValue)
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "amount").as[String] shouldBe s"$amount"
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "price").as[String] shouldBe s"$price"
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "sellMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "buyMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "order1" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "order2" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(blockSeq) \ 0 \ "transactions" \ 0 \ "fee").as[String] shouldBe s"$matcherFee"
+    val utxExchangeTxInfoById = sender.utxById(exchangeTx.id, amountsAsStrings = true)
+    val utxExchangeTxInfo = sender.utx(amountsAsStrings = true)
+    checkExchangeTx(utxExchangeTxInfoById)
+    checkExchangeTx(utxExchangeTxInfo.head)
 
-    val exchangeTxInfo = sender.getWithCustomHeader(s"/transactions/info/$exchangeTxId", headerName, headerValue)
-    (parseResponse(exchangeTxInfo) \ "amount").as[String] shouldBe s"$amount"
-    (parseResponse(exchangeTxInfo) \ "price").as[String] shouldBe s"$price"
-    (parseResponse(exchangeTxInfo) \ "sellMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxInfo) \ "buyMatcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxInfo) \ "order1" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxInfo) \ "order2" \ "matcherFee").as[String] shouldBe s"$matcherFee"
-    (parseResponse(exchangeTxInfo) \ "fee").as[String] shouldBe s"$matcherFee"
+    val exchangeTxHeight    = sender.waitForTransaction(exchangeTx.id).height
+    val exchangeTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
+    val exchangeTxBlockAt   = sender.blockAt(exchangeTxHeight, amountsAsStrings = true).transactions.head
+    val exchangeTxBlockBySignature   = sender.blockBySignature(sender.blockAt(exchangeTxHeight).signature, amountsAsStrings = true).transactions.head
+    val exchangeTxBlockSeq   = sender.blockSeq(exchangeTxHeight, exchangeTxHeight, amountsAsStrings = true).head.transactions.head
+    checkExchangeTx(exchangeTxBlockLast)
+    checkExchangeTx(exchangeTxBlockAt)
+    checkExchangeTx(exchangeTxBlockBySignature)
+    checkExchangeTx(exchangeTxBlockSeq)
+
+    val exchangeTxInfo = sender.transactionInfo(exchangeTx.id, amountsAsStrings = true)
+    exchangeTxInfo.amount shouldBe Some(amount)
+    exchangeTxInfo.price shouldBe Some(price)
+    exchangeTxInfo.sellMatcherFee shouldBe Some(matcherFee)
+    exchangeTxInfo.buyMatcherFee shouldBe Some(matcherFee)
+    exchangeTxInfo.sellOrderMatcherFee shouldBe Some(matcherFee)
+    exchangeTxInfo.buyOrderMatcherFee shouldBe Some(matcherFee)
+    exchangeTxInfo.fee shouldBe matcherFee
   }
 
   test("amount as string in data transaction") {
     nodes.waitForHeightArise()
     val dataEntries         = List(IntegerDataEntry("int", 666))
     val dataFee             = calcDataFee(dataEntries)
-    val dataTx              = DataTransaction.selfSigned(TxVersion.V2, sender.privateKey, dataEntries, dataFee, System.currentTimeMillis()).explicitGet()
-    val dataTxId            = Base58.encode(dataTx.id())
-    val dataTxFromBroadcast = sender.postJsObjectWithCustomHeader(s"/transactions/broadcast", dataTx.json(), headerName, headerValue)
-    (parseResponse(dataTxFromBroadcast) \ "data" \ 0 \ "value").as[String] shouldBe "666"
-    val utxDataTxInfo = sender.getWithCustomHeader(s"/transactions/unconfirmed/info/$dataTxId", headerName, headerValue)
-    (parseResponse(utxDataTxInfo) \ "data" \ 0 \ "value").as[String] shouldBe "666"
-    val utx2 = sender.getWithCustomHeader(s"/transactions/unconfirmed", headerName, headerValue)
-    (parseResponse(utx2) \ 0 \ "data" \ 0 \ "value").as[String] shouldBe "666"
-    val dataTxHeight    = sender.waitForTransaction(dataTxId).height
-    val dataTxBlockLast = sender.getWithCustomHeader("/blocks/last", headerName, headerValue)
-    val dataTxBlockAt   = sender.getWithCustomHeader(s"/blocks/at/$dataTxHeight", headerName, headerValue)
-    val dataTxBlockBySignature =
-      sender.getWithCustomHeader(s"/blocks/signature/${sender.blockAt(dataTxHeight).signature}", headerName, headerValue)
-    for (block <- Seq(dataTxBlockLast, dataTxBlockAt, dataTxBlockBySignature)) {
-      (parseResponse(block) \ "transactions" \ 0 \ "data" \ 0 \ "value").as[String] shouldBe "666"
-    }
-    val blockSeqWithDataTx = sender.getWithCustomHeader(s"/blocks/seq/$dataTxHeight/$dataTxHeight", headerName, headerValue)
-    (parseResponse(blockSeqWithDataTx) \ 0 \ "transactions" \ 0 \ "data" \ 0 \ "value").as[String] shouldBe "666"
-    val dataTxInfo = sender.getWithCustomHeader(s"/transactions/info/$dataTxId", headerName, headerValue)
-    (parseResponse(dataTxInfo) \ "data" \ 0 \ "value").as[String] shouldBe "666"
-    val addressData = sender.getWithCustomHeader(s"/addresses/data/${sender.address}", headerName, headerValue)
-    (parseResponse(addressData) \ 0 \ "value").as[String] shouldBe "666"
+    val dataTx              = sender.putData(sender.address, dataEntries, dataFee, amountsAsStrings = true)
+    dataTx.fee shouldBe dataFee
+    dataTx.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+
+    sender.utx(amountsAsStrings = true).head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.utxById(dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+
+    val dataTxHeight    = sender.waitForTransaction(dataTx.id).height
+    sender.lastBlock(amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.blockAt(dataTxHeight, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true).head.transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+
+    sender.transactionInfo(dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.getData(sender.address, amountsAsStrings = true).filter(_.key == "int").head.value shouldBe 666
   }
 
   test("amount as string in sponsorfee transaction") {
+    def checkSponsorshipTx(tx: Transaction): Assertion = {
+      tx.minSponsoredAssetFee shouldBe Some(10000)
+      tx.fee shouldBe sponsorFee
+    }
     val sponsoredAssetId = sender.issue(sender.address, "sponsor", "", someAssetAmount, 8, waitForTx = true).id
     nodes.waitForHeightArise()
-    val sponsorshipTx = SponsorFeeTransaction
-      .selfSigned(
-        TxVersion.V2,
-        sender.privateKey,
-        IssuedAsset(ByteStr.decodeBase58(sponsoredAssetId).get),
-        Some(10000),
-        sponsorFee,
-        System.currentTimeMillis()
-      )
-      .explicitGet()
-    val sponsorshipTxId            = Base58.encode(sponsorshipTx.id())
-    val sponsorshipTxFromBroadcast = sender.postJsObjectWithCustomHeader(s"/transactions/broadcast", sponsorshipTx.json(), headerName, headerValue)
-    (parseResponse(sponsorshipTxFromBroadcast) \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-    (parseResponse(sponsorshipTxFromBroadcast) \ "fee").as[String] shouldBe s"$sponsorFee"
-    val utxSponsorshipTxInfo = sender.getWithCustomHeader(s"/transactions/unconfirmed/info/$sponsorshipTxId", headerName, headerValue)
-    (parseResponse(utxSponsorshipTxInfo) \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-    (parseResponse(utxSponsorshipTxInfo) \ "fee").as[String] shouldBe s"$sponsorFee"
-    val utx3 = sender.getWithCustomHeader(s"/transactions/unconfirmed", headerName, headerValue)
-    (parseResponse(utx3) \ 0 \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-    (parseResponse(utx3) \ 0 \ "fee").as[String] shouldBe s"$sponsorFee"
-    val sponsorshipTxHeight    = sender.waitForTransaction(sponsorshipTxId).height
-    val sponsorshipTxBlockLast = sender.getWithCustomHeader("/blocks/last", headerName, headerValue)
-    val sponsorshipTxBlockAt   = sender.getWithCustomHeader(s"/blocks/at/$sponsorshipTxHeight", headerName, headerValue)
-    val sponsorshipTxBlockBySignature =
-      sender.getWithCustomHeader(s"/blocks/signature/${sender.blockAt(sponsorshipTxHeight).signature}", headerName, headerValue)
-    for (block <- Seq(sponsorshipTxBlockLast, sponsorshipTxBlockAt, sponsorshipTxBlockBySignature)) {
-      (parseResponse(block) \ "transactions" \ 0 \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-      (parseResponse(block) \ "transactions" \ 0 \ "fee").as[String] shouldBe s"$sponsorFee"
-    }
-    val blockSeqWithSponsorshipTx = sender.getWithCustomHeader(s"/blocks/seq/$sponsorshipTxHeight/$sponsorshipTxHeight", headerName, headerValue)
-    (parseResponse(blockSeqWithSponsorshipTx) \ 0 \ "transactions" \ 0 \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-    (parseResponse(blockSeqWithSponsorshipTx) \ 0 \ "transactions" \ 0 \ "fee").as[String] shouldBe s"$sponsorFee"
-    val sponsorshipTxInfo = sender.getWithCustomHeader(s"/transactions/info/$sponsorshipTxId", headerName, headerValue)
-    (parseResponse(sponsorshipTxInfo) \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-    (parseResponse(sponsorshipTxInfo) \ "fee").as[String] shouldBe s"$sponsorFee"
-    val sponsorInfoInAssetBalance = sender.getWithCustomHeader(s"/assets/balance/${sender.address}", headerName, headerValue)
-    (parseResponse(sponsorInfoInAssetBalance) \ "balances" \ 0 \ "minSponsoredAssetFee").as[String] shouldBe "10000"
-    (parseResponse(sponsorInfoInAssetBalance) \ "balances" \ 0 \ "sponsorBalance")
-      .as[String] shouldBe s"${sender.balanceDetails(sender.address).available}"
+    val sponsorshipTx = sender.sponsorAsset(sender.address, sponsoredAssetId, 10000, sponsorFee, amountsAsStrings = true)
+    checkSponsorshipTx(sponsorshipTx)
+
+    checkSponsorshipTx(sender.utx(amountsAsStrings = true).head)
+    checkSponsorshipTx(sender.utxById(sponsorshipTx.id))
+
+    val sponsorshipTxHeight    = sender.waitForTransaction(sponsorshipTx.id).height
+    val sponsorshipTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
+    val sponsorshipTxBlockAt   = sender.blockAt(sponsorshipTxHeight, amountsAsStrings = true).transactions.head
+    val sponsorshipTxBlockBySignature   = sender.blockBySignature(sender.blockAt(sponsorshipTxHeight).signature, amountsAsStrings = true).transactions.head
+    val sponsorshipTxBlockSeq   = sender.blockSeq(sponsorshipTxHeight, sponsorshipTxHeight, amountsAsStrings = true).head.transactions.head
+    checkSponsorshipTx(sponsorshipTxBlockLast)
+    checkSponsorshipTx(sponsorshipTxBlockAt)
+    checkSponsorshipTx(sponsorshipTxBlockBySignature)
+    checkSponsorshipTx(sponsorshipTxBlockSeq)
+
+    val sponsorshipTxInfo = sender.transactionInfo(sponsorshipTx.id)
+    sponsorshipTxInfo.minSponsoredAssetFee shouldBe Some(10000)
+    sponsorshipTxInfo.fee shouldBe sponsorFee
   }
   test("amount as string in masstransfer transaction") {
     nodes.waitForHeightArise()
-    val massTransferTx = MassTransferTransaction
-      .selfSigned(
-        TxVersion.V2,
-        sender.privateKey,
-        Waves,
-        List(ParsedTransfer(AddressOrAlias.fromString(secondAddress).explicitGet(), 1000)),
-        calcMassTransferFee(1),
-        System.currentTimeMillis(),
-        None
-      )
-      .explicitGet()
-    val massTransferTxId            = Base58.encode(massTransferTx.id())
-    val massTransferTxFromBroadcast = sender.postJsObjectWithCustomHeader(s"/transactions/broadcast", massTransferTx.json(), headerName, headerValue)
-    (parseResponse(massTransferTxFromBroadcast) \ "transfers" \ 0 \ "amount").as[String] shouldBe "1000"
-    (parseResponse(massTransferTxFromBroadcast) \ "totalAmount").as[String] shouldBe "1000"
-    val utxMassTransferTxInfo = sender.getWithCustomHeader(s"/transactions/unconfirmed/info/$massTransferTxId", headerName, headerValue)
-    (parseResponse(utxMassTransferTxInfo) \ "transfers" \ 0 \ "amount").as[String] shouldBe "1000"
-    (parseResponse(utxMassTransferTxInfo) \ "totalAmount").as[String] shouldBe "1000"
-    val utx4 = sender.getWithCustomHeader(s"/transactions/unconfirmed", headerName, headerValue)
-    (parseResponse(utx4) \ 0 \ "transfers" \ 0 \ "amount").as[String] shouldBe "1000"
-    (parseResponse(utx4) \ 0 \ "totalAmount").as[String] shouldBe "1000"
-    val massTransferTxHeight    = sender.waitForTransaction(massTransferTxId).height
-    val massTransferTxBlockLast = sender.getWithCustomHeader("/blocks/last", headerName, headerValue)
-    val massTransferTxBlockAt   = sender.getWithCustomHeader(s"/blocks/at/$massTransferTxHeight", headerName, headerValue)
-    val massTransferTxBlockBySignature =
-      sender.getWithCustomHeader(s"/blocks/signature/${sender.blockAt(massTransferTxHeight).signature}", headerName, headerValue)
-    for (block <- Seq(massTransferTxBlockLast, massTransferTxBlockAt, massTransferTxBlockBySignature)) {
-      (parseResponse(block) \ "transactions" \ 0 \ "transfers" \ 0 \ "amount").as[String] shouldBe "1000"
-      (parseResponse(block) \ "transactions" \ 0 \ "totalAmount").as[String] shouldBe "1000"
+    def checkMassTransferTx(tx: Transaction): Assertion = {
+      tx.transfers.get.head.amount shouldBe transferAmount
+      tx.totalAmount shouldBe Some(transferAmount)
     }
-    val blockSeqWithMassTransferTx = sender.getWithCustomHeader(s"/blocks/seq/$massTransferTxHeight/$massTransferTxHeight", headerName, headerValue)
-    (parseResponse(blockSeqWithMassTransferTx) \ 0 \ "transactions" \ 0 \ "transfers" \ 0 \ "amount").as[String] shouldBe "1000"
-    (parseResponse(blockSeqWithMassTransferTx) \ 0 \ "transactions" \ 0 \ "totalAmount").as[String] shouldBe "1000"
-    val massTransferTxInfo = sender.getWithCustomHeader(s"/transactions/info/$massTransferTxId", headerName, headerValue)
-    (parseResponse(massTransferTxInfo) \ "transfers" \ 0 \ "amount").as[String] shouldBe "1000"
-    (parseResponse(massTransferTxInfo) \ "totalAmount").as[String] shouldBe "1000"
+    val (transfers, massTransferFee) = (List(Transfer(secondAddress, transferAmount)), calcMassTransferFee(1))
+    val massTransferTx = sender.massTransfer(firstAddress, transfers, massTransferFee, amountsAsStrings = true)
+    checkMassTransferTx(massTransferTx)
+
+    checkMassTransferTx(sender.utx(amountsAsStrings = true).head)
+    checkMassTransferTx(sender.utxById(massTransferTx.id, amountsAsStrings = true))
+
+    val massTransferTxHeight    = sender.waitForTransaction(massTransferTx.id).height
+    val massTransferTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
+    val massTransferTxBlockAt   = sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.head
+    val massTransferTxBlockBySignature   = sender.blockBySignature(sender.blockAt(massTransferTxHeight).signature, amountsAsStrings = true).transactions.head
+    val massTransferTxBlockSeq   = sender.blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true).head.transactions.head
+    checkMassTransferTx(massTransferTxBlockLast)
+    checkMassTransferTx(massTransferTxBlockAt)
+    checkMassTransferTx(massTransferTxBlockBySignature)
+    checkMassTransferTx(massTransferTxBlockSeq)
+
+    val massTransferTxInfo = sender.transactionInfo(massTransferTx.id)
+    massTransferTxInfo.transfers.get.head.amount shouldBe transferAmount
+    massTransferTxInfo.totalAmount shouldBe Some(transferAmount)
 
     val tx =
       Json.obj(
-        "type"            -> CreateAliasTransaction.typeId,
-        "sender"          -> firstAddress,
-        "alias"           -> "alias",
-        "fee"             -> 100000,
-        "timestamp"       -> System.currentTimeMillis(),
-        "version"         -> 1,
+        "type" -> CreateAliasTransaction.typeId,
+        "sender" -> firstAddress,
+        "alias" -> "alias",
+        "fee" -> 100000,
+        "timestamp" -> System.currentTimeMillis(),
+        "version" -> 1,
         "senderPublicKey" -> PublicKey.fromBase58String(firstAddress).explicitGet()
       )
-    val calculateTxFee = sender.postJsObjectWithCustomHeader("/transactions/calculateFee", tx, headerName, headerValue)
-    (parseResponse(calculateTxFee) \ "feeAmount").as[String] shouldBe s"$minFee"
+    sender.calculateFee(tx, amountsAsStrings = true).feeAmount shouldBe minFee
   }
 
   test("amount as string in blocks api") {
     nodes.waitForHeightArise()
     val currentHeight    = sender.height
-    val blockLast        = sender.getWithCustomHeader("/blocks/last", headerName, headerValue)
-    val blockAt          = sender.getWithCustomHeader(s"/blocks/at/$currentHeight", headerName, headerValue)
-    val blockBySignature = sender.getWithCustomHeader(s"/blocks/signature/${sender.lastBlock.signature}", headerName, headerValue)
-    val blockHeadersLast = sender.getWithCustomHeader("/blocks/headers/last", headerName, headerValue)
-    val blockHeadersAt   = sender.getWithCustomHeader(s"/blocks/headers/at/$currentHeight", headerName, headerValue)
-    val reward           = sender.rewardStatus(currentHeight).currentReward
+    val reward           = sender.rewardStatus().currentReward
+    val blockLast        = sender.lastBlock(amountsAsStrings = true)
+    val blockAt          = sender.blockAt(currentHeight, amountsAsStrings = true)
+    val blockBySignature = sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true)
+    val blockHeadersAt   = sender.blockHeadersAt(currentHeight, amountsAsStrings = true)
+    val blockHeadersLast = sender.lastBlockHeaders(amountsAsStrings = true)
 
-    for (block <- Seq(blockLast, blockAt, blockHeadersLast, blockHeadersAt, blockBySignature)) {
-      (parseResponse(block) \ "reward").as[String] shouldBe s"$reward"
-      (parseResponse(block) \ "desiredReward").as[String] shouldBe "-1"
-      (parseResponse(block) \ "totalFee").as[String] shouldBe "0"
+    for (block <- Seq(blockLast, blockAt, blockBySignature)) {
+      block.reward shouldBe Some(reward)
+      block.desiredReward shouldBe Some(-1)
+      block.totalFee shouldBe Some(0)
     }
 
-    val blockSeq        = sender.getWithCustomHeader(s"/blocks/seq/$currentHeight/$currentHeight", headerName, headerValue)
-    val blockHeadersSeq = sender.getWithCustomHeader(s"/blocks/headers/seq/$currentHeight/$currentHeight", headerName, headerValue)
-    val blockSeqByAddress =
-      sender.getWithCustomHeader(s"/blocks/address/${sender.address}/$currentHeight/$currentHeight", headerName, headerValue)
-
-    for (block <- Seq(blockSeq, blockHeadersSeq, blockSeqByAddress)) {
-      (parseResponse(block) \ 0 \ "reward").as[String] shouldBe s"$reward"
-      (parseResponse(block) \ 0 \ "desiredReward").as[String] shouldBe "-1"
-      (parseResponse(block) \ 0 \ "totalFee").as[String] shouldBe "0"
+    for (block <- Seq(blockHeadersLast, blockHeadersAt)) {
+      block.reward shouldBe Some(reward)
+      block.desiredReward shouldBe Some(-1)
+      block.totalFee shouldBe 0
     }
+
+    val blockSeq        = sender.blockSeq(currentHeight, currentHeight, amountsAsStrings = true)
+    val blockSeqByAddress = sender.blockSeqByAddress(miner.address, currentHeight, currentHeight, amountsAsStrings = true)
+
+    for (blocks <- Seq(blockSeq, blockSeqByAddress)) {
+      blocks.head.reward shouldBe Some(reward)
+      blocks.head.desiredReward shouldBe Some(-1)
+      blocks.head.totalFee shouldBe Some(0)
+    }
+
+    val blockHeadersSeq = sender.blockHeadersSeq(currentHeight, currentHeight, amountsAsStrings = true)
+    blockHeadersSeq.head.reward shouldBe Some(reward)
+    blockHeadersSeq.head.desiredReward shouldBe Some(-1)
+    blockHeadersSeq.head.totalFee shouldBe 0
   }
 
   test("amount as string in rewards api") {
     val currentHeight    = sender.height
-    val rewards          = sender.getWithCustomHeader("/blockchain/rewards", headerName, headerValue)
-    val rewardsByHeight  = sender.getWithCustomHeader(s"/blockchain/rewards/$currentHeight", headerName, headerValue)
-    val rewardsAsInteger = sender.rewardStatus(currentHeight)
-    (parseResponse(rewards) \ "totalWavesAmount").as[String] shouldBe s"${rewardsAsInteger.totalWavesAmount}"
-    (parseResponse(rewards) \ "currentReward").as[String] shouldBe s"${rewardsAsInteger.currentReward}"
-    (parseResponse(rewards) \ "minIncrement").as[String] shouldBe s"${rewardsAsInteger.minIncrement}"
-    (parseResponse(rewardsByHeight) \ "totalWavesAmount").as[String] shouldBe s"${rewardsAsInteger.totalWavesAmount}"
-    (parseResponse(rewardsByHeight) \ "currentReward").as[String] shouldBe s"${rewardsAsInteger.currentReward}"
-    (parseResponse(rewardsByHeight) \ "minIncrement").as[String] shouldBe s"${rewardsAsInteger.minIncrement}"
-
+    val rewardsAsInteger = sender.rewardStatus()
+    val rewards          = sender.rewardStatus(amountsAsStrings = true)
+    val rewardsByHeight  = sender.rewardStatus(Some(currentHeight), amountsAsStrings = true)
+    rewards.totalWavesAmount shouldBe rewardsAsInteger.totalWavesAmount
+    rewards.currentReward shouldBe rewardsAsInteger.currentReward
+    rewards.minIncrement shouldBe rewardsAsInteger.minIncrement
+    rewardsByHeight.totalWavesAmount shouldBe rewardsAsInteger.totalWavesAmount
+    rewardsByHeight.currentReward shouldBe rewardsAsInteger.currentReward
+    rewardsByHeight.minIncrement shouldBe rewardsAsInteger.minIncrement
   }
 
   test("amount as string in consensus api") {
     val firstGeneratingBalance = sender.balanceDetails(firstAddress).generating
-    val generatingBalance      = sender.getWithCustomHeader(s"/consensus/generatingbalance/$firstAddress", headerName, headerValue)
-    (parseResponse(generatingBalance) \ "balance").as[String] shouldBe s"$firstGeneratingBalance"
+    sender.generatingBalance(firstAddress, amountsAsStrings = true).balance shouldBe firstGeneratingBalance
   }
 
   test("amount as string in debug api") {
     val firstBalance = sender.balanceDetails(firstAddress).available
-    val portfolio    = sender.getWithCustomHeader(s"/debug/portfolios/$firstAddress", headerName, headerValue, withApiKey = true)
-    (parseResponse(portfolio) \ "balance").as[String] shouldBe s"$firstBalance"
-    (parseResponse(portfolio) \ "lease" \ "in").as[String] shouldBe "0"
-    (parseResponse(portfolio) \ "lease" \ "out").as[String] shouldBe "0"
+    val portfolio    = sender.debugPortfoliosFor(firstAddress, considerUnspent = false, amountsAsStrings = true)
+    portfolio.balance shouldBe firstBalance
+    portfolio.lease.in shouldBe 0
+    portfolio.lease.out shouldBe 0
 
-    val state = sender.getWithCustomHeader("/debug/state", headerName, headerValue, withApiKey = true)
-    (parseResponse(state) \ s"$firstAddress").as[String] shouldBe s"$firstBalance"
-
-    val balanceHistory = sender.getWithCustomHeader(s"/debug/balances/history/$firstAddress", headerName, headerValue, withApiKey = true)
-    (parseResponse(balanceHistory) \ 0 \ "balance").as[String] shouldBe s"$firstBalance"
+    sender.debugBalanceHistory(firstAddress, amountsAsStrings = true).head.balance shouldBe firstBalance
 
     val stateWavesOnHeight = sender.getWithCustomHeader(s"/debug/stateWaves/${sender.height}", headerName, headerValue, withApiKey = true)
     (parseResponse(stateWavesOnHeight) \ s"$firstAddress").as[String] shouldBe s"$firstBalance"

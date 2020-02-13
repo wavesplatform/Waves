@@ -42,8 +42,8 @@ class BlockV5TestSuite
       //Activation height
       nodes.head.waitForHeight(ActivationHeight)
 
-      val lastBlockAfterActivationHeight = nodes.head.lastBlock
-      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders
+      val lastBlockAfterActivationHeight = nodes.head.lastBlock()
+      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders()
       val blockAfterActivationHeight = nodes.head.blockAt(ActivationHeight)
       val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(ActivationHeight)
       val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAfterActivationHeight.signature)
@@ -119,7 +119,7 @@ class BlockV5TestSuite
 
       val blockBeforeActivationHeight1 = nodes.head.blockAt(ActivationHeight - 1)
       blockBeforeActivationHeight1.version.value shouldBe Block.RewardBlockVersion
-      val returnedTxIds = nodes.head.utx.map(tx => tx.id)
+      val returnedTxIds = nodes.head.utx().map(tx => tx.id)
 
       nodes.head.waitForHeight(ActivationHeight, 2.minutes)
       val blockAtActivationHeight1 = nodes.head.blockAt(ActivationHeight)
