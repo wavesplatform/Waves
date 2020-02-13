@@ -38,7 +38,7 @@ trait IntegrationSuiteWithThreeAddresses
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    val defaultBalance: Long = 10000.waves
+    val defaultBalance: Long = 100.waves
 
     def dumpBalances(node: Node, accounts: Seq[String], label: String): Unit = {
       accounts.foreach(acc => {

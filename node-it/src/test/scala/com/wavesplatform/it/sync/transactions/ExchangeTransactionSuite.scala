@@ -205,7 +205,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     }
   }
 
-  test("exchange tx with orders v4 can use price impossible with orders v3/v2/v1") {
+  test("exchange tx with orders v4 can use price that is impossible for orders v3/v2/v1") {
 
     sender.transfer(sender.address, firstAddress, 1000.waves, waitForTx = true)
 
@@ -233,7 +233,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         seller.toAddress.stringRepr,
         "some",
         "6 decimals asset",
-        quantity = 100L,
+        quantity = 1000000L,
         decimals = 6,
         reissuable = false,
         script = None,
@@ -290,8 +290,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     val sellerBalanceAfterFirstExchange = sender.balanceDetails(sellerAddress).regular
     val buyerBalanceAfgerFirstExchange  = sender.balanceDetails(buyerAddress).regular
-    val bal = sender.assetBalance(buyerAddress, dec6AssetId).balance
-    val bal2 = sender.assetBalance(sellerAddress, dec6AssetId)
 
     val tx2 =
       ExchangeTransaction
@@ -314,8 +312,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     sender.nftAssetsBalance(buyerAddress, limit = 1) shouldBe empty
     sender.nftAssetsBalance(sellerAddress, 1).head.assetId shouldBe nftAsset
-    sender.assetBalance(buyerAddress, dec6AssetId) shouldBe 0
-    sender.assetBalance(sellerAddress, dec6AssetId) shouldBe 100
+    sender.assetBalance(sellerAddress, dec6AssetId).balance shouldBe 0
+    sender.assetBalance(buyerAddress, dec6AssetId).balance shouldBe 1000000
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalanceAfterFirstExchange - matcherFee
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfgerFirstExchange - matcherFee
 
