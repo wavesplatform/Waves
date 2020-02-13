@@ -120,21 +120,21 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = negativeTransfer, fee = calcMassTransferFee(negativeTransfer.size)),
       "One of the transfers has negative amount",
-      Code.INTERNAL
+      Code.INVALID_ARGUMENT
     )
 
     val tooManyTransfers = List.fill(MaxTransferCount + 1)(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), 1))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = tooManyTransfers, fee = calcMassTransferFee(MaxTransferCount + 1)),
       s"Number of transfers ${MaxTransferCount + 1} is greater than 100",
-      Code.INTERNAL
+      Code.INVALID_ARGUMENT
     )
 
     val tooBigAttachment = ByteString.copyFrom(("a" * (MaxAttachmentSize + 1)).getBytes("UTF-8"))
     assertGrpcError(
       sender.broadcastMassTransfer(firstAcc, transfers = defaultTransfer, attachment = tooBigAttachment, fee = calcMassTransferFee(1)),
-      "TooBigArray",
-      Code.INTERNAL
+      "Too big sequences requested",
+      Code.INVALID_ARGUMENT
     )
 
     sender.wavesBalance(firstAddress) shouldBe firstBalance

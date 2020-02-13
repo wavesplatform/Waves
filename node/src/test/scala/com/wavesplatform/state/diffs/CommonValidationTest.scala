@@ -98,30 +98,30 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
       val issueTx =
         if (smartToken)
           IssueTransaction(
-              TxVersion.V2,
-              richAcc,
-              "test".utf8Bytes,
-              "desc".utf8Bytes,
-              Long.MaxValue,
-              2,
-              reissuable = false,
-              Some(script),
-              Constants.UnitsInWave,
-              ts
-            ).signWith(richAcc)
+            TxVersion.V2,
+            richAcc,
+            "test".utf8Bytes,
+            "desc".utf8Bytes,
+            Long.MaxValue,
+            2,
+            reissuable = false,
+            Some(script),
+            Constants.UnitsInWave,
+            ts
+          ).signWith(richAcc)
         else
           IssueTransaction(
-              TxVersion.V1,
-              richAcc,
-              "test".utf8Bytes,
-              "desc".utf8Bytes,
-              Long.MaxValue,
-              2,
-              reissuable = false,
-              script = None,
-              Constants.UnitsInWave,
-              ts
-            ).signWith(richAcc)
+            TxVersion.V1,
+            richAcc,
+            "test".utf8Bytes,
+            "desc".utf8Bytes,
+            Long.MaxValue,
+            2,
+            reissuable = false,
+            script = None,
+            Constants.UnitsInWave,
+            ts
+          ).signWith(richAcc)
 
       val transferWavesTx = TransferTransaction
         .selfSigned(1.toByte, richAcc, recipientAcc, Waves, 10 * Constants.UnitsInWave, Waves, 1 * Constants.UnitsInWave, None, ts)
