@@ -16,8 +16,8 @@ import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
@@ -29,8 +29,8 @@ import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
-import scala.concurrent.{Await, Future}
 import scala.concurrent.duration._
+import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
 object Importer extends ScorexLogging {
@@ -108,7 +108,7 @@ object Importer extends ScorexLogging {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
       StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings, enablePriorityPool = false)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 

@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
-import java.net.{InetSocketAddress, URLEncoder}
-import java.nio.charset.StandardCharsets
+import java.net.InetSocketAddress
 import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
@@ -20,14 +19,11 @@ import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.api.SyncHttpApi.sync
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions, Recipient, _}
-import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -311,6 +307,9 @@ object SyncHttpApi extends Assertions {
 
     def transactionInfo(txId: String): TransactionInfo =
       sync(async(n).transactionInfo(txId))
+
+    def transactionStatus(txIds: Seq[String]): Seq[TransactionStatus] =
+      sync(async(n).transactionsStatus(txIds))
 
     def transactionsByAddress(address: String, limit: Int): Seq[TransactionInfo] =
       sync(async(n).transactionsByAddress(address, limit))
