@@ -90,7 +90,8 @@ package object appender extends ScorexLogging {
     } yield baseHeight
 
   private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
-      block: Block,
+      block: Block
+  ,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] =
     metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { maybeDiscardedTxs =>

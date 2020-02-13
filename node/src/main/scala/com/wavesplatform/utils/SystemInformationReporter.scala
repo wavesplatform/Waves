@@ -15,7 +15,7 @@ object SystemInformationReporter extends ScorexLogging {
         "waves.custom.genesis",
         "waves.wallet",
         "waves.rest-api.api-key-hash",
-        "metrics.influx-db",
+        "metrics.influx-db"
       ).foldLeft(orig)(_.withoutPath(_))
     }
 
@@ -27,7 +27,7 @@ object SystemInformationReporter extends ScorexLogging {
 
     val logInfo: Seq[(String, Any)] = Seq(
       "Available processors" -> Runtime.getRuntime.availableProcessors,
-      "Max memory available" -> Runtime.getRuntime.maxMemory,
+      "Max memory available" -> Runtime.getRuntime.maxMemory
     ) ++ Seq(
       "os.name",
       "os.version",
