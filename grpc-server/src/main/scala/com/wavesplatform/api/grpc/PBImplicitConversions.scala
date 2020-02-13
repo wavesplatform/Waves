@@ -5,6 +5,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.{ChainId, Proofs}
@@ -17,28 +18,11 @@ trait PBImplicitConversions {
   }
 
   implicit class PBSignedTransactionConversions(tx: PBSignedTransaction) {
-    def toVanilla: VanillaTransaction = PBTransactions.vanilla(tx).explicitGet()
-  }
-
-  implicit class PBTransactionConversions(tx: PBTransaction) {
-    def toVanilla: VanillaTransaction = PBSignedTransaction(Some(tx)).toVanilla
-    def sender: PublicKey             = PublicKey(tx.senderPublicKey.toByteArray)
-
-    def signed(signer: PrivateKey): PBSignedTransaction = {
-      import com.wavesplatform.common.utils._
-      PBSignedTransaction(
-        Some(tx),
-        Proofs.create(Seq(ByteStr(crypto.sign(signer, toVanilla.bodyBytes())))).explicitGet().map(bs => ByteString.copyFrom(bs.arr))
-      )
-    }
+    def toVanilla: Either[ValidationError, VanillaTransaction] = PBTransactions.vanilla(tx)
   }
 
   implicit class VanillaBlockConversions(block: VanillaBlock) {
     def toPB: PBBlock = PBBlocks.protobuf(block)
-  }
-
-  implicit class PBBlockConversions(block: PBBlock) {
-    def toVanilla: VanillaBlock = PBBlocks.vanilla(block).get
   }
 
   implicit class PBBlockHeaderConversionOps(header: PBBlock.Header) {
@@ -72,13 +56,11 @@ trait PBImplicitConversions {
 
   implicit class PBRecipientConversions(r: Recipient) {
     def toAddress: Address               = PBRecipients.toAddress(r, ChainId.global).explicitGet()
-    def toAlias: Alias                   = PBRecipients.toAlias(r, ChainId.global).explicitGet()
     def toAddressOrAlias: AddressOrAlias = PBRecipients.toAddressOrAlias(r, ChainId.global).explicitGet()
   }
 
   implicit class VanillaByteStrConversions(bytes: ByteStr) {
     def toPBByteString: ByteString = ByteString.copyFrom(bytes.arr)
-    def toPublicKey: PublicKey     = PublicKey(bytes)
   }
 
   implicit class PBByteStringConversions(bytes: ByteString) {
@@ -96,7 +78,7 @@ trait PBImplicitConversions {
   }
 
   private[this] def intToShort(int: Int): Short = {
-    require(int >= 0 && int <= 65535, s"Short overflow: $int")
+    require(int.isValidShort, s"Short overflow: $int")
     int.toShort
   }
 }

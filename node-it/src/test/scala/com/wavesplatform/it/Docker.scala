@@ -316,6 +316,12 @@ class Docker(suiteConfig: Config = empty, tag: String = "", enableProfiling: Boo
     id
   }
 
+  def printThreadDump(node: DockerNode): Unit = {
+    val id = node.containerId
+    log.info(s"Saving thread dump for: $id")
+    client.killContainer(id, DockerClient.Signal.SIGQUIT)
+  }
+
   def startContainer(id: String): Unit = {
     client.startContainer(id)
     nodes.asScala.find(_.containerId == id).foreach { node =>

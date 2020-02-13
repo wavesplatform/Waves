@@ -163,15 +163,20 @@ object CommonValidation {
       else Left(GenericError(s"Unknown version of $name transaction: ${t.version}"))
     }
 
-    tx match {
-      case _: PaymentTransaction => Right(tx)
-      case _: GenesisTransaction => Right(tx)
+    val versionsBarrier = tx match {
+      case p: LegacyPBSwitch if p.isProtobufVersion =>
+        activationBarrier(BlockchainFeatures.BlockV5)
 
       case v: VersionedTransaction if !v.builder.supportedVersions.contains(v.version) =>
         Left(GenericError(s"Invalid tx version: $v"))
 
-      case p: LegacyPBSwitch if p.isProtobufVersion =>
-        activationBarrier(BlockchainFeatures.BlockV5)
+      case _ =>
+        Right(tx)
+    }
+
+    val typedBarrier = tx match {
+      case _: PaymentTransaction => Right(tx)
+      case _: GenesisTransaction => Right(tx)
 
       case e: ExchangeTransaction if e.version == TxVersion.V1 => Right(tx)
       case exv2: ExchangeTransaction if exv2.version >= TxVersion.V2 =>
@@ -200,7 +205,7 @@ object CommonValidation {
       case sast: SetAssetScriptTransaction =>
         activationBarrier(BlockchainFeatures.SmartAssets).flatMap { _ =>
           sast.script match {
-            case None     => Left(GenericError("Cannot set empty script"))
+            case None     => Right(tx)
             case Some(sc) => scriptActivation(sc)
           }
         }
@@ -219,6 +224,11 @@ object CommonValidation {
 
       case _ => Left(GenericError("Unknown transaction must be explicitly activated"))
     }
+
+    for {
+      _ <- versionsBarrier
+      _ <- typedBarrier
+    } yield tx
   }
 
   def disallowTxFromFuture[T <: Transaction](settings: FunctionalitySettings, time: Long, tx: T): Either[ValidationError, T] = {

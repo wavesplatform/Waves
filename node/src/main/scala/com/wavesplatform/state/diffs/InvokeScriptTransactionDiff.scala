@@ -148,7 +148,7 @@ object InvokeScriptTransactionDiff {
 
           dataEntries = dataItems.map(dataItemToEntry)
 
-          _ <- TracedResult(checkDataEntries(dataEntries)).leftMap(GenericError(_))
+          _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(GenericError(_))
           _ <- TracedResult(
             Either.cond(
               actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
@@ -323,18 +323,31 @@ object InvokeScriptTransactionDiff {
     Diff(tx = tx, portfolios = feePart |+| payablePart)
   }
 
-  private def checkDataEntries(dataEntries: List[DataEntry[_]]): Either[String, Unit] =
-    if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
-      Left(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries")
-    } else if (dataEntries.exists(_.key.utf8Bytes.length > ContractLimits.MaxKeySizeInBytes)) {
-      Left(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}")
-    } else {
-      val totalDataBytes = dataEntries.map(_.toBytes.length).sum
-      if (totalDataBytes > ContractLimits.MaxWriteSetSizeInBytes)
-        Left(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes")
-      else
-        Right(())
-    }
+  private[this] def checkDataEntries(tx: InvokeScriptTransaction, dataEntries: Seq[DataEntry[_]]): Either[String, Unit] =
+    for {
+      _ <- Either.cond(
+        dataEntries.length <= ContractLimits.MaxWriteSetSize,
+        (),
+        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
+      )
+      _ <- Either.cond(
+        dataEntries.forall(_.key.utf8Bytes.length <= ContractLimits.MaxKeySizeInBytes),
+        (),
+        s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"
+      )
+
+      totalDataBytes = dataEntries.map(_.toBytes.length).sum
+      _ <- Either.cond(
+        totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
+        (),
+        s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
+      )
+      _ <- Either.cond(
+        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
+        (),
+        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
+      )
+    } yield ()
 
   private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],

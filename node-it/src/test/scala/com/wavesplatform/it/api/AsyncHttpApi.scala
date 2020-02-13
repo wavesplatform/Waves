@@ -28,11 +28,12 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{Attachment => PBAttachment, Recipient => PBRecipient, Script => _, _}
+import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient, Script => _, Attachment => PBAttachment, _}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
@@ -242,6 +243,10 @@ object AsyncHttpApi extends Assertions {
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
     def transactionInfo(txId: String): Future[TransactionInfo] = get(s"/transactions/info/$txId").as[TransactionInfo]
+
+
+    def transactionsStatus(txIds:Seq[String]):Future[Seq[TransactionStatus]] =
+      postJson(s"/transactions/status", Json.obj("ids" -> txIds)).as[List[TransactionStatus]]
 
     def transactionsByAddress(address: String, limit: Int): Future[Seq[TransactionInfo]] =
       get(s"/transactions/address/$address/limit/$limit").as[Seq[Seq[TransactionInfo]]].map(_.flatten)

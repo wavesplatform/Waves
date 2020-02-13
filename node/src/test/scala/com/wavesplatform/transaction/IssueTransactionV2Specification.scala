@@ -13,7 +13,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, utils}
-import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.utils._

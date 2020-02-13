@@ -29,6 +29,18 @@ class SetAssetScriptTransactionSpecification extends GenericTransactionSpecifica
       ) should produce("not Contract")
   }
 
+  property("can't be created with empty script") {
+    val gen = for {
+      acc   <- accountGen
+      asset <- bytes32gen
+      fee   <- smallFeeGen
+      ts    <- timestampGen
+      txEi = SetAssetScriptTransaction.selfSigned(TxVersion.V2, acc, IssuedAsset(asset), None, fee, ts)
+    } yield txEi
+
+    forAll(gen)(_ should produce("Cannot set empty script"))
+  }
+
   override def transactionParser: TransactionParser = SetAssetScriptTransaction
 
   override def updateProofs(tx: SetAssetScriptTransaction, p: Proofs): SetAssetScriptTransaction = tx.copy(1.toByte, proofs = p)

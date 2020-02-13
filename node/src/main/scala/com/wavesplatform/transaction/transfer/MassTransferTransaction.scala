@@ -11,11 +11,9 @@ import com.wavesplatform.transaction.serialization.impl.MassTransferTxSerializer
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction.validation.impl.MassTransferTxValidator
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
-import scala.annotation.meta.field
 import scala.util.{Either, Try}
 
 case class MassTransferTransaction(
@@ -69,10 +67,9 @@ object MassTransferTransaction extends TransactionParser {
   override def parseBytes(bytes: Array[Byte]): Try[MassTransferTransaction] =
     serializer.parseBytes(bytes)
 
-  @ApiModel
   case class Transfer(
-      @(ApiModelProperty @field)(dataType = "string", example = "3Mciuup51AxRrpSz7XhutnQYTkNT9691HAk", required = true) recipient: String,
-      @(ApiModelProperty @field)(dataType = "long", example = "3000000000", required = true) amount: Long
+      recipient: String,
+      amount: Long
   )
 
   object Transfer {
