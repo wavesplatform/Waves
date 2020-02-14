@@ -8,7 +8,6 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.{NoShrink, TestWallet}
 import org.scalamock.scalatest.PathMockFactory
