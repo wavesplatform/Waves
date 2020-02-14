@@ -106,7 +106,7 @@ object CommonAccountsApi extends ScorexLogging {
           }
         }
       }
-      Observable.fromIterable(entries)
+      Observable.fromIterable(entries).filterNot(_.isEmpty)
     }
 
     override def resolveAlias(alias: Alias): Either[ValidationError, Address] = blockchain.resolveAlias(alias)

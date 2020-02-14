@@ -334,7 +334,6 @@ class LevelDBWriter(
       }
 
       for ((leaseId, state) <- leaseStates) {
-        log.info(s"Lease $leaseId: active=$state")
         rw.put(Keys.leaseStatus(leaseId)(height), state)
         expiredKeys ++= updateHistory(rw, Keys.leaseStatusHistory(leaseId), threshold, Keys.leaseStatus(leaseId))
       }

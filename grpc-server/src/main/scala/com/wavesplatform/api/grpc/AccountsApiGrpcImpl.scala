@@ -62,11 +62,22 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
     }
 
   override def getDataEntries(request: DataRequest, responseObserver: StreamObserver[DataEntryResponse]): Unit = responseObserver.interceptErrors {
-    val stream = commonApi
-      .dataStream(request.address.toAddress, Option(request.key).filter(_.nonEmpty))
-      .map(de => DataEntryResponse(request.address, Some(PBTransactions.toPBDataEntry(de))))
 
-    responseObserver.completeWith(stream)
+
+    val stream = if (request.key.nonEmpty)
+      {
+        println(s"\n\t${Thread.currentThread().getName} REQ: ${request.key}\n")
+        val option = commonApi.data(request.address.toAddress, request.key)
+        println(s"\n\t${Thread.currentThread().getName} RES: $option\n")
+        Observable.fromIterable(option)
+      }
+    else {
+      println("\n\tREQ: key is empty")
+      commonApi.dataStream(request.address.toAddress, Option(request.key).filter(_.nonEmpty))
+    }
+
+
+    responseObserver.completeWith(stream.map(de => DataEntryResponse(request.address, Some(PBTransactions.toPBDataEntry(de)))))
   }
 
   override def resolveAlias(request: StringValue): Future[BytesValue] =

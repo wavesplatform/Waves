@@ -16,7 +16,8 @@ import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.protobuf.{StaticAssetInfo => PBStaticAssetInfo, AccountScriptInfo => PBAccountScriptInfo, AssetDetails => PBAssetDetails, BlockMeta => PBBlockMeta}
+import com.wavesplatform.database.protobuf.DataEntry.Value
+import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state._
@@ -26,7 +27,6 @@ import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
-
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -261,7 +261,7 @@ package object database extends ScorexLogging {
 
   def readAssetDetails(data: Array[Byte]): (AssetInfo, AssetVolumeInfo) = {
 
-    val pbad = PBAssetDetails.parseFrom(data)
+    val pbad = pb.AssetDetails.parseFrom(data)
 
     (
       AssetInfo(pbad.name, pbad.description, Height(pbad.lastRenamedAt)),
@@ -272,24 +272,27 @@ package object database extends ScorexLogging {
   def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
     val (info, volumeInfo) = ai
 
-    PBAssetDetails(
-      info.name,
-      info.description,
-      info.lastUpdatedAt,
-      volumeInfo.isReissuable,
-      ByteString.copyFrom(volumeInfo.volume.toByteArray)
-    ).toByteArray
+    pb.AssetDetails(
+        info.name,
+        info.description,
+        info.lastUpdatedAt,
+        volumeInfo.isReissuable,
+        ByteString.copyFrom(volumeInfo.volume.toByteArray)
+      )
+      .toByteArray
   }
 
-  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] = PBStaticAssetInfo(
-    ByteString.copyFrom(sai.source.arr),
-    ByteString.copyFrom(sai.issuer.arr),
-    sai.decimals,
-    sai.nft
-  ).toByteArray
+  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] =
+    pb.StaticAssetInfo(
+        ByteString.copyFrom(sai.source.arr),
+        ByteString.copyFrom(sai.issuer.arr),
+        sai.decimals,
+        sai.nft
+      )
+      .toByteArray
 
-  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo   = {
-    val sai = PBStaticAssetInfo.parseFrom(bb)
+  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
+    val sai = pb.StaticAssetInfo.parseFrom(bb)
     AssetStaticInfo(
       TransactionId(ByteStr(sai.sourceId.toByteArray)),
       PublicKey(sai.issuerPublicKey.toByteArray),
@@ -299,19 +302,20 @@ package object database extends ScorexLogging {
   }
 
   def writeBlockMeta(data: BlockMeta): Array[Byte] =
-    PBBlockMeta(
-      Some(PBBlocks.protobuf(data.header)),
-      ByteString.copyFrom(data.signature),
-      data.height,
-      data.size,
-      data.transactionCount,
-      data.totalFeeInWaves,
-      data.reward.getOrElse(-1L),
-      data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf))
-    ).toByteArray
+    pb.BlockMeta(
+        Some(PBBlocks.protobuf(data.header)),
+        ByteString.copyFrom(data.signature),
+        data.height,
+        data.size,
+        data.transactionCount,
+        data.totalFeeInWaves,
+        data.reward.getOrElse(-1L),
+        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf))
+      )
+      .toByteArray
 
   def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
-    val pbbm = PBBlockMeta.parseFrom(bs)
+    val pbbm = pb.BlockMeta.parseFrom(bs)
     BlockMeta(
       PBBlocks.vanilla(pbbm.header.get),
       ByteStr(pbbm.signature.toByteArray),
@@ -372,6 +376,23 @@ package object database extends ScorexLogging {
 
     ndo.toByteArray
   }
+
+  def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[_] =
+    pb.DataEntry.parseFrom(bs).value match {
+      case Value.Empty              => EmptyDataEntry(key)
+      case Value.IntValue(value)    => IntegerDataEntry(key, value)
+      case Value.BoolValue(value)   => BooleanDataEntry(key, value)
+      case Value.BinaryValue(value) => BinaryDataEntry(key, ByteStr(value.toByteArray))
+      case Value.StringValue(value) => StringDataEntry(key, value)
+    }
+
+  def writeDataEntry(e: DataEntry[_]): Array[Byte] = pb.DataEntry(e match {
+    case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
+    case BooleanDataEntry(_, value) =>pb.DataEntry.Value.BoolValue(value)
+    case BinaryDataEntry(_, value)  =>pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
+    case StringDataEntry(_, value)  =>pb.DataEntry.Value.StringValue(value)
+    case _: EmptyDataEntry          =>pb.DataEntry.Value.Empty
+  }).toByteArray
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
@@ -441,8 +462,8 @@ package object database extends ScorexLogging {
     ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
 
   def writeScript(scriptInfo: AccountScriptInfo): Array[Byte] = {
-    PBAccountScriptInfo.toByteArray(
-      PBAccountScriptInfo(
+    pb.AccountScriptInfo.toByteArray(
+      pb.AccountScriptInfo(
         ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes()),
         scriptInfo.verifierComplexity,
@@ -452,7 +473,7 @@ package object database extends ScorexLogging {
   }
 
   def readScript(b: Array[Byte]): AccountScriptInfo = {
-    val asi = PBAccountScriptInfo.parseFrom(b)
+    val asi = pb.AccountScriptInfo.parseFrom(b)
     AccountScriptInfo(
       PublicKey(asi.publicKey.toByteArray),
       ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),

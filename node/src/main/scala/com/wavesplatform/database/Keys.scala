@@ -82,7 +82,7 @@ object Keys {
   val DataHistoryPrefix: Short                                   = 33
   def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] = historyKey("data-history", 33, addressId.toByteArray ++ key.utf8Bytes)
   def data(addressId: BigInt, key: String)(height: Int): Key[Option[DataEntry[_]]] =
-    Key.opt("data", hBytes(34, addressId.toByteArray ++ key.utf8Bytes, height), DataEntry.parseValue(key, _, 0)._1, _.valueBytes)
+    Key.opt("data", hBytes(34, addressId.toByteArray ++ key.utf8Bytes, height), readDataEntry(key), writeDataEntry)
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey("sponsorship-history", 35, asset.id.arr)
   def sponsorship(asset: IssuedAsset)(height: Int): Key[SponsorshipValue] =

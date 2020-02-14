@@ -1,6 +1,7 @@
 package com.wavesplatform.network
 
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.network.message.{Message => ScorexMessage}
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
@@ -35,15 +36,16 @@ class TrafficLogger(settings: TrafficLogger.Settings) extends ChannelDuplexHandl
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = {
     codeOf(msg).filterNot(settings.ignoreRxMessages).foreach { code =>
-      log.trace(s"${id(ctx)} --> received($code): $msg")
+      log.trace(s"${id(ctx)} --> received($code): ${stringify(msg)}")
     }
 
     super.channelRead(ctx, msg)
   }
 
-  private def stringify(msg: Any) = msg match {
+  private def stringify(msg: Any): String = msg match {
     case tx: Transaction => tx.json().toString()
     case b: Block        => b.uniqueId.toString
+    case RawBytes(_, data) => Base64.encode(data)
     case other           => other.toString
   }
 }

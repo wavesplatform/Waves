@@ -36,3 +36,12 @@ message StaticAssetInfo {
     int32 decimals = 3;
     bool is_nft = 4;
 }
+
+message DataEntry {
+    oneof value {
+        int64 int_value = 1;
+        bool bool_value = 2;
+        bytes binary_value = 3;
+        string string_value = 4;
+    }
+}

@@ -63,11 +63,6 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         putDataEntries.takeRight(25).map(kv => EmptyDataEntry(kv.key)) ++ // 25 keys to remove
         (1 to 25).map(k => EmptyDataEntry(s"unknown-$k"))                 // 20 unknown keys to remove
 
-    assertApiError(
-      sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries), version = TxVersion.V1),
-      CustomValidationError("Empty data is not allowed in V1")
-    )
-
     val updateAndRemoveTxId =
       sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries)).id
 

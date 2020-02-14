@@ -4,6 +4,9 @@ import java.net.{InetSocketAddress, SocketAddress, URI}
 import java.util.concurrent.Callable
 
 import cats.Eq
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.group.{ChannelGroup, ChannelGroupFuture, ChannelMatcher}
 import io.netty.channel.local.LocalAddress
@@ -11,13 +14,10 @@ import io.netty.channel.socket.nio.NioSocketChannel
 import io.netty.channel.{Channel, ChannelHandlerContext}
 import io.netty.util.NetUtil.toSocketAddressString
 import io.netty.util.concurrent.{EventExecutorGroup, ScheduledFuture}
+import kamon.Kamon
 import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.transaction.Transaction
-import kamon.Kamon
 
 import scala.concurrent.duration._
 
@@ -102,8 +102,15 @@ package object network extends ScorexLogging {
     private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
       case RawBytes(TransactionSpec.messageCode | PBTransactionSpec.messageCode, _) =>
       case _ =>
-        val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
-        log.trace(s"Broadcasting $message to ${allChannels.size()} channels$exceptMsg")
+        log.trace {
+          val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
+          val msgString = message match {
+            case t: Transaction => s"transaction ${t.id()}"
+            case BlockForged(b) => s"block ${b.uniqueId}"
+            case other          => other.toString
+          }
+          s"Broadcasting $msgString to ${allChannels.size()} channels$exceptMsg"
+        }
     }
   }
 
