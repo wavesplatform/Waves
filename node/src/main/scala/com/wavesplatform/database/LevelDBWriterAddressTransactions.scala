@@ -6,6 +6,7 @@ import cats.effect.Resource
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.state.extensions.AddressTransactions
 import com.wavesplatform.state.{AddressId, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Transaction.Type
@@ -53,7 +54,11 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
 
         (
           takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
-            .flatMap { case (height, _, txNum) => db.get(Keys.transactionAt(height, txNum)).map((height, txNum, _)) },
+            .flatMap {
+              case (height, _, txNum) =>
+                db.get(Keys.transactionAt(height, txNum, levelDBWriter.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(_ <= height)))
+                  .map((height, txNum, _))
+            },
           () => ()
         )
       } else {

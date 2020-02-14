@@ -2,10 +2,19 @@ syntax = "proto3";
 package waves.api;
 option java_package = "com.wavesplatform.database.protobuf";
 
+import "waves/block.proto";
+
 message AssetDetails {
     bytes name = 1;
     bytes description = 2;
     int32 last_renamed_at = 3;
     bool reissuable = 4;
     bytes total_volume = 5;
+}
+
+message BlockInfo {
+    Block.Header header = 1;
+    bytes signature = 2;
+    int32 transaction_count = 3;
+    int32 size = 4;
 }

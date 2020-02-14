@@ -30,6 +30,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   val dbSettings: DBSettings
 
   @volatile
+  protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
+  protected def loadActivatedFeatures(): Map[Short, Int]
+  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
+
+  @volatile
   private var current = (loadHeight(), loadScore(), loadLastBlock())
 
   protected def loadHeight(): Int
@@ -185,11 +190,6 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
   protected def loadApprovedFeatures(): Map[Short, Int]
   override def approvedFeatures: Map[Short, Int] = approvedFeaturesCache
-
-  @volatile
-  protected var activatedFeaturesCache: Map[Short, Int] = loadActivatedFeatures()
-  protected def loadActivatedFeatures(): Map[Short, Int]
-  override def activatedFeatures: Map[Short, Int] = activatedFeaturesCache
 
   @volatile
   protected var lastBlockRewardCache: Option[Long] = loadLastBlockReward()

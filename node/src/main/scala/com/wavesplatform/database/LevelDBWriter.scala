@@ -1,11 +1,13 @@
 package com.wavesplatform.database
 
+import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 
 import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
+import com.google.protobuf.{CodedInputStream, CodedOutputStream}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -16,7 +18,6 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -57,7 +58,6 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
   private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
     v.takeWhile(_ <= h).lastOption // Should we use binary search?
   }
-
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -142,7 +142,7 @@ class LevelDBWriter(
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
+  override def accountData(address: Address): AccountDataInfo = readOnly { _ =>
     AccountDataInfo((for {
       key   <- accountDataKeys(address)
       value <- accountData(address, key) if !value.isInstanceOf[EmptyDataEntry]
@@ -286,7 +286,7 @@ class LevelDBWriter(
         k -> v
       }.toMap
 
-    rw.put(Keys.blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
+    rw.put(blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -447,7 +447,7 @@ class LevelDBWriter(
     }
 
     for ((id, (tx, num)) <- transactions) {
-      rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+      rw.put(transactionAt(Height(height), num), Some(tx))
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
@@ -505,7 +505,7 @@ class LevelDBWriter(
     expiredKeys.foreach(rw.delete(_, "expired-keys"))
 
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
-      DisableHijackedAliases(rw)
+      DisableHijackedAliases(rw, activatedFeatures.get(BlockchainFeatures.BlockV5.id))
     }
 
     rw.put(Keys.hitSource(height), hitSource.arr)
@@ -531,7 +531,7 @@ class LevelDBWriter(
           rw.put(Keys.height, currentHeight - 1)
 
           val BlockInfo(discardedHeader, _, _, discardedSignature) = rw
-            .get(Keys.blockInfoAt(h))
+            .get(blockInfoAt(h))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
@@ -632,12 +632,12 @@ class LevelDBWriter(
               }
 
               if (tx.typeId != GenesisTransaction.typeId) {
-                rw.delete(Keys.transactionAt(h, num))
+                rw.delete(transactionAt(h, num))
                 rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
               }
           }
 
-          rw.delete(Keys.blockInfoAt(h))
+          rw.delete(blockInfoAt(h))
           rw.delete(Keys.heightOf(discardedSignature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -661,7 +661,7 @@ class LevelDBWriter(
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
         accountDataToInvalidate.result().foreach {
-          case ak @ (addr, _) =>
+          case ak @ (_, _) =>
             discardAccountData(ak)
         }
         discardedBlock
@@ -699,7 +699,7 @@ class LevelDBWriter(
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      transaction   <- db.get(Keys.transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
+      transaction   <- db.get(transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
     } yield height -> transaction.asInstanceOf[TransferTransaction]
   }
 
@@ -709,7 +709,7 @@ class LevelDBWriter(
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
-      tx            <- db.get(Keys.transactionAt(height, num))
+      tx            <- db.get(transactionAt(height, num))
     } yield (height, tx)
   }
 
@@ -753,15 +753,15 @@ class LevelDBWriter(
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
-            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
-              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+            val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+            (wh, b)
+          }
         case asset @ IssuedAsset(_) =>
-            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
-              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+            val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+            (wh, b)
+          }
       }
     }
   }
@@ -834,7 +834,7 @@ class LevelDBWriter(
       leaseId <- probablyActiveLeases
       if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
       (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx     <- db.get(Keys.transactionAt(h, n))
+      tx     <- db.get(transactionAt(h, n))
     } yield tx
 
     activeLeaseTransactions.collect {
@@ -856,11 +856,11 @@ class LevelDBWriter(
   }
 
   override def loadBlockInfo(height: Int): Option[BlockInfo] = {
-    writableDB.get(Keys.blockInfoAt(Height(height)))
+    writableDB.get(blockInfoAt(Height(height)))
   }
 
   def loadBlockInfo(height: Int, db: ReadOnlyDB): Option[BlockInfo] = {
-    db.get(Keys.blockInfoAt(Height(height)))
+    db.get(blockInfoAt(Height(height)))
   }
 
   override def loadBlockInfo(blockId: ByteStr): Option[BlockInfo] = {
@@ -872,58 +872,83 @@ class LevelDBWriter(
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
     import com.wavesplatform.crypto._
 
-    val height = Height(h)
+    val height  = Height(h)
+    val isProto = isProtoBlock(height)
 
-    val headerKey = Keys.blockHeaderBytesAt(height)
+    val infoKey = Keys.blockInfoBytesAt(height, isProto)
 
-    def readTransactionBytes(version: Byte, count: Int) = {
+    def transactionBytes(count: Int): Seq[Array[Byte]] = {
       (0 until count).toArray.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-          .map { tx =>
-            val txBytes = version match {
-              case Block.ProtoBlockVersion => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
-              case _ => tx.bytes()
-            }
-            Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)
-          }
-          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
+        db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
       }
     }
 
-    db.get(headerKey)
-      .map { headerBytes => // TODO: Only protobuf serialization
-        val version             = headerBytes.head
-        val consensusDataOffset = 1 + Longs.BYTES + SignatureLength // version + timestamp + reference
-        val genSigLength        = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-        val txCountOffset       = consensusDataOffset + Longs.BYTES + genSigLength // baseTarget + genSig
-        val bytesBeforeCData    = headerBytes.take(consensusDataOffset)
-        val consensusDataBytes  = headerBytes.slice(consensusDataOffset, consensusDataOffset + Longs.BYTES + genSigLength)
+    db.get(infoKey)
+      .map { infoBytes =>
+        if (isProto) {
+          import com.google.protobuf.WireFormat._
+          import com.wavesplatform.database.protobuf.{BlockInfo => PBlockInfo}
+          import com.wavesplatform.protobuf.block.{Block => PBlock}
 
-        val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
-          val byte = headerBytes(txCountOffset)
-          (byte.toInt, Array[Byte](byte))
-        } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + Ints.BYTES)
-          (Ints.fromByteArray(bytes), bytes)
-        }
+          val codedInput  = CodedInputStream.newInstance(infoBytes)
+          val blockBytes  = new ByteArrayOutputStream()
+          val codedOutput = CodedOutputStream.newInstance(blockBytes)
 
-        val bytesAfterTxs =
-          if (version > Block.PlainBlockVersion) {
-            headerBytes.drop(txCountOffset + txCountBytes.length)
-          } else {
-            headerBytes.takeRight(SignatureLength + KeyLength) // featureVotes dropped
+          codedInput.readTag()
+          val hSize  = codedInput.readRawVarint32()
+          val hBytes = codedInput.readRawBytes(hSize)
+          codedOutput.writeTag(PBlock.HEADER_FIELD_NUMBER, WIRETYPE_LENGTH_DELIMITED)
+          codedOutput.writeUInt32NoTag(hSize)
+          codedOutput.writeRawBytes(hBytes)
+
+          codedInput.readTag()
+          codedOutput.writeBytes(PBlock.SIGNATURE_FIELD_NUMBER, codedInput.readBytes())
+
+          val mayBeTxsCountTag = codedInput.readTag()
+          if (getTagFieldNumber(mayBeTxsCountTag) == PBlockInfo.TRANSACTION_COUNT_FIELD_NUMBER) {
+            val txCount = codedInput.readRawVarint32()
+            transactionBytes(txCount).foreach { tx =>
+              codedOutput.writeTag(PBlock.TRANSACTIONS_FIELD_NUMBER, WIRETYPE_LENGTH_DELIMITED)
+              codedOutput.writeByteArrayNoTag(tx)
+            }
           }
 
-        val txBytes = txCountBytes ++ readTransactionBytes(version, txCount)
+          codedOutput.flush()
+          blockBytes.toByteArray
+        } else {
+          val headerBytes         = infoBytes.drop(4)
+          val version             = headerBytes.head
+          val consensusDataOffset = 1 + Longs.BYTES + SignatureLength // version + timestamp + reference
+          val txCountOffset       = consensusDataOffset + Longs.BYTES + Block.GenerationSignatureLength // baseTarget + genSig
+          val bytesBeforeCData    = headerBytes.take(consensusDataOffset)
+          val consensusDataBytes  = headerBytes.slice(consensusDataOffset, consensusDataOffset + Longs.BYTES + Block.GenerationSignatureLength)
 
-        val bytes = bytesBeforeCData ++
-          Ints.toByteArray(consensusDataBytes.length) ++
-          consensusDataBytes ++
-          Ints.toByteArray(txBytes.length) ++
-          txBytes ++
-          bytesAfterTxs
+          val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
+            val byte = headerBytes(txCountOffset)
+            (byte.toInt, Array[Byte](byte))
+          } else {
+            val bytes = headerBytes.slice(txCountOffset, txCountOffset + Ints.BYTES)
+            (Ints.fromByteArray(bytes), bytes)
+          }
 
-        bytes
+          val bytesAfterTxs =
+            if (version > Block.PlainBlockVersion) {
+              headerBytes.drop(txCountOffset + txCountBytes.length)
+            } else {
+              headerBytes.takeRight(SignatureLength + KeyLength) // featureVotes dropped
+            }
+
+          val txBytes = txCountBytes ++ transactionBytes(txCount).flatMap { txBytes =>
+            Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)
+          }
+
+          bytesBeforeCData ++
+            Ints.toByteArray(consensusDataBytes.length) ++
+            consensusDataBytes ++
+            Ints.toByteArray(txBytes.length) ++
+            txBytes ++
+            bytesAfterTxs
+        }
       }
   }
 
@@ -943,7 +968,7 @@ class LevelDBWriter(
     (currentHeight until (currentHeight - howMany).max(0) by -1)
       .map { h =>
         val height = Height(h)
-        db.get(Keys.blockInfoAt(height))
+        db.get(blockInfoAt(height))
       }
       .collect {
         case Some(BlockInfo(_, _, _, signature)) => signature
@@ -955,7 +980,7 @@ class LevelDBWriter(
       (parentHeight + 1 to (parentHeight + howMany))
         .map { h =>
           val height = Height(h)
-          db.get(Keys.blockInfoAt(height))
+          db.get(blockInfoAt(height))
         }
         .collect {
           case Some(BlockInfo(_, _, _, signature)) => signature
@@ -980,7 +1005,7 @@ class LevelDBWriter(
       .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
-        db.get(Keys.blockInfoAt(height))
+        db.get(blockInfoAt(height))
           .map(_.header.featureVotes.toSeq)
           .getOrElse(Seq.empty)
       }
@@ -994,7 +1019,7 @@ class LevelDBWriter(
         settings.rewardsSettings
           .votingWindow(activatedAt, height)
           .flatMap { h =>
-            db.get(Keys.blockInfoAt(Height(h)))
+            db.get(blockInfoAt(Height(h)))
               .map(_.header.rewardVote)
           }
       case _ => Seq()
@@ -1021,12 +1046,12 @@ class LevelDBWriter(
   }
 
   private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = Keys.blockInfoAt(height)
+    val headerKey = blockInfoAt(height)
 
     for {
       BlockInfo(header, _, transactionCount, signature) <- db.get(headerKey)
       txs = (0 until transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+        db.get(transactionAt(height, TxNum(n.toShort)))
       }
       block <- createBlock(header, signature, txs).toOption
     } yield block
@@ -1047,10 +1072,21 @@ class LevelDBWriter(
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
+        tx = if (isProtoBlock(h)) PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
+        else TransactionParsers.parseBytes(v).get
       } txs.append((TxNum(idx), tx))
     }
 
     txs.toList
   }
+
+  private def isProtoBlock(h: Height): Boolean = {
+    activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(_ <= h)
+  }
+
+  private def blockInfoAt(h: Height): Key[Option[BlockInfo]] =
+    Keys.blockInfoAt(h, isProtoBlock(h))
+
+  private def transactionAt(h: Height, n: TxNum): Key[Option[Transaction]] =
+    Keys.transactionAt(h, n, isProtoBlock(h))
 }

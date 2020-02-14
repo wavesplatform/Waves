@@ -162,7 +162,7 @@ class LevelDBWriterSpec
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransaction
-      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, None, ts)
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, None, ts)
       .explicitGet()
   }
 
@@ -186,7 +186,12 @@ class LevelDBWriterSpec
   }
 
   "correctly reassemble block from header and transactions" in {
-    val rw        = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val rw = TestLevelDB.withFunctionalitySettings(
+      db,
+      ignoreSpendableBalanceChanged,
+      TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(15.toShort -> 5)),
+      dbSettings
+    )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
@@ -218,24 +223,52 @@ class LevelDBWriterSpec
           )
         )
 
+      val block4 = TestBlock
+        .create(
+          ts + 17,
+          block3.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 13),
+            createTransfer(master, recipient.toAddress, ts + 14)
+          ),
+          version = Block.ProtoBlockVersion
+        )
+
+      val block5 = TestBlock
+        .create(
+          ts + 24,
+          block4.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 20),
+            createTransfer(master, recipient.toAddress, ts + 21)
+          ),
+          version = Block.ProtoBlockVersion
+        )
+
       bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) shouldBe 'right
       bcu.processBlock(block1, block1.header.generationSignature) shouldBe 'right
       bcu.processBlock(block2, block2.header.generationSignature) shouldBe 'right
       bcu.processBlock(block3, block3.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
 
       bcu.blockAt(1).get shouldBe genesisBlock
       bcu.blockAt(2).get shouldBe block1
       bcu.blockAt(3).get shouldBe block2
       bcu.blockAt(4).get shouldBe block3
+      bcu.blockAt(5).get shouldBe block4
+      bcu.blockAt(6).get shouldBe block5
 
       for (i <- 1 to db.get(Keys.height)) {
-        db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
+        db.get(Keys.blockInfoAt(Height(i), i >= 5)).isDefined shouldBe true
       }
 
       bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
       bcu.blockBytes(2).get shouldBe block1.bytes()
       bcu.blockBytes(3).get shouldBe block2.bytes()
       bcu.blockBytes(4).get shouldBe block3.bytes()
+      bcu.blockBytes(5).get shouldBe block4.bytes()
+      bcu.blockBytes(6).get shouldBe block5.bytes()
 
     } finally {
       bcu.shutdown()
