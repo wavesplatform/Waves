@@ -45,8 +45,6 @@ object Metrics extends ScorexLogging {
             .tag("node", settings.nodeId.toString)
             .time(ts, TimeUnit.MILLISECONDS)
             .build()
-
-          // log.trace(s"Point written: $point")
           db.write(point)
         } catch {
           case NonFatal(e) => log.warn(s"Failed to send data to InfluxDB (${e.getMessage})")
