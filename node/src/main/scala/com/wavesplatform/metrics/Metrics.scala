@@ -18,6 +18,7 @@ object Metrics extends ScorexLogging {
   case class InfluxDbSettings(
       uri: URI,
       db: String,
+      retentionPolicy: String,
       username: Option[String],
       password: Option[String],
       batchActions: Int,
@@ -74,6 +75,7 @@ object Metrics extends ScorexLogging {
           InfluxDBFactory.connect(dbSettings.uri.toString)
         }
         x.setDatabase(dbSettings.db)
+        x.setRetentionPolicy(dbSettings.retentionPolicy)
         x.enableBatch(dbSettings.batchActions, dbSettings.batchFlashDuration.toSeconds.toInt, TimeUnit.SECONDS)
 
         try {
