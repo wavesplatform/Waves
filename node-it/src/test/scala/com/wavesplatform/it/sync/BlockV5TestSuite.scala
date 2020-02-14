@@ -153,7 +153,7 @@ class BlockV5TestSuite
 
   "VRF" - {
     "is present in API" in {
-      nodes.head.lastBlockHeaders.vrf shouldBe 'defined
+      nodes.head.lastBlockHeaders().vrf shouldBe 'defined
 
       val (headersBeforeV5, headersV5) =
         nodes.head.blockHeadersSeq(1, nodes.head.height).partition(bh => bh.height < ActivationHeight)
@@ -185,8 +185,8 @@ class BlockV5TestSuite
             all(addressBlocksAfterV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
         }
 
-      nodes.head.lastBlock.vrf shouldBe 'defined
-      ByteStr.decodeBase58(nodes.head.lastBlock.vrf.value).get.length shouldBe Block.HitSourceLength
+      nodes.head.lastBlock().vrf shouldBe 'defined
+      ByteStr.decodeBase58(nodes.head.lastBlock().vrf.value).get.length shouldBe Block.HitSourceLength
 
       val (blocksBeforeV5, blocksV5) =
         nodes.head.blockSeq(1, nodes.head.height).partition(b => b.height < ActivationHeight)
