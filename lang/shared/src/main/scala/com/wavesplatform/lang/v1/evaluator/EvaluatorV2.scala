@@ -5,16 +5,33 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
+import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.traits.Environment
 
 class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
+  object Context {
+    def apply(context: EvaluationContext[Environment, Id]): Context = {
+      def extractLet(let: LazyVal[Id]) =
+        (let.value.value.explicitGet(), Context(environment = context.environment), true)
+
+      Context(
+        functions = context.functions,
+        //lets = context.letDefs.mapValues(extractLet), todo
+        types = context.typeDefs,
+        environment = context.environment
+      )
+    }
+  }
+
   case class Context(
     lets: Map[String, (EXPR, Context, Boolean)] = Map(),
-    functions: Map[FunctionHeader, BaseFunction[NoContext]] = Map(),
+    functions: Map[FunctionHeader, BaseFunction[Environment]] = Map(),
+    types: Map[String, FINAL] = Map(),
+    environment: Environment[Id],
     cost: Int = 0
   ) {
-    def isExhausted: Boolean =
+    val isExhausted: Boolean =
       cost >= limit
 
     def withCost(addCost: Int): Context =
@@ -23,13 +40,15 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     def withLet(newLet: LET, isEvaluated: Boolean): Context =
       copy(lets = lets + (newLet.name -> (newLet.value, this, isEvaluated)))
 
-    def withFunction(function: UserFunction[NoContext]): Context =
+    def withFunction(function: UserFunction[Environment]): Context =
       copy(functions = functions + (function.header -> function))
 
     def combine(that: Context): Context =
       Context(
         lets ++ that.lets,
         functions ++ that.functions,
+        types,
+        environment,
         Math.max(cost, that.cost)
       )
   }
@@ -66,7 +85,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
   }
 
   private def evaluateFunctionBlock(funcDef: FUNC, nextExpr: EXPR, ctx: Context): (EXPR, Context) = {
-    val function = UserFunction[NoContext](funcDef.name, 0, null, funcDef.args.map(n => (n, null)): _*)(funcDef.body)
+    val function = UserFunction[Environment](funcDef.name, 0, null, funcDef.args.map(n => (n, null)): _*)(funcDef.body)
     val (nextExprResult, nextExprCtx) = root(nextExpr, ctx.withFunction(function))
     val resultExpr =
       if (nextExprResult.isInstanceOf[EVALUATED]) nextExprResult
@@ -87,15 +106,25 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     }
   }
 
-  private def evaluateFunctionCall(header: FunctionHeader, args: List[EXPR], ctx: Context): (EXPR, Context) = {
-    val function = ctx.functions(header)
-    val (resultCtx, evaluatedArgs) = evaluateFunctionArgs(args, ctx)
+  private def evaluateFunctionCall(
+    header: FunctionHeader,
+    args: List[EXPR],
+    ctx: Context
+  ): (EXPR, Context) = {
+    val (resultCtx, resultArgs) = evaluateFunctionArgs(args, ctx)
     if (resultCtx.isExhausted) {
-      val call = FUNCTION_CALL(header, evaluatedArgs ::: args.drop(evaluatedArgs.size))
+      val call = FUNCTION_CALL(header, resultArgs ::: args.drop(resultArgs.size))
       (call, resultCtx)
     }
-    else
-      evaluateFunctionBody(function, resultCtx, evaluatedArgs.asInstanceOf[List[EVALUATED]]) //todo type safety
+    else {
+      val evaluatedArgs = resultArgs.asInstanceOf[List[EVALUATED]]      //todo type safety
+      ctx.functions.get(header)
+        .fold(
+          (evaluateConstructor(header.funcName, evaluatedArgs, ctx), ctx)
+        )(
+          evaluateFunctionBody(_, resultCtx, evaluatedArgs)
+        )
+    }
   }
 
   private def evaluateFunctionArgs(args: List[EXPR], ctx: Context): (Context, List[EXPR]) =
@@ -109,8 +138,14 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         }
     }
 
+  private def evaluateConstructor(constructor: String, args: List[EVALUATED], ctx: Context): EXPR = {
+    val objectType = ctx.types(constructor).asInstanceOf[CASETYPEREF]
+    val fields = objectType.fields.map(_._1) zip args
+    CaseObj(objectType, fields.toMap)
+  }
+
   private def evaluateFunctionBody(
-    function: BaseFunction[NoContext],
+    function: BaseFunction[Environment],
     ctx: Context,
     evaluatedArgs: List[EVALUATED]
   ): (EXPR, Context) =
@@ -120,13 +155,13 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         if (ctx.cost + cost > limit)
           (FUNCTION_CALL(function.header, evaluatedArgs), ctx)  //todo test
         else {
-          val result = ev[Id]((Contextful.empty, evaluatedArgs)).explicitGet()
+          val result = ev[Id]((ctx.environment, evaluatedArgs)).explicitGet()
           (result, ctx.withCost(cost))
         }
       case UserFunction(_, _, _, signature, expr, _) =>
         val argsWithExpr =
           (signature.args zip evaluatedArgs)
-            .foldRight(expr[Id](Contextful.empty)) {
+            .foldRight(expr[Id](ctx.environment)) {
               case (((argName, _), argValue), argsWithExpr) => //todo maybe check for existence
                 BLOCK(LET(argName, argValue), argsWithExpr)
             }
@@ -146,9 +181,12 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
       }
   }
 
-  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): (EVALUATED, Context) = {
+  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): (EXPR, Context) = {
     val (exprResult, exprResultCtx) = root(obj, ctx)
     val fields = exprResult.asInstanceOf[CaseObj].fields
-    (fields(field), exprResultCtx.withCost(1))                            // todo handle absence
+    if (exprResultCtx.isExhausted)
+      (GETTER(exprResult, field), exprResultCtx)
+    else
+      (fields(field), exprResultCtx.withCost(1))                // todo handle absence
   }
 }

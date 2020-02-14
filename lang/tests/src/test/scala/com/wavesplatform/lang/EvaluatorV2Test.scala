@@ -1,24 +1,30 @@
 package com.wavesplatform.lang
 
+import cats.implicits._
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler, Terms}
-import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
+import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
+import com.wavesplatform.lang.v1.traits.Environment
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   private val version = V4
-  private val ctx = PureContext.build(Global, version).withEnvironment[NoContext]
+  private val ctx =
+    PureContext.build(Global, version).withEnvironment[Environment] |+|
+    WavesContext.build(DirectiveSet.contractDirectiveSet)
 
   private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
+    val environment = Common.emptyBlockchainEnvironment()
     val evaluator = new EvaluatorV2(limit, version)
-    val evaluatorCtx = evaluator.Context(functions = ctx.evaluationContext.functions)
+    val evaluatorCtx = evaluator.Context(ctx.evaluationContext(environment))
     val (resultExpr, resultCtx) = evaluator.root(expr, evaluatorCtx)
     (resultExpr, Decompiler(resultExpr, ctx.decompilerContext), resultCtx.cost)
   }
@@ -466,8 +472,38 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-  property("getter") {
+  property("getter by step") {
+    val script =
+      """
+        |let address = Address(base58'aaaa')
+        |address.bytes
+      """.stripMargin.trim
 
+    inside(eval(script, limit = 0)) {
+      case Right((_, decompiled, cost)) =>
+        cost shouldBe 0
+        decompiled shouldBe script
+    }
+
+    inside(eval(script, limit = 1)) {
+      case Right((_, decompiled, cost)) =>
+        cost shouldBe 1
+        decompiled shouldBe
+        """
+          |let address = Address(
+          |	bytes = base58'aaaa'
+          |)
+          |Address(
+          |	bytes = base58'aaaa'
+          |).bytes
+        """.stripMargin.trim
+    }
+
+    inside(eval(script, limit = 2)) {
+      case Right((_, decompiled, cost)) =>
+        cost shouldBe 2
+        decompiled shouldBe "base58'aaaa'"
+    }
   }
 
 /*  property("stop if complexity exceeds limit") {
