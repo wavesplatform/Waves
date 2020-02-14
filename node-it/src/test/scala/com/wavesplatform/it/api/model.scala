@@ -322,7 +322,34 @@ case class DebugStateChanges(
     stateChanges: Option[StateChangesDetails]
 ) extends TxInfo
 object DebugStateChanges {
-  implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
+  implicit val debugStateChanges: Format[DebugStateChanges] = Format(
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        height <- (jsv \ "height").validate[Int]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        recipient <- (jsv \ "recipient").validateOpt[String]
+        script <- (jsv \ "script").validateOpt[String]
+        stateChanges <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+      }
+        yield DebugStateChanges(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender:,
+          height,
+          minSponsoredAssetFee,
+          recipient,
+          script,
+          stateChanges
+        )),
+    Json.writes[DebugStateChanges]
+  )
 }
 
 case class DataResponse(`type`: String, value: Long, key: String)
