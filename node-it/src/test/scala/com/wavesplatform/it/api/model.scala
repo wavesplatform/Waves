@@ -341,7 +341,7 @@ object DebugStateChanges {
           id,
           fee,
           timestamp,
-          sender:,
+          sender,
           height,
           minSponsoredAssetFee,
           recipient,
