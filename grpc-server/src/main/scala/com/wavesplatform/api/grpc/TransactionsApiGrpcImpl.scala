@@ -78,10 +78,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
   }
 
   override def broadcast(tx: PBSignedTransaction): Future[PBSignedTransaction] = Future {
-    commonApi
-      .broadcastTransaction(tx.toVanilla)
-      .resultE
-      .map(_ => tx)
-      .explicitGetErr()
+    val result = for {
+      txv <- tx.toVanilla
+      _   <- commonApi.broadcastTransaction(txv).resultE
+    } yield tx
+    result.explicitGetErr()
   }
 }

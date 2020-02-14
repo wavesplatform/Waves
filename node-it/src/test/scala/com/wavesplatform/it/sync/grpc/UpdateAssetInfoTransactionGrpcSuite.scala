@@ -95,8 +95,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
       sender.grpc.waitForHeight(sender.height + 3, 2.minutes)
       assertGrpcError(
         sender.grpc.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
-        "InvalidName",
-        Code.INTERNAL
+        "invalid name",
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -105,8 +105,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val tooBigDescription = Random.nextString(1001)
     assertGrpcError(
       sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "TooBigArray",
-      Code.INTERNAL
+      "Too big sequences requested",
+      Code.INVALID_ARGUMENT
     )
   }
 
