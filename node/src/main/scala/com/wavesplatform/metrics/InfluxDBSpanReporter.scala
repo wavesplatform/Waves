@@ -14,14 +14,11 @@ class InfluxDBSpanReporterFactory extends ModuleFactory {
 
 class InfluxDBSpanReporter extends SpanReporter with ScorexLogging {
   override def reportSpans(spans: Seq[Span.Finished]): Unit = spans.foreach { span =>
-    val basePoint = Point
-      .measurement(span.operationName)
-      .addField("finish", span.to.toEpochMilli - span.from.toEpochMilli)
+    def createPoint(name: String): Point.Builder =
+      (span.tags.all() ++ span.metricTags.all())
+        .foldLeft(Point.measurement(name))((bp, t) => bp.tag(t.key, String.valueOf(Tag.unwrapValue(t))))
 
-    val pointWithTags = (span.tags.all() ++ span.metricTags.all())
-      .foldLeft(basePoint)((bp, t) => bp.tag(t.key, String.valueOf(Tag.unwrapValue(t))))
-
-    val (pointWithMarks, _) = span.marks.foldRight((pointWithTags, span.from.toEpochMilli)) {
+    val (pointWithMarks, _) = span.marks.foldRight((createPoint(span.operationName), span.from.toEpochMilli)) {
       case (m, (bp, lastMarkTime)) =>
         val currentTime  = m.instant.toEpochMilli
         val relativeDiff = currentTime - lastMarkTime
@@ -31,6 +28,13 @@ class InfluxDBSpanReporter extends SpanReporter with ScorexLogging {
         )
     }
     Metrics.write(pointWithMarks, span.from.toEpochMilli)
+
+    val timeMarks = ("span.started", span.from) +: span.marks.reverse.map(m => (m.key, m.instant)) :+ ("span.finished", span.to)
+    timeMarks.foreach {
+      case (name, time) =>
+        val point = createPoint(s"${span.operationName}.marks").tag("mark", name)
+        Metrics.write(point, time.toEpochMilli)
+    }
   }
 
   override def stop(): Unit                         = ()
