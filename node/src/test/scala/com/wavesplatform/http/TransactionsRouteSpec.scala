@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidAddress, InvalidIds, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
@@ -340,8 +340,12 @@ class TransactionsRouteSpec
   routePath("/status/{signature}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/status?id=$invalidBase58")) ~> route should produce(InvalidSignature)
+        Get(routePath(s"/status?id=$invalidBase58")) ~> route should produce(InvalidIds(Seq(invalidBase58)))
       }
+    }
+
+    "handles empty request" in {
+      Get(routePath(s"/status?")) ~> route should produce(CustomValidationError("Empty request"))
     }
 
     "working properly otherwise" in {

@@ -146,7 +146,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointA => pa.X
         |  case pb: PointBC => pb.X
         |}""".stripMargin
-    eval[EVALUATED](sampleScript, Some(pointCInstance)) should produce("Compilation failed: Undefined field `X`")
+    eval[EVALUATED](sampleScript, Some(pointCInstance)) should produce("Compilation failed: [Undefined field `X`")
   }
 
   property("patternMatching _") {
@@ -513,7 +513,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("ban to compare different types") {
     val src =
       """true == "test passed" """
-    eval[EVALUATED](src) should produce("Compilation failed: Can't match inferred types")
+    eval[EVALUATED](src) should produce("Compilation failed: [Can't match inferred types")
   }
 
   property("postfix syntax (one argument)") {
@@ -1320,7 +1320,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("List[Int] median - list with non int elements - error") {
     val src =
       s"""["1", "2"].median()"""
-    eval(src, version = V4) should produce("Compilation failed: Non-matching types: expected: Int, actual: String")
+    eval(src, version = V4) should produce("Compilation failed: [Non-matching types: expected: Int, actual: String")
   }
 
   property("groth16Verify") {

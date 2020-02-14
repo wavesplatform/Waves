@@ -150,6 +150,52 @@ class BlockV5TestSuite
       blockAtActivationHeight3.version.value shouldBe Block.ProtoBlockVersion
     }
   }
+
+  "VRF" - {
+    "is present in API" in {
+      nodes.head.lastBlockHeaders.vrf shouldBe 'defined
+
+      val (headersBeforeV5, headersV5) =
+        nodes.head.blockHeadersSeq(1, nodes.head.height).partition(bh => bh.height < ActivationHeight)
+
+      all(headersBeforeV5.map(_.vrf)) shouldBe 'empty
+      all(headersV5.map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(h => ByteStr.decodeBase58(h.vrf.value).get.length)) shouldBe Block.HitSourceLength
+
+      all(headersBeforeV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.vrf)) shouldBe 'empty
+      all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(h => ByteStr.decodeBase58(h.vrf.value).get.length)) shouldBe Block.HitSourceLength
+
+      all(headersBeforeV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.vrf)) shouldBe 'empty
+      all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+
+      all(headersBeforeV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.vrf)) shouldBe 'empty
+      all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.vrf)) shouldBe 'defined
+      all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+
+      nodes
+        .map(n => n.address)
+        .map(a => nodes.head.blockSeqByAddress(a, 1, nodes.head.height))
+        .map(bs => bs.partition(b => b.height < ActivationHeight))
+        .foreach {
+          case (addressBlocksBeforeV5, addressBlocksAfterV5) =>
+            all(addressBlocksBeforeV5.map(_.vrf)) shouldBe 'empty
+            all(addressBlocksAfterV5.map(_.vrf)) shouldBe 'defined
+            all(addressBlocksAfterV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+        }
+
+      nodes.head.lastBlock.vrf shouldBe 'defined
+      ByteStr.decodeBase58(nodes.head.lastBlock.vrf.value).get.length shouldBe Block.HitSourceLength
+
+      val (blocksBeforeV5, blocksV5) =
+        nodes.head.blockSeq(1, nodes.head.height).partition(b => b.height < ActivationHeight)
+
+      all(blocksBeforeV5.map(_.vrf)) shouldBe 'empty
+      all(blocksV5.map(_.vrf)) shouldBe 'defined
+      all(blocksV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+    }
+  }
 }
 
 object BlockV5TestSuite {

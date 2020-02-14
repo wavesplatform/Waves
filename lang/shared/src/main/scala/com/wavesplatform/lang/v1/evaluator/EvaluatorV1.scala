@@ -123,12 +123,14 @@ class EvaluatorV1[F[_] : Monad, C[_[_]]](implicit ev: Monad[EvalF[F, ?]]) {
         dec match {
           case l: LET  => evalLetBlock(l, inner)
           case f: FUNC => evalFuncBlock(f, inner)
+          case _: FAILED_DEC => raiseError("Attempt to evaluate failed declaration.")
         }
       case REF(str)                    => evalRef(str)
       case c: EVALUATED                => get[F, LoggedEvaluationContext[C, F], ExecutionError].map(ctx => (ctx.ec, c))
       case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
       case GETTER(expr, field)         => evalGetter(expr, field)
       case FUNCTION_CALL(header, args) => evalFunctionCall(header, args)
+      case _: FAILED_EXPR => raiseError("Attempt to evaluate failed expression.")
     }
 
   def evalExpr(t: EXPR): EvalM[F, C, EVALUATED] =

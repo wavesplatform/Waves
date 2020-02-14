@@ -2,7 +2,6 @@ package com.wavesplatform.api.http
 
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
