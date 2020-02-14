@@ -82,7 +82,7 @@ object AsyncHttpApi extends Assertions {
       }
     }
 
-    def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false, f: RequestBuilder => RequestBuilder = identity): Future[Response] = {
+    def getWithCustomHeader(path: String, headerName: String = "Accept", headerValue: String, withApiKey: Boolean = false, f: RequestBuilder => RequestBuilder = identity): Future[Response] = {
       val requestBuilder = if (withApiKey) {
         _get(s"${n.nodeApiEndpoint}$path").setHeader(headerName, headerValue).withApiKey(n.apiKey)
       } else {
@@ -118,7 +118,7 @@ object AsyncHttpApi extends Assertions {
         .build()
     }
 
-    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String, headerValue: String): Future[Response] = retrying {
+    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String = "Accept", headerValue: String): Future[Response] = retrying {
       _post(s"${n.nodeApiEndpoint}$path")
         .withApiKey(n.apiKey)
         .setHeader("Content-type", "application/json")
@@ -632,7 +632,7 @@ object AsyncHttpApi extends Assertions {
     def signedBroadcast(json: JsValue, amountsAsStrings: Boolean = false): Future[Transaction] =
       if (amountsAsStrings) {
         postJsObjectWithCustomHeader(
-          "/transactions/broadcast", json, "Accept", "application/json;large-significand-format=string")
+          "/transactions/broadcast", json, headerValue = "application/json;large-significand-format=string")
           .as[Transaction](amountsAsStrings)
       } else {
         post("/transactions/broadcast", stringify(json)).as[Transaction]
@@ -892,7 +892,7 @@ object AsyncHttpApi extends Assertions {
 
     def calculateFee(json: JsValue, amountsAsStrings: Boolean = false): Future[FeeInfo] = {
       if (amountsAsStrings) {
-        postJsObjectWithCustomHeader("/transactions/calculateFee", json, "Accept", "application/json;large-significand-format=string")
+        postJsObjectWithCustomHeader("/transactions/calculateFee", json, headerValue = "application/json;large-significand-format=string")
           .as[FeeInfo](amountsAsStrings)
       } else {
         postJsObjectWithApiKey("/transactions/calculateFee", json).as[FeeInfo]

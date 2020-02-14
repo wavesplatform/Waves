@@ -166,7 +166,7 @@ object SyncHttpApi extends Assertions {
     def get(path: String): Response =
       sync(async(n).get(path))
 
-    def getWithCustomHeader(path: String, headerName: String, headerValue: String, withApiKey: Boolean = false): Response =
+    def getWithCustomHeader(path: String, headerName: String = "Accept", headerValue: String, withApiKey: Boolean = false): Response =
       sync(async(n).getWithCustomHeader(path, headerName, headerValue, withApiKey))
 
     def utx(amountsAsStrings: Boolean = false): Seq[Transaction] = sync(async(n).utx(amountsAsStrings))
@@ -206,7 +206,7 @@ object SyncHttpApi extends Assertions {
     def postJsonWithApiKey[A: Writes](path: String, body: A): Response =
       sync(async(n).postJsonWithApiKey(path, body))
 
-    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String, headerValue: String): Response =
+    def postJsObjectWithCustomHeader(path: String, body: JsValue, headerName: String = "Accept", headerValue: String): Response =
       sync(async(n).postJsObjectWithCustomHeader(path, body, headerName, headerValue))
 
     def getWithApiKey(path: String): Response =

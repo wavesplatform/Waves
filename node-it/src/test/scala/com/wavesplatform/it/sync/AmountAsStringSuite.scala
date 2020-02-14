@@ -32,7 +32,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     sender.nftAssetsBalance(firstAddress,1, amountsAsStrings = true).head.quantity shouldBe 1
 
     sender.waitForHeight(currentHeight + 1)
-    val assetDistribution = sender.getWithCustomHeader(s"/assets/$assetId/distribution/$currentHeight/limit/1", headerName, headerValue)
+    val assetDistribution = sender.getWithCustomHeader(s"/assets/$assetId/distribution/$currentHeight/limit/1", headerValue = "application/json;large-significand-format=string")
     (parseResponse(assetDistribution) \ "items" \ 0 \ 1).as[String] shouldBe s"$someAssetAmount"
   }
 
@@ -276,7 +276,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
 
     sender.debugBalanceHistory(firstAddress, amountsAsStrings = true).head.balance shouldBe firstBalance
 
-    val stateWavesOnHeight = sender.getWithCustomHeader(s"/debug/stateWaves/${sender.height}", headerName, headerValue, withApiKey = true)
+    val stateWavesOnHeight = sender.getWithCustomHeader(s"/debug/stateWaves/${sender.height}", headerValue = "application/json;large-significand-format=string", withApiKey = true)
     (parseResponse(stateWavesOnHeight) \ s"$firstAddress").as[String] shouldBe s"$firstBalance"
   }
 

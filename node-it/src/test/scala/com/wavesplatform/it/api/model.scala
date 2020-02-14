@@ -1,6 +1,7 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
@@ -101,6 +102,19 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
+case class DataValue(value: Option[String])
+object DataValue {
+  implicit val dataValueReads: Reads[Option[String]] = Reads {
+    case JsString(str) => JsSuccess(Some(str))
+    case JsBoolean(bool)=> JsSuccess(Some(bool.toString))
+    case JsNumber(num) => JsSuccess(Some(num.toString))
+    case JsNull        => JsSuccess(None)
+    case _             => JsError("Unexpected value")
+  }
+
+  implicit val dataValueFormat: Format[DataValue] = Json.format
+}
+
 case class Transaction(_type: Int,
                        id: String,
                        fee: Long,
@@ -114,7 +128,7 @@ case class Transaction(_type: Int,
                        buyMatcherFee: Option[Long],
                        sellOrderMatcherFee: Option[Long],
                        buyOrderMatcherFee: Option[Long],
-                       data: Option[Seq[DataResponse]],
+                       data: Option[Seq[DataEntry[_]]],
                        minSponsoredAssetFee: Option[Long],
                        transfers: Option[Seq[Transfer]],
                        totalAmount: Option[Long]
@@ -136,7 +150,7 @@ object Transaction {
         buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
         sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
         buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
-        data <- (jsv \ "data").validateOpt[Seq[DataResponse]]
+        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
         minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
         transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
         totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
@@ -194,7 +208,7 @@ case class TransactionInfo(
     minSponsoredAssetFee: Option[Long],
     recipient: Option[String],
     script: Option[String],
-    data: Option[Seq[DataResponse]],
+    data: Option[Seq[DataEntry[_]]],
     transfers: Option[Seq[Transfer]],
     totalAmount: Option[Long]
 ) extends TxInfo
@@ -219,7 +233,7 @@ object TransactionInfo {
         minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
         recipient <- (jsv \ "recipient").validateOpt[String]
         script <- (jsv \ "script").validateOpt[String]
-        data <- (jsv \ "data").validateOpt[Seq[DataResponse]]
+        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
         transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
         totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
       }
