@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import akka.http.scaladsl.model.StatusCodes
-import com.wavesplatform.api.http.ApiError.{Mistiming, StateCheckFailed, WrongJson}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, Mistiming, StateCheckFailed, WrongJson}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -78,6 +78,14 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(scriptBase64), version = v),
         AssertiveApiError(StateCheckFailed.Id, StateCheckFailed.message("Cannot set script on an asset issued without a script"))
       )
+      assertApiError(
+        sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, version = v),
+        AssertiveApiError(CustomValidationError.Id, "Cannot set empty script")
+      )
+      assertApiError(
+        sender.setAssetScript(assetWOScript, firstAddress, setAssetScriptFee, Some(""), version = v),
+        AssertiveApiError(CustomValidationError.Id, "Cannot set empty script")
+      )
       miner.assertBalances(firstAddress, balance, eff)
     }
   }
@@ -114,6 +122,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       assertApiError(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(scriptBase64), version = v)) { error =>
         error.id shouldBe StateCheckFailed.Id
         error.message shouldBe StateCheckFailed.message("Asset was issued by other address")
+      }
+      assertApiError(sender.setAssetScript(assetWAnotherOwner, secondAddress, setAssetScriptFee, Some(""), version = v)) { error =>
+        error.id shouldBe CustomValidationError.Id
+        error.message shouldBe "Cannot set empty script"
       }
     }
   }
