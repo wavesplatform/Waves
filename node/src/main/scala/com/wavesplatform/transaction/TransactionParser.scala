@@ -8,5 +8,4 @@ trait TransactionParser {
   def typeId: TxType
   def supportedVersions: Set[TxVersion]
   def parseBytes(bytes: Array[Byte]): Try[Transaction]
-  def validator: TxValidator[_]
 }
