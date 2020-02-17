@@ -150,7 +150,7 @@ package object state {
     def blockById(blockId: ByteStr): Option[Block] = blockchain.heightOf(blockId).flatMap(blockAt)
 
     def blockAt(height: Int): Option[Block] = blockchain.blockBytes(height).flatMap { bb =>
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)) PBBlocks.vanilla(PBBlock.parseFrom(bb)).toOption
+      if (height > 1 && blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)) PBBlocks.vanilla(PBBlock.parseFrom(bb)).toOption
       else Block.parseBytes(bb).toOption
     }
 

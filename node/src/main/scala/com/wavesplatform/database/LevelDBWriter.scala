@@ -7,16 +7,18 @@ import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
-import com.google.protobuf.{CodedInputStream, CodedOutputStream}
+import com.google.protobuf.{CodedInputStream, CodedOutputStream, WireFormat}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.database.protobuf.{BlockInfo => PBlockInfo}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.block.{Block => PBlock}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
@@ -58,6 +60,11 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
   private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
     v.takeWhile(_ <= h).lastOption // Should we use binary search?
   }
+
+  private val WireTypeBits                      = 3
+  private val BlockInfoHeaderFieldTag           = (PBlockInfo.HEADER_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_LENGTH_DELIMITED
+  private val BlockInfoSignatureFieldTag        = (PBlockInfo.SIGNATURE_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_LENGTH_DELIMITED
+  private val BlockInfoTransactionCountFieldTag = (PBlockInfo.TRANSACTION_COUNT_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_VARINT
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -278,6 +285,8 @@ class LevelDBWriter(
       rw.put(Keys.safeRollbackHeight, height - dbSettings.maxRollbackDepth)
     }
 
+    val isProtoVersion = block.header.version >= Block.ProtoBlockVersion
+
     val transactions: Map[TransactionId, (Transaction, TxNum)] =
       block.transactionData.zipWithIndex.map { in =>
         val (tx, idx) = in
@@ -286,7 +295,10 @@ class LevelDBWriter(
         k -> v
       }.toMap
 
-    rw.put(blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
+    rw.put(
+      Keys.blockInfoAt(Height(height), isProtoVersion),
+      Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature))
+    )
     rw.put(Keys.heightOf(block.uniqueId), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
@@ -447,7 +459,7 @@ class LevelDBWriter(
     }
 
     for ((id, (tx, num)) <- transactions) {
-      rw.put(transactionAt(Height(height), num), Some(tx))
+      rw.put(Keys.transactionAt(Height(height), num, isProtoVersion), Some(tx))
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
@@ -470,6 +482,14 @@ class LevelDBWriter(
         rw.put(Keys.activatedFeatures, featuresToSave)
       }
     }
+
+    require(
+      isProtoVersion == isProtoBlock(Height(height)),
+      if (isProtoVersion)
+        s"Can't save proto block before ${BlockchainFeatures.BlockV5} feature activation"
+      else
+        s"Block version should be >= ${Block.ProtoBlockVersion} after ${BlockchainFeatures.BlockV5} feature activation"
+    )
 
     lastBlockRewardCache = reward
     reward.foreach { lastReward =>
@@ -524,14 +544,15 @@ class LevelDBWriter(
         val assetScriptsToDiscard    = Seq.newBuilder[IssuedAsset]
         val accountDataToInvalidate  = Seq.newBuilder[(Address, String)]
 
-        val h = Height(currentHeight)
+        val h       = Height(currentHeight)
+        val isProto = isProtoBlock(h)
 
         val discardedBlock = readWrite { rw =>
           log.trace(s"Rolling back to ${currentHeight - 1}")
           rw.put(Keys.height, currentHeight - 1)
 
           val BlockInfo(discardedHeader, _, _, discardedSignature) = rw
-            .get(blockInfoAt(h))
+            .get(Keys.blockInfoAt(h, isProto))
             .getOrElse(throw new IllegalArgumentException(s"No block at height $currentHeight"))
 
           for (aId <- rw.get(Keys.changedAddresses(currentHeight))) {
@@ -632,12 +653,12 @@ class LevelDBWriter(
               }
 
               if (tx.typeId != GenesisTransaction.typeId) {
-                rw.delete(transactionAt(h, num))
+                rw.delete(Keys.transactionAt(h, num, isProto))
                 rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
               }
           }
 
-          rw.delete(blockInfoAt(h))
+          rw.delete(Keys.blockInfoAt(h, isProto))
           rw.delete(Keys.heightOf(discardedSignature))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
@@ -699,7 +720,7 @@ class LevelDBWriter(
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      transaction   <- db.get(transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
+      transaction   <- db.get(Keys.transactionAt(height, num, isProtoBlock(height))) if transaction.isInstanceOf[TransferTransaction]
     } yield height -> transaction.asInstanceOf[TransferTransaction]
   }
 
@@ -709,7 +730,7 @@ class LevelDBWriter(
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
-      tx            <- db.get(transactionAt(height, num))
+      tx            <- db.get(Keys.transactionAt(height, num, isProtoBlock(height)))
     } yield (height, tx)
   }
 
@@ -834,7 +855,7 @@ class LevelDBWriter(
       leaseId <- probablyActiveLeases
       if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
       (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx     <- db.get(transactionAt(h, n))
+      tx     <- db.get(Keys.transactionAt(h, n, isProtoBlock(h)))
     } yield tx
 
     activeLeaseTransactions.collect {
@@ -856,11 +877,13 @@ class LevelDBWriter(
   }
 
   override def loadBlockInfo(height: Int): Option[BlockInfo] = {
-    writableDB.get(blockInfoAt(Height(height)))
+    val h = Height(height)
+    writableDB.get(Keys.blockInfoAt(h, isProtoBlock(h)))
   }
 
   def loadBlockInfo(height: Int, db: ReadOnlyDB): Option[BlockInfo] = {
-    db.get(blockInfoAt(Height(height)))
+    val h = Height(height)
+    db.get(Keys.blockInfoAt(h, isProtoBlock(h)))
   }
 
   override def loadBlockInfo(blockId: ByteStr): Option[BlockInfo] = {
@@ -887,29 +910,28 @@ class LevelDBWriter(
       .map { infoBytes =>
         if (isProto) {
           import com.google.protobuf.WireFormat._
-          import com.wavesplatform.database.protobuf.{BlockInfo => PBlockInfo}
-          import com.wavesplatform.protobuf.block.{Block => PBlock}
 
           val codedInput  = CodedInputStream.newInstance(infoBytes)
           val blockBytes  = new ByteArrayOutputStream()
           val codedOutput = CodedOutputStream.newInstance(blockBytes)
 
-          codedInput.readTag()
+          require(codedInput.readTag() == BlockInfoHeaderFieldTag, "Can't parse proto bock info header")
           val hSize  = codedInput.readRawVarint32()
           val hBytes = codedInput.readRawBytes(hSize)
           codedOutput.writeTag(PBlock.HEADER_FIELD_NUMBER, WIRETYPE_LENGTH_DELIMITED)
           codedOutput.writeUInt32NoTag(hSize)
           codedOutput.writeRawBytes(hBytes)
 
-          codedInput.readTag()
+          require(codedInput.readTag() == BlockInfoSignatureFieldTag, "Can't parse proto block info signature")
           codedOutput.writeBytes(PBlock.SIGNATURE_FIELD_NUMBER, codedInput.readBytes())
 
           val mayBeTxsCountTag = codedInput.readTag()
-          if (getTagFieldNumber(mayBeTxsCountTag) == PBlockInfo.TRANSACTION_COUNT_FIELD_NUMBER) {
+          if (mayBeTxsCountTag == BlockInfoTransactionCountFieldTag) {
             val txCount = codedInput.readRawVarint32()
             transactionBytes(txCount).foreach { tx =>
               codedOutput.writeTag(PBlock.TRANSACTIONS_FIELD_NUMBER, WIRETYPE_LENGTH_DELIMITED)
-              codedOutput.writeByteArrayNoTag(tx)
+              codedOutput.writeUInt32NoTag(tx.length)
+              codedOutput.writeRawBytes(tx)
             }
           }
 
@@ -968,7 +990,7 @@ class LevelDBWriter(
     (currentHeight until (currentHeight - howMany).max(0) by -1)
       .map { h =>
         val height = Height(h)
-        db.get(blockInfoAt(height))
+        db.get(Keys.blockInfoAt(height, isProtoBlock(height)))
       }
       .collect {
         case Some(BlockInfo(_, _, _, signature)) => signature
@@ -980,7 +1002,7 @@ class LevelDBWriter(
       (parentHeight + 1 to (parentHeight + howMany))
         .map { h =>
           val height = Height(h)
-          db.get(blockInfoAt(height))
+          db.get(Keys.blockInfoAt(height, isProtoBlock(height)))
         }
         .collect {
           case Some(BlockInfo(_, _, _, signature)) => signature
@@ -1005,7 +1027,7 @@ class LevelDBWriter(
       .activationWindow(height)
       .flatMap { h =>
         val height = Height(h)
-        db.get(blockInfoAt(height))
+        db.get(Keys.blockInfoAt(height, isProtoBlock(height)))
           .map(_.header.featureVotes.toSeq)
           .getOrElse(Seq.empty)
       }
@@ -1019,7 +1041,7 @@ class LevelDBWriter(
         settings.rewardsSettings
           .votingWindow(activatedAt, height)
           .flatMap { h =>
-            db.get(blockInfoAt(Height(h)))
+            db.get(Keys.blockInfoAt(Height(h), isProtoBlock(Height(h))))
               .map(_.header.rewardVote)
           }
       case _ => Seq()
@@ -1046,12 +1068,13 @@ class LevelDBWriter(
   }
 
   private[database] def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] = {
-    val headerKey = blockInfoAt(height)
+    val isProto   = isProtoBlock(height)
+    val headerKey = Keys.blockInfoAt(height, isProto)
 
     for {
       BlockInfo(header, _, transactionCount, signature) <- db.get(headerKey)
       txs = (0 until transactionCount).toList.flatMap { n =>
-        db.get(transactionAt(height, TxNum(n.toShort)))
+        db.get(Keys.transactionAt(height, TxNum(n.toShort), isProto))
       }
       block <- createBlock(header, signature, txs).toOption
     } yield block
@@ -1081,12 +1104,6 @@ class LevelDBWriter(
   }
 
   private def isProtoBlock(h: Height): Boolean = {
-    activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(_ <= h)
+    h > 1 && activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(_ <= h)
   }
-
-  private def blockInfoAt(h: Height): Key[Option[BlockInfo]] =
-    Keys.blockInfoAt(h, isProtoBlock(h))
-
-  private def transactionAt(h: Height, n: TxNum): Key[Option[Transaction]] =
-    Keys.transactionAt(h, n, isProtoBlock(h))
 }

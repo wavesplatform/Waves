@@ -20,7 +20,7 @@ object DisableHijackedAliases extends ScorexLogging {
 
     for (h <- 1 until height) {
       val BlockInfo(_, _, transactionCount, _) = rw
-        .get(Keys.blockInfoAt(Height(h), protoActivationHeight.exists(h >= _)))
+        .get(Keys.blockInfoAt(Height(h), protoActivationHeight.exists(h > 1 && h >= _)))
         .get
 
       for (n <- 0 until transactionCount) {
