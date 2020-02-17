@@ -74,12 +74,12 @@ sealed trait Address extends AddressOrAlias {
 
 //noinspection ScalaDeprecation
 object Address extends ScorexLogging {
-  val Prefix               = "address:"
-  val AddressVersion: Byte = 1
-  val ChecksumLength       = 4
-  val HashLength           = 20
-  val AddressLength        = 1 + 1 + HashLength + ChecksumLength
-  val AddressStringLength  = base58Length(AddressLength)
+  val Prefix              = "address:"
+  val AddressVersion      = 1.toByte
+  val ChecksumLength      = 4
+  val HashLength          = 20
+  val AddressLength       = 1 + 1 + HashLength + ChecksumLength
+  val AddressStringLength = base58Length(AddressLength)
 
   private[this] val publicKeyBytesCache: Cache[(ByteStr, ChainId), Address] = CacheBuilder
     .newBuilder()
