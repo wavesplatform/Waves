@@ -29,7 +29,7 @@ class InfluxDBSpanReporter extends SpanReporter with ScorexLogging {
     }
     Metrics.write(pointWithMarks, span.from.toEpochMilli)
 
-    val timeMarks = ("span.started", span.from) +: span.marks.reverse.map(m => (m.key, m.instant)) :+ ("span.finished", span.to)
+    val timeMarks = ("span.started" -> span.from) +: span.marks.reverse.map(m => (m.key, m.instant)) :+ ("span.finished" -> span.to)
     timeMarks.foreach {
       case (name, time) =>
         val point = createPoint(s"${span.operationName}.marks").tag("mark", name)
