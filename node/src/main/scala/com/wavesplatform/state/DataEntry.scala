@@ -9,16 +9,9 @@ import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.DataEntry._
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.utils._
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json._
 
-import scala.annotation.meta.field
-
-sealed abstract class DataEntry[T](
-    @(ApiModelProperty @field)(required = true, dataType = "java.lang.String", value = "integer", allowableValues = "integer,boolean,binary,string")
-    val `type`: String,
-    val key: String,
-    val value: T
+sealed abstract class DataEntry[T](val `type`: String, val key: String, val value: T
 )(implicit val dataBytesOpt: DataBytesOpt) {
   def valueBytes: Array[Byte]
 

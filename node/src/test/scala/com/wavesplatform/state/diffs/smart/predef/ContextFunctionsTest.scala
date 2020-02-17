@@ -1,7 +1,5 @@
 package com.wavesplatform.state.diffs.smart.predef
 
-import java.util.Dictionary
-
 import cats.kernel.Monoid
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
@@ -10,8 +8,8 @@ import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, MultiPaymentInvokeScript}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
-import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
@@ -25,7 +23,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

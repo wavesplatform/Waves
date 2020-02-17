@@ -48,6 +48,15 @@ trait TaskMT[F[_], S, E, R] {
         case Left(err) => f(err).inner.run(s)
       }
     }
+
+  def handleError()(implicit m: Monad[EvalF[F, ?]]): TaskMT[F, S, E, (Option[R], List[E])] = {
+    TaskMT.fromEvalRef[F, S, E, (Option[R], List[E])] { s =>
+      m.flatMap(inner.run(s)) {
+        case Right(v)  => m.pure((Some(v), List.empty).asRight[E])
+        case Left(err) => m.pure((None, List(err)).asRight[E])
+      }
+    }
+  }
 }
 
 object TaskMT {

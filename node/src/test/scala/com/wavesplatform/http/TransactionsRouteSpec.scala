@@ -2,12 +2,12 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.api.http.ApiError.{InvalidAddress, InvalidSignature, TooBigArrayAllocation}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidAddress, InvalidIds, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lang.directives.values.V1
@@ -21,6 +21,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.execution.Scheduler
@@ -30,7 +31,6 @@ import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
-import com.wavesplatform.utils.StringBytes
 
 import scala.util.Random
 
@@ -340,8 +340,12 @@ class TransactionsRouteSpec
   routePath("/status/{signature}") - {
     "handles invalid signature" in {
       forAll(invalidBase58Gen) { invalidBase58 =>
-        Get(routePath(s"/status?id=$invalidBase58")) ~> route should produce(InvalidSignature)
+        Get(routePath(s"/status?id=$invalidBase58")) ~> route should produce(InvalidIds(Seq(invalidBase58)))
       }
+    }
+
+    "handles empty request" in {
+      Get(routePath(s"/status?")) ~> route should produce(CustomValidationError("Empty request"))
     }
 
     "working properly otherwise" in {
@@ -519,7 +523,7 @@ class TransactionsRouteSpec
       proofs.foreach { p =>
         val transactionId    = (p \ "id").as[String]
         val transactionIndex = (p \ "transactionIndex").as[Int]
-        val digests          = (p \ "merkleProof").as[List[String]].map(Base64.decode)
+        val digests          = (p \ "merkleProof").as[List[String]].map(Base58.decode)
 
         val block       = txIdsToBlock(transactionId)
         val transaction = block.transactionData.find(_.id().toString == transactionId)
