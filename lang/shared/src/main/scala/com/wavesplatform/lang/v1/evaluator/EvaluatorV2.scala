@@ -25,7 +25,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
   }
 
   case class Context(
-    lets: Map[String, (EXPR, Context, Boolean)] = Map(),
+    lets: Map[String, (EXPR, Boolean)] = Map(),
     functions: Map[FunctionHeader, BaseFunction[Environment]] = Map(),
     types: Map[String, FINAL] = Map(),
     environment: Environment[Id],
@@ -38,18 +38,18 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
       copy(cost = cost + addCost)
 
     def withLet(newLet: LET, isEvaluated: Boolean): Context =
-      copy(lets = lets + (newLet.name -> (newLet.value, this, isEvaluated)))
+      copy(lets = lets + (newLet.name -> (newLet.value, isEvaluated)))
 
     def withFunction(function: UserFunction[Environment]): Context =
       copy(functions = functions + (function.header -> function))
 
-    def combine(that: Context): Context =
+    def continue(next: Context): Context =
       Context(
-        lets ++ that.lets,
-        functions ++ that.functions,
+        lets ++ next.lets,
+        functions ++ next.functions,
         types,
         environment,
-        Math.max(cost, that.cost)
+        Math.max(cost, next.cost)
       )
   }
 
@@ -73,6 +73,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     (e, ctx)
 
   private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): (EXPR, Context) = {
+    val overlappedLetOpt = ctx.lets.get(let.name)
     val (nextExprResult, nextExprCtx) = root(nextExpr, ctx.withLet(let, isEvaluated = false))
     val resultExpr =
       if (nextExprResult.isInstanceOf[EVALUATED])
@@ -81,24 +82,33 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         val letDecl = LET(let.name, nextExprCtx.lets(let.name)._1)
         BLOCK(letDecl, nextExprResult)
       }
-    (resultExpr, nextExprCtx)
+    val resultCtx =
+      overlappedLetOpt.fold(nextExprCtx) {
+        case (expr, isEvaluated) => nextExprCtx.withLet(LET(let.name, expr), isEvaluated)
+      }
+    (resultExpr, resultCtx)
   }
 
   private def evaluateFunctionBlock(funcDef: FUNC, nextExpr: EXPR, ctx: Context): (EXPR, Context) = {
     val function = UserFunction[Environment](funcDef.name, 0, null, funcDef.args.map(n => (n, null)): _*)(funcDef.body)
+    val overlappedFuncOpt =
+      ctx.functions
+        .get(function.header)
+        .collect { case f: UserFunction[Environment] => f }
     val (nextExprResult, nextExprCtx) = root(nextExpr, ctx.withFunction(function))
     val resultExpr =
       if (nextExprResult.isInstanceOf[EVALUATED]) nextExprResult
       else BLOCK(funcDef, nextExprResult)
-    (resultExpr, nextExprCtx)
+    val resultCtx = overlappedFuncOpt.fold(nextExprCtx)(nextExprCtx.withFunction)
+    (resultExpr, resultCtx)
   }
 
   private def evaluateRef(key: String, ctx: Context): (EXPR, Context) = {
-    val (letExpr, letCtx, isEvaluated) = ctx.lets(key)
+    val (letExpr, isEvaluated) = ctx.lets(key)
     if (isEvaluated)
       (letExpr, ctx.withCost(1))
     else {
-      val (letValue, resultCtx) = root(letExpr, letCtx combine ctx)
+      val (letValue, resultCtx) = root(letExpr, ctx)
       if (resultCtx.isExhausted)
         (REF(key), resultCtx.withLet(LET(key, letValue), isEvaluated = false))
       else
@@ -165,8 +175,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
               case (((argName, _), argValue), argsWithExpr) => //todo maybe check for existence
                 BLOCK(LET(argName, argValue), argsWithExpr)
             }
-        val (result, functionResultCtx) = root(argsWithExpr, ctx)
-        (result, ctx.copy(cost = functionResultCtx.cost))
+        root(argsWithExpr, ctx)
     }
 
   private def evaluateIfBlock(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, ctx: Context): (EXPR, Context) = {

@@ -4,9 +4,10 @@ import cats.implicits._
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, CONST_LONG, EXPR, FUNCTION_CALL, LET, REF}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
@@ -409,23 +410,105 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
   property("multiple user functions and refs") {
     inside(eval(
-      """
-        | let x = 10
-        | let a = 1                                  # complexity
-        | func f(a: Int, b: Int) = a - b + x         #     5
-        | let b = 2
-        | func g(a: Int, b: Int) = a * b             #     3
-        | let expected = (a - b + x) * (b - a + x)   #     11
-        | let actual = g(f(a, b), f(b, a))           #     3 + 5 * 2 + 4 = 17
-        | actual == expected &&                      #     11 + 17 + 4 = 32
-        | actual == expected                         #     3
+      """                                            # complexity
+        | let x = 1 + 1 + 1                          # 2 (should be calculated once)
+        | let a = 1 + 1                              # 1 (should be calculated once)
+        | func f(a: Int, b: Int) = a - b + x         # 5
+        | let b = 4                                  #
+        | func g(a: Int, b: Int) = a * b             # 3
+        | let expected = (a - b + x) * (b - a + x)   # 11
+        | let actual = g(f(a, b), f(b, a))           # 3 + 5 * 2 + 4 = 17
+        | actual == expected &&                      # 11 + 17 + 4 = 32
+        | actual == expected &&                      # 4
+        | x == 3             &&                      # 3
+        | a == 2             &&                      # 3
+        | b == 4                                     # 2  Total: 32 + 4 + 3 + 3 + 2 + 2 (x value) + 1 (a value) = 47
       """.stripMargin,
-      limit = 35
+      limit = 47
     )) {
       case Right((_, decompiled, cost)) =>
-        cost shouldBe 35
+        cost shouldBe 47
         decompiled shouldBe "true"
     }
+  }
+
+  property("user functions and refs") {
+    inside(eval(
+      """                      # complexity
+        | let x = 1 + 1 + 1    # 2
+        | func f() = x         # 1
+        | func g() = x         # 1
+        | f() == g()           # 1 + 1 + 1 + 2
+      """.stripMargin,
+      limit = 100
+    )) {
+      case Right((_, decompiled, cost)) =>
+        cost shouldBe 5
+        decompiled shouldBe "true"
+    }
+  }
+
+  property("let overlap through function param") {
+    inside(eval(
+      """                                   # complexity
+        | let x = 1 + 1 + 1 + 1 + 1         # 4
+        | let y = x + 1                     # 2
+        |
+        | func f(x: Int) = x + 1            # 2
+        | func g(x: Int) = x + 1 + 1        # 3
+        | func h(x: Int) = x + 1 + 1 + 1    # 4
+        |
+        | f(g(h(y))) == x + x + 2
+        |
+        | # Total: 2 (f) + 3 (g) + 4(h) + 1 (y ref) + 2 (y value) + 1 (==) + 2 (2 x ref) + 4 (x value) + 2 (2 +)
+      """.stripMargin,
+      limit = 21
+    )) {
+      case Right((_, decompiled, cost)) =>
+        cost shouldBe 21
+        decompiled shouldBe "true"
+    }
+  }
+
+  property("let overlap inside let value block") {
+    val expr = BLOCK(
+      LET(
+        "x",
+        FUNCTION_CALL(
+          FunctionHeader.Native(FunctionIds.SUM_LONG),
+          List(
+            FUNCTION_CALL(
+              FunctionHeader.Native(FunctionIds.SUM_LONG),
+              List(CONST_LONG(1), CONST_LONG(1))
+            ),
+            CONST_LONG(1)
+          )
+        )
+      ),
+      BLOCK(
+        LET(
+          "y",
+          BLOCK(LET("x", CONST_LONG(1)), REF("x"))
+        ),
+        FUNCTION_CALL(
+          FunctionHeader.Native(FunctionIds.SUM_LONG),
+          List(REF("y"), REF("x"))
+        )
+      )
+    )
+
+    /*                   # complexity
+      let x = 1 + 1 + 1  # 2
+      let y = {          # 1
+        let x = 1        #
+        x                # 1
+      }
+      y + x              # 1 (y ref) + 1 (+) + 1 (x ref) + 2 (x value) + 1 (y value)
+    */
+
+    val (_, decompiled, cost) = eval(expr, limit = 6)
+    cost shouldBe 6
+    decompiled shouldBe "4"
   }
 
   property("if block by step") {
