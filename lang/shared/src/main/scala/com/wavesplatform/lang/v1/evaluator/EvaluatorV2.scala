@@ -43,13 +43,13 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     def withFunction(function: UserFunction[Environment]): Context =
       copy(functions = functions + (function.header -> function))
 
-    def continue(next: Context): Context =
+    def restoreTo(original: Context): Context =
       Context(
-        lets ++ next.lets,
-        functions ++ next.functions,
+        lets.filterKeys(original.lets.contains),
+        functions.filterKeys(original.functions.contains),
         types,
         environment,
-        Math.max(cost, next.cost)
+        cost
       )
   }
 
@@ -175,7 +175,8 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
               case (((argName, _), argValue), argsWithExpr) => //todo maybe check for existence
                 BLOCK(LET(argName, argValue), argsWithExpr)
             }
-        root(argsWithExpr, ctx)
+        val (result, resultCtx) = root(argsWithExpr, ctx)
+        (result, resultCtx.restoreTo(ctx))
     }
 
   private def evaluateIfBlock(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, ctx: Context): (EXPR, Context) = {

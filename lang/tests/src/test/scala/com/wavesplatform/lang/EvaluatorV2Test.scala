@@ -5,7 +5,7 @@ import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, CONST_LONG, EXPR, FUNCTION_CALL, LET, REF}
+import com.wavesplatform.lang.v1.compiler.Terms.{BLOCK, CONST_LONG, EXPR, FUNC, FUNCTION_CALL, LET, REF}
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
@@ -509,6 +509,50 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     val (_, decompiled, cost) = eval(expr, limit = 6)
     cost shouldBe 6
     decompiled shouldBe "4"
+  }
+
+  property("function context leak") {
+    val expr = BLOCK(
+      FUNC("f", Nil, BLOCK(LET("x", CONST_LONG(1)), REF("x"))),
+      FUNCTION_CALL(
+        FunctionHeader.Native(FunctionIds.SUM_LONG),
+        List(
+          FUNCTION_CALL(FunctionHeader.User("f"), Nil),
+          REF("x")
+        )
+      )
+    )
+
+    /*
+      func f() = {
+        let x = 1
+        x
+      }
+      f() + x
+    */
+
+    an[NoSuchElementException] should be thrownBy eval(expr, limit = 100)
+
+    val expr2 = BLOCK(
+      FUNC("f", Nil, BLOCK(FUNC("g", Nil, CONST_LONG(1)), FUNCTION_CALL(FunctionHeader.User("g"), Nil))),
+      FUNCTION_CALL(
+        FunctionHeader.Native(FunctionIds.SUM_LONG),
+        List(
+          FUNCTION_CALL(FunctionHeader.User("f"), Nil),
+          FUNCTION_CALL(FunctionHeader.User("g"), Nil)
+        )
+      )
+    )
+
+    /*
+      func f() = {
+        func g() = 1
+        g()
+      }
+      f() + g()
+    */
+
+    an[NoSuchElementException] should be thrownBy eval(expr2, limit = 100)
   }
 
   property("if block by step") {
