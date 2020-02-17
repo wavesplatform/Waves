@@ -90,182 +90,16 @@ object PBTransactions {
     } yield tx
   }
 
-  private[this] def createVanillaUnsafe(
-      version: Int,
-      chainId: Byte,
-      sender: PublicKey,
-      feeAmount: Long,
-      feeAssetId: VanillaAssetId,
-      timestamp: Long,
-      proofs: Proofs,
-      data: PBTransaction.Data
-  ): VanillaTransaction = {
-    import com.wavesplatform.common.utils._
-
-    val signature = proofs.toSignature
-    data match {
-      case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
-        vt.GenesisTransaction(PBRecipients.toAddress(recipient, chainId).explicitGet(), amount, timestamp, signature)
-
-      case Data.Payment(PaymentTransactionData(recipient, amount)) =>
-        vt.PaymentTransaction(sender, PBRecipients.toAddress(recipient, chainId).explicitGet(), amount, feeAmount, timestamp, signature)
-
-      case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
-        vt.transfer.TransferTransaction(
-          version.toByte,
-          sender,
-          recipient.toAddressOrAlias(chainId).explicitGet(),
-          amount.vanillaAssetId,
-          amount.longAmount,
-          feeAssetId,
-          feeAmount,
-          toVanillaAttachment(attachment),
-          timestamp,
-          proofs
-        )
-
-      case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
-        vt.CreateAliasTransaction(
-          version.toByte,
-          sender,
-          com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(),
-          feeAmount,
-          timestamp,
-          Proofs(signature)
-        )
-
-      case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
-        vt.assets.IssueTransaction(
-          version.toByte,
-          sender,
-          name.toByteString,
-          description.toByteString,
-          quantity,
-          decimals.toByte,
-          reissuable,
-          script.map(toVanillaScript),
-          feeAmount,
-          timestamp,
-          proofs,
-          chainId
-        )
-
-      case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
-        vt.assets.ReissueTransaction(version.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs, chainId)
-
-      case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
-        vt.assets.BurnTransaction(version.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs, chainId)
-
-      case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
-        vt.assets.SetAssetScriptTransaction(
-          version.toByte,
-          sender,
-          IssuedAsset(assetId),
-          script.map(toVanillaScript),
-          feeAmount,
-          timestamp,
-          proofs,
-          chainId
-        )
-
-      case Data.SetScript(SetScriptTransactionData(script)) =>
-        vt.smart.SetScriptTransaction(version.toByte, sender, script.map(toVanillaScript), feeAmount, timestamp, proofs, chainId)
-
-      case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
-        vt.lease.LeaseTransaction(version.toByte, sender, recipient.toAddressOrAlias(chainId).explicitGet(), amount, feeAmount, timestamp, proofs)
-
-      case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
-        vt.lease.LeaseCancelTransaction(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs, chainId)
-
-      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
-        vt.assets.exchange.ExchangeTransaction(
-          version.toByte,
-          PBOrders.vanilla(buyOrder),
-          PBOrders.vanilla(sellOrder),
-          amount,
-          price,
-          buyMatcherFee,
-          sellMatcherFee,
-          feeAmount,
-          timestamp,
-          proofs,
-          chainId
-        )
-
-      case Data.DataTransaction(dt) =>
-        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
-
-      case Data.MassTransfer(mt) =>
-        vt.transfer.MassTransferTransaction(
-          version.toByte,
-          sender,
-          PBAmounts.toVanillaAssetId(mt.assetId),
-          mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
-          feeAmount,
-          timestamp,
-          toVanillaAttachment(mt.attachment),
-          proofs
-        )
-
-      case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee)))) =>
-        vt.assets.SponsorFeeTransaction(
-          version.toByte,
-          sender,
-          IssuedAsset(assetId),
-          Option(minFee).filter(_ > 0),
-          feeAmount,
-          timestamp,
-          proofs,
-          chainId
-        )
-
-      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
-        import com.wavesplatform.lang.v1.Serde
-        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-
-        vt.smart.InvokeScriptTransaction(
-          version.toByte,
-          sender,
-          PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
-          Deser
-            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
-            .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
-          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
-          feeAmount,
-          feeAssetId,
-          timestamp,
-          proofs
-        )
-
-      case Data.UpdateAssetInfo(UpdateAssetInfoTransactionData(assetId, name, description)) =>
-        vt.assets.UpdateAssetInfoTransaction(
-          version.toByte,
-          sender,
-          IssuedAsset(assetId),
-          name,
-          description,
-          feeAssetId,
-          feeAmount,
-          timestamp,
-          proofs,
-          chainId
-        )
-
-      case other =>
-        throw new IllegalArgumentException(s"Unsupported transaction data: $other")
-    }
-  }
-
   private[this] def createVanilla(
-      version: Int,
-      chainId: Byte,
-      sender: PublicKey,
-      feeAmount: Long,
-      feeAssetId: VanillaAssetId,
-      timestamp: Long,
-      proofs: Proofs,
-      data: PBTransaction.Data
-  ): Either[ValidationError, VanillaTransaction] = {
+                                   version: Int,
+                                   chainId: Byte,
+                                   sender: PublicKey,
+                                   feeAmount: Long,
+                                   feeAssetId: VanillaAssetId,
+                                   timestamp: Long,
+                                   proofs: Proofs,
+                                   data: PBTransaction.Data
+                                 ): Either[ValidationError, VanillaTransaction] = {
 
     val signature = proofs.toSignature
     val result: Either[ValidationError, VanillaTransaction] = data match {
@@ -448,6 +282,172 @@ object PBTransactions {
     }
 
     result
+  }
+
+  private[this] def createVanillaUnsafe(
+      version: Int,
+      chainId: Byte,
+      sender: PublicKey,
+      feeAmount: Long,
+      feeAssetId: VanillaAssetId,
+      timestamp: Long,
+      proofs: Proofs,
+      data: PBTransaction.Data
+  ): VanillaTransaction = {
+    import com.wavesplatform.common.utils._
+
+    val signature = proofs.toSignature
+    data match {
+      case Data.Genesis(GenesisTransactionData(recipient, amount)) =>
+        vt.GenesisTransaction(PBRecipients.toAddress(recipient, chainId).explicitGet(), amount, timestamp, signature)
+
+      case Data.Payment(PaymentTransactionData(recipient, amount)) =>
+        vt.PaymentTransaction(sender, PBRecipients.toAddress(recipient, chainId).explicitGet(), amount, feeAmount, timestamp, signature)
+
+      case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
+        vt.transfer.TransferTransaction(
+          version.toByte,
+          sender,
+          recipient.toAddressOrAlias(chainId).explicitGet(),
+          amount.vanillaAssetId,
+          amount.longAmount,
+          feeAssetId,
+          feeAmount,
+          toVanillaAttachment(attachment),
+          timestamp,
+          proofs
+        )
+
+      case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
+        vt.CreateAliasTransaction(
+          version.toByte,
+          sender,
+          com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(),
+          feeAmount,
+          timestamp,
+          Proofs(signature)
+        )
+
+      case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
+        vt.assets.IssueTransaction(
+          version.toByte,
+          sender,
+          name.toByteString,
+          description.toByteString,
+          quantity,
+          decimals.toByte,
+          reissuable,
+          script.map(toVanillaScript),
+          feeAmount,
+          timestamp,
+          proofs,
+          chainId
+        )
+
+      case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
+        vt.assets.ReissueTransaction(version.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs, chainId)
+
+      case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
+        vt.assets.BurnTransaction(version.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs, chainId)
+
+      case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
+        vt.assets.SetAssetScriptTransaction(
+          version.toByte,
+          sender,
+          IssuedAsset(assetId),
+          script.map(toVanillaScript),
+          feeAmount,
+          timestamp,
+          proofs,
+          chainId
+        )
+
+      case Data.SetScript(SetScriptTransactionData(script)) =>
+        vt.smart.SetScriptTransaction(version.toByte, sender, script.map(toVanillaScript), feeAmount, timestamp, proofs, chainId)
+
+      case Data.Lease(LeaseTransactionData(Some(recipient), amount)) =>
+        vt.lease.LeaseTransaction(version.toByte, sender, recipient.toAddressOrAlias(chainId).explicitGet(), amount, feeAmount, timestamp, proofs)
+
+      case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
+        vt.lease.LeaseCancelTransaction(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs, chainId)
+
+      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
+        vt.assets.exchange.ExchangeTransaction(
+          version.toByte,
+          PBOrders.vanilla(buyOrder),
+          PBOrders.vanilla(sellOrder),
+          amount,
+          price,
+          buyMatcherFee,
+          sellMatcherFee,
+          feeAmount,
+          timestamp,
+          proofs,
+          chainId
+        )
+
+      case Data.DataTransaction(dt) =>
+        vt.DataTransaction(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
+
+      case Data.MassTransfer(mt) =>
+        vt.transfer.MassTransferTransaction(
+          version.toByte,
+          sender,
+          PBAmounts.toVanillaAssetId(mt.assetId),
+          mt.transfers.flatMap(t => t.getAddress.toAddressOrAlias(chainId).toOption.map(ParsedTransfer(_, t.amount))).toList,
+          feeAmount,
+          timestamp,
+          toVanillaAttachment(mt.attachment),
+          proofs
+        )
+
+      case Data.SponsorFee(SponsorFeeTransactionData(Some(Amount(assetId, minFee)))) =>
+        vt.assets.SponsorFeeTransaction(
+          version.toByte,
+          sender,
+          IssuedAsset(assetId),
+          Option(minFee).filter(_ > 0),
+          feeAmount,
+          timestamp,
+          proofs,
+          chainId
+        )
+
+      case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
+        import com.wavesplatform.lang.v1.Serde
+        import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+
+        vt.smart.InvokeScriptTransaction(
+          version.toByte,
+          sender,
+          PBRecipients.toAddressOrAlias(dappAddress, chainId).explicitGet(),
+          Deser
+            .parseOption(functionCall.asReadOnlyByteBuffer())(Serde.deserialize)
+            .map(_.explicitGet().asInstanceOf[FUNCTION_CALL]),
+          payments.map(p => vt.smart.InvokeScriptTransaction.Payment(p.longAmount, PBAmounts.toVanillaAssetId(p.assetId))),
+          feeAmount,
+          feeAssetId,
+          timestamp,
+          proofs
+        )
+
+      case Data.UpdateAssetInfo(UpdateAssetInfoTransactionData(assetId, name, description)) =>
+        vt.assets.UpdateAssetInfoTransaction(
+          version.toByte,
+          sender,
+          IssuedAsset(assetId),
+          name,
+          description,
+          feeAssetId,
+          feeAmount,
+          timestamp,
+          proofs,
+          chainId
+        )
+
+      case other =>
+        throw new IllegalArgumentException(s"Unsupported transaction data: $other")
+    }
   }
 
   def protobuf(tx: VanillaTransaction): PBSignedTransaction = {
