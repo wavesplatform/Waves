@@ -68,7 +68,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         case e: EVALUATED                  => evaluated(e, ctx)
       }
 
-  // todo check all local {} blocks semantics from EvaluatorV1
+  // todo recursion
   private def evaluated(e: EVALUATED, ctx: Context): (EXPR, Context) =
     (e, ctx)
 

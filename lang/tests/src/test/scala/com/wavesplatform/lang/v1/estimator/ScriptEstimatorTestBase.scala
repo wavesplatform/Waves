@@ -12,6 +12,7 @@ import com.wavesplatform.lang.v1.evaluator.ContextfulVal
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{Types, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorTestBase._
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -36,22 +37,6 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
     Map[FunctionHeader, Long](Plus -> 100, Minus -> 10, Gt -> 10).mapValues(Coeval.now)
 
   private val v3FunctionCosts = utils.functionCosts(V3)
-
-  private val ctx = {
-    val transactionType = Types.buildTransferTransactionType(true, V3)
-    val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
-    Monoid
-      .combineAll(Seq(
-        PureContext.build(Global, V3).withEnvironment[Environment],
-        CryptoContext.build(Global, V3).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet.contractDirectiveSet),
-        CTX[NoContext](
-          Seq(transactionType),
-          Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),
-          Array.empty
-        ).withEnvironment[Environment]
-      ))
-  }
 
   private val env = Common.emptyBlockchainEnvironment()
   private val lets: Set[String] =
@@ -88,5 +73,23 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
       results.head
     else
       Left(s"Estimators discrepancy: ${results.toString}")
+  }
+}
+
+object ScriptEstimatorTestBase {
+  val ctx: CTX[Environment] = {
+    val transactionType = Types.buildTransferTransactionType(true, V3)
+    val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
+    Monoid
+      .combineAll(Seq(
+        PureContext.build(Global, V3).withEnvironment[Environment],
+        CryptoContext.build(Global, V3).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet.contractDirectiveSet),
+        CTX[NoContext](
+          Seq(transactionType),
+          Map(("tx", (transactionType, ContextfulVal.pure[NoContext](tx)))),
+          Array.empty
+        ).withEnvironment[Environment]
+      ))
   }
 }
