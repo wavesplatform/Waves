@@ -2,6 +2,7 @@ package com.wavesplatform.state
 
 import cats._
 import cats.kernel.instances.map._
+import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block.Fraction
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
@@ -26,23 +27,38 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset
 }
 
 object Portfolio {
+  val empty: Portfolio = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
 
   def build(a: Asset, amount: Long): Portfolio = a match {
     case Waves              => Portfolio(amount, LeaseBalance.empty, Map.empty)
     case t @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(t -> amount))
   }
 
-  val empty = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
+  def combineAll(pfs: (Address, Portfolio)*): Map[Address, Portfolio] =
+    Monoid.combineAll(pfs.map { case (addr, pf) => Map(addr -> pf) })
 
-  implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
+  def combineAllWaves(pfs: (Address, Long)*): Map[Address, Portfolio] =
+    Monoid.combineAll(pfs.map { case (addr, balance) => Map(addr -> Portfolio(balance, LeaseBalance.empty, Map.empty)) })
+
+  def combineAllAsset(asset: IssuedAsset)(pfs: (Address, Long)*): Map[Address, Portfolio] =
+    Monoid.combineAll(pfs.map { case (addr, balance) => Map(addr -> Portfolio(0, LeaseBalance.empty, Map(asset -> balance))) })
+
+  def combineAllWavesOrAsset(asset: Asset)(pfs: (Address, Long)*): Map[Address, Portfolio] = asset match {
+    case ia: IssuedAsset => combineAllAsset(ia)(pfs: _*)
+    case Asset.Waves     => combineAllWaves(pfs: _*)
+  }
+
+  implicit val safeLongSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
   implicit val monoid: Monoid[Portfolio] = new Monoid[Portfolio] {
     override val empty: Portfolio = Portfolio.empty
 
     override def combine(older: Portfolio, newer: Portfolio): Portfolio =
-      Portfolio(balance = safeSum(older.balance, newer.balance),
-                lease = Monoid.combine(older.lease, newer.lease),
-                assets = Monoid.combine(older.assets, newer.assets))
+      Portfolio(
+        balance = safeSum(older.balance, newer.balance),
+        lease = Monoid.combine(older.lease, newer.lease),
+        assets = Monoid.combine(older.assets, newer.assets)
+      )
   }
 
   implicit class PortfolioExt(self: Portfolio) {
@@ -88,7 +104,7 @@ object Portfolio {
           .fold(
             _ => JsError("Expected base58-encoded string"),
             arr => JsSuccess(IssuedAsset(ByteStr(arr)))
-        )
+          )
 
       type Errors = Seq[(JsPath, Seq[JsonValidationError])]
       def locate(e: Errors, key: String) = e.map {

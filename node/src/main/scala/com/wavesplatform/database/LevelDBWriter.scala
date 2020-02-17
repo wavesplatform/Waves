@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import cats.Monoid
+import cats.{Monoid, kernel}
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
@@ -10,7 +10,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
-import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.database.patch.{DisableHijackedAliases, ResetInvalidSponsoredInvokes}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -314,8 +314,19 @@ class LevelDBWriter(
       expiredKeys ++= updateHistory(rw, Keys.leaseBalanceHistory(addressId), balanceThreshold, Keys.leaseBalance(addressId))
     }
 
+    val fixedAssetBalances = rw.get(Keys.patchStatus(ResetInvalidSponsoredInvokes.patchId)) match {
+      case None if height == settings.functionalitySettings.resetInvalidInvokeSponsoredFeeHeight =>
+        val result = ResetInvalidSponsoredInvokes(this, rw, assetBalances, newAddresses)
+        rw.put(Keys.patchStatus(ResetInvalidSponsoredInvokes.patchId), Some(height))
+        clearBalancesCache()
+        result
+
+      case _ =>
+        assetBalances
+    }
+
     val newAddressesForAsset = mutable.AnyRefMap.empty[IssuedAsset, Set[BigInt]]
-    for ((addressId, assets) <- assetBalances) {
+    for ((addressId, assets) <- fixedAssetBalances) {
       val prevAssets   = rw.get(Keys.assetList(addressId))
       val prevAssetSet = prevAssets.toSet
       val newAssets    = assets.keys.filter(!prevAssetSet(_))
@@ -597,6 +608,11 @@ class LevelDBWriter(
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
+          }
+
+          rw.iterateOver(Keys.PatchStatusPrefix) { e =>
+            val height = Ints.fromByteArray(e.getValue)
+            if (height >= currentHeight) rw.delete(e.getKey, "patch-status")
           }
 
           Block

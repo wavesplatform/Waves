@@ -1,8 +1,9 @@
 package com.wavesplatform
 
-import java.io.File
+import java.io.{File, FileInputStream, FileOutputStream, PrintWriter}
 import java.nio.ByteBuffer
 import java.util
+import java.util.zip.{GZIPInputStream, GZIPOutputStream}
 
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.account.Address
@@ -21,6 +22,7 @@ import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
+import scala.io.Source
 import scala.util.Try
 
 //noinspection ScalaStyle
@@ -116,8 +118,8 @@ object Explorer extends ScorexLogging {
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
     val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-    val db               = openDB(settings.dbSettings.directory)
-    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings, settings.dbSettings)
+    lazy val db          = openDB(settings.dbSettings.directory)
+    lazy val reader      = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings, settings.dbSettings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -131,7 +133,7 @@ object Explorer extends ScorexLogging {
           val balances = mutable.Map[BigInt, Long]()
           db.iterateOver(6: Short) { e =>
             val addressId = BigInt(e.getKey.drop(6))
-            val balance = Longs.fromByteArray(e.getValue)
+            val balance   = Longs.fromByteArray(e.getValue)
             balances += (addressId -> balance)
           }
 
@@ -140,20 +142,22 @@ object Explorer extends ScorexLogging {
             actualTotalReward += Longs.fromByteArray(e.getValue)
           }
 
-          val actualTotalBalance = balances.values.sum + reader.carryFee
+          val actualTotalBalance   = balances.values.sum + reader.carryFee
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
-          val byKeyTotalBalance = reader.wavesAmount(blockchainHeight)
+          val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 
           if (actualTotalBalance != expectedTotalBalance || expectedTotalBalance != byKeyTotalBalance)
-            log.error(s"Something wrong, actual total waves balance: $actualTotalBalance," +
-              s" expected total waves balance: $expectedTotalBalance, total waves balance by key: $byKeyTotalBalance")
+            log.error(
+              s"Something wrong, actual total waves balance: $actualTotalBalance," +
+                s" expected total waves balance: $expectedTotalBalance, total waves balance by key: $byKeyTotalBalance"
+            )
           else
             log.info(s"Correct total waves balance: $actualTotalBalance WAVELETS")
 
         case "DA" =>
           val addressIds = mutable.Seq[(BigInt, Address)]()
           db.iterateOver(25: Short) { e =>
-            val address = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
+            val address   = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
             val addressId = BigInt(e.getValue)
             addressIds :+ (addressId -> address)
           }
@@ -365,6 +369,81 @@ object Explorer extends ScorexLogging {
                 if (bal > 0)
                   println(s"$assetId : $bal")
             }
+          }
+
+        case "ABS" =>
+          val fw = new FileOutputStream(s"asset-balances-$blockchainHeight.csv.gz")
+          val gz = new GZIPOutputStream(fw)
+          val pw = new PrintWriter(gz)
+
+          try {
+            db.iterateOver(8.toShort) { e =>
+              val asset     = IssuedAsset(e.getKey.takeRight(32))
+              val addressId = BigInt(e.getKey.drop(2).dropRight(32))
+              val address   = db.get(Keys.idToAddress(addressId))
+              val heights   = database.readIntSeq(e.getValue)
+
+              for {
+                actualHeight <- heights.headOption
+                balance = db.get(Keys.assetBalance(addressId, asset)(actualHeight)) if balance > 0
+              } pw.println(s"${asset.id},$address,$balance")
+            }
+          } finally pw.close()
+          log.info("Finished")
+
+        case "ABSCMP" =>
+          def lines(file: String): Iterator[String] = {
+            val fs = new FileInputStream(file)
+            val gz = new GZIPInputStream(fs)
+            Source.fromInputStream(gz).getLines().filter(_.nonEmpty)
+          }
+
+          def balances(file: String): Iterator[(IssuedAsset, Address, Long)] = {
+            lines(file)
+              .map { line =>
+                val Array(asset, addr, balance) = line.split(",", 3)
+                (IssuedAsset(Base58.decode(asset)), Address.fromString(addr).explicitGet(), balance.toLong)
+              }
+              .filter(_._3 != 0)
+          }
+
+          val file1 = argument(1, "csv#1 missing")
+          val file2 = argument(2, "csv#2 missing")
+
+          val bs1 = balances(file1)
+          val bs2 = balances(file2)
+
+          var counter = 0
+          val map1    = mutable.AnyRefMap.empty[(IssuedAsset, Address), Long]
+          val map2    = mutable.AnyRefMap.empty[(IssuedAsset, Address), Long]
+
+          while (bs1.hasNext || bs2.hasNext) {
+            if (bs1.hasNext) {
+              val (asset, addr, balance) = bs1.next()
+              val b2                     = map2.get(asset -> addr)
+              if (b2.contains(balance)) map2 -= (asset -> addr)
+              else map1(asset -> addr) = balance
+            }
+
+            if (bs2.hasNext) {
+              val (asset, addr, balance) = bs2.next()
+              val b1                     = map1.get(asset -> addr)
+              if (b1.contains(balance)) map1 -= (asset -> addr)
+              else map2(asset -> addr) = balance
+            }
+
+            counter += 1
+            if (counter % 1000000 == 0) log.info(s"$counter entries processed")
+          }
+
+          log.info((map1.keySet ++ map2.keySet).size + " divergences found")
+          map1.foreach { case ((asset, address), balance) =>
+            val diff = map2.get(asset -> address).fold("???")(rb => (balance - rb).toString)
+            println(s"LEFT ${asset.id} on $address = $balance (diff = $diff)")
+          }
+          map2.foreach { case ((asset, address), balance) =>
+            val diff = map1.get(asset -> address).fold("???")(lb => (balance - lb).toString)
+            println(s"RIGHT ${asset.id} on $address = $balance (diff = $diff)")
           }
       }
     } finally db.close()

@@ -76,7 +76,7 @@ object InvokeScriptTransactionDiff {
             )
             val result = for {
               invocationComplexity <- DiffsCommon.functionComplexity(sc, blockchain.estimator, tx.funcCallOpt).leftMap((_, List.empty[LogItem[Id]]))
-              directives <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
+              directives           <- DirectiveSet(V3, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(
@@ -103,10 +103,9 @@ object InvokeScriptTransactionDiff {
 
           verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._2)
 
-          assetsComplexity =
-            (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
-              .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
-              .map(_._2)
+          assetsComplexity = (tx.checkedAssets().map(_.id) ++ ps.flatMap(_._3))
+            .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
+            .map(_._2)
 
           dataEntries = ds.map {
             case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
@@ -117,7 +116,8 @@ object InvokeScriptTransactionDiff {
 
           pmts: List[Map[Address, Map[Option[ByteStr], Long]]] = ps.map {
             case (Recipient.Address(addrBytes), amt, maybeAsset) =>
-              Map(Address.fromBytes(addrBytes.arr).explicitGet() -> Map(maybeAsset -> amt))
+              val nativeAddr = Address.fromBytes(addrBytes.arr).explicitGet()
+              Map(nativeAddr -> Map(maybeAsset -> amt))
           }
 
           feeInfo <- TracedResult(tx.assetFee._1 match {
@@ -133,11 +133,16 @@ object InvokeScriptTransactionDiff {
                   GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
                 )
               } yield {
-                (wavesFee,
-                 Map(
-                   tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee)),
-                   assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
-                 ))
+                (
+                  wavesFee,
+                  if (height >= blockchain.settings.functionalitySettings.resetInvalidInvokeSponsoredFeeHeight) Portfolio.combineAll(
+                    tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee)),
+                    assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
+                  ) else Map(
+                    tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee)),
+                    assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
+                  )
+                )
               }
           })
           dAppAddress <- TracedResult(dAppAddressEi)
@@ -154,7 +159,8 @@ object InvokeScriptTransactionDiff {
                 .forall(id => blockchain.assetDescription(IssuedAsset(id)).isDefined),
               (),
               GenericError(s"Unissued assets are not allowed")
-            ))
+            )
+          )
           _ <- TracedResult {
             val totalScriptsInvoked =
               tx.checkedAssets()
@@ -168,8 +174,10 @@ object InvokeScriptTransactionDiff {
             Either.cond(
               minWaves <= wavesFee,
               (),
-              GenericError(s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-                s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES.")
+              GenericError(
+                s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                  s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES."
+              )
             )
           }
           scriptsInvoked <- TracedResult {
@@ -178,15 +186,17 @@ object InvokeScriptTransactionDiff {
                 .collect { case asset @ IssuedAsset(_) => asset }
                 .count(blockchain.hasAssetScript) +
                 ps.count(_._3.fold(false)(id => blockchain.hasAssetScript(IssuedAsset(id)))) +
-                (if (blockchain.hasScript(tx.sender)) { 1 } else { 0 })
+                (if (blockchain.hasScript(tx.sender)) 1 else 0)
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
-              GenericError(s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-                s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES.")
+              GenericError(
+                s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
+                  s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES."
+              )
             )
           }
 
@@ -215,11 +225,13 @@ object InvokeScriptTransactionDiff {
     }
   }
 
-  private def payableAndDataPart(height: Int,
-                                 tx: InvokeScriptTransaction,
-                                 dAppAddress: Address,
-                                 dataEntries: List[DataEntry[_]],
-                                 feePart: Map[Address, Portfolio]) = {
+  private def payableAndDataPart(
+      height: Int,
+      tx: InvokeScriptTransaction,
+      dAppAddress: Address,
+      dataEntries: List[DataEntry[_]],
+      feePart: Map[Address, Portfolio]
+  ) = {
     if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
       Left(GenericError(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"))
     } else if (dataEntries.exists(_.key.getBytes("UTF-8").length > ContractLimits.MaxKeySizeInBytes)) {
@@ -227,27 +239,24 @@ object InvokeScriptTransactionDiff {
     } else {
       val totalDataBytes = dataEntries.map(_.toBytes.length).sum
 
-      val payablePart: Map[Address, Portfolio] = tx.payment
-        .map {
-          case InvokeScriptTransaction.Payment(amt, assetId) =>
-            assetId match {
-              case asset @ IssuedAsset(_) =>
-                Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))).combine(
-                  Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-                )
-              case Waves =>
-                Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty))
-                  .combine(Map(dAppAddress -> Portfolio(amt, LeaseBalance.empty, Map.empty)))
-            }
-        }
-        .foldLeft(Map[Address, Portfolio]())(_ combine _)
+      val payablePart = Monoid.combineAll(
+        tx.payment.map(
+          p =>
+            Portfolio.combineAllWavesOrAsset(p.assetId)(
+              tx.sender.toAddress -> -p.amount,
+              dAppAddress         -> p.amount
+            )
+        )
+      )
 
       if (totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes) {
         Right(
-          Diff(height = height,
-               tx = tx,
-               portfolios = feePart combine payablePart,
-               accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(d => d.key -> d).toMap)))
+          Diff(
+            height = height,
+            tx = tx,
+            portfolios = feePart combine payablePart,
+            accountData = Map(dAppAddress -> AccountDataInfo(dataEntries.map(e => e.key -> e).toMap))
+          )
         )
       } else
         Left(GenericError(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"))
@@ -256,7 +265,8 @@ object InvokeScriptTransactionDiff {
 
   private def foldScriptTransfers(blockchain: Blockchain, tx: InvokeScriptTransaction, dAppAddress: Address)(
       ps: List[(Recipient.Address, Long, Option[ByteStr])],
-      dataDiff: Diff): TracedResult[ValidationError, Diff] = {
+      dataDiff: Diff
+  ): TracedResult[ValidationError, Diff] = {
     if (ps.length <= ContractLimits.MaxPaymentAmount) {
       val foldResult = ps.foldLeft(TracedResult(dataDiff.asRight[ValidationError])) { (tracedDiffAcc, payment) =>
         val (addressRepr, amount, asset) = payment
@@ -265,18 +275,19 @@ object InvokeScriptTransactionDiff {
           case Waves =>
             Diff
               .stateOps(
-                portfolios = Map(
-                  address     -> Portfolio(amount, LeaseBalance.empty, Map.empty),
-                  dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty)
+                portfolios = Portfolio.combineAllWaves(
+                  address     -> amount,
+                  dAppAddress -> -amount
                 )
               )
               .asRight[ValidationError]
           case a @ IssuedAsset(id) =>
             val nextDiff = Diff.stateOps(
-              portfolios = Map(
-                address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-                dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
-              ))
+              portfolios = Portfolio.combineAllAsset(a)(
+                address     -> amount,
+                dAppAddress -> -amount
+              )
+            )
             blockchain.assetScript(a) match {
               case None =>
                 nextDiff.asRight[ValidationError]
@@ -305,7 +316,8 @@ object InvokeScriptTransactionDiff {
       amount: Long,
       asset: Option[ByteStr],
       nextDiff: Diff,
-      script: Script): Either[ValidationError, Diff] = {
+      script: Script
+  ): Either[ValidationError, Diff] = {
     Try {
       ScriptRunner(
         blockchain.height,
@@ -317,7 +329,8 @@ object InvokeScriptTransactionDiff {
             amount,
             tx.timestamp,
             tx.id()
-          )),
+          )
+        ),
         CompositeBlockchain(blockchain, Some(totalDiff)),
         script,
         isAssetScript = true,
