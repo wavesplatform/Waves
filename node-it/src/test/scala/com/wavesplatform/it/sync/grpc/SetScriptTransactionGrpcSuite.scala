@@ -44,7 +44,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3).explicitGet()
-      val setScriptTx = sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+      val setScriptTx = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
       val setScriptTxId = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
 
       val scriptInfo = sender.scriptInfo(contractAddr)
@@ -132,7 +132,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     for (v <- setScrTxSupportedVersions) {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
       val script = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
-      sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
+      sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
 
       val firstBalance = sender.wavesBalance(contractAddr).available
       val firstEffBalance = sender.wavesBalance(contractAddr).effective

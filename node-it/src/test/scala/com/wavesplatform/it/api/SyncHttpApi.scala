@@ -639,8 +639,6 @@ object SyncHttpApi extends Assertions {
 
     def featureActivationStatus(featureNum: Short): FeatureActivationStatus =
       activationStatus.features.find(_.id == featureNum).get
-
-    def grpc: NodeExtGrpc = new NodeExtGrpc(n)
   }
 
   implicit class NodesExtSync(nodes: Seq[Node]) {

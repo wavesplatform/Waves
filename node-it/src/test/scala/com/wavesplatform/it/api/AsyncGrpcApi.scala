@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, AssetInfoResponse, AssetRequest, AssetsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
@@ -18,6 +18,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
@@ -36,13 +38,14 @@ object AsyncGrpcApi {
     private[this] lazy val accounts = AccountsApiGrpc.stub(n.grpcChannel)
     private[this] lazy val blocks = BlocksApiGrpc.stub(n.grpcChannel)
     private[this] lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
+    private[this] lazy val assets = AssetsApiGrpc.stub(n.grpcChannel)
 
     val chainId: Byte = AddressScheme.current.chainId
 
     def blockAt(height: Int): Future[Block] = {
-      blocks.getBlock(
-        BlockRequest.of(
-          includeTransactions = true, BlockRequest.Request.Height(height))).map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
+      blocks
+        .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height(height)))
+        .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
     def broadcastIssue(source: KeyPair,
@@ -78,13 +81,13 @@ object AsyncGrpcApi {
 
     def broadcastTransfer(
                            source: KeyPair,
-                           recipient: PBRecipient,
+                           recipient: Recipient,
                            amount: Long,
                            fee: Long,
                            version: Int = 2,
                            assetId: String = "WAVES",
                            feeAssetId: String = "WAVES",
-                           attachment: PBAttachment.Attachment = PBAttachment.Attachment.Empty,
+                           attachment: Attachment.Attachment = Attachment.Attachment.Empty,
                            timestamp: Long = System.currentTimeMillis
                          ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
@@ -97,7 +100,7 @@ object AsyncGrpcApi {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            Some(PBAttachment(attachment))
+            Some(Attachment(attachment))
           )
         )
       )
@@ -424,6 +427,37 @@ object AsyncGrpcApi {
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
       }
     }
-  }
 
+    def updateAssetInfo(
+                         sender: KeyPair,
+                         assetId: String,
+                         updatedName: String,
+                         updatedDescription: String,
+                         fee: Long,
+                         feeAsset: Asset = Waves,
+                         version: TxVersion = TxVersion.V1
+                       ): Future[SignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(sender.publicKey),
+        Some(Amount.of(if (feeAsset == Waves) ByteString.EMPTY else ByteString.copyFrom(Base58.decode(feeAsset.maybeBase58Repr.get)), fee)),
+        System.currentTimeMillis(),
+        version,
+        PBTransaction.Data.UpdateAssetInfo(
+          UpdateAssetInfoTransactionData.of(
+            ByteString.copyFrom(Base58.decode(assetId)),
+            updatedName,
+            updatedDescription
+          )
+        )
+      )
+
+      val proofs      = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
+
+      transactions.broadcast(transaction)
+    }
+
+    def assetInfo(assetId: String): Future[AssetInfoResponse] = assets.getInfo(AssetRequest(ByteString.copyFrom(Base58.decode(assetId))))
+  }
 }

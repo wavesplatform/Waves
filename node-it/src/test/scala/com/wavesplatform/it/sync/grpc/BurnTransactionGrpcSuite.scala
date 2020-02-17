@@ -43,7 +43,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       ).explicitGet().id().toString
       sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferredQuantity, minFee, assetId = issuedAssetId, waitForTx = true)
 
-      val tx = sender.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, version = v, waitForTx = true)
+      sender.broadcastBurn(secondAcc, issuedAssetId, transferredQuantity, minFee, version = v, waitForTx = true)
       sender.assetsBalance(secondAddress, Seq(issuedAssetId)).getOrElse(issuedAssetId, 0L) shouldBe 0L
 
       assertGrpcError(

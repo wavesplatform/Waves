@@ -833,8 +833,6 @@ object AsyncHttpApi extends Assertions {
 
     def calculateFee(json: JsValue): Future[FeeInfo] =
       postJsObjectWithApiKey("/transactions/calculateFee", json).as[FeeInfo]
-
-    def grpc: NodeExtGrpc = new NodeExtGrpc(n)
   }
 
   implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {

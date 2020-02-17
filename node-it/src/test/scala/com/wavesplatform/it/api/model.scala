@@ -189,7 +189,7 @@ case class TransactionInfo(
     description: Option[String],
     recipient: Option[String],
     script: Option[String],
-    version: Byte,
+    version: Option[Byte],
     typedAttachment: Option[Attachment],
     attachment: Option[String]
 ) extends TxInfo
@@ -209,19 +209,19 @@ object TransactionInfo {
         description <- (jsv \ "description").validateOpt[String]
         recipient <- (jsv \ "recipient").validateOpt[String]
         script <- (jsv \ "script").validateOpt[String]
-        version <- (jsv \ "version").validate[Byte]
+        version <- (jsv \ "version").validateOpt[Byte]
         chainId <- version match {
-          case v if v > 2 => (jsv \ "chainId").validateOpt[Byte]
+          case Some(v) if v > 2 => (jsv \ "chainId").validateOpt[Byte]
           case _ => JsSuccess(None)
         }
         typedAttachment <- version match {
-          case v if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
-          case v if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
+          case Some(v) if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
+          case Some(v) if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
           case _ => JsSuccess(None)
         }
         attachment <- version match {
-          case v if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case v if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
       }
