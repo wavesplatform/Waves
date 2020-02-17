@@ -58,7 +58,6 @@ object BlockSizeConstraintsSuite {
                                                              |    quorum = 0
                                                              |    minimal-block-generation-offset = 60000ms
                                                              |    micro-block-interval = 1s
-                                                             |    max-transactions-in-key-block = 0
                                                              |    max-transactions-in-micro-block = $txsInMicroBlock
                                                              |  }
                                                              |

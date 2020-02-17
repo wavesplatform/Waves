@@ -45,7 +45,6 @@ object LeaseStatusTestSuite {
        |      minimal-block-generation-offset = $blockGenerationOffset
        |      quorum = 0
        |      micro-block-interval = 3s
-       |      max-transactions-in-key-block = 0
        |   }
        |}
      """.stripMargin)

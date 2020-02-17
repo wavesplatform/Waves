@@ -37,7 +37,6 @@ class SmartTransactionsConstraintsSuite extends FreeSpec with Matchers with Tran
          |    quorum = 0
          |    minimal-block-generation-offset = 60000ms
          |    micro-block-interval = 3s
-         |    max-transactions-in-key-block = 0
          |    max-transactions-in-micro-block = 500
          |  }
          |

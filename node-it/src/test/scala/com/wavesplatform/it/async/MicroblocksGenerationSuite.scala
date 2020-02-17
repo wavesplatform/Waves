@@ -45,7 +45,6 @@ object MicroblocksGenerationSuite {
                                                              |      quorum = 0
                                                              |      minimal-block-generation-offset = 1m
                                                              |      micro-block-interval = 3s
-                                                             |      max-transactions-in-key-block = 0
                                                              |      max-transactions-in-micro-block = $txsInMicroBlock
                                                              |    }
                                                              |
