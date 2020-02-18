@@ -57,8 +57,8 @@ case class AddressApiRoute(
         "address"            -> address.stringRepr,
         "script"             -> script.map(_.script.bytes().base64),
         "scriptText"         -> script.map(_.script.expr.toString),
-        "complexity"         -> script.fold(0L)(_.verifierComplexity),
-        "callableComplexity" -> script.fold[JsValue](JsNull)(m => Json.toJson(m.callableComplexity)),
+        "complexity"         -> script.fold(0L)(_.maxComplexity),
+        "callableComplexity" -> script.fold[JsValue](JsNull)(m => Json.obj()),
         "extraFee"           -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
       )
     }

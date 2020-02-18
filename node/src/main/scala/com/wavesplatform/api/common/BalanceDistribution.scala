@@ -29,7 +29,7 @@ trait BalanceDistribution {
         resource.iterator.seek(
           globalPrefix ++ after.flatMap(address => resource.get(Keys.addressId(address))).fold(Array.emptyByteArray)(id => (id + 1).toByteArray)
         )
-        Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala))
+        Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
       }
 
 }

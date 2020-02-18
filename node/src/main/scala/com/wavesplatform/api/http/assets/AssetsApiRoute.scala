@@ -203,28 +203,28 @@ case class AssetsApiRoute(
     }
 
   def nft(address: Address, limit: Int, maybeAfter: Option[String]): Route = {
-    val after = maybeAfter.map(s => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))))
+    val after = maybeAfter.collect { case s if s.nonEmpty => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))) }
+    log.info(s"LOAD NFT: after=$maybeAfter")
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
-    else
-      extractScheduler { implicit sc =>
-        complete {
-          implicit val j: EntityStreamingSupport = EntityStreamingSupport.json()
-          Source.fromPublisher(
-            commonAccountApi
-              .nftPortfolio(address, after)
-              .flatMap {
-                case (assetId, assetDesc) =>
-                  Observable.fromEither(
-                    AssetsApiRoute
-                      .jsonDetails(blockchain)(assetId, assetDesc, true)
-                      .leftMap(err => new IllegalArgumentException(err))
-                  )
-              }
-              .take(limit)
-              .toReactivePublisher
-          )
-        }
+    else extractScheduler { implicit sc =>
+      complete {
+        implicit val j: EntityStreamingSupport = EntityStreamingSupport.json()
+        Source.fromPublisher(
+          commonAccountApi
+            .nftPortfolio(address, after)
+            .flatMap {
+              case (assetId, assetDesc) =>
+                Observable.fromEither(
+                  AssetsApiRoute
+                    .jsonDetails(blockchain)(assetId, assetDesc, true)
+                    .leftMap(err => new IllegalArgumentException(err))
+                )
+            }
+            .take(limit)
+            .toReactivePublisher
+        )
       }
+    }
   }
 
   private def balanceJson(address: Address, assetId: IssuedAsset): JsObject =

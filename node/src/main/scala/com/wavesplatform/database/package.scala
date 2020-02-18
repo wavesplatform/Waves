@@ -386,13 +386,15 @@ package object database extends ScorexLogging {
       case Value.StringValue(value) => StringDataEntry(key, value)
     }
 
-  def writeDataEntry(e: DataEntry[_]): Array[Byte] = pb.DataEntry(e match {
-    case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
-    case BooleanDataEntry(_, value) =>pb.DataEntry.Value.BoolValue(value)
-    case BinaryDataEntry(_, value)  =>pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
-    case StringDataEntry(_, value)  =>pb.DataEntry.Value.StringValue(value)
-    case _: EmptyDataEntry          =>pb.DataEntry.Value.Empty
-  }).toByteArray
+  def writeDataEntry(e: DataEntry[_]): Array[Byte] =
+    pb.DataEntry(e match {
+        case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
+        case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
+        case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
+        case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
+        case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
+      })
+      .toByteArray
 
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
@@ -461,24 +463,28 @@ package object database extends ScorexLogging {
   def readAssetScript(b: Array[Byte]): (Script, Long) =
     ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
 
-  def writeScript(scriptInfo: AccountScriptInfo): Array[Byte] = {
+  def writeScript(scriptInfo: AccountScriptInfo): Array[Byte] =
     pb.AccountScriptInfo.toByteArray(
       pb.AccountScriptInfo(
         ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes()),
-        scriptInfo.verifierComplexity,
-        scriptInfo.callableComplexity
+        scriptInfo.maxComplexity,
+        scriptInfo.complexitiesByEstimator.map {
+          case (version, complexities) =>
+            pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
+        }.toSeq
       )
     )
-  }
 
   def readScript(b: Array[Byte]): AccountScriptInfo = {
     val asi = pb.AccountScriptInfo.parseFrom(b)
     AccountScriptInfo(
       PublicKey(asi.publicKey.toByteArray),
       ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),
-      asi.verifierComplexity,
-      asi.callableComplexity
+      asi.maxComplexity,
+      asi.callableComplexity.map { c =>
+        c.version -> c.callableComplexity
+      }.toMap
     )
   }
 

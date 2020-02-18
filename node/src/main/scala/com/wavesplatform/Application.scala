@@ -20,7 +20,6 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.alias.AliasApiRoute
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.api.http.leasing.LeaseApiRoute
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
@@ -135,7 +134,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, enablePriorityPool = settings.minerSettings.enable)
     maybeUtx = Some(utxStorage)
 
-    val timer = new HashedWheelTimer()
+    val timer                 = new HashedWheelTimer()
     val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
     val utxSynchronizerScheduler =
       Schedulers.timeBoundedFixedPool(
@@ -186,12 +185,13 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val history = History(blockchainUpdater, blockchainUpdater.liquidBlock, blockchainUpdater.microBlock, db)
 
-    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] = loadBlockMetaAt(height).map { meta =>
-      meta -> blockchainUpdater
-        .liquidBlock(meta.signature)
-        .orElse(history.loadBlockBytes(meta.signature).flatMap { case (_, bytes) => Block.parseBytes(bytes).toOption })
-        .fold(Seq.empty[Transaction])(_.transactionData)
-    }
+    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
+      loadBlockMetaAt(height).map { meta =>
+        meta -> blockchainUpdater
+          .liquidBlock(meta.signature)
+          .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+          .fold(Seq.empty[Transaction])(_.transactionData)
+      }
 
     def loadBlockMetaAt(height: Int): Option[BlockMeta] =
       blockchainUpdater.liquidBlockMeta.filter(_ => blockchainUpdater.height == height).orElse(db.get(Keys.blockMetaAt(Height(height))))

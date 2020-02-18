@@ -125,7 +125,8 @@ trait TransferSending extends ScorexLogging {
                 feeAsset = Waves,
                 fee = x.fee,
                 attachment =
-                  if (includeAttachment) Some(Attachment.Bin(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)))
+                  if (includeAttachment)
+                    Some(Attachment.Bin(Array.fill(TransferTransaction.MaxAttachmentSize)(ThreadLocalRandom.current().nextInt().toByte)))
                   else None,
                 timestamp = start + i
               )
@@ -133,7 +134,7 @@ trait TransferSending extends ScorexLogging {
               .get
           )
       }
-      .grouped(requests.size / nodes.size)
+      .grouped(requests.size / nodes.size + 1)
       .toSeq
 
     Future
@@ -141,7 +142,10 @@ trait TransferSending extends ScorexLogging {
         case (node, request) =>
           request.foldLeft(Future.successful(Seq.empty[Transaction])) {
             case (f, r) =>
-              f.flatMap(ts => node.signedBroadcast(toJson(r).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt)).map(_ +: ts))
+              for {
+                prevTransactions <- f
+                tx               <- node.signedBroadcast(toJson(r).as[JsObject] ++ Json.obj("type" -> TransferTransaction.typeId.toInt))
+              } yield tx +: prevTransactions
           }
       }
       .map(_.flatten)

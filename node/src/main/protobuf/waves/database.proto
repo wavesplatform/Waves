@@ -24,10 +24,15 @@ message BlockMeta {
 }
 
 message AccountScriptInfo {
+    message ComplexityByVersion {
+        int32 version = 1;
+        map<string, int64> callable_complexity = 2;
+    }
+
     bytes public_key = 1;
     bytes script_bytes = 2;
-    int64 verifier_complexity = 3;
-    map<string, int64> callable_complexity = 4;
+    int64 max_complexity = 3;
+    repeated ComplexityByVersion callable_complexity = 4;
 }
 
 message StaticAssetInfo {

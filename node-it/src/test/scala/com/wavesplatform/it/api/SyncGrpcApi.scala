@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, DataRequest, ScriptData, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, BalancesRequest, DataRequest, ScriptData, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
@@ -153,9 +153,8 @@ object SyncGrpcApi extends Assertions {
       sync(async(n).getTransaction(id, sender, recipient))
     }
 
-    def getTransactionSeq(ids: Seq[String], sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): List[PBSignedTransaction] = {
-      val txs = transactions.getTransactions(TransactionsRequest(sender, recipient, ids.map(id => ByteString.copyFrom(Base58.decode(id)))))
-      txs.toList.map(resp => resp.getTransaction)
+    def getTransactionSeq(ids: Seq[String], sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): List[TransactionResponse] = {
+      transactions.getTransactions(TransactionsRequest(sender, recipient, ids.map(id => ByteString.copyFrom(Base58.decode(id))))).toList
     }
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): PBSignedTransaction =
