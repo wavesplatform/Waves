@@ -378,12 +378,3 @@ object Explorer extends ScorexLogging {
     } finally db.close()
   }
 }
-
-object Test extends App {
-  import com.wavesplatform.database.protobuf.{BlockInfo => PBlockInfo}
-  import com.wavesplatform.block.Block.BlockInfo
-  val bStr = "AAAA9wQAAAFv1vPDekt7U7DdxM9APNvkUiJNCxDbJOIING79SUbI6Czovd4hwIOBRjnIMvFg763z6nAnE4iPQVQ1IfXv2Do/cIjUigQAAAAAAAAJBRBY3/DpHYwVDdRnMlm+c/wZKxN42SsydSOHLKAkMUEaAAAAAAAAAAcABQAGAAcACAAJAAoACwAAAAApuScATUtFEJSCkx0HdFheYQ6bzhaPcAcDOdZz7NajBHJ1QVQ31/fR3AmTVer5/3s8tGqQ+IpC+z4H9BrTmNU8tMjr1MZm3Dv1Qp0n5ON7AzrBUbEdjE4Hspeupl2ucNclh1gA"
-  val bs = Base64.decode(bStr)
-  println(database.readBlockInfo(false)(bs))
-
-}
