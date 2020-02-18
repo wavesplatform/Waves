@@ -40,10 +40,10 @@ package object transaction {
 
   type ChainId = Byte
   object ChainId {
-    @volatile private[this] var globalValue: ChainId = 'T'.toByte
+    private[this] var globalValue: ChainId = 'T'.toByte
     def global: ChainId                              = globalValue
 
-    def setGlobal(chainId: Int): Unit = {
+    def setGlobal(chainId: Int): Unit = synchronized {
       require(chainId.isValidByte)
       globalValue = chainId.toByte
     }
