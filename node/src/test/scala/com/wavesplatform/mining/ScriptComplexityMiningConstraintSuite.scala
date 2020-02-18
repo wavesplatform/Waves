@@ -5,7 +5,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance}
+import com.wavesplatform.state.{AccountScriptInfo, Blockchain, LeaseBalance}
 import com.wavesplatform.transaction.{DataTransaction, Transaction, TxVersion}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -38,7 +38,7 @@ class ScriptComplexityMiningConstraintSuite
           TransactionDiffer(Some(System.currentTimeMillis() - 1000), System.currentTimeMillis())(blockchain, _: Transaction).resultE.explicitGet()
         (blockchain.balance _).when(*, *).returning(10000000)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-        (blockchain.accountScriptWithComplexity _).when(tx1.sender.toAddress).returning(Some((null, null, 1000, Map.empty)))
+        (blockchain.accountScriptWithComplexity _).when(tx1.sender.toAddress).returning(Some(AccountScriptInfo(null, null, 1000, Map.empty)))
         (blockchain.accountScriptWithComplexity _).when(*).returning(None)
 
         val c1          = constraint.put(blockchain, tx1, txDiffer(tx1))

@@ -72,7 +72,8 @@ object ContractScript {
   def estimateComplexity(
       version: StdLibVersion,
       contract: DApp,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+    checkLimit: Boolean = true
   ): Either[String, (Long, Map[String, Long])] =
     for {
       cbf <- estimateComplexityByFunction(version, contract, estimator)
@@ -80,7 +81,7 @@ object ContractScript {
       _ <- max.fold(().asRight[String])(
         m =>
           Either.cond(
-            m._2 <= MaxComplexityByVersion(version),
+            !(checkLimit && m._2 > MaxComplexityByVersion(version)),
             (),
             s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
           )

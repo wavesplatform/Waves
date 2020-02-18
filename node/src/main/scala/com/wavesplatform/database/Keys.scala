@@ -61,7 +61,7 @@ object Keys {
   def idToAddress(id: BigInt): Key[Address]            = Key("id-to-address", bytes(26, id.toByteArray), Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
   def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("address-script-history", 27, addressId.toByteArray)
-  def addressScript(addressId: BigInt)(height: Int): Key[Option[(PublicKey, Script, Long, Map[String, Long])]] =
+  def addressScript(addressId: BigInt)(height: Int): Key[Option[AccountScriptInfo]] =
     Key.opt("address-script", hAddr(28, height, addressId), readScript, writeScript)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
