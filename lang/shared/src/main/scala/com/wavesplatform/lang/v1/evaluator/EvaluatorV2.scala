@@ -38,8 +38,8 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     def withCost(addCost: Int): Context =
       copy(cost = cost + addCost)
 
-    def withLet(newLet: LET, isEvaluated: Boolean): Context =
-      copy(lets = lets + (newLet.name -> (newLet.value, isEvaluated)))
+    def withLet(letName: String, letValue: EXPR, isEvaluated: Boolean): Context =
+      copy(lets = lets + (letName -> (letValue, isEvaluated)))
 
     def withoutLet(let: String): Context =
       copy(lets = lets - let)
@@ -69,8 +69,8 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
   private def evaluated(e: EVALUATED, ctx: Context): Eval[(EXPR, Context)] =
     Eval.now((e, ctx))
 
-  private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] = {
-    root(nextExpr, ctx.withLet(let, isEvaluated = false))
+  private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
+    root(nextExpr, ctx.withLet(let.name, let.value, isEvaluated = false))
       .map {
         case (nextExprResult, nextExprCtx) =>
           val resultExpr =
@@ -83,11 +83,10 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
           val overlapFixedCtx =
             ctx.lets.get(let.name)
               .fold(nextExprCtx.withoutLet(let.name)) {
-                case (expr, isEvaluated) => nextExprCtx.withLet(LET(let.name, expr), isEvaluated)
+                case (expr, isEvaluated) => nextExprCtx.withLet(let.name, expr, isEvaluated)
               }
           (resultExpr, overlapFixedCtx)
       }
-  }
 
   private def evaluateFunctionBlock(funcDef: FUNC, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] = {
     val function = UserFunction[Environment](funcDef.name, 0, null, funcDef.args.map(n => (n, null)): _*)(funcDef.body)
@@ -115,9 +114,9 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         .map {
           case (letValue, resultCtx) =>
             if (resultCtx.isExhausted)
-              (REF(key), resultCtx.withLet(LET(key, letValue), isEvaluated = false))
+              (REF(key), resultCtx.withLet(key, letValue, isEvaluated = false))
             else
-              (letValue, resultCtx.withLet(LET(key, letValue), isEvaluated = true).withCost(1))
+              (letValue, resultCtx.withLet(key, letValue, isEvaluated = true).withCost(1))
         }
   }
 
