@@ -54,9 +54,9 @@ class AmountAsStringSuite extends BaseTransactionSuite {
   test("amount as string in exchange transaction") {
     val exchanger      = KeyPair("exchanger".getBytes)
     val transferTxId   = sender.transfer(firstAddress, exchanger.stringRepr, transferAmount, minFee, waitForTx = true).id
-    val transferTxInfo = sender.getWithCustomHeader(s"/transactions/info/$transferTxId", headerName, headerValue)
-    (parseResponse(transferTxInfo) \ "amount").as[String] shouldBe s"$transferAmount"
-    (parseResponse(transferTxInfo) \ "fee").as[String] shouldBe s"$minFee"
+    val transferTxInfo = sender.transactionInfo(transferTxId, amountsAsStrings = true)
+    transferTxInfo.amount shouldBe Some(transferAmount)
+    transferTxInfo.fee shouldBe minFee
 
     val amount = 1000000
     val price  = 1000
