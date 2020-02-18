@@ -18,8 +18,10 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
 
       val aliasTx = sender.createAlias(firstAddress, alias, minFee, version = v)
       nodes.waitForHeightAriseAndTxPresent(aliasTx.id)
-      aliasTx.chainId shouldBe Some(AddressScheme.current.chainId)
-      sender.transactionInfo(aliasTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      if(v >= 3) {
+        aliasTx.chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo(aliasTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+      }
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - minFee)
 
       val aliasFull = fullAliasByAddress(firstAddress, alias)

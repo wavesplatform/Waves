@@ -109,7 +109,7 @@ case class Transaction (
                         fee: Long,
                         timestamp: Long,
                         sender: Option[String],
-                        version: Byte,
+                        version: Option[Byte],
                         name: Option[String],
                         amount: Option[Long],
                         description: Option[String],
@@ -126,22 +126,22 @@ object Transaction {
         fee <- (jsv \ "fee").validate[Long]
         timestamp <- (jsv \ "timestamp").validate[Long]
         sender <- (jsv \ "sender").validateOpt[String]
-        version <- (jsv \ "version").validate[Byte]
+        version <- (jsv \ "version").validateOpt[Byte]
         chainId <- version match {
-          case v if v > 2 => (jsv \ "chainId").validateOpt[Byte]
+          case Some(v) if v > 2 => (jsv \ "chainId").validateOpt[Byte]
           case _ => JsSuccess(None)
         }
         name <- (jsv \ "name").validateOpt[String]
         amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
         typedAttachment <- version match {
-          case v if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
-          case v if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
+          case Some(v) if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
+          case Some(v) if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]
           case _ => JsSuccess(None)
         }
         attachment <- version match {
-          case v if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
-          case v if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if v < 3 && _type == 4 => (jsv \ "attachment").validateOpt[String]
+          case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
       }
@@ -306,7 +306,34 @@ case class DebugStateChanges(
     stateChanges: Option[StateChangesDetails]
 ) extends TxInfo
 object DebugStateChanges {
-  implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
+  implicit val debugStateChanges: Format[DebugStateChanges] = Format(
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        height <- (jsv \ "height").validate[Int]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        recipient <- (jsv \ "recipient").validateOpt[String]
+        script <- (jsv \ "script").validateOpt[String]
+        stateChanges <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+      }
+        yield DebugStateChanges(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender,
+          height,
+          minSponsoredAssetFee,
+          recipient,
+          script,
+          stateChanges
+        )),
+    Json.writes[DebugStateChanges]
+  )
 }
 
 case class DataResponse(`type`: String, value: Long, key: String)
