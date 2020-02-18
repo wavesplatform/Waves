@@ -26,6 +26,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
 
   var assetWOScript    = ""
   var assetWScript     = ""
+  var assetWScript2     = ""
   private val accountB = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(
     s"""
@@ -64,6 +65,21 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         issueFee,
         2.toByte,
         Some(scriptBase64)
+      )
+      .id
+
+    assetWScript2 = sender
+      .issue(
+        firstAddress,
+        "SetAssetScript",
+        "Test coin for SetAssetScript tests",
+        someAssetAmount,
+        0,
+        reissuable = false,
+        issueFee,
+        2.toByte,
+        Some(scriptBase64),
+        waitForTx = true
       )
       .id
 
@@ -283,10 +299,10 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
   test("try to update script to null") {
     for (v <- setAssetScrTxSupportedVersions) {
       assertApiError(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, version = v)) { error =>
-        error.message should include regex "Reason: Cannot set empty script"
+        error.message should include regex "Cannot set empty script"
       }
       assertApiError(sender.setAssetScript(assetWScript, firstAddress, setAssetScriptFee, Some(""), version = v)) { error =>
-        error.message should include regex "Reason: Cannot set empty script"
+        error.message should include regex "Cannot set empty script"
       }
     }
   }
@@ -322,6 +338,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
     val accountA = pkByAddress(firstAddress)
 
     for (v <- setAssetScrTxSupportedVersions) {
+      val assetWithScript = if (v < 2) assetWScript else assetWScript2
       val setScriptTransaction = SetScriptTransaction
         .selfSigned(
           version = v,
@@ -338,7 +355,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
               estimator
             ).explicitGet()._1
           ),
-          setScriptFee,
+          setScriptFee + smartFee,
           System.currentTimeMillis()
         )
         .right
@@ -353,9 +370,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       val nonIssuerUnsignedTx = SetAssetScriptTransaction(
         version = v,
         accountA,
-        IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
+        IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(unchangeableScript),
-        setAssetScriptFee + 0.004.waves,
+        setAssetScriptFee + smartFee,
         System.currentTimeMillis,
         Proofs.empty
       )
@@ -363,7 +380,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
 
       val signedTxByB =
-        nonIssuerUnsignedTx.copy(1.toByte, proofs = Proofs(Seq(sigTxB)))
+        nonIssuerUnsignedTx.copy(proofs = Proofs(Seq(sigTxB)))
 
       val tx =
         sender.signedBroadcast(signedTxByB.json()).id
@@ -374,9 +391,9 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       val nonIssuerUnsignedTx2 = SetAssetScriptTransaction(
         version = v,
         accountA,
-        IssuedAsset(ByteStr.decodeBase58(assetWScript).get),
+        IssuedAsset(ByteStr.decodeBase58(assetWithScript).get),
         Some(script),
-        setAssetScriptFee + 0.004.waves,
+        setAssetScriptFee + smartFee,
         System.currentTimeMillis,
         Proofs.empty
       )
@@ -384,7 +401,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))
 
       val signedTxByB2 =
-        nonIssuerUnsignedTx2.copy(version = v, proofs = Proofs(Seq(sigTxB2)))
+        nonIssuerUnsignedTx2.copy(proofs = Proofs(Seq(sigTxB2)))
 
       assertApiError(sender.signedBroadcast(signedTxByB2.json())) { error =>
         error.message shouldBe errNotAllowedByToken

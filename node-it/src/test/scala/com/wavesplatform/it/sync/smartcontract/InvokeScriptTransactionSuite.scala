@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -11,7 +12,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import org.scalatest.CancelAfterFailure
 import play.api.libs.json.JsNumber
 
@@ -138,31 +139,33 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     }
   }
 
-  test("not able to set an empty key by invoking script") {
-    //TODO: must fail for transaction V3(protobuf) after https://jira.wavesplatform.com/browse/NODE-2046 will be done
-    for (v <- invokeScrTxSupportedVersions) {
-      val contract = if (v < 2) firstContract else secondContract
+  test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
+    assertApiError(
       sender.invokeScript(
         caller.stringRepr,
-        contract.stringRepr,
+        secondContract.stringRepr,
         func = Some("emptyKey"),
         payment = Seq(),
         fee = 1.waves,
-        waitForTx = true
-      )
+        version = TxVersion.V2
+      ), AssertiveApiError(StateCheckFailed.Id, "State check failed. Reason: Empty keys aren't allowed in tx version >= 2")
+    )
 
-      sender.getData(contract.stringRepr)
+    nodes.waitForHeightArise()
+    sender.getData(secondContract.stringRepr).filter(_.key.isEmpty) shouldBe List.empty
 
+    assertApiError(
       sender.invokeScript(
         caller.stringRepr,
         thirdContract.stringRepr,
-        func = if (v < 2) Some("foo") else Some("bar"),
+        func = Some("bar"),
         payment = Seq(),
         fee = 1.waves,
-        waitForTx = true
-      )
+        version = TxVersion.V2
+      ), AssertiveApiError(StateCheckFailed.Id, "State check failed. Reason: Empty keys aren't allowed in tx version >= 2")
+    )
 
-      sender.getData(thirdContract.stringRepr)
-    }
+    nodes.waitForHeightArise()
+    sender.getData(thirdContract.stringRepr).filter(_.key.isEmpty) shouldBe List.empty
   }
 }
