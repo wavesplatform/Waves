@@ -37,8 +37,8 @@ object JsAPI {
   private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
   private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
-  private val fullContractContext: CTX[Environment] =
-    buildContractContext(V3)
+  private def fullContractContext(version: StdLibVersion): CTX[Environment] =
+    buildContractContext(version)
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
@@ -161,7 +161,7 @@ object JsAPI {
           }
       case DAppType =>
         Global
-          .parseAndCompileContract(input, fullContractContext.compilerContext, stdLibVer, estimator)
+          .parseAndCompileContract(input, fullContractContext(ds.stdLibVersion).compilerContext, stdLibVer, estimator)
           .map {
             case (bytes, complexityWithMap, exprDApp, compErrorList) =>
               js.Dynamic.literal(
@@ -224,7 +224,7 @@ object JsAPI {
       case DAppType =>
         // Just ignore stdlib version here
         Global
-          .compileContract(input, fullContractContext.compilerContext, ver, estimator)
+          .compileContract(input, fullContractContext(ds.stdLibVersion).compilerContext, ver, estimator)
           .map {
             case (bytes, ast, complexity, complexityByFunc) =>
               js.Dynamic.literal(
