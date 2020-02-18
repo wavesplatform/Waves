@@ -1,0 +1,22 @@
+{
+  funcs: [
+    {
+      name: "cons"
+      params: [ "A", "List[B]" ]
+      doc: "Gets an element from a list by index."
+      paramsDoc: [ "The element.", "The list." ]
+    }
+    {
+      name: "size"
+      params: [ "List[T]" ]
+      doc: "Prepends a new element to the list."
+      paramsDoc: [ "The list." ]
+    }
+	 {
+      name: "getElement"
+      params: [ "List[T]", "Int" ]
+      doc: "Returns the size of a list."
+      paramsDoc: [ "The list.", "The index of the element." ]
+    }
+  ]
+}
