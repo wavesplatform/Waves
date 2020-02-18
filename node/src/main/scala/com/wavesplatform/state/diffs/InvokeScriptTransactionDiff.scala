@@ -61,7 +61,7 @@ object InvokeScriptTransactionDiff {
     accScriptEi match {
       case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
        for {
-          _          <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(ValidationError.ScriptParseError.apply))
+          _          <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(GenericError.apply))
           dAppAddress <- TracedResult(dAppAddressEi)
 
           feeInfo <- TracedResult(tx.assetFee._1 match {
@@ -89,9 +89,9 @@ object InvokeScriptTransactionDiff {
           wavesFee = feeInfo._1
           paymentsDiff = paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2)
 
-          directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(ValidationError.ScriptParseError.apply))
-          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(ValidationError.ScriptParseError.apply))
-          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(ValidationError.ScriptParseError.apply))
+          directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
+          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
+          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
 
           invocationComplexity <- TracedResult.wrapE({
                 val complexity =
@@ -105,7 +105,7 @@ object InvokeScriptTransactionDiff {
                   s"address = $dAppAddress, " +
                   s"estimator version = ${blockchain.estimator.version}"
 
-                complexity.toRight(ValidationError.ScriptParseError(errorMessage))
+                complexity.toRight(GenericError(errorMessage))
 
               })
  
