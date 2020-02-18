@@ -26,7 +26,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     val environment = Common.emptyBlockchainEnvironment()
     val evaluator = new EvaluatorV2(limit, version)
     val evaluatorCtx = evaluator.Context(ctx.evaluationContext(environment))
-    val (resultExpr, resultCtx) = evaluator.root(expr, evaluatorCtx)
+    val (resultExpr, resultCtx) = evaluator.root(expr, evaluatorCtx).value
     (resultExpr, Decompiler(resultExpr, ctx.decompilerContext), resultCtx.cost)
   }
 

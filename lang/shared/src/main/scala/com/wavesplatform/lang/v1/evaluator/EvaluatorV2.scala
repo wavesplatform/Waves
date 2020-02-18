@@ -1,6 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import cats.Id
+import cats.{Eval, Id}
+import cats.implicits._
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -53,9 +54,9 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
       )
   }
 
-  def root(expr: EXPR, ctx: Context): (EXPR, Context) =
+  def root(expr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
     if (ctx.isExhausted)
-      (expr, ctx)
+      Eval.now((expr, ctx))
     else
       expr match {
         case LET_BLOCK(let, body)          => evaluateLetBlock(let, body, ctx)
@@ -68,106 +69,123 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         case e: EVALUATED                  => evaluated(e, ctx)
       }
 
-  // todo recursion
-  private def evaluated(e: EVALUATED, ctx: Context): (EXPR, Context) =
-    (e, ctx)
+  private def evaluated(e: EVALUATED, ctx: Context): Eval[(EXPR, Context)] =
+    Eval.now((e, ctx))
 
-  private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): (EXPR, Context) = {
-    val overlappedLetOpt = ctx.lets.get(let.name)
-    val (nextExprResult, nextExprCtx) = root(nextExpr, ctx.withLet(let, isEvaluated = false))
-    val resultExpr =
-      if (nextExprResult.isInstanceOf[EVALUATED])
-        nextExprResult
-      else {
-        val letDecl = LET(let.name, nextExprCtx.lets(let.name)._1)
-        BLOCK(letDecl, nextExprResult)
+  private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] = {
+    root(nextExpr, ctx.withLet(let, isEvaluated = false))
+      .map {
+        case (nextExprResult, nextExprCtx) =>
+          val resultExpr =
+            if (nextExprResult.isInstanceOf[EVALUATED])
+              nextExprResult
+            else {
+              val letDecl = LET(let.name, nextExprCtx.lets(let.name)._1)
+              BLOCK(letDecl, nextExprResult)
+            }
+          val overlapFixedCtx =
+            ctx.lets.get(let.name).fold(nextExprCtx) {
+              case (expr, isEvaluated) => nextExprCtx.withLet(LET(let.name, expr), isEvaluated)
+            }
+          (resultExpr, overlapFixedCtx)
       }
-    val resultCtx =
-      overlappedLetOpt.fold(nextExprCtx) {
-        case (expr, isEvaluated) => nextExprCtx.withLet(LET(let.name, expr), isEvaluated)
-      }
-    (resultExpr, resultCtx)
   }
 
-  private def evaluateFunctionBlock(funcDef: FUNC, nextExpr: EXPR, ctx: Context): (EXPR, Context) = {
+  private def evaluateFunctionBlock(funcDef: FUNC, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] = {
     val function = UserFunction[Environment](funcDef.name, 0, null, funcDef.args.map(n => (n, null)): _*)(funcDef.body)
-    val overlappedFuncOpt =
-      ctx.functions
-        .get(function.header)
-        .collect { case f: UserFunction[Environment] => f }
-    val (nextExprResult, nextExprCtx) = root(nextExpr, ctx.withFunction(function))
-    val resultExpr =
-      if (nextExprResult.isInstanceOf[EVALUATED]) nextExprResult
-      else BLOCK(funcDef, nextExprResult)
-    val resultCtx = overlappedFuncOpt.fold(nextExprCtx)(nextExprCtx.withFunction)
-    (resultExpr, resultCtx)
+    root(nextExpr, ctx.withFunction(function))
+      .map {
+        case (nextExprResult, nextExprCtx) =>
+          val resultExpr =
+            if (nextExprResult.isInstanceOf[EVALUATED]) nextExprResult
+            else BLOCK(funcDef, nextExprResult)
+          val overlapFixedCtx =
+            ctx.functions
+              .get(function.header)
+              .collect { case f: UserFunction[Environment] => f }
+              .fold(nextExprCtx)(nextExprCtx.withFunction)
+          (resultExpr, overlapFixedCtx)
+      }
   }
 
-  private def evaluateRef(key: String, ctx: Context): (EXPR, Context) = {
+  private def evaluateRef(key: String, ctx: Context): Eval[(EXPR, Context)] = {
     val (letExpr, isEvaluated) = ctx.lets(key)
     if (isEvaluated)
-      (letExpr, ctx.withCost(1))
-    else {
-      val (letValue, resultCtx) = root(letExpr, ctx)
-      if (resultCtx.isExhausted)
-        (REF(key), resultCtx.withLet(LET(key, letValue), isEvaluated = false))
-      else
-        (letValue, resultCtx.withLet(LET(key, letValue), isEvaluated = true).withCost(1))
-    }
+      Eval.now((letExpr, ctx.withCost(1)))
+    else
+      root(letExpr, ctx)
+        .map {
+          case (letValue, resultCtx) =>
+            if (resultCtx.isExhausted)
+              (REF(key), resultCtx.withLet(LET(key, letValue), isEvaluated = false))
+            else
+              (letValue, resultCtx.withLet(LET(key, letValue), isEvaluated = true).withCost(1))
+        }
   }
 
   private def evaluateFunctionCall(
     header: FunctionHeader,
     args: List[EXPR],
     ctx: Context
-  ): (EXPR, Context) = {
-    val (resultCtx, resultArgs) = evaluateFunctionArgs(args, ctx)
-    if (resultCtx.isExhausted) {
-      val call = FUNCTION_CALL(header, resultArgs ::: args.drop(resultArgs.size))
-      (call, resultCtx)
-    }
-    else {
-      val evaluatedArgs = resultArgs.asInstanceOf[List[EVALUATED]]      //todo type safety
+  ): Eval[(EXPR, Context)] =
+    for {
+      (resultCtx, resultArgs) <- evaluateFunctionArgs(args, ctx)
+      result                  <- evaluateFunctionExpr(header, resultCtx, args, resultArgs)
+    } yield result
+
+  private def evaluateFunctionExpr(
+    header: FunctionHeader,
+    ctx: Context,
+    startArgs : List[EXPR],
+    resultArgs: List[EXPR]
+  ): Eval[(EXPR, Context)] =
+    if (ctx.isExhausted) {
+      val call = FUNCTION_CALL(header, resultArgs ::: startArgs.drop(resultArgs.size))
+      Eval.now((call, ctx))
+    } else {
+      val evaluatedArgs = resultArgs.asInstanceOf[List[EVALUATED]] //todo type safety
       ctx.functions.get(header)
         .fold(
-          (evaluateConstructor(header.funcName, evaluatedArgs, ctx), ctx)
+          Eval.now((tryCreateObject(header.funcName, evaluatedArgs, ctx), ctx))
         )(
-          evaluateFunctionBody(_, resultCtx, evaluatedArgs)
+          evaluateBaseFunctionBody(_, ctx, evaluatedArgs)
         )
     }
-  }
 
-  private def evaluateFunctionArgs(args: List[EXPR], ctx: Context): (Context, List[EXPR]) =
-    args.foldLeft((ctx, List.empty[EXPR])) {
+  private def evaluateFunctionArgs(args: List[EXPR], ctx: Context): Eval[(Context, List[EXPR])] =
+    args.foldM((ctx, List.empty[EXPR])) {
       case ((currentCtx, evaluatedArgs), nextArgExpr) =>
         if (currentCtx.isExhausted)
-          (currentCtx, evaluatedArgs)
-        else {
-          val (evaluatedArg, newCtx) = root(nextArgExpr, currentCtx)
-          (newCtx, evaluatedArgs :+ evaluatedArg)                        // todo optimize?
-        }
+          Eval.now((currentCtx, evaluatedArgs))
+        else
+          root(nextArgExpr, currentCtx)
+            .map { case (evaluatedArg, newCtx) =>
+              (newCtx, evaluatedArgs :+ evaluatedArg) // todo optimize?
+            }
     }
 
-  private def evaluateConstructor(constructor: String, args: List[EVALUATED], ctx: Context): EXPR = {
+  private def tryCreateObject(constructor: String, args: List[EVALUATED], ctx: Context): EXPR = {
     val objectType = ctx.types(constructor).asInstanceOf[CASETYPEREF]
     val fields = objectType.fields.map(_._1) zip args
     CaseObj(objectType, fields.toMap)
   }
 
-  private def evaluateFunctionBody(
+  private def evaluateBaseFunctionBody(
     function: BaseFunction[Environment],
     ctx: Context,
     evaluatedArgs: List[EVALUATED]
-  ): (EXPR, Context) =
+  ): Eval[(EXPR, Context)] =
     function match {
       case NativeFunction(_, costByVersion, _, ev, _) =>
         val cost = costByVersion(stdLibVersion).toInt
-        if (ctx.cost + cost > limit)
-          (FUNCTION_CALL(function.header, evaluatedArgs), ctx)  //todo test
-        else {
-          val result = ev[Id]((ctx.environment, evaluatedArgs)).explicitGet()
-          (result, ctx.withCost(cost))
-        }
+        val result =
+          if (ctx.cost + cost > limit)
+            (FUNCTION_CALL(function.header, evaluatedArgs), ctx)  //todo test
+          else {
+            val result = ev[Id]((ctx.environment, evaluatedArgs)).explicitGet()
+            (result, ctx.withCost(cost))
+          }
+        Eval.now(result)
       case UserFunction(_, _, _, signature, expr, _) =>
         val argsWithExpr =
           (signature.args zip evaluatedArgs)
@@ -175,28 +193,32 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
               case (((argName, _), argValue), argsWithExpr) => //todo maybe check for existence
                 BLOCK(LET(argName, argValue), argsWithExpr)
             }
-        val (result, resultCtx) = root(argsWithExpr, ctx)
-        (result, resultCtx.restoreTo(ctx))
+        root(argsWithExpr, ctx)
+          .map { case (result, resultCtx) => (result, resultCtx.restoreTo(ctx)) }
     }
 
-  private def evaluateIfBlock(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, ctx: Context): (EXPR, Context) = {
-    val (condResult, condResultCtx) = root(cond, ctx)
-    if (condResultCtx.isExhausted)
-      (IF(condResult, ifTrue, ifFalse), condResultCtx)
-    else
-      condResult match {
-        case TRUE  => root(ifTrue,  condResultCtx.withCost(1))
-        case FALSE => root(ifFalse, condResultCtx.withCost(1))
-        case _     => ???                                       // todo ???
-      }
-  }
+  private def evaluateIfBlock(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, ctx: Context): Eval[(EXPR, Context)] =
+    for {
+      (condResult, condResultCtx) <- root(cond, ctx)
+      result <-
+        if (condResultCtx.isExhausted)
+          Eval.now((IF(condResult, ifTrue, ifFalse), condResultCtx))
+        else
+          condResult match {
+            case TRUE  => root(ifTrue,  condResultCtx.withCost(1))
+            case FALSE => root(ifFalse, condResultCtx.withCost(1))
+            case _     => ???                                       // todo ???
+          }
+    } yield result
 
-  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): (EXPR, Context) = {
-    val (exprResult, exprResultCtx) = root(obj, ctx)
-    val fields = exprResult.asInstanceOf[CaseObj].fields
-    if (exprResultCtx.isExhausted)
-      (GETTER(exprResult, field), exprResultCtx)
-    else
-      (fields(field), exprResultCtx.withCost(1))                // todo handle absence
+  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): Eval[(EXPR, Context)] = {
+    root(obj, ctx).map {
+      case (exprResult, exprResultCtx) =>
+        val fields = exprResult.asInstanceOf[CaseObj].fields
+        if (exprResultCtx.isExhausted)
+          (GETTER(exprResult, field), exprResultCtx)
+        else
+          (fields(field), exprResultCtx.withCost(1))                // todo handle absence
+    }
   }
 }

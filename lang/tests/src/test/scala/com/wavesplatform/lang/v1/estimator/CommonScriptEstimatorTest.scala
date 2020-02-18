@@ -238,5 +238,5 @@ object CommonScriptEstimatorTest {
     evaluatorV2.Context(ScriptEstimatorTestBase.ctx.evaluationContext(Common.emptyBlockchainEnvironment()))
 
   private val evaluatorV2AsEstimator: ScriptEstimator =
-    (_, _, expr) => Try(evaluatorV2.root(expr, evaluatorCtx)).toEither.bimap(_.toString, _._2.cost)
+    (_, _, expr) => Try(evaluatorV2.root(expr, evaluatorCtx).value).toEither.bimap(_.toString, _._2.cost)
 }
