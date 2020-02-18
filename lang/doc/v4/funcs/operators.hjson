@@ -78,5 +78,17 @@
       doc: "Unary negation."
       paramsDoc: [ "Value" ]
     }
+    {
+      name: "++"
+      params: [ "List[A]", "List[B]" ]
+      doc: "List Concatenation."
+      paramsDoc: [ "First list", "Second list" ]
+    }
+    {
+      name: ":+"
+      params: [ "List[A]", "B" ]
+      doc: "Adding the element to the end of the list."
+      paramsDoc: [ "The list", "The element" ]
+    }
   ]
 }

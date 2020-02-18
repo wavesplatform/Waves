@@ -13,6 +13,12 @@
       paramsDoc: [ "Block height." ]
     }
     {
+      name: "calculateAssetId"
+      params: [ "Issue" ]
+      doc: "Calculates ID of asset obtained by invoke script transaction's call of the Issue structure."
+      paramsDoc: [ "Structure of a token issue." ]
+    }
+    {
       name: "transactionHeightById"
       params: [ "ByteVector" ]
       doc: "Gets the [block height](/blockchain/block-height.md) of a transaction."

@@ -19,6 +19,12 @@
       paramsDoc: [ "The array of bytes to encode." ]
     }
     {
+      name: "groth16Verify"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
       name: "toBase16String"
       params: [ "ByteVector" ]
       doc: "Encodes array of bytes to [Base16](https://en.wikipedia.org/wiki/Hexadecimal) string."

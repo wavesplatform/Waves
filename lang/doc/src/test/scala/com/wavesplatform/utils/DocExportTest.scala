@@ -25,7 +25,7 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
 
   lazy val directives: Seq[DirectiveSet] =
     DirectiveSet.contractDirectiveSet +:
-      Set(V1, V2, V3)
+      Set(V1, V2, V3, V4)
         .map(DirectiveSet(_, Account, Expression).explicitGet())
         .toSeq
 

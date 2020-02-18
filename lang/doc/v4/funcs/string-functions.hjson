@@ -1,6 +1,12 @@
 {
   funcs: [
     {
+      name: "contains"
+      params: [ "String", "String" ]
+      doc: "Checks whether the string contains substring"
+      paramsDoc: [ "String to search in.", "String to search for." ]
+    }
+    {
       name: "drop"
       params: [ "String", "Int" ]
       doc: "Drops the first n characters of a string"
