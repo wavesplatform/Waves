@@ -41,17 +41,14 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     def withLet(newLet: LET, isEvaluated: Boolean): Context =
       copy(lets = lets + (newLet.name -> (newLet.value, isEvaluated)))
 
+    def withoutLet(let: String): Context =
+      copy(lets = lets - let)
+
     def withFunction(function: UserFunction[Environment]): Context =
       copy(functions = functions + (function.header -> function))
 
-    def restoreTo(original: Context): Context =
-      Context(
-        lets.filterKeys(original.lets.contains),
-        functions.filterKeys(original.functions.contains),
-        types,
-        environment,
-        cost
-      )
+    def withoutFunction(header: FunctionHeader): Context =
+      copy(functions = functions - header)
   }
 
   def root(expr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
@@ -84,9 +81,10 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
               BLOCK(letDecl, nextExprResult)
             }
           val overlapFixedCtx =
-            ctx.lets.get(let.name).fold(nextExprCtx) {
-              case (expr, isEvaluated) => nextExprCtx.withLet(LET(let.name, expr), isEvaluated)
-            }
+            ctx.lets.get(let.name)
+              .fold(nextExprCtx.withoutLet(let.name)) {
+                case (expr, isEvaluated) => nextExprCtx.withLet(LET(let.name, expr), isEvaluated)
+              }
           (resultExpr, overlapFixedCtx)
       }
   }
@@ -103,7 +101,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
             ctx.functions
               .get(function.header)
               .collect { case f: UserFunction[Environment] => f }
-              .fold(nextExprCtx)(nextExprCtx.withFunction)
+              .fold(nextExprCtx.withoutFunction(function.header))(nextExprCtx.withFunction)
           (resultExpr, overlapFixedCtx)
       }
   }
@@ -194,7 +192,6 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
                 BLOCK(LET(argName, argValue), argsWithExpr)
             }
         root(argsWithExpr, ctx)
-          .map { case (result, resultCtx) => (result, resultCtx.restoreTo(ctx)) }
     }
 
   private def evaluateIfBlock(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, ctx: Context): Eval[(EXPR, Context)] =
