@@ -127,8 +127,8 @@ class LevelDBWriter(
     loadBlock(height, db)
   }
 
-  override protected def loadScript(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = readOnly { db =>
-    addressId(address).fold(Option.empty[(PublicKey, Script, Long, Map[String, Long])]) { addressId =>
+  override protected def loadScript(address: Address): Option[AccountScriptInfo] = readOnly { db =>
+    addressId(address).fold(Option.empty[AccountScriptInfo]) { addressId =>
       db.fromHistory(Keys.addressScriptHistory(addressId), Keys.addressScript(addressId)).flatten
     }
   }
@@ -264,7 +264,7 @@ class LevelDBWriter(
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
       updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
-      scripts: Map[BigInt, Option[(PublicKey, Script, Long, Map[String, Long])]],
+      scripts: Map[BigInt, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
       data: Map[BigInt, AccountDataInfo],
       aliases: Map[Alias, BigInt],

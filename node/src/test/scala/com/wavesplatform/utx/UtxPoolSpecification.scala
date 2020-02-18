@@ -748,7 +748,7 @@ class UtxPoolSpecification
         if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
 
-        (blockchain.accountScriptWithComplexity _).when(scripted).returning(Some((null, testScript, testScriptComplexity, Map.empty)))
+        (blockchain.accountScriptWithComplexity _).when(scripted).returning(Some(AccountScriptInfo(null, testScript, testScriptComplexity, Map.empty)))
         (blockchain.hasScript _).when(scripted).returning(true)
         (blockchain.accountScriptWithComplexity _).when(*).returning(None)
         (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))

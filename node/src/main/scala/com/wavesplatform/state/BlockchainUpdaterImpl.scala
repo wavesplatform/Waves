@@ -658,7 +658,7 @@ class BlockchainUpdaterImpl(
       .balanceSnapshots(address, from, to)
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = readLock {
+  override def accountScriptWithComplexity(address: Address): Option[AccountScriptInfo] = readLock {
     compositeBlockchain.accountScriptWithComplexity(address)
   }
 
