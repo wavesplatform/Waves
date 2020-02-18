@@ -1,9 +1,9 @@
 package com.wavesplatform.lang.v1.repl.node
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 
 import scala.concurrent.Future
 

@@ -12,6 +12,8 @@ import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
 object ScriptEstimatorV3 extends ScriptEstimator {
+  override val version: Int = 3
+
   override def apply(
       vars: Set[String],
       funcs: Map[FunctionHeader, Coeval[Long]],

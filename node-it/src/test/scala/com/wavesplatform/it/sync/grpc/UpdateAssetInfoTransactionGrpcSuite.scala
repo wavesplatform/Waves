@@ -1,25 +1,18 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.NodeConfigs.Miners
-import com.wavesplatform.it.api.SyncHttpApi.assertApiError
-import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.sync.transactions.UpdateAssetInfoTransactionSuite
-import com.wavesplatform.it.sync.transactions.UpdateAssetInfoTransactionSuite.configWithUpdateIntervalSetting
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionGrpcSuite._
@@ -102,8 +95,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
       sender.grpc.waitForHeight(sender.height + 3, 2.minutes)
       assertGrpcError(
         sender.grpc.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
-        "InvalidName",
-        Code.INTERNAL
+        "invalid name",
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -112,8 +105,8 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val tooBigDescription = Random.nextString(1001)
     assertGrpcError(
       sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "TooBigArray",
-      Code.INTERNAL
+      "Too big sequences requested",
+      Code.INVALID_ARGUMENT
     )
   }
 

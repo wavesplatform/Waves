@@ -70,8 +70,8 @@ trait Blockchain {
   def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
   def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot]
 
-  def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])]
-  def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_._2)
+  def accountScriptWithComplexity(address: Address): Option[AccountScriptInfo]
+  def accountScript(address: Address): Option[Script] = accountScriptWithComplexity(address).map(_.script)
   def hasScript(address: Address): Boolean
 
   def assetScriptWithComplexity(id: IssuedAsset): Option[(PublicKey, Script, Long)]
