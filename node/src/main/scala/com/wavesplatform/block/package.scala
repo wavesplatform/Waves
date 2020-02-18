@@ -2,7 +2,6 @@ package com.wavesplatform
 
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
-import com.wavesplatform.block.merkle.Merkle
 import com.wavesplatform.block.merkle.Merkle.TransactionProof
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
@@ -37,15 +36,15 @@ package object block {
   }
 
   // Merkle
-  implicit class BlockMerkleOps(block: Block) {
+  implicit class BlockTransactionsRootOps(block: Block) {
 
     def transactionProof(transaction: Transaction): Option[TransactionProof] =
-      Merkle.calcTransactionProof(block, transaction)
+      block.transactionsMerkleTree().transactionProof(transaction)
 
     def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
       block.transactionData
         .lift(transactionProof.transactionIndex)
         .filter(tx => tx.id() == transactionProof.id)
-        .exists(tx => Merkle.verifyTransactionProof(transactionProof, tx, block.transactionData.size, block.header.transactionsRoot.arr))
+        .exists(tx => transactionProof.valid(tx, block.transactionData.size, block.header.transactionsRoot))
   }
 }

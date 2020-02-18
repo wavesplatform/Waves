@@ -472,7 +472,7 @@ class TransactionsRouteSpec
   }
 
   routePath("/merkleProof") - {
-    import com.wavesplatform.block.BlockMerkleOps
+    import com.wavesplatform.block.BlockTransactionsRootOps
 
     val transactionsGen = for {
       txsSize <- Gen.choose(1, 10)

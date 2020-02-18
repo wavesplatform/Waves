@@ -1,91 +1,128 @@
 package com.wavesplatform.block.merkle
 
-import com.wavesplatform.block.Block
+import java.util
+
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Transaction
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.authds.{LeafData, Side}
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
+import io.estatico.newtype.macros.newtype
+import scorex.crypto.hash.Blake2b256
 
 import scala.annotation.tailrec
 
 object Merkle {
-
-  private[block] implicit object FastHash extends CryptographicHash32 {
-    override def hash(input: Message): Digest32 = Digest32 @@ com.wavesplatform.crypto.fastHash(input)
+  @newtype private case class Digest(toBytes: Array[Byte]) {
+    def concat(that: Digest): Message = Message(toBytes ++ that.toBytes)
+    def eq(that: Digest): Boolean     = util.Arrays.equals(toBytes, that.toBytes)
   }
 
-  case class TransactionProof(
-      id: ByteStr,
-      transactionIndex: Int,
-      digests: Seq[Array[Byte]]
-  )
+  @newtype private case class Message(toBytes: Array[Byte])
 
-  /** Calculates transaction's root */
-  def calcTransactionRoot(transactionData: Seq[Transaction]): ByteStr =
-    ByteStr(mkMerkleTree(transactionData).rootHash)
-
-  /** Calculates transaction's proof */
-  def calcTransactionProof(
-      block: Block,
-      transaction: Transaction
-  ): Option[TransactionProof] =
-    for {
-      proof               <- block.transactionsMerkleTree().proofByElement(mkMerkleLeaf(transaction))
-      (_, transactionIdx) <- block.transactionData.zipWithIndex.find { case (tx, _) => tx.id() == transaction.id() }
-    } yield TransactionProof(transaction.id(), transactionIdx, proof.levels.map(_._1))
-
-  /** Verifies transaction's proof */
-  def verifyTransactionProof(
-      transactionProof: TransactionProof,
-      transaction: Transaction,
-      transactionsCount: Int,
-      transactionsRoot: Array[Byte]
-  ): Boolean = {
-    val valid = for {
-      sides <- sides(transactionsCount, transactionProof.transactionIndex)
-      leaf  = mkMerkleLeaf(transaction)
-      proof = MerkleProof(leaf.data, transactionProof.digests.zip(sides).map { case (d, s) => (Digest32 @@ d, s) })
-    } yield proof.valid(Digest32 @@ transactionsRoot)
-    valid.getOrElse(false)
+  private trait HashFunction {
+    def hash(input: Message): Digest
   }
 
-  private val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
+  private implicit val hf: HashFunction = (input: Message) => Digest(Blake2b256.hash(input.toBytes))
 
-  /** Creates transactions merkle root */
-  private[block] def mkMerkleTree(transactions: Seq[Transaction]): MerkleTree[Digest32] = {
-    if (transactions.isEmpty) EmptyMerkleTree else MerkleTree(transactions.map(mkMerkleLeaf(_).data))
+  private sealed trait Node extends Product with Serializable {
+    def hash: Digest
   }
 
-  private[block] def mkMerkleLeaf(transaction: Transaction): Leaf[Digest32] =
-    Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
+  private case class InternalNode(l: Node, r: Node)(implicit hf: HashFunction) extends Node {
+    override lazy val hash: Digest = hf.hash(l.hash concat r.hash)
+  }
 
-  private sealed trait SideNode                                 extends Product with Serializable
-  private case class SideInternalNode(l: SideNode, r: SideNode) extends SideNode
-  private case object SideEmptyNode                             extends SideNode
-  private case object SideLeafNode                              extends SideNode
+  private case class LeafNode(data: Message)(implicit hf: HashFunction) extends Node {
+    override lazy val hash: Digest = hf.hash(data)
+  }
 
-  private def sides(leafsSize: Int, leafIndex: Int): Option[Seq[Side]] = {
-    def log2(x: Double): Double = math.log(x) / math.log(2)
+  private case class EmptyNode()(implicit hf: HashFunction) extends Node {
+    override def hash: Digest = hf.hash(Message(Array(0.toByte)))
+  }
 
-    @tailrec
-    def calcNode(nodes: Seq[SideNode]): SideInternalNode = {
-      val next = nodes.grouped(2).map(lr => SideInternalNode(lr.head, if (lr.length == 2) lr.last else SideEmptyNode)).toSeq
-      if (next.length == 1) next.head else calcNode(next)
+  private def log2(x: Double): Double = math.log(x) / math.log(2)
+
+  @tailrec
+  private def traverseProofPath[A](node: Node, i: Int, curLength: Int, acc: Seq[A], leftOp: Node => A, rightOp: Node => A): Option[Seq[A]] = {
+    node match {
+      case InternalNode(l, r) if i < curLength / 2 => traverseProofPath(l, i, curLength / 2, leftOp(r) +: acc, leftOp, rightOp)
+      case InternalNode(l, r) if i < curLength     => traverseProofPath(r, i - curLength / 2, curLength / 2, rightOp(l) +: acc, leftOp, rightOp)
+      case LeafNode(_)                             => Some(acc)
+      case _                                       => None
     }
+  }
 
-    @tailrec
-    def mkSides(node: SideNode, i: Int, cur: Int, acc: Seq[Side]): Option[Seq[Side]] =
-      node match {
-        case n: SideInternalNode if i < cur / 2 => mkSides(n.l, i, cur / 2, acc :+ MerkleProof.LeftSide)
-        case n: SideInternalNode if i < cur     => mkSides(n.r, i - cur / 2, cur / 2, acc :+ MerkleProof.RightSide)
-        case SideLeafNode                       => Some(acc.reverse)
-        case _                                  => None
+  @tailrec
+  private def calcTopNode(nodes: Seq[Node])(implicit hf: HashFunction): Node = {
+    val nextNodes = nodes
+      .grouped(2)
+      .map {
+        case Seq(l, r) => InternalNode(l, r)
+        case Seq(l)    => InternalNode(l, EmptyNode())
       }
+      .toSeq
+    if (nextNodes.length == 1) nextNodes.head else calcTopNode(nextNodes)
+  }
 
-    val node   = calcNode((0 until leafsSize).map(_ => SideLeafNode))
-    val height = Math.max(math.pow(2, math.ceil(log2(leafsSize))).toInt, 2)
-    mkSides(node, leafIndex, height, Seq())
+  case class TransactionProof(id: ByteStr, transactionIndex: Int, digests: Seq[Array[Byte]]) {
+    import TransactionProof._
+
+    def valid(transaction: Transaction, transactionsCount: Int, transactionsRoot: ByteStr): Boolean =
+      (for {
+        sides <- sides(transactionsCount, transactionIndex)
+        leafDigest = LeafNode(Message(PBTransactions.protobuf(transaction).toByteArray)).hash
+        levels     = digests.zip(sides).map { case (d, s) => (Digest(d), s) }
+      } yield {
+        levels
+          .foldLeft(leafDigest) {
+            case (prevDigest, (digest, Left))  => hf.hash(prevDigest concat digest)
+            case (prevDigest, (digest, Right)) => hf.hash(digest concat prevDigest)
+          }
+          .toBytes
+          .sameElements(transactionsRoot.arr)
+      }).getOrElse(false)
+
+  }
+
+  object TransactionProof {
+    private val noOp: HashFunction = _ => Digest(Array.emptyByteArray)
+
+    private sealed trait Side extends Product with Serializable
+    private case object Left  extends Side
+    private case object Right extends Side
+
+    private def sides(leafsSize: Int, leafIndex: Int): Option[Seq[Side]] = {
+      val leaf    = LeafNode(Message(Array.emptyByteArray))(noOp)
+      val topNode = calcTopNode((0 until leafsSize).map(_ => leaf))(noOp)
+      val height  = Math.max(math.pow(2, math.ceil(log2(leafsSize))).toInt, 2)
+      traverseProofPath[Side](topNode, leafIndex, height, Seq(), _ => Left, _ => Right)
+    }
+  }
+
+  class TransactionsTree private (topNode: Node, digestIndexes: Map[ByteStr, (Digest, Int)]) {
+    lazy val transactionsRoot: ByteStr = ByteStr(topNode.hash.toBytes)
+    lazy val length: Int               = digestIndexes.size
+    lazy val lengthWithEmptyLeafs: Int = Math.max(math.pow(2, math.ceil(log2(length))).toInt, 2)
+
+    def transactionProof(tx: Transaction): Option[TransactionProof] = {
+      val digest = LeafNode(Message(PBTransactions.protobuf(tx).toByteArray)).hash
+      digestIndexes.get(tx.id()).collect { case (d, i) if d eq digest => i }.flatMap { transactionIndex =>
+        traverseProofPath(topNode, transactionIndex, lengthWithEmptyLeafs, Seq(), _.hash, _.hash)
+          .map(digests => TransactionProof(tx.id(), transactionIndex, digests.map(_.toBytes)))
+      }
+    }
+  }
+
+  object TransactionsTree {
+    def apply(transactions: Seq[Transaction]): TransactionsTree =
+      if (transactions.isEmpty) new TransactionsTree(EmptyNode(), Map())
+      else {
+        val leafsWithIds  = transactions.map(tx => (tx.id(), LeafNode(Message(PBTransactions.protobuf(tx).toByteArray))))
+        val leafs         = leafsWithIds.map(_._2)
+        val digestIndexes = leafsWithIds.zipWithIndex.map { case ((id, leaf), index) => id -> (leaf.hash, index) }.toMap
+
+        val topNode = calcTopNode(leafs)
+        new TransactionsTree(topNode, digestIndexes)
+      }
   }
 }

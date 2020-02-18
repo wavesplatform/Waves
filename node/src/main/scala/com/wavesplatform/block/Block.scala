@@ -2,7 +2,7 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.block.merkle.Merkle._
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -17,8 +17,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
-import scorex.crypto.authds.merkle.MerkleTree
-import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
 
@@ -78,11 +76,11 @@ case class Block(
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(Merkle.mkMerkleTree(transactionData))
+  private[block] val transactionsMerkleTree: Coeval[TransactionsTree] = Coeval.evalOnce(TransactionsTree(transactionData))
 
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    require(header.version >= Block.ProtoBlockVersion, "Block's version should be >= 5 to retrieve transactionsRoot")
-    (transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr
+    require(header.version >= Block.ProtoBlockVersion, s"Block's version should be >= ${Block.ProtoBlockVersion} to retrieve transactionsRoot")
+    transactionsMerkleTree().transactionsRoot.arr sameElements header.transactionsRoot.arr
   }
 
   override def toString: String =
@@ -168,7 +166,7 @@ object Block extends ScorexLogging {
   }
 
   private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
-    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(Merkle.calcTransactionRoot(transactionData))
+    if (version < ProtoBlockVersion) ByteStr.empty else TransactionsTree(transactionData).transactionsRoot
 
   case class BlockInfo(
       header: BlockHeader,
