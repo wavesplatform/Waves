@@ -17,7 +17,7 @@ import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -59,7 +59,7 @@ object InvokeScriptTransactionDiff {
     val functionCall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some((pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
+      case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -103,18 +103,18 @@ object InvokeScriptTransactionDiff {
               )
               dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
               invocationComplexity <- {
-                val complexities =
-                  if (blockchain.useStoredCallableComplexities)
-                    storedCallableComplexities.asRight[String]
-                  else
-                    ContractScript.estimateComplexity(version, contract, blockchain.estimator).map(_._2)
+                val complexity =
+                  for {
+                    complexitiesByCallable <- storedCallableComplexities.get(blockchain.estimator.version)
+                    complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName)
+                  } yield complexity
 
-                complexities
-                  .flatMap(
-                    _.get(tx.funcCall.function.funcName)
-                      .toRight(s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress")
-                  )
-                  .leftMap((_, List.empty[LogItem[Id]]))
+                lazy val errorMessage =
+                  s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, " +
+                  s"address = $dAppAddress, " +
+                  s"estimator version = ${blockchain.estimator.version}"
+
+                complexity.toRight((errorMessage, List.empty[LogItem[Id]]))
               }
             } yield (evaluator, invocationComplexity)
 
@@ -170,7 +170,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._3)
+          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_.maxComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
             .map(_._3)

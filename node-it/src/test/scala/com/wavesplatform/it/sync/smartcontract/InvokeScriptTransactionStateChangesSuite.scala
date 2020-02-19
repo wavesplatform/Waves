@@ -232,7 +232,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges)(implicit pos: Position) {
-    info.`type` shouldBe stateChanges.`type`
+    info._type shouldBe stateChanges._type
     info.id shouldBe stateChanges.id
     info.fee shouldBe stateChanges.fee
     info.timestamp shouldBe stateChanges.timestamp

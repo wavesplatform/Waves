@@ -14,9 +14,6 @@ object EstimatorProvider {
       if (b.isFeatureActivated(MultiPaymentInvokeScript)) ScriptEstimatorV3
       else if (b.isFeatureActivated(BlockReward)) ScriptEstimatorV2
       else ScriptEstimatorV1
-
-    val useStoredCallableComplexities: Boolean =
-      b.isFeatureActivated(MultiPaymentInvokeScript)
   }
 
   implicit class EstimatorWavesSettingsExt(ws: WavesSettings) {

@@ -135,7 +135,7 @@ class IssueNFTSuite extends BaseTransactionSuite with TableDrivenPropertyChecks 
     nftAssetsBalance shouldNot contain atLeastOneElementOf assetsBalance
     nftAssetsBalance.length shouldBe 10
 
-    val remaingNftAssets = secondNode.nftAssetsBalance(secondNode.address, 15, after = nftAssetsBalance.last).map(id => id.assetId)
+    val remaingNftAssets = secondNode.nftAssetsBalance(secondNode.address, 15, maybeAfter = Some(nftAssetsBalance.last)).map(id => id.assetId)
     remaingNftAssets.length shouldBe 11 // 11 because we issue 1 more in previous test
     remaingNftAssets shouldNot contain atLeastOneElementOf nftAssetsBalance
 
