@@ -37,8 +37,10 @@ object JsAPI {
   private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
   private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
-  private def fullContractContext(version: StdLibVersion): CTX[Environment] =
-    buildContractContext(version)
+  private val fullContractContext: Map[StdLibVersion, CTX[Environment]] =
+    DirectiveDictionary[StdLibVersion].all
+      .map(v => (v, buildContractContext(v)))
+      .toMap
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
