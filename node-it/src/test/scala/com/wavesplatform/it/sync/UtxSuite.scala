@@ -62,7 +62,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
     implicit val sch: Scheduler = monix.execution.Scheduler.global
 
     def loop(): Task[Unit] = {
-      val utxIds = nodes.map(_.utx.size)
+      val utxIds = nodes.map(_.utx().size)
 
       if (utxIds.sum != 0) {
         Task
