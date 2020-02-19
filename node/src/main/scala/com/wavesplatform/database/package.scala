@@ -312,7 +312,7 @@ package object database extends ScorexLogging {
       if (bh.version < Block.ProtoBlockVersion)
         PBBlockInfo.Info.Custom(
           Custom(
-            ByteString.copyFrom(mkBytesBeforeTxs(bh)),
+            ByteString.copyFrom(mkPrefixBytes(bh)),
             ByteString.copyFrom(mkBytesAfterTxs(bh, signature))
           )
         )

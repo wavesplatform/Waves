@@ -55,12 +55,12 @@ object BlockSerializer {
       PBUtils.encodeDeterministic(PBBlocks.protobuf(block))
     else
       Bytes.concat(
-        mkBytesBeforeTxs(block.header),
-        mkTxsBytes(block.header, block.transactionData),
+        mkPrefixBytes(block.header),
+        mkSuffixBytes(block.header, block.transactionData),
         mkBytesAfterTxs(block.header, block.signature)
       )
 
-  def mkBytesBeforeTxs(header: BlockHeader): Array[Byte] = {
+  def mkPrefixBytes(header: BlockHeader): Array[Byte] = {
     val consensusBytes = writeConsensusBytes(header.baseTarget, header.generationSignature)
     Bytes.concat(
       Array(header.version),
@@ -71,7 +71,7 @@ object BlockSerializer {
     )
   }
 
-  def mkTxsBytes(header: BlockHeader, transactions: Seq[Transaction]): Array[Byte] = {
+  def mkSuffixBytes(header: BlockHeader, transactions: Seq[Transaction]): Array[Byte] = {
     val transactionsDataBytes = writeTransactionData(header.version, transactions)
     Bytes.concat(
       Ints.toByteArray(transactionsDataBytes.length),
