@@ -56,8 +56,8 @@ object BlockSerializer {
     else
       Bytes.concat(
         mkPrefixBytes(block.header),
-        mkSuffixBytes(block.header, block.transactionData),
-        mkBytesAfterTxs(block.header, block.signature)
+        mkTxsDataBytes(block.header, block.transactionData),
+        mkSuffixBytes(block.header, block.signature)
       )
 
   def mkPrefixBytes(header: BlockHeader): Array[Byte] = {
@@ -71,7 +71,7 @@ object BlockSerializer {
     )
   }
 
-  def mkSuffixBytes(header: BlockHeader, transactions: Seq[Transaction]): Array[Byte] = {
+  def mkTxsDataBytes(header: BlockHeader, transactions: Seq[Transaction]): Array[Byte] = {
     val transactionsDataBytes = writeTransactionData(header.version, transactions)
     Bytes.concat(
       Ints.toByteArray(transactionsDataBytes.length),
@@ -79,7 +79,7 @@ object BlockSerializer {
     )
   }
 
-  def mkBytesAfterTxs(header: BlockHeader, signature: ByteStr): Array[Byte] = {
+  def mkSuffixBytes(header: BlockHeader, signature: ByteStr): Array[Byte] = {
     val featureVotesBytes = header.version match {
       case v if v < NgBlockVersion => Array.empty[Byte]
       case _ =>

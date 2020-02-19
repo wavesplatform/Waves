@@ -313,7 +313,7 @@ package object database extends ScorexLogging {
         PBBlockInfo.Info.Custom(
           Custom(
             ByteString.copyFrom(mkPrefixBytes(bh)),
-            ByteString.copyFrom(mkBytesAfterTxs(bh, signature))
+            ByteString.copyFrom(mkSuffixBytes(bh, signature))
           )
         )
       else
