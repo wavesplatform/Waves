@@ -119,7 +119,7 @@ object Merkle {
       else {
         val leafsWithIds  = transactions.map(tx => (tx.id(), LeafNode(Message(PBTransactions.protobuf(tx).toByteArray))))
         val leafs         = leafsWithIds.map(_._2)
-        val digestIndexes = leafsWithIds.zipWithIndex.map { case ((id, leaf), index) => id -> (leaf.hash, index) }.toMap
+        val digestIndexes = leafsWithIds.zipWithIndex.map { case ((id, leaf), index) => (id, (leaf.hash, index)) }.toMap
 
         val topNode = calcTopNode(leafs)
         new TransactionsTree(topNode, digestIndexes)
