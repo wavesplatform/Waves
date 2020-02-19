@@ -104,6 +104,13 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       sender.broadcastData(sender.privateKey, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries)),
       TooBigArrayAllocation
     )
+
+    // can put and remove same data within one block
+    val putDataEntries2 = List(IntegerDataEntry("del", 42))
+    sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2), waitForTx = true).id
+    val removeDataTxId = sender.broadcastData(sender.privateKey, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")))).id
+    nodes.waitForHeightAriseAndTxPresent(removeDataTxId)
+    sender.getData(address).filter(_.key == "del") shouldBe List.empty
   }
 
   test("sender's waves balance is decreased by fee.") {
