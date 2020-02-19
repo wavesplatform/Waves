@@ -10,14 +10,14 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
+import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
-import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.{ContractScript, Script}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -35,11 +35,11 @@ import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import com.wavesplatform.utils._
 import monix.eval.Coeval
@@ -59,7 +59,7 @@ object InvokeScriptTransactionDiff {
     val functionCall  = tx.funcCall
 
     accScriptEi match {
-      case Right(Some((pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
+      case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
         val scriptResultE =
           stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
@@ -67,7 +67,7 @@ object InvokeScriptTransactionDiff {
               directives <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
               input      <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
               payments   <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
-              _                    <- checkCall(functionCall, blockchain).leftMap((_, List.empty[LogItem[Id]]))
+              _          <- checkCall(functionCall, blockchain).leftMap((_, List.empty[LogItem[Id]]))
               invocation = ContractEvaluator.Invocation(
                 functionCall,
                 Recipient.Address(invoker),
@@ -103,18 +103,18 @@ object InvokeScriptTransactionDiff {
               )
               dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
               invocationComplexity <- {
-                val complexities =
-                  if (blockchain.useStoredCallableComplexities)
-                    storedCallableComplexities.asRight[String]
-                  else
-                    ContractScript.estimateComplexity(version, contract, blockchain.estimator).map(_._2)
+                val complexity =
+                  for {
+                    complexitiesByCallable <- storedCallableComplexities.get(blockchain.estimator.version)
+                    complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName)
+                  } yield complexity
 
-                complexities
-                  .flatMap(
-                    _.get(tx.funcCall.function.funcName)
-                      .toRight(s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, address = $dAppAddress")
-                  )
-                  .leftMap((_, List.empty[LogItem[Id]]))
+                lazy val errorMessage =
+                  s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, " +
+                  s"address = $dAppAddress, " +
+                  s"estimator version = ${blockchain.estimator.version}"
+
+                complexity.toRight((errorMessage, List.empty[LogItem[Id]]))
               }
             } yield (evaluator, invocationComplexity)
 
@@ -148,7 +148,7 @@ object InvokeScriptTransactionDiff {
 
           dataEntries = dataItems.map(dataItemToEntry)
 
-          _ <- TracedResult(checkDataEntries(dataEntries)).leftMap(GenericError(_))
+          _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(GenericError(_))
           _ <- TracedResult(
             Either.cond(
               actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
@@ -170,7 +170,7 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_._3)
+          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_.maxComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
             .map(_._3)
@@ -323,18 +323,31 @@ object InvokeScriptTransactionDiff {
     Diff(tx = tx, portfolios = feePart |+| payablePart)
   }
 
-  private def checkDataEntries(dataEntries: List[DataEntry[_]]): Either[String, Unit] =
-    if (dataEntries.length > ContractLimits.MaxWriteSetSize) {
-      Left(s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries")
-    } else if (dataEntries.exists(_.key.utf8Bytes.length > ContractLimits.MaxKeySizeInBytes)) {
-      Left(s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}")
-    } else {
-      val totalDataBytes = dataEntries.map(_.toBytes.length).sum
-      if (totalDataBytes > ContractLimits.MaxWriteSetSizeInBytes)
-        Left(s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes")
-      else
-        Right(())
-    }
+  private[this] def checkDataEntries(tx: InvokeScriptTransaction, dataEntries: Seq[DataEntry[_]]): Either[String, Unit] =
+    for {
+      _ <- Either.cond(
+        dataEntries.length <= ContractLimits.MaxWriteSetSize,
+        (),
+        s"WriteSet can't contain more than ${ContractLimits.MaxWriteSetSize} entries"
+      )
+      _ <- Either.cond(
+        dataEntries.forall(_.key.utf8Bytes.length <= ContractLimits.MaxKeySizeInBytes),
+        (),
+        s"Key size must be less than ${ContractLimits.MaxKeySizeInBytes}"
+      )
+
+      totalDataBytes = dataEntries.map(_.toBytes.length).sum
+      _ <- Either.cond(
+        totalDataBytes <= ContractLimits.MaxWriteSetSizeInBytes,
+        (),
+        s"WriteSet size can't exceed ${ContractLimits.MaxWriteSetSizeInBytes} bytes, actual: $totalDataBytes bytes"
+      )
+      _ <- Either.cond(
+        !tx.isProtobufVersion || dataEntries.forall(_.key.nonEmpty),
+        (),
+        s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
+      )
+    } yield ()
 
   private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],
@@ -398,9 +411,11 @@ object InvokeScriptTransactionDiff {
         )
 
       def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-        if (issue.name.getBytes("UTF-8").length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
+        if (issue.name
+              .getBytes("UTF-8")
+              .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
           TracedResult(Left(InvalidName), List())
-        } else if(issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+        } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(TooBigArray), List())
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
@@ -417,7 +432,7 @@ object InvokeScriptTransactionDiff {
                   tx = itx,
                   portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
                   issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                  assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2))),
+                  assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2)))
                 )
             )
         }

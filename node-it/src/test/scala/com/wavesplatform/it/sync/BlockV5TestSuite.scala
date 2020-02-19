@@ -42,8 +42,8 @@ class BlockV5TestSuite
       //Activation height
       nodes.head.waitForHeight(ActivationHeight)
 
-      val lastBlockAfterActivationHeight = nodes.head.lastBlock
-      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders
+      val lastBlockAfterActivationHeight = nodes.head.lastBlock()
+      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders()
       val blockAfterActivationHeight = nodes.head.blockAt(ActivationHeight)
       val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(ActivationHeight)
       val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAfterActivationHeight.signature)
@@ -119,7 +119,7 @@ class BlockV5TestSuite
 
       val blockBeforeActivationHeight1 = nodes.head.blockAt(ActivationHeight - 1)
       blockBeforeActivationHeight1.version.value shouldBe Block.RewardBlockVersion
-      val returnedTxIds = nodes.head.utx.map(tx => tx.id)
+      val returnedTxIds = nodes.head.utx().map(tx => tx.id)
 
       nodes.head.waitForHeight(ActivationHeight, 2.minutes)
       val blockAtActivationHeight1 = nodes.head.blockAt(ActivationHeight)
@@ -153,7 +153,7 @@ class BlockV5TestSuite
 
   "VRF" - {
     "is present in API" in {
-      nodes.head.lastBlockHeaders.vrf shouldBe 'defined
+      nodes.head.lastBlockHeaders().vrf shouldBe 'defined
 
       val (headersBeforeV5, headersV5) =
         nodes.head.blockHeadersSeq(1, nodes.head.height).partition(bh => bh.height < ActivationHeight)
@@ -185,8 +185,8 @@ class BlockV5TestSuite
             all(addressBlocksAfterV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
         }
 
-      nodes.head.lastBlock.vrf shouldBe 'defined
-      ByteStr.decodeBase58(nodes.head.lastBlock.vrf.value).get.length shouldBe Block.HitSourceLength
+      nodes.head.lastBlock().vrf shouldBe 'defined
+      ByteStr.decodeBase58(nodes.head.lastBlock().vrf.value).get.length shouldBe Block.HitSourceLength
 
       val (blocksBeforeV5, blocksV5) =
         nodes.head.blockSeq(1, nodes.head.height).partition(b => b.height < ActivationHeight)
