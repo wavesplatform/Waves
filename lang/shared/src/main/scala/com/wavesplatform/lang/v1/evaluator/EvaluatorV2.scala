@@ -130,6 +130,18 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
       result                  <- evaluateFunctionExpr(header, resultCtx, args, resultArgs)
     } yield result
 
+  private def evaluateFunctionArgs(args: List[EXPR], ctx: Context): Eval[(Context, List[EXPR])] =
+    args.foldM((ctx, List.empty[EXPR])) {
+      case ((currentCtx, evaluatedArgs), nextArgExpr) =>
+        if (currentCtx.isExhausted)
+          Eval.now((currentCtx, evaluatedArgs))
+        else
+          root(nextArgExpr, currentCtx)
+            .map { case (evaluatedArg, newCtx) =>
+              (newCtx, evaluatedArgs :+ evaluatedArg) // todo optimize?
+            }
+    }
+
   private def evaluateFunctionExpr(
     header: FunctionHeader,
     ctx: Context,
@@ -149,20 +161,8 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
         )
     }
 
-  private def evaluateFunctionArgs(args: List[EXPR], ctx: Context): Eval[(Context, List[EXPR])] =
-    args.foldM((ctx, List.empty[EXPR])) {
-      case ((currentCtx, evaluatedArgs), nextArgExpr) =>
-        if (currentCtx.isExhausted)
-          Eval.now((currentCtx, evaluatedArgs))
-        else
-          root(nextArgExpr, currentCtx)
-            .map { case (evaluatedArg, newCtx) =>
-              (newCtx, evaluatedArgs :+ evaluatedArg) // todo optimize?
-            }
-    }
-
   private def tryCreateObject(constructor: String, args: List[EVALUATED], ctx: Context): EXPR = {
-    val objectType = ctx.types(constructor).asInstanceOf[CASETYPEREF]
+    val objectType = ctx.types(constructor).asInstanceOf[CASETYPEREF]  // todo handle absence
     val fields = objectType.fields.map(_._1) zip args
     CaseObj(objectType, fields.toMap)
   }
@@ -207,14 +207,14 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
           }
     } yield result
 
-  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): Eval[(EXPR, Context)] = {
+  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): Eval[(EXPR, Context)] =
     root(obj, ctx).map {
       case (exprResult, exprResultCtx) =>
-        val fields = exprResult.asInstanceOf[CaseObj].fields
         if (exprResultCtx.isExhausted)
           (GETTER(exprResult, field), exprResultCtx)
-        else
+        else {
+          val fields = exprResult.asInstanceOf[CaseObj].fields
           (fields(field), exprResultCtx.withCost(1))                // todo handle absence
+        }
     }
-  }
 }

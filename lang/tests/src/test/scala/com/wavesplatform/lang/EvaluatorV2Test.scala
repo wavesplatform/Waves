@@ -2,6 +2,7 @@ package com.wavesplatform.lang
 
 import cats.implicits._
 import com.wavesplatform.lang.Common.NoShrink
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -13,8 +14,12 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
+import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
+
+import scala.annotation.tailrec
+import scala.util.Random
 
 class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with Matchers with NoShrink with Inside {
   private val version = V4
@@ -633,16 +638,99 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-/*  property("stop if complexity exceeds limit") {
-    val n = 50
-    val script =
-      s"""
-         | func f0() = 0
-         | ${(0 until n).map(i => s"func f${i + 1}() = if (true) then f$i() else f$i()").mkString("\n") }
-         | f$n()
+  property("big script randomly splitted") {
+    val body =
+      """
+        | func f(a: Int) = {
+        |   func f(a: Int) = {
+        |     func f(a: Int) = {
+        |       func g(a: Int) = {
+        |         func h(a: Int) = {
+        |           func f(a: Int) = a
+        |           f(a)
+        |         }
+        |         h(a)
+        |       }
+        |       g(a)
+        |     }
+        |     f(a)
+        |   }
+        |   1 + f(a) + 1
+        | }
+        | func g(a: Int) = f(1) + f(a)
+        | func h(a: Int) = f(1) + g(a) + g(a)
+        |
+        |
+        | let a = {
+        |   if (false) then throw()
+        |   else {
+        |     let a = throw()
+        |     let b = 1
+        |     b + b
+        |   }
+        | }
+        | let b = 1
+        | let length = Address((let bytes = base58'aaaa'; bytes)).bytes.size()
+        | if (h(a) == f(a) + g(a) + length)
+        |   then (h(b) + f(b) + g(b) + 1) > (func ff(a: Int) = a + b; ff(h(f(a))))
+        |   else (h(b) + f(b) + g(b) + 1) > (func ff(a: Int) = a + b; ff(h(f(a))))
+        |
       """.stripMargin
-    // produce 101 complexity
 
-    eval(script) shouldBe 'left
-  }*/
+    val script =
+     s"""
+        | func r(x: Boolean) =
+        |  if (x)
+        |   then {
+        |     $body
+        |   } else {
+        |     $body
+        |   }
+        |
+        | let y = {
+        |   $body
+        | }
+        | r(r(y)) == r(r(true))
+        |
+      """.stripMargin
+
+    val random = new Random()
+    /*
+      a = (a(1) + ... + a(n))
+      a(i) = random from (0, a - (a1 + ... + a(i-1)) - n + i]
+      a(n) = a - (a1 + ... + a(i-1))
+    */
+    @tailrec def randomPieces(
+      expectedSum: Int,
+      piecesNumber: Int,
+      generatedSum: Int = 0,
+      acc: List[Int] = Nil
+    ): List[Int] =
+      if (acc.size + 1 == piecesNumber)
+        expectedSum - generatedSum :: acc
+      else {
+        val max = expectedSum - generatedSum - piecesNumber + acc.size + 1
+        val distributionCoefficient = random.nextInt(Math.min(max, piecesNumber)) + 1
+        val next = random.nextInt(max / distributionCoefficient) + 1
+        randomPieces(expectedSum, piecesNumber, generatedSum + next, next :: acc)
+      }
+
+    val (evaluated, _, precalculatedComplexity) = eval(script, 1500).explicitGet()
+    val startCost = 0
+    val (startExpr, _, _) = eval(script, startCost).explicitGet()
+
+    val piecesGen = Gen.choose(2, 100)
+      .map(randomPieces(precalculatedComplexity, _))
+
+    forAll(piecesGen) { pieces =>
+      val (resultExpr, summarizedCost) =
+        pieces.foldLeft((startExpr, startCost)) {
+          case ((expr, costSum), nextCostLimit) =>
+            val (nextExpr, _, cost) = eval(expr, nextCostLimit)
+            (nextExpr, costSum + cost)
+        }
+      resultExpr shouldBe evaluated
+      summarizedCost shouldBe precalculatedComplexity
+    }
+  }
 }
