@@ -69,9 +69,10 @@ object ExchangeTransaction extends TransactionParser {
       sellMatcherFee: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs = Proofs.empty
+      proofs: Proofs = Proofs.empty,
+      chainId: ChainId = ChainId.global
   ): Either[ValidationError, ExchangeTransaction] =
-    ExchangeTransaction(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, ChainId.global).validatedEither
+    ExchangeTransaction(version, buyOrder, sellOrder, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

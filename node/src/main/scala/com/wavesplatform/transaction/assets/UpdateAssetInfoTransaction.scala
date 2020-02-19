@@ -92,9 +92,10 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       feeAssetId: Asset,
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: ChainId = ChainId.global
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    UpdateAssetInfoTransaction(version, sender, IssuedAsset(assetId), name, description, feeAssetId, fee, timestamp, proofs, ChainId.global).validatedEither
+    UpdateAssetInfoTransaction(version, sender, IssuedAsset(assetId), name, description, feeAssetId, fee, timestamp, proofs, chainId).validatedEither
 
   def selfSigned(
       version: ChainId,

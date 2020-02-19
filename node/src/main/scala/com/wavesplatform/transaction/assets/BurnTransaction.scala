@@ -59,9 +59,10 @@ object BurnTransaction extends TransactionParser {
       quantity: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: ChainId = ChainId.global
   ): Either[ValidationError, BurnTransaction] =
-    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, ChainId.global).validatedEither
+    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

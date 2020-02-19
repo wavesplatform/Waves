@@ -99,7 +99,8 @@ object IssueTransaction extends TransactionParser {
       script: Option[Script],
       fee: Long,
       timestamp: Long,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: ChainId = ChainId.global
   ): Either[ValidationError, IssueTransaction] =
     IssueTransaction(
       version,
@@ -113,7 +114,7 @@ object IssueTransaction extends TransactionParser {
       fee,
       timestamp,
       proofs,
-      ChainId.global
+      chainId
     ).validatedEither
 
   def signed(

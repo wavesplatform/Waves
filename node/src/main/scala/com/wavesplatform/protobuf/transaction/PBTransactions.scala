@@ -91,15 +91,15 @@ object PBTransactions {
   }
 
   private[this] def createVanilla(
-                                   version: Int,
-                                   chainId: Byte,
-                                   sender: PublicKey,
-                                   feeAmount: Long,
-                                   feeAssetId: VanillaAssetId,
-                                   timestamp: Long,
-                                   proofs: Proofs,
-                                   data: PBTransaction.Data
-                                 ): Either[ValidationError, VanillaTransaction] = {
+      version: Int,
+      chainId: Byte,
+      sender: PublicKey,
+      feeAmount: Long,
+      feeAssetId: VanillaAssetId,
+      timestamp: Long,
+      proofs: Proofs,
+      data: PBTransaction.Data
+  ): Either[ValidationError, VanillaTransaction] = {
 
     val signature = proofs.toSignature
     val result: Either[ValidationError, VanillaTransaction] = data match {
@@ -149,14 +149,15 @@ object PBTransactions {
           script.map(toVanillaScript),
           feeAmount,
           timestamp,
-          proofs
+          proofs,
+          chainId
         )
 
       case Data.Reissue(ReissueTransactionData(Some(Amount(assetId, amount)), reissuable)) =>
-        vt.assets.ReissueTransaction.create(version.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs)
+        vt.assets.ReissueTransaction.create(version.toByte, sender, IssuedAsset(assetId), amount, reissuable, feeAmount, timestamp, proofs, chainId)
 
       case Data.Burn(BurnTransactionData(Some(Amount(assetId, amount)))) =>
-        vt.assets.BurnTransaction.create(version.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs)
+        vt.assets.BurnTransaction.create(version.toByte, sender, IssuedAsset(assetId), amount, feeAmount, timestamp, proofs, chainId)
 
       case Data.SetAssetScript(SetAssetScriptTransactionData(assetId, script)) =>
         vt.assets.SetAssetScriptTransaction.create(
@@ -166,7 +167,8 @@ object PBTransactions {
           script.map(toVanillaScript),
           feeAmount,
           timestamp,
-          proofs
+          proofs,
+          chainId
         )
 
       case Data.SetScript(SetScriptTransactionData(script)) =>
@@ -186,7 +188,7 @@ object PBTransactions {
         } yield tx
 
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
-        vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
+        vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs, chainId)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
         vt.assets.exchange.ExchangeTransaction.create(
@@ -199,11 +201,12 @@ object PBTransactions {
           sellMatcherFee,
           feeAmount,
           timestamp,
-          proofs
+          proofs,
+          chainId
         )
 
       case Data.DataTransaction(dt) =>
-        vt.DataTransaction.create(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs)
+        vt.DataTransaction.create(version.toByte, sender, dt.data.toList.map(toVanillaDataEntry), feeAmount, timestamp, proofs, chainId)
 
       case Data.MassTransfer(mt) =>
         for {
@@ -228,7 +231,8 @@ object PBTransactions {
           Option(minFee).filter(_ > 0),
           feeAmount,
           timestamp,
-          proofs
+          proofs,
+          chainId
         )
 
       case Data.InvokeScript(InvokeScriptTransactionData(Some(dappAddress), functionCall, payments)) =>
@@ -274,7 +278,8 @@ object PBTransactions {
           feeAssetId,
           feeAmount,
           timestamp,
-          proofs
+          proofs,
+          chainId
         )
 
       case _ =>

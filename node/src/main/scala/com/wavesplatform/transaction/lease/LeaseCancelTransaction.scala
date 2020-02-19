@@ -53,9 +53,10 @@ object LeaseCancelTransaction extends TransactionParser {
       leaseId: ByteStr,
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: ChainId = ChainId.global
   ): Either[ValidationError, TransactionT] =
-    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, ChainId.global).validatedEither
+    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

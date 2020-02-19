@@ -61,9 +61,10 @@ object SetAssetScriptTransaction extends TransactionParser {
       script: Option[Script],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: ChainId = ChainId.global
   ): Either[ValidationError, SetAssetScriptTransaction] =
-    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, ChainId.global).validatedEither
+    SetAssetScriptTransaction(version, sender, assetId, script, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
