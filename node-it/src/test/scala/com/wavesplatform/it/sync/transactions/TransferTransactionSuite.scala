@@ -196,29 +196,6 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
           typedAttachment = Some(Attachment.Num(123))
         )
       ) { error =>
-        error.id shouldBe 199
-        error.message shouldBe "Too big sequences requested"
-      }
-    }
-  }
-
-  test("not able to pass not typed attachment to transfer transaction V3") {
-    for (v <- transferTxSupportedVersions if v < 3) {
-      assertApiError(
-        sender.signAndBroadcast(
-          Json.obj(
-            "type"       -> TransferTransaction.typeId,
-            "sender"     -> firstAddress,
-            "amount"     -> 1000,
-            "recipient"  -> secondAddress,
-            "fee"        -> minFee,
-            "version" -> 3,
-            "assetId" -> JsNull,
-            "feeAssetId" -> JsNull,
-            "attachment" -> "somestring"
-          )
-        )
-      ) { error =>
         error.id shouldBe 10
         error.message shouldBe "Too big sequences requested"
       }

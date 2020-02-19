@@ -69,9 +69,9 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
 
-  test("able to broadcast tx of new versions before activation") {
+  test("able to broadcast tx of new version after activation") {
     val senderWavesBalance = sender.balanceDetails(senderAcc.stringRepr)
-    val recipientWavesBalance = sender.balanceDetails(senderAcc.stringRepr)
+    val recipientWavesBalance = sender.balanceDetails(recipientAcc.stringRepr)
     sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)
 
     senderWavesBalance.available shouldBe sender.balanceDetails(senderAcc.stringRepr).available - transferAmount - minFee

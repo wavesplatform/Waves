@@ -127,10 +127,7 @@ object Transaction {
         timestamp <- (jsv \ "timestamp").validate[Long]
         sender <- (jsv \ "sender").validateOpt[String]
         version <- (jsv \ "version").validateOpt[Byte]
-        chainId <- version match {
-          case Some(v) if v > 2 => (jsv \ "chainId").validateOpt[Byte]
-          case _ => JsSuccess(None)
-        }
+        chainId <- (jsv \ "chainId").validateOpt[Byte]
         name <- (jsv \ "name").validateOpt[String]
         amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
@@ -210,10 +207,7 @@ object TransactionInfo {
         recipient <- (jsv \ "recipient").validateOpt[String]
         script <- (jsv \ "script").validateOpt[String]
         version <- (jsv \ "version").validateOpt[Byte]
-        chainId <- version match {
-          case Some(v) if v > 2 => (jsv \ "chainId").validateOpt[Byte]
-          case _ => JsSuccess(None)
-        }
+        chainId <- (jsv \ "chainId").validateOpt[Byte]
         typedAttachment <- version match {
           case Some(v) if v > 2 && _type == 4 => (jsv \ "attachment").validateOpt[Attachment]
           case Some(v) if v > 1 && _type == 11 => (jsv \ "attachment").validateOpt[Attachment]

@@ -295,7 +295,7 @@ object AsyncHttpApi extends Assertions {
           },
           "attachment" -> {
             if (attachment.isDefined || typedAttachment.isDefined) {
-              if (version < 3) {
+              if (attachment.isDefined) {
                 attachment.get
               } else Json.toJson(typedAttachment.get)
             } else JsNull

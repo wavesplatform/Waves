@@ -60,7 +60,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
     // can put data
     val putDataEntries = (1 to 25).flatMap(i => dataEntries(i)).toList
-    val putTxId        = sender.putData(address, putDataEntries, calcDataFee(putDataEntries, TxVersion.V2)).id
+    val putTxId        = sender.putData(address, putDataEntries, calcDataFee(putDataEntries, TxVersion.V1)).id
     nodes.waitForHeightAriseAndTxPresent(putTxId)
 
     // can put new, update and remove existed in the same transaction

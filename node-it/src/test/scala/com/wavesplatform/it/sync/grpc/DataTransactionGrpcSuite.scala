@@ -190,23 +190,29 @@ class DataTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val tooBigKey = "a" * (maxKeySize + 1)
       val tooBigKeyDataEntry = List(DataEntry(tooBigKey, DataEntry.Value.BoolValue(false)))
 
-      assertGrpcError(sender.putData(firstAcc, tooBigKeyDataEntry, calcDataFee(tooBigKeyDataEntry, v), version = v), s"$TooBigArray", Code.INTERNAL)
-      assertGrpcError(sender.putData(firstAcc, List(DataEntry("", DataEntry.Value.BoolValue(false))), 1.waves, version = v), "Empty key found", Code.INTERNAL)
+      assertGrpcError(sender.putData(firstAcc, tooBigKeyDataEntry, calcDataFee(tooBigKeyDataEntry, v), version = v),
+        "Too big sequences requested", Code.INVALID_ARGUMENT)
+      assertGrpcError(sender.putData(firstAcc, List(DataEntry("", DataEntry.Value.BoolValue(false))), 1.waves, version = v),
+        "Empty key found", Code.INVALID_ARGUMENT)
       assertGrpcError(
         sender.putData(firstAcc, List(DataEntry("abc", DataEntry.Value.BoolValue(false)), DataEntry("abc", DataEntry.Value.BoolValue(false))), 1.waves, version = v),
         "Duplicated keys found",
-        Code.INTERNAL)
+        Code.INVALID_ARGUMENT)
 
       val extraValueData = List(DataEntry("key", DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(maxValueSize + 1)(1.toByte)))))
-      assertGrpcError(sender.putData(firstAcc, extraValueData, calcDataFee(extraValueData, v), version = v), s"$TooBigArray", Code.INTERNAL)
+      assertGrpcError(sender.putData(firstAcc, extraValueData, calcDataFee(extraValueData, v), version = v),
+        "Too big sequences requested", Code.INVALID_ARGUMENT)
       val largeBinData = List.tabulate(5)(n => DataEntry(tooBigKey, DataEntry.Value.BinaryValue(ByteString.copyFrom(Array.fill(maxValueSize)(n.toByte)))))
-      assertGrpcError(sender.putData(firstAcc, largeBinData, calcDataFee(largeBinData, v), version = v), s"$TooBigArray", Code.INTERNAL)
+      assertGrpcError(sender.putData(firstAcc, largeBinData, calcDataFee(largeBinData, v), version = v),
+        "Too big sequences requested", Code.INVALID_ARGUMENT)
 
       val largeStrData = List.tabulate(5)(n => DataEntry(tooBigKey, DataEntry.Value.StringValue("A" * maxValueSize)))
-      assertGrpcError(sender.putData(firstAcc, largeStrData, calcDataFee(largeStrData, v), version = v), s"$TooBigArray", Code.INTERNAL)
+      assertGrpcError(sender.putData(firstAcc, largeStrData, calcDataFee(largeStrData, v), version = v),
+        "Too big sequences requested", Code.INVALID_ARGUMENT)
 
       val tooManyEntriesData = List.tabulate(maxEntryCount + 1)(n => DataEntry(s"key$n", DataEntry.Value.IntValue(10)))
-      assertGrpcError(sender.putData(firstAcc, tooManyEntriesData, calcDataFee(tooManyEntriesData, v), version = v), s"$TooBigArray", Code.INTERNAL)
+      assertGrpcError(sender.putData(firstAcc, tooManyEntriesData, calcDataFee(tooManyEntriesData, v), version = v),
+        "Too big sequences requested", Code.INVALID_ARGUMENT)
     }
   }
 

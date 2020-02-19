@@ -32,7 +32,7 @@ class BurnTransactionSuite extends BaseTransactionSuite {
         burnTx.chainId shouldBe Some(AddressScheme.current.chainId)
         sender.transactionInfo(burnTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
-      sender.transactionInfo(burnTx.id).amount shouldBe issueAmount / 2
+      sender.transactionInfo(burnTx.id).amount shouldBe Some(issueAmount / 2)
       miner.assertBalances(firstAddress, balance - minFee - issueFee, effectiveBalance - minFee - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount / 2)
       val details2 = miner.assetsDetails(issuedAssetId)
