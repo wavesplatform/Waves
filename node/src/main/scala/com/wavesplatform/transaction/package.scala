@@ -51,9 +51,8 @@ package object transaction {
     def withGlobal[T](chainId: Int)(f: => T): Unit = synchronized {
       val oldValue = global
       setGlobal(chainId)
-      val result = f
-      setGlobal(oldValue)
-      result
+      try f
+      finally setGlobal(oldValue)
     }
   }
 }
