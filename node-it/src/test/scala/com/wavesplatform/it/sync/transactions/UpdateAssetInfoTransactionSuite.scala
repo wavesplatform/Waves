@@ -39,17 +39,17 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.waitForHeight(nextTerm, 3.minutes)
     val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
-    checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.utx().head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
     val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
     checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(sender.lastBlock.transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
       "updatedName",
       "updatedDescription"
     )
-    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock.signature).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock().signature).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
       "updatedName",
@@ -85,17 +85,17 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   test("able to update info of other asset after updating info of first asset") {
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, otherAssetId, "secondUpdate", "secondUpdatedDescription", minFee)._1.id
     sender.waitForUtxIncreased(0)
-    checkUpdateAssetInfoTx(sender.utx.head, "secondUpdate", "secondUpdatedDescription")
+    checkUpdateAssetInfoTx(sender.utx().head, "secondUpdate", "secondUpdatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
     secondUpdateInfoHeight = sender.transactionInfo(updateAssetInfoTxId).height
     checkUpdateAssetInfoTx(sender.blockAt(secondUpdateInfoHeight).transactions.head, "secondUpdate", "secondUpdatedDescription")
-    checkUpdateAssetInfoTx(sender.lastBlock.transactions.head, "secondUpdate", "secondUpdatedDescription")
+    checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "secondUpdate", "secondUpdatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeq(secondUpdateInfoHeight, secondUpdateInfoHeight).head.transactions.head,
       "secondUpdate",
       "secondUpdatedDescription"
     )
-    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock.signature).transactions.head, "secondUpdate", "secondUpdatedDescription")
+    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock().signature).transactions.head, "secondUpdate", "secondUpdatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeqByAddress(miner.address, secondUpdateInfoHeight, secondUpdateInfoHeight).head.transactions.head,
       "secondUpdate",
@@ -208,17 +208,17 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("able to update name/description of nft") {
     val updateAssetInfoTxId = sender.updateAssetInfo(issuer, nftId, "updatedName", "updatedDescription", minFee + smartFee)._1.id
-    checkUpdateAssetInfoTx(sender.utx.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.utx().head, "updatedName", "updatedDescription")
     sender.waitForTransaction(updateAssetInfoTxId)
     val updateAssetInfoTxHeight = sender.transactionInfo(updateAssetInfoTxId).height
     checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
-    checkUpdateAssetInfoTx(sender.lastBlock.transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeq(updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
       "updatedName",
       "updatedDescription"
     )
-    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock.signature).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock().signature).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
       "updatedName",

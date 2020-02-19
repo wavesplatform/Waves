@@ -1,8 +1,10 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.Attachment
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
 import org.scalatest.Assertions
 import play.api.libs.json._
@@ -102,32 +104,39 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction (
-                        _type: Int,
-                        id: String,
-                        chainId: Option[Byte],
-                        fee: Long,
-                        timestamp: Long,
-                        sender: Option[String],
-                        version: Option[Byte],
-                        name: Option[String],
-                        amount: Option[Long],
-                        description: Option[String],
-                        typedAttachment: Option[Attachment],
-                        attachment: Option[String]
+case class Transaction(_type: Int,
+                       id: String,
+                       chainId: Option[Byte],
+                       fee: Long,
+                       timestamp: Long,
+                       sender: Option[String],
+                       version: Option[Byte],
+                       name: Option[String],
+                       amount: Option[Long],
+                       description: Option[String],
+                       typedAttachment: Option[Attachment],
+                       attachment: Option[String],
+                       price: Option[Long],
+                       sellMatcherFee: Option[Long],
+                       buyMatcherFee: Option[Long],
+                       sellOrderMatcherFee: Option[Long],
+                       buyOrderMatcherFee: Option[Long],
+                       data: Option[Seq[DataEntry[_]]],
+                       minSponsoredAssetFee: Option[Long],
+                       transfers: Option[Seq[Transfer]],
+                       totalAmount: Option[Long]
                       )
-
 object Transaction {
-  implicit val transactionFormat: Format[Transaction] = Format( //Json.format
+  implicit val transactionFormat: Format[Transaction] = Format(
     Reads(jsv =>
       for {
         _type <- (jsv \ "type").validate[Int]
         id <- (jsv \ "id").validate[String]
+        chainId <- (jsv \ "chainId").validateOpt[Byte]
         fee <- (jsv \ "fee").validate[Long]
         timestamp <- (jsv \ "timestamp").validate[Long]
         sender <- (jsv \ "sender").validateOpt[String]
         version <- (jsv \ "version").validateOpt[Byte]
-        chainId <- (jsv \ "chainId").validateOpt[Byte]
         name <- (jsv \ "name").validateOpt[String]
         amount <- (jsv \ "amount").validateOpt[Long]
         description <- (jsv \ "description").validateOpt[String]
@@ -141,6 +150,15 @@ object Transaction {
           case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
+        price <- (jsv \ "price").validateOpt[Long]
+        sellMatcherFee <- (jsv \ "sellMatcherFee").validateOpt[Long]
+        buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
+        sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+        buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
+        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
       }
         yield Transaction(
           _type,
@@ -154,7 +172,16 @@ object Transaction {
           amount,
           description,
           typedAttachment,
-          attachment
+          attachment,
+          price,
+          sellMatcherFee,
+          buyMatcherFee,
+          sellOrderMatcherFee,
+          buyOrderMatcherFee,
+          data,
+          minSponsoredAssetFee,
+          transfers,
+          totalAmount
         )),
     Json.writes[Transaction]
   )
@@ -179,19 +206,27 @@ case class TransactionInfo(
     fee: Long,
     timestamp: Long,
     sender: Option[String],
+    name: Option[String],
+    description: Option[String],
+    amount: Option[Long],
+    price: Option[Long],
+    sellMatcherFee: Option[Long],
+    buyMatcherFee: Option[Long],
+    sellOrderMatcherFee: Option[Long],
+    buyOrderMatcherFee: Option[Long],
     height: Int,
     minSponsoredAssetFee: Option[Long],
-    name: Option[String],
-    amount: Option[Long],
-    description: Option[String],
     recipient: Option[String],
     script: Option[String],
     version: Option[Byte],
     typedAttachment: Option[Attachment],
-    attachment: Option[String]
+    attachment: Option[String],
+    data: Option[Seq[DataEntry[_]]],
+    transfers: Option[Seq[Transfer]],
+    totalAmount: Option[Long]
 ) extends TxInfo
 object TransactionInfo {
-  implicit val format: Format[TransactionInfo] = Format(
+  implicit val transactionFormat: Format[TransactionInfo] = Format(
     Reads(jsv =>
       for {
         _type <- (jsv \ "type").validate[Int]
@@ -218,6 +253,14 @@ object TransactionInfo {
           case Some(v) if v < 2 && _type == 11 => (jsv \ "attachment").validateOpt[String]
           case _ => JsSuccess(None)
         }
+        price <- (jsv \ "price").validateOpt[Long]
+        sellMatcherFee <- (jsv \ "sellMatcherFee").validateOpt[Long]
+        buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
+        sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+        buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
+        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
       }
         yield TransactionInfo(
           _type,
@@ -226,16 +269,24 @@ object TransactionInfo {
           fee,
           timestamp,
           sender,
+          name,
+          description,
+          amount,
+          price,
+          sellMatcherFee,
+          buyMatcherFee,
+          sellOrderMatcherFee,
+          buyOrderMatcherFee,
           height,
           minSponsoredAssetFee,
-          name,
-          amount,
-          description,
           recipient,
           script,
           version,
           typedAttachment,
-          attachment
+          attachment,
+          data,
+          transfers,
+          totalAmount
         )),
     Json.writes[TransactionInfo]
   )
@@ -642,6 +693,16 @@ object BlacklistedPeer {
 case class State(address: String, miningBalance: Long, timestamp: Long)
 object State {
   implicit val StateFormat: Format[State] = Json.format
+}
+
+case class GeneratingBalance(address: String, balance: Long)
+object GeneratingBalance {
+  implicit val GeneratingBalanceFormat: Format[GeneratingBalance] = Json.format
+}
+
+case class BalanceHistory(height: Int, balance: Long)
+object BalanceHistory {
+  implicit val BalanceHistoryFormat: Format[BalanceHistory] = Json.format
 }
 
 case class TransactionSerialize(bytes: Array[Int])
