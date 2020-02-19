@@ -260,7 +260,7 @@ class LevelDBWriterSpec
       bcu.blockAt(6).get shouldBe block5
 
       for (i <- 1 to db.get(Keys.height)) {
-        db.get(Keys.blockInfoAt(Height(i), i >= 5)).isDefined shouldBe true
+        db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
       }
 
       bcu.blockBytes(1).get shouldBe genesisBlock.bytes()

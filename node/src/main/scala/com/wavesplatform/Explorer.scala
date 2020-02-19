@@ -9,7 +9,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
-import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Height, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -172,8 +171,7 @@ object Explorer extends ScorexLogging {
             val blockHeightBytes = db.get(kBlockHeight.keyBytes)
             val maybeBlockHeight = kBlockHeight.parse(blockHeightBytes)
             maybeBlockHeight.foreach { h =>
-              val isProto    = db.get(Keys.activatedFeatures).get(BlockchainFeatures.BlockV5.id).exists(h >= _)
-              val kBlock     = Keys.blockInfoBytesAt(Height(h), isProto)
+              val kBlock     = Keys.blockInfoBytesAt(Height(h))
               val blockBytes = db.get(kBlock.keyBytes)
               log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base64.encode(blockBytes)}")
             }

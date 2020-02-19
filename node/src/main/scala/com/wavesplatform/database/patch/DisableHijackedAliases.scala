@@ -13,14 +13,14 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.collection.JavaConverters._
 
 object DisableHijackedAliases extends ScorexLogging {
-  def apply(rw: RW, protoActivationHeight: Option[Int]): Unit = {
+  def apply(rw: RW): Unit = {
     log.info("Collecting hijacked aliases")
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
     val height  = Height(rw.get(Keys.height))
 
     for (h <- 1 until height) {
       val BlockInfo(_, _, transactionCount, _) = rw
-        .get(Keys.blockInfoAt(Height(h), protoActivationHeight.exists(h > 1 && h >= _)))
+        .get(Keys.blockInfoAt(Height(h)))
         .get
 
       for (n <- 0 until transactionCount) {

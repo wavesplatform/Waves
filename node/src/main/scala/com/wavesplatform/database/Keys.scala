@@ -105,10 +105,10 @@ object Keys {
 
   val BlockInfoPrefix: Short = 50
 
-  def blockInfoAt(height: Height, isProto: Boolean): Key[Option[BlockInfo]] =
-    Key.opt("block-info-at-height", h(BlockInfoPrefix, height), readBlockInfo(isProto), writeBlockInfo(isProto))
+  def blockInfoAt(height: Height): Key[Option[BlockInfo]] =
+    Key.opt("block-info-at-height", h(BlockInfoPrefix, height), readBlockInfo, writeBlockInfo)
 
-  def blockInfoBytesAt(height: Height, isProto: Boolean): Key[Option[Array[Byte]]] =
+  def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
       "block-info-bytes-at-height",
       h(BlockInfoPrefix, height),

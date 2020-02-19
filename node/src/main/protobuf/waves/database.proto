@@ -13,8 +13,20 @@ message AssetDetails {
 }
 
 message BlockInfo {
-    Block.Header header = 1;
-    bytes signature = 2;
-    int32 transaction_count = 3;
-    int32 size = 4;
+    message Custom {
+        bytes prefix = 1;
+        bytes suffix = 2;
+    }
+
+    message Proto {
+        Block.Header header = 1;
+        bytes signature = 2;
+    }
+
+    int32 size = 1;
+    int32 transaction_count = 2;
+    oneof info {
+        Custom custom = 3;
+        Proto proto = 4;
+    }
 }

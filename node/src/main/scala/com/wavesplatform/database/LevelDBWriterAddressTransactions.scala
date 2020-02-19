@@ -56,11 +56,12 @@ private[database] final class LevelDBWriterAddressTransactions(levelDBWriter: Le
           takeAfter(takeTypes(heightNumStream, types.map(_.typeId)), maybeAfter)
             .flatMap {
               case (height, _, txNum) =>
+                val isProtoTx = levelDBWriter.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(height > 1 && _ <= height)
                 db.get(
                     Keys.transactionAt(
                       height,
                       txNum,
-                      levelDBWriter.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(height > 1 && _ <= height)
+                      isProtoTx
                     )
                   )
                   .map((height, txNum, _))
