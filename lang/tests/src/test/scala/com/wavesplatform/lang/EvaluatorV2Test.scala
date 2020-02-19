@@ -516,6 +516,30 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     decompiled shouldBe "4"
   }
 
+  property("let recursion") {
+    val expr =
+      BLOCK(
+        LET("a", REF("b")),
+        BLOCK(
+          LET("b", REF("a")),
+          REF("a")
+        )
+      )
+
+    an[NoSuchElementException] should be thrownBy eval(expr, limit = 100)
+
+    val expr2 =
+      BLOCK(
+        LET("a", FUNCTION_CALL(FunctionHeader.User("b"), Nil)),
+        BLOCK(
+          FUNC("b", Nil, REF("a")),
+          REF("a")
+        )
+      )
+
+    an[NoSuchElementException] should be thrownBy eval(expr2, limit = 100)
+  }
+
   property("function context leak") {
     val expr = BLOCK(
       FUNC("f", Nil, BLOCK(LET("x", CONST_LONG(1)), REF("x"))),

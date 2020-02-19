@@ -26,7 +26,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
   }
 
   case class Context(
-    lets: Map[String, (EXPR, Boolean)] = Map(),
+    lets: Map[String, (EXPR, Context, Boolean)] = Map(),
     functions: Map[FunctionHeader, BaseFunction[Environment]] = Map(),
     types: Map[String, FINAL] = Map(),
     environment: Environment[Id],
@@ -38,8 +38,8 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     def withCost(addCost: Int): Context =
       copy(cost = cost + addCost)
 
-    def withLet(letName: String, letValue: EXPR, isEvaluated: Boolean): Context =
-      copy(lets = lets + (letName -> (letValue, isEvaluated)))
+    def withLet(letName: String, letValue: EXPR, ctx: Context, isEvaluated: Boolean): Context =
+      copy(lets = lets + (letName -> (letValue, ctx, isEvaluated)))
 
     def withoutLet(let: String): Context =
       copy(lets = lets - let)
@@ -49,6 +49,18 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
 
     def withoutFunction(header: FunctionHeader): Context =
       copy(functions = functions - header)
+
+    def filterDecls(base: Context): Context =
+      copy(
+        lets = this.lets.filterKeys(base.lets.contains),
+        functions = this.functions.filterKeys(base.functions.contains)
+      )
+
+    def restoreDecls(base: Context): Context =
+      copy(
+        lets = this.lets ++ base.lets.filterKeys(!this.lets.contains(_)),
+        functions = this.functions ++ base.functions.filterKeys(!this.functions.contains(_))
+      )
   }
 
   def root(expr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
@@ -70,7 +82,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
     Eval.now((e, ctx))
 
   private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
-    root(nextExpr, ctx.withLet(let.name, let.value, isEvaluated = false))
+    root(nextExpr, ctx.withLet(let.name, let.value, ctx, isEvaluated = false))
       .map {
         case (nextExprResult, nextExprCtx) =>
           val resultExpr =
@@ -83,7 +95,7 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
           val overlapFixedCtx =
             ctx.lets.get(let.name)
               .fold(nextExprCtx.withoutLet(let.name)) {
-                case (expr, isEvaluated) => nextExprCtx.withLet(let.name, expr, isEvaluated)
+                case (expr, ctx, isEvaluated) => nextExprCtx.withLet(let.name, expr, ctx, isEvaluated)
               }
           (resultExpr, overlapFixedCtx)
       }
@@ -106,17 +118,17 @@ class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
   }
 
   private def evaluateRef(key: String, ctx: Context): Eval[(EXPR, Context)] = {
-    val (letExpr, isEvaluated) = ctx.lets(key)
+    val (letExpr, letCtx, isEvaluated) = ctx.lets(key)
     if (isEvaluated)
       Eval.now((letExpr, ctx.withCost(1)))
     else
-      root(letExpr, ctx)
-        .map {
-          case (letValue, resultCtx) =>
-            if (resultCtx.isExhausted)
-              (REF(key), resultCtx.withLet(key, letValue, isEvaluated = false))
-            else
-              (letValue, resultCtx.withLet(key, letValue, isEvaluated = true).withCost(1))
+      root(letExpr, ctx.filterDecls(letCtx))
+        .map { case (letValue, resultCtx) =>
+          val restoredCtx = resultCtx.restoreDecls(ctx)
+          if (resultCtx.isExhausted)
+            (REF(key), restoredCtx.withLet(key, letValue, resultCtx, isEvaluated = false))
+          else
+            (letValue, restoredCtx.withLet(key, letValue, resultCtx, isEvaluated = true).withCost(1))
         }
   }
 
