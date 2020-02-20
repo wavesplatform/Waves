@@ -6,8 +6,6 @@ import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
@@ -105,26 +103,26 @@ object Keys {
   def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, height, addressId), readStrings, writeStrings)
 
-  val BlockHeaderPrefix: Short = 50
+  val BlockInfoPrefix: Short = 50
 
   def blockInfoAt(height: Height): Key[Option[BlockInfo]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockInfo, writeBlockInfo)
+    Key.opt("block-info-at-height", h(BlockInfoPrefix, height), readBlockInfo, writeBlockInfo)
 
-  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] = // TODO: Store protobuf block header
+  def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
-      "block-header-bytes-at-height",
-      h(BlockHeaderPrefix, height),
-      _.drop(4),
-      _ => throw new Exception("Key \"block-header-bytes-at-height\" - is read only!")
+      "block-info-bytes-at-height",
+      h(BlockInfoPrefix, height),
+      identity,
+      _ => throw new Exception("Key \"block-info-bytes-at-height\" - is read only!")
     )
 
   val TransactionInfoPrefix: Short = 51
-  def transactionAt(height: Height, n: TxNum): Key[Option[Transaction]] =
+  def transactionAt(height: Height, n: TxNum, isProto: Boolean): Key[Option[Transaction]] =
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
       hNum(TransactionInfoPrefix, height, n),
-      data => PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(data)),
-      tx => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
+      readTransactionAt(isProto),
+      writeTransactionAt(isProto)
     )
 
   def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =

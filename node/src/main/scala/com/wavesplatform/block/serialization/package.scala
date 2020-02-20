@@ -13,32 +13,27 @@ import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 
 package object serialization {
   private[block] def writeTransactionData(version: Byte, txs: Seq[Transaction]): Array[Byte] = {
-    val txsCount = version match {
-      case GenesisBlockVersion | PlainBlockVersion                 => Array(txs.size.toByte)
-      case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => Ints.toByteArray(txs.size)
-    }
-
-    val txsBytes = txs.map(tx => if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx)) else tx.bytes())
+    val txsBytes     = txs.map(tx => if (version == ProtoBlockVersion) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx)) else tx.bytes())
     val txsBytesSize = txsBytes.map(_.length + Ints.BYTES).sum
     val txsBuf       = ByteBuffer.allocate(txsBytesSize)
     txsBytes.foreach(tx => txsBuf.putInt(tx.length).put(tx))
 
-    Bytes.concat(txsCount, txsBuf.array())
+    Bytes.concat(mkTxsCountBytes(version, txs.size), txsBuf.array())
   }
 
   private[block] def readTransactionData(version: Byte, buf: ByteBuffer): Seq[Transaction] = {
     val txCount = version match {
-      case GenesisBlockVersion | PlainBlockVersion                 => buf.get
+      case GenesisBlockVersion | PlainBlockVersion                 => buf.getByte
       case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => buf.getInt
     }
 
     val txs = (1 to txCount).foldLeft(List.empty[Transaction]) {
       case (txs, _) =>
-        val size = buf.getInt
+        val size    = buf.getInt
         val txBytes = buf.getByteArray(size)
         val tx = version match {
           case ProtoBlockVersion => PBTransactions.vanilla(SignedTransaction.parseFrom(txBytes)).explicitGet()
-          case _ => TransactionParsers.parseBytes(txBytes).get
+          case _                 => TransactionParsers.parseBytes(txBytes).get
         }
         tx :: txs
     }
@@ -50,4 +45,9 @@ package object serialization {
       Longs.toByteArray(baseTarget),
       generationSignature.arr
     )
+
+  def mkTxsCountBytes(version: Byte, txsCount: Int): Array[Byte] = version match {
+    case GenesisBlockVersion | PlainBlockVersion                 => Array(txsCount.toByte)
+    case NgBlockVersion | RewardBlockVersion | ProtoBlockVersion => Ints.toByteArray(txsCount)
+  }
 }
