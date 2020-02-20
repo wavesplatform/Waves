@@ -204,6 +204,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     }
 
     sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
+    nodes.waitForHeightArise()
   }
 
   test("able to update name/description of nft") {
