@@ -1,0 +1,34 @@
+{
+  funcs: [
+    {
+      name: "drop"
+      params: [ "ByteVector", "Int" ]
+      doc: "Drops the first n bytes of an array of bytes."
+      paramsDoc: [ "The array of bytes.", "The number n." ]
+    }
+    {
+      name: "dropRight"
+      params: [ "ByteVector", "Int" ]
+      doc: "Drops the first n bytes of an array of bytes."
+      paramsDoc: [ "The array of bytes.", "The number n." ]
+    }
+    {
+      name: "size"
+      params: [ "ByteVector" ]
+      doc: "Returns the size of an array of bytes."
+      paramsDoc: [ "The array of bytes." ]
+    }
+    {
+      name: "take"
+      params: [ "ByteVector", "Int" ]
+      doc: "Takes the first n bytes from an array of bytes."
+      paramsDoc: [ "The array of bytes.", "The number n." ]
+    }
+    {
+      name: "takeRight"
+      params: [ "ByteVector", "Int" ]
+      doc: "Takes the last n bytes from an array of bytes."
+      paramsDoc: [ "The array of bytes.", "The number n." ]
+    }
+  ]
+}
