@@ -417,15 +417,14 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   }
 
   property("block info by height") {
-    pending
-    val generatorSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
-
     forAll(for {
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
       withVrf <- Gen.oneOf(false, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
+        val generationSignature =
+          if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
         val fs =
           if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
@@ -462,7 +461,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
                  | let block = extract(blockInfoByHeight(3))
                  | let checkHeight = block.height == 3
                  | let checkBaseTarget = block.baseTarget == 2
-                 | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
+                 | let checkGenSignature = block.generationSignature == base58'$generationSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  | $v4DeclOpt
@@ -486,7 +485,6 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
   }
 
   property("blockInfoByHeight(height) is the same as lastBlock") {
-    pending
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, _) =>
         assertDiffAndState(smartEnabledFS) { append =>

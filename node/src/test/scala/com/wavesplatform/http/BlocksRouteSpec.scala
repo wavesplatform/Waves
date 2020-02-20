@@ -3,6 +3,7 @@ package com.wavesplatform.http
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.api.http.BlocksApiRoute
+import com.wavesplatform.block.Block
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.http.ApiMarshallers._
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -17,7 +18,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   private val route     = BlocksApiRoute(restAPISettings, blocksApi).route
 
   val testBlock1 = TestBlock.create(Nil)
-  val testBlock2 = TestBlock.create(Nil)
+  val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
 
   val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
   val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)
@@ -89,10 +90,17 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/seq/{from}/{to}") in {
-    (blocksApi.blocksRange(_: Int, _: Int)).expects(1, 2).returning(Observable.fromIterable(Seq(
-      testBlock1Meta -> Seq.empty,
-      testBlock2Meta -> Seq.empty
-    )))
+    (blocksApi
+      .blocksRange(_: Int, _: Int))
+      .expects(1, 2)
+      .returning(
+        Observable.fromIterable(
+          Seq(
+            testBlock1Meta -> Seq.empty,
+            testBlock2Meta -> Seq.empty
+          )
+        )
+      )
     Get(routePath("/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1Json, testBlock2Json)
@@ -128,10 +136,16 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/headers/seq/{from}/{to}") in {
-    (blocksApi.metaRange _).expects(1, 2).returning(Observable.fromIterable(Seq(
-      testBlock1Meta,
-      testBlock2Meta
-    )))
+    (blocksApi.metaRange _)
+      .expects(1, 2)
+      .returning(
+        Observable.fromIterable(
+          Seq(
+            testBlock1Meta,
+            testBlock2Meta
+          )
+        )
+      )
     Get(routePath("/headers/seq/1/2")) ~> route ~> check {
       val response = responseAs[Seq[JsObject]]
       response shouldBe Seq(testBlock1HeaderJson, testBlock2HeaderJson)

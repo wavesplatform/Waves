@@ -98,7 +98,7 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
+    blockchain.transactionInfo(ByteStr(id)).map(_._1.toLong)
 
   override def tthis: Address = Recipient.Address(address())
 

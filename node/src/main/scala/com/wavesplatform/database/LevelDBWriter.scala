@@ -642,8 +642,8 @@ class LevelDBWriter(
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      transaction   <- db.get(Keys.transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
-    } yield height -> transaction.asInstanceOf[TransferTransaction]
+      tx            <- db.get(Keys.transferTransactionAt(height, num))
+    } yield height -> tx
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
@@ -657,8 +657,7 @@ class LevelDBWriter(
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
-    val txId = TransactionId(id)
-    db.get(Keys.transactionHNById(txId)).map(_._1)
+    db.get(Keys.transactionHNById(TransactionId(id))).map(_._1)
   }
 
   override def resolveAlias(alias: Alias): Either[ValidationError, Address] = readOnly { db =>
@@ -845,7 +844,8 @@ class LevelDBWriter(
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
+        tx = if (v(0) == 1) PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v.tail))
+        else TransactionParsers.parseBytes(v.tail).get
       } txs.append((TxNum(idx), tx))
     }
 

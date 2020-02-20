@@ -21,7 +21,7 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
+import com.wavesplatform.{RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -162,7 +162,7 @@ class LevelDBWriterSpec
 
   def createTransfer(master: KeyPair, recipient: Address, ts: Long): TransferTransaction = {
     TransferTransaction
-      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 5, Waves, 1000000, None, ts)
+      .selfSigned(1.toByte, master, recipient, Waves, ENOUGH_AMT / 10, Waves, 1000000, None, ts)
       .explicitGet()
   }
 
@@ -186,7 +186,12 @@ class LevelDBWriterSpec
   }
 
   "correctly reassemble block from header and transactions" in {
-    val rw        = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val rw = TestLevelDB.withFunctionalitySettings(
+      db,
+      ignoreSpendableBalanceChanged,
+      TestFunctionalitySettings.Stub.copy(preActivatedFeatures = Map(15.toShort -> 5)),
+      dbSettings
+    )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
@@ -218,25 +223,50 @@ class LevelDBWriterSpec
           )
         )
 
+      val block4 = TestBlock
+        .create(
+          ts + 17,
+          block3.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 13),
+            createTransfer(master, recipient.toAddress, ts + 14)
+          ),
+          version = Block.ProtoBlockVersion
+        )
+
+      val block5 = TestBlock
+        .create(
+          ts + 24,
+          block4.uniqueId,
+          Seq(
+            createTransfer(master, recipient.toAddress, ts + 20),
+            createTransfer(master, recipient.toAddress, ts + 21)
+          ),
+          version = Block.ProtoBlockVersion
+        )
+
       bcu.processBlock(genesisBlock, genesisBlock.header.generationSignature) shouldBe 'right
       bcu.processBlock(block1, block1.header.generationSignature) shouldBe 'right
       bcu.processBlock(block2, block2.header.generationSignature) shouldBe 'right
       bcu.processBlock(block3, block3.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
+      bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
 
-      // todo
-//      bcu.blockAt(1).get shouldBe genesisBlock
-//      bcu.blockAt(2).get shouldBe block1
-//      bcu.blockAt(3).get shouldBe block2
-//      bcu.blockAt(4).get shouldBe block3
+      def blockAt(height: Int): Option[Block] = bcu.liquidBlockMeta
+        .filter(_ => bcu.height == height)
+        .flatMap(m => bcu.liquidBlock(m.signature))
+        .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+
+      blockAt(1).get shouldBe genesisBlock
+      blockAt(2).get shouldBe block1
+      blockAt(3).get shouldBe block2
+      blockAt(4).get shouldBe block3
+      blockAt(5).get shouldBe block4
+      blockAt(6).get shouldBe block5
 
       for (i <- 1 to db.get(Keys.height)) {
         db.get(Keys.blockMetaAt(Height(i))).isDefined shouldBe true
       }
-
-//      bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
-//      bcu.blockBytes(2).get shouldBe block1.bytes()
-//      bcu.blockBytes(3).get shouldBe block2.bytes()
-//      bcu.blockBytes(4).get shouldBe block3.bytes()
 
     } finally {
       bcu.shutdown()
@@ -252,11 +282,11 @@ class LevelDBWriterSpec
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
         db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
 
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
       }
     }

@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
@@ -567,7 +568,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(s => dataContractGen(s, bigData = false))
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
             newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
@@ -618,7 +619,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
             newState.balance(acc, Waves) shouldBe amount
@@ -634,7 +635,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
       case (_, _, genesis, setScript, ci) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, _) =>
             blockDiff.transactions should contain key (ci.id())
         }
@@ -649,7 +650,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             newState.balance(acc, Waves) shouldBe amount
         }
@@ -707,7 +708,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContractWithAlias(contractGen)
     } yield (a, am, r._1, r._3, r._6, r._4)) {
       case (acc, amount, genesis, setScript, aliasTx, ciWithAlias) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(aliasTx, setScript))), TestBlock.create(Seq(ciWithAlias)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(aliasTx, setScript))), TestBlock.create(Seq(ciWithAlias), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
             newState.balance(acc, Waves) shouldBe amount
@@ -773,7 +774,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       )
     } yield (a, am, r._1, r._2, r._3, r._4, asset, invoker)) {
       case (acc, amount, genesis, setScript, ci, dAppAddress, asset, invoker) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 2
             newState.balance(acc, Waves) shouldBe amount
@@ -910,7 +911,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       r <- preconditionsAndSetContract(contractGen, masterGen = Gen.oneOf(Seq(master)), feeGen = ciFee(1))
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci)), fs) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), fs) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 3
             newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)
@@ -1232,7 +1233,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             .explicitGet()
         assertDiffAndState(
           Seq(TestBlock.create(genesis ++ Seq[Transaction](sponsoredAsset, t, setSponsorship, setScript))),
-          TestBlock.create(Seq(ci)),
+          TestBlock.create(Seq(ci), Block.ProtoBlockVersion),
           fs
         ) {
           case (blockDiff, newState) =>
@@ -1475,7 +1476,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         val features = fs.copy(
           preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
         )
-        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci)), features) {
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), features) {
           case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 3
             newState.balance(master, IssuedAsset(asset.id())) shouldBe (asset.quantity - amount)

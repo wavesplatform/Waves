@@ -6,11 +6,11 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils._
 
 object Keys {
@@ -69,7 +69,7 @@ object Keys {
 
   def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey("address-script-history", 27, addressId.toByteArray)
   def addressScript(addressId: BigInt)(height: Int): Key[Option[AccountScriptInfo]] =
-    Key.opt("address-script", hAddr(28, height, addressId), readScript, writeScript)
+    Key.opt("address-script", hAddr(28, height, addressId), readAccountScriptInfo, writeAccountScriptInfo)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key("approved-features", Array[Byte](0, 29), readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key("activated-features", Array[Byte](0, 30), readFeatureMap, writeFeatureMap)
@@ -109,17 +109,17 @@ object Keys {
   def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] =
     Key("changed-data-keys", hAddr(49, height, addressId), readStrings, writeStrings)
 
-  val BlockHeaderPrefix: Short = 50
+  val BlockInfoPrefix: Short = 50
 
   def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
-    Key.opt("block-header-at-height", h(BlockHeaderPrefix, height), readBlockMeta(height), writeBlockMeta)
+    Key.opt("block-info-at-height", h(BlockInfoPrefix, height), readBlockMeta(height), writeBlockMeta)
 
-  def blockHeaderBytesAt(height: Height): Key[Option[Array[Byte]]] = // TODO: Store protobuf block header
+  def blockInfoBytesAt(height: Height): Key[Option[Array[Byte]]] =
     Key.opt(
-      "block-header-bytes-at-height",
-      h(BlockHeaderPrefix, height),
-      _.drop(4),
-      _ => throw new Exception("Key \"block-header-bytes-at-height\" - is read only!")
+      "block-info-bytes-at-height",
+      h(BlockInfoPrefix, height),
+      identity,
+      unsupported("Can not explicitly write block bytes")
     )
 
   val TransactionInfoPrefix: Short = 51
@@ -127,16 +127,16 @@ object Keys {
     Key.opt[Transaction](
       "nth-transaction-info-at-height",
       hNum(TransactionInfoPrefix, height, n),
-      data => PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(data)),
-      tx => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
+      readTransaction,
+      writeTransaction
     )
 
-  def transactionBytesAt(height: Height, n: TxNum): Key[Option[Array[Byte]]] =
-    Key.opt(
+  def transferTransactionAt(height: Height, n: TxNum): Key[Option[TransferTransaction]] =
+    Key(
       "nth-transaction-info-bytes-at-height",
       hNum(TransactionInfoPrefix, height, n),
-      identity,
-      identity
+      TransferTxSerializer.tryParseTransfer,
+      unsupported("Can not explicitly write transfer transaction")
     )
 
   val AddressTransactionSeqNrPrefix: Short = 52

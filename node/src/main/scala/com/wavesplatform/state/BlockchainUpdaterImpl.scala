@@ -50,7 +50,7 @@ class BlockchainUpdaterImpl(
     finally l.unlock()
   }
 
-  private val lock                     = new ReentrantReadWriteLock
+  private val lock                     = new ReentrantReadWriteLock(true)
   private def writeLock[B](f: => B): B = inLock(lock.writeLock(), f)
   private def readLock[B](f: => B): B  = inLock(lock.readLock(), f)
 
@@ -586,11 +586,11 @@ class BlockchainUpdaterImpl(
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = readLock {
-    CompositeBlockchain(leveldb, ngState.map(_.bestLiquidDiff)).balanceOnlySnapshots(address, h, assetId)
+    compositeBlockchain.balanceOnlySnapshots(address, h, assetId)
   }
 
   override def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot] = readLock {
-    CompositeBlockchain(leveldb, ngState.map(_.bestLiquidDiff))
+    CompositeBlockchain(leveldb, to.fold(ngState.map(_.bestLiquidDiff))(id => ngState.map(_.diffFor(id)._1)))
       .balanceSnapshots(address, from, to)
   }
 

@@ -81,7 +81,7 @@ object Explorer extends ScorexLogging {
     "asset-script",
     "safe-rollback-height",
     "changed-data-keys",
-    "block-header-at-height",
+    "block-info-at-height",
     "nth-transaction-info-at-height",
     "address-transaction-seq-nr",
     "address-transaction-height-type-and-nums",
@@ -174,7 +174,7 @@ object Explorer extends ScorexLogging {
             val blockHeightBytes = db.get(kBlockHeight.keyBytes)
             val maybeBlockHeight = kBlockHeight.parse(blockHeightBytes)
             maybeBlockHeight.foreach { h =>
-              val kBlock     = Keys.blockHeaderBytesAt(Height(h))
+              val kBlock     = Keys.blockInfoBytesAt(Height(h))
               val blockBytes = db.get(kBlock.keyBytes)
               log.info(s"BlockId=${maybeBlockId.get} at h=$h: ${Base64.encode(blockBytes)}")
             }
@@ -318,6 +318,12 @@ object Explorer extends ScorexLogging {
           pf.assets.toSeq.sortBy(_._1.toString) foreach {
             case (assetId, balance) => log.info(s"$assetId : $balance")
           }
+
+        case "HS" =>
+          val height = argument(1, "height").toInt
+          val hitSourceKey = Keys.hitSource(height)
+          val hitSource = db.get(hitSourceKey.keyBytes)
+          log.info(s"HitSource at height=$height: ${Base64.encode(hitSource)}")
       }
     } finally db.close()
   }

@@ -19,7 +19,7 @@ object PBBlocks {
       header.baseTarget,
       ByteStr(header.generationSignature.toByteArray),
       PublicKey(header.generator.toByteArray),
-      header.featureVotes.map(intToShort),
+      header.featureVotes.map(_.toShort),
       header.rewardVote,
       ByteStr(header.transactionsRoot.toByteArray)
     )
@@ -37,7 +37,7 @@ object PBBlocks {
     ByteString.copyFrom(header.reference),
     header.baseTarget,
     ByteString.copyFrom(header.generationSignature),
-    header.featureVotes.map(shortToInt),
+    header.featureVotes.map(_.toInt),
     header.timestamp,
     header.version,
     ByteString.copyFrom(header.generator),
@@ -69,14 +69,5 @@ object PBBlocks {
       _.header.chainId := chainId,
       _.transactions.foreach(_.transaction.chainId := chainId)
     )
-  }
-
-  private[this] def shortToInt(s: Short): Int = {
-    java.lang.Short.toUnsignedInt(s)
-  }
-
-  private[this] def intToShort(int: Int): Short = {
-    require(int >= 0 && int <= 65535, s"Short overflow: $int")
-    int.toShort
   }
 }

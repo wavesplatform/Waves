@@ -7,7 +7,7 @@ import java.util.{Map => JMap}
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
-import com.google.common.primitives.{Ints, Longs, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.BlockMeta
@@ -20,9 +20,10 @@ import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{LegacyPBSwitch, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -463,7 +464,7 @@ package object database extends ScorexLogging {
   def readAssetScript(b: Array[Byte]): (Script, Long) =
     ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
 
-  def writeScript(scriptInfo: AccountScriptInfo): Array[Byte] =
+  def writeAccountScriptInfo(scriptInfo: AccountScriptInfo): Array[Byte] =
     pb.AccountScriptInfo.toByteArray(
       pb.AccountScriptInfo(
         ByteString.copyFrom(scriptInfo.publicKey.arr),
@@ -476,7 +477,7 @@ package object database extends ScorexLogging {
       )
     )
 
-  def readScript(b: Array[Byte]): AccountScriptInfo = {
+  def readAccountScriptInfo(b: Array[Byte]): AccountScriptInfo = {
     val asi = pb.AccountScriptInfo.parseFrom(b)
     AccountScriptInfo(
       PublicKey(asi.publicKey.toByteArray),
@@ -487,6 +488,19 @@ package object database extends ScorexLogging {
       }.toMap
     )
   }
+
+  def readTransaction(b: Array[Byte]): Transaction = b.head match {
+    case 0 => TransactionParsers.parseBytes(b.tail).get
+    case 1 => PBTransactions.vanilla(PBSignedTransaction.parseFrom(b.tail)).explicitGet()
+  }
+
+  def writeTransaction(t: Transaction): Array[Byte] = Bytes.concat(
+    t match {
+      case lps: LegacyPBSwitch if lps.isProtobufVersion => Array(1.toByte)
+      case _                                            => Array(0.toByte)
+    },
+    t.bytes()
+  )
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
