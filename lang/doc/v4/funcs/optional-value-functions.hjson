@@ -1,0 +1,34 @@
+{
+  funcs: [
+    {
+      name: "value"
+      params: [ "T|Unit" ]
+      doc: "Extract value from option or fail"
+      paramsDoc: [ "Optional value" ]
+    }
+	{
+      name: "valueOrElse"
+      params: [ "T|Unit", "T" ]
+      doc: "Returns value from union type argument if it's not unit. Otherwise, returns the second argument."
+      paramsDoc: [ "The argument to return value from.", "Returned if the value of t is unit." ]
+    }
+	{
+      name: "valueOrErrorMessage"
+      params: [ "T|Unit", "String" ]
+      doc: "Extract value from option or fail with message"
+      paramsDoc: [ "Optional value", "Error message" ]
+    }
+    {
+      name: "extract"
+      params: [ "T|Unit" ]
+      doc: "Extract value from option or fail"
+      paramsDoc: [ "Optional value" ]
+    }
+    {
+      name: "isDefined"
+      params: [ "T|Unit" ]
+      doc: "Checks if a value is not `Unit`"
+      paramsDoc: [ "Optional value" ]
+    }
+  ]
+}

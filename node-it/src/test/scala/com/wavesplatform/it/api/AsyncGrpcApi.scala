@@ -8,6 +8,9 @@ import com.wavesplatform.account.{Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
 import com.wavesplatform.api.grpc.{
   AccountsApiGrpc,
+  AssetInfoResponse,
+  AssetRequest,
+  AssetsApiGrpc,
   BalanceResponse,
   BalancesRequest,
   BlockRequest,
@@ -42,6 +45,7 @@ object AsyncGrpcApi {
     import com.wavesplatform.protobuf.transaction.{Script => PBScript, Transaction => PBTransaction, _}
     import monix.execution.Scheduler.Implicits.global
 
+    private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
     private[this] lazy val accounts     = AccountsApiGrpc.stub(n.grpcChannel)
     private[this] lazy val blocks       = BlocksApiGrpc.stub(n.grpcChannel)
     private[this] lazy val transactions = TransactionsApiGrpc.stub(n.grpcChannel)
@@ -449,6 +453,8 @@ object AsyncGrpcApi {
           transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
       }
     }
-  }
 
+    def assetInfo(assetId: String): Future[AssetInfoResponse] =
+      assets.getInfo(AssetRequest(ByteString.copyFrom(Base58.decode(assetId))))
+  }
 }

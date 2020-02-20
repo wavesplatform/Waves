@@ -267,7 +267,7 @@ case class AddressApiRoute(
 
   private def addressScriptInfoJson(account: Address): AddressScriptInfo = {
     val CommonAccountApi.AddressScriptInfo(script, scriptText, complexity, extraFee) = commonAccountApi.script(account)
-    AddressScriptInfo(account.stringRepr, script.map(_.base64), scriptText, complexity, extraFee)
+    AddressScriptInfo(account.stringRepr, script.map(_.bytes().base64), scriptText, complexity, extraFee)
   }
 
   private def scriptMetaJson(account: Address): Either[ValidationError.ScriptParseError, AccountScriptMeta] = {
