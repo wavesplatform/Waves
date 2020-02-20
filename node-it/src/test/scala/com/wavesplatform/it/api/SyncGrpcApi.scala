@@ -202,9 +202,6 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).setAssetScript(sender, assetId, script, fee, timestamp, version)), waitForTx)
     }
 
-    def assetInfo(assetId: String): AssetInfoResponse =
-      sync(async(n).assetInfo(assetId))
-
     def getDataByKey(address: ByteString, key: String): List[DataTransactionData.DataEntry] = {
       accounts.getDataEntries(DataRequest.of(address, key)).toList.map(res => res.getEntry)
     }
