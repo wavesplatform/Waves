@@ -33,7 +33,7 @@ class RewardsTestSuite
 
     "when miner votes for increase" in {
 
-      assertApiError(miner.rewardStatus(1), CustomValidationError("Block reward feature is not activated yet"))
+      assertApiError(miner.rewardStatus(Some(1)), CustomValidationError("Block reward feature is not activated yet"))
       miner.waitForHeight(activationHeight - 1, 5.minutes)
       miner.balanceDetails(miner.address).available shouldBe initMinerBalance
       miner.waitForHeight(activationHeight)
@@ -43,9 +43,9 @@ class RewardsTestSuite
       featureInfo.blockchainStatus shouldBe BlockchainFeatureStatus.Activated
 
       val minerBalanceAtActivationHeight = miner.balanceDetails(miner.address).available
-      minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus(miner.height).currentReward
+      minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus().currentReward
 
-      val rewardAtActivation = miner.rewardStatus(activationHeight)
+      val rewardAtActivation = miner.rewardStatus(Some(activationHeight))
       rewardAtActivation.currentReward shouldBe initial
       rewardAtActivation.minIncrement shouldBe minIncrement
       rewardAtActivation.term shouldBe term
@@ -57,11 +57,11 @@ class RewardsTestSuite
       rewardAtActivation.totalWavesAmount shouldBe initialAmount + initial
 
       miner.waitForHeight(activationHeight + 1) // 5
-      miner.balanceDetails(miner.address).available shouldBe minerBalanceAtActivationHeight + miner.rewardStatus(miner.height).currentReward
+      miner.balanceDetails(miner.address).available shouldBe minerBalanceAtActivationHeight + miner.rewardStatus().currentReward
 
       val votingStartHeight = activationHeight + term - votingInterval
       miner.waitForHeight(votingStartHeight, 2.minutes) // 8
-      val rewardAfterFirstVote = miner.rewardStatus(votingStartHeight)
+      val rewardAfterFirstVote = miner.rewardStatus(Some(votingStartHeight))
       rewardAfterFirstVote.currentReward shouldBe initial
       rewardAfterFirstVote.minIncrement shouldBe minIncrement
       rewardAfterFirstVote.term shouldBe term
@@ -77,13 +77,13 @@ class RewardsTestSuite
       val amountAfterTerm = initialAmount + BigInt(initial) * BigInt(term) + newReward
 
       miner.waitForHeight(termEndHeight - 1, 2.minutes) // 11
-      miner.rewardStatus(miner.height).currentReward shouldBe initial
+      miner.rewardStatus().currentReward shouldBe initial
       val minerBalanceBeforeTermEnd = miner.balanceDetails(miner.address).available
-      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * miner.rewardStatus(miner.height).currentReward
+      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * miner.rewardStatus().currentReward
 
       miner.waitForHeight(termEndHeight) // 12
 
-      val rewardAtTermEnd = miner.rewardStatus(termEndHeight)
+      val rewardAtTermEnd = miner.rewardStatus(Some(termEndHeight))
       rewardAtTermEnd.currentReward shouldBe newReward
       rewardAtTermEnd.minIncrement shouldBe minIncrement
       rewardAtTermEnd.term shouldBe term
@@ -94,16 +94,16 @@ class RewardsTestSuite
       rewardAtTermEnd.votes.decrease shouldBe 0
       rewardAtTermEnd.totalWavesAmount shouldBe amountAfterTerm
       val minerBalanceAtTermEndHeight = miner.balanceDetails(miner.address).available
-      minerBalanceAtTermEndHeight shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus(miner.height).currentReward
+      minerBalanceAtTermEndHeight shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus().currentReward
 
       miner.waitForHeight(termEndHeight + 1) // 13
-      miner.rewardStatus(miner.height).currentReward shouldBe newReward
-      miner.balanceDetails(miner.address).available shouldBe minerBalanceAtTermEndHeight + miner.rewardStatus(miner.height).currentReward
+      miner.rewardStatus().currentReward shouldBe newReward
+      miner.balanceDetails(miner.address).available shouldBe minerBalanceAtTermEndHeight + miner.rewardStatus().currentReward
 
       val secondVotingStartHeightPlusTwo = termEndHeight + term - votingInterval + 2
 
       miner.waitForHeight(secondVotingStartHeightPlusTwo, 5.minutes) // 18
-      val rewardSecVoting = miner.rewardStatus(secondVotingStartHeightPlusTwo)
+      val rewardSecVoting = miner.rewardStatus(Some(secondVotingStartHeightPlusTwo))
       rewardSecVoting.currentReward shouldBe newReward
       rewardSecVoting.minIncrement shouldBe minIncrement
       rewardSecVoting.term shouldBe term
@@ -120,9 +120,9 @@ class RewardsTestSuite
 
       miner.waitForHeight(activationHeight, 2.minutes)
       val minerBalanceAtActivationHeight = miner.balanceDetails(miner.address).available
-      minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus(miner.height).currentReward
+      minerBalanceAtActivationHeight shouldBe initMinerBalance + miner.rewardStatus().currentReward
 
-      val rewardAtActivation = miner.rewardStatus(activationHeight)
+      val rewardAtActivation = miner.rewardStatus(Some(activationHeight))
       rewardAtActivation.currentReward shouldBe initial
       rewardAtActivation.minIncrement shouldBe minIncrement
       rewardAtActivation.term shouldBe term
@@ -139,10 +139,10 @@ class RewardsTestSuite
 
       miner.waitForHeight(termEndHeight - 1, 2.minutes)
       val minerBalanceBeforeTermEnd = miner.balanceDetails(miner.address).available
-      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * miner.rewardStatus(miner.height).currentReward
+      minerBalanceBeforeTermEnd shouldBe minerBalanceAtActivationHeight + (termEndHeight - activationHeight - 1) * miner.rewardStatus().currentReward
 
       miner.waitForHeight(termEndHeight)
-      val rewardAtTermEnd = miner.rewardStatus(termEndHeight)
+      val rewardAtTermEnd = miner.rewardStatus(Some(termEndHeight))
       rewardAtTermEnd.currentReward shouldBe newReward
       rewardAtTermEnd.minIncrement shouldBe minIncrement
       rewardAtTermEnd.term shouldBe term
@@ -153,15 +153,15 @@ class RewardsTestSuite
       rewardAtTermEnd.votes.decrease shouldBe 0
       rewardAtTermEnd.totalWavesAmount shouldBe amountAfterTerm
       val minerBalanceAtTermEnd = miner.balanceDetails(miner.address).available
-      minerBalanceAtTermEnd shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus(miner.height).currentReward
+      minerBalanceAtTermEnd shouldBe minerBalanceBeforeTermEnd + miner.rewardStatus().currentReward
 
       miner.waitForHeight(termEndHeight + 1)
-      miner.rewardStatus(termEndHeight + 1).currentReward shouldBe newReward
-      miner.balanceDetails(miner.address).available shouldBe minerBalanceAtTermEnd + miner.rewardStatus(miner.height).currentReward
+      miner.rewardStatus(Some(termEndHeight + 1)).currentReward shouldBe newReward
+      miner.balanceDetails(miner.address).available shouldBe minerBalanceAtTermEnd + miner.rewardStatus().currentReward
 
       val secondVotingStartHeightPlusTwo = termEndHeight + term - votingInterval + 2
       miner.waitForHeight(secondVotingStartHeightPlusTwo, 5.minutes) // 18
-      val rewardSecVoting = miner.rewardStatus(secondVotingStartHeightPlusTwo)
+      val rewardSecVoting = miner.rewardStatus(Some(secondVotingStartHeightPlusTwo))
       rewardSecVoting.currentReward shouldBe newReward
       rewardSecVoting.minIncrement shouldBe minIncrement
       rewardSecVoting.term shouldBe term
