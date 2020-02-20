@@ -211,7 +211,7 @@ case class AssetsApiRoute(
         implicit val j: EntityStreamingSupport = EntityStreamingSupport.json()
         Source.fromPublisher(
           commonAccountApi
-            .nftPortfolio(address, after)
+            .nftList(address, after)
             .flatMap {
               case (assetId, assetDesc) =>
                 Observable.fromEither(

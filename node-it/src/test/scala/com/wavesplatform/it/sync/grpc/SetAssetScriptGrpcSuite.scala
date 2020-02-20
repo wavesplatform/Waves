@@ -27,42 +27,6 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     estimator
   ).explicitGet()._1
 
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-    assetWOScript = PBTransactions
-      .vanilla(
-        sender.broadcastIssue(
-          source = firstAcc,
-          name = "AssetWOScript",
-          quantity = someAssetAmount,
-          decimals = 0,
-          reissuable = false,
-          fee = issueFee,
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-
-    assetWScript = PBTransactions
-      .vanilla(
-        sender.broadcastIssue(
-          source = firstAcc,
-          name = "AssetWOScript",
-          quantity = someAssetAmount,
-          decimals = 0,
-          reissuable = false,
-          fee = issueFee,
-          script = Right(Some(script)),
-          waitForTx = true
-        )
-      )
-      .explicitGet()
-      .id()
-      .toString
-  }
-
   test("issuer cannot change script on asset w/o initial script") {
     val firstBalance    = sender.wavesBalance(firstAddress).available
     val firstEffBalance = sender.wavesBalance(firstAddress).effective
@@ -136,6 +100,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
     sender.setAssetScript(firstAcc, assetWScript, Right(Some(script2)), setAssetScriptFee, waitForTx = true)
+    sender.assetInfo(assetWScript).script.map(sd => PBTransactions.toVanillaScript(sd.getScript)) shouldBe Some(script2)
 
     sender.wavesBalance(firstAddress).available shouldBe firstBalance - setAssetScriptFee
     sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - setAssetScriptFee
@@ -226,5 +191,42 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     sender.wavesBalance(thirdAddress).available shouldBe balance
     sender.wavesBalance(thirdAddress).effective shouldBe effBalance
 
+  }
+
+
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    assetWOScript = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "AssetWOScript",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+
+    assetWScript = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "AssetWOScript",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          script = Right(Some(script)),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
   }
 }

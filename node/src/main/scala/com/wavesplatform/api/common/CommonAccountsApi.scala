@@ -33,7 +33,7 @@ trait CommonAccountsApi {
 
   def portfolio(address: Address): Observable[(IssuedAsset, Long)]
 
-  def nftPortfolio(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)]
+  def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)]
 
   def script(address: Address): Option[AccountScriptInfo]
 
@@ -81,7 +81,7 @@ object CommonAccountsApi extends ScorexLogging {
         Observable.fromIterator(Task(assetBalanceIterator(resource, address, diff, includeNft(blockchain))))
       }
 
-    override def nftPortfolio(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
+    override def nftList(address: Address, after: Option[IssuedAsset]): Observable[(IssuedAsset, AssetDescription)] =
       db.resourceObservable.flatMap { resource =>
         Observable.fromIterator(Task(nftIterator(resource, address, diff, after, blockchain.assetDescription)))
       }

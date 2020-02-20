@@ -6,7 +6,6 @@ import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.state.AccountScriptInfo
 import com.wavesplatform.transaction.Asset
 import io.grpc.stub.StreamObserver
 import monix.execution.Scheduler
@@ -29,6 +28,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
       )
     )
   }
+
   private def assetBalanceResponse(v: (Asset.IssuedAsset, Long)): BalanceResponse =
     BalanceResponse().withAsset(Amount(v._1.id.toPBByteString, v._2))
 
@@ -57,10 +57,8 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
 
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
     commonApi.script(request.address.toAddress) match {
-      case None => ScriptData()
-      case Some(AccountScriptInfo(_, script, complexity, _)) =>
-        ScriptData(script.bytes().toPBByteString, script.expr.toString, complexity)
-
+      case Some(desc) => ScriptData(Some(PBTransactions.toPBScript(desc.script)), desc.script.expr.toString, desc.maxComplexity)
+      case None       => ScriptData()
     }
   }
 
@@ -72,14 +70,9 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
     }
 
   override def getDataEntries(request: DataRequest, responseObserver: StreamObserver[DataEntryResponse]): Unit = responseObserver.interceptErrors {
-
     val stream = if (request.key.nonEmpty) {
-      println(s"\n\t${Thread.currentThread().getName} REQ: ${request.key}\n")
-      val option = commonApi.data(request.address.toAddress, request.key)
-      println(s"\n\t${Thread.currentThread().getName} RES: $option\n")
-      Observable.fromIterable(option)
+      Observable.fromIterable(commonApi.data(request.address.toAddress, request.key))
     } else {
-      println("\n\tREQ: key is empty")
       commonApi.dataStream(request.address.toAddress, Option(request.key).filter(_.nonEmpty))
     }
 

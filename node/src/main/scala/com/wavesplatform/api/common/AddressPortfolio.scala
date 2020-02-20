@@ -11,39 +11,46 @@ import com.wavesplatform.database.{DBResource, Keys, readIntSeq}
 import com.wavesplatform.state.Portfolio.longSemigroup
 import com.wavesplatform.state.{AssetDescription, Diff}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.utils.ScorexLogging
 
 import scala.collection.JavaConverters._
 
-object AddressPortfolio extends ScorexLogging {
+object AddressPortfolio {
+  private def filter(
+      underlying: Iterator[(IssuedAsset, Long)],
+      loadAssetDescription: IssuedAsset => Option[AssetDescription]
+  ): Iterator[(IssuedAsset, AssetDescription)] =
+    underlying
+      .collect { case (assetId, 1) => assetId -> loadAssetDescription(assetId) }
+      .collect { case (assetId, Some(desc)) if desc.nft => assetId -> desc }
+
   def nftIterator(
       resource: DBResource,
       address: Address,
       diff: Diff,
       maybeAfter: Option[IssuedAsset],
       loadAssetDescription: IssuedAsset => Option[AssetDescription]
-  ): Iterator[(IssuedAsset, AssetDescription)] = resource.get(Keys.addressId(address)).fold(Iterator[(IssuedAsset, AssetDescription)]()) {
-    addressId =>
+  ): Iterator[(IssuedAsset, AssetDescription)] = resource.get(Keys.addressId(address)) match {
+    case None =>
+      filter(diff.portfolios.get(address).orEmpty.assets.iterator, loadAssetDescription)
+
+    case Some(addressId) =>
       val keyPrefixBytes = Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ addressId.toByteArray
       resource.iterator.seek(keyPrefixBytes ++ maybeAfter.fold(Array.emptyByteArray)(_.id.arr))
 
       for (after <- maybeAfter) {
         @inline
         def skipEntry(key: Array[Byte]): Boolean = {
-          log.info(s"LOAD NFT: key=${key.mkString(",")}, prefix=${keyPrefixBytes.mkString(",")}, suffix=${after.id.arr.mkString(",")}")
           key.startsWith(keyPrefixBytes) && !key.endsWith(after.id.arr)
         }
 
         while (resource.iterator.hasNext && skipEntry(resource.iterator.next().getKey)) {}
-        log.info(s"LOAD NFT: skipping one more entry")
         resource.iterator.next()
       }
 
-      log.info(s"LOAD NFT: assets=${diff.portfolios.get(address).map(_.assets).orEmpty}")
-
-      new BalanceIterator(Some(addressId), _ => true, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala
-        .collect { case (issuedAsset, balance) if balance != 0 => issuedAsset -> loadAssetDescription(issuedAsset) }
-        .collect { case (id, Some(ad)) if ad.nft => id -> ad }
+      filter(
+        new BalanceIterator(Some(addressId), _ => true, resource, diff.portfolios.get(address).map(_.assets).orEmpty).asScala,
+        loadAssetDescription
+      )
   }
 
   def assetBalanceIterator(
