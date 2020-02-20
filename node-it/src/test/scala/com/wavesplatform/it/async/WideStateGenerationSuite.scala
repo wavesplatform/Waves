@@ -112,7 +112,7 @@ class WideStateGenerationSuite extends FreeSpec with WaitForHeight2 with Matcher
       utxSize <- node.utxSize
       height  <- node.height
       blockGroups <- traverse((2 to height).grouped(maxRequestSize).map { xs =>
-        (xs.head, xs.last)
+        (xs.head, xs.last, false)
       })(Function.tupled(node.blockSeq))
     } yield {
       val blocks = blockGroups.flatten.toList
