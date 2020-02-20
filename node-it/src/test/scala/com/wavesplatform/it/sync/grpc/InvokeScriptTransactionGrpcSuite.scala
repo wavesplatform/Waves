@@ -13,7 +13,7 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, FUNCTION_CALL}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
-import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.{PBTransactions, PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
@@ -75,8 +75,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.setScript(thirdContract, Right(Some(script2)), setScriptFee, waitForTx = true)
 
     val scriptInfo = sender.scriptInfo(firstAddress)
-
-    scriptInfo.scriptBytes shouldBe ByteString.copyFrom(script.bytes())
+    scriptInfo.script.map(PBTransactions.toVanillaScript) shouldBe Some(script)
   }
 
   test("dApp caller invokes a function on a dApp") {

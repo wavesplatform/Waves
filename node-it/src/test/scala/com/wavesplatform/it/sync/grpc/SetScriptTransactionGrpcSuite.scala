@@ -49,9 +49,9 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
       val scriptInfo = sender.scriptInfo(contractAddr)
 
-      scriptInfo.scriptBytes shouldBe ByteString.copyFrom(Base64.decode(script.bytes().base64))
-      scriptInfo.scriptText shouldBe script.expr.toString
-      scriptInfo.complexity shouldBe scriptComplexity
+    scriptInfo.script.map(PBTransactions.toVanillaScript) should contain(script)
+    scriptInfo.scriptText shouldBe script.expr.toString
+    scriptInfo.complexity shouldBe scriptComplexity
 
       sender.getTransaction(setScriptTxId).getTransaction.getSetScript.script.get shouldBe PBTransactions.toPBScript(script)
     }
@@ -98,34 +98,33 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("able to clear script from scripted account") {
-    for (v <- setScrTxSupportedVersions) {
-      val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
-      val unsignedSetScript = PBTransaction(
-        chainId = AddressScheme.current.chainId,
-        senderPublicKey = ByteString.copyFrom(contract.publicKey),
-        fee = Some(Amount.of(ByteString.EMPTY, setScriptFee + smartFee)),
-        timestamp = System.currentTimeMillis(),
-        version = 1,
-        data = PBTransaction.Data.SetScript(SetScriptTransactionData())
-      )
-      val sig1 = ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
-      val sig2 = ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
+    val unsignedSetScript = PBTransaction(
+      chainId = AddressScheme.current.chainId,
+      senderPublicKey = ByteString.copyFrom(firstAcc.publicKey),
+      fee = Some(Amount.of(ByteString.EMPTY, setScriptFee + smartFee)),
+      timestamp = System.currentTimeMillis(),
+      version = 1,
+      data = PBTransaction.Data.SetScript(SetScriptTransactionData())
+    )
+    val sig1 =
+      ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
+    val sig2 =
+      ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedSetScript))).explicitGet().bodyBytes()))
 
-      sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
+    sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 
-      val scriptInfo = sender.scriptInfo(contractAddr)
-      scriptInfo.scriptBytes shouldBe ByteString.EMPTY
-      scriptInfo.scriptText shouldBe ""
-      scriptInfo.complexity shouldBe 0L
+    val scriptInfo = sender.scriptInfo(firstAddress)
+    scriptInfo.script shouldBe empty
+    scriptInfo.scriptText shouldBe ""
+    scriptInfo.complexity shouldBe 0L
 
-      val firstBalance = sender.wavesBalance(contractAddr).available
-      val secondBalance = sender.wavesBalance(thirdAddress).available
+    val firstBalance  = sender.wavesBalance(firstAddress).available
+    val secondBalance = sender.wavesBalance(secondAddress).available
 
-      sender.broadcastTransfer(contract, Recipient().withPublicKeyHash(thirdAddress), transferAmount, minFee, waitForTx = true)
+    sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferAmount, minFee, waitForTx = true)
 
-      sender.wavesBalance(contractAddr).available shouldBe firstBalance - transferAmount - minFee
-      sender.wavesBalance(thirdAddress).available shouldBe secondBalance + transferAmount
-    }
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance - transferAmount - minFee
+    sender.wavesBalance(secondAddress).available shouldBe secondBalance + transferAmount
   }
 
   test("not able to broadcast tx from scripted acc if tx fee doesn't include smart fee") {
