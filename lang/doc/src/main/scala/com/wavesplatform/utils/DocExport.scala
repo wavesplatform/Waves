@@ -54,7 +54,7 @@ object DocExport {
         case UNION(Seq(UNIT, l), _) => OptionOf(typeRepr(l)())
         case UNION(Seq(l, UNIT), _) => OptionOf(typeRepr(l)())
         case UNION(l, _)            => UnionDoc(name, l.map(t => typeRepr(t)()).asJava)
-        case CASETYPEREF(_, fields) =>
+        case CASETYPEREF(_, fields, _) =>
           objDoc(name, fields.map(f => Field(f._1, typeRepr(f._2)())).asJava)
         case LIST(t) => ListOf(typeRepr(t)())
         case t       => nativeTypeDoc(t.toString)

@@ -16,7 +16,70 @@ import scala.concurrent.{ExecutionContext, Future}
 
 package object api {
   implicit class ResponseFutureExt(val f: Future[Response]) extends AnyVal {
+    import cats.instances.either._
+    import cats.instances.list._
+    import cats.syntax.alternative._
+    import cats.syntax.either._
     def as[A: Reads](implicit ec: ExecutionContext): Future[A] = f.map(r => parse(r.getResponseBody(StandardCharsets.UTF_8)).as[A])(ec)
+
+    def as[A: Reads](numberAsString: Boolean = false)(implicit ec: ExecutionContext): Future[A] = {
+      def convert(jsv: JsValue): Either[RuntimeException, JsValue] = {
+        val fieldNamesToTranslate = Set(
+          "amount",
+          "available",
+          "balance",
+          "buyMatcherFee",
+          "currentReward",
+          "desiredReward",
+          "effective",
+          "fee",
+          "feeAmount",
+          "generating",
+          "in",
+          "matcherFee",
+          "minIncrement",
+          "minSponsoredAssetFee",
+          "out",
+          "price",
+          "quantity",
+          "regular",
+          "reward",
+          "sellMatcherFee",
+          "sponsorBalance",
+          "totalAmount",
+          "totalFee",
+          "totalWavesAmount",
+          "value"
+        )
+        jsv match {
+          case JsArray(arr) =>
+            arr.map(convert).toList.separate match {
+              case (Nil, elements) => JsArray(elements).asRight
+              case (errors, _)     => new RuntimeException(errors.map(_.getMessage).mkString("\n")).asLeft
+            }
+          case JsObject(srcValues) =>
+            val values = srcValues.toList.map {
+              case (name, JsString(v)) if fieldNamesToTranslate.contains(name) => (name -> JsNumber(BigDecimal(v))).asRight[String]
+              case (name, JsNull) if fieldNamesToTranslate.contains(name)      => (name -> JsNull).asRight[String]
+              case (name, _) if fieldNamesToTranslate.contains(name)           => name.asLeft[(String, JsValue)]
+              case (name, v)                                                   => convert(v).map(r => name -> r)
+            }
+            values.separate match {
+              case (Nil, fields) => JsObject(fields).asRight
+              case (errors, _)   => new RuntimeException(s"Invalid number as string: ${errors.mkString("[", ",", "]")}").asLeft
+            }
+          case jsv => jsv.asRight
+        }
+      }
+      f.map { r =>
+        val value = parse(r.getResponseBody(StandardCharsets.UTF_8))
+        if (numberAsString) convert(value) else value.asRight[RuntimeException]
+      }
+        .flatMap {
+          case Right(value) => Future(value.as[A])
+          case Left(err)    => Future.failed(err)
+        }
+    }
   }
 
   implicit val addressReads: Reads[com.wavesplatform.account.Address] = Reads {
