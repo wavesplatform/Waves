@@ -190,14 +190,6 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
 
   def validateAssetIssued(account: String, tx: Transaction, data: Map[String, Any]): String = {
     val asset = sender.debugStateChanges(tx.id.toString).stateChanges.get.issues.head
-//
-//    asset.name should be(data("name"))
-//    asset.description should be(data("description"))
-//    asset.decimals should be(data("decimals"))
-//    asset.quantity should be(data("quantity"))
-//    asset.isReissuable should be(data("isReissuable"))
-//    asset.compiledScript.getOrElse("") should be(data("compiledScript"))
-
     val assetInfo = sender.assetsDetails(asset.assetId)
 
     assetInfo.originTransactionId shouldBe tx.id
