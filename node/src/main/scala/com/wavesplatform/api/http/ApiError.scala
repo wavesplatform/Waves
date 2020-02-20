@@ -25,7 +25,7 @@ trait ApiError {
 
 //noinspection TypeAnnotation
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError =
+  implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
@@ -55,11 +55,13 @@ object ApiError {
             if (isTokenScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)               => Mistiming(errorMessage)
+          case TxValidationError.ValueLimitsError(errorMessage)        => CustomValidationError(errorMessage)
           case TxValidationError.ScriptExecutionError(err, _, isToken) => ScriptExecutionError(tx, err, isToken)
           case err                                                     => StateCheckFailed(tx, fromValidationError(err).message)
         }
       case error => CustomValidationError(error.toString)
     }
+  }
 
   case object Unknown extends ApiError {
     override val id      = 0
@@ -373,7 +375,7 @@ object ApiError {
   }
 
   case object NegativeAmount {
-    val Id = 111
+    val Id = 511
   }
 
   final case class InsufficientFee(override val message: String = "insufficient fee") extends ApiError {
@@ -382,7 +384,7 @@ object ApiError {
   }
 
   case object InsufficientFee {
-    val Id = 112
+    val Id = 512
   }
 
   final case class WrongTransactionJson(err: JsError) extends ApiError {
@@ -393,7 +395,7 @@ object ApiError {
   }
 
   case object WrongTransactionJson {
-    val Id = 113
+    val Id = 513
   }
 
   final case class NegativeMinFee(msg: String) extends ApiError {
@@ -403,7 +405,7 @@ object ApiError {
   }
 
   case object NegativeMinFee {
-    val Id = 114
+    val Id = 514
   }
 
   final case class NonPositiveAmount(msg: String) extends ApiError {
@@ -413,7 +415,7 @@ object ApiError {
   }
 
   case object NonPositiveAmount {
-    val Id = 115
+    val Id = 515
   }
 
   case class AlreadyInState(transactionId: ByteStr, height: Int) extends ApiError {

@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -103,8 +103,9 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       dApp,
       payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
     )) { error =>
+      println(error)
       error.message should include("Script payment amount=3 should not exceed 2")
-      error.id shouldBe ScriptExecutionError.Id
+      error.id shouldBe CustomValidationError.Id
       error.statusCode shouldBe 400
     }
   }

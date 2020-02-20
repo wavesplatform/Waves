@@ -36,6 +36,7 @@ object TxValidationError {
   case class BlockAppendError(err: String, b: Block)           extends ValidationError
   case class ActivationError(err: String)                      extends ValidationError
   case class UnsupportedVersion(version: Int)                  extends ValidationError
+  case class ValueLimitsError(err: String)                     extends ValidationError
   case class GenericError(err: String)                         extends ValidationError
 
   object GenericError {
