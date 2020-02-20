@@ -46,7 +46,7 @@ class BlockV5Test
     with PrivateMethodTester {
   import BlockV5Test._
 
-  private val testTime = new TestTime(ntpTime.correctedTime())
+  private val testTime = new TestTime(1)
   def shiftTime(miner: MinerImpl, minerAcc: KeyPair): Unit = {
     val offset = miner.getNextBlockGenerationOffset(minerAcc).explicitGet()
     testTime.advance(offset + 1.milli)
@@ -169,9 +169,9 @@ class BlockV5Test
               Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
               blockchain.height shouldBe (h + 1)
 
-              val hitSource = blockchain.hitSourceAtHeight(if (h > 100) h - 100 else h).value
+              val hitSource     = blockchain.hitSourceAtHeight(if (h > 100) h - 100 else h).value
               val nextHitSource = blockchain.hitSourceAtHeight(h + 1).value
-              val lastBlock = blockchain.lastBlock.value
+              val lastBlock     = blockchain.lastBlock.value
 
               nextHitSource shouldBe crypto
                 .verifyVRF(
@@ -203,6 +203,68 @@ class BlockV5Test
               Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
               blockchain.height shouldBe (h + 1)
             }
+        }
+      }
+  }
+
+  "Block version" should "be validated accordingly features activation" in forAll(genesis) {
+    case (minerAcc, _, genesis) =>
+      val disabledFeatures = new AtomicReference(Set.empty[Short])
+      withBlockchain(disabledFeatures, testTime) { blockchain =>
+        blockchain.processBlock(genesis, genesis.header.generationSignature).explicitGet()
+        withMiner(blockchain, testTime) {
+          case (miner, appender, scheduler) =>
+            def forge(): Block = {
+              val forge = miner invokePrivate forgeBlock(minerAcc)
+              forge shouldBe 'right
+              forge.right.value._2
+            }
+
+            def forgeAppendAndValidate(version: Byte, height: Int): Unit = {
+              val block = forge()
+              block.header.version shouldBe version
+              Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
+              blockchain.height shouldBe height
+            }
+
+            for (h <- 2 to NGActivationHeight) {
+              shiftTime(miner, minerAcc)
+              forgeAppendAndValidate(Block.PlainBlockVersion, h)
+            }
+
+            shiftTime(miner, minerAcc)
+            forgeAppendAndValidate(Block.NgBlockVersion, NGActivationHeight + 1)
+
+            for (h <- blockchain.height + 1 to BlockRewardActivationHeight) {
+              shiftTime(miner, minerAcc)
+              forgeAppendAndValidate(Block.NgBlockVersion, h)
+            }
+
+            disabledFeatures.set(Set(BlockchainFeatures.BlockReward.id))
+            shiftTime(miner, minerAcc)
+            val badNgBlock = forge()
+            badNgBlock.header.version shouldBe Block.NgBlockVersion
+            disabledFeatures.set(Set())
+            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
+
+            shiftTime(miner, minerAcc)
+            forgeAppendAndValidate(Block.RewardBlockVersion, BlockRewardActivationHeight + 1)
+
+            for (h <- blockchain.height + 1 until BlockV5ActivationHeight) {
+              shiftTime(miner, minerAcc)
+              forgeAppendAndValidate(Block.RewardBlockVersion, h)
+            }
+
+            disabledFeatures.set(Set(BlockchainFeatures.BlockV5.id))
+            shiftTime(miner, minerAcc)
+            val badRewardBlock = forge()
+            badRewardBlock.header.version shouldBe Block.RewardBlockVersion
+            disabledFeatures.set(Set())
+            Await.result(appender(badNgBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
+            Await.result(appender(badRewardBlock).runToFuture(scheduler), 10.seconds) shouldBe 'left
+
+            shiftTime(miner, minerAcc)
+            forgeAppendAndValidate(Block.ProtoBlockVersion, BlockV5ActivationHeight)
         }
       }
   }
@@ -295,15 +357,16 @@ class BlockV5Test
 }
 
 object BlockV5Test {
-  private val BlockV5ActivationHeight     = 6
-  private val FairPoSActivationHeight     = 5
-  private val BlockRewardActivationHeight = 4
+  private val BlockV5ActivationHeight     = 11
+  private val FairPoSActivationHeight     = 10
+  private val BlockRewardActivationHeight = 6
   private val NGActivationHeight          = 3
 
   private val defaultSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
   private val testSettings = defaultSettings.copy(
     blockchainSettings = defaultSettings.blockchainSettings.copy(
       functionalitySettings = FunctionalitySettings(
+        blockVersion3AfterHeight = NGActivationHeight,
         featureCheckBlocksPeriod = 10,
         blocksForFeatureActivation = 1,
         doubleFeaturesPeriodsAfterHeight = Int.MaxValue,
@@ -320,6 +383,7 @@ object BlockV5Test {
   private val preActivatedTestSettings = testSettings.copy(
     blockchainSettings = testSettings.blockchainSettings.copy(
       functionalitySettings = testSettings.blockchainSettings.functionalitySettings.copy(
+        blockVersion3AfterHeight = 0,
         preActivatedFeatures = Map(
           BlockchainFeatures.BlockV5.id     -> 0,
           BlockchainFeatures.BlockReward.id -> 0,
