@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -20,7 +21,7 @@ class AliasTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       nodes.waitForHeightAriseAndTxPresent(aliasTx.id)
       if(v >= 3) {
         aliasTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(aliasTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[TransactionInfo](aliasTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - minFee)
 

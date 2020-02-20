@@ -318,8 +318,8 @@ object SyncHttpApi extends Assertions {
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
       sync(async(n).payment(sourceAddress, recipient, amount, fee))
 
-    def transactionInfo(txId: String, amountsAsStrings: Boolean = false): TransactionInfo =
-      sync(async(n).transactionInfo(txId, amountsAsStrings))
+    def transactionInfo[A: Reads](txId: String, amountsAsStrings: Boolean = false): A =
+      sync(async(n).transactionInfo[A](txId, amountsAsStrings))
 
     def transactionStatus(txIds: Seq[String]): Seq[TransactionStatus] =
       sync(async(n).transactionsStatus(txIds))

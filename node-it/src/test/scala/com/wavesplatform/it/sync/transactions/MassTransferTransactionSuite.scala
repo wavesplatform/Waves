@@ -5,6 +5,7 @@ import com.wavesplatform.api.http.requests.{MassTransferRequest, SignedMassTrans
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.{MassTransferTransactionInfo, TransactionInfo}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -38,7 +39,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
       nodes.waitForHeightAriseAndTxPresent(massTransferTx.id)
       if (v > 1) {
         massTransferTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(massTransferTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[MassTransferTransactionInfo](massTransferTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
 
       miner.assertBalances(firstAddress, balance1 - massTransferTransactionFee - issueFee, eff1 - massTransferTransactionFee - issueFee)
@@ -353,7 +354,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         typedAttachment = Some(Attachment.Str("qwe")),
         waitForTx = true
       )
-    val txWithStringAttInfo = sender.transactionInfo(txWithStringAtt.id)
+    val txWithStringAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithStringAtt.id)
     txWithStringAttInfo.typedAttachment shouldBe Some(Attachment.Str("qwe"))
     txWithStringAtt.typedAttachment shouldBe Some(Attachment.Str("qwe"))
 
@@ -366,7 +367,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         typedAttachment = Some(Attachment.Bool(true)),
         waitForTx = true
       )
-    val txWithBoolAttInfo = sender.transactionInfo(txWithBoolAtt.id)
+    val txWithBoolAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithBoolAtt.id)
     txWithBoolAttInfo.typedAttachment shouldBe Some(Attachment.Bool(true))
 
     val txWithIntAtt =
@@ -378,7 +379,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         typedAttachment = Some(Attachment.Num(123)),
         waitForTx = true
       )
-    val txWithIntAttInfo = sender.transactionInfo(txWithIntAtt.id)
+    val txWithIntAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithIntAtt.id)
     txWithIntAttInfo.typedAttachment shouldBe Some(Attachment.Num(123))
 
     val txWithBinaryAtt =
@@ -390,7 +391,7 @@ class MassTransferTransactionSuite extends BaseTransactionSuite /*with CancelAft
         typedAttachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
         waitForTx = true
       )
-    val txWithBinaryAttInfo = sender.transactionInfo(txWithBinaryAtt.id)
+    val txWithBinaryAttInfo = sender.transactionInfo[MassTransferTransactionInfo](txWithBinaryAtt.id)
     txWithBinaryAttInfo.typedAttachment.get.asInstanceOf[Bin].value shouldBe Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)).value
   }
   test("not able to pass typed attachment to mass transfer transaction V1") {

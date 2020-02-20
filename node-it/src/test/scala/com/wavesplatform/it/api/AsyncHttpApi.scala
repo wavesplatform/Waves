@@ -265,7 +265,7 @@ object AsyncHttpApi extends Assertions {
     def scriptInfo(address: String): Future[AddressApiRoute.AddressScriptInfo] =
       get(s"/addresses/scriptInfo/$address").as[AddressApiRoute.AddressScriptInfo]
 
-    def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo(txId).transform {
+    def findTransactionInfo(txId: String): Future[Option[TransactionInfo]] = transactionInfo[TransactionInfo](txId).transform {
       case Success(tx)                                          => Success(Some(tx))
       case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
       case Failure(ex)                                          => Failure(ex)
@@ -273,7 +273,7 @@ object AsyncHttpApi extends Assertions {
 
     def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): Future[TransactionInfo] = {
       val condition = waitFor[Option[TransactionInfo]](s"transaction $txId")(
-        _.transactionInfo(txId).transform {
+        _.transactionInfo[TransactionInfo](txId).transform {
           case Success(tx)                                          => Success(Some(tx))
           case Failure(UnexpectedStatusCodeException(_, _, 404, _)) => Success(None)
           case Failure(ex)                                          => Failure(ex)
@@ -295,8 +295,9 @@ object AsyncHttpApi extends Assertions {
 
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
-    def transactionInfo(txId: String, amountsAsStrings: Boolean = false): Future[TransactionInfo] = get(s"/transactions/info/$txId", amountsAsStrings).as[TransactionInfo](amountsAsStrings)
-
+    def transactionInfo[A: Reads](txId: String, amountsAsStrings: Boolean = false): Future[A] = {
+      get(s"/transactions/info/$txId", amountsAsStrings).as[A]
+    }
 
     def transactionsStatus(txIds:Seq[String]):Future[Seq[TransactionStatus]] =
       postJson(s"/transactions/status", Json.obj("ids" -> txIds)).as[List[TransactionStatus]]

@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.util._
@@ -57,7 +58,7 @@ class SponsorshipSuite
   var secondSponsorTxId: String = ""
 
   def assertMinAssetFee(txId: String, sponsorship: Long): Assertion = {
-    val txInfo = miner.transactionInfo(txId)
+    val txInfo = miner.transactionInfo[TransactionInfo](txId)
     assert(txInfo.minSponsoredAssetFee.contains(sponsorship))
   }
 
@@ -112,7 +113,7 @@ class SponsorshipSuite
     "make assets sponsored" in {
       nodes.waitForHeightAriseAndTxPresent(firstSponsorTxId)
       nodes.waitForHeightAriseAndTxPresent(secondSponsorTxId)
-      sender.transactionInfo(secondSponsorTxId).chainId shouldBe Some(AddressScheme.current.chainId)
+      sender.transactionInfo[TransactionInfo](secondSponsorTxId).chainId shouldBe Some(AddressScheme.current.chainId)
 
       assertSponsorship(firstSponsorAssetId, 1 * Token)
       assertSponsorship(secondSponsorAssetId, 1 * Token)

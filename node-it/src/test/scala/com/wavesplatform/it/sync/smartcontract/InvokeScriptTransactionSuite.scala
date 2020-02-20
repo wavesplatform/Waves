@@ -4,6 +4,7 @@ import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFai
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -80,8 +81,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     acc0ScriptInfo2.scriptText.isEmpty shouldBe false
     acc0ScriptInfo2.script.get.startsWith("base64:") shouldBe true
 
-    sender.transactionInfo(setScriptId).script.get.startsWith("base64:") shouldBe true
-    sender.transactionInfo(setScriptId2).script.get.startsWith("base64:") shouldBe true
+    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
+    sender.transactionInfo[TransactionInfo](setScriptId2).script.get.startsWith("base64:") shouldBe true
   }
 
   test("contract caller invokes a function on a contract") {

@@ -5,6 +5,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -24,7 +25,7 @@ class ReissueTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(reissueTx.id)
       if (v > 2) {
         reissueTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(reissueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[TransactionInfo](reissueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
       miner.assertBalances(firstAddress, balance - issueFee - reissueReducedFee, effectiveBalance - issueFee - reissueReducedFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, 2 * someAssetAmount)

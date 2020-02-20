@@ -4,6 +4,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.{minFee, setScriptFee, transferAmount}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -60,7 +61,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
       acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
-      sender.transactionInfo(setScriptId).script.get.startsWith("base64:") shouldBe true
+      sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
       sender.assertBalances(contract.stringRepr, contractBalance - setScriptFee, contractEffBalance - setScriptFee)
     }
   }
@@ -139,7 +140,7 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
 
       nodes.waitForHeightAriseAndTxPresent(removeScriptId)
 
-      sender.transactionInfo(removeScriptId).script shouldBe None
+      sender.transactionInfo[TransactionInfo](removeScriptId).script shouldBe None
       sender.addressScriptInfo(contract.stringRepr).script shouldBe None
       sender.addressScriptInfo(contract.stringRepr).scriptText shouldBe None
       sender.assertBalances(contract.stringRepr, contractBalance - setScriptFee - 0.004.waves, contractEffBalance - setScriptFee - 0.004.waves)

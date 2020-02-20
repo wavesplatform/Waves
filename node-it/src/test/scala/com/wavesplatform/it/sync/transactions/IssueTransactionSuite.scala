@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidName, NonPositiveAmount, TooBigArrayAllocation}
+import com.wavesplatform.it.api.IssueTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -21,7 +22,7 @@ class IssueTransactionSuite extends BaseTransactionSuite with TableDrivenPropert
       nodes.waitForHeightAriseAndTxPresent(issueTx.id)
       if (v > 2) {
         issueTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(issueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[IssueTransactionInfo](issueTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
 
       miner.assertBalances(firstAddress, balance1 - issueFee, eff1 - issueFee)

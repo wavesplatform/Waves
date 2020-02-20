@@ -100,7 +100,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     nodes.waitForHeightAriseAndTxPresent(id)
 
-    val txInfo             = sender.transactionInfo(id)
+    val txInfo             = sender.transactionInfo[TransactionInfo](id)
 
     sender.waitForHeight(txInfo.height + 1)
 
@@ -138,7 +138,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo(invokeTx._1.id)
+    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
     val callerTxs             = sender.transactionsByAddress(caller, 100)
     val dAppTxs               = sender.transactionsByAddress(contract, 100)
     val recipientTxs          = sender.transactionsByAddress(recipient, 100)
@@ -180,7 +180,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo(invokeTx._1.id)
+    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
     val callerTxs             = sender.transactionsByAddress(caller, 100)
     val dAppTxs               = sender.transactionsByAddress(contract, 100)
     val recipientTxs          = sender.transactionsByAddress(recipient, 100)

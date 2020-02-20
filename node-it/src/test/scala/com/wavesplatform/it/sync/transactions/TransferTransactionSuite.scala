@@ -4,7 +4,7 @@ import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{Block, Transaction}
+import com.wavesplatform.it.api.{Block, Transaction, TransferTransactionInfo}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -35,7 +35,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       nodes.waitForHeightAriseAndTxPresent(transferTransaction.id)
       if (v > 2) {
         transferTransaction.chainId shouldBe Some(AddressScheme.current.chainId)
-        miner.transactionInfo(transferTransaction.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        miner.transactionInfo[TransferTransactionInfo](transferTransaction.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
 
       miner.assertBalances(firstAddress, firstBalance - minFee - issueFee, firstEffBalance - minFee - issueFee)
@@ -141,7 +141,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         typedAttachment = Some(Attachment.Str("somestring")),
         waitForTx = true
       )
-    val txWithStringAttInfo = sender.transactionInfo(txWithStringAtt.id)
+    val txWithStringAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithStringAtt.id)
     txWithStringAttInfo.typedAttachment shouldBe Some(Attachment.Str("somestring"))
 
     val txWithBoolAtt =
@@ -154,7 +154,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         typedAttachment = Some(Attachment.Bool(false)),
         waitForTx = true
       )
-    val txWithBoolAttInfo = sender.transactionInfo(txWithBoolAtt.id)
+    val txWithBoolAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithBoolAtt.id)
     txWithBoolAttInfo.typedAttachment shouldBe Some(Attachment.Bool(false))
 
     val txWithIntAtt =
@@ -167,7 +167,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         typedAttachment = Some(Attachment.Num(123)),
         waitForTx = true
       )
-    val txWithIntAttInfo = sender.transactionInfo(txWithIntAtt.id)
+    val txWithIntAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithIntAtt.id)
     txWithIntAttInfo.typedAttachment shouldBe Some(Attachment.Num(123))
 
     val txWithBinaryAtt =
@@ -180,7 +180,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
         typedAttachment = Some(Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1))),
         waitForTx = true
       )
-    val txWithBinaryAttInfo = sender.transactionInfo(txWithBinaryAtt.id)
+    val txWithBinaryAttInfo = sender.transactionInfo[TransferTransactionInfo](txWithBinaryAtt.id)
     txWithBinaryAttInfo.typedAttachment.get.asInstanceOf[Bin].value shouldBe Attachment.Bin(Array[Byte](127.toByte, 0, 1, 1)).value
   }
 

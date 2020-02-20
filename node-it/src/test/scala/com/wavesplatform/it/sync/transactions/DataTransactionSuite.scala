@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.UnexpectedStatusCodeException
+import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
 import com.wavesplatform.it.sync.{calcDataFee, minFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -125,7 +125,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       nodes.waitForHeightAriseAndTxPresent(dataTx.id)
       if (v > 2) {
         dataTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(dataTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[TransactionInfo](dataTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
       miner.assertBalances(firstAddress, balance1 - dataFee, eff1 - dataFee)
     }

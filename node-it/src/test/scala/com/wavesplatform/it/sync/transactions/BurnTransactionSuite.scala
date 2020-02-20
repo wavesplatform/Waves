@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.transactions
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.{BurnTransactionInfo, TransactionInfo}
 import com.wavesplatform.it.sync.{issueAmount, issueFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.sync._
@@ -30,9 +31,9 @@ class BurnTransactionSuite extends BaseTransactionSuite {
       miner.waitForTransaction(burnTx.id)
       if (v > 2) {
         burnTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(burnTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[BurnTransactionInfo](burnTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
-      sender.transactionInfo(burnTx.id).amount shouldBe Some(issueAmount / 2)
+      sender.transactionInfo[BurnTransactionInfo](burnTx.id).amount shouldBe issueAmount / 2
       miner.assertBalances(firstAddress, balance - minFee - issueFee, effectiveBalance - minFee - issueFee)
       miner.assertAssetBalance(firstAddress, issuedAssetId, issueAmount / 2)
       val details2 = miner.assetsDetails(issuedAssetId)

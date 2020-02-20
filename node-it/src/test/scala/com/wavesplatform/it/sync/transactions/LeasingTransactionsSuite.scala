@@ -4,6 +4,7 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.api.http.TransactionsApiRoute.LeaseStatus
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -22,7 +23,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       nodes.waitForHeightAriseAndTxPresent(createdLeaseTx.id)
       if (v > 2) {
         createdLeaseTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(createdLeaseTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[TransactionInfo](createdLeaseTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
 
       miner.assertBalances(firstAddress, balance1 - minFee, eff1 - leasingAmount - minFee)
@@ -94,7 +95,7 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       nodes.waitForHeightAriseAndTxPresent(createdCancelLeaseTx.id)
       if (v > 2) {
         createdCancelLeaseTx.chainId shouldBe Some(AddressScheme.current.chainId)
-        sender.transactionInfo(createdCancelLeaseTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
+        sender.transactionInfo[TransactionInfo](createdCancelLeaseTx.id).chainId shouldBe Some(AddressScheme.current.chainId)
       }
 
       miner.assertBalances(firstAddress, balance1 - 2 * minFee, eff1 - 2 * minFee)

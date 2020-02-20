@@ -6,9 +6,11 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.TxVersion
+
 import scala.concurrent.duration._
 
 class VRFProtobufActivationSuite extends BaseTransactionSuite {
@@ -64,7 +66,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("able to broadcast UpdateAssetInfoTransaction after activation") {
-    val nextTerm = sender.transactionInfo(otherAssetId).height + updateInterval + 1
+    val nextTerm = sender.transactionInfo[TransactionInfo](otherAssetId).height + updateInterval + 1
     sender.waitForHeight(nextTerm, 2.minutes)
     sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
@@ -72,7 +74,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("able to broadcast tx of new version after activation") {
     val senderWavesBalance = sender.balanceDetails(senderAcc.stringRepr)
     val recipientWavesBalance = sender.balanceDetails(recipientAcc.stringRepr)
-    sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)
+    sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3, waitForTx = true)
 
     senderWavesBalance.available shouldBe sender.balanceDetails(senderAcc.stringRepr).available - transferAmount - minFee
     recipientWavesBalance.available shouldBe sender.balanceDetails(recipientAcc.stringRepr).available + transferAmount
