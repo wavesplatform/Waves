@@ -296,7 +296,7 @@ object AsyncHttpApi extends Assertions {
     def rawTransactionInfo(txId: String): Future[JsValue] = get(s"/transactions/info/$txId").map(r => Json.parse(r.getResponseBody))
 
     def transactionInfo[A: Reads](txId: String, amountsAsStrings: Boolean = false): Future[A] = {
-      get(s"/transactions/info/$txId", amountsAsStrings).as[A]
+      get(s"/transactions/info/$txId", amountsAsStrings).as[A](amountsAsStrings)
     }
 
     def transactionsStatus(txIds:Seq[String]):Future[Seq[TransactionStatus]] =

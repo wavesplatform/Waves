@@ -76,7 +76,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val recipientWavesBalance = sender.balanceDetails(recipientAcc.stringRepr)
     sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3, waitForTx = true)
 
-    senderWavesBalance.available shouldBe sender.balanceDetails(senderAcc.stringRepr).available - transferAmount - minFee
-    recipientWavesBalance.available shouldBe sender.balanceDetails(recipientAcc.stringRepr).available + transferAmount
+    sender.balanceDetails(senderAcc.stringRepr).available shouldBe senderWavesBalance.available - transferAmount - minFee
+    sender.balanceDetails(recipientAcc.stringRepr).available shouldBe recipientWavesBalance.available + transferAmount
   }
 }
