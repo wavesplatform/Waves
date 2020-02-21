@@ -6,7 +6,7 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 
 trait BlockchainUpdateTriggers {
-  def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit
+  def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit
 
   def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit
 
@@ -17,7 +17,7 @@ trait BlockchainUpdateTriggers {
 
 object BlockchainUpdateTriggers {
   def noop: BlockchainUpdateTriggers = new BlockchainUpdateTriggers {
-    override def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {}
+    override def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {}
 
     override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {}
 

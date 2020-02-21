@@ -15,9 +15,10 @@ import scala.collection.mutable.ArrayBuffer
 
 class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdated]) extends BlockchainUpdateTriggers {
 
-  override def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {
+  override def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val (blockStateUpdate, txsStateUpdates) = containerStateUpdate(blockchainBefore, diff, block.transactionData)
-    events.onNext(BlockAppended(block.signature, blockchainBefore.height + 1, block, blockStateUpdate, txsStateUpdates))
+    val updatedWavesAmount                  = blockchainBefore.wavesAmount(blockchainBefore.height).toLong + minerReward.getOrElse(0L)
+    events.onNext(BlockAppended(block.signature, blockchainBefore.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates))
   }
 
   override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {

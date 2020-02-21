@@ -27,6 +27,8 @@ import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
 import scala.concurrent.duration._
 
 class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with WithBlockchain {
+  private val WAVES_INITIAL_AMOUNT = Math.pow(10, 16).toLong
+
   override protected def settings: WavesSettings = TestHelpers.enableNG(super.settings)
 
   // add a genesis block to the blockchain
@@ -58,8 +60,8 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
   private def detailedDiffFromBlock(b: Block): DetailedDiff =
     BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
 
-  private def appendBlock(b: Block): BlockAppended =
-    produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b), blockchain)) match {
+  private def appendBlock(b: Block, minerReward: Option[Long] = None): BlockAppended =
+    produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b), minerReward, blockchain)) match {
       case ba: BlockAppended => ba
       case _                 => fail()
     }
@@ -105,6 +107,17 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
     }
   }
 
+  "calculates updated Waves amount correctly" in forAll {
+    for {
+      b      <- blockGen(Seq.empty, master)
+      reward <- Gen.option(Gen.choose(1L, 1000000L))
+      ba = appendBlock(b, reward)
+    } yield (reward, ba)
+  } {
+    case (reward, BlockAppended(_, _, _, updatedWavesAmount, _, _)) =>
+      updatedWavesAmount shouldBe WAVES_INITIAL_AMOUNT + reward.getOrElse(0L)
+  }
+
   "appends correctly" - {
     "empty block" in forAll {
       for {
@@ -112,7 +125,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
         ba = appendBlock(b)
       } yield (b, ba)
     } {
-      case (b, BlockAppended(toId, toHeight, block, _, _)) =>
+      case (b, BlockAppended(toId, toHeight, block, _, _, _)) =>
         toId shouldBe b.signature
         toHeight shouldBe blockchain.height + 1
 
@@ -291,7 +304,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
             .copy(transactions = Map((invoke.id(), (invoke, Set(master)))))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
-          produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, blockchain)) match {
+          produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, None, blockchain)) match {
             case ba: BlockAppended =>
               val AssetStateUpdate(asset, decimals, name, description, reissuable, volume, script, sponsorship, nft, assetExistedBefore) =
                 ba.transactionStateUpdates.head.assets.head
