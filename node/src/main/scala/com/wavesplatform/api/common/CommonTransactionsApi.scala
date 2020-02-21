@@ -2,10 +2,9 @@ package com.wavesplatform.api.common
 
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.{BlockMeta, common}
+import com.wavesplatform.block
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.merkle.Merkle
-import com.wavesplatform.account.Address
-import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.diffs.FeeValidation
@@ -117,7 +116,7 @@ object CommonTransactionsApi {
         transactionId           <- transactionIds
         (height, transaction)   <- blockchain.transactionInfo(transactionId)
         (meta, allTransactions) <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
-        transactionProof        <- Merkle.calcTransactionProof(allTransactions, transaction)
+        transactionProof        <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
   }
 }

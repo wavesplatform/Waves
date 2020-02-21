@@ -27,13 +27,13 @@ case class BlockMeta(
 }
 
 object BlockMeta {
-  def fromBlock(block: Block, height: Int, reward: Option[Long], vrf: Option[ByteStr]): BlockMeta = BlockMeta(
+  def fromBlock(block: Block, height: Int, totalFee: Long, reward: Option[Long], vrf: Option[ByteStr]): BlockMeta = BlockMeta(
     block.header,
     block.signature,
     height,
     block.bytes().length,
     block.transactionData.length,
-    block.feesPortfolio().balance,
+    totalFee,
     reward,
     vrf
   )

@@ -248,17 +248,7 @@ class LevelDBWriter(
       rw.put(
         Keys.blockMetaAt(Height(height)),
         Some(
-          BlockMeta(
-            block.header,
-            block.signature,
-            height,
-            block.bytes().length,
-            block.transactionData.size,
-            totalFee,
-            reward,
-            if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource)
-            else None
-          )
+          BlockMeta.fromBlock(block, height, totalFee, reward, if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None)
         )
       )
       rw.put(Keys.heightOf(block.uniqueId), Some(height))
@@ -278,6 +268,7 @@ class LevelDBWriter(
 
       // balances
       val updatedBalanceAddresses = ArrayBuffer.empty[BigInt]
+      val updatedNftLists         = mutable.AnyRefMap.empty[BigInt, Seq[IssuedAsset]].withDefaultValue(Seq.empty)
 
       for ((addressId, updatedBalances) <- balances) {
         for ((asset, balance) <- updatedBalances) {
@@ -290,8 +281,26 @@ class LevelDBWriter(
               expiredKeys ++= updateHistory(rw, wbh, kwbh, balanceThreshold, Keys.wavesBalance(addressId))
             case a: IssuedAsset =>
               rw.put(Keys.assetBalance(addressId, a)(height), balance)
-              expiredKeys ++= updateHistory(rw, Keys.assetBalanceHistory(addressId, a), threshold, Keys.assetBalance(addressId, a))
+              val kBalanceHistory = Keys.assetBalanceHistory(addressId, a)
+              val balanceHistory  = rw.get(kBalanceHistory)
+              expiredKeys ++= updateHistory(rw, balanceHistory, kBalanceHistory, threshold, Keys.assetBalance(addressId, a))
+              if (balance > 0 && balanceHistory.isEmpty && issuedAssets
+                    .get(a)
+                    .map(_._1.nft)
+                    .orElse(assetDescription(a).map(_.nft))
+                    .getOrElse(false)) {
+                updatedNftLists += addressId -> (a +: updatedNftLists(addressId))
+              }
           }
+        }
+      }
+
+      for ((addressId, nftIds) <- updatedNftLists) {
+        val kCount           = Keys.nftCount(addressId)
+        val previousNftCount = rw.get(kCount)
+        rw.put(kCount, previousNftCount + nftIds.length)
+        for ((id, idx) <- nftIds.zipWithIndex) {
+          rw.put(Keys.nftAt(addressId, idx, id), Some(()))
         }
       }
 

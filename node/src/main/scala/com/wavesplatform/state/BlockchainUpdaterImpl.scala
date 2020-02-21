@@ -327,7 +327,7 @@ class BlockchainUpdaterImpl(
                     log.info(s"New height: $newHeight")
                   }
 
-                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, leveldb)
+                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, reward, leveldb)
 
                   discarded
               }

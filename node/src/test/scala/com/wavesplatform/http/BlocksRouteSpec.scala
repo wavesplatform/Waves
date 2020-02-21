@@ -35,8 +35,8 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     "VRF"      -> testBlock2.uniqueId.toString
   )
 
-  private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, None, None)
-  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, Some(5), Some(testBlock2.uniqueId))
+  private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, 0L, None, None)
+  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.uniqueId))
 
   routePath("/first") in {
     (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()

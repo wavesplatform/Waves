@@ -2,9 +2,13 @@ package com.wavesplatform
 
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
+import com.wavesplatform.block.merkle.Merkle._
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
+import com.wavesplatform.transaction.Transaction
 
 import scala.util.Try
 
@@ -32,4 +36,23 @@ package object block {
   private[block] implicit class MicroBlockSignOps(microBlock: MicroBlock) {
     def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, ByteStr(microBlock.bytesWithoutSignature())))
   }
+
+  def transactionProof(transaction: Transaction, transactionData: Seq[Transaction]): Option[TransactionProof] =
+    transactionData.indexWhere(transaction.id() == _.id()) match {
+      case -1  => None
+      case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, mkMerkleTree(transactionData)).reverse))
+    }
+
+  implicit class MerkleTreeOps(private val levels: TransactionsMerkleTree) extends AnyVal {
+    def transactionsRoot: ByteStr = {
+      require(levels.nonEmpty && levels.head.nonEmpty, "Invalid merkle tree")
+      ByteStr(levels.head.head)
+    }
+  }
+
+  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.protobuf(_).toByteArray))
+
+  def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < Block.ProtoBlockVersion) ByteStr.empty
+    else ByteStr(mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot)
 }

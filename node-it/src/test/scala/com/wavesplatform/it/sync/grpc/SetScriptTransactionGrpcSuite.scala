@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
@@ -11,14 +11,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
-import com.wavesplatform.protobuf.transaction.{
-  PBTransactions,
-  Recipient,
-  SetScriptTransactionData,
-  SignedTransaction,
-  TransferTransactionData,
-  Transaction => PBTransaction
-}
+import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient, SetScriptTransactionData, SignedTransaction, TransferTransactionData, Transaction => PBTransaction}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 

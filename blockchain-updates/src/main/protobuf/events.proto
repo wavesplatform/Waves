@@ -12,19 +12,33 @@ message BlockchainUpdated {
     int32 height = 2;
 
     message Append {
-        oneof body {
+        message BlockAppend {
             Block block = 1;
-            SignedMicroBlock micro_block = 2;
+            int64 updated_waves_amount = 2;
         }
+
+        message MicroBlockAppend {
+            SignedMicroBlock micro_block = 1;
+        }
+
+        oneof body {
+            BlockAppend block = 1;
+            MicroBlockAppend micro_block = 2;
+        }
+
         repeated bytes transaction_ids = 3;
 
         StateUpdate state_update = 11;
         repeated StateUpdate transaction_state_updates = 12;
     }
 
-    enum Rollback {
-        BLOCK = 0;
-        MICROBLOCK = 1;
+    message Rollback {
+        enum RollbackType {
+            BLOCK = 0;
+            MICROBLOCK = 1;
+        }
+
+        RollbackType type = 1;
     }
 
     oneof update {

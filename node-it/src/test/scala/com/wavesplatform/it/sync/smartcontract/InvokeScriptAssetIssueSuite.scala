@@ -199,6 +199,8 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     info.size shouldBe 1
     info.head.assetId shouldBe nftIssueTxAssetId
 
+    nodes.waitForHeightArise()
+
     val afterInfo = sender.nftList(secondAddress, 100, Some(nftIssueTxAssetId))
     afterInfo.size shouldBe 0
   }
@@ -223,6 +225,8 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     val info = sender.nftList(firstAddress, 100, None)
     info.size shouldBe 1
     info.head.assetId shouldBe nftInvokeScriptAssetId
+
+    nodes.waitForHeightArise()
 
     val afterInfo = sender.nftList(firstAddress, 100, Some(nftInvokeScriptAssetId))
     afterInfo.size shouldBe 0

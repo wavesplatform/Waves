@@ -1,7 +1,7 @@
 package com.wavesplatform.block
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.block.merkle.Merkle._
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.Waves
@@ -11,9 +11,7 @@ import com.wavesplatform.{BlockGen, NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers, OptionValues}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-import scorex.crypto.authds.LeafData
-import scorex.crypto.authds.merkle.{Leaf, MerkleTree}
-import scorex.crypto.hash.Digest32
+import scorex.crypto.hash.Blake2b256
 
 class TransactionsRootSpec
     extends FreeSpec
@@ -23,7 +21,6 @@ class TransactionsRootSpec
     with TransactionGen
     with NoShrink
     with Matchers {
-  import TransactionsRootSpec._
 
   val commonGen: Gen[(KeyPair, List[TransferTransaction])] =
     for {
@@ -33,6 +30,42 @@ class TransactionsRootSpec
       txsLength <- Gen.choose(1, 1000)
       txs       <- Gen.listOfN(txsLength, versionedTransferGeneratorP(sender, recipient, Waves, Waves))
     } yield (signer, txs)
+
+  val validProofsScenario: Gen[(List[Transaction], Int)] =
+    for {
+      (_, txs) <- commonGen
+      idx      <- Gen.choose(0, txs.size - 1)
+    } yield (txs, idx)
+
+  "Merkle should validate correct proofs" in forAll(validProofsScenario) {
+    case (txs, idx) =>
+      val messages = txs.map(PBTransactions.protobuf(_).toByteArray)
+      val digest   = hash(messages(idx))
+
+      val levels = mkLevels(messages)
+      val proofs = mkProofs(idx, levels)
+
+      verify(digest, idx, proofs, levels.head.head) shouldBe true
+  }
+
+  val invalidProofsScenario: Gen[((List[Transaction], Int), (List[Transaction], Int))] =
+    for {
+      (txs, idx)              <- validProofsScenario
+      (anotherTx, anotherIdx) <- validProofsScenario
+    } yield ((txs, idx), (anotherTx, anotherIdx))
+
+  "Merkle should invalidate incorrect proofs" in forAll(invalidProofsScenario) {
+    case ((txs, idx), (anotherTxs, anotherIdx)) =>
+      val messages        = txs.map(PBTransactions.protobuf(_).toByteArray)
+      val anotherMessages = anotherTxs.map(PBTransactions.protobuf(_).toByteArray)
+
+      val levels        = mkLevels(messages)
+      val anotherLevels = mkLevels(anotherMessages)
+      val anotherProofs = mkProofs(anotherIdx, anotherLevels)
+      val anotherDigest = hash(anotherMessages(anotherIdx))
+
+      verify(anotherDigest, idx, anotherProofs, levels.head.head) shouldBe false
+  }
 
   val happyPathScenario: Gen[(Block, Transaction)] =
     for {
@@ -62,6 +95,7 @@ class TransactionsRootSpec
     case (block, transaction) =>
       block.transactionsRootValid() shouldBe true
       block.transactionProof(transaction) shouldBe 'empty
+      block.header.transactionsRoot.arr should contain theSameElementsAs Blake2b256.hash(Array(0.toByte))
   }
 
   val incorrectTransactionScenario: Gen[(Block, Transaction)] =
@@ -94,18 +128,7 @@ class TransactionsRootSpec
 
       merkleProof shouldBe 'defined
       block.verifyTransactionProof(merkleProof.value) shouldBe true
-      merkleProof.value.digests.head shouldBe Array.emptyByteArray
-
-      val nativeLeafData    = LeafData @@ PBTransactions.protobuf(transaction).toByteArray
-      val nativeMerkleTree  = MerkleTree(Seq(nativeLeafData))
-      val nativeMerkleProof = nativeMerkleTree.proofByElement(Leaf(nativeLeafData))
-      nativeMerkleProof shouldBe 'defined
-      nativeMerkleProof.value.valid(Digest32 @@ block.header.transactionsRoot.arr)
-
-      // it's okay to have empty digest in a single level for the tree with the only one leaf
-      nativeMerkleProof.value.levels.map(_._1.toList) shouldBe merkleProof.value.digests.map(_.toList)
-      merkleProof.value.digests.nonEmpty shouldBe true
-      merkleProof.value.digests.head.isEmpty shouldBe true
+      merkleProof.value.digests.head shouldBe Blake2b256.hash(Array(0.toByte))
   }
 
   val incorrectProofScenario: Gen[(Block, Transaction, TransactionProof)] =
@@ -124,16 +147,3 @@ class TransactionsRootSpec
   }
 }
 
-object TransactionsRootSpec {
-  implicit class BlockMerkleOps(block: Block) {
-
-    def transactionProof(transaction: Transaction): Option[TransactionProof] =
-      Merkle.calcTransactionProof(block.transactionData, transaction)
-
-    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
-      block.transactionData
-        .lift(transactionProof.transactionIndex)
-        .filter(tx => tx.id() == transactionProof.id)
-        .exists(tx => Merkle.verifyTransactionProof(transactionProof, tx, block.transactionData.size, block.header.transactionsRoot.arr))
-  }
-}

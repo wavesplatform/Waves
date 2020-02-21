@@ -2,13 +2,14 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.block.merkle.Merkle.{hash, mkProofs, verify}
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -17,8 +18,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
-import scorex.crypto.authds.merkle.MerkleTree
-import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
 
@@ -78,11 +77,11 @@ case class Block(
 
   protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(Merkle.mkMerkleTree(transactionData))
+  private[block] val transactionsMerkleTree: Coeval[TransactionsMerkleTree] = Coeval.evalOnce(mkMerkleTree(transactionData))
 
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    require(header.version >= Block.ProtoBlockVersion, "Block's version should be >= 5 to retrieve transactionsRoot")
-    (transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr
+    require(header.version >= Block.ProtoBlockVersion, s"Block's version should be >= ${Block.ProtoBlockVersion} to retrieve transactionsRoot")
+    transactionsMerkleTree().transactionsRoot == header.transactionsRoot
   }
 
   override def toString: String =
@@ -167,9 +166,6 @@ object Block extends ScorexLogging {
     } yield validBlock
   }
 
-  private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
-    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(Merkle.calcTransactionRoot(transactionData))
-
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
   }
@@ -177,6 +173,8 @@ object Block extends ScorexLogging {
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   type BlockId = ByteStr
+  type TransactionsMerkleTree = Seq[Seq[Array[Byte]]]
+  case class TransactionProof(id: ByteStr, transactionIndex: Int, digests: Seq[Array[Byte]])
 
   val MaxTransactionsPerBlockVer1Ver2: Int = 100
   val MaxTransactionsPerBlockVer3: Int     = 6000
@@ -193,6 +191,29 @@ object Block extends ScorexLogging {
   val NgBlockVersion: Byte      = 3
   val RewardBlockVersion: Byte  = 4
   val ProtoBlockVersion: Byte   = 5
+
+  // Merkle
+  implicit class BlockTransactionsRootOps(private val block: Block) extends AnyVal {
+    def transactionProof(transaction: Transaction): Option[TransactionProof] =
+      block.transactionData.indexWhere(transaction.id() == _.id()) match {
+        case -1  => None
+        case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, block.transactionsMerkleTree()).reverse))
+      }
+
+    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
+      block.transactionData
+        .lift(transactionProof.transactionIndex)
+        .filter(tx => tx.id() == transactionProof.id)
+        .exists(
+          tx =>
+            verify(
+              hash(PBTransactions.protobuf(tx).toByteArray),
+              transactionProof.transactionIndex,
+              transactionProof.digests.reverse,
+              block.header.transactionsRoot.arr
+            )
+        )
+  }
 }
 
 case class SignedBlockHeader(header: BlockHeader, signature: ByteStr)

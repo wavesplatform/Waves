@@ -3,17 +3,10 @@ package com.wavesplatform.http
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.common.CommonTransactionsApi
-import com.wavesplatform.api.http.ApiError.{
-  CustomValidationError,
-  InvalidAddress,
-  InvalidIds,
-  InvalidSignature,
-  InvalidTransactionId,
-  TooBigArrayAllocation
-}
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidAddress, InvalidIds, InvalidSignature, InvalidTransactionId, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.http.ApiMarshallers._
@@ -420,7 +413,6 @@ class TransactionsRouteSpec
   }
 
   routePath("/merkleProof") - {
-
     val transactionsGen = for {
       txsSize <- Gen.choose(1, 10)
       txs     <- Gen.listOfN(txsSize, randomTransactionGen)
