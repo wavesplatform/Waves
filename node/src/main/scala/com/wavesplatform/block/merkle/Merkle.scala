@@ -1,91 +1,72 @@
 package com.wavesplatform.block.merkle
 
-import com.wavesplatform.block.Block
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.transaction.Transaction
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.authds.{LeafData, Side}
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
+import scorex.crypto.hash.Blake2b256
 
 import scala.annotation.tailrec
 
 object Merkle {
+  private type Message = Array[Byte]
+  private type Digest  = Array[Byte]
+  private type Level   = Seq[Digest]
 
-  private[block] implicit object FastHash extends CryptographicHash32 {
-    override def hash(input: Message): Digest32 = Digest32 @@ com.wavesplatform.crypto.fastHash(input)
-  }
+  private val empty: Digest           = hash(Array[Byte](0))
+  private val emptyLevels: Seq[Level] = Seq(Seq(empty))
 
-  case class TransactionProof(
-      id: ByteStr,
-      transactionIndex: Int,
-      digests: Seq[Array[Byte]]
-  )
+  @inline private def isLeft(i: Int): Boolean = i % 2 == 0
 
-  /** Calculates transaction's root */
-  def calcTransactionRoot(transactionData: Seq[Transaction]): ByteStr =
-    ByteStr(mkMerkleTree(transactionData).rootHash)
+  /** Hash function */
+  def hash(input: Message): Digest = Blake2b256.hash(input)
 
-  /** Calculates transaction's proof */
-  def calcTransactionProof(
-      block: Block,
-      transaction: Transaction
-  ): Option[TransactionProof] =
-    for {
-      proof               <- block.transactionsMerkleTree().proofByElement(mkMerkleLeaf(transaction))
-      (_, transactionIdx) <- block.transactionData.zipWithIndex.find { case (tx, _) => tx.id() == transaction.id() }
-    } yield TransactionProof(transaction.id(), transactionIdx, proof.levels.map(_._1))
-
-  /** Verifies transaction's proof */
-  def verifyTransactionProof(
-      transactionProof: TransactionProof,
-      transaction: Transaction,
-      transactionsCount: Int,
-      transactionsRoot: Array[Byte]
-  ): Boolean = {
-    val valid = for {
-      sides <- sides(transactionsCount, transactionProof.transactionIndex)
-      leaf  = mkMerkleLeaf(transaction)
-      proof = MerkleProof(leaf.data, transactionProof.digests.zip(sides).map { case (d, s) => (Digest32 @@ d, s) })
-    } yield proof.valid(Digest32 @@ transactionsRoot)
-    valid.getOrElse(false)
-  }
-
-  private val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
-
-  /** Creates transactions merkle root */
-  private[block] def mkMerkleTree(transactions: Seq[Transaction]): MerkleTree[Digest32] = {
-    if (transactions.isEmpty) EmptyMerkleTree else MerkleTree(transactions.map(mkMerkleLeaf(_).data))
-  }
-
-  private[block] def mkMerkleLeaf(transaction: Transaction): Leaf[Digest32] =
-    Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
-
-  private sealed trait SideNode                                 extends Product with Serializable
-  private case class SideInternalNode(l: SideNode, r: SideNode) extends SideNode
-  private case object SideEmptyNode                             extends SideNode
-  private case object SideLeafNode                              extends SideNode
-
-  private def sides(leafsSize: Int, leafIndex: Int): Option[Seq[Side]] = {
-    def log2(x: Double): Double = math.log(x) / math.log(2)
-
-    @tailrec
-    def calcNode(nodes: Seq[SideNode]): SideInternalNode = {
-      val next = nodes.grouped(2).map(lr => SideInternalNode(lr.head, if (lr.length == 2) lr.last else SideEmptyNode)).toSeq
-      if (next.length == 1) next.head else calcNode(next)
-    }
-
-    @tailrec
-    def mkSides(node: SideNode, i: Int, cur: Int, acc: Seq[Side]): Option[Seq[Side]] =
-      node match {
-        case n: SideInternalNode if i < cur / 2 => mkSides(n.l, i, cur / 2, acc :+ MerkleProof.LeftSide)
-        case n: SideInternalNode if i < cur     => mkSides(n.r, i - cur / 2, cur / 2, acc :+ MerkleProof.RightSide)
-        case SideLeafNode                       => Some(acc.reverse)
-        case _                                  => None
+  /** Makes levels of merkle tree (from top to bottom) */
+  def mkLevels(data: Seq[Message]): Seq[Level] = {
+    if (data.isEmpty) emptyLevels
+    else {
+      @tailrec
+      def loop(prevLevel: Seq[Digest], acc: Seq[Level]): Seq[Level] = {
+        val level = prevLevel
+          .grouped(2)
+          .map {
+            case Seq(l, r) => hash(l ++ r)
+            case Seq(l)    => hash(l ++ empty)
+          }
+          .toSeq
+        if (level.size == 1) level +: acc else loop(level, level +: acc)
       }
+      val bottom = data.map(hash)
+      loop(bottom, Seq(bottom))
+    }
+  }
 
-    val node   = calcNode((0 until leafsSize).map(_ => SideLeafNode))
-    val height = Math.max(math.pow(2, math.ceil(log2(leafsSize))).toInt, 2)
-    mkSides(node, leafIndex, height, Seq())
+  /** Makes proofs for data (from top to bottom)
+    *
+    * @param index of data
+    * @param levels of merkle tree (from top to bottom)
+    * */
+  def mkProofs(index: Int, levels: Seq[Level]): Seq[Digest] = {
+    val (result, _) = levels.tail.reverse.foldLeft((Seq.empty[Digest], index)) {
+      case ((proofs, idx), level) =>
+        val proof = isLeft(idx) match {
+          case true if idx + 1 == level.size => empty
+          case true                          => level(idx + 1)
+          case false                         => level(idx - 1)
+        }
+        (proof +: proofs, idx / 2)
+    }
+    result
+  }
+
+  /** Verifies proofs
+    *
+    * @param digest data digest
+    * @param index data index
+    * @param proofs merkle proofs (from top to bottom)
+    * @param root merkle root
+    */
+  def verify(digest: Digest, index: Int, proofs: Seq[Digest], root: Digest): Boolean = {
+    val (calculated, _) = proofs.reverse.foldLeft((digest, index)) {
+      case ((left, idx), right) if isLeft(idx) => (hash(left ++ right), idx / 2)
+      case ((right, idx), left)                => (hash(left ++ right), idx / 2)
+    }
+    calculated sameElements root
   }
 }
