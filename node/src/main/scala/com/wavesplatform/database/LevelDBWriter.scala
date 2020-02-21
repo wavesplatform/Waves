@@ -5,18 +5,21 @@ import java.nio.ByteBuffer
 import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
+import com.google.common.primitives.{Bytes, Ints, Shorts}
+import com.google.protobuf.{CodedInputStream, CodedOutputStream, WireFormat}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.block.serialization.mkTxsCountBytes
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
+import com.wavesplatform.database.protobuf.{BlockInfo => PBlockInfo}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.block.{Block => PBlock}
 import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -58,6 +61,13 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
     v.takeWhile(_ <= h).lastOption // Should we use binary search?
   }
 
+  private val WireTypeBits                 = 3
+  private val BlockInfoTransactionCountTag = (PBlockInfo.TRANSACTION_COUNT_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_VARINT
+  private val BlockInfoSizeTag             = (PBlockInfo.SIZE_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_VARINT
+  private val BlockInfoCustomTag           = (PBlockInfo.CUSTOM_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_LENGTH_DELIMITED
+  private val BlockInfoProtoTag            = (PBlockInfo.PROTO_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_LENGTH_DELIMITED
+  private val BlockInfoCustomPrefixTag     = (PBlockInfo.Custom.PREFIX_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_LENGTH_DELIMITED
+  private val BlockInfoCustomSuffixTag     = (PBlockInfo.Custom.SUFFIX_FIELD_NUMBER << WireTypeBits) | WireFormat.WIRETYPE_LENGTH_DELIMITED
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -142,7 +152,7 @@ class LevelDBWriter(
 
   override def carryFee: Long = readOnly(_.get(Keys.carryFee(height)))
 
-  override def accountData(address: Address): AccountDataInfo = readOnly { db =>
+  override def accountData(address: Address): AccountDataInfo = readOnly { _ =>
     AccountDataInfo((for {
       key   <- accountDataKeys(address)
       value <- accountData(address, key) if !value.isInstanceOf[EmptyDataEntry]
@@ -267,7 +277,6 @@ class LevelDBWriter(
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = readWrite { rw =>
-
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
     rw.put(Keys.height, height)
@@ -447,7 +456,7 @@ class LevelDBWriter(
     }
 
     for ((id, (tx, num)) <- transactions) {
-      rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+      rw.put(Keys.transactionAt(Height(height), num, block.header.version >= Block.ProtoBlockVersion), Some(tx))
       rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
     }
 
@@ -632,7 +641,7 @@ class LevelDBWriter(
               }
 
               if (tx.typeId != GenesisTransaction.typeId) {
-                rw.delete(Keys.transactionAt(h, num))
+                rw.delete(Keys.transactionAt(h, num, discardedHeader.version >= Block.ProtoBlockVersion))
                 rw.delete(Keys.transactionHNById(TransactionId(tx.id())))
               }
           }
@@ -661,7 +670,7 @@ class LevelDBWriter(
         scriptsToDiscard.result().foreach(discardScript)
         assetScriptsToDiscard.result().foreach(discardAssetScript)
         accountDataToInvalidate.result().foreach {
-          case ak @ (addr, _) =>
+          case ak @ (_, _) =>
             discardAccountData(ak)
         }
         discardedBlock
@@ -699,7 +708,7 @@ class LevelDBWriter(
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      transaction   <- db.get(Keys.transactionAt(height, num)) if transaction.isInstanceOf[TransferTransaction]
+      transaction   <- db.get(Keys.transactionAt(height, num, protoBlockAt(height))) if transaction.isInstanceOf[TransferTransaction]
     } yield height -> transaction.asInstanceOf[TransferTransaction]
   }
 
@@ -709,7 +718,7 @@ class LevelDBWriter(
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
-      tx            <- db.get(Keys.transactionAt(height, num))
+      tx            <- db.get(Keys.transactionAt(height, num, protoBlockAt(height)))
     } yield (height, tx)
   }
 
@@ -753,15 +762,15 @@ class LevelDBWriter(
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
-            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
-              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+            val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+            (wh, b)
+          }
         case asset @ IssuedAsset(_) =>
-            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
-              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+            val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+            (wh, b)
+          }
       }
     }
   }
@@ -834,7 +843,7 @@ class LevelDBWriter(
       leaseId <- probablyActiveLeases
       if to >= height || loadLeaseStatus(db, leaseId) // only check lease status if we haven't checked all entries
       (h, n) <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx     <- db.get(Keys.transactionAt(h, n))
+      tx     <- db.get(Keys.transactionAt(h, n, protoBlockAt(h)))
     } yield tx
 
     activeLeaseTransactions.collect {
@@ -870,60 +879,63 @@ class LevelDBWriter(
   }
 
   override def loadBlockBytes(h: Int): Option[Array[Byte]] = readOnly { db =>
-    import com.wavesplatform.crypto._
+    val height  = Height(h)
+    val infoKey = Keys.blockInfoBytesAt(height)
 
-    val height = Height(h)
-
-    val headerKey = Keys.blockHeaderBytesAt(height)
-
-    def readTransactionBytes(version: Byte, count: Int) = {
+    def transactionBytes(count: Int): Seq[Array[Byte]] = {
       (0 until count).toArray.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
-          .map { tx =>
-            val txBytes = version match {
-              case Block.ProtoBlockVersion => PBUtils.encodeDeterministic(PBTransactions.protobuf(tx))
-              case _ => tx.bytes()
-            }
-            Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)
-          }
-          .getOrElse(throw new Exception(s"Cannot parse ${n}th transaction in block at height: $h"))
+        db.get(Keys.transactionBytesAt(height, TxNum(n.toShort)))
       }
     }
 
-    db.get(headerKey)
-      .map { headerBytes => // TODO: Only protobuf serialization
-        val version             = headerBytes.head
-        val consensusDataOffset = 1 + Longs.BYTES + SignatureLength // version + timestamp + reference
-        val genSigLength        = if (version < Block.ProtoBlockVersion) Block.GenerationSignatureLength else Block.GenerationVRFSignatureLength
-        val txCountOffset       = consensusDataOffset + Longs.BYTES + genSigLength // baseTarget + genSig
-        val bytesBeforeCData    = headerBytes.take(consensusDataOffset)
-        val consensusDataBytes  = headerBytes.slice(consensusDataOffset, consensusDataOffset + Longs.BYTES + genSigLength)
+    db.get(infoKey)
+      .map { infoBytes =>
+        import com.google.protobuf.WireFormat._
 
-        val (txCount, txCountBytes) = if (version == Block.GenesisBlockVersion || version == Block.PlainBlockVersion) {
-          val byte = headerBytes(txCountOffset)
-          (byte.toInt, Array[Byte](byte))
-        } else {
-          val bytes = headerBytes.slice(txCountOffset, txCountOffset + Ints.BYTES)
-          (Ints.fromByteArray(bytes), bytes)
+        val codedInput = CodedInputStream.newInstance(infoBytes)
+
+        require(codedInput.readTag() == BlockInfoSizeTag, "Can't parse block info size")
+        val size = codedInput.readRawVarint32()
+
+        def mkBlock(txsCount: Int, isProto: Boolean): Array[Byte] = {
+          codedInput.readRawVarint32() // skipping length-delimited size
+          if (isProto) {
+            val bytes       = new Array[Byte](size)
+            val codedOutput = CodedOutputStream.newInstance(bytes)
+            codedOutput.writeRawBytes(infoBytes.drop(codedInput.getTotalBytesRead))
+            transactionBytes(txsCount).foreach { tx =>
+              codedOutput.writeTag(PBlock.TRANSACTIONS_FIELD_NUMBER, WIRETYPE_LENGTH_DELIMITED)
+              codedOutput.writeUInt32NoTag(tx.length)
+              codedOutput.writeRawBytes(tx)
+            }
+            codedOutput.flush()
+            bytes
+          } else {
+            require(codedInput.readTag() == BlockInfoCustomPrefixTag, "Can't parse block info custom prefix")
+            val beforeTxs = codedInput.readByteArray()
+            require(codedInput.readTag() == BlockInfoCustomSuffixTag, "Can't parse block info custom suffix")
+            val afterTxs = codedInput.readByteArray()
+            val version  = beforeTxs.head
+            val txsData = Bytes.concat(
+              mkTxsCountBytes(version, txsCount),
+              transactionBytes(txsCount).flatMap(txBytes => Bytes.concat(Ints.toByteArray(txBytes.length), txBytes)).toArray
+            )
+            Bytes.concat(beforeTxs, Ints.toByteArray(txsData.length), txsData, afterTxs)
+          }
         }
 
-        val bytesAfterTxs =
-          if (version > Block.PlainBlockVersion) {
-            headerBytes.drop(txCountOffset + txCountBytes.length)
-          } else {
-            headerBytes.takeRight(SignatureLength + KeyLength) // featureVotes dropped
-          }
+        codedInput.readTag() match {
+          case BlockInfoTransactionCountTag =>
+            val txsCount = codedInput.readRawVarint32()
+            val infoTag  = codedInput.readTag()
+            require(infoTag == BlockInfoCustomTag || infoTag == BlockInfoProtoTag, "Can't parse block info")
+            mkBlock(txsCount, infoTag == BlockInfoProtoTag)
 
-        val txBytes = txCountBytes ++ readTransactionBytes(version, txCount)
+          case BlockInfoCustomTag => mkBlock(0, false)
+          case BlockInfoProtoTag  => mkBlock(0, true)
 
-        val bytes = bytesBeforeCData ++
-          Ints.toByteArray(consensusDataBytes.length) ++
-          consensusDataBytes ++
-          Ints.toByteArray(txBytes.length) ++
-          txBytes ++
-          bytesAfterTxs
-
-        bytes
+          case _ => throw new IllegalArgumentException("Can't parse block info")
+        }
       }
   }
 
@@ -1026,7 +1038,7 @@ class LevelDBWriter(
     for {
       BlockInfo(header, _, transactionCount, signature) <- db.get(headerKey)
       txs = (0 until transactionCount).toList.flatMap { n =>
-        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+        db.get(Keys.transactionAt(height, TxNum(n.toShort), header.version >= Block.ProtoBlockVersion))
       }
       block <- createBlock(header, signature, txs).toOption
     } yield block
@@ -1047,10 +1059,15 @@ class LevelDBWriter(
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
+        tx = if (protoBlockAt(h)) PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v))
+        else TransactionParsers.parseBytes(v).get
       } txs.append((TxNum(idx), tx))
     }
 
     txs.toList
+  }
+
+  private def protoBlockAt(h: Height): Boolean = {
+    h > 1 && activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(_ <= h)
   }
 }

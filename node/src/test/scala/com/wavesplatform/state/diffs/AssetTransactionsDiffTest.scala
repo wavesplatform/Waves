@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import com.wavesplatform.transaction.ChainId
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
@@ -356,9 +357,9 @@ class AssetTransactionsDiffTest
   property(s"Can't update right before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval} blocks") {
     forAll(genesisIssueUpdate, Gen.chooseNum(0, assetInfoUpdateEnabled.minAssetInfoUpdateInterval - 2)) {
       case ((gen, issue, update), blocksCount) =>
-        val blocks = Seq.fill(blocksCount)(TestBlock.create(Seq.empty))
+        val blocks = Seq.fill(blocksCount)(TestBlock.create(Seq.empty, Block.ProtoBlockVersion))
 
-        assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
+        assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei should produce(
             s"Can't update info of asset with id=${issue.id.value} " +
             s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
@@ -372,9 +373,9 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueUpdate) {
       case (gen, issue, update) =>
         val blocks =
-          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(TestBlock.create(Seq.empty))
+          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(TestBlock.create(Seq.empty, Block.ProtoBlockVersion))
 
-        assertDiffEi(blocks, TestBlock.create(Seq(update)), assetInfoUpdateEnabled) { ei =>
+        assertDiffEi(blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei shouldBe 'right
 
           val info = ei
@@ -398,7 +399,7 @@ class AssetTransactionsDiffTest
           d.appendBlock(genesisBlock)
 
           val (keyBlock, Seq(microBlock)) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.uniqueId, Nil, Seq(Seq(update1)), signer, 3, genesisBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.uniqueId, Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
           d.appendBlock(keyBlock)
           d.appendMicroBlock(microBlock)
 
@@ -416,7 +417,7 @@ class AssetTransactionsDiffTest
           }
 
           val (keyBlock1, Nil) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockSig, Nil, Nil, signer, 3, keyBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockSig, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
           d.appendBlock(keyBlock1)
 
           { // Check after new key block
