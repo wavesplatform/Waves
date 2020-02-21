@@ -370,8 +370,8 @@ object DebugStateChanges {
   )
 }
 
-case class IssueTransactionInfo(`type`: String,
-                            id: Long,
+case class IssueTransactionInfo(`type`: Int,
+                            id: String,
                             chainId: Option[Byte],
                             senderPublicKey: String,
                             quantity: Long,
