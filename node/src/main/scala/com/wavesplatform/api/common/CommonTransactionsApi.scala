@@ -1,7 +1,7 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
-import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.block.{Block, BlockTransactionsRootOps}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError

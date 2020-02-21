@@ -2,7 +2,6 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.merkle.Merkle._
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -76,11 +75,11 @@ case class Block(
 
   protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-  private[block] val transactionsMerkleTree: Coeval[TransactionsTree] = Coeval.evalOnce(TransactionsTree(transactionData))
+  private[block] val transactionsMerkleTree: Coeval[TransactionsMerkleTree] = Coeval.evalOnce(mkMerkleTree(transactionData))
 
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
     require(header.version >= Block.ProtoBlockVersion, s"Block's version should be >= ${Block.ProtoBlockVersion} to retrieve transactionsRoot")
-    transactionsMerkleTree().transactionsRoot.arr sameElements header.transactionsRoot.arr
+    transactionsMerkleTree().transactionsRoot == header.transactionsRoot
   }
 
   override def toString: String =
@@ -165,9 +164,6 @@ object Block extends ScorexLogging {
     } yield validBlock
   }
 
-  private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
-    if (version < ProtoBlockVersion) ByteStr.empty else TransactionsTree(transactionData).transactionsRoot
-
   case class BlockInfo(
       header: BlockHeader,
       size: Int,
@@ -182,6 +178,8 @@ object Block extends ScorexLogging {
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   type BlockId = ByteStr
+  type TransactionsMerkleTree = Seq[Seq[Array[Byte]]]
+  case class TransactionProof(id: ByteStr, transactionIndex: Int, digests: Seq[Array[Byte]])
 
   val MaxTransactionsPerBlockVer1Ver2: Int = 100
   val MaxTransactionsPerBlockVer3: Int     = 6000

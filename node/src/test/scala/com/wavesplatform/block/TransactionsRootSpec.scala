@@ -1,7 +1,9 @@
 package com.wavesplatform.block
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.block.merkle.Merkle._
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -27,6 +29,42 @@ class TransactionsRootSpec
       txsLength <- Gen.choose(1, 1000)
       txs       <- Gen.listOfN(txsLength, versionedTransferGeneratorP(sender, recipient, Waves, Waves))
     } yield (signer, txs)
+
+  val validProofsScenario: Gen[(List[Transaction], Int)] =
+    for {
+      (_, txs) <- commonGen
+      idx      <- Gen.choose(0, txs.size - 1)
+    } yield (txs, idx)
+
+  "Merkle should validate correct proofs" in forAll(validProofsScenario) {
+    case (txs, idx) =>
+      val messages = txs.map(PBTransactions.protobuf(_).toByteArray)
+      val digest   = hash(messages(idx))
+
+      val levels = mkLevels(messages)
+      val proofs = mkProofs(idx, levels)
+
+      verify(digest, idx, proofs, levels.head.head) shouldBe true
+  }
+
+  val invalidProofsScenario: Gen[((List[Transaction], Int), (List[Transaction], Int))] =
+    for {
+      (txs, idx)              <- validProofsScenario
+      (anotherTx, anotherIdx) <- validProofsScenario
+    } yield ((txs, idx), (anotherTx, anotherIdx))
+
+  "Merkle should invalidate incorrect proofs" in forAll(invalidProofsScenario) {
+    case ((txs, idx), (anotherTxs, anotherIdx)) =>
+      val messages        = txs.map(PBTransactions.protobuf(_).toByteArray)
+      val anotherMessages = anotherTxs.map(PBTransactions.protobuf(_).toByteArray)
+
+      val levels        = mkLevels(messages)
+      val anotherLevels = mkLevels(anotherMessages)
+      val anotherProofs = mkProofs(anotherIdx, anotherLevels)
+      val anotherDigest = hash(anotherMessages(anotherIdx))
+
+      verify(anotherDigest, idx, anotherProofs, levels.head.head) shouldBe false
+  }
 
   val happyPathScenario: Gen[(Block, Transaction)] =
     for {
