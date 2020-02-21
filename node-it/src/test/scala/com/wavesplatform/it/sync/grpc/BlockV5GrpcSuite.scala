@@ -56,7 +56,7 @@ class BlockV5GrpcSuite
       blockAfterVRFUsingById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsingById.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
 
-      val blockSeqOfBlocksV4 = sender.blockSeq(ActivationHeight - 2, ActivationHeight - 1)
+      val blockSeqOfBlocksV4 = sender.blockSeq(ActivationHeight - 1, ActivationHeight - 1)
       val blockSeqOfBlocksV5 = sender.blockSeq(ActivationHeight, ActivationHeight + 2)
 
       for (blockV3 <- blockSeqOfBlocksV4) {

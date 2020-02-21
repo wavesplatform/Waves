@@ -1,6 +1,7 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.http.BlocksApiRoute
+import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockInfo
 import com.wavesplatform.block.serialization.BlockHeaderSerializer
 import com.wavesplatform.common.state.ByteStr
@@ -20,7 +21,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     BlocksApiRoute(restAPISettings, blockchain).route
 
   val testBlock1 = TestBlock.create(Nil)
-  val testBlock2 = TestBlock.create(Nil)
+  val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
 
   val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 10L)
   val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 10L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)

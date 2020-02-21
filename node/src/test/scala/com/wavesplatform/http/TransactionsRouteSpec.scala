@@ -5,7 +5,7 @@ import akka.http.scaladsl.server.Route
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidAddress, InvalidIds, InvalidSignature, TooBigArrayAllocation}
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures
@@ -472,7 +472,7 @@ class TransactionsRouteSpec
   }
 
   routePath("/merkleProof") - {
-    import com.wavesplatform.block.BlockMerkleOps
+    import com.wavesplatform.block.BlockTransactionsRootOps
 
     val transactionsGen = for {
       txsSize <- Gen.choose(1, 10)
@@ -505,11 +505,19 @@ class TransactionsRouteSpec
       } yield blocks
 
     def prepareBlockchain(blocks: List[Block]): Blockchain = { // resetting blockchain for each property check iteration
-      val blockchain        = mock[Blockchain]
-      val heightToBlock     = blocks.zipWithIndex.map { case (b, h) => (h + 1, b) }.toMap
+      val blockchain    = mock[Blockchain]
+      val heightToBlock = blocks.zipWithIndex.map { case (b, h) => (h + 2, b) }.toMap
+      val activatedFeatures = heightToBlock
+        .collect { case (h, b) if b.header.version >= Block.ProtoBlockVersion => h }
+        .toList
+        .sorted
+        .headOption
+        .map(BlockchainFeatures.BlockV5.id -> _)
+        .toMap
       val txIdToHeightAndTx = heightToBlock.flatMap { case (h, b) => b.transactionData.map(tx => (tx.id(), (h, tx))) }
       (blockchain.transactionInfo _).expects(*).onCall((x: ByteStr) => txIdToHeightAndTx.get(x)).anyNumberOfTimes()
       (blockchain.blockBytes(_: Int)).expects(*).onCall((h: Int) => heightToBlock.get(h).map(_.bytes())).anyNumberOfTimes()
+      (blockchain.activatedFeatures _).expects().onCall(() => activatedFeatures).anyNumberOfTimes()
       blockchain
     }
 
@@ -565,7 +573,7 @@ class TransactionsRouteSpec
       val gen = validBlocksGen.flatMap(bs => invalidBlocksGen.flatMap(ibs => transactionsGen.map(txs => (bs, ibs, txs))))
       forAll(gen) {
         case (validBlocks, invalidBlocks, unknownTransactions) =>
-          val blockchain = prepareBlockchain(validBlocks ++ invalidBlocks)
+          val blockchain = prepareBlockchain(invalidBlocks ++ validBlocks)
           val route      = TransactionsApiRoute(restAPISettings, testWallet, blockchain, utx, utxPoolSynchronizer, new TestTime).route
 
           val txIdsToBlock = validBlocks.flatMap(b => b.transactionData.map(tx => (tx.id().toString, b))).toMap
