@@ -1,37 +1,32 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.WavesSettings
-import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
-import com.wavesplatform.state.diffs.{BlockDiffer, ENOUGH_AMT}
+import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
+import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
 import com.wavesplatform.{BlockGen, TestHelpers, crypto}
-import monix.execution.Scheduler.Implicits.global
-import monix.reactive.subjects.ReplaySubject
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
+class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with EventsHelpers {
+  private val WAVES_AMOUNT = Constants.UnitsInWave * Constants.TotalWaves
 
-import scala.concurrent.duration._
-
-class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with WithBlockchain {
   override protected def settings: WavesSettings = TestHelpers.enableNG(super.settings)
 
   // add a genesis block to the blockchain
   private val master: KeyPair = accountGen.sample.get
-  private val genesis         = TestBlock.create(0, Seq(GenesisTransaction.create(master, ENOUGH_AMT, 0).explicitGet()), master)
+  private val genesis         = TestBlock.create(0, Seq(GenesisTransaction.create(master, WAVES_AMOUNT, 0).explicitGet()), master)
   override protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(genesis).explicitGet()
     super.initBlockchain(blockchainUpdater)
@@ -47,31 +42,6 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
       mb = MicroBlock.buildAndSign(3.toByte, signer, txs, genesis.signature, sig).explicitGet()
     } yield mb
 
-  private def produceEvent(useTrigger: BlockchainUpdateTriggers => Unit): BlockchainUpdated = {
-    val evts = ReplaySubject[BlockchainUpdated]()
-    val t    = new BlockchainUpdateTriggersImpl(evts)
-    useTrigger(t)
-    evts.onComplete()
-    evts.toListL.runSyncUnsafe(500.milliseconds).head
-  }
-
-  private def detailedDiffFromBlock(b: Block): DetailedDiff =
-    BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
-
-  private def appendBlock(b: Block): BlockAppended =
-    produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b), blockchain)) match {
-      case ba: BlockAppended => ba
-      case _                 => fail()
-    }
-
-  private def appendMicroBlock(mb: MicroBlock): MicroBlockAppended = {
-    val dd = BlockDiffer.fromMicroBlock(blockchain, Some(0), mb, 1, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
-    produceEvent(_.onProcessMicroBlock(mb, dd, blockchain)) match {
-      case mba: MicroBlockAppended => mba
-      case _                       => fail()
-    }
-  }
-
   /**
     * Tests the assertion both for transactions added in a block and in a microblock
     */
@@ -84,6 +54,17 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
   }
 
   private def isNFT(tx: IssueTransaction): Boolean = tx.quantity == 1 && tx.decimals == 0 && !tx.reissuable
+
+  "updated Waves amount is calculated correctly for miner reward" in forAll {
+    for {
+      b      <- blockGen(Seq.empty, master)
+      reward <- Gen.option(Gen.choose(1L, 1000000L))
+      ba = appendBlock(b, reward)
+    } yield (reward, ba)
+  } {
+    case (reward, BlockAppended(_, _, _, updatedWavesAmount, _, _)) =>
+      updatedWavesAmount shouldBe WAVES_AMOUNT + reward.getOrElse(0L)
+  }
 
   "rollbacks correctly" - {
     "block" in forAll(sigGen, heightGen) { (sig, height) =>
@@ -112,7 +93,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
         ba = appendBlock(b)
       } yield (b, ba)
     } {
-      case (b, BlockAppended(toId, toHeight, block, _, _)) =>
+      case (b, BlockAppended(toId, toHeight, block, _, _, _)) =>
         toId shouldBe b.signature
         toHeight shouldBe blockchain.height + 1
 
@@ -153,7 +134,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
         } yield (tx, mba.microBlockStateUpdate)
       } {
         case (tx, su) =>
-          su.balances.find(_._1 == master.publicKey.toAddress).get._3 shouldBe (0.4 * tx.fee + ENOUGH_AMT)
+          su.balances.find(_._1 == master.publicKey.toAddress).get._3 shouldBe (0.4 * tx.fee + WAVES_AMOUNT)
       }
     }
 
@@ -161,7 +142,8 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
       for {
         sender        <- accountGen
         recipient     <- accountGen
-        master2sender <- transferGeneratorPV2(1, master, sender, ENOUGH_AMT / 3)
+        amount        <- Gen.choose(1L, WAVES_AMOUNT - Constants.UnitsInWave)
+        master2sender <- transferGeneratorPV2(1, master, sender, amount)
         fee           <- Gen.choose(1, master2sender.amount - 1)
         sender2recipient = TransferTransaction
           .selfSigned(2.toByte, sender, recipient, Waves, master2sender.amount - fee, Waves, fee, None, 2)
@@ -291,7 +273,7 @@ class BlockchainUpdateTriggersImplSpec extends FreeSpec with Matchers with Block
             .copy(transactions = Map((invoke.id(), (invoke, Set(master)))))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
-          produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, blockchain)) match {
+          produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, None, blockchain)) match {
             case ba: BlockAppended =>
               val AssetStateUpdate(asset, decimals, name, description, reissuable, volume, script, sponsorship, nft, assetExistedBefore) =
                 ba.transactionStateUpdates.head.assets.head
