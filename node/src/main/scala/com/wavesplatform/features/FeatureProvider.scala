@@ -1,6 +1,6 @@
 package com.wavesplatform.features
 
-import com.wavesplatform.block.Block.{NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
+import com.wavesplatform.block.Block.{GenesisBlockVersion, NgBlockVersion, PlainBlockVersion, ProtoBlockVersion, RewardBlockVersion}
 import com.wavesplatform.lang.v1.traits.domain.Issue
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 object FeatureProvider {
   final implicit class FeatureProviderExt(private val blockchain: Blockchain) extends AnyVal {
     def isNFT(issueTransaction: IssueTransaction): Boolean = isNFT(issueTransaction.quantity, issueTransaction.decimals, issueTransaction.reissuable)
-    def isNFT(issueAction: Issue): Boolean = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
+    def isNFT(issueAction: Issue): Boolean                 = isNFT(issueAction.quantity, issueAction.decimals, issueAction.isReissuable)
     def isNFT(quantity: Long, decimals: Int, reissuable: Boolean): Boolean =
       isFeatureActivated(BlockchainFeatures.ReduceNFTFee) && quantity == 1 && decimals == 0 && !reissuable
 
@@ -33,8 +33,11 @@ object FeatureProvider {
 
     def blockVersionAt(height: Int): Byte =
       if (isFeatureActivated(BlockchainFeatures.BlockV5, height)) ProtoBlockVersion
-      else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) RewardBlockVersion
+      else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
+        if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
+      }
       else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight < height) NgBlockVersion
-      else PlainBlockVersion
+      else if (height > 1) PlainBlockVersion
+      else GenesisBlockVersion
   }
 }
