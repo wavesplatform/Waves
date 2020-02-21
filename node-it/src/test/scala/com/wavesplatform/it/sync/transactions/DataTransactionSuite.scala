@@ -27,7 +27,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       .overrideBase(_.raw("waves.blockchain.custom.functionality.feature-check-blocks-period = 1"))
       .overrideBase(_.preactivatedFeatures(15 -> 0))
       .withDefault(1)
-      .withSpecial(3, _.nonMiner)
+      .withSpecial(1, _.nonMiner)
       .buildNonConflicting()
 
   test("put and remove keys") {
@@ -91,6 +91,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       CustomValidationError("Duplicated keys found")
     )
 
+    //can't remove data by nonexistent key
+    sender.broadcastData(sender.privateKey, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey"))), waitForTx = true)
+    sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
+
     // max number of data entries is 100
     val tooLargeSizeDataEntries = updateAndRemoveDataEntries ++ (1 to 11).map(k => EmptyDataEntry(s"another-unknown-$k"))
     assertApiError(
@@ -106,10 +110,12 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     )
 
     // can put and remove same data within one block
+    nodes.waitForHeightArise()
     val putDataEntries2 = List(IntegerDataEntry("del", 42))
-    sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2), waitForTx = true).id
+    val putDataTxId = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2) * 10).id
     val removeDataTxId = sender.broadcastData(sender.privateKey, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")))).id
-    nodes.waitForHeightAriseAndTxPresent(removeDataTxId)
+    nodes.waitForTransaction(putDataTxId)
+    nodes.waitForTransaction(removeDataTxId)
     sender.getData(address).filter(_.key == "del") shouldBe List.empty
   }
 
