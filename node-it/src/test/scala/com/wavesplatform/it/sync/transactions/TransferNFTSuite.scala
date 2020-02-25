@@ -127,7 +127,7 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
 
   test("NFT should be correctly transferred via mass transfer transaction") {
     val nftAsset = sender.issue(caller, assetName, assetDescription, 1, 0, reissuable = false, 1.waves / 1000, waitForTx = true).id
-    sender.massTransfer(caller, List(Transfer(receiver, 1)), calcMassTransferFee(1), Some(nftAsset), waitForTx = true)
+    sender.massTransfer(caller, List(Transfer(receiver, 1)), calcMassTransferFee(1), assetId = Some(nftAsset), waitForTx = true)
 
     sender.assetBalance(caller, nftAsset).balance shouldBe 0
     sender.nftAssetsBalance(caller, 10).map(info => info.assetId) shouldNot contain(nftAsset)

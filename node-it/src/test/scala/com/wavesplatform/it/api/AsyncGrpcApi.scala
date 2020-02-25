@@ -30,6 +30,8 @@ import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
@@ -86,16 +88,16 @@ object AsyncGrpcApi {
     }
 
     def broadcastTransfer(
-        source: KeyPair,
-        recipient: Recipient,
-        amount: Long,
-        fee: Long,
-        version: Int = 2,
-        assetId: String = "WAVES",
-        feeAssetId: String = "WAVES",
-        attachment: ByteString = ByteString.EMPTY,
-        timestamp: Long = System.currentTimeMillis
-    ): Future[PBSignedTransaction] = {
+                           source: KeyPair,
+                           recipient: Recipient,
+                           amount: Long,
+                           fee: Long,
+                           version: Int = 2,
+                           assetId: String = "WAVES",
+                           feeAssetId: String = "WAVES",
+                           attachment: Attachment.Attachment = Attachment.Attachment.Empty,
+                           timestamp: Long = System.currentTimeMillis
+                         ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
@@ -106,14 +108,17 @@ object AsyncGrpcApi {
           TransferTransactionData.of(
             Some(recipient),
             Some(Amount.of(if (assetId == "WAVES") ByteString.EMPTY else ByteString.copyFrom(Base58.decode(assetId)), amount)),
-            if (attachment.isEmpty) None else Some(Attachment.of(Attachment.Attachment.BinaryValue(attachment)))
+            Some(Attachment(attachment))
           )
         )
       )
-      val proofs      = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).right.get.bodyBytes())
-      val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
-
-      transactions.broadcast(transaction)
+      try {
+        val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
+        transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
+      }
+      catch {
+        case _: IllegalArgumentException => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
+      }
     }
 
     def broadcastReissue(
@@ -453,7 +458,36 @@ object AsyncGrpcApi {
       }
     }
 
-    def assetInfo(assetId: String): Future[AssetInfoResponse] =
-      assets.getInfo(AssetRequest(ByteString.copyFrom(Base58.decode(assetId))))
+    def updateAssetInfo(
+                         sender: KeyPair,
+                         assetId: String,
+                         updatedName: String,
+                         updatedDescription: String,
+                         fee: Long,
+                         feeAsset: Asset = Waves,
+                         version: TxVersion = TxVersion.V1
+                       ): Future[SignedTransaction] = {
+      val unsigned = PBTransaction(
+        chainId,
+        ByteString.copyFrom(sender.publicKey),
+        Some(Amount.of(if (feeAsset == Waves) ByteString.EMPTY else ByteString.copyFrom(Base58.decode(feeAsset.maybeBase58Repr.get)), fee)),
+        System.currentTimeMillis(),
+        version,
+        PBTransaction.Data.UpdateAssetInfo(
+          UpdateAssetInfoTransactionData.of(
+            ByteString.copyFrom(Base58.decode(assetId)),
+            updatedName,
+            updatedDescription
+          )
+        )
+      )
+
+      val proofs      = crypto.sign(sender, PBTransactions.vanilla(SignedTransaction(Some(unsigned)), unsafe = true).explicitGet().bodyBytes())
+      val transaction = SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs)))
+
+      transactions.broadcast(transaction)
+    }
+
+    def assetInfo(assetId: String): Future[AssetInfoResponse] = assets.getInfo(AssetRequest(ByteString.copyFrom(Base58.decode(assetId))))
   }
 }
