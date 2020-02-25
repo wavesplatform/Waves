@@ -91,7 +91,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       CustomValidationError("Duplicated keys found")
     )
 
-    //can't remove data by nonexistent key
+    //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
     sender.broadcastData(sender.privateKey, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey"))), waitForTx = true)
     sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
 
