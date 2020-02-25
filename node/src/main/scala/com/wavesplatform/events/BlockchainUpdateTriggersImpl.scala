@@ -8,16 +8,25 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.{AccountDataInfo, AssetDescription, Blockchain, Diff, DiffToStateApplier}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.{Asset, GenesisTransaction, Transaction}
 import monix.reactive.Observer
 
 import scala.collection.mutable.ArrayBuffer
 
 class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdated]) extends BlockchainUpdateTriggers {
 
-  override def onProcessBlock(block: Block, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {
+  override def onProcessBlock(block: Block, diff: DetailedDiff, minerReward: Option[Long], blockchainBefore: Blockchain): Unit = {
     val (blockStateUpdate, txsStateUpdates) = containerStateUpdate(blockchainBefore, diff, block.transactionData)
-    events.onNext(BlockAppended(block.signature, blockchainBefore.height + 1, block, blockStateUpdate, txsStateUpdates))
+
+    // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
+    val updatedWavesAmount = blockchainBefore.height match {
+      // genesis case
+      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _) => amount }.sum
+      // miner reward case
+      case _ => blockchainBefore.wavesAmount(blockchainBefore.height).toLong + minerReward.getOrElse(0L)
+    }
+
+    events.onNext(BlockAppended(block.signature, blockchainBefore.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates))
   }
 
   override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {

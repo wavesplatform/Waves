@@ -7,14 +7,13 @@ import com.wavesplatform.lang.directives.Directive.extractDirectives
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveParser, DirectiveSet}
 import com.wavesplatform.lang.script.ScriptPreprocessor
-import com.wavesplatform.lang.v1.compiler.Types._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.Repl
 import com.wavesplatform.lang.v1.repl.node.http.NodeConnectionSettings
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{CTX, ContractLimits}
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.{Global, Version}
 
 import scala.concurrent.ExecutionContext.Implicits.global
@@ -37,8 +36,11 @@ object JsAPI {
   private def pureContext(version: StdLibVersion)   = PureContext.build(Global, version).withEnvironment[Environment]
   private val letBLockVersions: Set[StdLibVersion]  = Set(V1, V2)
 
-  private val fullContractContext: CTX[Environment] =
-    buildContractContext(V3)
+  private val fullDAppContext: Map[StdLibVersion, CTX[Environment]] =
+    DirectiveDictionary[StdLibVersion].all
+      .filter(_ >= V3)
+      .map(v => (v, buildContractContext(v)))
+      .toMap
 
   private def buildScriptContext(v: StdLibVersion, isTokenContext: Boolean, isContract: Boolean): CTX[Environment] =
     Monoid.combineAll(Seq(pureContext(v), cryptoContext(v), wavesContext(v, isTokenContext, isContract)))
@@ -161,7 +163,7 @@ object JsAPI {
           }
       case DAppType =>
         Global
-          .parseAndCompileContract(input, fullContractContext.compilerContext, stdLibVer, estimator)
+          .parseAndCompileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, stdLibVer, estimator)
           .map {
             case (bytes, complexityWithMap, exprDApp, compErrorList) =>
               js.Dynamic.literal(
@@ -224,7 +226,7 @@ object JsAPI {
       case DAppType =>
         // Just ignore stdlib version here
         Global
-          .compileContract(input, fullContractContext.compilerContext, ver, estimator)
+          .compileContract(input, fullDAppContext(ds.stdLibVersion).compilerContext, ver, estimator)
           .map {
             case (bytes, ast, complexity, complexityByFunc) =>
               js.Dynamic.literal(
@@ -282,5 +284,5 @@ object JsAPI {
         )
       )
       .toJSPromise
-  
+
 }

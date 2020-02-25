@@ -1,7 +1,9 @@
 package com.wavesplatform.it.api
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.assets.exchange.AssetPair
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
 import play.api.libs.json._
 
@@ -100,13 +102,84 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction(`type`: Int, id: String, fee: Long, timestamp: Long, sender: Option[String], name: Option[String], description: Option[String])
+case class DataValue(value: Option[String])
+object DataValue {
+  implicit val dataValueReads: Reads[Option[String]] = Reads {
+    case JsString(str) => JsSuccess(Some(str))
+    case JsBoolean(bool)=> JsSuccess(Some(bool.toString))
+    case JsNumber(num) => JsSuccess(Some(num.toString))
+    case JsNull        => JsSuccess(None)
+    case _             => JsError("Unexpected value")
+  }
+
+  implicit val dataValueFormat: Format[DataValue] = Json.format
+}
+
+case class Transaction(_type: Int,
+                       id: String,
+                       fee: Long,
+                       timestamp: Long,
+                       sender: Option[String],
+                       name: Option[String],
+                       description: Option[String],
+                       amount: Option[Long],
+                       price: Option[Long],
+                       sellMatcherFee: Option[Long],
+                       buyMatcherFee: Option[Long],
+                       sellOrderMatcherFee: Option[Long],
+                       buyOrderMatcherFee: Option[Long],
+                       data: Option[Seq[DataEntry[_]]],
+                       minSponsoredAssetFee: Option[Long],
+                       transfers: Option[Seq[Transfer]],
+                       totalAmount: Option[Long]
+                      )
 object Transaction {
-  implicit val transactionFormat: Format[Transaction] = Json.format
+  implicit val transactionFormat: Format[Transaction] = Format(
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        name <- (jsv \ "name").validateOpt[String]
+        description <- (jsv \ "description").validateOpt[String]
+        amount <- (jsv \ "amount").validateOpt[Long]
+        price <- (jsv \ "price").validateOpt[Long]
+        sellMatcherFee <- (jsv \ "sellMatcherFee").validateOpt[Long]
+        buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
+        sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+        buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
+        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
+      }
+        yield Transaction(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender,
+          name,
+          description,
+          amount,
+          price,
+          sellMatcherFee,
+          buyMatcherFee,
+          sellOrderMatcherFee,
+          buyOrderMatcherFee,
+          data,
+          minSponsoredAssetFee,
+          transfers,
+          totalAmount
+        )),
+    Json.writes[Transaction]
+  )
 }
 
 trait TxInfo {
-  def `type`: Int
+  def _type: Int
   def id: String
   def fee: Long
   def timestamp: Long
@@ -118,20 +191,76 @@ trait TxInfo {
 }
 
 case class TransactionInfo(
-    `type`: Int,
+    _type: Int,
     id: String,
     fee: Long,
     timestamp: Long,
     sender: Option[String],
-    height: Int,
-    minSponsoredAssetFee: Option[Long],
     name: Option[String],
     description: Option[String],
+    amount: Option[Long],
+    price: Option[Long],
+    sellMatcherFee: Option[Long],
+    buyMatcherFee: Option[Long],
+    sellOrderMatcherFee: Option[Long],
+    buyOrderMatcherFee: Option[Long],
+    height: Int,
+    minSponsoredAssetFee: Option[Long],
     recipient: Option[String],
-    script: Option[String]
+    script: Option[String],
+    data: Option[Seq[DataEntry[_]]],
+    transfers: Option[Seq[Transfer]],
+    totalAmount: Option[Long]
 ) extends TxInfo
 object TransactionInfo {
-  implicit val format: Format[TransactionInfo] = Json.format
+  implicit val transactionFormat: Format[TransactionInfo] = Format(
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        name <- (jsv \ "name").validateOpt[String]
+        description <- (jsv \ "description").validateOpt[String]
+        amount <- (jsv \ "amount").validateOpt[Long]
+        price <- (jsv \ "price").validateOpt[Long]
+        sellMatcherFee <- (jsv \ "sellMatcherFee").validateOpt[Long]
+        buyMatcherFee <- (jsv \ "buyMatcherFee").validateOpt[Long]
+        sellOrderMatcherFee <- (jsv \ "order2" \ "matcherFee").validateOpt[Long]
+        buyOrderMatcherFee <- (jsv \ "order1" \  "matcherFee").validateOpt[Long]
+        height <- (jsv \ "height").validate[Int]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        recipient <- (jsv \ "recipient").validateOpt[String]
+        script <- (jsv \ "script").validateOpt[String]
+        data <- (jsv \ "data").validateOpt[Seq[DataEntry[_]]]
+        transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
+        totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
+      }
+        yield TransactionInfo(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender,
+          name,
+          description,
+          amount,
+          price,
+          sellMatcherFee,
+          buyMatcherFee,
+          sellOrderMatcherFee,
+          buyOrderMatcherFee,
+          height,
+          minSponsoredAssetFee,
+          recipient,
+          script,
+          data,
+          transfers,
+          totalAmount
+        )),
+    Json.writes[TransactionInfo]
+  )
 }
 
 case class TransactionStatus(
@@ -181,7 +310,7 @@ object StateChangesDetails {
 }
 
 case class DebugStateChanges(
-    `type`: Int,
+    _type: Int,
     id: String,
     fee: Long,
     timestamp: Long,
@@ -193,7 +322,34 @@ case class DebugStateChanges(
     stateChanges: Option[StateChangesDetails]
 ) extends TxInfo
 object DebugStateChanges {
-  implicit val debugStateChanges: Format[DebugStateChanges] = Json.format
+  implicit val debugStateChanges: Format[DebugStateChanges] = Format(
+    Reads(jsv =>
+      for {
+        _type <- (jsv \ "type").validate[Int]
+        id <- (jsv \ "id").validate[String]
+        fee <- (jsv \ "fee").validate[Long]
+        timestamp <- (jsv \ "timestamp").validate[Long]
+        sender <- (jsv \ "sender").validateOpt[String]
+        height <- (jsv \ "height").validate[Int]
+        minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
+        recipient <- (jsv \ "recipient").validateOpt[String]
+        script <- (jsv \ "script").validateOpt[String]
+        stateChanges <- (jsv \ "stateChanges").validateOpt[StateChangesDetails]
+      }
+        yield DebugStateChanges(
+          _type,
+          id,
+          fee,
+          timestamp,
+          sender,
+          height,
+          minSponsoredAssetFee,
+          recipient,
+          script,
+          stateChanges
+        )),
+    Json.writes[DebugStateChanges]
+  )
 }
 
 case class DataResponse(`type`: String, value: Long, key: String)
@@ -508,6 +664,16 @@ object BlacklistedPeer {
 case class State(address: String, miningBalance: Long, timestamp: Long)
 object State {
   implicit val StateFormat: Format[State] = Json.format
+}
+
+case class GeneratingBalance(address: String, balance: Long)
+object GeneratingBalance {
+  implicit val GeneratingBalanceFormat: Format[GeneratingBalance] = Json.format
+}
+
+case class BalanceHistory(height: Int, balance: Long)
+object BalanceHistory {
+  implicit val BalanceHistoryFormat: Format[BalanceHistory] = Json.format
 }
 
 case class TransactionSerialize(bytes: Array[Int])
