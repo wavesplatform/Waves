@@ -417,6 +417,8 @@ object InvokeScriptTransactionDiff {
           TracedResult(Left(InvalidName), List())
         } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(TooBigArray), List())
+        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
+          TracedResult(Left(InvalidAssetId), List())
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
           val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
