@@ -105,7 +105,7 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     )) { error =>
       println(error)
       error.message should include("Script payment amount=3 should not exceed 2")
-      error.id shouldBe CustomValidationError.Id
+      error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
   }
