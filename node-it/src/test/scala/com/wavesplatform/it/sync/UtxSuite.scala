@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -78,7 +79,7 @@ class UtxSuite extends FunSuite with CancelAfterFailure with NodesFromDocker wit
 
   def txInBlockchain(txId: String, nodes: Seq[Node]): Boolean = {
     nodes.forall { node =>
-      Try(node.transactionInfo(txId)).isSuccess
+      Try(node.transactionInfo[TransactionInfo](txId)).isSuccess
     }
   }
 }

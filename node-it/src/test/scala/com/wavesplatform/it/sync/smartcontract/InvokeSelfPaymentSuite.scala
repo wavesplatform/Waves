@@ -64,7 +64,7 @@ class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailur
       caller,
       List(Transfer(dAppV4, 1000), Transfer(dAppV3, 1000)),
       smartMinFee,
-      Some(asset1Id),
+      assetId = Some(asset1Id),
       waitForTx = true
     )
   }
