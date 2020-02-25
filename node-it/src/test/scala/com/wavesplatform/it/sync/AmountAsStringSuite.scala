@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, T
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
@@ -54,7 +54,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
   test("amount as string in exchange transaction") {
     val exchanger      = KeyPair("exchanger".getBytes)
     val transferTxId   = sender.transfer(firstAddress, exchanger.stringRepr, transferAmount, minFee, waitForTx = true).id
-    val transferTxInfo = sender.transactionInfo(transferTxId, amountsAsStrings = true)
+    val transferTxInfo = sender.transactionInfo[TransactionInfo](transferTxId, amountsAsStrings = true)
     transferTxInfo.amount shouldBe Some(transferAmount)
     transferTxInfo.fee shouldBe minFee
 
@@ -114,7 +114,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     checkExchangeTx(exchangeTxBlockBySignature)
     checkExchangeTx(exchangeTxBlockSeq)
 
-    val exchangeTxInfo = sender.transactionInfo(exchangeTx.id, amountsAsStrings = true)
+    val exchangeTxInfo = sender.transactionInfo[TransactionInfo](exchangeTx.id, amountsAsStrings = true)
     exchangeTxInfo.amount shouldBe Some(amount)
     exchangeTxInfo.price shouldBe Some(price)
     exchangeTxInfo.sellMatcherFee shouldBe Some(matcherFee)
@@ -127,7 +127,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
   test("amount as string in data transaction") {
     nodes.waitForHeightArise()
     val dataEntries         = List(IntegerDataEntry("int", 666))
-    val dataFee             = calcDataFee(dataEntries)
+    val dataFee             = calcDataFee(dataEntries, TxVersion.V1)
     val dataTx              = sender.putData(sender.address, dataEntries, dataFee, amountsAsStrings = true)
     dataTx.fee shouldBe dataFee
     dataTx.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
@@ -141,7 +141,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true).head.transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
 
-    sender.transactionInfo(dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.transactionInfo[TransactionInfo](dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.getData(sender.address, amountsAsStrings = true).filter(_.key == "int").head.value shouldBe 666
   }
 
@@ -168,7 +168,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     checkSponsorshipTx(sponsorshipTxBlockBySignature)
     checkSponsorshipTx(sponsorshipTxBlockSeq)
 
-    val sponsorshipTxInfo = sender.transactionInfo(sponsorshipTx.id)
+    val sponsorshipTxInfo = sender.transactionInfo[TransactionInfo](sponsorshipTx.id)
     sponsorshipTxInfo.minSponsoredAssetFee shouldBe Some(10000)
     sponsorshipTxInfo.fee shouldBe sponsorFee
   }
@@ -195,7 +195,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     checkMassTransferTx(massTransferTxBlockBySignature)
     checkMassTransferTx(massTransferTxBlockSeq)
 
-    val massTransferTxInfo = sender.transactionInfo(massTransferTx.id)
+    val massTransferTxInfo = sender.transactionInfo[TransactionInfo](massTransferTx.id)
     massTransferTxInfo.transfers.get.head.amount shouldBe transferAmount
     massTransferTxInfo.totalAmount shouldBe Some(transferAmount)
 

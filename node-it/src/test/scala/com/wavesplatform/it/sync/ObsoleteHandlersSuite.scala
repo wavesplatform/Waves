@@ -1,15 +1,7 @@
 package com.wavesplatform.it.sync
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.requests.{
-  CreateAliasRequest,
-  DataRequest,
-  LeaseCancelRequest,
-  LeaseRequest,
-  MassTransferRequest,
-  SponsorFeeRequest,
-  TransferRequest
-}
+import com.wavesplatform.api.http.requests.{CreateAliasRequest, DataRequest, LeaseCancelRequest, LeaseRequest, MassTransferRequest, SponsorFeeRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
@@ -18,6 +10,7 @@ import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -138,7 +131,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
       BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
       StringDataEntry("str", "AAA-AAA")
     )
-    val fee  = calcDataFee(data)
+    val fee  = calcDataFee(data, TxVersion.V1)
     val json = sender.postJson("/addresses/data", DataRequest(1.toByte, firstAddress, data, fee))
     val tx   = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
