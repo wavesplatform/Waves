@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync.{minFee, setScriptFee}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -94,7 +95,7 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
     acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
 
-    sender.transactionInfo(setScriptId).script.get.startsWith("base64:") shouldBe true
+    sender.transactionInfo[TransactionInfo](setScriptId).script.get.startsWith("base64:") shouldBe true
   }
 
   test("caller deposits waves") {

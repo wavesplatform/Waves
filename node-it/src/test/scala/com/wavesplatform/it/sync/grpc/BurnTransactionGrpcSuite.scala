@@ -11,7 +11,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   private val decimals: Byte = 2
 
   test("burning assets changes issuer's asset balance; issuer's waves balance is decreased by fee") {
-    for (v <- supportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedAssetId = PBTransactions.vanilla(
         sender.broadcastIssue(firstAcc, s"name+$v", issueAmount, decimals, reissuable = false, fee = issueFee, waitForTx = true)
       ).explicitGet().id().toString
@@ -34,7 +34,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("non-issuer able to burn assets that he own") {
-    for (v <- supportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
 
@@ -55,7 +55,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("issuer can't burn more tokens than he own") {
-    for (v <- supportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity = issueAmount
       val burnedQuantity = issuedQuantity + 1
 
@@ -72,7 +72,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("user can't burn more tokens than he own") {
-    for (v <- supportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
       val burnedQuantity      = transferredQuantity + 1
@@ -91,7 +91,7 @@ class BurnTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("non-owner can burn asset after reissue") {
-    for (v <- supportedVersions) {
+    for (v <- burnTxSupportedVersions) {
       val issuedQuantity      = issueAmount
       val transferredQuantity = issuedQuantity / 2
 

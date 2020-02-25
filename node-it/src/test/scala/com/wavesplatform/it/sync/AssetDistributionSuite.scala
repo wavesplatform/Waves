@@ -29,7 +29,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
       issuer.stringRepr,
       addresses.map(addr => MassTransferTransaction.Transfer(addr.stringRepr, transferAmount)),
       minFee + (minFee * addresses.size),
-      Some(issueTx),
+      assetId = Some(issueTx),
       waitForTx = true
     )
 
@@ -80,7 +80,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
         issuer.stringRepr,
         receivers.map(rc => MassTransferTransaction.Transfer(rc.stringRepr, 10)).toList,
         minFee + minFee * receivers.length,
-        Some(issueTx),
+        assetId = Some(issueTx),
         waitForTx = true
       )
 
@@ -104,7 +104,7 @@ class AssetDistributionSuite extends BaseTransactionSuite with CancelAfterFailur
         issuer.stringRepr,
         receivers.map(rc => MassTransferTransaction.Transfer(rc.stringRepr, 10)).toList,
         minFee + minFee * receivers.length,
-        Some(issueTx),
+        assetId = Some(issueTx),
         waitForTx = true
       )
 
