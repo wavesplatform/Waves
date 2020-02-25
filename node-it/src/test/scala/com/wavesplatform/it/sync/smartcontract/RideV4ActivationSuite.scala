@@ -209,7 +209,7 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
     ) { error =>
       error.statusCode shouldBe 400
       error.message should include("DApp version 3 < 4 doesn't support multiple payment attachment")
-      error.id shouldBe CustomValidationError.Id
+      error.id shouldBe StateCheckFailed.Id
     }
   }
 

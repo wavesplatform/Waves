@@ -90,7 +90,7 @@ object InvokeScriptTransactionDiff {
           paymentsDiff = paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2)
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
-          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(ValueLimitsError.apply))
+          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
           input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
 
           invocationComplexity <- TracedResult.wrapE({

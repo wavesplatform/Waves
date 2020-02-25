@@ -55,7 +55,6 @@ object ApiError {
             if (isTokenScript) TransactionNotAllowedByAssetScript(tx)
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)               => Mistiming(errorMessage)
-          case TxValidationError.ValueLimitsError(errorMessage)        => CustomValidationError(errorMessage)
           case TxValidationError.ScriptExecutionError(err, _, isToken) => ScriptExecutionError(tx, err, isToken)
           case err                                                     => StateCheckFailed(tx, fromValidationError(err).message)
         }
@@ -375,7 +374,7 @@ object ApiError {
   }
 
   case object NegativeAmount {
-    val Id = 511
+    val Id = 111
   }
 
   final case class InsufficientFee(override val message: String = "insufficient fee") extends ApiError {
@@ -384,7 +383,7 @@ object ApiError {
   }
 
   case object InsufficientFee {
-    val Id = 512
+    val Id = 112
   }
 
   final case class WrongTransactionJson(err: JsError) extends ApiError {
@@ -395,7 +394,7 @@ object ApiError {
   }
 
   case object WrongTransactionJson {
-    val Id = 513
+    val Id = 113
   }
 
   final case class NegativeMinFee(msg: String) extends ApiError {
@@ -405,7 +404,7 @@ object ApiError {
   }
 
   case object NegativeMinFee {
-    val Id = 514
+    val Id = 114
   }
 
   final case class NonPositiveAmount(msg: String) extends ApiError {
@@ -415,7 +414,7 @@ object ApiError {
   }
 
   case object NonPositiveAmount {
-    val Id = 515
+    val Id = 115
   }
 
   case class AlreadyInState(transactionId: ByteStr, height: Int) extends ApiError {
