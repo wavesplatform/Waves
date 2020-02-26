@@ -14,12 +14,6 @@ object PartialEvaluator extends App {
 //  def traverse(b: LET_BLOCK): Unit =
 //    visit(Context(Map.empty), b, List.empty)
 //
-//  def visitRef(ctx: Context, key: String, parentRef: List[EXPR]): Boolean =
-//    parentRef match {
-//      case LET_BLOCK(LET(`key`, value), _) :: nextParentRef => visit(ctx, value, nextParentRef)
-//      case _ :: next                                        => visitRef(ctx, key, next)
-//      case Nil                                              => ???
-//    }
 //
 //  def visit(ctx: Context, e: EXPR, parentRef: List[EXPR]): Boolean = {
 //    println(s"Visiting $e, parent:$parentRef")
@@ -57,17 +51,38 @@ object PartialEvaluator extends App {
 //  case class VisitResult(a: Boolean, newValue: Option[EVALUATED])
 
   sealed trait VisitResult
-  case object TreeUpdated extends VisitResult
-  case object Nop extends VisitResult
-  case class NewValue(e:EVALUATED) extends VisitResult
-  def visit(ctx: Context, e: EXPR): VisitResult = {
+  case object TreeUpdated           extends VisitResult
+  case object Nop                   extends VisitResult
+  case class NewValue(e: EVALUATED) extends VisitResult
+
+  def visitRef(ctx: Context, key: String, parentRef: List[EXPR]): VisitResult =
+    parentRef match {
+      case LET_BLOCK(l @ LET(`key`, value), _) :: nextParentRef =>
+        value match {
+          case evaluated: EVALUATED =>
+            NewValue(evaluated)
+          case _ =>
+            visit(ctx, value, nextParentRef) match {
+              case NewValue(newValue) =>
+                l.value = newValue
+                TreeUpdated
+              case r => r
+            }
+
+        }
+      case _ :: next => visitRef(ctx, key, next)
+      case Nil       => ???
+    }
+
+  def visit(ctx: Context, e: EXPR, parentRefs: List[EXPR]): VisitResult = {
 //    println(s"Visiting $e")
     e match {
-//            case LET_BLOCK(let, body)          => visit(ctx, body, e +: parentRef)
-//            case REF(key)                      => visitRef(ctx, key, parentRef)
+      case lb @ LET_BLOCK(let, body) => visit(ctx, body, lb +: parentRefs)
+      case r @ REF(key)              => visitRef(ctx, key, parentRefs)
+
       case f @ FUNCTION_CALL(_, args) => {
         if (!args.forall(_.isInstanceOf[EVALUATED])) {
-          val visitResultArg0 = visit(ctx, args(0)) match {
+          val visitResultArg0 = visit(ctx, args(0), f +: parentRefs) match {
             case NewValue(newValue) =>
               f.args = newValue +: f.args.tail
               TreeUpdated
@@ -76,11 +91,11 @@ object PartialEvaluator extends App {
           visitResultArg0 match {
             case TreeUpdated => TreeUpdated
             case _ =>
-              visit(ctx, args(1)) match {
+              visit(ctx, args(1), f +: parentRefs) match {
                 case NewValue(newValue) =>
                   f.args = f.args.init :+ newValue
                   TreeUpdated
-                case r =>r
+                case r => r
               }
 
           }
@@ -89,7 +104,7 @@ object PartialEvaluator extends App {
           NewValue(CONST_LONG(args(0).asInstanceOf[CONST_LONG].t + args(1).asInstanceOf[CONST_LONG].t))
         }
       }
-      case evaluated: EVALUATED => Nop
+      case _: EVALUATED => Nop
     }
   }
   def buildSum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(1), List(a, b))
@@ -103,18 +118,45 @@ object PartialEvaluator extends App {
   )
 
   println(expr)
-  println(visit(Context(Map.empty), expr))
+  println(visit(Context(Map.empty), expr, List.empty))
   println(expr)
 
-  println(visit(Context(Map.empty), expr))
+  println(visit(Context(Map.empty), expr, List.empty))
   println(expr)
 
-  println(visit(Context(Map.empty), expr))
+  println(visit(Context(Map.empty), expr, List.empty))
   println(expr)
 
-  println(visit(Context(Map.empty), expr))
+  println(visit(Context(Map.empty), expr, List.empty))
   println(expr)
 
-  println(visit(Context(Map.empty), expr))
+  println(visit(Context(Map.empty), expr, List.empty))
   println(expr)
+
+  val expr2 = LET_BLOCK(
+    LET("a", buildSum(CONST_LONG(1), CONST_LONG(2))),
+    buildSum(
+      buildSum(
+        buildSum(CONST_LONG(3), CONST_LONG(4)),
+        REF("a")
+      ),
+      CONST_LONG(5)
+    )
+  )
+
+  println(expr2)
+  println(visit(Context(Map.empty), expr2, List.empty))
+  println(expr2)
+
+  println(visit(Context(Map.empty), expr2, List.empty))
+  println(expr2)
+
+  println(visit(Context(Map.empty), expr2, List.empty))
+  println(expr2)
+
+  println(visit(Context(Map.empty), expr2, List.empty))
+  println(expr2)
+
+  println(visit(Context(Map.empty), expr2, List.empty))
+  println(expr2)
 }

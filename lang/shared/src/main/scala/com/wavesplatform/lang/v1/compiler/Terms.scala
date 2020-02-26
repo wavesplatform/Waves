@@ -16,7 +16,7 @@ object Terms {
     def toStr: Coeval[String]
     override def toString: String = toStr()
   }
-  case class LET(name: String, value: EXPR)                     extends DECLARATION {
+  case class LET(name: String, var value: EXPR)                     extends DECLARATION {
     def toStr: Coeval[String] = for {
       e <- value.toStr
     } yield "LET(" ++ name.toString ++ "," ++ e ++ ")"
