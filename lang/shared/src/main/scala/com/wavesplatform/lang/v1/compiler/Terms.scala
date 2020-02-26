@@ -60,7 +60,7 @@ object Terms {
     override def toString: String = "REF(" ++ key.toString ++ ")"
     def toStr: Coeval[String] = Coeval.now(toString)
   }
-  case class FUNCTION_CALL(function: FunctionHeader, args: List[EXPR]) extends EXPR {
+  case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] = for {
       e <- args.map(_.toStr).sequence
     } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
