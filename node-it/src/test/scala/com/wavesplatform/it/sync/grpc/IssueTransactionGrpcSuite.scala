@@ -18,7 +18,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   val (issuer, issuerAddress) = (firstAcc, firstAddress)
 
   test("asset issue changes issuer's asset balance") {
-    for (v <- supportedVersions) {
+    for (v <- issueTxSupportedVersions) {
       val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength).mkString
       val assetDescription = "my asset description"
       val issuerBalance    = sender.wavesBalance(issuerAddress).available
@@ -53,7 +53,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   }
 
   test("not able to issue asset with fee less then issueFee (minFee for NFT)") {
-    for (v <- supportedVersions) {
+    for (v <- issueTxSupportedVersions) {
       val assetName                                 = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MinAssetNameLength + 1).mkString
       val assetDescription                          = "nft asset"
       val issuerBalance                             = sender.wavesBalance(issuerAddress).available
@@ -78,7 +78,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   }
 
   test("Able to create asset with the same name") {
-    for (v <- supportedVersions) {
+    for (v <- issueTxSupportedVersions) {
       val assetName        = Random.alphanumeric.filter(_.isLetter).take(IssueTransaction.MaxAssetNameLength).mkString
       val assetDescription = "my asset description 2"
 
@@ -193,7 +193,7 @@ class IssueTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime wi
   }
 
   test("Not able to create asset with too big description") {
-    val tooBigDescription = Random.nextString(IssueTransaction.MaxAssetDescriptionLength + 1)
+    val tooBigDescription = Random.nextString(1000 + 1)
     assertGrpcError(
       sender.broadcastIssue(issuer, "assetName", someAssetAmount, 2, description = tooBigDescription, reissuable = false, fee = issueFee),
       "Too big sequences requested",

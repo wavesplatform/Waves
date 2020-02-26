@@ -1,6 +1,5 @@
 package com.wavesplatform.state.diffs
 
-import cats.Id
 import cats.instances.map._
 import cats.kernel.Monoid
 import cats.syntax.either._
@@ -25,7 +24,7 @@ import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, LogItem, ScriptResultV3, ScriptResultV4}
+import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -62,15 +61,59 @@ object InvokeScriptTransactionDiff {
 
     accScriptEi match {
       case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, storedCallableComplexities))) =>
-        val scriptResultE =
-          stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
+       for {
+          _          <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(GenericError.apply))
+          dAppAddress <- TracedResult(dAppAddressEi)
+
+          feeInfo <- TracedResult(tx.assetFee._1 match {
+            case Waves => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
+            case asset @ IssuedAsset(_) =>
+              for {
+                assetInfo <- blockchain
+                  .assetDescription(asset)
+                  .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
+                wavesFee <- Either.cond(
+                  assetInfo.sponsorship > 0,
+                  Sponsorship.toWaves(tx.fee, assetInfo.sponsorship),
+                  GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
+                )
+              } yield {
+                (
+                  wavesFee,
+                  Map(
+                    tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee)),
+                    assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
+                  )
+                )
+              }
+          })
+          wavesFee = feeInfo._1
+          paymentsDiff = paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2)
+
+          directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
+          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
+          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
+
+          invocationComplexity <- TracedResult.wrapE({
+                val complexity =
+                  for {
+                    complexitiesByCallable <- storedCallableComplexities.get(blockchain.estimator.version)
+                    complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName)
+                  } yield complexity
+
+                lazy val errorMessage =
+                  s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, " +
+                  s"address = $dAppAddress, " +
+                  s"estimator version = ${blockchain.estimator.version}"
+
+                complexity.toRight(GenericError(errorMessage))
+
+              })
+ 
+          scriptResult <- {
+           val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
             val invoker = tx.sender.toAddress.bytes
-            val result = for {
-              directives <- DirectiveSet(version, Account, DAppType).leftMap((_, List.empty[LogItem[Id]]))
-              input      <- buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap((_, List.empty[LogItem[Id]]))
-              payments   <- AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap((_, List.empty[LogItem[Id]]))
-              _          <- checkCall(functionCall, blockchain).leftMap((_, List.empty[LogItem[Id]]))
-              invocation = ContractEvaluator.Invocation(
+            val invocation = ContractEvaluator.Invocation(
                 functionCall,
                 Recipient.Address(invoker),
                 tx.sender,
@@ -80,7 +123,7 @@ object InvokeScriptTransactionDiff {
                 tx.fee,
                 tx.feeAssetId.compatId
               )
-              environment = new WavesEnvironment(
+            val environment = new WavesEnvironment(
                 AddressScheme.current.chainId,
                 Coeval.evalOnce(input),
                 Coeval(blockchain.height),
@@ -89,6 +132,8 @@ object InvokeScriptTransactionDiff {
                 directives,
                 tx.id()
               )
+ 
+            val result = for {
               evaluator <- ContractEvaluator(
                 Monoid
                   .combineAll(
@@ -103,37 +148,21 @@ object InvokeScriptTransactionDiff {
                 invocation,
                 version
               )
-              dAppAddress <- dAppAddressEi.leftMap(e => (e.toString, List.empty[LogItem[Id]]))
-              invocationComplexity <- {
-                val complexity =
-                  for {
-                    complexitiesByCallable <- storedCallableComplexities.get(blockchain.estimator.version)
-                    complexity             <- complexitiesByCallable.get(tx.funcCall.function.funcName)
-                  } yield complexity
-
-                lazy val errorMessage =
-                  s"Cannot find callable function `${tx.funcCall.function.funcName}` complexity, " +
-                  s"address = $dAppAddress, " +
-                  s"estimator version = ${blockchain.estimator.version}"
-
-                complexity.toRight((errorMessage, List.empty[LogItem[Id]]))
-              }
             } yield (evaluator, invocationComplexity)
 
             result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
-          })
-        for {
-          scriptResult <- TracedResult(
-            scriptResultE,
-            List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
-          )
+           })
+           TracedResult(
+             scriptResultE,
+             List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
+           ) 
+          }
+
           invocationComplexity = scriptResult._2
           actions = scriptResult._1._1 match {
             case ScriptResultV3(dataItems, transfers) => dataItems ::: transfers
             case ScriptResultV4(actions)              => actions
           }
-
-          dAppAddress <- TracedResult(dAppAddressEi)
 
           actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
           transfers     = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
@@ -177,30 +206,6 @@ object InvokeScriptTransactionDiff {
             .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
             .map(_._2)
 
-          feeInfo <- TracedResult(tx.assetFee._1 match {
-            case Waves => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
-            case asset @ IssuedAsset(_) =>
-              for {
-                assetInfo <- blockchain
-                  .assetDescription(asset)
-                  .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
-                wavesFee <- Either.cond(
-                  assetInfo.sponsorship > 0,
-                  Sponsorship.toWaves(tx.fee, assetInfo.sponsorship),
-                  GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
-                )
-              } yield {
-                (
-                  wavesFee,
-                  Map(
-                    tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee)),
-                    assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))
-                  )
-                )
-              }
-          })
-          wavesFee = feeInfo._1
-          paymentsDiff <- TracedResult.wrapValue(paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2))
           scriptsInvoked <- TracedResult {
             val smartAssetInvocations =
               tx.checkedAssets ++
@@ -418,6 +423,8 @@ object InvokeScriptTransactionDiff {
           TracedResult(Left(InvalidName), List())
         } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
           TracedResult(Left(TooBigArray), List())
+        } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
+          TracedResult(Left(InvalidAssetId), List())
         } else {
           val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
           val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
