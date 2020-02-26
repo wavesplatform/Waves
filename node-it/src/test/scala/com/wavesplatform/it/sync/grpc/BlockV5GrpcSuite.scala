@@ -5,7 +5,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.block.Block
 import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, ReportingTestName}
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
 
@@ -24,20 +24,20 @@ class BlockV5GrpcSuite
 
   "block v5 appears and blockchain grows" - {
     "when feature activation happened" in {
-      sender.grpc.waitForHeight(ActivationHeight - 1)
+      sender.waitForHeight(ActivationHeight - 1)
 
-      val blockAtActivationHeight = sender.grpc.blockAt(ActivationHeight - 1)
-      val blockAtActivationHeightById = sender.grpc.blockById(ByteString.copyFrom(blockAtActivationHeight.signature))
+      val blockAtActivationHeight = sender.blockAt(ActivationHeight - 1)
+      val blockAtActivationHeightById = sender.blockById(ByteString.copyFrom(blockAtActivationHeight.signature))
 
       blockAtActivationHeight.header.version shouldBe Block.RewardBlockVersion
       blockAtActivationHeight.header.generationSignature.length shouldBe Block.GenerationSignatureLength
       blockAtActivationHeightById.header.version shouldBe Block.RewardBlockVersion
       blockAtActivationHeightById.header.generationSignature.length shouldBe Block.GenerationSignatureLength
 
-      sender.grpc.waitForHeight(ActivationHeight)
+      sender.waitForHeight(ActivationHeight)
 
-      val blockAfterActivationHeight = sender.grpc.blockAt(ActivationHeight)
-      val blockAfterActivationHeightById = sender.grpc.blockById(ByteString.copyFrom(blockAfterActivationHeight.signature))
+      val blockAfterActivationHeight = sender.blockAt(ActivationHeight)
+      val blockAfterActivationHeightById = sender.blockById(ByteString.copyFrom(blockAfterActivationHeight.signature))
 
       blockAfterActivationHeight.header.version shouldBe Block.ProtoBlockVersion
       blockAfterActivationHeight.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
@@ -46,18 +46,18 @@ class BlockV5GrpcSuite
       blockAfterActivationHeightById.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
       assert(blockAfterActivationHeightById.transactionsRootValid(), "transactionsRoot is not valid")
 
-      sender.grpc.waitForHeight(ActivationHeight + 2)
+      sender.waitForHeight(ActivationHeight + 2)
 
-      val blockAfterVRFUsing = sender.grpc.blockAt(ActivationHeight + 2)
-      val blockAfterVRFUsingById = sender.grpc.blockById(ByteString.copyFrom(blockAfterVRFUsing.signature))
+      val blockAfterVRFUsing = sender.blockAt(ActivationHeight + 2)
+      val blockAfterVRFUsingById = sender.blockById(ByteString.copyFrom(blockAfterVRFUsing.signature))
 
       blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsing.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
       blockAfterVRFUsingById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsingById.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
 
-      val blockSeqOfBlocksV4 = sender.grpc.blockSeq(ActivationHeight - 2, ActivationHeight - 1)
-      val blockSeqOfBlocksV5 = sender.grpc.blockSeq(ActivationHeight, ActivationHeight + 2)
+      val blockSeqOfBlocksV4 = sender.blockSeq(ActivationHeight - 1, ActivationHeight - 1)
+      val blockSeqOfBlocksV5 = sender.blockSeq(ActivationHeight, ActivationHeight + 2)
 
       for (blockV3 <- blockSeqOfBlocksV4) {
         blockV3.header.version shouldBe Block.RewardBlockVersion
@@ -69,8 +69,8 @@ class BlockV5GrpcSuite
         blockV5.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
       }
 
-      val blockSeqOfBlocksV3ByAddress = sender.grpc.blockSeqByAddress(miner.address, ActivationHeight - 2, ActivationHeight - 1)
-      val blockSeqOfBlocksV5ByAddress = sender.grpc.blockSeqByAddress(miner.address, ActivationHeight, ActivationHeight + 2)
+      val blockSeqOfBlocksV3ByAddress = sender.blockSeqByAddress(miner.address, ActivationHeight - 2, ActivationHeight - 1)
+      val blockSeqOfBlocksV5ByAddress = sender.blockSeqByAddress(miner.address, ActivationHeight, ActivationHeight + 2)
 
       for (blockV3 <- blockSeqOfBlocksV3ByAddress) {
         blockV3.header.version should not be Block.ProtoBlockVersion

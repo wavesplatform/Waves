@@ -2,10 +2,11 @@ package com.wavesplatform
 
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
-import com.wavesplatform.block.merkle.Merkle
-import com.wavesplatform.block.merkle.Merkle.TransactionProof
+import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
+import com.wavesplatform.block.merkle.Merkle._
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Transaction
 
@@ -37,15 +38,38 @@ package object block {
   }
 
   // Merkle
-  implicit class BlockMerkleOps(block: Block) {
-
+  implicit class BlockTransactionsRootOps(private val block: Block) extends AnyVal {
     def transactionProof(transaction: Transaction): Option[TransactionProof] =
-      Merkle.calcTransactionProof(block, transaction)
+      block.transactionData.indexWhere(transaction.id() == _.id()) match {
+        case -1  => None
+        case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, block.transactionsMerkleTree()).reverse))
+      }
 
     def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
       block.transactionData
         .lift(transactionProof.transactionIndex)
         .filter(tx => tx.id() == transactionProof.id)
-        .exists(tx => Merkle.verifyTransactionProof(transactionProof, tx, block.transactionData.size, block.header.transactionsRoot.arr))
+        .exists(
+          tx =>
+            verify(
+              hash(PBTransactions.protobuf(tx).toByteArray),
+              transactionProof.transactionIndex,
+              transactionProof.digests.reverse,
+              block.header.transactionsRoot.arr
+            )
+        )
   }
+
+  implicit class MerkleTreeOps(private val levels: TransactionsMerkleTree) extends AnyVal {
+    def transactionsRoot: ByteStr = {
+      require(levels.nonEmpty && levels.head.nonEmpty, "Invalid merkle tree")
+      ByteStr(levels.head.head)
+    }
+  }
+
+  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.protobuf(_).toByteArray))
+
+  def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < Block.ProtoBlockVersion) ByteStr.empty
+    else ByteStr(mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot)
 }

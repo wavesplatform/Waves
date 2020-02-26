@@ -147,7 +147,7 @@ object TransactionsGeneratorApp extends App with ScoptImplicits with FicusImplic
       .load()
       .as[GeneratorSettings]("generator")
 
-  val wavesSettings = WavesSettings.fromRootConfig(ConfigFactory.load())
+  val wavesSettings = WavesSettings.default()
 
   parser.parse(args, defaultConfig) match {
     case None => parser.failure("Failed to parse command line parameters")

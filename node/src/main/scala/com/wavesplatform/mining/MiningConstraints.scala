@@ -40,13 +40,7 @@ object MiningConstraints {
             NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
         else total,
       keyBlock =
-        if (isNgEnabled)
-          if (isMassTransferEnabled)
-            OneDimensionalMiningConstraint(0, TxEstimators.one, "MaxTxsInKeyBlock")
-          else
-            minerSettings
-              .map(ms => OneDimensionalMiningConstraint(ms.maxTransactionsInKeyBlock, TxEstimators.one, "MaxTxsInKeyBlock"))
-              .getOrElse(MiningConstraint.Unlimited)
+        if (isNgEnabled) OneDimensionalMiningConstraint(0, TxEstimators.one, "MaxTxsInKeyBlock")
         else OneDimensionalMiningConstraint(ClassicAmountOfTxsInBlock, TxEstimators.one, "MaxTxsInKeyBlock"),
       micro =
         if (isNgEnabled && minerSettings.isDefined)

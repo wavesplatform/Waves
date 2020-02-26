@@ -7,7 +7,6 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.ExchangeTxSerializer
 import com.wavesplatform.transaction.validation.impl.ExchangeTxValidator
-import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -33,7 +32,6 @@ case class ExchangeTransaction(
 
   override def builder: TransactionParser = ExchangeTransaction
 
-  @ApiModelProperty(hidden = true)
   override val sender: PublicKey = buyOrder.matcherPublicKey
 
   override val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(ExchangeTransaction.serializer.bodyBytes(this))
