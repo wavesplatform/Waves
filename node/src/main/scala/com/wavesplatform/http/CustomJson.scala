@@ -2,8 +2,8 @@ package com.wavesplatform.http
 
 import java.io.IOException
 
+import akka.http.scaladsl.model.MediaType
 import akka.http.scaladsl.model.MediaTypes.`application/json`
-import akka.http.scaladsl.model.{MediaRange, MediaType}
 import com.fasterxml.jackson.core.io.SegmentedStringWriter
 import com.fasterxml.jackson.core.util.BufferRecyclers
 import com.fasterxml.jackson.core.{JsonGenerator, JsonProcessingException}
@@ -71,11 +71,6 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
 
 object CustomJson {
   val jsonWithNumbersAsStrings: MediaType.WithFixedCharset = `application/json`.withParams(Map("large-significand-format" -> "string"))
-
-  def acceptsNumbersAsStrings(mr: MediaRange): Boolean = mr match {
-    case MediaRange.One(`jsonWithNumbersAsStrings`, _) => true
-    case _                                             => false
-  }
 
   private lazy val mapper = (new ObjectMapper)
     .registerModule(new SimpleModule("WavesJson").addSerializer(classOf[JsValue], NumberAsStringSerializer))

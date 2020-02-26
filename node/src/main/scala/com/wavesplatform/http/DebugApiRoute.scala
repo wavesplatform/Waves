@@ -87,7 +87,8 @@ case class DebugApiRoute(
     (get & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
       extractScheduler { implicit s =>
         complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
-          val base = Portfolio.empty.copy(assets = assetList.toMap)
+          val bd = accountsApi.balanceDetails(address)
+          val base = Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
           if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
         })
       }

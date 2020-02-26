@@ -95,7 +95,6 @@ object AddressTransactions {
       .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
       .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
       .flatMap { case (h, txNum) => loadTransaction(resource, h, txNum, sender) }
-
   }
 
   def transactionsFromDiff(

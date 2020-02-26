@@ -2,8 +2,8 @@ package com.wavesplatform.api.http.assets
 
 import java.util.concurrent._
 
-import akka.http.scaladsl.common.EntityStreamingSupport
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.NotUsed
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
 import cats.instances.either._
@@ -82,8 +82,16 @@ case class AssetsApiRoute(
       get {
         pathPrefix("balance") {
           pathPrefix(AddrSegment) { address =>
-            pathEndOrSingleSlash(balances(address)) ~
-              path(AssetId)(balance(address, _))
+            pathEndOrSingleSlash {
+
+              val result = balances(address)
+              println(s"\n\tBALANCE: $address, $result\n")
+              result
+            } ~
+              path(AssetId) { assetId =>
+                println(s"\n\tBALANCE: $address, ASSET: $assetId\n")
+                balance(address, assetId)
+              }
           }
         } ~ pathPrefix("details") {
           (pathEndOrSingleSlash & parameters(('id.*, 'full.as[Boolean] ? false))) { (ids, full) =>
@@ -105,9 +113,9 @@ case class AssetsApiRoute(
             (jsv \ "ids").validate[List[String]] match {
               case JsSuccess(ids, _) =>
                 ids.map(id => ByteStr.decodeBase58(id).toEither.leftMap(_ => id)).separate match {
-                  case (Nil, Nil) => CustomValidationError("Empty request")
+                  case (Nil, Nil)      => CustomValidationError("Empty request")
                   case (Nil, assetIds) => assetIds.map(id => assetDetails(IssuedAsset(id), full).fold(_.json, identity))
-                  case (errors, _) => InvalidIds(errors)
+                  case (errors, _)     => InvalidIds(errors)
                 }
               case JsError(err) => WrongJson(errors = err)
             }
@@ -117,32 +125,34 @@ case class AssetsApiRoute(
     }
 
   def balances(address: Address): Route = extractScheduler { implicit s =>
-    implicit val jsonStreamingSupport: EntityStreamingSupport = jsonStream(s"""{"address":"$address","balances":[""", ",", "]}")
-    complete(
-      Source.fromPublisher(
-        commonAccountApi
-          .portfolio(address)
-          .flatMap {
-            case (assetId, balance) =>
-              Observable.fromIterable(commonAssetsApi.fullInfo(assetId).map {
-                case CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) =>
-                  Json.obj(
-                    "assetId"    -> assetId.id.toString,
-                    "balance"    -> balance,
-                    "reissuable" -> assetInfo.reissuable,
-                    "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
-                      case 0           => JsNull
-                      case sponsorship => JsNumber(sponsorship)
-                    }),
-                    "sponsorBalance"   -> sponsorBalance,
-                    "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
-                    "issueTransaction" -> issueTransaction.map(_.json())
-                  )
-              })
+    implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] =
+      jsonStreamMarshaller(s"""{"address":"$address","balances":[""", ",", "]}")
+    val value = Source.fromPublisher(
+      commonAccountApi
+        .portfolio(address)
+        .flatMap {
+          case (assetId, balance) =>
+            Observable.fromIterable(commonAssetsApi.fullInfo(assetId).map {
+              case CommonAssetsApi.AssetInfo(assetInfo, issueTransaction, sponsorBalance) =>
+                Json.obj(
+                  "assetId"    -> assetId.id.toString,
+                  "balance"    -> balance,
+                  "reissuable" -> assetInfo.reissuable,
+                  "minSponsoredAssetFee" -> (assetInfo.sponsorship match {
+                    case 0           => JsNull
+                    case sponsorship => JsNumber(sponsorship)
+                  }),
+                  "sponsorBalance"   -> sponsorBalance,
+                  "quantity"         -> JsNumber(BigDecimal(assetInfo.totalVolume)),
+                  "issueTransaction" -> issueTransaction.map(_.json())
+                )
+            })
 
-          }
-          .toReactivePublisher
-      )
+        }
+        .toReactivePublisher
+    )
+    complete(
+      value
     )
   }
 
@@ -205,25 +215,26 @@ case class AssetsApiRoute(
   def nft(address: Address, limit: Int, maybeAfter: Option[String]): Route = {
     val after = maybeAfter.collect { case s if s.nonEmpty => IssuedAsset(ByteStr.decodeBase58(s).getOrElse(throw ApiException(InvalidAssetId))) }
     if (limit > settings.transactionsByAddressLimit) complete(TooBigArrayAllocation)
-    else extractScheduler { implicit sc =>
-      complete {
-        implicit val j: EntityStreamingSupport = EntityStreamingSupport.json()
-        Source.fromPublisher(
-          commonAccountApi
-            .nftList(address, after)
-            .flatMap {
-              case (assetId, assetDesc) =>
-                Observable.fromEither(
-                  AssetsApiRoute
-                    .jsonDetails(blockchain)(assetId, assetDesc, true)
-                    .leftMap(err => new IllegalArgumentException(err))
-                )
-            }
-            .take(limit)
-            .toReactivePublisher
-        )
+    else
+      extractScheduler { implicit sc =>
+        implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller()
+        complete {
+          Source.fromPublisher(
+            commonAccountApi
+              .nftList(address, after)
+              .flatMap {
+                case (assetId, assetDesc) =>
+                  Observable.fromEither(
+                    AssetsApiRoute
+                      .jsonDetails(blockchain)(assetId, assetDesc, true)
+                      .leftMap(err => new IllegalArgumentException(err))
+                  )
+              }
+              .take(limit)
+              .toReactivePublisher
+          )
+        }
       }
-    }
   }
 
   private def balanceJson(address: Address, assetId: IssuedAsset): JsObject =

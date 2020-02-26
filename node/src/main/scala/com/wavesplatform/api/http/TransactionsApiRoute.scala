@@ -1,8 +1,7 @@
 package com.wavesplatform.api.http
 
 import akka.NotUsed
-import akka.http.scaladsl.common.EntityStreamingSupport
-import akka.http.scaladsl.marshalling.ToResponseMarshallable
+import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
 import cats.instances.either._
@@ -59,7 +58,7 @@ case class TransactionsApiRoute(
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
       if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
       extractScheduler { implicit sc =>
-        implicit val jsonStreamingSupport: EntityStreamingSupport = jsonStream("[[", ",", "]]")
+        implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller("[[", ",", "]]")
         complete(transactionsByAddress(address, limit, after))
       }
     }
