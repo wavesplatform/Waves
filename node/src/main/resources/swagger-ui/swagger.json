@@ -55,10 +55,6 @@
       "name": "node"
     }
   ],
-  "schemes": [
-    "http",
-    "https"
-  ],
   "paths": {
     "/addresses": {
       "get": {
