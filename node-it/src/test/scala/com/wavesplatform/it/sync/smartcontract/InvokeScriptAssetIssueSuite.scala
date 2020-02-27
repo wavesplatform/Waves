@@ -55,53 +55,6 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     balance.value.issueTransaction.value.id shouldBe issueTx.id
   }
 
-  test("Correct data for assets issued by script") {
-
-    sender.setScript(
-      smartAcc.stringRepr,
-      Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64),
-      fee = setScriptFee + smartFee,
-      waitForTx = true
-    )
-    invokeScriptTx = sender
-      .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
-        Some("i"),
-        args = List.empty,
-        waitForTx = true
-      )
-      ._1
-
-    val stateChanges = sender.debugStateChanges(invokeScriptTx.id).stateChanges
-    stateChanges shouldBe 'defined
-    stateChanges.value.issues.size shouldBe 1
-
-    invokeScriptAssetId = stateChanges.value.issues.head.assetId
-
-    val assetInfo = sender.assetsDetails(invokeScriptAssetId)
-    assetInfo.assetId shouldBe invokeScriptAssetId
-    assetInfo.originTransactionId shouldBe invokeScriptTx.id
-    assetInfo.issueTimestamp shouldBe invokeScriptTx.timestamp
-    assetInfo.issuer shouldBe smartAcc.stringRepr
-    assetInfo.name shouldBe "InvokeAsset"
-    assetInfo.description shouldBe "InvokeDesc"
-    assetInfo.reissuable shouldBe true
-    assetInfo.decimals shouldBe 0
-    assetInfo.quantity shouldBe 100L
-
-    stateChanges.value.issues.head.name shouldBe "InvokeAsset"
-    stateChanges.value.issues.head.description shouldBe "InvokeDesc"
-    stateChanges.value.issues.head.quantity shouldBe 100L
-    stateChanges.value.issues.head.decimals shouldBe 0
-    stateChanges.value.issues.head.isReissuable shouldBe true
-    stateChanges.value.issues.head.compiledScript shouldBe None
-    stateChanges.value.issues.head.nonce shouldBe 0
-
-    val balance = sender.assetsBalance(firstAddress).balances.find(_.assetId == invokeScriptAssetId)
-    balance shouldBe 'defined
-    balance.value.issueTransaction shouldBe None
-  }
 
   test("Correct data for assets reissued by transaction") {
     sender.reissue(callerAcc.stringRepr, issueTxAssetId, 100L, reissuable = true, waitForTx = true)
@@ -116,35 +69,6 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     assetInfo.reissuable shouldBe true
     assetInfo.decimals shouldBe 0
     assetInfo.quantity shouldBe 200L
-  }
-
-  test("Correct data for assets reissued by script") {
-    val txId = sender
-      .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
-        Some("r"),
-        args = List(CONST_BYTESTR(ByteStr.decodeBase58(invokeScriptAssetId).get).explicitGet()),
-        waitForTx = true
-      )
-      ._1
-      .id
-
-    val assetInfo = sender.assetsDetails(invokeScriptAssetId)
-    assetInfo.assetId shouldBe invokeScriptAssetId
-    assetInfo.originTransactionId shouldBe invokeScriptTx.id
-    assetInfo.issueTimestamp shouldBe invokeScriptTx.timestamp
-    assetInfo.issuer shouldBe smartAcc.stringRepr
-    assetInfo.name shouldBe "InvokeAsset"
-    assetInfo.description shouldBe "InvokeDesc"
-    assetInfo.reissuable shouldBe true
-    assetInfo.decimals shouldBe 0
-    assetInfo.quantity shouldBe 200L
-
-    val stateChanges = sender.debugStateChanges(txId).stateChanges
-    stateChanges.value.reissues.size shouldBe 1
-    stateChanges.value.reissues.head.assetId shouldBe invokeScriptAssetId
-    stateChanges.value.reissues.head.quantity shouldBe 100L
   }
 
   test("Correct data for assets burnt by transaction") {
@@ -200,31 +124,6 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     info.head.assetId shouldBe nftIssueTxAssetId
 
     val afterInfo = sender.nftAssetsBalance(secondAddress, 100, Some(nftIssueTxAssetId))
-    afterInfo.size shouldBe 0
-  }
-
-  test("correct data for NFT issued by script") {
-    val nftInvokeScriptTx = sender
-      .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
-        Some("n"),
-        args = List.empty,
-        waitForTx = true
-      )
-      ._1
-
-    val stateChanges = sender.debugStateChanges(nftInvokeScriptTx.id).stateChanges
-    stateChanges shouldBe 'defined
-    stateChanges.value.issues.size shouldBe 1
-
-    val nftInvokeScriptAssetId = stateChanges.value.issues.head.assetId
-
-    val info = sender.nftAssetsBalance(firstAddress, 100)
-    info.size shouldBe 1
-    info.head.assetId shouldBe nftInvokeScriptAssetId
-
-    val afterInfo = sender.nftAssetsBalance(firstAddress, 100, Some(nftInvokeScriptAssetId))
     afterInfo.size shouldBe 0
   }
 }
