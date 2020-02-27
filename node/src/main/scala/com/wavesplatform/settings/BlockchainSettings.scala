@@ -71,7 +71,8 @@ case class FunctionalitySettings(
     maxTransactionTimeForwardOffset: FiniteDuration = 90.minutes,
     lastTimeBasedForkParameter: Long = 0L,
     leaseExpiration: Int = 1000000,
-    estimatorPreCheckHeight: Int = 0
+    estimatorPreCheckHeight: Int = 0,
+    resetInvalidInvokeSponsoredFeeHeight: Int = 0
 ) {
   val allowLeasedBalanceTransferUntilHeight: Int        = blockVersion3AfterHeight
   val allowTemporaryNegativeUntil                       = lastTimeBasedForkParameter
@@ -113,7 +114,8 @@ object FunctionalitySettings {
     resetEffectiveBalancesAtHeight = 462000,
     blockVersion3AfterHeight = 795000,
     doubleFeaturesPeriodsAfterHeight = 810000,
-    estimatorPreCheckHeight = 1847610
+    estimatorPreCheckHeight = 1847610,
+    resetInvalidInvokeSponsoredFeeHeight = 1950100
   )
 
   val TESTNET = apply(

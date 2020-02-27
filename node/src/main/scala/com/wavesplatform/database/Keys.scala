@@ -1,7 +1,7 @@
 package com.wavesplatform.database
 
 import com.google.common.base.Charsets.UTF_8
-import com.google.common.primitives.{Ints, Longs}
+import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -39,7 +39,7 @@ object Keys {
   def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
     Key("lease-balance", hAddr(13, height, addressId), readLeaseBalance, writeLeaseBalance)
   def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey("lease-status-history", 14, leaseId.arr)
-  val LeaseStatusPrefix: Short = 15
+  val LeaseStatusPrefix: Short                            = 15
   def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
     Key("lease-status", hBytes(LeaseStatusPrefix, height, leaseId.arr), _(0) == 1, active => Array[Byte](if (active) 1 else 0))
 
@@ -172,6 +172,10 @@ object Keys {
   def blockReward(height: Int): Key[Option[Long]] =
     Key.opt("block-reward", h(BlockRewardPrefix, height), Longs.fromByteArray, Longs.toByteArray)
 
-  val wavesAmountPrefix: Short = 58
+  val wavesAmountPrefix: Short              = 58
   def wavesAmount(height: Int): Key[BigInt] = Key("waves-amount", h(wavesAmountPrefix, height), Option(_).fold(BigInt(0))(BigInt(_)), _.toByteArray)
+
+  val PatchStatusPrefix: Short = 61
+  def patchStatus(patchId: Short): Key[Option[Int]] =
+    Key.opt("patch-status", Bytes.concat(Shorts.toByteArray(PatchStatusPrefix), Shorts.toByteArray(patchId)), Ints.fromByteArray, Ints.toByteArray)
 }
