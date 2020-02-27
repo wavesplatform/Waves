@@ -3,12 +3,14 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import scorex.crypto.hash.Blake2b256
 
 import scala.concurrent.duration._
 
@@ -151,7 +153,7 @@ class BlockV5TestSuite
     }
   }
 
-  "VRF" - {
+  "VRF and transactionsRoot" - {
     "is present in API" in {
       nodes.head.lastBlockHeaders().vrf shouldBe 'defined
 
@@ -161,18 +163,22 @@ class BlockV5TestSuite
       all(headersBeforeV5.map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.vrf)) shouldBe 'defined
       all(headersV5.map(h => ByteStr.decodeBase58(h.vrf.value).get.length)) shouldBe Block.HitSourceLength
+      all(headersV5.map(_.transactionsRoot)) shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
 
       all(headersBeforeV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.vrf)) shouldBe 'defined
       all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(h => ByteStr.decodeBase58(h.vrf.value).get.length)) shouldBe Block.HitSourceLength
+      all(headersV5.map(_.height).map(h => nodes.head.blockHeadersAt(h)).map(_.transactionsRoot)) shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
 
       all(headersBeforeV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.vrf)) shouldBe 'defined
       all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+      all(headersV5.map(_.height).map(h => nodes.head.blockAt(h)).map(_.transactionsRoot)) shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
 
       all(headersBeforeV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.vrf)) shouldBe 'empty
       all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.vrf)) shouldBe 'defined
       all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+      all(headersV5.map(_.signature).map(s => nodes.head.blockBySignature(s)).map(_.transactionsRoot)) shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
 
       nodes
         .map(n => n.address)
@@ -183,10 +189,12 @@ class BlockV5TestSuite
             all(addressBlocksBeforeV5.map(_.vrf)) shouldBe 'empty
             all(addressBlocksAfterV5.map(_.vrf)) shouldBe 'defined
             all(addressBlocksAfterV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+            all(addressBlocksAfterV5.map(_.transactionsRoot)) shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
         }
 
       nodes.head.lastBlock().vrf shouldBe 'defined
       ByteStr.decodeBase58(nodes.head.lastBlock().vrf.value).get.length shouldBe Block.HitSourceLength
+      nodes.head.lastBlock().transactionsRoot shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
 
       val (blocksBeforeV5, blocksV5) =
         nodes.head.blockSeq(1, nodes.head.height).partition(b => b.height < ActivationHeight)
@@ -194,6 +202,7 @@ class BlockV5TestSuite
       all(blocksBeforeV5.map(_.vrf)) shouldBe 'empty
       all(blocksV5.map(_.vrf)) shouldBe 'defined
       all(blocksV5.map(b => ByteStr.decodeBase58(b.vrf.value).get.length)) shouldBe Block.HitSourceLength
+      all(blocksV5.map(_.transactionsRoot)) shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
     }
   }
 }
