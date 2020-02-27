@@ -409,11 +409,12 @@ class InvokeScriptTransactionDiffTest
       sponsored: Boolean = false,
       isCIDefaultFunc: Boolean = false,
       version: StdLibVersion = V3,
-      txVersion: TxVersion = TxVersion.V1
+      txVersion: TxVersion = TxVersion.V1,
+      selfSend: Boolean = false
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
-      invoker <- invokerGen
+      invoker <- if (selfSend) Gen.const(master) else invokerGen
       ts      <- timestampGen
       genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
@@ -423,7 +424,8 @@ class InvokeScriptTransactionDiffTest
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(version, contract)
       setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
-      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      sponsoredFee = Sponsorship.fromWaves(900000L, sponsorTx.minSponsoredAssetFee.get)
       fc = if (!isCIDefaultFunc)
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
@@ -435,20 +437,16 @@ class InvokeScriptTransactionDiffTest
           master,
           fc,
           payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
+          if (sponsored) sponsoredFee else
             fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
+          ,
+          if (sponsored) sponsorTx.asset else
             Waves
-          },
+          ,
           ts + 3
         )
         .explicitGet()
-    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
+    } yield (if (selfSend) List(genesis) else List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
       verifier: DApp,
@@ -1549,6 +1547,22 @@ class InvokeScriptTransactionDiffTest
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
             ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
           }
+        }
+    }
+  }
+
+  property("correctly counts sponsored fee") {
+    forAll(for {
+      (genesis, setScript, invoke, _, issue, sponsorFee) <- preconditionsAndSetContract(s => writeSet(s, 1), sponsored = true, selfSend = true)
+    } yield (genesis, setScript, issue, sponsorFee, invoke)) {
+      case (genesis, setScript, issue, sponsorFee, invoke) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(issue, sponsorFee, setScript))), TestBlock.create(Seq(invoke)), fs) { diff =>
+          invoke.feeAssetId shouldBe sponsorFee.asset
+          invoke.dAppAddressOrAlias shouldBe invoke.sender.toAddress
+
+          val dv           = diff.explicitGet()
+          val senderChange = dv.portfolios(invoke.sender).balanceOf(sponsorFee.asset)
+          senderChange shouldBe 0L
         }
     }
   }
