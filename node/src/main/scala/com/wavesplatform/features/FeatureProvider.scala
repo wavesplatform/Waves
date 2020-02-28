@@ -36,7 +36,7 @@ object FeatureProvider {
       else if (isFeatureActivated(BlockchainFeatures.BlockReward, height)) {
         if (blockchain.activatedFeatures(BlockchainFeatures.BlockReward.id) == height) NgBlockVersion else RewardBlockVersion
       }
-      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight < height) NgBlockVersion
+      else if (blockchain.settings.functionalitySettings.blockVersion3AfterHeight + 1 < height) NgBlockVersion
       else if (height > 1) PlainBlockVersion
       else GenesisBlockVersion
   }
