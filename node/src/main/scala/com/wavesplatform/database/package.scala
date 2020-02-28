@@ -447,10 +447,10 @@ package object database extends ScorexLogging {
     def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
       iterateOver(Shorts.toByteArray(prefix))(f)
 
-    def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = {
+    def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
       val iterator = db.iterator()
       try {
-        iterator.seek(prefix)
+        iterator.seek(Bytes.concat(prefix, seekPrefix))
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
       } finally iterator.close()
     }

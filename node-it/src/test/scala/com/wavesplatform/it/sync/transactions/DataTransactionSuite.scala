@@ -100,6 +100,10 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       CustomValidationError("Duplicated keys found")
     )
 
+    //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
+    sender.broadcastData(sender.privateKey, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2), waitForTx = true)
+    sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
+
     // max number of data entries is 100
     val tooLargeSizeDataEntries = updateAndRemoveDataEntries ++ (1 to 11).map(k => EmptyDataEntry(s"another-unknown-$k"))
     assertApiError(
@@ -113,6 +117,15 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
       sender.broadcastData(sender.privateKey, tooLargeKeyDataEntries, calcDataFee(tooLargeKeyDataEntries, TxVersion.V2), version = TxVersion.V2),
       TooBigArrayAllocation
     )
+
+    // can put and remove same data within one block
+    nodes.waitForHeightArise()
+    val putDataEntries2 = List(IntegerDataEntry("del", 42))
+    val putDataTxId = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
+    val removeDataTxId = sender.broadcastData(sender.privateKey, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
+    nodes.waitForTransaction(putDataTxId)
+    nodes.waitForTransaction(removeDataTxId)
+    sender.getData(address).filter(_.key == "del") shouldBe List.empty
   }
 
   test("sender's waves balance is decreased by fee") {
