@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._

@@ -52,8 +52,14 @@ trait WithState extends DBCacheSettings with Matchers {
     withLevelDBWriter(TestLevelDB.createTestBlockchainSettings(fs))(test)
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: Either[ValidationError, Diff] => Unit
+    assertion: Either[ValidationError, Diff] => Unit
   ): Unit = withLevelDBWriter(fs) { state =>
+    assertDiffEi(preconditions, block, state)(assertion)
+  }
+
+  def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
+    assertion: Either[ValidationError, Diff] => Unit
+  ): Unit = {
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>

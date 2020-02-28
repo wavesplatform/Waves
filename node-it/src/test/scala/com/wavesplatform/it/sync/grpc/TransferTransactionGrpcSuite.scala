@@ -5,7 +5,6 @@ import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.protobuf.transaction.Attachment.Attachment
-import com.wavesplatform.protobuf.transaction.Attachment.Attachment.{BinaryValue, BoolValue, IntValue, StringValue}
 import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
 import io.grpc.Status.Code
 

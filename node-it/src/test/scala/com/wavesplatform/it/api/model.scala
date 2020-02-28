@@ -6,7 +6,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.Attachment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
-import org.scalatest.Assertions
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
