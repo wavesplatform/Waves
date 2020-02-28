@@ -80,7 +80,7 @@ object ScriptResult {
 
   private def processScriptTransfer(ctx: EvaluationContext[Environment, Id], fields: Map[String, EVALUATED], version: StdLibVersion): Either[ExecutionError, AssetTransfer] =
     (fields(FieldNames.Recipient), fields(FieldNames.Amount), fields(FieldNames.Asset)) match {
-      case (other@CaseObj(at, fields2), CONST_LONG(b), maybeToken) if at.name == Types.addressType.name =>
+      case (other@CaseObj(at, fields2), CONST_LONG(b), maybeToken) if ctx.environment.multiPaymentAllowed || at.name == Types.addressType.name =>
         for {
           token <- maybeToken match {
             case CONST_BYTESTR(tokenId) => Right(Some(tokenId))
