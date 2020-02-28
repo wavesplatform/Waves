@@ -693,6 +693,25 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
+  property("payment to alias before feature activation") {
+    forAll(for {
+      ts <- timestampGen
+      fee <- ciFee(0)
+      a  <- accountGen
+      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      alias = Alias.create("alias").explicitGet()
+      aliasTx <- createAliasGen(a, alias, fee, ts)
+      am <- smallFeeGen
+      contractGen = defaultPaymentContractGen(alias, am) _
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
+      case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
+          _ shouldBe 'Left
+        }
+    }
+  }
+
 
   property("suitable verifier error message on incorrect proofs number") {
     forAll(for {
