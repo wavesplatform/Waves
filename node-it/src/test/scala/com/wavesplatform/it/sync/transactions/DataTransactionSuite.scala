@@ -96,7 +96,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     )
 
     //able to "remove" nonexistent key (account state won't be changed, but transaction should be succesfully broadcasted)
-    sender.broadcastData(sender.privateKey, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey"))), waitForTx = true)
+    sender.broadcastData(sender.privateKey, List(EmptyDataEntry("nonexistentkey")), calcDataFee(List(EmptyDataEntry("nonexistentkey")), TxVersion.V2), waitForTx = true)
     sender.getData(sender.address).filter(_.key == "nonexistentkey") shouldBe List.empty
 
     // max number of data entries is 100
@@ -116,8 +116,8 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
     // can put and remove same data within one block
     nodes.waitForHeightArise()
     val putDataEntries2 = List(IntegerDataEntry("del", 42))
-    val putDataTxId = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2) * 10).id
-    val removeDataTxId = sender.broadcastData(sender.privateKey, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")))).id
+    val putDataTxId = sender.putData(address, putDataEntries2, calcDataFee(putDataEntries2, TxVersion.V1) * 10).id
+    val removeDataTxId = sender.broadcastData(sender.privateKey, List(EmptyDataEntry("del")), calcDataFee(List(EmptyDataEntry("del")), TxVersion.V2)).id
     nodes.waitForTransaction(putDataTxId)
     nodes.waitForTransaction(removeDataTxId)
     sender.getData(address).filter(_.key == "del") shouldBe List.empty
