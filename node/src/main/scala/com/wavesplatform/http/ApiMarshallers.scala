@@ -109,7 +109,7 @@ trait ApiMarshallers {
     }
   }
 
-  def jsonStreamMarshaller(prefix: String = "[", delimiter: String = ".", suffix: String = "]"): ToResponseMarshaller[Source[JsValue, NotUsed]] = {
+  def jsonStreamMarshaller(prefix: String = "[", delimiter: String = ",", suffix: String = "]"): ToResponseMarshaller[Source[JsValue, NotUsed]] = {
     val pjm             = playJsonMarshaller[JsValue].map(_.dataBytes)
     val framingRenderer = Flow[ByteString].intersperse(ByteString(prefix), ByteString(delimiter), ByteString(suffix))
     Marshaller[Source[JsValue, NotUsed], HttpResponse] { implicit ec => source =>
