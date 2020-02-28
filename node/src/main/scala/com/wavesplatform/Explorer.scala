@@ -34,30 +34,24 @@ object Explorer extends ScorexLogging {
     "version",
     "height",
     "score",
-    "block-at-height", // not used now
     "height-of",
     "waves-balance-history",
     "waves-balance",
-    "assets-for-address",
     "asset-balance-history",
     "asset-balance",
-    "asset-info-history",
-    "asset-info",
+    "asset-details-history",
+    "asset-details",
     "lease-balance-history",
     "lease-balance",
     "lease-status-history",
     "lease-status",
     "filled-volume-and-fee-history",
     "filled-volume-and-fee",
-    "transaction-info", // not used now
-    "address-transaction-history",
-    "address-transaction-ids-at-height",
     "changed-addresses",
-    "transaction-ids-at-height", // not used now
     "address-id-of-alias",
     "last-address-id",
-    "address-to-id",
-    "id-of-address",
+    "address-id",
+    "id-to-address",
     "address-script-history",
     "address-script",
     "approved-features",
@@ -68,14 +62,6 @@ object Explorer extends ScorexLogging {
     "data",
     "sponsorship-history",
     "sponsorship",
-    "addresses-for-waves-seq-nr",
-    "addresses-for-waves",
-    "addresses-for-asset-seq-nr",
-    "addresses-for-asset",
-    "address-transaction-ids-seq-nr", // not used now
-    "address-transaction-ids",        // not used now
-    "alias-is-disabled",
-    "carry-fee-history",
     "carry-fee",
     "asset-script-history",
     "asset-script",
@@ -89,7 +75,12 @@ object Explorer extends ScorexLogging {
     "block-transactions-fee",
     "invoke-script-result",
     "block-reward",
-    "waves-amount"
+    "waves-amount",
+    "hit-source",
+    "disabled-aliases",
+    "asset-static-info",
+    "nft-count",
+    "nft-possession"
   )
 
   def main(argsRaw: Array[String]): Unit = {

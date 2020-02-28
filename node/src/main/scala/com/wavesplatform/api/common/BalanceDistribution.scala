@@ -51,28 +51,30 @@ object BalanceDistribution {
     @tailrec
     private def findNextBalance(): Option[(Address, Long)] = {
       if (!resource.iterator.hasNext) None
-      else if (!resource.iterator.peekNext().getKey.startsWith(globalPrefix)) None
       else {
-        val current       = resource.iterator.next()
-        val aid           = addressId(current.getKey)
-        val address       = resource.get(Keys.idToAddress(aid))
-        var balance       = Longs.fromByteArray(current.getValue)
-        var currentHeight = Ints.fromByteArray(current.getKey.takeRight(4))
+        val current = resource.iterator.next()
+        if (!current.getKey.startsWith(globalPrefix)) None
+        else {
+          val aid           = addressId(current.getKey)
+          val address       = resource.get(Keys.idToAddress(aid))
+          var balance       = Longs.fromByteArray(current.getValue)
+          var currentHeight = Ints.fromByteArray(current.getKey.takeRight(4))
 
-        while (stillSameAddress(aid)) {
-          val next       = resource.iterator.next()
-          val nextHeight = Ints.fromByteArray(next.getKey.takeRight(4))
-          if (nextHeight <= height) {
-            currentHeight = nextHeight
-            balance = Longs.fromByteArray(next.getValue)
+          while (stillSameAddress(aid)) {
+            val next       = resource.iterator.next()
+            val nextHeight = Ints.fromByteArray(next.getKey.takeRight(4))
+            if (nextHeight <= height) {
+              currentHeight = nextHeight
+              balance = Longs.fromByteArray(next.getValue)
+            }
           }
+
+          pendingPortfolios -= address
+          val adjustedBalance = longSemigroup.combine(balance, pendingPortfolios.get(address).fold(0L)(balanceOf))
+
+          if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
+          else findNextBalance()
         }
-
-        pendingPortfolios -= address
-        val adjustedBalance = longSemigroup.combine(balance, pendingPortfolios.get(address).fold(0L)(balanceOf))
-
-        if (currentHeight <= height && adjustedBalance > 0) Some(address -> adjustedBalance)
-        else findNextBalance()
       }
     }
 

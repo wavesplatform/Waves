@@ -83,13 +83,9 @@ case class AssetsApiRoute(
         pathPrefix("balance") {
           pathPrefix(AddrSegment) { address =>
             pathEndOrSingleSlash {
-
-              val result = balances(address)
-              println(s"\n\tBALANCE: $address, $result\n")
-              result
+              balances(address)
             } ~
               path(AssetId) { assetId =>
-                println(s"\n\tBALANCE: $address, ASSET: $assetId\n")
                 balance(address, assetId)
               }
           }

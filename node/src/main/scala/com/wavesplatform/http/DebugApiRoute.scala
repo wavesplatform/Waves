@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
-import akka.NotUsed
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
 import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
@@ -34,6 +33,7 @@ import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -87,7 +87,7 @@ case class DebugApiRoute(
     (get & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
       extractScheduler { implicit s =>
         complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
-          val bd = accountsApi.balanceDetails(address)
+          val bd   = accountsApi.balanceDetails(address)
           val base = Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
           if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
         })
@@ -110,13 +110,13 @@ case class DebugApiRoute(
   }
 
   private def distribution(height: Int): Route = extractScheduler { implicit s =>
-    val assetDistribution: Source[(Address, Long), NotUsed] = Source.fromPublisher(
+    complete(
       assetsApi
         .wavesDistribution(height, None)
-        .toReactivePublisher
+        .toListL
+        .runToFuture
+        .map(l => Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }: _*))
     )
-
-    complete(assetDistribution)
   }
 
   def state: Route = (path("state") & get) {
