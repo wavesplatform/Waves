@@ -23,7 +23,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{LegacyPBSwitch, Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
@@ -496,6 +496,7 @@ package object database extends ScorexLogging {
 
   def writeTransaction(t: Transaction): Array[Byte] = Bytes.concat(
     t match {
+      case _: GenesisTransaction                         => Array(0.toByte)
       case lps: LegacyPBSwitch if !lps.isProtobufVersion => Array(0.toByte)
       case _                                             => Array(1.toByte)
     },
