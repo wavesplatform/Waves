@@ -227,13 +227,13 @@ class BlockV5Test
               blockchain.height shouldBe height
             }
 
-            for (h <- 2 to NGActivationHeight) {
+            for (h <- 2 to NGActivationHeight + 1) {
               shiftTime(miner, minerAcc)
               forgeAppendAndValidate(Block.PlainBlockVersion, h)
             }
 
             shiftTime(miner, minerAcc)
-            forgeAppendAndValidate(Block.NgBlockVersion, NGActivationHeight + 1)
+            forgeAppendAndValidate(Block.NgBlockVersion, NGActivationHeight + 2)
 
             for (h <- blockchain.height + 1 to BlockRewardActivationHeight) {
               shiftTime(miner, minerAcc)

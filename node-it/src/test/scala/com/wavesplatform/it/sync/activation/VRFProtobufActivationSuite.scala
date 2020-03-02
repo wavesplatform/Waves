@@ -2,6 +2,8 @@ package com.wavesplatform.it.sync.activation
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
+import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -37,6 +39,16 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     otherAssetId = sender.broadcastIssue(senderAcc, defaultName, defaultDescription, someAssetAmount, 8, true, script = None, waitForTx = true).id
   }
 
+  test("miner generates block v4 before activation") {
+    val blockBeforeActivationHeight = sender.blockAt(sender.height)
+    val blockHeadersBeforeActivationHeight = sender.blockHeadersAt(sender.height)
+    blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
+    blockHeadersBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
+    ByteStr.decodeBase58(blockBeforeActivationHeight.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
+    ByteStr.decodeBase58(sender.blockGenerationSignature(blockBeforeActivationHeight.signature).generationSignature).get.length shouldBe Block.GenerationSignatureLength
+    blockBeforeActivationHeight.baseTarget shouldBe blockHeadersBeforeActivationHeight.baseTarget
+  }
+
   test("not able to broadcast tx of new versions before activation") {
     assertApiError(sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)) { error =>
       error.statusCode shouldBe 400
@@ -61,6 +73,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     }
   }
 
+  test("miner generates block v5 after activation") {
+    val blockAtActivationHeight = sender.blockAt(sender.height)
+    val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
+    blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+    blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+  }
+
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {
     sender.updateAssetInfo(senderAcc, assetId, "updatedName", "updatedDescription", minFee, waitForTx = true)
   }
@@ -78,5 +97,42 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
     sender.balanceDetails(senderAcc.stringRepr).available shouldBe senderWavesBalance.available - transferAmount - minFee
     sender.balanceDetails(recipientAcc.stringRepr).available shouldBe recipientWavesBalance.available + transferAmount
+  }
+
+  test("rollback to height before activation/at activation/after activation height") {
+    //rollback to height one block before activation height
+    nodes.rollback(activationHeight - 1, returnToUTX = true)
+
+    val blockBeforeActivationHeight1 = sender.blockAt(activationHeight - 1)
+    blockBeforeActivationHeight1.version.get shouldBe Block.RewardBlockVersion
+    val returnedTxIds = sender.utx().map(tx => tx.id)
+
+    sender.waitForHeight(activationHeight, 2.minutes)
+    val blockAtActivationHeight1 = sender.blockAt(activationHeight)
+    blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
+
+    sender.waitForHeight(activationHeight + 1, 2.minutes)
+    val blockAfterActivationHeight1 = sender.blockAt(activationHeight + 1)
+    blockAfterActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
+    nodes.waitForHeightArise()
+
+    returnedTxIds.foreach(sender.waitForTransaction(_))
+
+    //rollback to activation height
+    nodes.rollback(activationHeight, returnToUTX = false)
+
+    val blockAtActivationHeight2 = sender.blockAt(activationHeight)
+    blockAtActivationHeight2.version.get shouldBe Block.ProtoBlockVersion
+
+    sender.waitForHeight(activationHeight + 1, 2.minutes)
+    val blockAfterActivationHeight2 = sender.blockAt(activationHeight + 1)
+    blockAfterActivationHeight2.version.get shouldBe Block.ProtoBlockVersion
+    nodes.waitForHeightArise()
+
+    //rollback to height after activation height using rollback to block with signature method
+    nodes.rollbackToBlockWithSignature(sender.blockAt(activationHeight + 1).signature)
+
+    val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
+    blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion
   }
 }
