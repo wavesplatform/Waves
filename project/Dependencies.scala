@@ -149,8 +149,8 @@ object Dependencies {
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core" % "1.22.0",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0" classifier "osx",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core" % "1.22.0-SNAPSHOT",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "linux-x86_64",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
