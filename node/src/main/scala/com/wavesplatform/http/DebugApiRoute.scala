@@ -4,11 +4,10 @@ import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
 import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
-import akka.http.scaladsl.marshalling.{Marshaller, Marshalling}
-import akka.http.scaladsl.model.{ContentTypes, StatusCodes}
+import akka.http.scaladsl.model.StatusCodes
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
-import akka.util.ByteString
 import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
@@ -101,22 +100,21 @@ case class DebugApiRoute(
     }))
   }
 
-  private implicit val jsonStreamingSupport: EntityStreamingSupport = jsonStream("{", ",", "}")
-  private implicit val balanceAsJson: Marshaller[(Address, Long), ByteString] = Marshaller.strict[(Address, Long), ByteString] {
-    case (address, balance) =>
-      Marshalling.WithFixedContentType(ContentTypes.`application/json`, () => {
-        ByteString(s""""${address.stringRepr}":$balance""")
-      })
-  }
-
-  private def distribution(height: Int): Route = extractScheduler { implicit s =>
-    complete(
-      assetsApi
-        .wavesDistribution(height, None)
-        .toListL
-        .runToFuture
-        .map(l => Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }: _*))
-    )
+  private def distribution(height: Int): Route = optionalHeaderValueByType[Accept](()) { accept =>
+    extractScheduler { implicit s =>
+      complete(
+        assetsApi
+          .wavesDistribution(height, None)
+          .toListL
+          .runToFuture
+          .map {
+            case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }: _*)
+            case l =>
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }: _*)
+          }
+      )
+    }
   }
 
   def state: Route = (path("state") & get) {

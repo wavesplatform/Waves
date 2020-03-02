@@ -4,6 +4,7 @@ import java.util.concurrent._
 
 import akka.NotUsed
 import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.stream.scaladsl.Source
 import cats.instances.either._
@@ -17,7 +18,7 @@ import com.wavesplatform.api.http._
 import com.wavesplatform.api.http.assets.AssetsApiRoute.DistributionParams
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.http.{BroadcastRoute, CustomJson}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.settings.RestAPISettings
@@ -175,23 +176,30 @@ case class AssetsApiRoute(
       Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
     }
 
-  def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route = {
-    val paramsEi: Either[ValidationError, DistributionParams] =
-      AssetsApiRoute
-        .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
+  def balanceDistributionAtHeight(assetId: IssuedAsset, heightParam: Int, limitParam: Int, afterParam: Option[String]): Route =
+    optionalHeaderValueByType[Accept](()) { accept =>
+      val paramsEi: Either[ValidationError, DistributionParams] =
+        AssetsApiRoute
+          .validateDistributionParams(blockchain, heightParam, limitParam, settings.distributionAddressLimit, afterParam)
 
-    paramsEi match {
-      case Right((height, limit, after)) =>
-        balanceDistribution(assetId, height, limit, after) { l =>
-          Json.obj(
-            "hasNext"  -> (l.length == limit),
-            "lastItem" -> l.lastOption.map(_._1),
-            "items"    -> Json.toJson(l.map { case (a, b) => a.stringRepr -> b }.toMap)
-          )
-        }
-      case Left(error) => complete(error)
+      paramsEi match {
+        case Right((height, limit, after)) =>
+          balanceDistribution(assetId, height, limit, after) { l =>
+            Json.obj(
+              "hasNext"  -> (l.length == limit),
+              "lastItem" -> l.lastOption.map(_._1),
+              "items" -> Json.toJson(l.map {
+                case (a, b) =>
+                  a.stringRepr -> accept.fold[JsValue](JsNumber(b)) {
+                    case a if a.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) => JsString(b.toString)
+                    case _                                                             => JsNumber(b)
+                  }
+              }.toMap)
+            )
+          }
+        case Left(error) => complete(error)
+      }
     }
-  }
 
   def singleDetails(assetId: IssuedAsset, full: Boolean): Route = complete(assetDetails(assetId, full))
 

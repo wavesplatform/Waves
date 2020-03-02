@@ -496,8 +496,8 @@ package object database extends ScorexLogging {
 
   def writeTransaction(t: Transaction): Array[Byte] = Bytes.concat(
     t match {
-      case lps: LegacyPBSwitch if lps.isProtobufVersion => Array(1.toByte)
-      case _                                            => Array(0.toByte)
+      case lps: LegacyPBSwitch if !lps.isProtobufVersion => Array(0.toByte)
+      case _                                             => Array(1.toByte)
     },
     t.bytes()
   )

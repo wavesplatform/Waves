@@ -1,9 +1,7 @@
 package com.wavesplatform.api.http
 
-import akka.NotUsed
-import akka.http.scaladsl.marshalling.{ToResponseMarshallable, ToResponseMarshaller}
+import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import akka.stream.scaladsl.Source
 import cats.instances.either._
 import cats.instances.list._
 import cats.instances.try_._
@@ -31,6 +29,7 @@ import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
 
+import scala.concurrent.Future
 import scala.util.Success
 
 case class TransactionsApiRoute(
@@ -58,8 +57,7 @@ case class TransactionsApiRoute(
         maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
       if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
       extractScheduler { implicit sc =>
-        implicit val jsonStreamingSupport: ToResponseMarshaller[Source[JsValue, NotUsed]] = jsonStreamMarshaller("[[", ",", "]]")
-        complete(transactionsByAddress(address, limit, after))
+        complete(transactionsByAddress(address, limit, after).map(txs => List(txs)))
       }
     }
   }
@@ -190,8 +188,7 @@ case class TransactionsApiRoute(
     }
   }
 
-  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Source[JsObject, NotUsed] =
-    Source.fromPublisher(
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
       Observable
         .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
         .flatMap { aliases =>
@@ -214,8 +211,8 @@ case class TransactionsApiRoute(
             .take(limitParam)
             .map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }
         }
-        .toReactivePublisher
-    )
+    .toListL
+    .runToFuture
 }
 
 object TransactionsApiRoute {
