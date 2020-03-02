@@ -52,7 +52,8 @@ case class ByteStr(arr: Array[Byte]) {
     case _              => false
   }
 
-  override def hashCode(): Int = java.util.Arrays.hashCode(arr)
+  private[this] lazy val _hashCode = java.util.Arrays.hashCode(arr)
+  override def hashCode(): Int = _hashCode
 }
 
 object ByteStr {
