@@ -1506,7 +1506,7 @@ class InvokeScriptTransactionDiffTest
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
            |@Callable(i)
-           |func $funcName() = [Issue(unit, 0, "InvokeDesc", true, "InvokeAsset", 100, 0)]
+           |func $funcName() = [Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)]
            |""".stripMargin
       Parser.parseContract(script).get.value
     }
