@@ -1,21 +1,23 @@
 package com.wavesplatform.lang.v1.estimator.v2
 
-import cats.{Id, Monad}
 import cats.implicits._
+import cats.{Id, Monad}
 import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
-import com.wavesplatform.lang.v1.task.imports._
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.EvalM
 import com.wavesplatform.lang.v1.estimator.v2.EstimatorContext.Lenses._
+import com.wavesplatform.lang.v1.task.imports._
 import monix.eval.Coeval
 
 object ScriptEstimatorV2 extends ScriptEstimator {
+  override val version: Int = 2
+
   override def apply(
-    vars:  Set[String],
-    funcs: Map[FunctionHeader, Coeval[Long]],
-    expr:  EXPR
+      vars: Set[String],
+      funcs: Map[FunctionHeader, Coeval[Long]],
+      expr: EXPR
   ): Either[ExecutionError, Long] = {
     val v = vars.map((_, (true, const(0)))).toMap
     val f = funcs.mapValues(_.value)
@@ -30,11 +32,13 @@ object ScriptEstimatorV2 extends ScriptEstimator {
         case LET_BLOCK(let, inner)       => evalLetBlock(let, inner)
         case BLOCK(let: LET, inner)      => evalLetBlock(let, inner)
         case BLOCK(f: FUNC, inner)       => evalFuncBlock(f, inner)
+        case BLOCK(_: FAILED_DEC, _)     => const(0)
         case REF(str)                    => evalRef(str)
         case _: EVALUATED                => const(1)
         case IF(cond, t1, t2)            => evalIF(cond, t1, t2)
         case GETTER(expr, _)             => evalGetter(expr)
         case FUNCTION_CALL(header, args) => evalFuncCall(header, args)
+        case _: FAILED_EXPR              => const(0)
       }
 
   private def evalLetBlock(let: LET, inner: EXPR): EvalM[Long] =
@@ -75,7 +79,7 @@ object ScriptEstimatorV2 extends ScriptEstimator {
       ctx <- get[Id, EstimatorContext, ExecutionError]
       r <- lets.get(ctx).get(key) match {
         case Some((false, lzy)) => setRefEvaluated(key, lzy)
-        case Some((true,  _))   => const(0)
+        case Some((true, _))    => const(0)
         case None               => raiseError[Id, EstimatorContext, ExecutionError, Long](s"A definition of '$key' not found")
       }
     } yield r + 2
@@ -89,8 +93,11 @@ object ScriptEstimatorV2 extends ScriptEstimator {
 
   private def evalFuncCall(header: FunctionHeader, args: List[EXPR]): EvalM[Long] =
     for {
-      ctx <-  get[Id, EstimatorContext, ExecutionError]
-      bodyComplexity <- predefFuncs.get(ctx).get(header).map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
+      ctx <- get[Id, EstimatorContext, ExecutionError]
+      bodyComplexity <- predefFuncs
+        .get(ctx)
+        .get(header)
+        .map(bodyComplexity => evalFuncArgs(args).map(_ + bodyComplexity))
         .orElse(userFuncs.get(ctx).get(header).map(evalUserFuncCall(_, args)))
         .getOrElse(raiseError[Id, EstimatorContext, ExecutionError, Long](s"function '$header' not found"))
     } yield bodyComplexity
@@ -98,15 +105,15 @@ object ScriptEstimatorV2 extends ScriptEstimator {
   private def evalUserFuncCall(func: FUNC, args: List[EXPR]): EvalM[Long] =
     for {
       argsComplexity <- evalFuncArgs(args)
-      ctx <-  get[Id, EstimatorContext, ExecutionError]
-      _   <- update(lets.modify(_)(_ ++ ctx.overlappedRefs))
+      ctx            <- get[Id, EstimatorContext, ExecutionError]
+      _              <- update(lets.modify(_)(_ ++ ctx.overlappedRefs))
       overlapped = func.args.flatMap(arg => ctx.letDefs.get(arg).map((arg, _))).toMap
       ctxArgs    = func.args.map((_, (false, const(1)))).toMap
-      _              <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l ++ ctxArgs, or ++ overlapped)})
+      _              <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l ++ ctxArgs, or ++ overlapped) })
       bodyComplexity <- evalExpr(func.body).map(_ + func.args.size * 5)
-      evaluatedCtx   <-  get[Id, EstimatorContext, ExecutionError]
-      overlappedChanges = overlapped.map { case ref@(name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
-      _              <- update((lets ~ overlappedRefs).modify(_){ case (l, or) => (l -- ctxArgs.keys ++ overlapped, or ++ overlappedChanges)})
+      evaluatedCtx   <- get[Id, EstimatorContext, ExecutionError]
+      overlappedChanges = overlapped.map { case ref @ (name, _) => evaluatedCtx.letDefs.get(name).map((name, _)).getOrElse(ref) }
+      _ <- update((lets ~ overlappedRefs).modify(_) { case (l, or) => (l -- ctxArgs.keys ++ overlapped, or ++ overlappedChanges) })
     } yield bodyComplexity + argsComplexity
 
   private def evalFuncArgs(args: List[EXPR]): EvalM[Long] =

@@ -435,7 +435,7 @@ object NarrowTransactionGenerator {
   def apply(settings: Settings, accounts: Seq[KeyPair], time: NTP, estimator: ScriptEstimator): NarrowTransactionGenerator = {
 
     val (setScriptInitTxs, setScriptTailInitTxs, setScriptAccounts, setScriptAssets) =
-      if (settings.probabilities.keySet.count(p => p == SetScriptTransaction || p == SetAssetScriptTransaction) > 0) {
+      if (settings.probabilities.get(SetScriptTransaction).exists(_ > 0) || settings.probabilities.get(SetAssetScriptTransaction).exists(_ > 0)) {
         require(settings.setScript.isDefined, "SetScript and SetAssetScript generations require additional settings [set-script]")
 
         val accountsSettings = settings.setScript.get.accounts

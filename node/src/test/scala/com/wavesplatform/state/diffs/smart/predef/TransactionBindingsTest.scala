@@ -647,7 +647,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |}
          """.stripMargin
 
-      val noProofsError = s"Compilation failed: Undefined field `proofs` of variable of type `$txType`"
+      val noProofsError = s"Undefined field `proofs` of variable of type `$txType`"
 
       runForAsset(src1) should produce(noProofsError)
 

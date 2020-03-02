@@ -38,6 +38,7 @@ final case class BlockAppended(
     toId: ByteStr,
     toHeight: Int,
     block: Block,
+    updatedWavesAmount: Long,
     blockStateUpdate: StateUpdate,
     transactionStateUpdates: Seq[StateUpdate]
 ) extends BlockchainUpdated

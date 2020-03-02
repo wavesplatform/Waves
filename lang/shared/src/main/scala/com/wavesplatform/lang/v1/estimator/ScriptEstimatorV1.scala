@@ -6,6 +6,8 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import monix.eval.Coeval
 
 object ScriptEstimatorV1 extends ScriptEstimator {
+  override val version: Int = 1
+
   override def apply(declaredVals: Set[String], functionCosts: Map[FunctionHeader, Coeval[Long]], t: EXPR): Either[String, Long] = {
     type Result[T] = EitherT[Coeval, String, T]
 

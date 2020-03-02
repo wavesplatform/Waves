@@ -138,23 +138,12 @@ package object appender extends ScorexLogging {
       )
   }
 
-  private def validateBlockVersion(height: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
-    val version3Height  = blockchain.settings.functionalitySettings.blockVersion3AfterHeight
-    val versionAtHeight = blockchain.blockVersionAt(height)
-    for {
-      _ <- Either.cond(
-        height > version3Height
-          || block.header.version == Block.GenesisBlockVersion
-          || block.header.version == Block.PlainBlockVersion,
-        (),
-        GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
-      )
-      _ <- Either.cond(
-        versionAtHeight <= block.header.version,
-        (),
-        GenericError(s"Block Version ${block.header.version} is lower than $versionAtHeight")
-      )
-    } yield ()
+  private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
+    Either.cond(
+      blockchain.blockVersionAt(parentHeight + 1) == block.header.version,
+      (),
+      GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
+    )
   }
 
   private[this] object metrics {

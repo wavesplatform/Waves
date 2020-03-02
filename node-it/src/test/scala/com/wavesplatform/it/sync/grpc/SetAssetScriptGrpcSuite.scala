@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.grpc
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -14,8 +14,8 @@ import scala.concurrent.duration._
 class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
   val estimator = ScriptEstimatorV2
 
-  var assetWOScript    = ""
-  var assetWScript     = ""
+  var assetWOScript = ""
+  var assetWScript  = ""
   private val unchangeableScript = ScriptCompiler(
     s"""
        |match tx {
@@ -27,74 +27,59 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     estimator
   ).explicitGet()._1
 
-  protected override def beforeAll(): Unit = {
-    super.beforeAll()
-    assetWOScript = PBTransactions.vanilla(
-      sender.grpc.broadcastIssue(
-        source = firstAcc,
-        name = "AssetWOScript",
-        quantity = someAssetAmount,
-        decimals = 0,
-        reissuable = false,
-        fee = issueFee,
-        waitForTx = true)).explicitGet().id().toString
-
-    assetWScript = PBTransactions.vanilla(
-      sender.grpc.broadcastIssue(
-        source = firstAcc,
-        name = "AssetWOScript",
-        quantity = someAssetAmount,
-        decimals = 0,
-        reissuable = false,
-        fee = issueFee,
-        script = Some(scriptBase64),
-        waitForTx = true)).explicitGet().id().toString
-  }
-
   test("issuer cannot change script on asset w/o initial script") {
-    val firstBalance     = sender.grpc.wavesBalance(firstAddress).available
-    val firstEffBalance  = sender.grpc.wavesBalance(firstAddress).effective
+    val firstBalance    = sender.wavesBalance(firstAddress).available
+    val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
     assertGrpcError(
-      sender.grpc.setAssetScript(firstAcc, assetWOScript, Some(scriptBase64), setAssetScriptFee),
+      sender.setAssetScript(firstAcc, assetWOScript, Right(Some(script)), setAssetScriptFee),
       "Cannot set script on an asset issued without a script",
       Code.INVALID_ARGUMENT
     )
     assertGrpcError(
-      sender.grpc.setAssetScript(firstAcc, assetWOScript, None, setAssetScriptFee),
+      sender.setAssetScript(firstAcc, assetWOScript, Right(None), setAssetScriptFee),
       "Cannot set empty script",
       Code.INVALID_ARGUMENT
     )
 
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance
-    sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance
+    sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
   }
 
   test("non-issuer cannot change script") {
-    val assetWAnotherOwner = PBTransactions.vanilla(
-      sender.grpc.broadcastIssue(
-        source = firstAcc,
-        name = "NonOwnCoin",
-        quantity = someAssetAmount,
-        decimals = 0,
-        reissuable = false,
-        fee = issueFee,
-        script = Some(
-          ScriptCompiler(
-            s"""
+    val assetWAnotherOwner = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "NonOwnCoin",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          script = Right(
+            Some(
+              ScriptCompiler(
+                s"""
                |match tx {
                |  case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(secondAcc.publicKey).toString}')
                |  case _ => false
                |}
                """.stripMargin,
-            isAssetScript = true,
-            estimator
-          ).explicitGet()._1.bytes.value.base64),
-        waitForTx = true)).explicitGet().id().toString
+                isAssetScript = true,
+                estimator
+              ).explicitGet()._1
+            )
+          ),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
 
     assertGrpcError(
-      sender.grpc.setAssetScript(secondAcc, assetWAnotherOwner, Some(scriptBase64), setAssetScriptFee),
-    "Asset was issued by other address",
+      sender.setAssetScript(secondAcc, assetWAnotherOwner, Right(Some(script)), setAssetScriptFee),
+      "Asset was issued by other address",
       Code.INVALID_ARGUMENT
     )
   }
@@ -109,92 +94,139 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
          """.stripMargin,
       isAssetScript = true,
       estimator
-    ).explicitGet()._1.bytes.value.base64
+    ).explicitGet()._1
 
-    val firstBalance     = sender.grpc.wavesBalance(firstAddress).available
-    val firstEffBalance  = sender.grpc.wavesBalance(firstAddress).effective
+    val firstBalance    = sender.wavesBalance(firstAddress).available
+    val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
-    sender.grpc.setAssetScript(firstAcc, assetWScript, Some(script2), setAssetScriptFee, waitForTx = true)
+    sender.setAssetScript(firstAcc, assetWScript, Right(Some(script2)), setAssetScriptFee, waitForTx = true)
+    sender.assetInfo(assetWScript).script.map(sd => PBTransactions.toVanillaScript(sd.getScript)) shouldBe Some(script2)
 
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance - setAssetScriptFee
-    sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance - setAssetScriptFee
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance - setAssetScriptFee
+    sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - setAssetScriptFee
   }
 
   test("not able set script without having enough waves") {
-    val firstBalance     = sender.grpc.wavesBalance(firstAddress).available
-    val firstEffBalance  = sender.grpc.wavesBalance(firstAddress).effective
+    val firstBalance    = sender.wavesBalance(firstAddress).available
+    val firstEffBalance = sender.wavesBalance(firstAddress).effective
     assertGrpcError(
-      sender.grpc.setAssetScript(firstAcc, assetWScript, Some(scriptBase64), fee = firstBalance + 1),
+      sender.setAssetScript(firstAcc, assetWScript, Right(Some(script)), fee = firstBalance + 1),
       "Accounts balance errors",
-      Code.INVALID_ARGUMENT)
+      Code.INVALID_ARGUMENT
+    )
 
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance
-    sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance
+    sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
   }
 
   test("not able to broadcast invalid set script transaction") {
-    val firstBalance     = sender.grpc.wavesBalance(firstAddress).available
-    val firstEffBalance  = sender.grpc.wavesBalance(firstAddress).effective
+    val firstBalance    = sender.wavesBalance(firstAddress).available
+    val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
     assertGrpcError(
-      sender.grpc.setAssetScript(firstAcc, assetWScript, Some(scriptBase64),setAssetScriptFee, timestamp = System.currentTimeMillis() + 1.day.toMillis),
-    "Transaction timestamp .* is more than .*ms in the future",
+      sender.setAssetScript(firstAcc, assetWScript, Right(Some(script)), setAssetScriptFee, timestamp = System.currentTimeMillis() + 1.day.toMillis),
+      "Transaction timestamp .* is more than .*ms in the future",
       Code.INVALID_ARGUMENT
     )
     assertGrpcError(
-      sender.grpc.setAssetScript(thirdAcc, assetWScript, Some(scriptBase64),setAssetScriptFee - 1),
+      sender.setAssetScript(thirdAcc, assetWScript, Right(Some(script)), setAssetScriptFee - 1),
       "Fee .* does not exceed minimal value",
       Code.INVALID_ARGUMENT
     )
     assertGrpcError(
-      sender.grpc.setAssetScript(firstAcc, "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz", Some(scriptBase64),setAssetScriptFee),
+      sender.setAssetScript(firstAcc, "9ekQuYn92natMnMq8KqeGK3Nn7cpKd3BvPEGgD6fFyyz", Right(Some(script)), setAssetScriptFee),
       "Referenced assetId not found",
       Code.INVALID_ARGUMENT
     )
 
-    sender.grpc.waitForHeight(sender.height + 1)
-    sender.grpc.wavesBalance(firstAddress).available shouldBe firstBalance
-    sender.grpc.wavesBalance(firstAddress).effective shouldBe firstEffBalance
+    sender.waitForHeight(sender.height + 1)
+    sender.wavesBalance(firstAddress).available shouldBe firstBalance
+    sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance
   }
 
   test("try to make SetAssetScript tx on script that deprecates SetAssetScript") {
     val assetUnchangeableScript =
-      PBTransactions.vanilla(
-        sender.grpc.broadcastIssue(
-        source = firstAcc,
-        name = "SetAssetWDep",
-        someAssetAmount,
-        2,
-        reissuable = false,
-        issueFee,
-        script = Some(unchangeableScript.bytes.value.base64),
-        waitForTx = true
-      )).explicitGet().id().toString
+      PBTransactions
+        .vanilla(
+          sender.broadcastIssue(
+            source = firstAcc,
+            name = "SetAssetWDep",
+            someAssetAmount,
+            2,
+            reissuable = false,
+            issueFee,
+            script = Right(Some(unchangeableScript)),
+            waitForTx = true
+          )
+        )
+        .explicitGet()
+        .id()
+        .toString
 
     assertGrpcError(
-      sender.grpc.setAssetScript(firstAcc, assetUnchangeableScript, Some(scriptBase64), setAssetScriptFee),
+      sender.setAssetScript(firstAcc, assetUnchangeableScript, Right(Some(script)), setAssetScriptFee),
       "Transaction is not allowed by token-script",
-      Code.INVALID_ARGUMENT)
+      Code.INVALID_ARGUMENT
+    )
   }
 
   test("try to make SetAssetScript for asset v1") {
-    val assetV1 = PBTransactions.vanilla(
-      sender.grpc.broadcastIssue(thirdAcc, "assetV1", someAssetAmount, 8, reissuable = true, issueFee, waitForTx = true)
-    ).explicitGet().id().toString
+    val assetV1 = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(thirdAcc, "assetV1", someAssetAmount, 8, reissuable = true, issueFee, waitForTx = true)
+      )
+      .explicitGet()
+      .id()
+      .toString
 
-    val balance     = sender.grpc.wavesBalance(thirdAddress).available
-    val effBalance  = sender.grpc.wavesBalance(thirdAddress).effective
+    val balance    = sender.wavesBalance(thirdAddress).available
+    val effBalance = sender.wavesBalance(thirdAddress).effective
 
     assertGrpcError(
-      sender.grpc.setAssetScript(thirdAcc, assetV1, Some(scriptBase64), setAssetScriptFee),
+      sender.setAssetScript(thirdAcc, assetV1, Right(Some(script)), setAssetScriptFee),
       "Reason: Cannot set script on an asset issued without a script",
       Code.INVALID_ARGUMENT
     )
 
-    sender.grpc.wavesBalance(thirdAddress).available shouldBe balance
-    sender.grpc.wavesBalance(thirdAddress).effective shouldBe effBalance
+    sender.wavesBalance(thirdAddress).available shouldBe balance
+    sender.wavesBalance(thirdAddress).effective shouldBe effBalance
 
   }
 
 
+  protected override def beforeAll(): Unit = {
+    super.beforeAll()
+    assetWOScript = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "AssetWOScript",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+
+    assetWScript = PBTransactions
+      .vanilla(
+        sender.broadcastIssue(
+          source = firstAcc,
+          name = "AssetWOScript",
+          quantity = someAssetAmount,
+          decimals = 0,
+          reissuable = false,
+          fee = issueFee,
+          script = Right(Some(script)),
+          waitForTx = true
+        )
+      )
+      .explicitGet()
+      .id()
+      .toString
+  }
 }

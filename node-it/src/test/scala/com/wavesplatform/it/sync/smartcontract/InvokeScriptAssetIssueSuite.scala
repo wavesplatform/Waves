@@ -199,7 +199,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     info.size shouldBe 1
     info.head.assetId shouldBe nftIssueTxAssetId
 
-    val afterInfo = sender.nftAssetsBalance(secondAddress, 100, nftIssueTxAssetId)
+    val afterInfo = sender.nftAssetsBalance(secondAddress, 100, Some(nftIssueTxAssetId))
     afterInfo.size shouldBe 0
   }
 
@@ -224,7 +224,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     info.size shouldBe 1
     info.head.assetId shouldBe nftInvokeScriptAssetId
 
-    val afterInfo = sender.nftAssetsBalance(firstAddress, 100, nftInvokeScriptAssetId)
+    val afterInfo = sender.nftAssetsBalance(firstAddress, 100, Some(nftInvokeScriptAssetId))
     afterInfo.size shouldBe 0
   }
 }

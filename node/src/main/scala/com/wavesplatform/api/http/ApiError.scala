@@ -25,7 +25,7 @@ trait ApiError {
 
 //noinspection TypeAnnotation
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError =
+  implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
@@ -60,6 +60,7 @@ object ApiError {
         }
       case error => CustomValidationError(error.toString)
     }
+  }
 
   case object Unknown extends ApiError {
     override val id      = 0
@@ -200,6 +201,18 @@ object ApiError {
     override val id: Int          = 115
     override val message: String  = "no private key for sender address in wallet"
     override val code: StatusCode = StatusCodes.BadRequest
+  }
+
+  case class InvalidIds(ids: Seq[String]) extends ApiError {
+    override val id: Int          = InvalidIds.Id
+    override val message: String  = s"Request contains invalid IDs. ${ids.mkString(", ")}"
+    override val code: StatusCode = StatusCodes.BadRequest
+
+    override lazy val json: JsObject = Json.obj("error" -> id, "message" -> message, "ids" -> ids)
+  }
+
+  case object InvalidIds {
+    val Id = 116
   }
 
   final case class CustomValidationError(errorMessage: String) extends ApiError {

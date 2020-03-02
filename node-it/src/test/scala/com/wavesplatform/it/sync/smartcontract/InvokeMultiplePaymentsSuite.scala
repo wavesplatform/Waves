@@ -1,6 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.{NonPositiveAmount, ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -15,8 +15,6 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterFailure {
-  import InvokeMultiplePaymentsSuite._
-
   private val dApp = pkByAddress(firstAddress).stringRepr
   private val caller = pkByAddress(secondAddress).stringRepr
 
@@ -105,8 +103,9 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       dApp,
       payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
     )) { error =>
+      println(error)
       error.message should include("Script payment amount=3 should not exceed 2")
-      error.id shouldBe ScriptExecutionError.Id
+      error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400
     }
   }
@@ -163,10 +162,4 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
     )
   }
 
-}
-
-object InvokeMultiplePaymentsSuite {
-  implicit class TypedDataEntry(entry: DataEntry[_]) {
-    def as[T]: T = entry.asInstanceOf[T]
-  }
 }

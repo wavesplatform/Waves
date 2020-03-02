@@ -7,6 +7,9 @@ import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
 package object smartcontract {
+  val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
+  val setScrTxSupportedVersions: List[Byte] = List(1, 2)
+
   def cryptoContextScript(accountScript: Boolean): String =
     s"""
        |match tx {

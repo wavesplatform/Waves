@@ -1,0 +1,31 @@
+{
+  funcs: [
+    {
+      name: "sigVerify"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "Verifies a [Curve25519](https://en.wikipedia.org/wiki/Curve25519) signature."
+      paramsDoc: [ "The message.", "The signature.", "The account public key." ]
+    }
+    {
+      name: "rsaVerify"
+      params: [
+        "Md5|NoAlg|Sha1|Sha224|Sha256|Sha3224|Sha3256|Sha3384|Sha3512|Sha384|Sha512"
+        "ByteVector"
+        "ByteVector"
+        "ByteVector"
+      ]
+      doc: "Verifies an [RSA](https://en.wikipedia.org/wiki/RSA_%28cryptosystem%29) signature."
+      paramsDoc: [ "The RSA algorithm.", "The message.", "The signature.", "The public key." ]
+    }
+    {
+      name: "checkMerkleProof"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "Verifies if a tree of hashes is part of the [Merkle tree](https://en.wikipedia.org/wiki/Merkle_tree)."
+      paramsDoc: [
+        "The root hash of the Merkle tree."
+        "The array of bytes of the Merkle tree proof."
+        "The tree of hashes."
+      ]
+    }
+  ]
+}

@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.it.util._
+import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves

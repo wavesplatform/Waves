@@ -1,11 +1,11 @@
 package com.wavesplatform.transaction.smart
 
-import com.google.common.io.ByteStreams
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.crypto
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
@@ -18,8 +18,6 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
-
-import scala.util.Try
 
 object WavesEnvironment {
   type In = Transaction :+: Order :+: PseudoTx :+: CNil
@@ -136,7 +134,7 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
       generatorPublicKey = ByteStr(blockH.generator),
-      vrf
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }
 }
