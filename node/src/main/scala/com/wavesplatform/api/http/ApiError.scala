@@ -25,7 +25,7 @@ trait ApiError {
 
 //noinspection TypeAnnotation
 object ApiError {
-  implicit def fromValidationError(e: ValidationError): ApiError =
+  implicit def fromValidationError(e: ValidationError): ApiError = {
     e match {
       case TxValidationError.InvalidAddress(_)               => InvalidAddress
       case TxValidationError.NegativeAmount(x, of)           => NegativeAmount(s"$x of $of")
@@ -60,6 +60,7 @@ object ApiError {
         }
       case error => CustomValidationError(error.toString)
     }
+  }
 
   case object Unknown extends ApiError {
     override val id      = 0

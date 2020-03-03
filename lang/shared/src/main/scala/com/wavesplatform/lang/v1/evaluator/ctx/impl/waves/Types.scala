@@ -11,22 +11,6 @@ object Types {
   lazy val aliasType          = CASETYPEREF("Alias", List("alias" -> STRING))
   lazy val addressOrAliasType = UNION(addressType, aliasType)
 
-  val blockHeader = CASETYPEREF(
-    "BlockHeader",
-    List(
-      "timestamp"                      -> LONG,
-      "version"                        -> LONG,
-      "reference"                      -> BYTESTR,
-      "generator"                      -> BYTESTR,
-      "generatorPublicKey"             -> BYTESTR,
-      "signature"                      -> BYTESTR,
-      "baseTarget"                     -> LONG,
-      "generationSignature"            -> BYTESTR,
-      "transactionCount"               -> LONG,
-      "featureVotes"                   -> LIST(LONG)
-    )
-  )
-
   def assetType(version: StdLibVersion) = {
     val sponsoredFields =
       if (version >= V4) "minSponsoredFee" -> optionLong
@@ -504,6 +488,6 @@ object Types {
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) blockHeader :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }

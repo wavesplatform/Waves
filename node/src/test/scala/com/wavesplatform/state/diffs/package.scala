@@ -4,6 +4,7 @@ import cats.Monoid
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -19,7 +20,14 @@ package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: Either[ValidationError, Diff] => Unit): Unit = withLevelDBWriter(fs) { state =>
+      assertion: Either[ValidationError, Diff] => Unit
+  ): Unit = withLevelDBWriter(fs) { state =>
+    assertDiffEi(preconditions, block, state)(assertion)
+  }
+
+  def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
+      assertion: Either[ValidationError, Diff] => Unit
+  ): Unit = {
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>

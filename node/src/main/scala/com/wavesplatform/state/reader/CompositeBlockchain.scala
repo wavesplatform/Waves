@@ -217,8 +217,10 @@ final case class CompositeBlockchain(
 
   override def accountDataKeys(acc: Address): Set[String] = {
     val fromInner = inner.accountDataKeys(acc)
-    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    fromInner ++ fromDiff
+    val AccountDataInfo(data) = diff.accountData.get(acc).orEmpty
+    def isRemoved(key: String) = data.get(key).exists(_.isEmpty)
+    val fromDiff  = data.keys
+    (fromInner ++ fromDiff).filterNot(isRemoved)
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
