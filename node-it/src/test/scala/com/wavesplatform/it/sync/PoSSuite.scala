@@ -12,7 +12,7 @@ import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{NodeConfigs, WaitForHeight2}
+import com.wavesplatform.it.{Docker, NodeConfigs, WaitForHeight2}
 import com.wavesplatform.network.RawBytes
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 import play.api.libs.json.{JsSuccess, Json, Reads}
@@ -30,7 +30,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     JsSuccess(NxtLikeConsensusBlockData(bt, ByteStr.decodeBase58(gs).get))
   }
 
-  test("Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1100ms)") {
+  test("BlockV4: Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1100ms)") {
 
     val height = nodes.last.height
 
@@ -46,10 +46,9 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     }
   }
 
-  test("Accept correct block") {
-
-    nodes.last.close()
+  test("BlockV4: Accept correct block") {
     val height = nodes.head.height
+
     val block  = forgeBlock(height, signerPK)()
 
     waitForBlockTime(block)
@@ -64,7 +63,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     newBlockSig sameElements block.uniqueId.arr
   }
 
-  test("Reject block with invalid delay") {
+  test("BlockV4: Reject block with invalid delay") {
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateDelay = _ - 1000)
 
@@ -78,7 +77,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     newBlockSig should not be block.uniqueId.arr
   }
 
-  test("Reject block with invalid BT") {
+  test("BlockV4: Reject block with invalid BT") {
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
 
@@ -93,7 +92,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     newBlockSig should not be block.uniqueId.arr
   }
 
-  test("Reject block with invalid generation signature") {
+  test("BlockV4: Reject block with invalid generation signature") {
     val height = nodes.head.height
     val block  = forgeBlock(height, signerPK)()
     block.copy(header = block.header.copy(generationSignature = {
@@ -115,7 +114,114 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     newBlockSig should not be block.uniqueId.arr
   }
 
-  test("Reject block with invalid signature") {
+  test("BlockV4: Reject block with invalid signature") {
+    val otherNodePK = KeyPair.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
+
+    val height = nodes.head.height
+    val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
+
+    val signature = ByteStr(crypto.sign(otherNodePK, block.bytes()))
+    val resignedBlock =
+      block
+        .copy(signature = signature)
+
+    waitForBlockTime(resignedBlock)
+
+    nodes.head.sendByNetwork(RawBytes.fromBlock(resignedBlock))
+
+    nodes.head.waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be resignedBlock.uniqueId.arr
+  }
+
+  test("BlockV5: Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1100ms)") {
+    nodes.waitForHeight(vrfActivationHeight)
+    val height = nodes.last.height
+
+    for (h <- height to (height + 10)) {
+
+      val block = forgeBlock(h, signerPK)()
+
+      nodes.waitForHeightArise()
+
+      val newTimestamp = blockTimestamp(h + 1)
+
+      block.header.timestamp shouldBe (newTimestamp +- 1100)
+    }
+  }
+
+  test("BlockV5: Accept correct block") {
+
+    nodes.last.close()
+    val height = nodes.head.height
+    val block  = forgeBlock(height, signerPK)()
+
+    waitForBlockTime(block)
+
+    nodes.head.printDebugMessage(DebugMessage(s"Send block for $height"))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
+
+    nodes.head.waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig sameElements block.uniqueId.arr
+  }
+
+  test("BlockV5: Reject block with invalid delay") {
+    val height = nodes.head.height
+    val block  = forgeBlock(height, signerPK)(updateDelay = _ - 1000)
+
+    waitForBlockTime(block)
+
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
+    nodes.head.waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be block.uniqueId.arr
+  }
+
+  test("BlockV5: Reject block with invalid BT") {
+    val height = nodes.head.height
+    val block  = forgeBlock(height, signerPK)(updateBaseTarget = _ + 2)
+
+    waitForBlockTime(block)
+
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
+
+    nodes.head.waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be block.uniqueId.arr
+  }
+
+  test("BlockV5: Reject block with invalid generation signature") {
+    val height = nodes.head.height
+    val block  = forgeBlock(height, signerPK)()
+    block.copy(header = block.header.copy(generationSignature = {
+      val arr  = block.header.generationSignature.arr
+      val init = arr.init
+      Random.nextBytes(arr)
+      ByteStr(init :+ arr.last)
+    }))
+
+    waitForBlockTime(block)
+
+    nodes.head.printDebugMessage(DebugMessage(s"Send invalid block for $height"))
+    nodes.head.sendByNetwork(RawBytes.fromBlock(block))
+
+    nodes.head.waitForHeight(height + 1)
+
+    val newBlockSig = blockSignature(height + 1)
+
+    newBlockSig should not be block.uniqueId.arr
+  }
+
+  test("BlockV5: Reject block with invalid signature") {
     val otherNodePK = KeyPair.fromSeed(nodeConfigs.head.getString("account-seed")).explicitGet()
 
     val height = nodes.head.height
@@ -173,7 +279,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
       .get
   }
 
-  private val vrfActivationHeight = 7
+  private val vrfActivationHeight = 20
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -249,7 +355,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         )
     )
 
-    val bastTarget: Long = updateBaseTarget(
+    val baseTarget: Long = updateBaseTarget(
       FairPoSCalculator
         .calculateBaseTarget(
           10,
@@ -266,7 +372,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         version = version,
         timestamp = lastBlockTS + validBlockDelay,
         reference = ByteStr(lastBlockId),
-        baseTarget = bastTarget,
+        baseTarget = baseTarget,
         generationSignature = genSig,
         txs = Nil,
         signer = signerPK,
