@@ -123,7 +123,7 @@ object Bindings {
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
                sender = ct.sender,
                bodyBytes = ByteStr.empty,
-               senderPk = ByteStr.empty,
+               senderPk = ct.senderPk,
                proofs = IndexedSeq.empty),
         feeAssetId = None,
         assetId = ct.assetId,
@@ -142,7 +142,7 @@ object Bindings {
         h = Header(id = r.txId, fee = 0, timestamp = r.timestamp, version = 0),
         sender = r.sender,
         bodyBytes = ByteStr.empty,
-        senderPk = ByteStr.empty,
+        senderPk = r.senderPk,
         proofs = IndexedSeq.empty
       ),
       r.reissue.quantity,
@@ -157,7 +157,7 @@ object Bindings {
         h = Header(id = b.txId, fee = 0, timestamp = b.timestamp, version = 0),
         sender = b.sender,
         bodyBytes = ByteStr.empty,
-        senderPk = ByteStr.empty,
+        senderPk = b.senderPk,
         proofs = IndexedSeq.empty
       ),
       b.burn.quantity,
