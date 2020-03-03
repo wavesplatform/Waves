@@ -123,12 +123,12 @@ object Types {
     CASETYPEREF(
       FieldNames.Issue,
       List(
-        FieldNames.IssueScript -> UNION(issueScriptType, UNIT),
-        FieldNames.IssueDecimals -> LONG,
-        FieldNames.IssueDescription -> STRING,
-        FieldNames.IssueIsReissuable -> BOOLEAN,
         FieldNames.IssueName -> STRING,
+        FieldNames.IssueDescription -> STRING,
         FieldNames.IssueQuantity -> LONG,
+        FieldNames.IssueDecimals -> LONG,
+        FieldNames.IssueIsReissuable -> BOOLEAN,
+        FieldNames.IssueScript -> UNION(issueScriptType, UNIT),
         FieldNames.IssueNonce -> LONG,
       )
     )
