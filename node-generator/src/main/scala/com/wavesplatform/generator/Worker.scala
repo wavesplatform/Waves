@@ -194,10 +194,8 @@ object Worker {
       this match {
         case SkipState(_) => SkipState(utxToSendCnt)
         case EmptyState(warmUp) =>
-          WorkState(warmUp.start, false, warmUp.duration.map(d => LocalDateTime.now.plus(d.toMillis, ChronoUnit.MILLIS)), warmUp)
-        case s @ WorkState(cnt, raised, endAfter, warmUp) =>
-          if (raised) s.copy(cnt = utxToSendCnt)
-          else {
+          WorkState(warmUp.start, raised = false, warmUp.duration.map(d => LocalDateTime.now.plus(d.toMillis, ChronoUnit.MILLIS)), warmUp)
+        case s @ WorkState(cnt, _, endAfter, warmUp) =>
             endAfter match {
               case Some(ldt) if ldt.isBefore(LocalDateTime.now) => s.copy(cnt = utxToSendCnt, raised = true)
               case _ =>
@@ -205,7 +203,6 @@ object Worker {
                 val nextCnt      = math.min(mayBeNextCnt, utxToSendCnt)
                 val nextRaised   = nextCnt == warmUp.end && warmUp.once
                 WorkState(nextCnt, nextRaised, endAfter, warmUp)
-            }
           }
       }
   }
