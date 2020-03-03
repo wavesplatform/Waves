@@ -235,7 +235,7 @@ object InvokeScriptAssetIssueSuite {
       |{-# CONTENT_TYPE DAPP #-}
       |
       |@Callable(i)
-      |func i() = [Issue(unit, 0, "InvokeDesc", true, "InvokeAsset", 100, 0)]
+      |func i() = [Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)]
       |
       |@Callable(i)
       |func r(id: ByteVector) = [Reissue(id, true, 100)]
