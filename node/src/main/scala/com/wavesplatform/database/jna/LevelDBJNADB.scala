@@ -1,8 +1,6 @@
 package com.wavesplatform.database.jna
 
-import java.util
-import java.util.Map
-
+import com.google.common.collect.AbstractIterator
 import com.protonail.leveldb.jna._
 import com.wavesplatform.database.jna.LevelDBJNADB.{JNADBIterator, JNASnapshot, JNAWriteBatch}
 import org.iq80.leveldb._
@@ -100,37 +98,49 @@ private object LevelDBJNADB {
       batch.close()
   }
 
-  final class JNADBIterator(levelDB: LevelDB, options: LevelDBReadOptions) extends DBIterator {
+  private[this] type DBEntry = java.util.Map.Entry[Array[Byte], Array[Byte]]
+
+  //noinspection ScalaStyle
+  final class JNADBIterator(levelDB: LevelDB, options: LevelDBReadOptions) extends AbstractIterator[DBEntry] with DBIterator {
     private[this] val iterator = new LevelDBKeyValueIterator(levelDB, options)
 
-    override def seek(key: Array[Byte]): Unit = iterator.seekToKey(key)
+    override def seek(key: Array[Byte]): Unit =
+      iterator.seekToKey(key)
 
-    override def seekToFirst(): Unit = iterator.seekToFirst()
+    override def seekToFirst(): Unit =
+      iterator.seekToFirst()
 
-    override def peekNext(): Map.Entry[Array[Byte], Array[Byte]] = ???
+    override def peekNext(): DBEntry =
+      this.peek()
 
-    override def hasPrev: Boolean = false
+    override def hasPrev: Boolean =
+      false
 
-    override def prev(): Map.Entry[Array[Byte], Array[Byte]] = ???
+    override def prev(): DBEntry =
+      ???
 
-    override def peekPrev(): Map.Entry[Array[Byte], Array[Byte]] = ???
+    override def peekPrev(): DBEntry =
+      ???
 
-    override def seekToLast(): Unit = iterator.seekToLast()
+    override def seekToLast(): Unit =
+      iterator.seekToLast()
 
     override def close(): Unit = {
       iterator.close()
       options.close()
     }
 
-    override def hasNext: Boolean = iterator.hasNext
-
-    override def next(): util.Map.Entry[Array[Byte], Array[Byte]] = {
-      val pair = iterator.next()
-
-      new util.Map.Entry[Array[Byte], Array[Byte]] {
-        override def getKey: Array[Byte]                       = pair.getKey
-        override def getValue: Array[Byte]                     = pair.getValue
-        override def setValue(value: Array[Byte]): Array[Byte] = ???
+    override def computeNext(): DBEntry = {
+      if (iterator.hasNext) {
+        val pair = iterator.next()
+        new DBEntry {
+          override def getKey: Array[Byte]                       = pair.getKey
+          override def getValue: Array[Byte]                     = pair.getValue
+          override def setValue(value: Array[Byte]): Array[Byte] = ???
+        }
+      } else {
+        this.endOfData()
+        null
       }
     }
   }
