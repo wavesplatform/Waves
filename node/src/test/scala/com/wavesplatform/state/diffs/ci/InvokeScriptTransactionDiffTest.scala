@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
+import com.wavesplatform.account._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -186,7 +186,7 @@ class InvokeScriptTransactionDiffTest
   def defaultPaymentContract(
       senderBinding: String,
       argName: String,
-      recipientAddress: Address,
+      recipientAddress: AddressOrAlias,
       recipientAmount: Long,
       assets: List[Asset] = List(Waves)
   ): DApp = {
@@ -196,7 +196,10 @@ class InvokeScriptTransactionDiffTest
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet())),
+            (recipientAddress match {
+              case  recipientAddress : Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet()))
+              case  recipientAddress : Alias => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
+            }),
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
@@ -394,7 +397,7 @@ class InvokeScriptTransactionDiffTest
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, assets, version)
 
-  def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(someName: String): Gen[DApp] =
+  def defaultPaymentContractGen(address: AddressOrAlias, amount: Long, assets: List[Asset] = List(Waves))(someName: String): Gen[DApp] =
     for {
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
@@ -409,11 +412,12 @@ class InvokeScriptTransactionDiffTest
       sponsored: Boolean = false,
       isCIDefaultFunc: Boolean = false,
       version: StdLibVersion = V3,
-      txVersion: TxVersion = TxVersion.V1
+      txVersion: TxVersion = TxVersion.V1,
+      selfSend: Boolean = false
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
-      invoker <- invokerGen
+      invoker <- if (selfSend) Gen.const(master) else invokerGen
       ts      <- timestampGen
       genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
@@ -423,7 +427,8 @@ class InvokeScriptTransactionDiffTest
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(version, contract)
       setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
-      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      sponsoredFee = Sponsorship.fromWaves(900000L, sponsorTx.minSponsoredAssetFee.get)
       fc = if (!isCIDefaultFunc)
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
@@ -435,20 +440,16 @@ class InvokeScriptTransactionDiffTest
           master,
           fc,
           payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
+          if (sponsored) sponsoredFee else
             fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
+          ,
+          if (sponsored) sponsorTx.asset else
             Waves
-          },
+          ,
           ts + 3
         )
         .explicitGet()
-    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
+    } yield (if (selfSend) List(genesis) else List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
       verifier: DApp,
@@ -670,6 +671,47 @@ class InvokeScriptTransactionDiffTest
         }
     }
   }
+
+  property("invoking default func payment to alias contract results in accounts state") {
+    forAll(for {
+      ts <- timestampGen
+      fee <- ciFee(0)
+      a  <- accountGen
+      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      alias = Alias.create("alias").explicitGet()
+      aliasTx <- createAliasGen(a, alias, fee, ts)
+      am <- smallFeeGen
+      contractGen = defaultPaymentContractGen(alias, am) _
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
+      case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), features) {
+          case (blockDiff, newState) =>
+            newState.balance(acc, Waves) shouldBe amount
+        }
+    }
+  }
+
+  property("payment to alias before feature activation") {
+    forAll(for {
+      ts <- timestampGen
+      fee <- ciFee(0)
+      a  <- accountGen
+      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      alias = Alias.create("alias").explicitGet()
+      aliasTx <- createAliasGen(a, alias, fee, ts)
+      am <- smallFeeGen
+      contractGen = defaultPaymentContractGen(alias, am) _
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
+      case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
+          _ shouldBe 'Left
+        }
+    }
+  }
+
 
   property("suitable verifier error message on incorrect proofs number") {
     forAll(for {
@@ -1508,7 +1550,7 @@ class InvokeScriptTransactionDiffTest
            |{-#SCRIPT_TYPE ACCOUNT#-}
            |
            |@Callable(i)
-           |func $funcName() = [Issue(unit, 0, "InvokeDesc", true, "InvokeAsset", 100, 0)]
+           |func $funcName() = [Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)]
            |""".stripMargin
       Parser.parseContract(script).get.value
     }
@@ -1549,6 +1591,22 @@ class InvokeScriptTransactionDiffTest
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
             ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
           }
+        }
+    }
+  }
+
+  property("correctly counts sponsored fee") {
+    forAll(for {
+      (genesis, setScript, invoke, _, issue, sponsorFee) <- preconditionsAndSetContract(s => writeSet(s, 1), sponsored = true, selfSend = true)
+    } yield (genesis, setScript, issue, sponsorFee, invoke)) {
+      case (genesis, setScript, issue, sponsorFee, invoke) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(issue, sponsorFee, setScript))), TestBlock.create(Seq(invoke)), fs) { diff =>
+          invoke.feeAssetId shouldBe sponsorFee.asset
+          invoke.dAppAddressOrAlias shouldBe invoke.sender.toAddress
+
+          val dv           = diff.explicitGet()
+          val senderChange = dv.portfolios(invoke.sender).balanceOf(sponsorFee.asset)
+          senderChange shouldBe 0L
         }
     }
   }
