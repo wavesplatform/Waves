@@ -186,11 +186,10 @@ object PBTransactions {
         vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
 
       case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(order1, order2))) =>
-        val (buyOrder, sellOrder) = if (order1.orderSide == PBOrder.Side.BUY) (order1, order2) else (order2, order1)
         vt.assets.exchange.ExchangeTransaction.create(
           version.toByte,
-          PBOrders.vanilla(buyOrder),
-          PBOrders.vanilla(sellOrder),
+          PBOrders.vanilla(order1),
+          PBOrders.vanilla(order2),
           amount,
           price,
           buyMatcherFee,
@@ -477,7 +476,7 @@ object PBTransactions {
           price,
           buyMatcherFee,
           sellMatcherFee,
-          Seq(PBOrders.protobuf(buyOrder), PBOrders.protobuf(sellOrder))
+          Seq(PBOrders.protobuf(order1), PBOrders.protobuf(order2))
         )
         PBTransactions.create(tx.sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Exchange(data))
 

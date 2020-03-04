@@ -14,8 +14,8 @@ import scala.util.Try
 
 case class ExchangeTransaction(
     version: TxVersion,
-    buyOrder: Order,
-    sellOrder: Order,
+    order1: Order,
+    order2: Order,
     amount: Long,
     price: Long,
     buyMatcherFee: Long,
@@ -29,6 +29,8 @@ case class ExchangeTransaction(
     with FastHashId
     with SigProofsSwitch
     with LegacyPBSwitch.V3 {
+
+  val (buyOrder, sellOrder) = if (order1.orderType == OrderType.BUY) (order1, order2) else (order2, order1)
 
   override def builder: TransactionParser = ExchangeTransaction
 
