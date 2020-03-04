@@ -70,6 +70,7 @@ object FunctionIds {
   val BLS12_GROTH16_VERIFY: Short = 800
 
   val SIGVERIFY_LIM: Short = 2500 // Reserved n id for generated limited functions
+  val RSAVERIFY_LIM: Short = 2600 // Reserved n id for generated limited functions
 
   // Waves
   val GETTRANSACTIONBYID: Short      = 1000

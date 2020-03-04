@@ -92,6 +92,7 @@ object CryptoContext {
                                                         ("sig", BYTESTR),
                                                         ("pub", BYTESTR)) {
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
+          println(msg)
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case xs => notImplemented[Id, EVALUATED](s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
     }
@@ -127,6 +128,27 @@ object CryptoContext {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
             if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
           Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
+        case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
+          algFromCO(digestAlg) flatMap { alg =>
+            Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
+              .toEither
+              .bimap(_ => "Illegal input params", CONST_BOOLEAN)
+          }
+        case xs => notImplemented[Id, EVALUATED](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
+      }
+
+    val rsaVerifyL: Array[BaseFunction[NoContext]] = lgen(Array(1,2,4,8,16,32,64,256),
+                                                         (n => (s"rsaVerify_${n._1}Kb", (RSAVERIFY_LIM + n._2).toShort)),
+                                                         (n => 100 + n), // XXX
+                                                         (n => {
+                                                            case _ :: CONST_BYTESTR(msg: ByteStr) :: _ => Either.cond(msg.size <= n*1024, (), s"Invalid message size, must be not greater than $n Kb")
+                                                            case xs => notImplemented[Id, Unit](s"rsaVerify_${n}Kb(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
+                                                          }),
+                                                        BOOLEAN,
+                                                        ("digest", digestAlgorithmType),
+                                                        ("message", BYTESTR),
+                                                        ("sig", BYTESTR),
+                                                        ("pub", BYTESTR)) {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) flatMap { alg =>
             Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
@@ -261,7 +283,7 @@ object CryptoContext {
       )
 
     val v4Functions =
-      Array(bls12Groth16VerifyF) ++ sigVerifyL
+      Array(bls12Groth16VerifyF) ++ sigVerifyL ++ rsaVerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
