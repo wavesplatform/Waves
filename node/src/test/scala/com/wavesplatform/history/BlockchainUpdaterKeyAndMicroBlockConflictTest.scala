@@ -15,6 +15,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     extends PropSpec
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
+    with OptionValues
     with Matchers
     with TransactionGen
     with BlocksTransactionsHelpers {
@@ -63,12 +64,9 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
       case (genesisBlock, Seq(block1, block2), microBlocks, address) =>
         withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
           Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          // todo
-//          d.blockchainUpdater.accountDataKeys(address) shouldBe Set("test")
-
+          d.blockchainUpdater.accountData(address, "test") shouldBe 'defined
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          // todo
-//          d.blockchainUpdater.accountDataKeys(address) shouldBe Set("test")
+          d.blockchainUpdater.accountData(address, "test") shouldBe 'defined
         }
     }
   }
