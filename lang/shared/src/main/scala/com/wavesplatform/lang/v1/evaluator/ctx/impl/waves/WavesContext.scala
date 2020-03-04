@@ -104,6 +104,5 @@ object WavesContext {
 
   private def variableTypes(version: StdLibVersion, proofsEnabled: Boolean) =
     buildWavesTypes(proofsEnabled, version)           ++
-    (if (version >= V3) dAppTypes(version) else Nil)  ++
-    (if (version >= V4) List(blockHeader)  else Nil)
+    (if (version >= V3) dAppTypes(version) else Nil)
 }
