@@ -131,6 +131,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
+  protected def clearBalancesCache(): Unit = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long

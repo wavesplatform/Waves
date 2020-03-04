@@ -8,6 +8,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.transaction.TxVersion
 import play.api.libs.json._
 
 import scala.util.Random
@@ -27,7 +28,7 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     )
     val invalidRegexps = List("%5Ba-z", "%5Ba-z%5D%7B0", "%5Ba-z%5D%7B%2C5%7D")
     val data           = dataKeys.map(str => StringDataEntry(str, Random.nextString(16)))
-    val dataFee        = calcDataFee(data)
+    val dataFee        = calcDataFee(data, TxVersion.V1)
     val txId           = sender.putData(firstAddress, data, dataFee).id
     nodes.waitForHeightAriseAndTxPresent(txId)
 

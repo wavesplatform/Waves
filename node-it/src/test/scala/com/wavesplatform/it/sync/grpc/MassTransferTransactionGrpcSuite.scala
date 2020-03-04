@@ -13,9 +13,10 @@ import io.grpc.Status.Code
 class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
 
   test("asset mass transfer changes asset balances and sender's.waves balance is decreased by fee.") {
-    val firstBalance  = sender.wavesBalance(firstAddress)
-    val secondBalance = sender.wavesBalance(secondAddress)
-    val attachment    = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
+    for (v <- massTransferTxSupportedVersions) {
+      val firstBalance  = sender.wavesBalance(firstAddress)
+      val secondBalance = sender.wavesBalance(secondAddress)
+      val attachment    = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
 
     val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
     val assetId = PBTransactions
@@ -27,18 +28,19 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       .toString
     sender.waitForTransaction(assetId)
 
-    val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-    sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
+      val massTransferTransactionFee = calcMassTransferFee(transfers.size)
+      sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
 
-    val firstBalanceAfter  = sender.wavesBalance(firstAddress)
-    val secondBalanceAfter = sender.wavesBalance(secondAddress)
+      val firstBalanceAfter  = sender.wavesBalance(firstAddress)
+      val secondBalanceAfter = sender.wavesBalance(secondAddress)
 
-    firstBalanceAfter.regular shouldBe firstBalance.regular - issueFee - massTransferTransactionFee
-    firstBalanceAfter.effective shouldBe firstBalance.effective - issueFee - massTransferTransactionFee
-    sender.assetsBalance(firstAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe issueAmount - transferAmount
-    secondBalanceAfter.regular shouldBe secondBalance.regular
-    secondBalanceAfter.effective shouldBe secondBalance.effective
-    sender.assetsBalance(secondAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe transferAmount
+      firstBalanceAfter.regular shouldBe firstBalance.regular - issueFee - massTransferTransactionFee
+      firstBalanceAfter.effective shouldBe firstBalance.effective - issueFee - massTransferTransactionFee
+      sender.assetsBalance(firstAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe issueAmount - transferAmount
+      secondBalanceAfter.regular shouldBe secondBalance.regular
+      secondBalanceAfter.effective shouldBe secondBalance.effective
+      sender.assetsBalance(secondAddress, Seq(assetId)).getOrElse(assetId, 0L) shouldBe transferAmount
+    }
   }
 
   test("waves mass transfer changes waves balances") {
@@ -183,5 +185,4 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.wavesBalance(secondAddress).regular shouldBe secondBalance.regular + transferAmount - minFee
     sender.wavesBalance(secondAddress).effective shouldBe secondBalance.effective + transferAmount - minFee
   }
-
 }

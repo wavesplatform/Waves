@@ -160,7 +160,7 @@ object CommonValidation {
     def generic1or2Barrier(t: VersionedTransaction, name: String) = {
       if (t.version == 1.toByte) Right(tx)
       else if (t.version == 2.toByte) activationBarrier(BlockchainFeatures.SmartAccounts)
-      else Left(GenericError(s"Unknown version of $name transaction: ${t.version}"))
+      else Right(tx)
     }
 
     val versionsBarrier = tx match {
