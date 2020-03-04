@@ -18,15 +18,15 @@ class MassTransferTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       val secondBalance = sender.wavesBalance(secondAddress)
       val attachment    = ByteString.copyFrom("mass transfer description".getBytes("UTF-8"))
 
-    val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
-    val assetId = PBTransactions
-      .vanilla(
-        sender.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
-      )
-      .explicitGet()
-      .id()
-      .toString
-    sender.waitForTransaction(assetId)
+      val transfers = List(Transfer(Some(Recipient().withPublicKeyHash(secondAddress)), transferAmount))
+      val assetId = PBTransactions
+        .vanilla(
+          sender.broadcastIssue(firstAcc, "name", issueAmount, 8, reissuable = false, issueFee, waitForTx = true)
+        )
+        .explicitGet()
+        .id()
+        .toString
+      sender.waitForTransaction(assetId)
 
       val massTransferTransactionFee = calcMassTransferFee(transfers.size)
       sender.broadcastMassTransfer(firstAcc, Some(assetId), transfers, attachment, massTransferTransactionFee, waitForTx = true)
