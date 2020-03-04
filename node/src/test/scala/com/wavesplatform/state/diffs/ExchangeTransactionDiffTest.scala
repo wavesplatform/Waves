@@ -477,8 +477,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     ExchangeTransaction.signed(
       1.toByte,
       matcher = matcher,
-      buyOrder = buy.asInstanceOf[Order],
-      sellOrder = sell.asInstanceOf[Order],
+      order1 = buy.asInstanceOf[Order],
+      order2 = sell.asInstanceOf[Order],
       amount = amount,
       price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
@@ -612,8 +612,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       .signed(
         1.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = 425532,
         price = 238,
         buyMatcherFee = 41,
@@ -1190,8 +1190,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             .signed(
               2.toByte,
               matcher = matcher,
-              buyOrder = bigBuyOrder,
-              sellOrder = sellOrder,
+              order1 = bigBuyOrder,
+              order2 = sellOrder,
               amount = sellOrder.amount,
               price = bigBuyOrder.price,
               buyMatcherFee = buyMatcherFee,
