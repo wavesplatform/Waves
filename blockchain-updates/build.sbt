@@ -1,4 +1,4 @@
-import WavesDockerKeys._
+import sun.jvm.hotspot.opto.Compile
 
 name := "blockchain-updates"
 
@@ -8,6 +8,8 @@ extensionClasses += "com.wavesplatform.events.BlockchainUpdates"
 
 inConfig(Compile)(
   Seq(
+    PB.protoSources in Compile := Seq(PB.externalIncludePath.value),
+    includeFilter in PB.generate := new SimpleFileFilter((f: File) => f.getName.endsWith(".proto") && f.getParent.replace('\\', '/').endsWith("waves/events")),
     PB.targets += scalapb.gen(flatPackage = true) -> sourceManaged.value
   ))
 

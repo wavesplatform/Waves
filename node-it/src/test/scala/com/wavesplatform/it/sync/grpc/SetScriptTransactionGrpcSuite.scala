@@ -3,7 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
@@ -42,18 +42,18 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         }
       """.stripMargin
 
-      val script = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val script           = ScriptCompiler(scriptText, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       val scriptComplexity = Script.estimate(Script.fromBase64String(script.bytes().base64).explicitGet(), ScriptEstimatorV3).explicitGet()
-      val setScriptTx = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
-      val setScriptTxId = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
+      val setScriptTx      = sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
+      val setScriptTxId    = PBTransactions.vanilla(setScriptTx).explicitGet().id().toString
 
       val scriptInfo = sender.scriptInfo(contractAddr)
 
-    scriptInfo.script.map(PBTransactions.toVanillaScript) should contain(script)
-    scriptInfo.scriptText shouldBe script.expr.toString
-    scriptInfo.complexity shouldBe scriptComplexity
+      PBTransactions.toVanillaScript(scriptInfo.scriptBytes) should contain(script)
+      scriptInfo.scriptText shouldBe script.expr.toString
+      scriptInfo.complexity shouldBe scriptComplexity
 
-      sender.getTransaction(setScriptTxId).getTransaction.getSetScript.script.get shouldBe PBTransactions.toPBScript(script)
+      sender.getTransaction(setScriptTxId).getTransaction.getSetScript.script shouldBe PBTransactions.toPBScript(Some(script))
     }
   }
 
@@ -71,9 +71,9 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("able to broadcast tx if that is allowed by account-script") {
     for (v <- setScrTxSupportedVersions) {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
-      val firstBalance = sender.wavesBalance(contractAddr).available
-      val thirdBalance = sender.wavesBalance(thirdAddress).available
-      val transferFee = minFee + smartFee
+      val firstBalance             = sender.wavesBalance(contractAddr).available
+      val thirdBalance             = sender.wavesBalance(thirdAddress).available
+      val transferFee              = minFee + smartFee
 
       val unsignedTransfer = PBTransaction(
         chainId = AddressScheme.current.chainId,
@@ -81,14 +81,18 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
         fee = Some(Amount.of(ByteString.EMPTY, transferFee)),
         timestamp = System.currentTimeMillis(),
         version = 2,
-        data = PBTransaction.Data.Transfer(TransferTransactionData.of(
-          recipient = Some(Recipient().withPublicKeyHash(thirdAddress)),
-          amount = Some(Amount.of(ByteString.EMPTY, transferAmount)),
-          None
-        ))
+        data = PBTransaction.Data.Transfer(
+          TransferTransactionData.of(
+            recipient = Some(Recipient().withPublicKeyHash(thirdAddress)),
+            amount = Some(Amount.of(ByteString.EMPTY, transferAmount)),
+            None
+          )
+        )
       )
-      val sig1 = ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
-      val sig2 = ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
+      val sig1 =
+        ByteString.copyFrom(crypto.sign(secondAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
+      val sig2 =
+        ByteString.copyFrom(crypto.sign(thirdAcc, PBTransactions.vanilla(SignedTransaction(Some(unsignedTransfer))).explicitGet().bodyBytes()))
 
       sender.broadcast(unsignedTransfer, Seq(sig1, sig2), waitForTx = true)
 
@@ -121,7 +125,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       scriptInfo.complexity shouldBe 0L
 
       val contractBalance = sender.wavesBalance(contractAddr).available
-      val thirdBalance = sender.wavesBalance(thirdAddress).available
+      val thirdBalance    = sender.wavesBalance(thirdAddress).available
 
       sender.broadcastTransfer(contract, Recipient().withPublicKeyHash(thirdAddress), transferAmount, minFee, waitForTx = true)
 
@@ -133,16 +137,17 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   test("not able to broadcast tx from scripted acc if tx fee doesn't include smart fee") {
     for (v <- setScrTxSupportedVersions) {
       val (contract, contractAddr) = if (v < 2) (firstAcc, firstAddress) else (secondAcc, secondAddress)
-      val script = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
+      val script                   = ScriptCompiler(s"true", isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
       sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
 
-      val contractBalance = sender.wavesBalance(contractAddr).available
+      val contractBalance    = sender.wavesBalance(contractAddr).available
       val contractEffBalance = sender.wavesBalance(contractAddr).effective
-      val thirdBalance = sender.wavesBalance(thirdAddress).available
-      val thirdEffBalance = sender.wavesBalance(thirdAddress).effective
+      val thirdBalance       = sender.wavesBalance(thirdAddress).available
+      val thirdEffBalance    = sender.wavesBalance(thirdAddress).effective
 
       assertGrpcError(
-        sender.broadcastTransfer(contract, recipient = Recipient().withPublicKeyHash(thirdAddress), amount = transferAmount, fee = minFee + smartFee - 1),
+        sender
+          .broadcastTransfer(contract, recipient = Recipient().withPublicKeyHash(thirdAddress), amount = transferAmount, fee = minFee + smartFee - 1),
         "Transaction sent from smart account",
         Code.INVALID_ARGUMENT
       )
