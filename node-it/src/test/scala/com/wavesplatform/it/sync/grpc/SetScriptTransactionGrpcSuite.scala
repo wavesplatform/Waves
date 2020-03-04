@@ -120,7 +120,7 @@ class SetScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
       sender.broadcast(unsignedSetScript, Seq(sig1, sig2), waitForTx = true)
 
       val scriptInfo = sender.scriptInfo(contractAddr)
-      scriptInfo.script shouldBe empty
+      scriptInfo.scriptBytes shouldBe empty
       scriptInfo.scriptText shouldBe ""
       scriptInfo.complexity shouldBe 0L
 

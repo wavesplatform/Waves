@@ -1,8 +1,8 @@
-import sun.jvm.hotspot.opto.Compile
+import WavesDockerKeys._
 
 name := "blockchain-updates"
 
-libraryDependencies += Dependencies.kafka
+libraryDependencies ++= Dependencies.kafka +: Dependencies.protobuf.value
 
 extensionClasses += "com.wavesplatform.events.BlockchainUpdates"
 
