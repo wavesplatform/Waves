@@ -239,7 +239,7 @@ object InvokeScriptAssetIssueSuite {
       |{-# CONTENT_TYPE DAPP #-}
       |
       |@Callable(i)
-      |func i() = [Issue(unit, 0, "InvokeDesc", true, "InvokeAsset", 100, 0)]
+      |func i() = [Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)]
       |
       |@Callable(i)
       |func r(id: ByteVector) = [Reissue(id, true, 100)]
@@ -248,7 +248,7 @@ object InvokeScriptAssetIssueSuite {
       |func b(id: ByteVector) = [Burn(id, 100)]
       |
       |@Callable(i)
-      |func n() = [Issue(unit, 0, "NFT", false, "_NFT", 1, 0)]
+      |func n() = [Issue("_NFT", "NFT", 1, 0, false, unit, 0)]
       |
       |""".stripMargin
 }
