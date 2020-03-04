@@ -12,6 +12,7 @@ import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -475,7 +476,7 @@ object InvokeScriptTransactionDiff {
         }
 
       val diff = action match {
-        case t: AssetTransfer => applyTransfer(t, pk)
+        case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(MultiPaymentInvokeScript)) { pk } else { PublicKey(ByteStr.empty) }))
         case d: DataItem[_]   => applyDataItem(d)
         case i: Issue         => applyIssue(tx, pk, i)
         case r: Reissue       => applyReissue(r, pk)
