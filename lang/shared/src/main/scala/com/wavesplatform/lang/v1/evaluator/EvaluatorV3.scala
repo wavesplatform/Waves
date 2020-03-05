@@ -60,40 +60,28 @@ class EvaluatorV3(
         )
         if (unused < 0) throw new Error("Unused < 0")
         i.cond match {
-          case TRUE =>
-            if (unused == 0) 0
-            else {
-              val u2 = root(
-                expr = i.ifTrue,
-                update = update,
-                limit = unused,
-                parentBlocks = parentBlocks
-              )
-              if (u2 < 0) throw new Error("Unused < 0")
-              else if (u2 == 0) {
-                println(s"Stopping because true branch not evaluated: $u2")
-                0
-              } else u2 - 1
-            }
-          case FALSE =>
-            if (unused == 0) 0
-            else {
-              val u2 = root(
-                expr = i.ifFalse,
-                update = update,
-                limit = unused,
-                parentBlocks = parentBlocks
-              )
-              if (u2 < 0) throw new Error("Unused < 0")
-              else if (u2 == 0) {
-                println(s"Stopping because false branch not evaluated: $u2")
-                0
-              } else u2 - 1
-            }
+          case TRUE | FALSE if unused == 0 =>
+            0
+          case TRUE if unused > 0 =>
+            update(i.ifTrue)
+            root(
+              expr = i.ifTrue,
+              update = update,
+              limit = unused - 1,
+              parentBlocks = parentBlocks
+            )
+          case FALSE if unused > 0 =>
+            update(i.ifFalse)
+            root(
+              expr = i.ifFalse,
+              update = update,
+              limit = unused - 1,
+              parentBlocks = parentBlocks
+            )
           case e: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
           case nonEvaluated => {
             println(s"Stopping because condition not evaluated: $unused")
-            0
+            unused
           }
         }
 
