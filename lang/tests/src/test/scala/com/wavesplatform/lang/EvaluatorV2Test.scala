@@ -443,22 +443,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-  property("user functions and refs") {
-    inside(eval(
-      """                      # complexity
-        | let x = 1 + 1 + 1    # 2
-        | func f() = x         # 1
-        | func g() = x         # 1
-        | f() == g()           # 1 + 1 + 1 + 2
-      """.stripMargin,
-      limit = 100
-    )) {
-      case (_, decompiled, cost) =>
-        cost shouldBe 5
-        decompiled shouldBe "true"
-    }
-  }
-
   property("let overlap through function param") {
     inside(eval(
       """                                   # complexity

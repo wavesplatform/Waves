@@ -127,18 +127,20 @@ class EvaluatorV3(
                 unusedArgsEval - cost
               }
             case FunctionHeader.User(_, name) =>
-              findUserFunction(name, parentBlocks) match {
-                case None => throw new IllegalArgumentException(s"Function $name not found")
-                case Some(signature) =>
-                  val argsWithExpr =
-                    (signature.args zip fc.args)
-                      .foldRight(signature.body.deepCopy()) {
-                        case ((argName, argValue), argsWithExpr) =>
-                          BLOCK(LET(argName, argValue), argsWithExpr)
-                      }
-                  update(argsWithExpr)
-                  root(argsWithExpr, update, unusedArgsEval, parentBlocks)
-              }
+              if (unusedArgsEval > 0)
+                findUserFunction(name, parentBlocks) match {
+                  case None => throw new NoSuchElementException(s"Function $name not found")
+                  case Some(signature) =>
+                    val argsWithExpr =
+                      (signature.args zip fc.args)
+                        .foldRight(signature.body.deepCopy()) {
+                          case ((argName, argValue), argsWithExpr) =>
+                            BLOCK(LET(argName, argValue), argsWithExpr)
+                        }
+                    update(argsWithExpr)
+                    root(argsWithExpr, update, unusedArgsEval, parentBlocks)
+                }
+              else 0
           }
         } else {
           println(s"Stopping because not all args evaluated, unused: $unusedArgsEval")
@@ -157,6 +159,7 @@ class EvaluatorV3(
       case LET_BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks => evaluateRef(update, limit, l, nextParentBlocks)
       case BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks     => evaluateRef(update, limit, l, nextParentBlocks)
       case _ :: nextParentBlocks                               => visitRef(key, update, limit, nextParentBlocks)
+      case Nil                                                 => throw new NoSuchElementException("")
     }
 
   private def evaluateRef(
