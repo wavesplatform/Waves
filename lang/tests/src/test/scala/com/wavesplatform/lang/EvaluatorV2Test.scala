@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler, Types}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV3, FunctionIds}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -28,16 +28,16 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     PureContext.build(Global, version).withEnvironment[Environment] |+|
     WavesContext.build(DirectiveSet.contractDirectiveSet)
 
-  private def eval(expr: EXPR, limit: Int): (EvaluatorV2.EvaluatorResult, String, Int) = {
-    val environment = Common.emptyBlockchainEnvironment()
-    val evaluator = new EvaluatorV2(limit, version)
-    var ref = expr
-    val evaluatorCtx = evaluator.Context(ctx.evaluationContext(environment))
-    val (result, resultCtx) = evaluator.root(expr, evaluatorCtx, Nil, ref = _).value
-    (result, Decompiler(ref, ctx.decompilerContext), resultCtx.cost)
+  private val environment = Common.emptyBlockchainEnvironment()
+  private val evaluator =
+    new EvaluatorV3(ctx.evaluationContext(environment), version)
+
+  private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
+    val (result, unusedComplexity) = evaluator(expr, limit)
+    (result, Decompiler(result, ctx.decompilerContext), limit - unusedComplexity)
   }
 
-  private def eval(script: String, limit: Int): (EvaluatorV2.EvaluatorResult, String, Int) =
+  private def eval(script: String, limit: Int): (EXPR, String, Int) =
     eval(compile(script), limit)
 
   private def compile(script: String): EXPR = {
@@ -55,8 +55,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin
 
     inside(eval(script, limit = 0)) {
-      case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
+      case (_, decompiled, cost) =>
         cost shouldBe 0
         decompiled shouldBe
           """
@@ -225,7 +224,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         | f(1, 2)
       """.stripMargin
 
-/*
     inside(eval(script, limit = 0)) {
       case (_, decompiled, cost) =>
         cost shouldBe 0
@@ -240,7 +238,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
             |f(1, 2)
           """.stripMargin.trim
     }
-*/
 
     inside(eval(script, limit = 1)) {
       case (_, decompiled, cost) =>
@@ -598,7 +595,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
     inside(eval(script, limit = 0)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
         cost shouldBe 0
         decompiled shouldBe
           """
@@ -610,7 +606,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
     inside(eval(script, limit = 1)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
         cost shouldBe 1
         decompiled shouldBe
           """
@@ -622,23 +617,20 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
     inside(eval(script, limit = 2)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
         cost shouldBe 2
         decompiled shouldBe "((1 + 2) + 3)"
     }
 
     inside(eval(script, limit = 3)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
         cost shouldBe 3
-        //decompiled shouldBe "(3 + 3)"
+        decompiled shouldBe "(3 + 3)"
     }
 
     inside(eval(script, limit = 4)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Success(CONST_LONG(6))
         cost shouldBe 4
-        //decompiled shouldBe "6"
+        decompiled shouldBe "6"
     }
   }
 
@@ -651,14 +643,12 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
     inside(eval(script, limit = 0)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
         cost shouldBe 0
         decompiled shouldBe script
     }
 
     inside(eval(script, limit = 1)) {
       case (result, decompiled, cost) =>
-        result shouldBe EvaluatorV2.Stop
         cost shouldBe 1
         decompiled shouldBe
         """
@@ -674,9 +664,8 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     inside(eval(script, limit = 2)) {
       case (result, decompiled, cost) =>
         val expected = CONST_BYTESTR(ByteStr.decodeBase58("aaaa").get).explicitGet()
-        result shouldBe EvaluatorV2.Success(expected)
         cost shouldBe 2
-        // decompiled shouldBe "base58'aaaa'"
+        decompiled shouldBe "base58'aaaa'"
     }
   }
 
@@ -857,11 +846,11 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
     forAll(piecesGen) { pieces =>
       val (resultExpr, summarizedCost) =
-        pieces.foldLeft((EvaluatorV2.Stop : EvaluatorV2.EvaluatorResult, startCost)) {
-          case ((previousResult, costSum), nextCostLimit) =>
-            previousResult shouldBe EvaluatorV2.Stop
-            val (result, _, cost) = eval(expr, nextCostLimit)
-            (result, costSum + cost)
+        pieces.foldLeft((expr, startCost)) {
+          case ((currentExpr, costSum), nextCostLimit) =>
+            currentExpr should not be an[EVALUATED]
+            val (nextExpr, _, cost) = eval(expr, nextCostLimit)
+            (nextExpr, costSum + cost)
         }
       resultExpr shouldBe evaluated
       summarizedCost shouldBe precalculatedComplexity
