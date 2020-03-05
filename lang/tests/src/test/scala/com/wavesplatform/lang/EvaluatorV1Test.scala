@@ -353,6 +353,19 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     r.isRight shouldBe true
   }
 
+
+  property("fail if sigVerify_NKb limits exhausted") {
+    implicit val version = V4
+    val seed                    = "seed".getBytes("UTF-8")
+    val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
+
+    val bodyBytes = ("m"*4097).getBytes("UTF-8")
+    val signature = Curve25519.sign(privateKey, bodyBytes)
+
+    val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(2))
+    r.isLeft shouldBe true
+  }
+
   property("returns correct context") {
     val (alicePrivateKey, _)          = Curve25519.createKeyPair("seed0".getBytes("UTF-8"))
     val (bobPrivateKey, bobPublicKey) = Curve25519.createKeyPair("seed1".getBytes("UTF-8"))
