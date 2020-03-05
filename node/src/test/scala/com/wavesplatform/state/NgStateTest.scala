@@ -29,12 +29,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
         microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L, 0L))
 
-        ng.totalDiffOf(microBlocks.last.totalResBlockSig)
+        ng.totalDiffOf(microBlocks.last.totalResBlockRef)
         microBlocks.foreach { m =>
-          val (forged, _, _, _, _) = ng.totalDiffOf(m.totalResBlockSig).get
+          val (forged, _, _, _, _) = ng.totalDiffOf(m.totalResBlockRef).get
           forged.signaturesValid() shouldBe 'right
         }
-        Seq(microBlocks(4)).map(x => ng.totalDiffOf(x.totalResBlockSig))
+        Seq(microBlocks(4)).map(x => ng.totalDiffOf(x.totalResBlockRef))
     }
   }
 
@@ -46,7 +46,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
         microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L, 0L))
 
-        ng.bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockSig
+        ng.bestLiquidBlock.uniqueId shouldBe microBlocks.last.totalResBlockRef
 
         new NgState(block, Diff.empty, 0L, 0L, Set.empty, Some(0), block.header.generationSignature, Map.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
@@ -66,9 +66,9 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         }
 
         ng.bestLastBlockInfo(0).blockId shouldBe block.uniqueId
-        ng.bestLastBlockInfo(1001).blockId shouldBe microBlocks.head.totalResBlockSig
-        ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
-        ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
+        ng.bestLastBlockInfo(1001).blockId shouldBe microBlocks.head.totalResBlockRef
+        ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockRef
+        ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockRef
 
         new NgState(block, Diff.empty, 0L, 0L, Set.empty, Some(0), block.header.generationSignature, Map.empty).bestLiquidBlock.uniqueId shouldBe block.uniqueId
     }
@@ -85,7 +85,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         ng.totalDiffOf(block.uniqueId).map(_._3) shouldBe Some(0L)
         microBlocks.zipWithIndex.foreach {
           case (m, i) =>
-            val u = ng.totalDiffOf(m.totalResBlockSig).map(_._3)
+            val u = ng.totalDiffOf(m.totalResBlockRef).map(_._3)
             u shouldBe Some(i + 1)
         }
         ng.carryFee shouldBe microBlocks.size

@@ -18,9 +18,10 @@ object PBMicroBlocks {
       microBlock.version.toByte,
       PublicKey(microBlock.senderPublicKey.toByteArray),
       transactions,
-      ByteStr(microBlock.reference.toByteArray),
-      ByteStr(microBlock.updatedBlockSignature.toByteArray),
-      ByteStr(signedMicro.signature.toByteArray)
+      microBlock.reference,
+      microBlock.totalBlockRef,
+      signedMicro.signature,
+      microBlock.totalSignature
     )
   }
 
@@ -29,10 +30,11 @@ object PBMicroBlocks {
       microBlock = Some(
         PBMicroBlock(
           version = microBlock.version,
-          reference = microBlock.prevResBlockSig,
-          updatedBlockSignature = microBlock.totalResBlockSig,
+          reference = microBlock.prevResBlockRef,
+          totalBlockRef = microBlock.totalResBlockRef,
           senderPublicKey = ByteStr(microBlock.sender),
-          transactions = microBlock.transactionData.map(PBTransactions.protobuf)
+          transactions = microBlock.transactionData.map(PBTransactions.protobuf),
+          totalSignature = microBlock.totalSignature
         )
       ),
       signature = microBlock.signature

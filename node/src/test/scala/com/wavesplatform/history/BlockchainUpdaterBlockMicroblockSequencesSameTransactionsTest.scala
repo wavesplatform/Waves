@@ -59,7 +59,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
       case (domain, (miner, genesis, payment, ts)) =>
         val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
         val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, Seq(Seq(payment)), miner, 3, ts)
-        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
+        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockRef, Seq.empty, miner, 3, ts)
         domain.blockchainUpdater.processBlock(genBlock).explicitGet()
         domain.blockchainUpdater.processBlock(base).explicitGet()
         domain.blockchainUpdater.processMicroBlock(micros.head).explicitGet()
@@ -91,7 +91,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
       case (domain, (miner, genesis, microBlockTxs, ts)) =>
         val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
         val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, microBlockTxs, miner, 3, ts)
-        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
+        val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockRef, Seq.empty, miner, 3, ts)
         domain.blockchainUpdater.processBlock(genBlock).explicitGet()
         domain.blockchainUpdater.processBlock(base).explicitGet()
         micros.foreach(domain.blockchainUpdater.processMicroBlock(_).explicitGet())
@@ -211,7 +211,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
   }
 
   def bestRef(r: BlockAndMicroblocks): ByteStr = r._2.lastOption match {
-    case Some(mb) => mb.totalResBlockSig
+    case Some(mb) => mb.totalResBlockRef
     case None     => r._1.uniqueId
   }
 

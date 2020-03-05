@@ -417,7 +417,7 @@ class AssetTransactionsDiffTest
           }
 
           val (keyBlock1, Nil) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockSig, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockRef, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
           d.appendBlock(keyBlock1)
 
           { // Check after new key block

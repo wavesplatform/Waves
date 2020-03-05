@@ -76,8 +76,18 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
     def nftIssue(from: KeyPair, timestamp: Gen[Long] = timestampGen): Gen[IssueTransaction] =
       for {
         timestamp <- timestamp
-      } yield IssueTransaction(TxVersion.V1, from, "test".utf8Bytes, Array.emptyByteArray, 1, 0, reissuable = false, script = None, 100000000L, timestamp)
-        .signWith(from)
+      } yield IssueTransaction(
+        TxVersion.V1,
+        from,
+        "test".utf8Bytes,
+        Array.emptyByteArray,
+        1,
+        0,
+        reissuable = false,
+        script = None,
+        100000000L,
+        timestamp
+      ).signWith(from)
 
     def setScript(from: KeyPair, script: Script, timestamp: Gen[Long] = timestampGen): Gen[SetScriptTransaction] =
       for {
@@ -125,9 +135,17 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ts: Long
     ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned      = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.uniqueId, ByteStr.empty)
-      val signature     = crypto.sign(signer, unsigned.bytes())
-      val signed        = unsigned.copy(signature = ByteStr(signature))
+      val unsigned = new MicroBlock(
+        version,
+        signer,
+        txs,
+        prevTotal.uniqueId,
+        newTotalBlock.uniqueId,
+        ByteStr.empty,
+        if (version >= Block.ProtoBlockVersion) newTotalBlock.signature else ByteStr.empty
+      )
+      val signature = crypto.sign(signer, unsigned.bytes())
+      val signed    = unsigned.copy(signature = ByteStr(signature))
       (newTotalBlock, signed)
     }
 

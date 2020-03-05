@@ -36,7 +36,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
-        val badSigMicro            = microblocks1.head.copy(totalResBlockSig = randomSig)
+        val badSigMicro            = microblocks1.head.copy(totalResBlockRef = randomSig)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(badSigMicro) should produce("InvalidSignature")

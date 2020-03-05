@@ -266,7 +266,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       b3        = mkEmptyBlock(b2.uniqueId, miner)
       b4        = mkEmptyBlock(b3.uniqueId, miner)
       (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx)), miner, 3.toByte, ntpNow)
-      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
+      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockRef, Seq.empty, miner)
       b6b = TestBlock.sign(
         miner,
         b6a.copy(header = b6a.header.copy(baseTarget = b6a.header.baseTarget - 1L))
@@ -305,7 +305,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       b3        = mkEmptyBlock(b2.uniqueId, miner)
       b4        = mkEmptyBlock(b3.uniqueId, miner)
       (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx1)), miner, 3.toByte, ntpNow)
-      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
+      b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockRef, Seq.empty, miner)
       b6b       = TestBlock.sign(miner, b6a.copy(transactionData = Seq(tx2)))
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
 

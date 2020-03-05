@@ -39,7 +39,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
   private def microBlockGen(txs: Seq[Transaction], signer: KeyPair): Gen[MicroBlock] =
     for {
       sig <- byteArrayGen(crypto.SignatureLength).map(ByteStr.apply)
-      mb = MicroBlock.buildAndSign(3.toByte, signer, txs, genesis.signature, sig).explicitGet()
+      mb = MicroBlock.buildAndSign(3.toByte, signer, txs, genesis.signature, sig, ByteStr.empty).explicitGet()
     } yield mb
 
   /**
@@ -109,7 +109,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
       } yield (mb, mba)
     } {
       case (mb, MicroBlockAppended(toId, toHeight, microBlock, _, _)) =>
-        toId shouldBe mb.totalResBlockSig
+        toId shouldBe mb.totalResBlockRef
         toHeight shouldBe blockchain.height
 
         microBlock.signature shouldBe mb.signature

@@ -78,7 +78,7 @@ object TxValidationError {
     }
 
   case class MicroBlockAppendError(err: String, microBlock: MicroBlock) extends ValidationError {
-    override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockSig} ~> ${microBlock.prevResBlockSig.trim}])"
+    override def toString: String = s"MicroBlockAppendError($err, ${microBlock.totalResBlockRef} ~> ${microBlock.prevResBlockRef.trim}])"
   }
 
   case object EmptyDataKey extends ValidationError {

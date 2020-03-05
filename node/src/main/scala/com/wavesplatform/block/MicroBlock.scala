@@ -17,9 +17,10 @@ case class MicroBlock(
     version: Byte,
     sender: PublicKey,
     transactionData: Seq[Transaction],
-    prevResBlockSig: BlockId,
-    totalResBlockSig: BlockId,
-    signature: ByteStr
+    prevResBlockRef: BlockId,
+    totalResBlockRef: BlockId,
+    signature: ByteStr,
+    totalSignature: ByteStr
 ) extends Signed {
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(MicroBlockSerializer.toBytes(this))
@@ -29,7 +30,7 @@ case class MicroBlock(
   override val signatureValid: Coeval[Boolean]        = Coeval.evalOnce(crypto.verify(signature.arr, bytesWithoutSignature(), sender))
   override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
-  override def toString: String = s"MicroBlock(${totalResBlockSig.trim} -> ${prevResBlockSig.trim}, txs=${transactionData.size})"
+  override def toString: String = s"MicroBlock(${totalResBlockRef.trim} -> ${prevResBlockRef.trim}, txs=${transactionData.size})"
 }
 
 object MicroBlock extends ScorexLogging {
@@ -39,9 +40,10 @@ object MicroBlock extends ScorexLogging {
       generator: KeyPair,
       transactionData: Seq[Transaction],
       prevResBlockSig: BlockId,
-      totalResBlockSig: BlockId
+      totalResBlockSig: BlockId,
+      totalSignature: ByteStr
   ): Either[ValidationError, MicroBlock] =
-    MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty).validate
+    MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, ByteStr.empty, totalSignature).validate
       .map(_.sign(generator))
 
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =

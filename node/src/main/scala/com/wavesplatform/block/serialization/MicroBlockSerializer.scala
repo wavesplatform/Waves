@@ -3,7 +3,7 @@ package com.wavesplatform.block.serialization
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Ints}
-import com.wavesplatform.block.MicroBlock
+import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto.SignatureLength
 import com.wavesplatform.serialization.ByteBufferOps
@@ -15,11 +15,12 @@ object MicroBlockSerializer {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
     Bytes.concat(
       Array(microBlock.version),
-      microBlock.prevResBlockSig.arr,
-      microBlock.totalResBlockSig.arr,
+      microBlock.prevResBlockRef.arr,
+      microBlock.totalResBlockRef.arr,
       Ints.toByteArray(transactionDataBytes.length),
       transactionDataBytes,
       microBlock.sender.arr,
+      microBlock.totalSignature.arr,
       microBlock.signature.arr
     )
   }
@@ -29,15 +30,16 @@ object MicroBlockSerializer {
       val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
 
       val version          = buf.get
-      val prevResBlockSig  = ByteStr(buf.getByteArray(SignatureLength))
-      val totalResBlockSig = ByteStr(buf.getByteArray(SignatureLength))
+      val prevResBlockSig  = ByteStr(buf.getByteArray(Block.referenceLength(version)))
+      val totalResBlockSig = ByteStr(buf.getByteArray(Block.referenceLength(version)))
 
       buf.getInt
 
       val transactionData = readTransactionData(version, buf)
       val generator       = buf.getPublicKey
+      val totalSignature  = if (version >= Block.ProtoBlockVersion) ByteStr(buf.getByteArray(SignatureLength)) else ByteStr.empty
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
 
-      MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature)
+      MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature, totalSignature)
     }
 }

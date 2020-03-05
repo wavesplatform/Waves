@@ -41,8 +41,8 @@ package object history {
     featuresSettings = settings.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false)
   )
 
-  val defaultSigner       = KeyPair(Array.fill(KeyLength)(0: Byte))
-  val generationSignature = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
+  val defaultSigner          = KeyPair(Array.fill(KeyLength)(0: Byte))
+  val generationSignature    = ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
   val generationVRFSignature = ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte))
 
   def correctGenerationSignature(version: Byte): ByteStr = if (version < Block.ProtoBlockVersion) generationSignature else generationVRFSignature
@@ -85,7 +85,16 @@ package object history {
   ): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val nonSigned = MicroBlock
-      .buildAndSign(version, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
+      .buildAndSign(
+        version,
+        generator = signer,
+        transactionData = txs,
+        prevResBlockSig = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.uniqueId,
+        totalSignature =
+          if (version >= Block.ProtoBlockVersion) newTotalBlock.signature
+          else ByteStr.empty
+      )
       .explicitGet()
     (newTotalBlock, nonSigned)
   }
@@ -93,7 +102,14 @@ package object history {
   def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val nonSigned = MicroBlock
-      .buildAndSign(3.toByte, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
+      .buildAndSign(
+        3.toByte,
+        generator = signer,
+        transactionData = txs,
+        prevResBlockSig = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.uniqueId,
+        totalSignature = ByteStr.empty
+      )
       .explicitGet()
     (newTotalBlock, nonSigned)
   }

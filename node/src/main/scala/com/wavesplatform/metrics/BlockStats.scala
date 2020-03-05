@@ -94,7 +94,7 @@ object BlockStats {
 
   def received(m: MicroBlock, ch: Channel): Unit = write(
     micro(m)
-      .tag("parent-id", id(m.prevResBlockSig))
+      .tag("parent-id", id(m.prevResBlockRef))
       .addField("from", nodeName(ch)),
     Event.Received,
     Seq.empty
@@ -115,7 +115,7 @@ object BlockStats {
 
   def mined(m: MicroBlock): Unit = write(
     micro(m)
-      .tag("parent-id", id(m.prevResBlockSig))
+      .tag("parent-id", id(m.prevResBlockRef))
       .addField("txs", m.transactionData.size),
     Event.Mined,
     Seq.empty
@@ -128,7 +128,7 @@ object BlockStats {
 
   private def micro(m: MicroBlock): Point.Builder =
     measurement(Type.Micro)
-      .tag("id", id(m.totalResBlockSig))
+      .tag("id", id(m.totalResBlockRef))
 
   private def measurement(t: Type): Point.Builder =
     Point.measurement("block").tag("type", t.toString)

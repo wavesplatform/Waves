@@ -34,7 +34,7 @@ class BlockchainUpdaterBadReferencesTest
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3).map(Seq(_)))
         val goodMicro              = microblocks1(0)
-        val badMicroRef            = microblocks1(1).copy(prevResBlockSig = randomSig)
+        val badMicroRef            = microblocks1(1).copy(prevResBlockRef = randomSig)
 
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -50,7 +50,7 @@ class BlockchainUpdaterBadReferencesTest
         val block0 = blocks(0)
         val block1 = blocks(1)
         val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), defaultSigner)._2
-          .copy(prevResBlockSig = randomSig)
+          .copy(prevResBlockRef = randomSig)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(badMicroRef) should produce("doesn't reference base block")
@@ -64,7 +64,7 @@ class BlockchainUpdaterBadReferencesTest
         val block0 = blocks(0)
         val block1 = blocks(1)
         val badMicroRef = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), defaultSigner)._2
-          .copy(prevResBlockSig = randomSig)
+          .copy(prevResBlockRef = randomSig)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(badMicroRef) should produce("doesn't reference base block")
@@ -89,7 +89,7 @@ class BlockchainUpdaterBadReferencesTest
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
         val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2, payment3).map(Seq(_)))
         val goodMicro              = microblocks1(0)
-        val badRefMicro            = microblocks1(1).copy(prevResBlockSig = block1.uniqueId)
+        val badRefMicro            = microblocks1(1).copy(prevResBlockRef = block1.uniqueId)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(goodMicro).explicitGet()
