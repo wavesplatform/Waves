@@ -1,59 +1,30 @@
 package com.wavesplatform.lang.v1.evaluator
 
-import com.wavesplatform.lang.Global
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.V3
-import com.wavesplatform.lang.v1.compiler.Decompiler
-import com.wavesplatform.lang.v1.{BaseGlobal, FunctionHeader}
+import cats.Id
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, NativeFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 
-object EvaluatorV3 extends App {
+import scala.annotation.tailrec
 
-  def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[FUNC] = {
-    parentBlocks match {
-      case (l: LET_BLOCK) :: _                         => ???
-      case (b @ BLOCK(f @ FUNC(`name`, _, _), _)) :: _ => Some(f)
-      case _ :: xs                                     => findUserFunction(name, xs)
-      case Nil                                         => None
-    }
+class EvaluatorV3(
+  val ctx: EvaluationContext[Environment, Id],
+  val stdLibVersion: StdLibVersion
+) {
+
+  def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
+    var ref = expr
+    val unused = root(expr, ref = _, limit, Nil)
+    (ref, unused)
   }
 
-  def visitRef(key: String, update: EVALUATED => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int =
-    parentBlocks match {
-      case (l: LET_BLOCK) :: _ => ???
-      case (b @ BLOCK(l @ LET(`key`, _), _)) :: nextParentBlocks =>
-        val unused = root(
-          expr = l.value,
-          update = {
-            case ev: EVALUATED =>
-              l.value = ev
-              update(ev)
-            case nonEvaluated =>
-              l.value = nonEvaluated
-          },
-          limit = limit,
-          parentBlocks = nextParentBlocks
-        )
-        if (unused < 0) throw new Error("Unused < 0")
-        else if (l.value.isInstanceOf[EVALUATED]) {
-          if (unused == 0) {
-            println(s"Stopping because ref not evaluated: $unused, ")
-            0
-          } else {
-            println(s"REF $key: reducing unused to ${unused - 1}")
-            unused - 1
-          }
-        } else unused
-      case _ :: nextParentBlocks => visitRef(key, update, limit, nextParentBlocks)
-    }
+  private def root(expr: EXPR, update: EXPR => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int = {
+    //println(s"Visiting $expr")
 
-  def root(expr: EXPR, update: EXPR => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int = {
-    println(s"Visiting $expr")
-    val dc = expr.deepCopy()
-    val r= expr match {
+    expr match {
       case b: BLOCK_DEF =>
         root(
           expr = b.body,
@@ -145,12 +116,13 @@ object EvaluatorV3 extends App {
         if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
           fc.function match {
             case FunctionHeader.Native(_) =>
-              val cost = 5
+              val NativeFunction(_, costByVersion, _, ev, _) = ctx.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
+              val cost = costByVersion(stdLibVersion).toInt
               if (unusedArgsEval < cost) {
                 println(s"Stopping because not enough limit to evaluate function: $unusedArgsEval")
                 0
               } else {
-                update(CONST_LONG(fc.args(0).asInstanceOf[CONST_LONG].t + fc.args(1).asInstanceOf[CONST_LONG].t))
+                update(ev[Id]((ctx.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
                 println(s"FUNCTION CALL: reducing unused to ${unusedArgsEval - cost}")
                 unusedArgsEval - cost
               }
@@ -176,110 +148,45 @@ object EvaluatorV3 extends App {
         update(evaluated)
         limit
     }
-    println(s"Finished visiting $dc, result: $expr, Consumed: ${limit-r}")
-    r
+    //println(s"Finished visiting $dc, result: $expr, Consumed: ${limit-r}")
   }
 
+  @tailrec
+  private def visitRef(key: String, update: EVALUATED => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int =
+    parentBlocks match {
+      case LET_BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks => evaluateRef(update, limit, l, nextParentBlocks)
+      case BLOCK(l @ LET(`key`, _), _) :: nextParentBlocks     => evaluateRef(update, limit, l, nextParentBlocks)
+      case _ :: nextParentBlocks                               => visitRef(key, update, limit, nextParentBlocks)
+    }
 
-  def expr() =
-    BLOCK(
-      LET("a", FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(CONST_LONG(1), CONST_LONG(1)))),
-      BLOCK(
-        LET("b", REF("a")),
-        BLOCK(
-          FUNC(
-            "g",
-            Nil,
-            BLOCK(
-              LET(
-                "a",
-                FUNCTION_CALL(
-                  FunctionHeader.Native(FunctionIds.SUM_LONG),
-                  List(
-                    FUNCTION_CALL(
-                      FunctionHeader.Native(FunctionIds.SUM_LONG),
-                      List(CONST_LONG(2), CONST_LONG(2))
-                    ),
-                    CONST_LONG(2)
-                  )
-                )
-              ),
-              BLOCK(
-                LET("c", REF("a")),
-                FUNCTION_CALL(
-                  FunctionHeader.Native(FunctionIds.SUM_LONG),
-                  List(
-                    REF("c"),
-                    FUNCTION_CALL(
-                      FunctionHeader.Native(FunctionIds.SUM_LONG),
-                      List(REF("b"), REF("a"))
-                    )
-                  )
-                )
-              )
-            )
-          ),
-          FUNCTION_CALL(
-            FunctionHeader.Native(FunctionIds.SUM_LONG),
-            List(FUNCTION_CALL(FunctionHeader.User("g"), Nil), REF("a"))
-          )
-        )
-      )
+  private def evaluateRef(
+    update: EVALUATED => Unit,
+    limit: Int,
+    let: LET,
+    nextParentBlocks: List[BLOCK_DEF]
+  ) = {
+    val unused = root(
+      expr = let.value,
+      update = let.value = _,
+      limit = limit,
+      parentBlocks = nextParentBlocks
     )
-  def buildSum(a: EXPR, b: EXPR) = FUNCTION_CALL(FunctionHeader.Native(FunctionIds.SUM_LONG), List(a, b))
-
-  def expr2() = buildSum(
-    buildSum(
-      buildSum(CONST_LONG(1), CONST_LONG(2)),
-      buildSum(CONST_LONG(3), CONST_LONG(4))
-    ),
-    CONST_LONG(5)
-  )
-
-  def expr3() = buildSum(
-    buildSum(
-      BLOCK(LET("a",buildSum(CONST_LONG(1), CONST_LONG(2))), buildSum(REF("a"),CONST_LONG(6))),
-      buildSum(CONST_LONG(3), CONST_LONG(4))
-    ),
-    CONST_LONG(5)
-  )
-
-  def expr4() =
-    BLOCK(
-      LET("a", CONST_LONG(2)),
-      BLOCK(
-        LET("a", CONST_LONG(6)),
-        REF("a")))
-
-  def expr5() =
-    BLOCK(
-      LET("a", buildSum(CONST_LONG(1), CONST_LONG(1))),
-      BLOCK(
-        LET("b", REF("a")),
-        buildSum(
-        BLOCK(
-          LET("a", CONST_LONG(6)),
-          BLOCK(
-            LET("c", CONST_LONG(6)),
-            buildSum(CONST_LONG(6), buildSum(REF("b"), CONST_LONG(6)))
-          )
-        ), REF("a"))
-      )
-    )
-
-  import cats.implicits._
-  private val Global: BaseGlobal = com.wavesplatform.lang.Global // Hack for IDEA
-
-  val ctx =
-    PureContext.build(Global, V3).withEnvironment[Environment] |+|
-    WavesContext.build(DirectiveSet.contractDirectiveSet)
-
-  Range(0, 100).foreach { c =>
-    var e: EXPR = expr5()
-    println(s"==== limit: $c ====")
-    println("unused cost: " + root(e, e = _, c, List.empty))
-    println(Decompiler(e, ctx.decompilerContext))
-    println()
-
+    if (unused < 0) throw new Error("Unused < 0")
+    let.value match {
+      case ev: EVALUATED if unused > 0 =>
+        update(ev)
+        unused - 1
+      case _ =>
+        unused
+    }
   }
+
+  @tailrec
+  private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[FUNC] =
+    parentBlocks match {
+      case (l: LET_BLOCK) :: xs                        => findUserFunction(name, xs)
+      case (b @ BLOCK(f @ FUNC(`name`, _, _), _)) :: _ => Some(f)
+      case _ :: xs                                     => findUserFunction(name, xs)
+      case Nil                                         => None
+    }
 }
