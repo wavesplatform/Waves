@@ -19,8 +19,7 @@ class CommonScriptEstimatorTest
   extends ScriptEstimatorTestBase(
     ScriptEstimatorV1,
     ScriptEstimatorV2,
-    ScriptEstimatorV3,
-    evaluatorV2AsEstimator
+    ScriptEstimatorV3
   ) {
 
   property("recursive func block") {
@@ -234,9 +233,11 @@ class CommonScriptEstimatorTest
 object CommonScriptEstimatorTest {
   private val evaluatorV2 = new EvaluatorV2(1000, V3)
 
+/*
   private val evaluatorCtx =
     evaluatorV2.Context(ScriptEstimatorTestBase.ctx.evaluationContext(Common.emptyBlockchainEnvironment()))
 
   private val evaluatorV2AsEstimator: ScriptEstimator =
-    (_, _, expr) => Try(evaluatorV2.root(expr, evaluatorCtx).value).toEither.bimap(_.toString, _._2.cost)
+    (_, _, expr) => Try(evaluatorV2.root(expr, evaluatorCtx, Nil).value).toEither.bimap(_.toString, _._2.cost)
+*/
 }

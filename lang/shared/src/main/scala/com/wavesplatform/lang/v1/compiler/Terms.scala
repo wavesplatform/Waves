@@ -14,61 +14,99 @@ object Terms {
 
   sealed abstract class DECLARATION {
     def toStr: Coeval[String]
+    def deepCopy(): DECLARATION
     override def toString: String = toStr()
   }
   case class LET(name: String, var value: EXPR)                     extends DECLARATION {
     def toStr: Coeval[String] = for {
       e <- value.toStr
     } yield "LET(" ++ name.toString ++ "," ++ e ++ ")"
+
+    def deepCopy(): LET =
+      LET(name, value.deepCopy())
   }
-  case class FUNC(name: String, args: List[String], body: EXPR) extends DECLARATION {
+  case class FUNC(name: String, args: List[String], var body: EXPR) extends DECLARATION {
     def toStr: Coeval[String] = for {
       e <- body.toStr
     } yield "FUNC(" ++ name.toString ++ "," ++ args.toString ++ "," ++ e ++ ")"
+
+    def deepCopy(): FUNC =
+      FUNC(name, args, body.deepCopy())
   }
 
   sealed abstract class EXPR {
     def toStr: Coeval[String]
+    def deepCopy(): EXPR
     override def toString: String = toStr()
   }
-  case class GETTER(expr: EXPR, field: String)                         extends EXPR {
+  case class GETTER(var expr: EXPR, field: String)                         extends EXPR {
     def toStr: Coeval[String] = for {
       e <- expr.toStr
     } yield "GETTER(" ++ e ++ "," ++ field.toString ++ ")"
+
+    override def deepCopy(): EXPR =
+      GETTER(expr.deepCopy(), field)
   }
+
+  sealed trait BLOCK_DEF {
+    val dec: DECLARATION
+    var body: EXPR
+  }
+
   @Deprecated
-  case class LET_BLOCK(let: LET, body: EXPR)                           extends EXPR {
+  case class LET_BLOCK(let: LET, var body: EXPR)                           extends EXPR with BLOCK_DEF {
     def toStr: Coeval[String] = for {
       e <- let.toStr
       b <- body.toStr
     } yield "LET_BLOCK(" ++ e ++ "," ++ b ++ ")"
+
+    override val dec: DECLARATION = let
+
+    override def deepCopy(): EXPR =
+      LET_BLOCK(let.deepCopy(), body.deepCopy())
   }
-  case class BLOCK(dec: DECLARATION, body: EXPR)                       extends EXPR {
+
+  case class BLOCK(dec: DECLARATION, var body: EXPR)                       extends EXPR with BLOCK_DEF {
     def toStr: Coeval[String] = for {
       e <- dec.toStr
       b <- body.toStr
     } yield "BLOCK(" ++ e ++ "," ++ b ++ ")"
+
+    override def deepCopy(): EXPR =
+      BLOCK(dec.deepCopy(), body.deepCopy())
   }
-  case class IF(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)               extends EXPR {
+  case class IF(var cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)               extends EXPR {
     def toStr: Coeval[String] = for {
       c <- cond.toStr
       t <- ifTrue.toStr
       f <- ifFalse.toStr
     } yield "IF(" ++ c ++ "," ++ t ++ "," ++ f ++ ")"
+
+    override def deepCopy(): EXPR =
+      IF(cond.deepCopy(), ifTrue.deepCopy(), ifFalse.deepCopy())
   }
   case class REF(key: String)                                          extends EXPR {
     override def toString: String = "REF(" ++ key.toString ++ ")"
     def toStr: Coeval[String] = Coeval.now(toString)
+
+    override def deepCopy(): EXPR =
+      this
   }
   case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] = for {
       e <- args.map(_.toStr).sequence
-    } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
+    } yield  s"sum($e)" // "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
+
+    override def deepCopy(): EXPR =
+      FUNCTION_CALL(function, args.map(_.deepCopy()))
   }
 
   sealed trait EVALUATED extends EXPR {
     def prettyString(level: Int) : String = toString
     def toStr: Coeval[String] = Coeval.now(toString)
+
+    override def deepCopy(): EXPR =
+      this
   }
   case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString  }
 

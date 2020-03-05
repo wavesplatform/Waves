@@ -1,232 +1,263 @@
-package com.wavesplatform.lang.v1.evaluator
-
-import cats.{Eval, Id}
-import cats.implicits._
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.FunctionHeader
-import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
-import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, LazyVal, NativeFunction, UserFunction}
-import com.wavesplatform.lang.v1.traits.Environment
-
-class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
-  object Context {
-    def apply(context: EvaluationContext[Environment, Id]): Context = {
-      def extractLet(let: LazyVal[Id]) =
-        (let.value.value.explicitGet(), Context(environment = context.environment), true)
-
-      Context(
-        functions = context.functions,
-        //lets = context.letDefs.mapValues(extractLet), todo
-        types = context.typeDefs,
-        environment = context.environment
-      )
-    }
-  }
-
-  case class Context(
-    lets: Map[String, (EXPR, Context, Boolean)] = Map(),
-    functions: Map[FunctionHeader, BaseFunction[Environment]] = Map(),
-    types: Map[String, FINAL] = Map(),
-    environment: Environment[Id],
-    cost: Int = 0
-  ) {
-    val isExhausted: Boolean =
-      cost >= limit
-
-    def withCost(addCost: Int): Context =
-      copy(cost = cost + addCost)
-
-    def withLet(letName: String, letValue: EXPR, ctx: Context, isEvaluated: Boolean): Context =
-      copy(lets = lets + (letName -> (letValue, ctx, isEvaluated)))
-
-    def withoutLet(let: String): Context =
-      copy(lets = lets - let)
-
-    def withFunction(function: UserFunction[Environment]): Context =
-      copy(functions = functions + (function.header -> function))
-
-    def withoutFunction(header: FunctionHeader): Context =
-      copy(functions = functions - header)
-
-    def filterDecls(base: Context): Context =
-      copy(
-        lets = this.lets.filterKeys(base.lets.contains),
-        functions = this.functions.filterKeys(base.functions.contains)
-      )
-
-    def restoreDecls(base: Context): Context =
-      copy(
-        lets = this.lets ++ base.lets.filterKeys(!this.lets.contains(_)),
-        functions = this.functions ++ base.functions.filterKeys(!this.functions.contains(_))
-      )
-  }
-
-  def root(expr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
-    if (ctx.isExhausted)
-      Eval.now((expr, ctx))
-    else
-      expr match {
-        case LET_BLOCK(let, body)          => evaluateLetBlock(let, body, ctx)
-        case BLOCK(let: LET, body)         => evaluateLetBlock(let, body, ctx)
-        case BLOCK(func: FUNC, body)       => evaluateFunctionBlock(func, body, ctx)
-        case GETTER(obj, field)            => evaluateGetter(obj, field, ctx)
-        case IF(cond, ifTrue, ifFalse)     => evaluateIfBlock(cond, ifTrue, ifFalse, ctx)
-        case FUNCTION_CALL(function, args) => evaluateFunctionCall(function, args, ctx)
-        case REF(key)                      => evaluateRef(key, ctx)
-        case e: EVALUATED                  => evaluated(e, ctx)
-      }
-
-  private def evaluated(e: EVALUATED, ctx: Context): Eval[(EXPR, Context)] =
-    Eval.now((e, ctx))
-
-  private def evaluateLetBlock(let: LET, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] =
-    root(nextExpr, ctx.withLet(let.name, let.value, ctx, isEvaluated = false))
-      .map {
-        case (nextExprResult, nextExprCtx) =>
-          val resultExpr =
-            if (nextExprResult.isInstanceOf[EVALUATED])
-              nextExprResult
-            else {
-              val letDecl = LET(let.name, nextExprCtx.lets(let.name)._1)
-              BLOCK(letDecl, nextExprResult)
-            }
-          val overlapFixedCtx =
-            ctx.lets.get(let.name)
-              .fold(nextExprCtx.withoutLet(let.name)) {
-                case (expr, ctx, isEvaluated) => nextExprCtx.withLet(let.name, expr, ctx, isEvaluated)
-              }
-          (resultExpr, overlapFixedCtx)
-      }
-
-  private def evaluateFunctionBlock(funcDef: FUNC, nextExpr: EXPR, ctx: Context): Eval[(EXPR, Context)] = {
-    val function = UserFunction[Environment](funcDef.name, 0, null, funcDef.args.map(n => (n, null)): _*)(funcDef.body)
-    root(nextExpr, ctx.withFunction(function))
-      .map {
-        case (nextExprResult, nextExprCtx) =>
-          val resultExpr =
-            if (nextExprResult.isInstanceOf[EVALUATED]) nextExprResult
-            else BLOCK(funcDef, nextExprResult)
-          val overlapFixedCtx =
-            ctx.functions
-              .get(function.header)
-              .collect { case f: UserFunction[Environment] => f }
-              .fold(nextExprCtx.withoutFunction(function.header))(nextExprCtx.withFunction)
-          (resultExpr, overlapFixedCtx)
-      }
-  }
-
-  private def evaluateRef(key: String, ctx: Context): Eval[(EXPR, Context)] = {
-    val (letExpr, letCtx, isEvaluated) = ctx.lets(key)
-    if (isEvaluated)
-      Eval.now((letExpr, ctx.withCost(1)))
-    else
-      root(letExpr, ctx.filterDecls(letCtx))
-        .map { case (letValue, resultCtx) =>
-          val restoredCtx = resultCtx.restoreDecls(ctx)
-          if (resultCtx.isExhausted)
-            (REF(key), restoredCtx.withLet(key, letValue, resultCtx, isEvaluated = false))
-          else
-            (letValue, restoredCtx.withLet(key, letValue, resultCtx, isEvaluated = true).withCost(1))
-        }
-  }
-
-  private def evaluateFunctionCall(
-    header: FunctionHeader,
-    args: List[EXPR],
-    ctx: Context
-  ): Eval[(EXPR, Context)] =
-    for {
-      (resultCtx, resultArgs) <- evaluateFunctionArgs(args, ctx)
-      result                  <- evaluateFunctionExpr(header, resultCtx, args, resultArgs)
-    } yield result
-
-  private def evaluateFunctionArgs(args: List[EXPR], ctx: Context): Eval[(Context, List[EXPR])] =
-    args.foldM((ctx, List.empty[EXPR])) {
-      case ((currentCtx, evaluatedArgs), nextArgExpr) =>
-        if (currentCtx.isExhausted)
-          Eval.now((currentCtx, evaluatedArgs))
-        else
-          root(nextArgExpr, currentCtx)
-            .map { case (evaluatedArg, newCtx) =>
-              (newCtx, evaluatedArgs :+ evaluatedArg) // todo optimize?
-            }
-    }
-
-  private def evaluateFunctionExpr(
-    header: FunctionHeader,
-    ctx: Context,
-    startArgs : List[EXPR],
-    resultArgs: List[EXPR]
-  ): Eval[(EXPR, Context)] =
-    if (ctx.isExhausted) {
-      val call = FUNCTION_CALL(header, resultArgs ::: startArgs.drop(resultArgs.size))
-      Eval.now((call, ctx))
-    } else {
-      val evaluatedArgs = resultArgs.asInstanceOf[List[EVALUATED]] //todo type safety
-      ctx.functions.get(header)
-        .fold(
-          Eval.now((tryCreateObject(header.funcName, evaluatedArgs, ctx), ctx))
-        )(
-          evaluateBaseFunctionBody(_, ctx, evaluatedArgs)
-        )
-    }
-
-  private def tryCreateObject(constructor: String, args: List[EVALUATED], ctx: Context): EXPR = {
-    val objectType = ctx.types(constructor).asInstanceOf[CASETYPEREF]  // todo handle absence
-    val fields = objectType.fields.map(_._1) zip args
-    CaseObj(objectType, fields.toMap)
-  }
-
-  private def evaluateBaseFunctionBody(
-    function: BaseFunction[Environment],
-    ctx: Context,
-    evaluatedArgs: List[EVALUATED]
-  ): Eval[(EXPR, Context)] =
-    function match {
-      case NativeFunction(_, costByVersion, _, ev, _) =>
-        val cost = costByVersion(stdLibVersion).toInt
-        val result =
-          if (ctx.cost + cost > limit)
-            (FUNCTION_CALL(function.header, evaluatedArgs), ctx)  //todo test
-          else {
-            val result = ev[Id]((ctx.environment, evaluatedArgs)).explicitGet()
-            (result, ctx.withCost(cost))
-          }
-        Eval.now(result)
-      case UserFunction(_, _, _, signature, expr, _) =>
-        val argsWithExpr =
-          (signature.args zip evaluatedArgs)
-            .foldRight(expr[Id](ctx.environment)) {
-              case (((argName, _), argValue), argsWithExpr) => //todo maybe check for existence
-                BLOCK(LET(argName, argValue), argsWithExpr)
-            }
-        root(argsWithExpr, ctx)
-    }
-
-  private def evaluateIfBlock(cond: EXPR, ifTrue: EXPR, ifFalse: EXPR, ctx: Context): Eval[(EXPR, Context)] =
-    for {
-      (condResult, condResultCtx) <- root(cond, ctx)
-      result <-
-        if (condResultCtx.isExhausted)
-          Eval.now((IF(condResult, ifTrue, ifFalse), condResultCtx))
-        else
-          condResult match {
-            case TRUE  => root(ifTrue,  condResultCtx.withCost(1))
-            case FALSE => root(ifFalse, condResultCtx.withCost(1))
-            case _     => ???                                       // todo ???
-          }
-    } yield result
-
-  private def evaluateGetter(obj: EXPR, field: String, ctx: Context): Eval[(EXPR, Context)] =
-    root(obj, ctx).map {
-      case (exprResult, exprResultCtx) =>
-        if (exprResultCtx.isExhausted)
-          (GETTER(exprResult, field), exprResultCtx)
-        else {
-          val fields = exprResult.asInstanceOf[CaseObj].fields
-          (fields(field), exprResultCtx.withCost(1))                // todo handle absence
-        }
-    }
-}
+//package com.wavesplatform.lang.v1.evaluator
+//
+//import cats.{Eval, Id}
+//import cats.implicits._
+//import com.wavesplatform.common.utils.EitherExt2
+//import com.wavesplatform.lang.directives.values.StdLibVersion
+//import com.wavesplatform.lang.v1.FunctionHeader
+//import com.wavesplatform.lang.v1.compiler.Terms._
+//import com.wavesplatform.lang.v1.compiler.Types.{CASETYPEREF, FINAL}
+//import com.wavesplatform.lang.v1.evaluator.ctx.{BaseFunction, EvaluationContext, NativeFunction, UserFunction}
+//import com.wavesplatform.lang.v1.evaluator.EvaluatorV2._
+//import com.wavesplatform.lang.v1.traits.Environment
+//
+//import scala.annotation.tailrec
+//import scala.collection.mutable
+//
+//object EvaluatorV2 {
+//  sealed trait EvaluatorResult
+//  case class Success(expr: EXPR)    extends EvaluatorResult
+//  case object Stop                  extends EvaluatorResult
+//}
+//
+//class EvaluatorV2(limit: Int, stdLibVersion: StdLibVersion) {
+//  object Context {
+//    def apply(context: EvaluationContext[Environment, Id]): Context = {
+///*
+//      def extractLet(let: LazyVal[Id]) =
+//        (let.value.value.explicitGet(), Context(environment = context.environment, ???), true)
+//*/
+//
+//      Context(
+//        functions = context.functions,
+//        //lets = context.letDefs.mapValues(extractLet), todo
+//        types = context.typeDefs,
+//        environment = context.environment
+//      )
+//    }
+//  }
+//
+//  case class Context(
+//    functions: Map[FunctionHeader, BaseFunction[Environment]] = Map(),
+//    types: Map[String, FINAL] = Map(),
+//    environment: Environment[Id],
+//    cost: Int = 0
+//  ) {
+//    val isExhausted: Boolean =
+//      cost >= limit
+//
+//    def withCost(addCost: Int): Context =
+//      copy(cost = cost + addCost)
+//  }
+//
+//  def root(expr: EXPR, ctx: Context, parentBlocks: List[BLOCK_DEF], update: EXPR => Unit): Eval[(EvaluatorResult, Context)] =
+//    if (ctx.isExhausted) {
+//      Eval.now((Stop, ctx))
+//    } else
+//      expr match {
+//        case b: BLOCK_DEF     => evaluateBlock(b, ctx, parentBlocks, update)
+//        case g: GETTER        => evaluateGetter(g, ctx, parentBlocks)
+//        case i: IF            => evaluateIfBlock(i, ctx, parentBlocks)
+//        case f: FUNCTION_CALL => evaluateFunctionCall(f, ctx, parentBlocks, update)
+//        case REF(key)         => evaluateRef(key, ctx, parentBlocks)
+//        case e: EVALUATED     => evaluated(e, ctx)
+//      }
+//
+//  private def evaluateBlock(
+//    block: EXPR with BLOCK_DEF,
+//    ctx: Context,
+//    parentBlocks: List[BLOCK_DEF],
+//    update: EXPR => Unit
+//  ) =
+//    root(block.body, ctx, block :: parentBlocks, update)
+//      .map { case (result, resultCtx) =>
+//        result match {
+//          case Stop =>
+//            (Stop, resultCtx)
+//
+//          case s@Success(ev) if (ev.isInstanceOf[EVALUATED]) =>
+//            parentBlocks.headOption.fold(update(ev))(_.body = ev)
+//            (s, resultCtx)
+//
+//          case s@Success(ev)  =>
+//            (Stop, resultCtx)
+//        }
+//      }
+//
+//  private def evaluated(e: EVALUATED, ctx: Context): Eval[(EvaluatorResult, Context)] =
+//    Eval.now((Success(e), ctx))
+//
+//  private def evaluateRef(key: String, ctx: Context, parentBlocks: List[BLOCK_DEF]): Eval[(EvaluatorResult, Context)] = {
+//    val (let, letParentBlocks) = findLet(key, parentBlocks)
+//    let.value match {
+//      case ev: EVALUATED =>
+//        Eval.now((Success(ev), ctx.withCost(1)))
+//      case expr =>
+//        root(expr, ctx, letParentBlocks, let.value = _)
+//          .map { case (letValue, resultCtx) =>
+//            letValue match {
+//              case Success(ev) if resultCtx.isExhausted =>
+//                let.value = ev
+//                (Stop, resultCtx)
+//
+//              case s@Success(ev) =>
+//                let.value = ev
+//                (s, resultCtx.withCost(1))
+//
+//              case r =>
+//                (r, resultCtx)
+//            }
+//          }
+//    }
+//  }
+//
+//  @tailrec
+//  private def findLet(key: String, parentBlocks: List[BLOCK_DEF]): (LET, List[BLOCK_DEF]) =
+//    parentBlocks match {
+//      case LET_BLOCK(let@LET(`key`, _), _) :: letParentBlocks => (let, letParentBlocks)
+//      case BLOCK(let@LET(`key`, _), _) :: letParentBlocks     => (let, letParentBlocks)
+//      case _ :: nextParentBlocks                              => findLet(key, nextParentBlocks)
+//      case Nil                                                => throw new RuntimeException(s"Let `$key` not found")
+//    }
+//
+//  private def evaluateFunctionCall(
+//    call: FUNCTION_CALL,
+//    ctx: Context,
+//    parentBlocks: List[BLOCK_DEF],
+//    update: EXPR => Unit
+//  ): Eval[(EvaluatorResult, Context)] =
+//    for {
+//      (resultCtx, resultArgs) <- evaluateFunctionArgs(call.args, ctx, parentBlocks)
+//      result                  <- evaluateFunctionCallExpr(call, resultCtx, resultArgs, parentBlocks)
+//    } yield result
+//
+//  private def evaluateFunctionArgs(
+//    args: List[EXPR],
+//    ctx: Context,
+//    parentBlocks: List[BLOCK_DEF]
+//  ): Eval[(Context, List[EXPR])] = {
+//    val buffer = args.toBuffer
+//    args.zipWithIndex
+//      .foldM(ctx) {
+//        case (currentCtx, (nextArgExpr, i)) =>
+//          if (currentCtx.isExhausted)
+//            Eval.now(currentCtx)
+//          else
+//            root(nextArgExpr, currentCtx, parentBlocks, buffer(i) = _).map(_._2)
+//      }
+//      .map((_, buffer.toList))
+//  }
+//
+//  private def evaluateFunctionCallExpr(
+//    call: FUNCTION_CALL,
+//    ctx: Context,
+//    resultArgs: List[EXPR],
+//    parentBlocks: List[BLOCK_DEF]
+//  ): Eval[(EvaluatorResult, Context)] = {
+//    val updatedArgs = resultArgs ::: call.args.drop(resultArgs.size)
+//    call.args = updatedArgs
+//    if (ctx.isExhausted) {
+//      Eval.now((Success(call.copy(args = updatedArgs)), ctx))
+//    } else {
+//      val evaluatedArgs = updatedArgs.asInstanceOf[List[EVALUATED]]        //todo type safety
+//      ctx.functions.get(call.function)
+//        .orElse(findUserFunction(call.function.funcName, parentBlocks))
+//        .fold(
+//          Eval.now((tryCreateObject(call.function.funcName, evaluatedArgs, ctx), ctx))
+//        )(
+//          evaluateFunctionBody(_, call, ctx, evaluatedArgs, parentBlocks)
+//        )
+//    }
+//  }
+//
+//  private def findUserFunction(name: String, parentBlocks: List[BLOCK_DEF]): Option[UserFunction[Environment]] =
+//    parentBlocks match {
+//      case BLOCK(func@FUNC(`name`, _, _), _) :: _ => Some(mapToUserFunction(func))
+//      case _ :: nextParentBlocks                  => findUserFunction(name, nextParentBlocks)
+//      case Nil                                    => None
+//    }
+//
+//  private def mapToUserFunction(func: FUNC): UserFunction[Environment] =
+//    UserFunction[Environment](func.name, 0, null, func.args.map(n => (n, null)): _*)(func.body)
+//
+//  private def tryCreateObject(constructor: String, args: List[EVALUATED], ctx: Context): EvaluatorResult = {
+//    val objectType = ctx.types(constructor).asInstanceOf[CASETYPEREF]  // todo handle absence
+//    val fields = objectType.fields.map(_._1) zip args
+//    Success(CaseObj(objectType, fields.toMap))
+//  }
+//
+//  private def evaluateFunctionBody(
+//    function: BaseFunction[Environment],
+//    call: FUNCTION_CALL,
+//    ctx: Context,
+//    evaluatedArgs: List[EVALUATED],
+//    parentBlocks: List[BLOCK_DEF]
+//  ): Eval[(EvaluatorResult, Context)] =
+//    function match {
+//      case NativeFunction(_, costByVersion, _, ev, _) =>
+//        val cost = costByVersion(stdLibVersion).toInt
+//        val result =
+//          if (ctx.cost + cost > limit) {
+//            call.args = evaluatedArgs
+//            (Stop, ctx)            //todo test
+//          } else {
+//            val result = ev[Id]((ctx.environment, evaluatedArgs)).explicitGet()
+//            (Success(result), ctx.withCost(cost))
+//          }
+//        Eval.now(result)
+//      case UserFunction(_, _, _, signature, expr, _) =>
+//        val argsWithExpr =
+//          (signature.args zip evaluatedArgs)
+//            .foldRight(expr[Id](ctx.environment).deepCopy()) {
+//              case (((argName, _), argValue), argsWithExpr) => //todo maybe check for existence
+//                BLOCK(LET(argName, argValue), argsWithExpr)
+//            }
+//        root(argsWithExpr, ctx, parentBlocks)
+//    }
+//
+//  private def evaluateIfBlock(
+//    i: IF,
+//    ctx: Context,
+//    parentBlocks: List[BLOCK_DEF]
+//  ): Eval[(EvaluatorResult, Context)] =
+//    for {
+//      (condResult, condResultCtx) <- root(i.cond, ctx, parentBlocks)
+//      result <-
+//        condResult match {
+//          case Stop =>
+//            Eval.now((Stop, condResultCtx))
+//          case Success(ev) if condResultCtx.isExhausted =>
+//            i.cond = ev
+//            Eval.now((Stop, condResultCtx))
+//          case Success(ev) =>
+//            ev match {
+//              case TRUE  =>
+//                //condResultCtx.setRef(i.ifTrue)
+//                root(i.ifTrue,  condResultCtx.withCost(1), parentBlocks)
+//              case FALSE =>
+//                //condResultCtx.setRef(i.ifFalse)
+//                root(i.ifFalse, condResultCtx.withCost(1), parentBlocks)
+//              case _     => ???                                                    // todo ???
+//            }
+//        }
+//    } yield result
+//
+//  private def evaluateGetter(
+//    getter: GETTER,
+//    ctx: Context,
+//    parentBlocks: List[BLOCK_DEF]
+//  ): Eval[(EvaluatorResult, Context)] =
+//    root(getter.expr, ctx, parentBlocks).map {
+//      case (exprResult, exprResultCtx) =>
+//        exprResult match {
+//          case Stop =>
+//            (Stop, exprResultCtx)
+//          case Success(ev) if exprResultCtx.isExhausted =>
+//            getter.expr = ev
+//            (Stop, exprResultCtx)
+//          case Success(ev) =>
+//            val fields = ev.asInstanceOf[CaseObj].fields
+//            (Success(fields(getter.field)), exprResultCtx.withCost(1))  // todo handle absence
+//        }
+//    }
+//}
