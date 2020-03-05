@@ -48,7 +48,7 @@ class AccountsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extend
 
   override def getScript(request: AccountRequest): Future[ScriptData] = Future {
     val desc = commonApi.script(request.address.toAddress)
-    ScriptData(desc.script.map(PBTransactions.toPBScript), desc.scriptText.getOrElse(""), desc.complexity)
+    ScriptData(desc.script.map(PBTransactions.toPBScript).get.bytes, desc.scriptText.getOrElse(""), desc.complexity)
   }
 
   override def getActiveLeases(request: AccountRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =

@@ -15,6 +15,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
 class InvokeReissueBurnAssetSuite extends BaseSuite {
   val initialWavesBalance = 100.waves
+  val setScriptPrice = 0.1.waves
 
   def script(asset: Map[String, Any], function: String = ""): String = {
     val s  = if (asset("compiledScript").equals("")) "unit" else asset("compiledScript")
@@ -125,7 +126,7 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
       val nonNftCount = if (isNft(data)) 0 else 1
 
       validateIssuedAssets(acc, tx, data)
-      sender.balanceDetails(acc).regular shouldBe (initialWavesBalance - invocationCost(nonNftCount))
+      sender.balanceDetails(acc).regular shouldBe (initialWavesBalance - setScriptPrice - invocationCost(nonNftCount))
     }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset)) s"${data("type")} asset could be partially burned" in {
@@ -278,6 +279,6 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
   }
 
   def invocationCost(aCount: Int, isSmartAcc: Boolean = true, sPCount: Int = 0, sAinActions: Int = 0): Long = {
-    0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * sPCount + 0.004.waves * sAinActions + 1 * aCount
+    0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * sPCount + 0.004.waves * sAinActions + 1.waves * aCount
   }
 }
