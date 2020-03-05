@@ -90,9 +90,9 @@ object Dependencies {
         .exclude("org.typelevel", "cats-effect_sjs0.6_2.12")
         .exclude("org.scala-js", "scalajs-library_2.12"),
       catsCore.value.exclude("org.scala-js", "scalajs-library_2.12"),
-      ("org.rudogma" %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
-      ("com.lihaoyi" %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
-      ("org.parboiled" %%% "parboiled" % "2.1.8").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.rudogma"   %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("com.lihaoyi"   %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.parboiled" %%% "parboiled"   % "2.1.8").exclude("org.scala-js", "scalajs-library_2.12"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.12"),
       machinist.exclude("org.scala-js", "scalajs-library_2.12"),
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
@@ -109,7 +109,7 @@ object Dependencies {
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
       "com.softwaremill.sttp" %%% "core" % "1.6.4",
-      "com.wavesplatform" % "zwaves" % "0.1.0-SNAPSHOT"
+      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT"
     ) ++ scalapbRuntime.value ++ circe.value
   )
 
@@ -135,6 +135,16 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
+  private[this] val levelDBJNA = {
+    val levelDbVersion = "1.22.0"
+    Seq(
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+    )
+  }
+
   lazy val node = Def.setting(
     Seq(
       "commons-net"          % "commons-net"              % "3.6",
@@ -149,10 +159,6 @@ object Dependencies {
       "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
       "com.typesafe.play"        %% "play-json"     % "2.7.1",
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core" % "1.22.0-SNAPSHOT",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "linux-x86_64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "win32-x86-64",
-      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "osx",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
@@ -165,11 +171,11 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console ++ logDeps
+    ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.1.0-SNAPSHOT" classifier "proto" changing()
+    "com.wavesplatform" % "protobuf-schemas" % "1.1.0-SNAPSHOT" classifier "proto" changing ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
