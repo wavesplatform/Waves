@@ -151,6 +151,8 @@ object Dependencies {
       "org.ethereum"             % "leveldbjni-all" % "1.18.3",
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-core" % "1.22.0-SNAPSHOT",
       "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "linux-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "win32-x86-64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % "1.22.0-SNAPSHOT" classifier "osx",
       akkaModule("actor"),
       akkaModule("stream"),
       akkaHttp,
