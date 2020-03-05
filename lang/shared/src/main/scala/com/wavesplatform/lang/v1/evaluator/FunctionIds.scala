@@ -71,6 +71,9 @@ object FunctionIds {
 
   val SIGVERIFY_LIM: Short = 2500 // Reserved n id for generated limited functions
   val RSAVERIFY_LIM: Short = 2600 // Reserved n id for generated limited functions
+  val KECCAK256_LIM: Short = 2700 // Reserved n id for generated limited functions
+  val BLAKE256_LIM : Short = 2800 // Reserved n id for generated limited functions
+  val SHA256_LIM   : Short = 2900 // Reserved n id for generated limited functions
 
   // Waves
   val GETTRANSACTIONBYID: Short      = 1000
