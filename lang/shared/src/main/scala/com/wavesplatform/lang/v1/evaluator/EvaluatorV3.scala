@@ -5,7 +5,8 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, NativeFunction}
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 
 import scala.annotation.tailrec
@@ -38,19 +39,21 @@ class EvaluatorV3(
       case g: GETTER =>
         val unused = root(
           expr = g.expr,
-          update = {
-            case co: CaseObj   => update(co.fields(g.field))
-            case ev: EVALUATED => throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
-            case nonEvaluated  => g.expr = nonEvaluated
-          },
+          update = g.expr = _,
           limit = limit,
           parentBlocks = parentBlocks
         )
-        if (unused < 0) throw new Error("Unused < 0")
-        else if (unused == 0) {
-          println(s"Stopping because getter not evaluated: $unused")
-          0
-        } else unused - 1
+        g.expr match {
+          case co: CaseObj if unused > 0 =>
+            update(co.fields(g.field))
+            unused - 1
+          case _: CaseObj =>
+            0
+          case ev: EVALUATED =>
+            throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
+          case _ =>
+            0
+        }
       case i: IF =>
         val unused = root(
           expr = i.cond,
@@ -108,7 +111,7 @@ class EvaluatorV3(
               val cost = costByVersion(stdLibVersion).toInt
               if (unusedArgsEval < cost) {
                 println(s"Stopping because not enough limit to evaluate function: $unusedArgsEval")
-                0
+                unusedArgsEval
               } else {
                 update(ev[Id]((ctx.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
                 println(s"FUNCTION CALL: reducing unused to ${unusedArgsEval - cost}")
@@ -116,9 +119,11 @@ class EvaluatorV3(
               }
             case FunctionHeader.User(_, name) =>
               if (unusedArgsEval > 0)
-                findUserFunction(name, parentBlocks) match {
-                  case None => throw new NoSuchElementException(s"Function $name not found")
-                  case Some(signature) =>
+                ctx.functions.get(fc.function)
+                  .map(_.asInstanceOf[UserFunction[Environment]])
+                  .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.environment)))
+                  .orElse(findUserFunction(name, parentBlocks))
+                  .map { signature =>
                     val argsWithExpr =
                       (signature.args zip fc.args)
                         .foldRight(signature.body.deepCopy()) {
@@ -127,12 +132,18 @@ class EvaluatorV3(
                         }
                     update(argsWithExpr)
                     root(argsWithExpr, update, unusedArgsEval, parentBlocks)
-                }
-              else 0
+                  }
+                  .getOrElse {
+                    val objectType = ctx.typeDefs(name).asInstanceOf[CASETYPEREF]  // todo handle absence
+                    val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
+                    root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+                  }
+              else
+                unusedArgsEval
           }
         } else {
           println(s"Stopping because not all args evaluated, unused: $unusedArgsEval")
-          0
+          unusedArgsEval
         }
       case evaluated: EVALUATED =>
         update(evaluated)
