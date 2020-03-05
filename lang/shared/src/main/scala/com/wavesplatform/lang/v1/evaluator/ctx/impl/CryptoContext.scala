@@ -235,6 +235,36 @@ object CryptoContext {
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
 
+    val bls12Groth16VerifyL: Array[BaseFunction[NoContext]] = lgen(Array(2,4,8,16),
+                                                         (n => (s"groth16Verify_${n._1}inputs", (BLS12_GROTH16_VERIFY_LIM + n._2).toShort)),
+                                                         ({ case 2 => 500
+                                                            case 4 => 550
+                                                            case 8 => 625
+                                                            case 16 => 750  // XXX
+                                                         }),
+                                                         (n => {
+                                                            case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ => Either.cond(inputs.size <= n*32, (), s"Invalid inputs count, must be not greater than $n")
+                                                            case xs => notImplemented[Id, Unit](s"groth16Verify_${n}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+                                                          }),
+                                                        BOOLEAN,
+                                                        ("verifying key", BYTESTR),
+                                                        ("proof", BYTESTR),
+                                                        ("inputs", BYTESTR)) {
+        case CONST_BYTESTR(vk:ByteStr) :: CONST_BYTESTR(proof:ByteStr) :: CONST_BYTESTR(inputs:ByteStr) :: Nil =>
+          if (vk.size > 1152)
+            Left(s"Groth16Verify key size should not exceed 1 Kbyte, but ${vk.size} found")
+          else if (vk.size % 48 != 0)
+            Left(s"Groth16Verify key size should be multiple of 48, but ${vk.size} found")
+          else if (proof.size != 192)
+            Left(s"Groth16Verify proof size should be exactly 192 bytes, but ${proof.size} found")
+          else if (inputs.size % 32 != 0)
+            Left(s"Groth16Verify inputs size should be multiple of 32, but ${inputs.size} found")
+          else
+            Right(CONST_BOOLEAN(global.groth16Verify(vk.arr, proof.arr, inputs.arr)))
+        case xs => notImplemented[Id, EVALUATED]("groth16Verify(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
+      }
+
+
     val bls12Groth16VerifyF: BaseFunction[NoContext] =
       NativeFunction(
         "groth16Verify",
@@ -312,7 +342,7 @@ object CryptoContext {
       )
 
     val v4Functions =
-      Array(bls12Groth16VerifyF) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim
+      Array(bls12Groth16VerifyF) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
