@@ -1,27 +1,15 @@
 package com.wavesplatform.lang.v1.estimator
 
-import cats.implicits._
-import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.estimator.CommonScriptEstimatorTest._
+import com.wavesplatform.lang.v1.evaluator.FunctionIds.SUM_LONG
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
-import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.FunctionIds.SUM_LONG
 
-import scala.util.Try
-
-class CommonScriptEstimatorTest
-  extends ScriptEstimatorTestBase(
-    ScriptEstimatorV1,
-    ScriptEstimatorV2,
-    ScriptEstimatorV3
-  ) {
-
+class CommonScriptEstimatorTest extends ScriptEstimatorTestBase(ScriptEstimatorV1, ScriptEstimatorV2, ScriptEstimatorV3) {
   property("recursive func block") {
     val expr = BLOCK(
       FUNC("x", List.empty, FUNCTION_CALL(FunctionHeader.User("y"), List.empty)),
@@ -228,16 +216,4 @@ class CommonScriptEstimatorTest
     */
     estimateDelta(expr("a"), expr("x")) shouldBe Right(0)
   }
-}
-
-object CommonScriptEstimatorTest {
-  private val evaluatorV2 = new EvaluatorV2(1000, V3)
-
-/*
-  private val evaluatorCtx =
-    evaluatorV2.Context(ScriptEstimatorTestBase.ctx.evaluationContext(Common.emptyBlockchainEnvironment()))
-
-  private val evaluatorV2AsEstimator: ScriptEstimator =
-    (_, _, expr) => Try(evaluatorV2.root(expr, evaluatorCtx, Nil).value).toEither.bimap(_.toString, _._2.cost)
-*/
 }
