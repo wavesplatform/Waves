@@ -80,10 +80,7 @@ class EvaluatorV3(
               parentBlocks = parentBlocks
             )
           case e: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
-          case nonEvaluated => {
-            println(s"Stopping because condition not evaluated: $unused")
-            unused
-          }
+          case nonEvaluated => unused
         }
 
       case REF(key) => visitRef(key, update, limit, parentBlocks)
@@ -107,11 +104,9 @@ class EvaluatorV3(
               val NativeFunction(_, costByVersion, _, ev, _) = ctx.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
               val cost = costByVersion(stdLibVersion).toInt
               if (unusedArgsEval < cost) {
-                println(s"Stopping because not enough limit to evaluate function: $unusedArgsEval")
                 unusedArgsEval
               } else {
                 update(ev[Id]((ctx.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
-                //println(s"FUNCTION CALL: reducing unused to ${unusedArgsEval - cost}")
                 unusedArgsEval - cost
               }
             case FunctionHeader.User(_, name) =>
@@ -133,13 +128,12 @@ class EvaluatorV3(
                   .getOrElse {
                     val objectType = ctx.typeDefs(name).asInstanceOf[CASETYPEREF]  // todo handle absence
                     val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
-                    root(CaseObj(objectType, fields.toMap), update, limit, parentBlocks)
+                    root(CaseObj(objectType, fields.toMap), update, unusedArgsEval, parentBlocks)
                   }
               else
                 unusedArgsEval
           }
         } else {
-          println(s"Stopping because not all args evaluated, unused: $unusedArgsEval")
           unusedArgsEval
         }
       case evaluated: EVALUATED =>
@@ -163,7 +157,6 @@ class EvaluatorV3(
     let: LET,
     nextParentBlocks: List[BLOCK_DEF]
   ) = {
-    if (limit > 0) {
       val unused = root(
         expr = let.value,
         update = let.value = _,
@@ -178,7 +171,6 @@ class EvaluatorV3(
         case _ =>
           unused
       }
-    } else limit
   }
 
   @tailrec

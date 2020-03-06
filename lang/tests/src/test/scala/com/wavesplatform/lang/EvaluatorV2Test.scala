@@ -242,7 +242,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     inside(eval(script, limit = 1)) {
       case (_, decompiled, cost) =>
         cost shouldBe 1
-        println(decompiled)
         decompiled shouldBe
           """
             |func f (a,b) = {
@@ -262,7 +261,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     inside(eval(script, limit = 2)) {
       case (_, decompiled, cost) =>
         cost shouldBe 2
-        println(decompiled)
         decompiled shouldBe
           """
             |func f (a,b) = {
@@ -821,9 +819,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     val piecesGen = Gen.choose(2, 100)
       .map(randomPieces(precalculatedComplexity, _))
 
-    val pieces = List(142, 1, 1, 2, 3, 1, 7, 1, 2, 1, 2, 9, 2, 1, 2, 2, 1, 2, 8, 3, 2, 9, 13, 5, 5, 21, 1, 1, 1, 1, 26, 6, 1, 8, 6, 1, 4, 9, 2, 11, 2, 116, 4, 5, 8, 6, 35, 66, 19, 9, 6, 4, 2, 4, 13, 1, 6, 5, 1, 132, 7, 12, 12, 2, 21, 5, 9, 2, 9, 12, 5, 41, 7, 21, 8, 4, 2, 5, 2, 87, 44, 32, 6, 10, 6, 14)
-
-    //forAll(piecesGen) { pieces =>
+    forAll(piecesGen) { pieces =>
       val (resultExpr, summarizedCost) =
         pieces.foldLeft((expr(), startCost)) {
           case ((currentExpr, costSum), nextCostLimit) =>
@@ -831,8 +827,8 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
             val (nextExpr, _, cost) = eval(currentExpr, nextCostLimit)
             (nextExpr, cost + costSum)
         }
-      resultExpr shouldBe evaluated
       summarizedCost shouldBe precalculatedComplexity
-    //}
+      resultExpr shouldBe evaluated
+    }
   }
 }
