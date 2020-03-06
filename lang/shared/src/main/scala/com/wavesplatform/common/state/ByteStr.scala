@@ -1,5 +1,6 @@
 package com.wavesplatform.common.state
 
+import com.google.common.primitives.Bytes
 import com.wavesplatform.common.utils.{Base58, Base64}
 
 import scala.util.Try
@@ -25,7 +26,7 @@ case class ByteStr(arr: Array[Byte]) {
   def size: Int = arr.length
 
   def ++(other: ByteStr): ByteStr =
-    if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
+    if (this.isEmpty) other else ByteStr(Bytes.concat(this.arr, other.arr))
 
   def take(n: Long): ByteStr = {
     val n1 = n min arr.length max 0

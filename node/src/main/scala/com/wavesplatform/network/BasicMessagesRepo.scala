@@ -177,12 +177,23 @@ object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
 
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockInv] =
     Try(
-      MicroBlockInv(
-        sender = PublicKey.apply(bytes.take(KeyLength)),
-        totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
-        prevBlockSig = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
-        signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)
-      )
+      bytes.length match {
+        case l if l == (KeyLength + SignatureLength * 3) =>
+          MicroBlockInv(
+            sender = PublicKey.apply(bytes.take(KeyLength)),
+            totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
+            prevBlockSig = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
+            signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)
+          )
+
+        case l if l == (KeyLength + (DigestLength * 2) + SignatureLength) =>
+          MicroBlockInv(
+            sender = PublicKey.apply(bytes.take(KeyLength)),
+            totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + DigestLength).toArray),
+            prevBlockSig = ByteStr(bytes.view.slice(KeyLength + DigestLength, KeyLength + DigestLength * 2).toArray),
+            signature = ByteStr(bytes.view.slice(KeyLength + DigestLength * 2, KeyLength + (DigestLength * 2) + SignatureLength).toArray)
+          )
+      }
     )
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {

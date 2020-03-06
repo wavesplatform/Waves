@@ -28,7 +28,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient, Script => _, Attachment => PBAttachment, _}
+import com.wavesplatform.protobuf.transaction.{Attachment => PBAttachment, Recipient => PBRecipient, Script => _, _}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
@@ -38,6 +38,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
@@ -947,7 +948,7 @@ object AsyncHttpApi extends Assertions {
     }
   }
 
-  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
+  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers with ScorexLogging {
     def height: Future[Seq[Int]] = traverse(nodes)(_.height)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
@@ -977,6 +978,7 @@ object AsyncHttpApi extends Assertions {
       def waitSameBlockHeaders =
         waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
           val sig = blocks.map(_.signature)
+          log.info(sig.toVector.toString())
           sig.forall(_ == sig.head)
         })
 
@@ -987,6 +989,7 @@ object AsyncHttpApi extends Assertions {
     }
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
+      log.info(s"Awaiting $desc")
       def retry = timer.schedule(waitFor(desc)(retryInterval)(request, cond), retryInterval)
 
       Future

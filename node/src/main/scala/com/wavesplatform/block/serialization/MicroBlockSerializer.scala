@@ -15,13 +15,13 @@ object MicroBlockSerializer {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
     Bytes.concat(
       Array(microBlock.version),
-      microBlock.prevResBlockRef.arr,
-      microBlock.totalResBlockRef.arr,
+      microBlock.prevResBlockRef,
+      microBlock.totalResBlockRef,
       Ints.toByteArray(transactionDataBytes.length),
       transactionDataBytes,
-      microBlock.sender.arr,
-      microBlock.totalSignature.arr,
-      microBlock.signature.arr
+      microBlock.sender,
+      if (microBlock.version >= Block.ProtoBlockVersion) microBlock.totalSignature.ensuring(_.length == SignatureLength) else ByteStr.empty,
+      microBlock.signature
     )
   }
 

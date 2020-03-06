@@ -86,11 +86,15 @@ case class Block(
   }
 
   override def toString: String =
-    s"Block($signature -> ${header.reference.trim}, " +
+    s"Block($uniqueId -> ${header.reference.trim}, " +
       s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
+  def uniqueId(h: BlockHeader, signature: ByteStr): ByteStr =
+    if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
+    else signature
+
   def protoHeaderHash(h: BlockHeader): ByteStr = {
     require(h.version >= ProtoBlockVersion)
     crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray)

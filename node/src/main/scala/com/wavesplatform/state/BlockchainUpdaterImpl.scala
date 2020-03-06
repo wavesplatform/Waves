@@ -510,7 +510,7 @@ class BlockchainUpdaterImpl(
   }
 
   override def blockInfo(blockId: BlockId): Option[BlockInfo] = readLock {
-    liquidBlockHeaderAndSize().filter(_.signature == blockId) orElse blockchain.blockInfo(blockId)
+    liquidBlockHeaderAndSize().filter(bi => Block.uniqueId(bi.header, bi.signature) == blockId) orElse blockchain.blockInfo(blockId)
   }
 
   override def height: Int = readLock {
