@@ -95,7 +95,7 @@ object Terms {
   case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
     def toStr: Coeval[String] = for {
       e <- args.map(_.toStr).sequence
-    } yield  s"sum($e)" // "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
+    } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
     override def deepCopy(): EXPR =
       FUNCTION_CALL(function, args.map(_.deepCopy()))

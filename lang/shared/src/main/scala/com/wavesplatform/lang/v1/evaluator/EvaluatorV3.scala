@@ -23,8 +23,6 @@ class EvaluatorV3(
   }
 
   private def root(expr: EXPR, update: EXPR => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int = {
-    //println(s"Visiting $expr")
-
     expr match {
       case b: BLOCK_DEF =>
         root(
@@ -48,11 +46,11 @@ class EvaluatorV3(
             update(co.fields(g.field))
             unused - 1
           case _: CaseObj =>
-            0
+            unused
           case ev: EVALUATED =>
             throw new IllegalArgumentException(s"GETTER of non-case-object $ev")
           case _ =>
-            0
+            unused
         }
       case i: IF =>
         val unused = root(
@@ -64,7 +62,7 @@ class EvaluatorV3(
         if (unused < 0) throw new Error("Unused < 0")
         i.cond match {
           case TRUE | FALSE if unused == 0 =>
-            0
+            unused
           case TRUE if unused > 0 =>
             update(i.ifTrue)
             root(
@@ -92,17 +90,16 @@ class EvaluatorV3(
       case fc: FUNCTION_CALL =>
         val unusedArgsEval = fc.args.indices.foldLeft(limit) {
           case (unused, argIndex) =>
-            if (unused == 0) {
-              println(s"Not evaluating next args: $unused")
-              0
-            }
             if (unused < 0) throw new Error("Unused < 0")
-            root(
-              expr = fc.args(argIndex),
-              update = argValue => fc.args = fc.args.updated(argIndex, argValue),
-              limit = unused,
-              parentBlocks
-            )
+            else if (unused == 0)
+              unused
+            else
+              root(
+                expr = fc.args(argIndex),
+                update = argValue => fc.args = fc.args.updated(argIndex, argValue),
+                limit = unused,
+                parentBlocks
+              )
         }
         if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
           fc.function match {
@@ -114,7 +111,7 @@ class EvaluatorV3(
                 unusedArgsEval
               } else {
                 update(ev[Id]((ctx.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
-                println(s"FUNCTION CALL: reducing unused to ${unusedArgsEval - cost}")
+                //println(s"FUNCTION CALL: reducing unused to ${unusedArgsEval - cost}")
                 unusedArgsEval - cost
               }
             case FunctionHeader.User(_, name) =>
@@ -149,7 +146,6 @@ class EvaluatorV3(
         update(evaluated)
         limit
     }
-    //println(s"Finished visiting $dc, result: $expr, Consumed: ${limit-r}")
   }
 
   @tailrec
@@ -167,20 +163,22 @@ class EvaluatorV3(
     let: LET,
     nextParentBlocks: List[BLOCK_DEF]
   ) = {
-    val unused = root(
-      expr = let.value,
-      update = let.value = _,
-      limit = limit,
-      parentBlocks = nextParentBlocks
-    )
-    if (unused < 0) throw new Error("Unused < 0")
-    let.value match {
-      case ev: EVALUATED if unused > 0 =>
-        update(ev)
-        unused - 1
-      case _ =>
-        unused
-    }
+    if (limit > 0) {
+      val unused = root(
+        expr = let.value,
+        update = let.value = _,
+        limit = limit,
+        parentBlocks = nextParentBlocks
+      )
+      if (unused < 0) throw new Error("Unused < 0")
+      let.value match {
+        case ev: EVALUATED if unused > 0 =>
+          update(ev)
+          unused - 1
+        case _ =>
+          unused
+      }
+    } else limit
   }
 
   @tailrec

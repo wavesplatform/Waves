@@ -732,13 +732,6 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
                                   # Total: 12   Result: 16
       */
 
-    (0 to 13) foreach (i => {
-      println(s"$i.")
-      eval(expr, i)
-      println(Decompiler(expr, ctx.decompilerContext))
-      println("\n\n")
-    })
-
     val (_, result, cost) = eval(expr, 100)
     result shouldBe "16"
     cost shouldBe 12
@@ -823,21 +816,23 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
     val (evaluated, _, precalculatedComplexity) = eval(script, 1500)
     val startCost = 0
-    val expr = compile(script)
+    def expr() = compile(script)
 
     val piecesGen = Gen.choose(2, 100)
       .map(randomPieces(precalculatedComplexity, _))
 
-    forAll(piecesGen) { pieces =>
+    val pieces = List(142, 1, 1, 2, 3, 1, 7, 1, 2, 1, 2, 9, 2, 1, 2, 2, 1, 2, 8, 3, 2, 9, 13, 5, 5, 21, 1, 1, 1, 1, 26, 6, 1, 8, 6, 1, 4, 9, 2, 11, 2, 116, 4, 5, 8, 6, 35, 66, 19, 9, 6, 4, 2, 4, 13, 1, 6, 5, 1, 132, 7, 12, 12, 2, 21, 5, 9, 2, 9, 12, 5, 41, 7, 21, 8, 4, 2, 5, 2, 87, 44, 32, 6, 10, 6, 14)
+
+    //forAll(piecesGen) { pieces =>
       val (resultExpr, summarizedCost) =
-        pieces.foldLeft((expr, startCost)) {
+        pieces.foldLeft((expr(), startCost)) {
           case ((currentExpr, costSum), nextCostLimit) =>
             currentExpr should not be an[EVALUATED]
-            val (nextExpr, _, cost) = eval(expr, nextCostLimit)
-            (nextExpr, costSum + cost)
+            val (nextExpr, _, cost) = eval(currentExpr, nextCostLimit)
+            (nextExpr, cost + costSum)
         }
       resultExpr shouldBe evaluated
       summarizedCost shouldBe precalculatedComplexity
-    }
+    //}
   }
 }
