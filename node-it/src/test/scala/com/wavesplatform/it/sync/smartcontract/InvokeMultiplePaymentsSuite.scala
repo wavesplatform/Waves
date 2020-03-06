@@ -92,7 +92,6 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
           waitForTx = true
         )
     ) { error =>
-      println(error)
       error.message should include(s"Error while executing account-script: Alias 'alias:I:$alias")
       error.id shouldBe ScriptExecutionError.Id
       error.statusCode shouldBe 400
@@ -109,7 +108,6 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
           waitForTx = true
         )
     ) { error =>
-      println(error)
       error.message should include("Alias should contain only following characters")
       error.id shouldBe CustomValidationError.Id
       error.statusCode shouldBe 400
