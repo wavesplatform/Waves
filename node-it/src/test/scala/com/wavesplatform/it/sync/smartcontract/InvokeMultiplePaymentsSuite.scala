@@ -98,6 +98,23 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
       error.statusCode shouldBe 400
     }
 
+    assertApiError(
+      sender
+        .invokeScript(
+          caller,
+          dApp,
+          Some("f"),
+          payment = Seq(Payment(1.waves, Waves)),
+          args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
+          waitForTx = true
+        )
+    ) { error =>
+      println(error)
+      error.message should include("Alias should contain only following characters")
+      error.id shouldBe CustomValidationError.Id
+      error.statusCode shouldBe 400
+    }
+
   }
 
   test("can invoke with no payments") {
