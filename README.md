@@ -4,7 +4,7 @@ Waves is an open source [blockchain platform](https://wavesplatform.com/).
 
 You can use it to build your own decentralised applications. Waves provides full blockchain ecosystem including smart contracts language called RIDE.
 
-### How does the blockchain network work?
+## How does the blockchain network work?
 
 There is a huge collection of nodes deployed by miners that store all of the network information in the chain of blocks (blockchain), process requests and can add new transactions to the network after checking their compliance with the rules. The miners are rewarded with the network coins called MRT. 
 
@@ -12,7 +12,7 @@ The main advantage of this technology is that each node is a synchronized copy o
 
 
 
-# What is node?
+## What is node?
 
 A **node** is a [host](https://en.wikipedia.org/wiki/Host_(network)) connected to the [blockchain network](https://docs.wavesplatform.com/en/blockchain/blockchain-network.html) using the [Waves Node](https://github.com/wavesplatform/Waves) application.
 
@@ -22,97 +22,69 @@ Node functions are:
 - [transaction validation](https://docs.wavesplatform.com/en/blockchain/transaction/transaction-validation.html)
 - sending [transactions](https://docs.wavesplatform.com/en/blockchain/transaction.html)
 
-
-
 Learn more about Waves Full Node in the [documentation](https://docs.wavesplatform.com/en/waves-node/what-is-a-full-node.html).
 
 
 
 
 
-# How to Build and Test a Node
+## Build from Source
 
-The node can be built and installed wherever java can run. For ***Ubuntu***,sbt packageAll ‌produces only deb package but for other operating systems, ZIP archive or a fat JAR can be used as well. To build and test your Waves Node, you will need to follow these steps:
+The waves-node can be built and installed wherever java can run. For ***Ubuntu***, sbt packageAllproduces only deb package but for other operating systems, ZIP archive or a fat JAR can be used as well. To build and test your Waves Node, you will need to follow these steps:
 
 
 
-## 1. Setup the environment
+### Prerequisites
 
-- ### Installing Java
+You'll need Java (JRE & JDK) and SBT (Scala Build Tools) on your machine. Docker is needed for testing.
 
 ```
 sudo apt-get update
 sudo apt-get install default-jre default-jdk
 ```
 
-- ### Installing SBT
-
 Please follow the SBT installation instructions depending on your operating system ([Mac](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Mac.html), [Windows](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Windows.html), [Linux](https://www.scala-sbt.org/1.0/docs/Installing-sbt-on-Linux.html)).
 
+https://www.docker.com
 
-
-## 2. Obtaining Source Codes
-
-Cloning with HTTPS URLs (recommended)
+### Build
 
 ```
 git clone https://github.com/wavesplatform/Waves.git
 cd Waves
+sbt checkPR  # builds and runs unit tests
 ```
 
-or cloning with SSH URLs
+### Integration Tests (optional)
 
-```
-git clone git@github.com:wavesplatform/Waves.git
-cd Waves
-```
+Create a Docker image before you run any test: 
 
+```sh
+sbt node-it/docker
+SBT_THREAD_NUMBER=4 sbt node-it/test  # adjest thread-number as needed
 
-
-## 3. Compilation and unit tests
-
-```
-sbt checkPR
-```
-
-
-
-## 4. Running NODE integration tests (optional)
-
-Create a Docker image before you run any test: `sbt node-it/docker`
-
-- Run all tests: `SBT_THREAD_NUMBER=4 sbt node-it/test` . You can increase or decrease number of parallel running tests by changing `SBT_THREAD_NUMBER`
-- Run one test: `sbt node-it/testOnly *.TestClassName` or `node-it/testOnly full.package.TestClassName`
-
-
-
-## 5. Building packages
-
-- ### Mainnet
-
-```
-sbt packageAll
-```
-
-- ### Testnet
-
-```
-sbt -Dnetwork=testnet packageAll
+#run one test
+sbt node-it/testOnly *.TestClassName  # or
+sbt node-it/testOnly full.package.TestClassName
 ```
 
 
+### Packaging
 
-## 6. Installing DEB package
+```sh
+sbt packageAll                    # for mainnet use
+sbt -Dnetwork=testnet packageAll  # for testnet use
+```
+
+### Installing DEB package
 
 DEB package located in target folder. You can replace '*' with actual package name:
 
-```
+```sh
 sudo dpkg -i node/target/*.deb
 ```
 
-
-
-## 7. Running fat jar
+### Running fat jar
 
 You can replace waves-all*.jar with actual jar name (it should have "all"-word):
 
@@ -120,20 +92,20 @@ You can replace waves-all*.jar with actual jar name (it should have "all"-word):
 java -jar node/target/waves-all*.jar path/to/config/file
 ```
 
-**Note.** For OSX - homebrew is preferable choice. You can install java with brew cask install java and sbt with brew install sbt@1. Build/Test steps are common for any OS (but you should use ‘' instead of '/' in windows). {% endprettyhint %}
+**Note.** For OSX - homebrew is preferable choice. You can install java with brew cask install java and sbt with brew install sbt@1. Build/Test steps are common for any OS (but you should use ‘' instead of '/' in windows). 
 
 
 
-## 8. Running an extension project locally during development
+### 8. Running an extension project locally during development
 
-### SBT
+#### SBT
 
-```
+```sh
 sbt "extension-module/run /path/to/configuration"
 
 ```
 
-### IntelliJ IDEA
+#### IntelliJ IDEA
 
 1. Click on `Add configuration` (or `Edit configurations...`)
 2. Click on `+` to add a new configuration, choose `Application`
@@ -150,7 +122,7 @@ sbt "extension-module/run /path/to/configuration"
 
 
 
-# Useful links
+## Useful links
 
 - [Official Documentation](https://docs.wavesplatform.com/)
 - [Client Mainnet](https://client.wavesplatform.com/) – Waves Platform client
@@ -162,7 +134,7 @@ sbt "extension-module/run /path/to/configuration"
 
 
 
-# Support
+## Support
 
 Keep up with the latest news and articles, and find out all about events happening on the [Waves Platform](https://wavesplatform.com/).
 
@@ -174,7 +146,7 @@ Keep up with the latest news and articles, and find out all about events happeni
 
 
 
-# Acknowledgement
+## Acknowledgement
 [<img src="https://camo.githubusercontent.com/97fa03cac759a772255b93c64ab1c9f76a103681/68747470733a2f2f7777772e796f75726b69742e636f6d2f696d616765732f796b6c6f676f2e706e67">](https://www.yourkit.com/)
 
 We use YourKit full-featured Java Profiler to make Waves node faster. YourKit, LLC is the creator of innovative and intelligent tools for profiling Java and .NET applications.
