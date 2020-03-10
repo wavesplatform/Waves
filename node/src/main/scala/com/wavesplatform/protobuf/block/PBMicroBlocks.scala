@@ -19,7 +19,7 @@ object PBMicroBlocks {
       PublicKey(microBlock.senderPublicKey.toByteArray),
       transactions,
       microBlock.reference,
-      microBlock.totalBlockRef,
+      microBlock.updatedBlockSignature,
       signedMicro.signature
     )
   }
@@ -30,7 +30,7 @@ object PBMicroBlocks {
         PBMicroBlock(
           version = microBlock.version,
           reference = microBlock.reference,
-          totalBlockRef = microBlock.totalResBlockSig,
+          updatedBlockSignature = microBlock.totalResBlockSig,
           senderPublicKey = ByteStr(microBlock.sender),
           transactions = microBlock.transactionData.map(PBTransactions.protobuf)
         )

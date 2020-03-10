@@ -28,7 +28,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           info.description.script.map(
             script =>
               ScriptData(
-                Some(PBTransactions.toPBScript(script)),
+                PBTransactions.toPBScript(Some(script)),
                 script.expr.toString,
                 Script.estimate(script, blockchain.estimator).explicitGet()
               )

@@ -244,8 +244,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             ExchangeTransaction.signed(
               1.toByte,
               matcher = sender1,
-              buyOrder = buyOrder,
-              sellOrder = sellOrder,
+              order1 = buyOrder,
+              order2 = sellOrder,
               amount = amount,
               price = price,
               buyMatcherFee = buyMatcherFee,
@@ -257,8 +257,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             ExchangeTransaction.signed(
               2.toByte,
               matcher = sender1,
-              buyOrder = buyOrder,
-              sellOrder = sellOrder,
+              order1 = buyOrder,
+              order2 = sellOrder,
               amount = amount,
               price = price,
               buyMatcherFee = buyMatcherFee,
@@ -319,8 +319,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       ExchangeTransaction.signed(
         1.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = price,
         buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
@@ -332,8 +332,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       ExchangeTransaction.signed(
         2.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = price,
         buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
