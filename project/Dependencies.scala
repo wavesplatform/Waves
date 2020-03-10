@@ -127,6 +127,16 @@ object Dependencies {
     akkaModule("slf4j") % Runtime
   )
 
+  private[this] val levelDBJNA = {
+    val levelDbVersion = "1.22.1"
+    Seq(
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+    )
+  }
+
   lazy val node = Def.setting(
     Seq(
       "commons-net"          % "commons-net"              % "3.6",
@@ -151,7 +161,7 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console ++ logDeps
+    ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
   )
 
   private[this] val protoSchemasLib =
