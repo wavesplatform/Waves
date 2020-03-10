@@ -25,6 +25,7 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
     val n  = asset("name")
     val q  = asset("quantity")
     val ns = asset("nounce")
+    val issueParams = s""""$n","$ds",$q, $d,$r,${if (s.equals(None)) "unit" else s}"""
 
     s"""
        |{-# STDLIB_VERSION 4 #-}
@@ -34,37 +35,37 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
        |@Callable (i)
        |func issue10Assets() = {
        |  [
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 0),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 1),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 2),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 3),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 4),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 5),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 6),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 7),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 8),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 9)
+       |    Issue($issueParams, 0),
+       |    Issue($issueParams, 1),
+       |    Issue($issueParams, 2),
+       |    Issue($issueParams, 3),
+       |    Issue($issueParams, 4),
+       |    Issue($issueParams, 5),
+       |    Issue($issueParams, 6),
+       |    Issue($issueParams, 7),
+       |    Issue($issueParams, 8),
+       |    Issue($issueParams, 9)
        |  ]
        |}
        |
        |@Callable (i)
        |func issue11Assets() = {
        |  [
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 1),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 2),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 3),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 4),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 5),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 6),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 7),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 8),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 9),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 10),
-       |    Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, 11)
+       |    Issue($issueParams, 1),
+       |    Issue($issueParams, 2),
+       |    Issue($issueParams, 3),
+       |    Issue($issueParams, 4),
+       |    Issue($issueParams, 5),
+       |    Issue($issueParams, 6),
+       |    Issue($issueParams, 7),
+       |    Issue($issueParams, 8),
+       |    Issue($issueParams, 9),
+       |    Issue($issueParams, 10),
+       |    Issue($issueParams, 11)
        |  ]
        |}
        |
-       |@Callable (i) func issueAsset() = [Issue(${if (s.equals(None)) "unit" else s}, $d, "$ds", $r, "$n", $q, $ns)]
+       |"@Callable (i) func issueAsset() = [Issue($issueParams, $ns)]"
        |
        |@Callable (i) func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]
        |
