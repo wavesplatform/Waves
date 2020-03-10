@@ -1,17 +1,16 @@
 package com.wavesplatform.lang
 
 import cats.implicits._
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.V4
-import com.wavesplatform.lang.v1.{FunctionHeader, Serde, evaluator}
+import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler, Types}
+import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.{EvaluatorV3, FunctionIds}
+import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
@@ -30,7 +29,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
-    new EvaluatorV3(ctx.evaluationContext(environment), version)
+    new EvaluatorV2(ctx.evaluationContext(environment), version)
 
   private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity) = evaluator(expr, limit)

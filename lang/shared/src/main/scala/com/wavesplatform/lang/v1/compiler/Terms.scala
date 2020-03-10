@@ -15,7 +15,7 @@ object Terms {
   sealed abstract class DECLARATION {
     def name: String
     def toStr: Coeval[String]
-    def deepCopy(): DECLARATION
+    def deepCopy: DECLARATION
     override def toString: String = toStr()
     def isItFailed: Boolean = false
   }
@@ -23,27 +23,28 @@ object Terms {
     def name = "NO_NAME"
     def toStr: Coeval[String] = Coeval.now("Error")
     override def isItFailed: Boolean = true
+    override def deepCopy: DECLARATION = this
   }
   case class LET(name: String, var value: EXPR)                     extends DECLARATION {
     def toStr: Coeval[String] = for {
       e <- value.toStr
     } yield "LET(" ++ name.toString ++ "," ++ e ++ ")"
 
-    def deepCopy(): LET =
-      LET(name, value.deepCopy())
+    def deepCopy: LET =
+      LET(name, value.deepCopy)
   }
   case class FUNC(name: String, args: List[String], var body: EXPR) extends DECLARATION {
     def toStr: Coeval[String] = for {
       e <- body.toStr
     } yield "FUNC(" ++ name.toString ++ "," ++ args.toString ++ "," ++ e ++ ")"
 
-    def deepCopy(): FUNC =
-      FUNC(name, args, body.deepCopy())
+    def deepCopy: FUNC =
+      FUNC(name, args, body.deepCopy)
   }
 
   sealed abstract class EXPR {
     def toStr: Coeval[String]
-    def deepCopy(): EXPR
+    def deepCopy: EXPR
     override def toString: String = toStr()
     def isItFailed: Boolean = false
   }
@@ -51,6 +52,7 @@ object Terms {
   case class FAILED_EXPR() extends EXPR {
     def toStr: Coeval[String] = Coeval.now("error")
     override def isItFailed: Boolean = true
+    override def deepCopy: EXPR = this
   }
 
   case class GETTER(var expr: EXPR, field: String)                         extends EXPR {
@@ -58,8 +60,8 @@ object Terms {
       e <- expr.toStr
     } yield "GETTER(" ++ e ++ "," ++ field.toString ++ ")"
 
-    override def deepCopy(): EXPR =
-      GETTER(expr.deepCopy(), field)
+    override def deepCopy: EXPR =
+      GETTER(expr.deepCopy, field)
   }
 
   sealed trait BLOCK_DEF {
@@ -76,8 +78,8 @@ object Terms {
 
     override val dec: DECLARATION = let
 
-    override def deepCopy(): EXPR =
-      LET_BLOCK(let.deepCopy(), body.deepCopy())
+    override def deepCopy: EXPR =
+      LET_BLOCK(let.deepCopy, body.deepCopy)
   }
 
   case class BLOCK(dec: DECLARATION, var body: EXPR)                       extends EXPR with BLOCK_DEF {
@@ -86,8 +88,8 @@ object Terms {
       b <- body.toStr
     } yield "BLOCK(" ++ e ++ "," ++ b ++ ")"
 
-    override def deepCopy(): EXPR =
-      BLOCK(dec.deepCopy(), body.deepCopy())
+    override def deepCopy: EXPR =
+      BLOCK(dec.deepCopy, body.deepCopy)
   }
   case class IF(var cond: EXPR, ifTrue: EXPR, ifFalse: EXPR)               extends EXPR {
     def toStr: Coeval[String] = for {
@@ -96,14 +98,14 @@ object Terms {
       f <- ifFalse.toStr
     } yield "IF(" ++ c ++ "," ++ t ++ "," ++ f ++ ")"
 
-    override def deepCopy(): EXPR =
-      IF(cond.deepCopy(), ifTrue.deepCopy(), ifFalse.deepCopy())
+    override def deepCopy: EXPR =
+      IF(cond.deepCopy, ifTrue.deepCopy, ifFalse.deepCopy)
   }
   case class REF(key: String)                                          extends EXPR {
     override def toString: String = "REF(" ++ key.toString ++ ")"
     def toStr: Coeval[String] = Coeval.now(toString)
 
-    override def deepCopy(): EXPR =
+    override def deepCopy: EXPR =
       this
   }
   case class FUNCTION_CALL(function: FunctionHeader, var args: List[EXPR]) extends EXPR {
@@ -111,15 +113,15 @@ object Terms {
       e <- args.map(_.toStr).sequence
     } yield "FUNCTION_CALL(" ++ function.toString ++ "," ++ e.toString ++ ")"
 
-    override def deepCopy(): EXPR =
-      FUNCTION_CALL(function, args.map(_.deepCopy()))
+    override def deepCopy: EXPR =
+      FUNCTION_CALL(function, args.map(_.deepCopy))
   }
 
   sealed trait EVALUATED extends EXPR {
     def prettyString(level: Int) : String = toString
     def toStr: Coeval[String] = Coeval.now(toString)
 
-    override def deepCopy(): EXPR =
+    override def deepCopy: EXPR =
       this
   }
   case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString  }
