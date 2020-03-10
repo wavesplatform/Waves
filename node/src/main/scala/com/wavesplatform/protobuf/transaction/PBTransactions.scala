@@ -143,7 +143,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -160,7 +160,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId),
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -170,7 +170,7 @@ object PBTransactions {
         vt.smart.SetScriptTransaction.create(
           version.toByte,
           sender,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -332,7 +332,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -349,7 +349,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId),
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -359,7 +359,7 @@ object PBTransactions {
         vt.smart.SetScriptTransaction(
           version.toByte,
           sender,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -482,7 +482,7 @@ object PBTransactions {
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
-        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, script.map(toPBScript))
+        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
@@ -496,11 +496,11 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Burn(data))
 
       case tx @ vt.assets.SetAssetScriptTransaction(_, sender, assetId, script, fee, timestamp, proofs) =>
-        val data = SetAssetScriptTransactionData(assetId.id, script.map(toPBScript))
+        val data = SetAssetScriptTransactionData(assetId.id, toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetAssetScript(data))
 
       case tx @ vt.smart.SetScriptTransaction(_, sender, script, fee, timestamp, proofs) =>
-        val data = SetScriptTransactionData(script.map(toPBScript))
+        val data = SetScriptTransactionData(toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetScript(data))
 
       case tx: vt.lease.LeaseTransaction =>
@@ -607,14 +607,13 @@ object PBTransactions {
       .map(Attachment.of)
   }
 
-  def toVanillaScript(script: Script): com.wavesplatform.lang.script.Script = {
+  def toVanillaScript(script: ByteString): Option[com.wavesplatform.lang.script.Script] = {
     import com.wavesplatform.common.utils._
-    val array = Bytes.concat(Array(script.version.toByte), script.bytes.toByteArray)
-    ScriptReader.fromBytes(array).explicitGet()
+    if (script.isEmpty) None else Some(ScriptReader.fromBytes(script.toByteArray).explicitGet())
   }
 
-  def toPBScript(script: com.wavesplatform.lang.script.Script): Script = {
-    val Array(ver, body @ _*) = script.bytes().arr
-    Script.of(ByteString.copyFrom(body.toArray), ver)
+  def toPBScript(script: Option[com.wavesplatform.lang.script.Script]): ByteString = script match {
+    case Some(sc) => ByteString.copyFrom(sc.bytes())
+    case None => ByteString.EMPTY
   }
 }
