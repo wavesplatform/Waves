@@ -1344,7 +1344,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     val issue = Issue.create(compiledScript = None, decimals, description, isReissuable, name, quantity, nonce, ByteStr.empty)
     val script =
      s"""
-        | let issue = Issue(unit, $decimals, "$description", $isReissuable, "$name", $quantity, $nonce)
+        | let issue = Issue("$name", "$description", $quantity, $decimals, $isReissuable, unit, $nonce)
         | calculateAssetId(issue)
       """.stripMargin
 

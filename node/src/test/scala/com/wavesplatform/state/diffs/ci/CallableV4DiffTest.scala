@@ -411,7 +411,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     dApp(
       s"""
          | [
-         |   Issue(unit, $decimals, "$description", $reissuable, "$name", $issueAmount, 0)
+         |   Issue("$name", "$description", $issueAmount, $decimals, $reissuable, unit, 0)
          | ]
        """.stripMargin
     )
