@@ -95,7 +95,7 @@ object MicroBlockSynchronizer {
 
     val observable = microblockResponses.observeOn(scheduler).flatMap {
       case (ch, MicroBlockResponse(mb)) =>
-        import mb.{totalResBlockRef => totalSig}
+        import mb.{totalResBlockSig => totalSig}
         successfullyReceived.put(totalSig, dummy)
         BlockStats.received(mb, ch)
         Option(awaiting.getIfPresent(totalSig)) match {

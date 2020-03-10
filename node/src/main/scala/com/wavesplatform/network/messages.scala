@@ -53,17 +53,17 @@ case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
 case class MicroBlockResponse(microblock: MicroBlock)
 
-case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
+case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockRef: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =
-    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender))
+    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockRef.arr, sender))
 
-  override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockSig.trim})"
+  override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockRef.trim})"
 }
 
 object MicroBlockInv {
 
-  def apply(sender: KeyPair, totalBlockSig: ByteStr, prevBlockSig: ByteStr): MicroBlockInv = {
-    val signature = crypto.sign(sender, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr)
-    new MicroBlockInv(sender, totalBlockSig, prevBlockSig, ByteStr(signature))
+  def apply(sender: KeyPair, totalBlockSig: ByteStr, prevBlockRef: ByteStr): MicroBlockInv = {
+    val signature = crypto.sign(sender, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockRef.arr)
+    new MicroBlockInv(sender, totalBlockSig, prevBlockRef, ByteStr(signature))
   }
 }

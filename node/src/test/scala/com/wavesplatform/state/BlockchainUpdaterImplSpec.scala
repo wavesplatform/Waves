@@ -263,7 +263,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         try {
           val (genesis, transfers)       = preconditions(0).sample.get
           val (block1, microBlocks1And2) = chainBaseAndMicro(randomSig, genesis, Seq(transfers.take(2), Seq(transfers(2))))
-          val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockRef, transfers(3), Seq(Seq(transfers(4))))
+          val (block2, microBlock3)      = chainBaseAndMicro(microBlocks1And2.head.totalResBlockSig, transfers(3), Seq(Seq(transfers(4))))
 
           inSequence {
             // genesis
@@ -304,7 +304,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             // rollback microblock
             (triggersMock.onMicroBlockRollback _)
               .expects(where {
-                case (toSig, height) => height == 1 && toSig == microBlocks1And2.head.totalResBlockRef
+                case (toSig, height) => height == 1 && toSig == microBlocks1And2.head.totalResBlockSig
               })
               .once()
 
@@ -313,7 +313,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .expects(where {
                 case (block, _, _, bc) =>
                   bc.height == 1 &&
-                    block.header.reference == microBlocks1And2.head.totalResBlockRef
+                    block.header.reference == microBlocks1And2.head.totalResBlockSig
               })
               .once()
 
@@ -321,7 +321,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             (triggersMock.onProcessMicroBlock _)
               .expects(where {
                 case (microBlock, diff, bc) =>
-                  bc.height == 2 && microBlock.prevResBlockRef == block2.signature
+                  bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()
           }

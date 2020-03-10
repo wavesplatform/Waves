@@ -147,7 +147,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
         )
 
         val (keyBlock1, _) = unsafeChainBaseAndMicro(
-          totalRefTo = microBlocks.head.totalResBlockRef,
+          totalRefTo = microBlocks.head.totalResBlockSig,
           base = Seq(transfer3),
           micros = Nil,
           signer = secondAccount,

@@ -114,7 +114,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
       case (domain, (genesis, masterToAlice, feeAsset, sponsor, aliceToBob, bobToMaster, bobToMaster2)) =>
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
         val block1 =
-          customBuildBlockOfTxs(microBlocks.last.totalResBlockRef, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
+          customBuildBlockOfTxs(microBlocks.last.totalResBlockSig, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
         val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
         val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
         val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))

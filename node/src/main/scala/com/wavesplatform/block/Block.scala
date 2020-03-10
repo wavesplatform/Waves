@@ -104,7 +104,7 @@ object Block extends ScorexLogging {
     if (version >= ProtoBlockVersion) DigestLength
     else SignatureLength
 
-  def validateReferenceLength(version: Byte, length: Int): Boolean =
+  def validateReferenceLength(length: Int): Boolean =
     length == DigestLength || length == SignatureLength
 
   def create(

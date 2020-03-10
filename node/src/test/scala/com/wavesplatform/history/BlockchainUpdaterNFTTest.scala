@@ -121,7 +121,7 @@ class BlockchainUpdaterNFTTest
         )
 
         val (postBlock, _) = unsafeChainBaseAndMicro(
-          totalRefTo = microBlocks.last.totalResBlockRef,
+          totalRefTo = microBlocks.last.totalResBlockSig,
           base = Seq(),
           micros = Seq(),
           signer = richAccount,
@@ -200,7 +200,7 @@ class BlockchainUpdaterNFTTest
         )
 
         val (postBlock, _) = unsafeChainBaseAndMicro(
-          totalRefTo = microBlocks.last.totalResBlockRef,
+          totalRefTo = microBlocks.last.totalResBlockSig,
           base = Seq(),
           micros = Seq(),
           signer = richAccount,

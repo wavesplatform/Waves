@@ -106,7 +106,7 @@ class MicroBlockMinerImpl(
       }
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock): Task[Unit] =
-    Task(allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockRef, microBlock.prevResBlockRef)))
+    Task(allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[Unit] =
     MicroblockAppender(blockchainUpdater, utx, appenderScheduler, verify = false)(microBlock)
@@ -136,7 +136,7 @@ class MicroBlockMinerImpl(
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock
-          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.uniqueId, signedBlock.uniqueId, signedBlock.signature)
+          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.uniqueId, signedBlock.signature)
           .leftMap(MicroBlockBuildError)
         _ = BlockStats.mined(microBlock)
       } yield (signedBlock, microBlock)

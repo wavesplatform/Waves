@@ -15,7 +15,7 @@ object Validators {
 
   def validateBlock(b: Block): Validation[Block] =
     (for {
-      _ <- Either.cond(Block.validateReferenceLength(b.header.version, b.header.reference.length), (), "Incorrect reference")
+      _ <- Either.cond(Block.validateReferenceLength(b.header.reference.length), (), "Incorrect reference")
       genSigLength = if (b.header.version < ProtoBlockVersion) GenerationSignatureLength else GenerationVRFSignatureLength
       _ <- Either.cond(b.header.generationSignature.arr.length == genSigLength, (), "Incorrect generationSignature")
       _ <- Either.cond(b.header.generator.length == KeyLength, (), "Incorrect signer")
@@ -50,14 +50,14 @@ object Validators {
   def validateMicroBlock(mb: MicroBlock): Validation[MicroBlock] =
     (for {
       _ <- Either.cond(
-        Block.validateReferenceLength(mb.version, mb.prevResBlockRef.length),
+        MicroBlock.validateReferenceLength(mb.version, mb.reference.length),
         (),
-        s"Incorrect prevResBlockSig: ${mb.prevResBlockRef.length}"
+        s"Incorrect prevResBlockSig: ${mb.reference.length}"
       )
       _ <- Either.cond(
-        Block.validateReferenceLength(mb.version, mb.totalResBlockRef.length),
+        mb.totalResBlockSig.length == crypto.SignatureLength,
         (),
-        s"Incorrect totalResBlockSig: ${mb.totalResBlockRef.length}"
+        s"Incorrect totalResBlockSig: ${mb.totalResBlockSig.length}"
       )
       _ <- Either.cond(mb.sender.length == KeyLength, (), s"Incorrect generator.publicKey: ${mb.sender.length}")
       _ <- Either.cond(mb.transactionData.nonEmpty, (), "cannot create empty MicroBlock")

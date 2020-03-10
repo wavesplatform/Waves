@@ -15,12 +15,11 @@ object MicroBlockSerializer {
     val transactionDataBytes = writeTransactionData(microBlock.version, microBlock.transactionData)
     Bytes.concat(
       Array(microBlock.version),
-      microBlock.prevResBlockRef,
-      microBlock.totalResBlockRef,
+      microBlock.reference,
+      microBlock.totalResBlockSig,
       Ints.toByteArray(transactionDataBytes.length),
       transactionDataBytes,
       microBlock.sender,
-      if (microBlock.version >= Block.ProtoBlockVersion) microBlock.totalSignature.ensuring(_.length == SignatureLength) else ByteStr.empty,
       microBlock.signature
     )
   }
@@ -30,16 +29,15 @@ object MicroBlockSerializer {
       val buf = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
 
       val version          = buf.get
-      val prevResBlockSig  = ByteStr(buf.getByteArray(Block.referenceLength(version)))
-      val totalResBlockSig = ByteStr(buf.getByteArray(Block.referenceLength(version)))
+      val reference        = ByteStr(buf.getByteArray(Block.referenceLength(version)))
+      val totalResBlockSig = ByteStr(buf.getByteArray(SignatureLength))
 
       buf.getInt
 
       val transactionData = readTransactionData(version, buf)
       val generator       = buf.getPublicKey
-      val totalSignature  = if (version >= Block.ProtoBlockVersion) ByteStr(buf.getByteArray(SignatureLength)) else ByteStr.empty
       val signature       = ByteStr(buf.getByteArray(SignatureLength))
 
-      MicroBlock(version, generator, transactionData, prevResBlockSig, totalResBlockSig, signature, totalSignature)
+      MicroBlock(version, generator, transactionData, reference, totalResBlockSig, signature)
     }
 }

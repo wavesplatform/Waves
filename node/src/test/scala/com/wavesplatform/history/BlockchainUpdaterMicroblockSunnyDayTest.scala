@@ -82,7 +82,7 @@ class BlockchainUpdaterMicroblockSunnyDayTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (genesis, masterToAlice, aliceToBob, aliceToBob2)) =>
         val (block0, microBlocks0) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, aliceToBob).map(Seq(_)))
-        val block1                 = buildBlockOfTxs(microBlocks0.head.totalResBlockRef, Seq(aliceToBob2))
+        val block1                 = buildBlockOfTxs(microBlocks0.head.totalResBlockSig, Seq(aliceToBob2))
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks0(0)).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks0(1)).explicitGet()

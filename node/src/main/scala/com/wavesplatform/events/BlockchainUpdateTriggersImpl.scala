@@ -31,7 +31,7 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
 
   override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {
     val (microBlockStateUpdate, txsStateUpdates) = containerStateUpdate(blockchainBefore, diff, microBlock.transactionData)
-    events.onNext(MicroBlockAppended(microBlock.totalResBlockRef, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates))
+    events.onNext(MicroBlockAppended(microBlock.totalResBlockSig, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates))
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = events.onNext(RollbackCompleted(toBlockId, toHeight))

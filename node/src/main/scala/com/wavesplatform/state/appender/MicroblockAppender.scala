@@ -36,7 +36,7 @@ object MicroblockAppender extends ScorexLogging {
             peerDatabase: PeerDatabase,
             scheduler: Scheduler)(ch: Channel, md: MicroblockData): Task[Unit] = {
     import md.microBlock
-    val microblockTotalResBlockSig = microBlock.totalResBlockRef
+    val microblockTotalResBlockSig = microBlock.totalResBlockSig
     (for {
       _                <- EitherT(Task.now(microBlock.signaturesValid()))
       validApplication <- EitherT(apply(blockchainUpdater, utxStorage, scheduler)(microBlock))
