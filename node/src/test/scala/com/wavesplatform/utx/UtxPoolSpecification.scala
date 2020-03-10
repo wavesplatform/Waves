@@ -14,7 +14,7 @@ import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{StorageFactory, randomSig}
+import com.wavesplatform.history.{Domain, StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -272,7 +272,7 @@ class UtxPoolSpecification
   private def massTransferWithBlacklisted(allowRecipients: Boolean) =
     (for {
       (sender, senderBalance, bcu) <- stateGen
-      addressesSize <- Gen.choose(1, MassTransferTransaction.MaxTransferCount)
+      addressesSize                <- Gen.choose(1, MassTransferTransaction.MaxTransferCount)
       addressGen = Gen.listOfN(addressesSize, accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
       recipients <- addressGen.map(_.map(_.publicKey))
       time = new TestTime()
@@ -462,7 +462,14 @@ class UtxPoolSpecification
                 GenesisTransaction.create(richAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 GenesisTransaction.create(randomAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 SetScriptTransaction
-                  .signed(1.toByte, richAccount, Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()), QuickTX.FeeAmount * 4, ntpNow, richAccount)
+                  .signed(
+                    1.toByte,
+                    richAccount,
+                    Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
+                    QuickTX.FeeAmount * 4,
+                    ntpNow,
+                    richAccount
+                  )
                   .explicitGet()
               ),
               signer = TestBlock.defaultSigner,
@@ -552,27 +559,28 @@ class UtxPoolSpecification
 
       "takes into account unconfirmed transactions" in forAll(withValidPayments) {
         case (sender, state, utxPool, _, _) =>
-        // todo
-//          val baseAssetIds  = basePortfolio.assetIds
-//
-//          val pessimisticAssetIds = {
-//            val p = utxPool.pessimisticPortfolio(sender)
-//            p.assetIds.filter(x => p.balanceOf(x) != 0)
-//          }
-//
-//          val unchangedAssetIds = baseAssetIds -- pessimisticAssetIds
-//          withClue("unchanged") {
-//            unchangedAssetIds.foreach { assetId =>
-//              basePortfolio.balanceOf(assetId) shouldBe basePortfolio.balanceOf(assetId)
-//            }
-//          }
-//
-//          val changedAssetIds = pessimisticAssetIds -- baseAssetIds
-//          withClue("changed") {
-//            changedAssetIds.foreach { assetId =>
-//              basePortfolio.balanceOf(assetId) should not be basePortfolio.balanceOf(assetId)
-//            }
-//          }
+          println(db)
+          val basePortfolio = Portfolio(state.balance(sender), state.leaseBalance(sender), Domain.portfolio(sender, db, state).toMap)
+          val baseAssetIds  = basePortfolio.assetIds
+
+          val pessimisticAssetIds = {
+            val p = utxPool.pessimisticPortfolio(sender)
+            p.assetIds.filter(x => p.balanceOf(x) != 0)
+          }
+
+          val unchangedAssetIds = baseAssetIds -- pessimisticAssetIds
+          withClue("unchanged") {
+            unchangedAssetIds.foreach { assetId =>
+              basePortfolio.balanceOf(assetId) shouldBe basePortfolio.balanceOf(assetId)
+            }
+          }
+
+          val changedAssetIds = pessimisticAssetIds -- baseAssetIds
+          withClue("changed") {
+            changedAssetIds.foreach { assetId =>
+              basePortfolio.balanceOf(assetId) should not be basePortfolio.balanceOf(assetId)
+            }
+          }
       }
     }
 

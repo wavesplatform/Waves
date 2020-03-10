@@ -49,16 +49,18 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
       .toSeq
   }
 
-  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
-    AddressPortfolio
-      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
-      .toSeq
-  }
+  def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
 }
 
 object Domain {
   implicit class BlockchainUpdaterExt[A <: BlockchainUpdater](bcu: A) {
     def processBlock(block: Block): Either[ValidationError, Option[DiscardedTransactions]] =
       bcu.processBlock(block, block.header.generationSignature)
+  }
+
+  def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
+    AddressPortfolio
+      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
+      .toSeq
   }
 }
