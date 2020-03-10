@@ -325,10 +325,10 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val transfers = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100))
     val massTransferFee = calcMassTransferFee(transfers.size)
-    sender.massTransfer(firstAddress, transfers, massTransferFee + smartFee, Some(asset), waitForTx = true)
+    sender.massTransfer(firstAddress, transfers, massTransferFee + smartFee, assetId = Some(asset), waitForTx = true)
 
     val transfers2 = List(Transfer(firstAddress, 9), Transfer(secondAddress, 100))
-    assertApiError(sender.massTransfer(firstAddress, transfers2, massTransferFee + smartFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(sender.massTransfer(firstAddress, transfers2, massTransferFee + smartFee, assetId = Some(asset)), errNotAllowedByTokenApiError)
   }
 
   test("masstransfer - transferCount <=2") {
@@ -348,7 +348,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val transfers = List(Transfer(firstAddress, 10), Transfer(secondAddress, 100), Transfer(firstAddress, 10))
     val massTransferTransactionFee = calcMassTransferFee(transfers.size)
-    assertApiError(sender.massTransfer(firstAddress, transfers, massTransferTransactionFee + smartFee, Some(asset)), errNotAllowedByTokenApiError)
+    assertApiError(sender.massTransfer(firstAddress, transfers, massTransferTransactionFee + smartFee, assetId = Some(asset)), errNotAllowedByTokenApiError)
   }
 
   test("reissue by non-issuer") {
@@ -441,7 +441,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
 
     val transfers = List(Transfer(firstAddress, 10))
     assertApiError(
-      sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size) + smartFee, Some(assetWOSupport)),
+      sender.massTransfer(firstAddress, transfers, calcMassTransferFee(transfers.size) + smartFee, assetId = Some(assetWOSupport)),
       errNotAllowedByTokenApiError
     )
 

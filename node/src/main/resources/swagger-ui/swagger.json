@@ -1,0 +1,4773 @@
+{
+  "swagger": "2.0",
+  "info": {
+    "description": "The Web Interface to the Waves Full Node API",
+    "version": "???",
+    "title": "Waves Full Node (???)",
+    "termsOfService": "",
+    "license": {
+      "name": "MIT License",
+      "url": "https://github.com/wavesplatform/Waves/blob/master/LICENSE"
+    }
+  },
+  "basePath": "/",
+  "tags": [
+    {
+      "name": "addresses"
+    },
+    {
+      "name": "blocks"
+    },
+    {
+      "name": "peers"
+    },
+    {
+      "name": "blockchain"
+    },
+    {
+      "name": "transactions"
+    },
+    {
+      "name": "utils"
+    },
+    {
+      "name": "wallet"
+    },
+    {
+      "name": "alias"
+    },
+    {
+      "name": "assets"
+    },
+    {
+      "name": "leasing"
+    },
+    {
+      "name": "consensus"
+    },
+    {
+      "name": "activation"
+    },
+    {
+      "name": "debug"
+    },
+    {
+      "name": "node"
+    }
+  ],
+  "paths": {
+    "/addresses": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Addresses",
+        "description": "Get wallet accounts addresses",
+        "operationId": "root_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Create",
+        "description": "Create a new account in the wallet(if it exists)",
+        "operationId": "create_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "address"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/verify/{address}": {
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Verify",
+        "description": "Check a signature of a message signed by an account",
+        "operationId": "verify_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Json with data",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Signed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "isValid": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "isValid"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/seq/{from}/{to}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Seq",
+        "description": "Get wallet accounts addresses",
+        "operationId": "seq_2",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "path",
+            "description": "Start address",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "description": "address",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/addresses/seed/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Seed",
+        "description": "Export seed value for the {address}",
+        "operationId": "seed_2",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "seed"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/publicKey/{publicKey}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Address from Public Key",
+        "description": "Generate a address from public key",
+        "operationId": "publicKey_1",
+        "parameters": [
+          {
+            "name": "publicKey",
+            "in": "path",
+            "description": "Public key Base58-encoded",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "address"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "/addresses/balance/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Balance",
+        "description": "Account's balance",
+        "operationId": "balance_2",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Balance"
+            }
+          }
+        }
+      }
+    },
+    "/addresses/effectiveBalance/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Balance",
+        "description": "Account's balance",
+        "operationId": "effectiveBalance_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Balance"
+            }
+          }
+        }
+      }
+    },
+    "/addresses/data/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Complete Data",
+        "description": "Read all data posted by an account",
+        "operationId": "getData_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "matches",
+            "in": "query",
+            "description": "URL encoded (percent-encoded) regular expression to filter keys (https://www.tutorialspoint.com/scala/scala_regular_expressions.htm)",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "key",
+            "in": "query",
+            "description": "Exact keys to query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/DataEntry"
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Complete Data",
+        "description": "Read all data posted by an account",
+        "operationId": "postData_1",
+        "consumes": [
+          "application/json",
+          "application/x-www-form-urlencoded"
+        ],
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "keys",
+            "in": "body",
+            "description": "Exact keys to query",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "keys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "keys"
+              ]
+            }
+          },
+          {
+            "name": "key",
+            "in": "formData",
+            "description": "Exact keys to query",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/DataEntry"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/addresses/sign/{address}": {
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Sign",
+        "description": "Sign a message with a private key associated with {address}",
+        "operationId": "sign_3",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "message",
+            "description": "Message to sign as a plain string",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Signed"
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/validate/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Validate",
+        "description": "Check whether address {address} is valid or not",
+        "operationId": "validate_2",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "valid"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "valid": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/addresses/scriptInfo/{address}/meta": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Meta by address",
+        "description": "Account's script meta",
+        "operationId": "scriptMeta_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "meta"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "meta": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/addresses/scriptInfo/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Details for account",
+        "description": "Account's script",
+        "operationId": "scriptInfo_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "complexity",
+                "extraFee"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "script": {
+                  "type": "string"
+                },
+                "scriptText": {
+                  "type": "string"
+                },
+                "complexity": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "extraFee": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/addresses/{address}": {
+      "delete": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Delete",
+        "description": "Remove the account with address {address} from the wallet",
+        "operationId": "deleteAddress_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Deletion result",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "deleted": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "deleted"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/signText/{address}": {
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Sign",
+        "description": "Sign a message with a private key associated with {address}",
+        "operationId": "signText_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "message",
+            "description": "Message to sign as a plain string",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Signed"
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/verifyText/{address}": {
+      "post": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Verify text",
+        "description": "Check a signature of a message signed by an account",
+        "operationId": "verifyText_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Json with data",
+            "required": true,
+            "schema": {
+              "$ref": "#/definitions/Signed"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "isValid": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "isValid"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/addresses/balance/details/{address}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Details for balance",
+        "description": "Account's balances",
+        "operationId": "balanceDetails_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "available",
+                "effective",
+                "generating",
+                "regular"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "regular": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "generating": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "available": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "effective": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/addresses/balance/{address}/{confirmations}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Confirmed balance",
+        "description": "Balance of {address} after {confirmations}",
+        "operationId": "balanceWithConfirmations_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "confirmations",
+            "in": "path",
+            "description": "0",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Balance"
+            }
+          }
+        }
+      }
+    },
+    "/addresses/effectiveBalance/{address}/{confirmations}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Confirmed balance",
+        "description": "Balance of {address} after {confirmations}",
+        "operationId": "effectiveBalanceWithConfirmations_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "confirmations",
+            "in": "path",
+            "description": "0",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Balance"
+            }
+          }
+        }
+      }
+    },
+    "/addresses/data/{address}/{key}": {
+      "get": {
+        "tags": [
+          "addresses"
+        ],
+        "summary": "Data by Key",
+        "description": "Read data associated with an account and a key",
+        "operationId": "getDataItem_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "key",
+            "in": "path",
+            "description": "Data key",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/DataEntry"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/signature/{signature}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block by signature",
+        "description": "Get block by its signature",
+        "operationId": "signature_1",
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "path",
+            "description": "Base58-encoded block signature",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Block"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/first": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Genesis block",
+        "description": "Get genesis block",
+        "operationId": "first_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Block"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/address/{address}/{from}/{to}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Blocks produced by address",
+        "description": "Get list of blocks generated by specified address",
+        "operationId": "address_1",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "path",
+            "description": "Start block height",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "description": "End block height",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Block"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/seq/{from}/{to}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block range",
+        "description": "Get blocks at specified heights",
+        "operationId": "seq",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "path",
+            "description": "Start block height",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "description": "End block height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Block"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/delay/{signature}/{blockNum}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Average block delay",
+        "description": "Average delay in milliseconds between last `blockNum` blocks starting from block with `signature`",
+        "operationId": "delay_1",
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "path",
+            "description": "Base58-encoded block signature",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "blockNum",
+            "in": "path",
+            "description": "Number of blocks to count delay",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "delay"
+              ],
+              "properties": {
+                "delay": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/height": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Blockchain height",
+        "description": "Get current blockchain height",
+        "operationId": "height_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "height"
+              ],
+              "properties": {
+                "height": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/at/{height}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block at height",
+        "description": "Get block at specified height",
+        "operationId": "at_1",
+        "parameters": [
+          {
+            "name": "height",
+            "in": "path",
+            "description": "Block height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Block"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/last": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Last block",
+        "description": "Get last block",
+        "operationId": "last_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Block"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/height/{signature}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block height",
+        "description": "Height of a block by its signature",
+        "operationId": "heightEncoded_1",
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "path",
+            "description": "Base58-encoded block signature",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "height"
+              ],
+              "properties": {
+                "height": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/headers/at/{height}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block header at height",
+        "description": "Get block header at specified height",
+        "operationId": "atHeaderOnly_1",
+        "parameters": [
+          {
+            "name": "height",
+            "in": "path",
+            "description": "Block height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/BlockHeader"
+            }
+          }
+        }
+      }
+    },
+    "/blocks/headers/seq/{from}/{to}": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Block header range",
+        "description": "Get block headers at specified heights",
+        "operationId": "seqHeaderOnly_1",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "path",
+            "description": "Start block height",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "to",
+            "in": "path",
+            "description": "End block height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/BlockHeader"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blocks/headers/last": {
+      "get": {
+        "tags": [
+          "blocks"
+        ],
+        "summary": "Last block header",
+        "description": "Get last block header",
+        "operationId": "lastHeaderOnly_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/BlockHeader"
+            }
+          }
+        }
+      }
+    },
+    "/peers/connect": {
+      "post": {
+        "tags": [
+          "peers"
+        ],
+        "summary": "Connect to peer",
+        "description": "Connect to peer",
+        "operationId": "connect_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Json with data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "host",
+                "port"
+              ],
+              "properties": {
+                "host": {
+                  "type": "string",
+                  "example": "127.0.0.1"
+                },
+                "port": {
+                  "type": "integer",
+                  "format": "int32",
+                  "example": 6868
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "hostname",
+                "status"
+              ],
+              "properties": {
+                "hostname": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/peers/clearblacklist": {
+      "post": {
+        "tags": [
+          "peers"
+        ],
+        "summary": "Remove all blacklisted peers",
+        "description": "Clear blacklist",
+        "operationId": "clearBlacklist_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "result"
+              ],
+              "properties": {
+                "result": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/peers/all": {
+      "get": {
+        "tags": [
+          "peers"
+        ],
+        "summary": "Peer list",
+        "description": "Peer list",
+        "operationId": "allPeers_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "address",
+                  "lastSeen"
+                ],
+                "properties": {
+                  "address": {
+                    "type": "string"
+                  },
+                  "lastSeen": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/peers/connected": {
+      "get": {
+        "tags": [
+          "peers"
+        ],
+        "summary": "Connected peers list",
+        "description": "Connected peers list",
+        "operationId": "connectedPeers_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "peers"
+              ],
+              "properties": {
+                "peers": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "address",
+                      "applicationName",
+                      "applicationVersion",
+                      "declaredAddress",
+                      "peerName",
+                      "peerNonce"
+                    ],
+                    "properties": {
+                      "address": {
+                        "type": "string"
+                      },
+                      "declaredAddress": {
+                        "type": "string"
+                      },
+                      "peerName": {
+                        "type": "string"
+                      },
+                      "peerNonce": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "applicationName": {
+                        "type": "string"
+                      },
+                      "applicationVersion": {
+                        "type": "string"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/peers/blacklisted": {
+      "get": {
+        "tags": [
+          "peers"
+        ],
+        "summary": "Blacklisted peers list",
+        "description": "Blacklisted peers list",
+        "operationId": "blacklistedPeers_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "hostname": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "hostname",
+                  "reason",
+                  "timestamp"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/peers/suspended": {
+      "get": {
+        "tags": [
+          "peers"
+        ],
+        "summary": "Suspended peers list",
+        "description": "Suspended peers list",
+        "operationId": "suspendedPeers_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "hostname": {
+                    "type": "string"
+                  },
+                  "timestamp": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "hostname",
+                  "reason",
+                  "timestamp"
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "/blockchain/rewards": {
+      "get": {
+        "tags": [
+          "blockchain"
+        ],
+        "summary": "Current reward status",
+        "description": "Get current miner’s reward status",
+        "operationId": "rewards_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/RewardStatus"
+            }
+          }
+        }
+      }
+    },
+    "/blockchain/rewards/{height}": {
+      "get": {
+        "tags": [
+          "blockchain"
+        ],
+        "summary": "Reward status",
+        "description": "Get miner’s reward status at height",
+        "operationId": "rewardsAtHeight_1",
+        "parameters": [
+          {
+            "name": "height",
+            "in": "path",
+            "description": "Target block height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/RewardStatus"
+            }
+          }
+        }
+      }
+    },
+    "/transactions/status": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Transaction status",
+        "description": "Get a transaction status by its ID",
+        "operationId": "status_3",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "query",
+            "description": "Transaction ID",
+            "required": true,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/TransactionStatus"
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Transaction status",
+        "description": "Get a transaction status by its ID",
+        "operationId": "status_4",
+        "consumes": [
+          "application/json",
+          "application/x-www-form-urlencoded"
+        ],
+        "parameters": [
+          {
+            "name": "ids",
+            "in": "body",
+            "description": "Transaction IDs",
+            "required": false,
+            "schema": {
+              "type": "object",
+              "properties": {
+                "ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "ids"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "in": "formData",
+            "description": "Transaction IDs",
+            "required": false,
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "collectionFormat": "multi"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/TransactionStatus"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/info/{id}": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Transaction info",
+        "description": "Get a transaction by its ID",
+        "operationId": "info_2",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Transaction"
+            }
+          }
+        }
+      }
+    },
+    "/transactions/sign": {
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Sign a transaction",
+        "description": "Sign a transaction with the sender's private key",
+        "operationId": "sign",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "json",
+            "description": "Transaction data including type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Transaction"
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/transactions/unconfirmed": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Unconfirmed transactions",
+        "description": "Get list of unconfirmed transactions",
+        "operationId": "unconfirmed_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Transaction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/address/{address}/limit/{limit}": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "List of transactions by address",
+        "description": "Get list of transactions where specified address has been involved",
+        "operationId": "addressLimit_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "path",
+            "description": "Number of transactions to be returned",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Id of transaction to paginate after",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/Transaction"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/unconfirmed/size": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Number of unconfirmed transactions",
+        "description": "Get the number of unconfirmed transactions in the UTX pool",
+        "operationId": "utxSize_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "size"
+              ],
+              "properties": {
+                "size": {
+                  "type": "integer",
+                  "format": "int32"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/unconfirmed/info/{id}": {
+      "get": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Unconfirmed transaction info",
+        "description": "Get an unconfirmed transaction by its ID",
+        "operationId": "utxTransactionInfo_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Transaction"
+            }
+          }
+        }
+      }
+    },
+    "/transactions/calculateFee": {
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Calculate transaction fee",
+        "description": "Calculates minimal fee for a transaction",
+        "operationId": "calculateFee_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "json",
+            "description": "Transaction data including type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "feeAmount",
+                "feeAssetId"
+              ],
+              "properties": {
+                "feeAssetId": {
+                  "type": "string"
+                },
+                "feeAmount": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/transactions/sign/{signerAddress}": {
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Sign a transaction with a non-default private key",
+        "description": "Sign a transaction with the private key corresponding to the given address",
+        "operationId": "signWithSigner_1",
+        "parameters": [
+          {
+            "name": "signerAddress",
+            "in": "path",
+            "description": "Wallet address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "in": "body",
+            "name": "json",
+            "description": "Transaction data including <a href='transaction-types.html'>type</a>",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Transaction"
+            }
+          }
+        }
+      }
+    },
+    "/transactions/broadcast": {
+      "post": {
+        "tags": [
+          "transactions"
+        ],
+        "summary": "Broadcast a signed transaction",
+        "description": "Broadcast a signed transaction",
+        "operationId": "signedBroadcast_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "json",
+            "description": "Transaction data including type and signature/proofs",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/Transaction"
+            }
+          }
+        }
+      }
+    },
+    "/utils/seed/{length}": {
+      "get": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Seed of specified length",
+        "description": "Generate random seed of specified length",
+        "operationId": "length_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "length",
+            "in": "path",
+            "description": "Seed length ",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "seed"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "/utils/script/compile": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Compile",
+        "description": "Compiles string code to base64 script representation",
+        "operationId": "compile_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "Script code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/CompiledScript"
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/utils/time": {
+      "get": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Time",
+        "description": "Current Node time (UTC)",
+        "operationId": "time_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "NTP",
+                "system"
+              ],
+              "properties": {
+                "system": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "NTP": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/utils/sign/{privateKey}": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Hash",
+        "description": "Return FastCryptographicHash of specified message",
+        "operationId": "sign_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "name": "privateKey",
+            "in": "path",
+            "description": "privateKey",
+            "required": true,
+            "type": "string",
+            "x-example": "3kMEhU5z3v8bmer1ERFUUhW58Dtuhyo9hE5vrhjqAWYT"
+          },
+          {
+            "in": "body",
+            "name": "message",
+            "description": "Message to hash (base58 string)",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "message",
+                "signature"
+              ],
+              "properties": {
+                "message": {
+                  "type": "string"
+                },
+                "signature": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/utils/script/decompile": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Decompile",
+        "description": "Decompiles base64 script representation to string code",
+        "operationId": "decompile_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "Script code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "script"
+              ],
+              "properties": {
+                "script": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/utils/script/compileCode": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Compile script",
+        "description": "Compiles string code to base64 script representation",
+        "operationId": "compileCode_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "Script code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/CompiledScript"
+            }
+          }
+        }
+      }
+    },
+    "/utils/script/compileWithImports": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Compile script",
+        "description": "Compiles string code with imports to base64 script representation",
+        "operationId": "compileWithImports_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "Script code with imports",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "imports",
+                "script"
+              ],
+              "properties": {
+                "script": {
+                  "type": "string"
+                },
+                "imports": {
+                  "type": "object",
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/CompiledScript"
+            }
+          }
+        }
+      }
+    },
+    "/utils/script/estimate": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Estimate",
+        "description": "Estimates compiled code in Base64 representation",
+        "operationId": "estimate_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "code",
+            "description": "A compiled Base64 code",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "complexity",
+                "extraFee",
+                "script",
+                "scriptText"
+              ],
+              "properties": {
+                "script": {
+                  "type": "string"
+                },
+                "scriptText": {
+                  "type": "string"
+                },
+                "complexity": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "extraFee": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/utils/seed": {
+      "get": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Seed",
+        "description": "Generate random seed",
+        "operationId": "seedRoute_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "seed"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        }
+      }
+    },
+    "/utils/hash/secure": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Hash",
+        "description": "Return SecureCryptographicHash of specified message",
+        "operationId": "hashSecure_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "message",
+            "description": "Message to hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/HashedMessage"
+            }
+          }
+        }
+      }
+    },
+    "/utils/hash/fast": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Hash",
+        "description": "Return FastCryptographicHash of specified message",
+        "operationId": "hashFast_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "message",
+            "description": "Message to hash",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/HashedMessage"
+            }
+          }
+        }
+      }
+    },
+    "/utils/transactionSerialize": {
+      "post": {
+        "tags": [
+          "utils"
+        ],
+        "summary": "Serialize transaction",
+        "description": "Serialize transaction",
+        "operationId": "transactionSerialize_1",
+        "produces": [
+          "application/json"
+        ],
+        "parameters": [
+          {
+            "in": "body",
+            "name": "json",
+            "description": "Transaction data including type and signature/proofs",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "bytes"
+              ],
+              "properties": {
+                "bytes": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "format": "byte"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/wallet/seed": {
+      "get": {
+        "tags": [
+          "wallet"
+        ],
+        "summary": "Seed",
+        "description": "Export wallet seed",
+        "operationId": "seed",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "seed": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "seed"
+              ]
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/alias/by-alias/{alias}": {
+      "get": {
+        "tags": [
+          "alias"
+        ],
+        "summary": "Address by alias",
+        "description": "Returns an address associated with an Alias. Alias should be plain text without an 'alias' prefix and network code.",
+        "operationId": "addressOfAlias_1",
+        "parameters": [
+          {
+            "name": "alias",
+            "in": "path",
+            "description": "Alias",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "properties": {
+                "address": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "address"
+              ]
+            }
+          }
+        }
+      }
+    },
+    "/alias/by-address/{address}": {
+      "get": {
+        "tags": [
+          "alias"
+        ],
+        "summary": "Aliases by address",
+        "description": "Returns a collection of aliases associated with an address",
+        "operationId": "aliasOfAddress_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Aliases",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "uniqueItems": true
+            }
+          }
+        }
+      }
+    },
+    "/assets/balance/{address}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Account's balance",
+        "description": "Account's balances for all assets",
+        "operationId": "balances_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "balances"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "balances": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "assetId",
+                      "balance",
+                      "issueTransaction",
+                      "minSponsoredAssetFee",
+                      "quantity",
+                      "reissuable",
+                      "sponsorBalance"
+                    ],
+                    "properties": {
+                      "assetId": {
+                        "type": "string"
+                      },
+                      "balance": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "reissuable": {
+                        "type": "boolean"
+                      },
+                      "minSponsoredAssetFee": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "sponsorBalance": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "format": "int64"
+                      },
+                      "issueTransaction": {
+                        "type": "object",
+                        "required": [
+                          "decimals",
+                          "description",
+                          "height",
+                          "id",
+                          "name",
+                          "quantity",
+                          "reissuable",
+                          "version"
+                        ],
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "height": {
+                            "type": "integer",
+                            "format": "int32"
+                          },
+                          "version": {
+                            "type": "string",
+                            "format": "byte"
+                          },
+                          "name": {
+                            "type": "string"
+                          },
+                          "description": {
+                            "type": "string"
+                          },
+                          "quantity": {
+                            "type": "integer",
+                            "format": "int64"
+                          },
+                          "reissuable": {
+                            "type": "boolean"
+                          },
+                          "decimals": {
+                            "type": "integer",
+                            "format": "int32"
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/details/{assetId}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Information about an asset",
+        "description": "Provides detailed information about given asset",
+        "operationId": "details_1",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "description": "ID of the asset",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "full",
+            "in": "query",
+            "description": "false",
+            "required": false,
+            "type": "boolean"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "assetId",
+                "decimals",
+                "description",
+                "issueHeight",
+                "issueTimestamp",
+                "issuer",
+                "minSponsoredAssetFee",
+                "name",
+                "quantity",
+                "reissuable",
+                "scriptDetails",
+                "scripted"
+              ],
+              "properties": {
+                "assetId": {
+                  "type": "string"
+                },
+                "issueHeight": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "issueTimestamp": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "issuer": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "decimals": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "reissuable": {
+                  "type": "boolean"
+                },
+                "quantity": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "scripted": {
+                  "type": "boolean"
+                },
+                "minSponsoredAssetFee": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "scriptDetails": {
+                  "type": "object",
+                  "required": [
+                    "script",
+                    "scriptComplexity",
+                    "scriptText"
+                  ],
+                  "properties": {
+                    "scriptComplexity": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "script": {
+                      "type": "string"
+                    },
+                    "scriptText": {
+                      "type": "string"
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/balance/{address}/{assetId}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Asset's balance",
+        "description": "Account's balance by given asset",
+        "operationId": "balance",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "assetId",
+            "in": "path",
+            "description": "Asset ID",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "assetId",
+                "balance"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "assetId": {
+                  "type": "string"
+                },
+                "balance": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/assets/{assetId}/distribution": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Asset balance distribution",
+        "description": "Asset balance distribution by account",
+        "operationId": "balanceDistribution_1",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "description": "Asset ID",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/AssetDistribution"
+            }
+          }
+        },
+        "deprecated": true
+      }
+    },
+    "/assets/{assetId}/distribution/{height}/limit/{limit}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "Asset balance distribution at height",
+        "description": "Asset balance distribution by account at specified height",
+        "operationId": "balanceDistributionAtHeight_1",
+        "parameters": [
+          {
+            "name": "assetId",
+            "in": "path",
+            "description": "Asset ID",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "height",
+            "in": "path",
+            "description": "Height",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "limit",
+            "in": "path",
+            "description": "Number of addresses to be returned",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "address to paginate after",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/AssetDistribution"
+            }
+          }
+        }
+      }
+    },
+    "/assets/nft/{address}/limit/{limit}": {
+      "get": {
+        "tags": [
+          "assets"
+        ],
+        "summary": "NFTs",
+        "description": "Account's NFTs balance",
+        "operationId": "nft_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "path",
+            "description": "Number of tokens to be returned",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Id of token to paginate after",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "decimals",
+                  "description",
+                  "height",
+                  "id",
+                  "name",
+                  "quantity",
+                  "reissuable",
+                  "version"
+                ],
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "height": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "version": {
+                    "type": "string",
+                    "format": "byte"
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "quantity": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "reissuable": {
+                    "type": "boolean"
+                  },
+                  "decimals": {
+                    "type": "integer",
+                    "format": "int32"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/leasing/active/{address}": {
+      "get": {
+        "tags": [
+          "leasing"
+        ],
+        "summary": "Get all active leases for an address",
+        "description": "",
+        "operationId": "active_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Wallet address ",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Lease transactions"
+          }
+        }
+      }
+    },
+    "/consensus/generationsignature": {
+      "get": {
+        "tags": [
+          "consensus"
+        ],
+        "summary": "Generation signature last",
+        "description": "Generation signature of a last block",
+        "operationId": "generationSignature_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "generationSignature"
+              ],
+              "properties": {
+                "generationSignature": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consensus/generatingbalance/{address}": {
+      "get": {
+        "tags": [
+          "consensus"
+        ],
+        "summary": "Generating balance",
+        "description": "Account's generating balance(the same as balance atm)",
+        "operationId": "generatingBalance_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "balance"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "balance": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consensus/generationsignature/{blockId}": {
+      "get": {
+        "tags": [
+          "consensus"
+        ],
+        "summary": "Generation signature",
+        "description": "Generation signature of a block with specified id",
+        "operationId": "generationSignatureId_1",
+        "parameters": [
+          {
+            "name": "blockId",
+            "in": "path",
+            "description": "Block id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "generationSignature"
+              ],
+              "properties": {
+                "generationSignature": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consensus/basetarget/{blockId}": {
+      "get": {
+        "tags": [
+          "consensus"
+        ],
+        "summary": "Base target",
+        "description": "base target of a block with specified id",
+        "operationId": "baseTargetId_1",
+        "parameters": [
+          {
+            "name": "blockId",
+            "in": "path",
+            "description": "Block id",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "baseTarget"
+              ],
+              "properties": {
+                "baseTarget": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consensus/basetarget": {
+      "get": {
+        "tags": [
+          "consensus"
+        ],
+        "summary": "Base target last",
+        "description": "Base target of a last block",
+        "operationId": "basetarget_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "baseTarget",
+                "score"
+              ],
+              "properties": {
+                "baseTarget": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "score": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/consensus/algo": {
+      "get": {
+        "tags": [
+          "consensus"
+        ],
+        "summary": "Consensus algo",
+        "description": "Shows which consensus algo being using",
+        "operationId": "algo_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "consensusAlgo"
+              ],
+              "properties": {
+                "consensusAlgo": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/activation/status": {
+      "get": {
+        "tags": [
+          "activation"
+        ],
+        "summary": "Status",
+        "description": "Get activation status",
+        "operationId": "status",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "features",
+                "height",
+                "nextCheck",
+                "votingInterval",
+                "votingThreshold"
+              ],
+              "properties": {
+                "height": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "votingInterval": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "votingThreshold": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "nextCheck": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "features": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "required": [
+                      "blockchainStatus",
+                      "description",
+                      "id",
+                      "nodeStatus"
+                    ],
+                    "properties": {
+                      "id": {
+                        "type": "integer",
+                        "format": "int32"
+                      },
+                      "description": {
+                        "type": "string"
+                      },
+                      "blockchainStatus": {
+                        "type": "string",
+                        "enum": [
+                          "VOTING",
+                          "APPROVED",
+                          "ACTIVATED"
+                        ]
+                      },
+                      "nodeStatus": {
+                        "type": "string",
+                        "enum": [
+                          "NOT_IMPLEMENTED",
+                          "IMPLEMENTED",
+                          "VOTED"
+                        ]
+                      },
+                      "activationHeight": {
+                        "type": "integer",
+                        "format": "int32"
+                      },
+                      "supportingBlocks": {
+                        "type": "integer",
+                        "format": "int32"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug/print": {
+      "post": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Print",
+        "description": "Prints a string at DEBUG level, strips to 100 chars",
+        "operationId": "print_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Json with data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "message"
+              ],
+              "properties": {
+                "message": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/state": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "State",
+        "description": "Get current state",
+        "operationId": "state_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "description": "map of address <-> balance",
+              "additionalProperties": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "example": {
+                "addr1": 0,
+                "addr2": 100
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/info": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "State",
+        "description": "All info you need to debug",
+        "operationId": "info",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "extensionLoaderState",
+                "historyReplierCacheSizes",
+                "microBlockSynchronizerCacheSizes",
+                "minerState",
+                "scoreObserverStats",
+                "stateHeight"
+              ],
+              "properties": {
+                "stateHeight": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "extensionLoaderState": {
+                  "type": "string"
+                },
+                "historyReplierCacheSizes": {
+                  "type": "object",
+                  "required": [
+                    "awaiting",
+                    "microBlockOwners",
+                    "nextInvs",
+                    "successfullyReceived"
+                  ],
+                  "properties": {
+                    "microBlockOwners": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "nextInvs": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "awaiting": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "successfullyReceived": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "microBlockSynchronizerCacheSizes": {
+                  "type": "object",
+                  "required": [
+                    "awaiting",
+                    "microBlockOwners",
+                    "nextInvs",
+                    "successfullyReceived"
+                  ],
+                  "properties": {
+                    "microBlockOwners": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "nextInvs": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "awaiting": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "successfullyReceived": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "scoreObserverStats": {
+                  "type": "object",
+                  "required": [
+                    "currentBestChannel",
+                    "localScore",
+                    "scoresCacheSize"
+                  ],
+                  "properties": {
+                    "localScore": {
+                      "type": "integer",
+                      "format": "int32"
+                    },
+                    "currentBestChannel": {
+                      "type": "string"
+                    },
+                    "scoresCacheSize": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "minerState": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/blocks/{howMany}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Blocks",
+        "description": "Get sizes and full hashes for last blocks",
+        "operationId": "blocks_1",
+        "parameters": [
+          {
+            "name": "howMany",
+            "in": "path",
+            "description": "How many last blocks to take",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Sizes and full hashes"
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/blacklist": {
+      "post": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Blacklist given peer",
+        "description": "Moving peer to blacklist",
+        "operationId": "blacklist_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "address",
+            "description": "IP address of node",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          },
+          "404": {
+            "description": "There are no peer with such address"
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/portfolios/{address}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Portfolio",
+        "description": "Get current portfolio considering pessimistic transactions in the UTX pool",
+        "operationId": "portfolios_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "An address of portfolio",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "considerUnspent",
+            "in": "query",
+            "description": "Taking into account pessimistic transactions from UTX pool",
+            "required": false,
+            "type": "boolean",
+            "default": true
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Json portfolio",
+            "schema": {
+              "type": "object",
+              "required": [
+                "assets",
+                "balance",
+                "lease"
+              ],
+              "properties": {
+                "balance": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "lease": {
+                  "type": "object",
+                  "required": [
+                    "in",
+                    "out"
+                  ],
+                  "properties": {
+                    "in": {
+                      "type": "integer",
+                      "format": "int64"
+                    },
+                    "out": {
+                      "type": "integer",
+                      "format": "int64"
+                    }
+                  }
+                },
+                "assets": {
+                  "type": "object",
+                  "description": "map of assetId <-> balance",
+                  "additionalProperties": {
+                    "type": "integer",
+                    "format": "int64"
+                  },
+                  "example": {
+                    "assetId1": 0,
+                    "assetId2": 100
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/rollback-to/{signature}": {
+      "delete": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Block signature",
+        "description": "Rollback the state to the block with a given signature",
+        "operationId": "rollbackTo_1",
+        "parameters": [
+          {
+            "name": "signature",
+            "in": "path",
+            "description": "Base58-encoded block signature",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "BlockId"
+              ],
+              "properties": {
+                "BlockId": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/validate": {
+      "post": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Validate Transaction",
+        "description": "Validates a transaction and measures time spent in milliseconds",
+        "operationId": "validate",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "transaction",
+            "description": "Signed transaction",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "trace",
+                "valid",
+                "validationTime"
+              ],
+              "properties": {
+                "valid": {
+                  "type": "boolean"
+                },
+                "validationTime": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "trace": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/balances/history/{address}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Waves balance history",
+        "description": "Waves balance history",
+        "operationId": "balanceHistory_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "An address to load waves balance history for",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "balance",
+                  "height"
+                ],
+                "properties": {
+                  "height": {
+                    "type": "integer",
+                    "format": "int32"
+                  },
+                  "balance": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/debug/stateWaves/{height}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "State at block",
+        "description": "Get state at specified height",
+        "operationId": "stateWaves_1",
+        "parameters": [
+          {
+            "name": "height",
+            "in": "path",
+            "description": "height",
+            "required": true,
+            "type": "integer"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "description": "map of address <-> balance",
+              "additionalProperties": {
+                "type": "integer",
+                "format": "int64"
+              },
+              "example": {
+                "addr1": 0,
+                "addr2": 100
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/rollback": {
+      "post": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Rollback to height",
+        "description": "Removes all blocks after given height",
+        "operationId": "rollback_1",
+        "parameters": [
+          {
+            "in": "body",
+            "name": "body",
+            "description": "Json with data",
+            "required": true,
+            "schema": {
+              "type": "object",
+              "required": [
+                "returnTransactionsToUtx",
+                "rollbackTo"
+              ],
+              "properties": {
+                "rollbackTo": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "returnTransactionsToUtx": {
+                  "type": "boolean"
+                }
+              }
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "BlockId"
+              ],
+              "properties": {
+                "BlockId": {
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/minerInfo": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "State",
+        "description": "All miner info you need to debug",
+        "operationId": "minerInfo_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "address",
+                "miningBalance",
+                "timestamp"
+              ],
+              "properties": {
+                "address": {
+                  "type": "string"
+                },
+                "miningBalance": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "timestamp": {
+                  "type": "integer",
+                  "format": "int64"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/historyInfo": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "State",
+        "description": "All history info you need to debug",
+        "operationId": "historyInfo_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "lastBlockIds",
+                "microBlockIds"
+              ],
+              "properties": {
+                "lastBlockIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "microBlockIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/configInfo": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Config",
+        "description": "Currently running node config",
+        "operationId": "configInfo_1",
+        "parameters": [
+          {
+            "name": "full",
+            "in": "query",
+            "description": "Exposes full typesafe config",
+            "required": false,
+            "type": "boolean",
+            "default": false
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Json config"
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/debug/stateChanges/info/{id}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "Transaction state changes",
+        "description": "Returns state changes made by the transaction",
+        "operationId": "stateChangesById_1",
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "description": "Transaction ID",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "$ref": "#/definitions/StateChanges"
+            }
+          }
+        }
+      }
+    },
+    "/debug/stateChanges/address/{address}/limit/{limit}": {
+      "get": {
+        "tags": [
+          "debug"
+        ],
+        "summary": "List of transactions by address with state changes",
+        "description": "Get list of transactions with state changes where specified address has been involved",
+        "operationId": "stateChangesByAddress_1",
+        "parameters": [
+          {
+            "name": "address",
+            "in": "path",
+            "description": "Address",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "limit",
+            "in": "path",
+            "description": "Number of transactions to be returned",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "after",
+            "in": "query",
+            "description": "Id of transaction to paginate after",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "array",
+              "items": {
+                "$ref": "#/definitions/StateChanges"
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/stop": {
+      "post": {
+        "tags": [
+          "node"
+        ],
+        "summary": "Stop",
+        "description": "Stop the node",
+        "operationId": "stop_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "stopped"
+              ],
+              "properties": {
+                "stopped": {
+                  "type": "boolean"
+                }
+              }
+            }
+          },
+          "403": {
+            "$ref": "#/responses/ApiKeyNotValid"
+          }
+        },
+        "security": [
+          {
+            "API Key": [
+            ]
+          }
+        ]
+      }
+    },
+    "/node/status": {
+      "get": {
+        "tags": [
+          "node"
+        ],
+        "summary": "Status",
+        "description": "Get status of the running core",
+        "operationId": "status_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "blockchainHeight",
+                "stateHeight",
+                "updatedDate",
+                "updatedTimestamp"
+              ],
+              "properties": {
+                "blockchainHeight": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "stateHeight": {
+                  "type": "integer",
+                  "format": "int32"
+                },
+                "updatedTimestamp": {
+                  "type": "integer",
+                  "format": "int64"
+                },
+                "updatedDate": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/node/version": {
+      "get": {
+        "tags": [
+          "node"
+        ],
+        "summary": "Version",
+        "description": "Get Waves node version",
+        "operationId": "version_1",
+        "parameters": [
+        ],
+        "responses": {
+          "200": {
+            "description": "successful operation",
+            "schema": {
+              "type": "object",
+              "required": [
+                "version"
+              ],
+              "properties": {
+                "version": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "responses": {
+    "ApiKeyNotValid": {
+      "description": "Provided API key is not correct",
+      "schema": {
+        "$ref": "#/definitions/ApiError"
+      },
+      "examples": {
+        "application/json": {
+          "error": 2,
+          "message": "Provided API key is not correct"
+        }
+      }
+    }
+  },
+  "securityDefinitions": {
+    "API Key": {
+      "type": "apiKey",
+      "name": "X-API-Key",
+      "in": "header"
+    }
+  },
+  "definitions": {
+    "ApiError": {
+      "type": "object",
+      "properties": {
+        "error": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "message": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "error",
+        "message"
+      ]
+    },
+    "AssetDistribution": {
+      "type": "object",
+      "required": [
+        "hasNext",
+        "last",
+        "values"
+      ],
+      "properties": {
+        "hasNext": {
+          "type": "boolean"
+        },
+        "last": {
+          "type": "string"
+        },
+        "values": {
+          "type": "object",
+          "description": "map of assetId <-> balance",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "int64"
+          },
+          "example": {
+            "assetId1": 0,
+            "assetId2": 100
+          }
+        }
+      }
+    },
+    "Balance": {
+      "type": "object",
+      "required": [
+        "address",
+        "balance",
+        "confirmations"
+      ],
+      "properties": {
+        "address": {
+          "type": "string"
+        },
+        "confirmations": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "balance": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "Block": {
+      "type": "object",
+      "required": [
+        "blocksize",
+        "generator",
+        "height",
+        "nxt-consensus",
+        "reference",
+        "signature",
+        "timestamp",
+        "totalFee",
+        "transactionCount",
+        "transactions",
+        "version"
+      ],
+      "properties": {
+        "transactions": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Transaction"
+          }
+        },
+        "timestamp": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "version": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalFee": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "generator": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "nxt-consensus": {
+          "type": "object",
+          "required": [
+            "base-target",
+            "generation-signature"
+          ],
+          "properties": {
+            "base-target": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "generation-signature": {
+              "type": "string"
+            }
+          }
+        },
+        "blocksize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transactionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "reward": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "desiredReward": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "BlockHeader": {
+      "type": "object",
+      "required": [
+        "blocksize",
+        "generator",
+        "height",
+        "nxt-consensus",
+        "reference",
+        "signature",
+        "timestamp",
+        "totalFee",
+        "transactionCount",
+        "version"
+      ],
+      "properties": {
+        "timestamp": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "version": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalFee": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "reference": {
+          "type": "string"
+        },
+        "generator": {
+          "type": "string"
+        },
+        "signature": {
+          "type": "string"
+        },
+        "nxt-consensus": {
+          "type": "object",
+          "required": [
+            "base-target",
+            "generation-signature"
+          ],
+          "properties": {
+            "base-target": {
+              "type": "integer",
+              "format": "int64"
+            },
+            "generation-signature": {
+              "type": "string"
+            }
+          }
+        },
+        "blocksize": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "transactionCount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "features": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "int32"
+          }
+        },
+        "reward": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "desiredReward": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "CompiledScript": {
+      "type": "object",
+      "required": [
+        "complexity",
+        "extraFee",
+        "script"
+      ],
+      "properties": {
+        "script": {
+          "type": "string"
+        },
+        "complexity": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "extraFee": {
+          "type": "integer",
+          "format": "int64"
+        }
+      }
+    },
+    "DataEntry": {
+      "type": "object",
+      "required": [
+        "key",
+        "type",
+        "value"
+      ],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": [
+            "integer",
+            "boolean",
+            "binary",
+            "string"
+          ]
+        },
+        "key": {
+          "type": "string"
+        },
+        "value": {
+          "type": "object",
+          "description": "integer/boolean/binary/string value"
+        }
+      }
+    },
+    "HashedMessage": {
+      "type": "object",
+      "required": [
+        "hash",
+        "message"
+      ],
+      "properties": {
+        "message": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        }
+      }
+    },
+    "RewardStatus": {
+      "type": "object",
+      "required": [
+        "currentReward",
+        "height",
+        "minIncrement",
+        "nextCheck",
+        "term",
+        "totalWavesAmount",
+        "votes",
+        "votingInterval",
+        "votingIntervalStart",
+        "votingThreshold"
+      ],
+      "properties": {
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "totalWavesAmount": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "currentReward": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "minIncrement": {
+          "type": "integer",
+          "format": "int64"
+        },
+        "term": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "nextCheck": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "votingIntervalStart": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "votingInterval": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "votingThreshold": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "votes": {
+          "type": "object",
+          "required": [
+            "decrease",
+            "increase"
+          ],
+          "properties": {
+            "increase": {
+              "type": "integer",
+              "format": "int32"
+            },
+            "decrease": {
+              "type": "integer",
+              "format": "int32"
+            }
+          }
+        }
+      }
+    },
+    "Signed": {
+      "type": "object",
+      "properties": {
+        "message": {
+          "type": "string",
+          "description": "plain text"
+        },
+        "publicKey": {
+          "type": "string",
+          "description": "Base58-encoded public key"
+        },
+        "signature": {
+          "type": "string",
+          "description": "Base58-encoded signature"
+        }
+      }
+    },
+    "StateChanges": {
+      "type": "object",
+      "required": [
+        "height",
+        "id",
+        "stateChanges"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "stateChanges": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "description": "integer",
+                    "enum": [
+                      "integer",
+                      "boolean",
+                      "binary",
+                      "string"
+                    ]
+                  },
+                  "key": {
+                    "type": "string"
+                  },
+                  "value": {
+                    "type": "object"
+                  }
+                },
+                "required": [
+                  "key",
+                  "type",
+                  "value"
+                ]
+              }
+            },
+            "transfers": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "address": {
+                    "type": "string"
+                  },
+                  "asset": {
+                    "type": "string"
+                  },
+                  "amount": {
+                    "type": "integer",
+                    "format": "int64"
+                  }
+                },
+                "required": [
+                  "address",
+                  "amount",
+                  "asset"
+                ]
+              }
+            }
+          },
+          "required": [
+            "data",
+            "transfers"
+          ]
+        }
+      }
+    },
+    "Transaction": {
+      "type": "object",
+      "description": "Transaction's json representation (see https://docs.wavesplatform.com/en/blockchain/transaction/)",
+      "additionalProperties": {
+        "type": "object"
+      },
+      "example": {
+        "id": "string",
+        "timestamp": 0,
+        "version": 2,
+        "...": "..."
+      }
+    },
+    "TransactionStatus": {
+      "type": "object",
+      "required": [
+        "id",
+        "status"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "confirmed",
+            "unconfirmed",
+            "not_found"
+          ]
+        },
+        "height": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "confirmations": {
+          "type": "integer",
+          "format": "int32"
+        }
+      }
+    }
+  }
+}

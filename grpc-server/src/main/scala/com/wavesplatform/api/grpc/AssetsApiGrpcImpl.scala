@@ -5,6 +5,7 @@ import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.execution.Scheduler
@@ -27,7 +28,7 @@ class AssetsApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           info.description.script.map(
             script =>
               ScriptData(
-                script.bytes().toPBByteString,
+                Some(PBTransactions.toPBScript(script)),
                 script.expr.toString,
                 Script.estimate(script, blockchain.estimator).explicitGet()
               )

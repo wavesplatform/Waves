@@ -1,28 +1,30 @@
 package com.wavesplatform.settings
 
-import com.typesafe.config.Config
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.metrics.Metrics
 import net.ceedubs.ficus.Ficus._
 import net.ceedubs.ficus.readers.ArbitraryTypeReader._
 
 import scala.concurrent.duration.FiniteDuration
 
-case class WavesSettings(directory: String,
-                         ntpServer: String,
-                         dbSettings: DBSettings,
-                         extensions: Seq[String],
-                         extensionsShutdownTimeout: FiniteDuration,
-                         networkSettings: NetworkSettings,
-                         walletSettings: WalletSettings,
-                         blockchainSettings: BlockchainSettings,
-                         minerSettings: MinerSettings,
-                         restAPISettings: RestAPISettings,
-                         synchronizationSettings: SynchronizationSettings,
-                         utxSettings: UtxSettings,
-                         featuresSettings: FeaturesSettings,
-                         rewardsSettings: RewardsVotingSettings,
-                         metrics: Metrics.Settings,
-                         config: Config)
+case class WavesSettings(
+    directory: String,
+    ntpServer: String,
+    dbSettings: DBSettings,
+    extensions: Seq[String],
+    extensionsShutdownTimeout: FiniteDuration,
+    networkSettings: NetworkSettings,
+    walletSettings: WalletSettings,
+    blockchainSettings: BlockchainSettings,
+    minerSettings: MinerSettings,
+    restAPISettings: RestAPISettings,
+    synchronizationSettings: SynchronizationSettings,
+    utxSettings: UtxSettings,
+    featuresSettings: FeaturesSettings,
+    rewardsSettings: RewardsVotingSettings,
+    metrics: Metrics.Settings,
+    config: Config
+)
 
 object WavesSettings extends CustomValueReaders {
   def fromRootConfig(rootConfig: Config): WavesSettings = {
@@ -63,4 +65,6 @@ object WavesSettings extends CustomValueReaders {
       rootConfig
     )
   }
+
+  def default(): WavesSettings = fromRootConfig(ConfigFactory.load())
 }

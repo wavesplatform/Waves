@@ -4,7 +4,9 @@ import cats.Monoid
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.LevelDBWriter
 import com.wavesplatform.db.WithState
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
@@ -18,7 +20,14 @@ package object diffs extends WithState with Matchers {
   val ENOUGH_AMT: Long = Long.MaxValue / 3
 
   def assertDiffEi(preconditions: Seq[Block], block: Block, fs: FunctionalitySettings = TFS.Enabled)(
-      assertion: Either[ValidationError, Diff] => Unit): Unit = withLevelDBWriter(fs) { state =>
+      assertion: Either[ValidationError, Diff] => Unit
+  ): Unit = withLevelDBWriter(fs) { state =>
+    assertDiffEi(preconditions, block, state)(assertion)
+  }
+
+  def assertDiffEi(preconditions: Seq[Block], block: Block, state: LevelDBWriter)(
+      assertion: Either[ValidationError, Diff] => Unit
+  ): Unit = {
     def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
     preconditions.foreach { precondition =>
@@ -73,8 +82,10 @@ package object diffs extends WithState with Matchers {
       def differ(blockchain: Blockchain, b: Block) = BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited)
 
       test(txs => {
-        val block = TestBlock.create(txs)
-        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature, block))
+        val nextHeight = state.height + 1
+        val isProto = state.activatedFeatures.get(BlockchainFeatures.BlockV5.id).exists(nextHeight > 1 && nextHeight >= _)
+        val block = TestBlock.create(txs, if (isProto) Block.ProtoBlockVersion else Block.PlainBlockVersion)
+        differ(state, block).map(diff => state.append(diff.diff, diff.carry, diff.totalFee, None, block.header.generationSignature.take(Block.HitSourceLength), block))
       })
     }
 

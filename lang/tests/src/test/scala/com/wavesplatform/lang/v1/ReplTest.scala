@@ -42,14 +42,14 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
 
   property("syntax errors") {
     val repl = Repl()
-    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: expected a value's expression in 9-9")
-    await(repl.execute(""" 1 %% 2 """))       shouldBe Left("Compilation failed: expected a second operator in 4-4")
+    await(repl.execute(""" let a = {{1} """)) shouldBe Left("Compilation failed: [expected a value's expression in 9-9]")
+    await(repl.execute(""" 1 %% 2 """))       shouldBe Left("Compilation failed: [expected a second operator in 4-4]")
   }
 
   property("logic errors") {
     val repl = Repl()
     await(repl.execute(""" let a = base64'12345' """)) shouldBe Left("Compilation failed: can't parse Base64 string in 17-21")
-    await(repl.execute(""" let b = "abc" + 1 """))     shouldBe Left("Compilation failed: Can't find a function overload '+'(String, Int) in 9-18")
+    await(repl.execute(""" let b = "abc" + 1 """))     shouldBe Left("Compilation failed: [Can't find a function overload '+'(String, Int) in 9-18]")
   }
 
   property("exceptions") {
@@ -73,8 +73,8 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     await(repl.execute("let b = a + 2")) shouldBe Right("defined let b: Int")
     await(repl.execute("b"))             shouldBe Right("res1: Int = 3")
     repl.clear()
-    await(repl.execute("a")) shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
-    await(repl.execute("b")) shouldBe Left("Compilation failed: A definition of 'b' is not found in 0-1")
+    await(repl.execute("a")) shouldBe Left("Compilation failed: [A definition of 'a' is not found in 0-1]")
+    await(repl.execute("b")) shouldBe Left("Compilation failed: [A definition of 'b' is not found in 0-1]")
   }
 
   property("keep state if input contain both expression and declarations") {
@@ -118,7 +118,7 @@ class ReplTest extends PropSpec with ScriptGen with Matchers with NoShrink {
     ))
     await(repl.execute("f()")) shouldBe Right("res1: Int = 3")
     await(repl.execute("b"))   shouldBe Right("res2: Int = 3")
-    await(repl.execute("a"))   shouldBe Left("Compilation failed: A definition of 'a' is not found in 0-1")
+    await(repl.execute("a"))   shouldBe Left("Compilation failed: [A definition of 'a' is not found in 0-1]")
   }
 
   property("type info") {

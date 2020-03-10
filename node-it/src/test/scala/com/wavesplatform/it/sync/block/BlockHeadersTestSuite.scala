@@ -78,8 +78,8 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
     val baseHeight = nodes.map(_.height).max
     Await.result(processRequests(generateTransfersToRandomAddresses(30, nodeAddresses)), 2.minutes)
     nodes.waitForHeight(baseHeight + 1)
-    val blocks        = nodes.map(_.lastBlock)
-    val blocksHeaders = nodes.map(_.lastBlockHeaders)
+    val blocks        = nodes.map(_.lastBlock())
+    val blocksHeaders = nodes.map(_.lastBlockHeaders())
     blocks.zip(blocksHeaders).foreach { case (k, v) => assertBlockInfo(k, v) }
   }
 
