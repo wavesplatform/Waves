@@ -1,25 +1,18 @@
 package com.wavesplatform.it.sync.grpc
 
-import com.google.protobuf.ByteString
 import com.typesafe.config.{Config, ConfigFactory}
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
-import com.wavesplatform.it.NodeConfigs.Miners
-import com.wavesplatform.it.api.SyncHttpApi.assertApiError
-import com.wavesplatform.it.api.{Transaction, TransactionInfo}
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.sync._
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.sync.transactions.UpdateAssetInfoTransactionSuite
-import com.wavesplatform.it.sync.transactions.UpdateAssetInfoTransactionSuite.configWithUpdateIntervalSetting
+import com.wavesplatform.it.NodeConfigs.Miners
+import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
-import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import io.grpc.Status.Code
 import org.scalatest.prop.TableDrivenPropertyChecks
 
-import scala.util.Random
 import scala.concurrent.duration._
+import scala.util.Random
 
 class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionGrpcSuite._
@@ -37,13 +30,13 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     assetId = Base58.encode(
       PBTransactions
         .vanilla(
-          sender.grpc.broadcastIssue(
+          sender.broadcastIssue(
             issuer,
             "asset",
             someAssetAmount,
             8,
             reissuable = true,
-            script = None,
+            script = Right(None),
             fee = issueFee,
             description = "description",
             version = 1,
@@ -53,37 +46,37 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
         .explicitGet()
         .id()
     )
-    issueHeight = sender.grpc.height
+    issueHeight = sender.height
   }
 
   test("able to update name/description of issued asset") {
     val nextTerm = issueHeight + updateInterval + 1
-    sender.grpc.waitForHeight(nextTerm)
+    sender.waitForHeight(nextTerm)
     val updateAssetInfoTxId = Base58.encode(
       PBTransactions
         .vanilla(
-          sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)
+          sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)
         )
         .explicitGet()
         .id()
     )
-    sender.grpc.waitForTransaction(updateAssetInfoTxId)
+    sender.waitForTransaction(updateAssetInfoTxId)
 
-    sender.grpc.assetInfo(assetId).name shouldBe "updatedName"
-    sender.grpc.assetInfo(assetId).description shouldBe "updatedDescription"
+    sender.assetInfo(assetId).name shouldBe "updatedName"
+    sender.assetInfo(assetId).description shouldBe "updatedDescription"
   }
 
   test("not able to update name/description more than once within interval") {
-    val nextTermEnd = sender.transactionInfo(assetId).height + 2 * updateInterval
+    val nextTermEnd = issueHeight + 2 * updateInterval
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
+      sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
       s"Can't update info of asset with id=$assetId",
       Code.INVALID_ARGUMENT
     )
     sender.waitForHeight(nextTermEnd)
 
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
+      sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee),
       s"Can't update info of asset with id=$assetId",
       Code.INVALID_ARGUMENT
     )
@@ -99,11 +92,11 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   forAll(invalidAssetsNames) { assetName: String =>
     test(s"not able to update name to $assetName") {
-      sender.grpc.waitForHeight(sender.height + 3, 2.minutes)
+      sender.waitForHeight(sender.height + 3, 2.minutes)
       assertGrpcError(
-        sender.grpc.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
-        "InvalidName",
-        Code.INTERNAL
+        sender.updateAssetInfo(issuer, assetId, assetName, "updatedDescription", minFee),
+        "invalid name",
+        Code.INVALID_ARGUMENT
       )
     }
   }
@@ -111,15 +104,15 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   test(s"not able to set too big description") {
     val tooBigDescription = Random.nextString(1001)
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
-      "TooBigArray",
-      Code.INTERNAL
+      sender.updateAssetInfo(issuer, assetId, "updatedName", tooBigDescription, minFee),
+      "Too big sequences requested",
+      Code.INVALID_ARGUMENT
     )
   }
 
   test("not able to update asset info without paying enough fee") {
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1),
+      sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee - 1),
       s"does not exceed minimal value of $minFee WAVES",
       Code.INVALID_ARGUMENT
     )
@@ -128,7 +121,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
   test("not able to update info of not-issued asset") {
     val notIssuedAssetId = "BzARFPgBqWFu6MHGxwkPVKmaYAzyShu495Ehsgru72Wz"
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, notIssuedAssetId, "updatedName", "updatedDescription", minFee),
+      sender.updateAssetInfo(issuer, notIssuedAssetId, "updatedName", "updatedDescription", minFee),
       "Referenced assetId not found",
       Code.INVALID_ARGUMENT
     )
@@ -136,7 +129,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
 
   test("non-issuer cannot update asset info") {
     assertGrpcError(
-      sender.grpc.updateAssetInfo(nonIssuer, assetId, "updatedName", "updatedDescription", minFee),
+      sender.updateAssetInfo(nonIssuer, assetId, "updatedName", "updatedDescription", minFee),
       "Asset was issued by other address",
       Code.INVALID_ARGUMENT
     )
@@ -148,7 +141,7 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
     val smartAssetId = Base58.encode(
       PBTransactions
         .vanilla(
-          sender.grpc.broadcastIssue(
+          sender.broadcastIssue(
             issuer,
             "smartAsset",
             someAssetAmount,
@@ -156,27 +149,27 @@ class UpdateAssetInfoTransactionGrpcSuite extends GrpcBaseTransactionSuite with 
             reissuable = true,
             description = "description",
             fee = issueFee,
-            script = Some(script.bytes().base64),
+            script = Right(Some(script)),
             waitForTx = true
           )
         )
         .explicitGet()
         .id()
     )
-    sender.grpc.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
+    sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + smartFee - 1),
+      sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + smartFee - 1),
       s"State check failed. Reason: Transaction involves 1 scripted assets. Requires $smartFee extra fee.",
       Code.INVALID_ARGUMENT
     )
-    sender.grpc.setScript(issuer, Some(script), fee = setScriptFee, waitForTx = true)
+    sender.setScript(issuer, Right(Some(script)), fee = setScriptFee, waitForTx = true)
     assertGrpcError(
-      sender.grpc.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee - 1),
+      sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee - 1),
       s"State check failed. Reason: Transaction sent from smart account. Requires $smartFee extra fee.",
       Code.INVALID_ARGUMENT
     )
 
-    sender.grpc.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
+    sender.updateAssetInfo(issuer, smartAssetId, "updatedName", "updatedDescription", minFee + 2 * smartFee, waitForTx = true)
   }
 
 }

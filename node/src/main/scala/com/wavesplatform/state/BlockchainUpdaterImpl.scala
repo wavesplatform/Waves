@@ -318,7 +318,7 @@ class BlockchainUpdaterImpl(
                     log.info(s"New height: $newHeight")
                   }
 
-                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, blockchain)
+                  blockchainUpdateTriggers.onProcessBlock(block, detailedDiff, reward, blockchain)
 
                   discarded
               }
@@ -658,7 +658,7 @@ class BlockchainUpdaterImpl(
       .balanceSnapshots(address, from, to)
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(PublicKey, Script, Long, Map[String, Long])] = readLock {
+  override def accountScriptWithComplexity(address: Address): Option[AccountScriptInfo] = readLock {
     compositeBlockchain.accountScriptWithComplexity(address)
   }
 

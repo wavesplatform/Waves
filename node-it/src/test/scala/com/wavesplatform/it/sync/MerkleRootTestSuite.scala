@@ -3,12 +3,14 @@ package com.wavesplatform.it.sync
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, InvalidSignature}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.ReportingTestName
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers, OptionValues}
+import scorex.crypto.hash.Blake2b256
 
 import scala.concurrent.duration._
 
@@ -45,6 +47,10 @@ class MerkleRootTestSuite
     nodes.head.getMerkleProofPost(txId1, txId2, txId3).map(resp => resp.id) should contain theSameElementsAs Seq(txId1, txId2, txId3)
     nodes.head.getMerkleProof(txId1, txId2, txId3).map(resp => resp.transactionIndex) should contain theSameElementsAs Seq(0, 1, 2)
     nodes.head.getMerkleProofPost(txId1, txId2, txId3).map(resp => resp.transactionIndex) should contain theSameElementsAs Seq(0, 1, 2)
+    nodes.head.getMerkleProof(txId3).map(resp => resp.merkleProof.head).head shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
+    nodes.head.getMerkleProofPost(txId3).map(resp => resp.merkleProof.head).head shouldBe Base58.encode(Blake2b256.hash(Array(0.toByte)))
+    assert(Base58.tryDecode(nodes.head.getMerkleProof(txId1).head.merkleProof.head).isSuccess)
+    assert(Base58.tryDecode(nodes.head.getMerkleProofPost(txId1).head.merkleProof.head).isSuccess)
   }
   "error raised if transaction id is not valid" in {
     assertApiError(
@@ -56,7 +62,7 @@ class MerkleRootTestSuite
       CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
     )
 
-    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 can not contain "0"
+    val invalidId = "FCym43ddiKKT000kznawWasoMbWd1LWyX8DUrwAAbcUA" //id is invalid because base58 cannot contain "0"
     assertApiError(
       nodes.head.getMerkleProof(invalidId),
       InvalidSignature

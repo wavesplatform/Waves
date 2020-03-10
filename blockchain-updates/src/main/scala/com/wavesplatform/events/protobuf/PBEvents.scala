@@ -21,7 +21,7 @@ object PBEvents {
 
   def protobuf(event: events.BlockchainUpdated): BlockchainUpdated =
     event match {
-      case events.BlockAppended(sig, height, block, blockStateUpdate, transactionStateUpdates) =>
+      case events.BlockAppended(sig, height, block, updatedWavesAmount, blockStateUpdate, transactionStateUpdates) =>
         val blockUpdate = Some(blockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdate)
         val txsUpdates  = transactionStateUpdates.map(protobufStateUpdate)
 
@@ -33,7 +33,12 @@ object PBEvents {
               transactionIds = getIds(block.transactionData),
               stateUpdate = blockUpdate,
               transactionStateUpdates = txsUpdates,
-              body = PBAppend.Body.Block(PBBlocks.protobuf(block))
+              body = PBAppend.Body.Block(
+                PBAppend.BlockAppend(
+                  block = Some(PBBlocks.protobuf(block)),
+                  updatedWavesAmount = updatedWavesAmount
+                )
+              )
             )
           )
         )
@@ -49,7 +54,11 @@ object PBEvents {
               transactionIds = getIds(microBlock.transactionData),
               stateUpdate = microBlockUpdate,
               transactionStateUpdates = txsUpdates,
-              body = PBAppend.Body.MicroBlock(PBMicroBlocks.protobuf(microBlock))
+              body = PBAppend.Body.MicroBlock(
+                PBAppend.MicroBlockAppend(
+                  microBlock = Some(PBMicroBlocks.protobuf(microBlock))
+                )
+              )
             )
           )
         )
@@ -57,13 +66,17 @@ object PBEvents {
         BlockchainUpdated(
           id = to,
           height = height,
-          update = BlockchainUpdated.Update.Rollback(PBRollback.BLOCK)
+          update = BlockchainUpdated.Update.Rollback(
+            PBRollback(PBRollback.RollbackType.BLOCK)
+          )
         )
       case events.MicroBlockRollbackCompleted(toSig, height) =>
         BlockchainUpdated(
           id = toSig,
           height = height,
-          update = BlockchainUpdated.Update.Rollback(PBRollback.MICROBLOCK)
+          update = BlockchainUpdated.Update.Rollback(
+            PBRollback(PBRollback.RollbackType.MICROBLOCK)
+          )
         )
     }
 

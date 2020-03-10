@@ -7,7 +7,6 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.Validation.booleanOperators
 import com.wavesplatform.transaction.serialization.impl.OrderSerializer
-import io.swagger.annotations.ApiModelProperty
 import monix.eval.Coeval
 import play.api.libs.json.{Format, JsObject}
 
@@ -32,7 +31,6 @@ case class Order(
 ) extends Proven {
   import Order._
 
-  @ApiModelProperty(hidden = true)
   val sender: PublicKey = senderPublicKey
 
   def isValid(atTime: Long): Validation = {
@@ -46,39 +44,29 @@ case class Order(
     (matcherFeeAssetId == Waves || version >= Order.V3) :| "matcherFeeAssetId should be waves"
   }
 
-  //  @ApiModelProperty(hidden = true)
   def isValidAmount(matchAmount: Long, matchPrice: Long): Validation = {
     (matchAmount > 0) :| "amount should be > 0" &&
     (matchPrice > 0) :| "price should be > 0" &&
     (matchAmount < MaxAmount) :| "amount too large"
   }
 
-  // TODO: Check if we can remove ApiModelProperty annotations
-  @ApiModelProperty(hidden = true)
   val bodyBytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.bodyBytes(this))
-  @ApiModelProperty(hidden = true)
   val id: Coeval[ByteStr] = Coeval.evalOnce(ByteStr(crypto.fastHash(bodyBytes())))
-  @ApiModelProperty(hidden = true)
   val idStr: Coeval[String] = Coeval.evalOnce(id().toString)
-  @ApiModelProperty(hidden = true)
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(OrderSerializer.toBytes(this))
 
-  @ApiModelProperty(hidden = true)
   def getReceiveAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.amountAsset
     case OrderType.SELL => assetPair.priceAsset
   }
 
-  @ApiModelProperty(hidden = true)
   def getSpendAssetId: Asset = orderType match {
     case OrderType.BUY  => assetPair.priceAsset
     case OrderType.SELL => assetPair.amountAsset
   }
 
-  @ApiModelProperty(hidden = true)
   val json: Coeval[JsObject] = Coeval.evalOnce(OrderSerializer.toJson(this))
 
-  @ApiModelProperty(hidden = true)
   override def toString: String = {
     val matcherFeeAssetIdStr = if (version == 3) s" matcherFeeAssetId=${matcherFeeAssetId.fold("Waves")(_.toString)}," else ""
     s"OrderV$version(id=${idStr()}, sender=$senderPublicKey, matcher=$matcherPublicKey, pair=$assetPair, tpe=$orderType, amount=$amount, " +

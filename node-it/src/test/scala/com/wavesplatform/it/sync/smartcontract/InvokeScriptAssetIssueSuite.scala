@@ -199,7 +199,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     info.size shouldBe 1
     info.head.assetId shouldBe nftIssueTxAssetId
 
-    val afterInfo = sender.nftAssetsBalance(secondAddress, 100, nftIssueTxAssetId)
+    val afterInfo = sender.nftAssetsBalance(secondAddress, 100, Some(nftIssueTxAssetId))
     afterInfo.size shouldBe 0
   }
 
@@ -224,7 +224,7 @@ class InvokeScriptAssetIssueSuite extends BaseTransactionSuite with Matchers wit
     info.size shouldBe 1
     info.head.assetId shouldBe nftInvokeScriptAssetId
 
-    val afterInfo = sender.nftAssetsBalance(firstAddress, 100, nftInvokeScriptAssetId)
+    val afterInfo = sender.nftAssetsBalance(firstAddress, 100, Some(nftInvokeScriptAssetId))
     afterInfo.size shouldBe 0
   }
 }
@@ -235,7 +235,7 @@ object InvokeScriptAssetIssueSuite {
       |{-# CONTENT_TYPE DAPP #-}
       |
       |@Callable(i)
-      |func i() = [Issue(unit, 0, "InvokeDesc", true, "InvokeAsset", 100, 0)]
+      |func i() = [Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)]
       |
       |@Callable(i)
       |func r(id: ByteVector) = [Reissue(id, true, 100)]
@@ -244,7 +244,7 @@ object InvokeScriptAssetIssueSuite {
       |func b(id: ByteVector) = [Burn(id, 100)]
       |
       |@Callable(i)
-      |func n() = [Issue(unit, 0, "NFT", false, "_NFT", 1, 0)]
+      |func n() = [Issue("_NFT", "NFT", 1, 0, false, unit, 0)]
       |
       |""".stripMargin
 }

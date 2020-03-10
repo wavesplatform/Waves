@@ -33,15 +33,15 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     simpleAsset = sender.issue(contract, "simple", "", 9000, 0).id
     assetSponsoredByDApp = sender.issue(contract, "DApp asset", "", 9000, 0).id
     assetSponsoredByRecipient = sender.issue(recipient, "Recipient asset", "", 9000, 0, waitForTx = true).id
-    sender.massTransfer(contract, List(Transfer(caller, 3000), Transfer(recipient, 3000)), 0.01.waves, Some(simpleAsset))
+    sender.massTransfer(contract, List(Transfer(caller, 3000), Transfer(recipient, 3000)), 0.01.waves, assetId = Some(simpleAsset))
     sender.massTransfer(contract,
                         List(Transfer(caller, 3000), Transfer(recipient, 3000)),
                         0.01.waves,
-                        Some(assetSponsoredByDApp))
+                        assetId = Some(assetSponsoredByDApp))
     sender.massTransfer(recipient,
                         List(Transfer(caller, 3000), Transfer(contract, 3000)),
                         0.01.waves,
-                        Some(assetSponsoredByRecipient))
+                        assetId = Some(assetSponsoredByRecipient))
     sender.sponsorAsset(contract, assetSponsoredByDApp, 1)
     sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5)
 
@@ -100,7 +100,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     nodes.waitForHeightAriseAndTxPresent(id)
 
-    val txInfo             = sender.transactionInfo(id)
+    val txInfo             = sender.transactionInfo[TransactionInfo](id)
 
     sender.waitForHeight(txInfo.height + 1)
 
@@ -138,7 +138,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo(invokeTx._1.id)
+    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
     val callerTxs             = sender.transactionsByAddress(caller, 100)
     val dAppTxs               = sender.transactionsByAddress(contract, 100)
     val recipientTxs          = sender.transactionsByAddress(recipient, 100)
@@ -180,7 +180,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       waitForTx = true
     )
 
-    val txInfo                = sender.transactionInfo(invokeTx._1.id)
+    val txInfo                = sender.transactionInfo[TransactionInfo](invokeTx._1.id)
     val callerTxs             = sender.transactionsByAddress(caller, 100)
     val dAppTxs               = sender.transactionsByAddress(contract, 100)
     val recipientTxs          = sender.transactionsByAddress(recipient, 100)
@@ -232,7 +232,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
   }
 
   def txInfoShouldBeEqual(info: TransactionInfo, stateChanges: DebugStateChanges)(implicit pos: Position) {
-    info.`type` shouldBe stateChanges.`type`
+    info._type shouldBe stateChanges._type
     info.id shouldBe stateChanges.id
     info.fee shouldBe stateChanges.fee
     info.timestamp shouldBe stateChanges.timestamp

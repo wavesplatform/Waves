@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.{ScriptExecutionError, StateCheckFailed}
+import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
@@ -208,8 +208,8 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       sender.invokeScript(callerAcc, smartAccV3, payment = Seq(Payment(1, Waves), Payment(1, Waves)), waitForTx = true)
     ) { error =>
       error.statusCode shouldBe 400
-      error.id shouldBe ScriptExecutionError.Id
       error.message should include("DApp version 3 < 4 doesn't support multiple payment attachment")
+      error.id shouldBe StateCheckFailed.Id
     }
   }
 

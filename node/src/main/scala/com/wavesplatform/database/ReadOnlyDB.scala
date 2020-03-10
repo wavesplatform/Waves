@@ -23,7 +23,8 @@ class ReadOnlyDB(db: DB, readOptions: ReadOptions) {
 
   def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
 
-  def iterateOver(prefix: Array[Byte])(f: DBEntry => Unit): Unit = db.iterateOver(prefix)(f)
+  def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit =
+    db.iterateOver(prefix, seekPrefix)(f)
 
   def read[T](keyName: String, prefix: Array[Byte], seek: Array[Byte], n: Int)(deserialize: DBEntry => T): Vector[T] = {
     val iter = iterator

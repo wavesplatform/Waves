@@ -2,12 +2,10 @@ package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
-import com.wavesplatform.utils._
 import play.api.libs.json.{Format, Json}
 
 case class IssueRequest(

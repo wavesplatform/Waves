@@ -5,8 +5,8 @@ import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.features.MultiPaymentPolicyProvider._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits._
@@ -18,8 +18,6 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
-
-import scala.util.Try
 
 object WavesEnvironment {
   type In = Transaction :+: Order :+: PseudoTx :+: CNil

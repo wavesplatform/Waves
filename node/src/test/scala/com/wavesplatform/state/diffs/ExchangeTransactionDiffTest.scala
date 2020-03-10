@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.{Order => _, _}
 import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -101,7 +102,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditionsAndExchange) {
       case (gen1, gen2, issue1, issue2, exchange) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1, issue2))), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
@@ -143,7 +144,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditionsAndExchange) {
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
+        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
@@ -246,7 +247,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (gen1, gen2, gen3, issue1, issue2, issue3, issue4, exchange) =>
         assertDiffAndState(
           Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2, issue3, issue4))),
-          TestBlock.create(Seq(exchange)),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
           fsWithOrderFeature
         ) {
           case (blockDiff, state) =>
@@ -373,8 +374,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, bigBuyOrder) =>
         assertDiffAndState(
-          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
-          TestBlock.create(exchanges),
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer), Block.ProtoBlockVersion)),
+          TestBlock.create(exchanges, Block.ProtoBlockVersion),
           fsOrderMassTransfer
         ) {
           case (blockDiff, _) =>
@@ -409,8 +410,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, _) =>
         assertDiffEi(
-          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
-          TestBlock.create(exchanges),
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer), Block.ProtoBlockVersion)),
+          TestBlock.create(exchanges, Block.ProtoBlockVersion),
           fsOrderMassTransfer
         ) { blockDiffEi =>
           blockDiffEi should produce("Insufficient buy fee")
@@ -429,8 +430,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions) {
       case (genesises, issueTx1, issueTx2, massTransfer, exchanges, _) =>
         assertDiffEi(
-          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer))),
-          TestBlock.create(exchanges),
+          Seq(TestBlock.create(genesises), TestBlock.create(Seq(issueTx1, issueTx2, massTransfer), Block.ProtoBlockVersion)),
+          TestBlock.create(exchanges, Block.ProtoBlockVersion),
           fsOrderMassTransfer
         ) { blockDiffEi =>
           blockDiffEi should produce("Too much buy")
@@ -457,7 +458,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions) {
       case (gen1, gen2, issue1, exchange) =>
         whenever(exchange.amount > 300000) {
-          assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange)), fsWithOrderFeature) {
+          assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) {
             case (blockDiff, _) =>
               val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
               totalPortfolioDiff.balance shouldBe 0
@@ -887,7 +888,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       val tidex  = IssuedAsset(tidexTx.assetId)
       val liquid = IssuedAsset(liquidTx.assetId)
 
-      (Seq(TestBlock.create(genesisTxs), TestBlock.create(Seq(usdnTx, tidexTx, liquidTx))), usdn, tidex, liquid)
+      (Seq(TestBlock.create(genesisTxs), TestBlock.create(Seq(usdnTx, tidexTx, liquidTx), Block.ProtoBlockVersion)), usdn, tidex, liquid)
     }
 
     def mkExchange(txv: Byte, bov: Byte, sov: Byte, amount: Long, txPrice: Long, boPrice: Long, soPrice: Long, pair: AssetPair)
@@ -931,19 +932,19 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       case (txWithV3, txWithV4, txWithV3V4, txWithV4V3) =>
         val portfolios = collection.mutable.ListBuffer[Map[Address, Portfolio]]()
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4)), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4), Block.ProtoBlockVersion), fsWithOrderFeature) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3V4)), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3V4), Block.ProtoBlockVersion), fsWithOrderFeature) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4V3)), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4V3), Block.ProtoBlockVersion), fsWithOrderFeature) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3)), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3), Block.ProtoBlockVersion), fsWithOrderFeature) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 

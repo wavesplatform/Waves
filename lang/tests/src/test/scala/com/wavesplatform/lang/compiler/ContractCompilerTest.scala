@@ -17,7 +17,7 @@ import com.wavesplatform.lang.v1.compiler.{CompilerContext, Terms}
 import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.{FieldNames, Types, WavesContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.parser.{Parser}
 import com.wavesplatform.lang.v1.testing.ScriptGen
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, compiler}
@@ -815,7 +815,7 @@ class ContractCompilerTest extends PropSpec with PropertyChecks with Matchers wi
           |     BinaryEntry("key", base58''),
           |     DeleteEntry("key"),
           |     ScriptTransfer(i.caller, 1, base58''),
-          |     Issue(unit, 4, "description", true, "name", 1000, 0),
+          |     Issue("name", "description", 1000, 4, true, unit, 0),
           |     Reissue(base58'', false, 1),
           |     Burn(base58'', 1)
           |   ]
