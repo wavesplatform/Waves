@@ -287,9 +287,9 @@ class BlockV5Test
     tx4       = createTx(miner2, miner1)
     tx5       = createTx(miner1, miner2)
     (b4, m4s) = chainBaseAndMicro(b3.uniqueId, Seq.empty, Seq(Seq(tx1)), miner2, Block.NgBlockVersion, ntpNow)
-    (b5, m5s) = chainBaseAndMicro(m4s.head.totalResBlockSig, Seq.empty, Seq(Seq(tx2)), miner1, Block.RewardBlockVersion, ntpNow)
-    (b6, m6s) = chainBaseAndMicro(m5s.head.totalResBlockSig, Seq(tx3), Seq(Seq(tx4)), miner2, Block.ProtoBlockVersion, ntpNow)
-    (b7, m7s) = chainBaseAndMicro(m6s.head.totalResBlockSig, Seq.empty, Seq(Seq(tx5)), miner1, Block.ProtoBlockVersion, ntpNow)
+    (b5, m5s) = chainBaseAndMicro(m4s.head.totalBlockId, Seq.empty, Seq(Seq(tx2)), miner1, Block.RewardBlockVersion, ntpNow)
+    (b6, m6s) = chainBaseAndMicro(m5s.head.totalBlockId, Seq(tx3), Seq(Seq(tx4)), miner2, Block.ProtoBlockVersion, ntpNow)
+    (b7, m7s) = chainBaseAndMicro(m6s.head.totalBlockId, Seq.empty, Seq(Seq(tx5)), miner1, Block.ProtoBlockVersion, ntpNow)
   } yield (Seq(b1, b2, b3), (b4, m4s), (b5, m5s), (b6, m6s), (b7, m7s))
 
   "BlockchainUpdater" should "accept valid key blocks and microblocks" in forAll(updaterScenario) {

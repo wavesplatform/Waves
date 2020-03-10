@@ -906,7 +906,7 @@ class UtxPoolSpecification
 
       val settingsWithNG = wavesplatform.history.settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)
 
-      "applies chains correctly" ignore forAll(genChain) {
+      "applies chains correctly" in forAll(genChain) {
         case (genBlock, (block1, mbs1), (block2, mbs2), block3, block4) =>
           withDomain(settingsWithNG) { d =>
             implicit val scheduler = Scheduler.singleThread("ext-appender")

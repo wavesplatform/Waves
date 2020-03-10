@@ -1,14 +1,14 @@
 package com.wavesplatform.history
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -71,7 +71,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
   }
 
   property("Microblock tx sequence") {
-    val txCount = 10
+    val txCount         = 10
     val microBlockCount = 10
     val preconditionsAndPayments: Gen[(KeyPair, GenesisTransaction, Seq[Seq[TransferTransaction]], Int)] =
       for {
@@ -81,11 +81,10 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         fee    <- smallFeeGen
         amt    <- smallFeeGen
         genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        microBlockTxs =
-          (1 to txCount * microBlockCount)
-            .map(step => createWavesTransfer(master, master, amt, fee, ts + step).explicitGet())
-            .grouped(microBlockCount)
-            .toSeq
+        microBlockTxs = (1 to txCount * microBlockCount)
+          .map(step => createWavesTransfer(master, master, amt, fee, ts + step).explicitGet())
+          .grouped(microBlockCount)
+          .toSeq
       } yield (miner, genesis, microBlockTxs, ts)
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (miner, genesis, microBlockTxs, ts)) =>
@@ -168,7 +167,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
 
   type BlockAndMicroblockSize     = (Int, Seq[Int])
   type BlockAndMicroblockSizes    = Seq[BlockAndMicroblockSize]
-  type BlockAndMicroblocks        = (Block, Seq[MicroBlock])
+  type BlockAndMicroblocks        = (Block, Seq[MicroBlockWithTotalId])
   type BlockAndMicroblockSequence = Seq[BlockAndMicroblocks]
 
   def randomSizeSequence(total: Int): Gen[BlockAndMicroblockSizes] =
@@ -211,7 +210,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
   }
 
   def bestRef(r: BlockAndMicroblocks): ByteStr = r._2.lastOption match {
-    case Some(mb) => mb.totalResBlockSig
+    case Some(mb) => mb.totalBlockId
     case None     => r._1.uniqueId
   }
 

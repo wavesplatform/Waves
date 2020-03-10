@@ -948,7 +948,7 @@ object AsyncHttpApi extends Assertions {
     }
   }
 
-  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers with ScorexLogging {
+  implicit class NodesAsyncHttpApi(nodes: Seq[Node]) extends Matchers {
     def height: Future[Seq[Int]] = traverse(nodes)(_.height)
 
     def waitForHeightAriseAndTxPresent(transactionId: String)(implicit p: Position): Future[Unit] =
@@ -978,7 +978,6 @@ object AsyncHttpApi extends Assertions {
       def waitSameBlockHeaders =
         waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
           val sig = blocks.map(_.signature)
-          log.info(sig.toVector.toString())
           sig.forall(_ == sig.head)
         })
 
@@ -989,7 +988,6 @@ object AsyncHttpApi extends Assertions {
     }
 
     def waitFor[A](desc: String)(retryInterval: FiniteDuration)(request: Node => Future[A], cond: Iterable[A] => Boolean): Future[Boolean] = {
-      log.info(s"Awaiting $desc")
       def retry = timer.schedule(waitFor(desc)(retryInterval)(request, cond), retryInterval)
 
       Future

@@ -85,7 +85,7 @@ object BlockStats {
 
   def inv(m: MicroBlockInv, ch: Channel): Unit = write(
     measurement(Type.Micro)
-      .tag("id", id(m.totalBlockSig))
+      .tag("id", id(m.totalBlockRef))
       .tag("parent-id", id(m.prevBlockRef))
       .addField("from", nodeName(ch)),
     Event.Inv,

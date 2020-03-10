@@ -26,8 +26,7 @@ class NgState(
 ) {
 
   private[this] case class MicroBlockInfo(totalBlockId: BlockId, microBlock: MicroBlock) {
-    def idEquals(id: ByteStr): Boolean =
-      totalBlockId == id || microBlock.totalResBlockSig == id
+    def idEquals(id: ByteStr): Boolean = totalBlockId == id
   }
 
   private[this] case class CachedMicroDiff(diff: Diff, carryFee: Long, totalFee: Long, timestamp: Long)
@@ -122,12 +121,13 @@ class NgState(
     BlockMinerInfo(NxtLikeConsensusBlockData(base.header.baseTarget, base.header.generationSignature), base.header.timestamp, blockId)
   }
 
-  def append(microBlock: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): Unit = {
+  def append(microBlock: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): BlockId = {
     val blockId = this.createBlockId(microBlock.transactionData, microBlock.totalResBlockSig)
     microDiffs.put(microBlock.totalResBlockSig, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
     microBlocks.prepend(MicroBlockInfo(blockId, microBlock))
     internalCaches.invalidate(microBlock.totalResBlockSig)
     internalCaches.invalidate(blockId)
+    blockId
   }
 
   def carryFee: Long =

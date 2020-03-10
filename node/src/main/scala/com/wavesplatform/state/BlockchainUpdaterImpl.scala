@@ -392,7 +392,7 @@ class BlockchainUpdaterImpl(
 
   private def diff(p1: Map[Address, Portfolio], p2: Map[Address, Portfolio]) = Monoid.combine(p1, p2.map { case (k, v) => k -> v.negate })
 
-  override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, Unit] = writeLock {
+  override def processMicroBlock(microBlock: MicroBlock, verify: Boolean = true): Either[ValidationError, BlockId] = writeLock {
     ngState match {
       case None =>
         Left(MicroBlockAppendError("No base block exists", microBlock))
@@ -431,14 +431,15 @@ class BlockchainUpdaterImpl(
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
               blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this)
               restTotalConstraint = updatedMdConstraint
-              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
-              log.info(s"$microBlock appended")
-              internalLastBlockInfo.onNext(LastBlockInfo(microBlock.totalResBlockSig, height, score, ready = true))
+              val blockId = ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
+              log.info(s"$microBlock appended with id $blockId")
+              internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
               for {
                 (addr, p) <- diff.portfolios
                 assetId   <- p.assetIds
               } spendableBalanceChanged.onNext(addr -> assetId)
+              blockId
             }
         }
     }

@@ -82,20 +82,32 @@ package object history {
       signer: KeyPair,
       version: Byte,
       ts: Long
-  ): (Block, MicroBlock) = {
+  ): (Block, MicroBlockWithTotalId) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val nonSigned = MicroBlock
-      .buildAndSign(version, generator = signer, transactionData = txs, prevResBlockRef = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.signature)
+      .buildAndSign(
+        version,
+        generator = signer,
+        transactionData = txs,
+        prevResBlockRef = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.signature
+      )
       .explicitGet()
-    (newTotalBlock, nonSigned)
+    (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.uniqueId))
   }
 
-  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlock) = {
+  def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlockWithTotalId) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val nonSigned = MicroBlock
-      .buildAndSign(3.toByte, generator = signer, transactionData = txs, prevResBlockRef = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.signature)
+      .buildAndSign(
+        3.toByte,
+        generator = signer,
+        transactionData = txs,
+        prevResBlockRef = prevTotal.uniqueId,
+        totalResBlockSig = newTotalBlock.signature
+      )
       .explicitGet()
-    (newTotalBlock, nonSigned)
+    (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.uniqueId))
   }
 
   def randomSig: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
@@ -111,7 +123,7 @@ package object history {
     chainBlocksR(randomSig, txs)
   }
 
-  def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlock]) =
+  def chainBaseAndMicro(totalRefTo: ByteStr, base: Transaction, micros: Seq[Seq[Transaction]]): (Block, Seq[MicroBlockWithTotalId]) =
     chainBaseAndMicro(totalRefTo, Seq(base), micros, defaultSigner, 3, base.timestamp)
 
   def chainBaseAndMicro(
@@ -121,10 +133,10 @@ package object history {
       signer: KeyPair,
       version: Byte,
       timestamp: Long
-  ): (Block, Seq[MicroBlock]) = {
+  ): (Block, Seq[MicroBlockWithTotalId]) = {
     val block = customBuildBlockOfTxs(totalRefTo, base, signer, version, timestamp)
     val microBlocks = micros
-      .foldLeft((block, Seq.empty[MicroBlock])) {
+      .foldLeft((block, Seq.empty[MicroBlockWithTotalId])) {
         case ((lastTotal, allMicros), txs) =>
           val (newTotal, micro) = customBuildMicroBlockOfTxs(totalRefTo, lastTotal, txs, signer, version, timestamp)
           (newTotal, allMicros :+ micro)

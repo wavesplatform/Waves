@@ -7,6 +7,7 @@ import com.google.common.primitives.{Bytes, Ints}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
 import com.wavesplatform.mining.MiningConstraints
@@ -181,23 +182,23 @@ object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
         case l if l == (KeyLength + SignatureLength * 3) =>
           MicroBlockInv(
             sender = PublicKey.apply(bytes.take(KeyLength)),
-            totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
+            totalBlockRef = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
             prevBlockRef = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
             signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)
           )
 
-        case l if l == (KeyLength + DigestLength + SignatureLength * 2) =>
+        case l if l == (KeyLength + (DigestLength * 2) + SignatureLength) =>
           MicroBlockInv(
             sender = PublicKey.apply(bytes.take(KeyLength)),
-            totalBlockSig = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
-            prevBlockRef = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + DigestLength + SignatureLength).toArray),
-            signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength + DigestLength, KeyLength + DigestLength + SignatureLength * 2).toArray)
+            totalBlockRef = ByteStr(bytes.view.slice(KeyLength, KeyLength + DigestLength).toArray),
+            prevBlockRef = ByteStr(bytes.view.slice(KeyLength + DigestLength, KeyLength + DigestLength * 2).toArray),
+            signature = ByteStr(bytes.view.slice(KeyLength + DigestLength * 2, KeyLength + (DigestLength * 2) + SignatureLength).toArray)
           )
       }
     )
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {
-    inv.sender ++ inv.totalBlockSig.arr ++ inv.prevBlockRef.arr ++ inv.signature.arr
+    inv.sender ++ inv.totalBlockRef.arr ++ inv.prevBlockRef.arr ++ inv.signature.arr
   }
 
   override val maxLength: Int = 300
@@ -214,13 +215,14 @@ object MicroBlockRequestSpec extends MessageSpec[MicroBlockRequest] {
   override val maxLength: Int = 500
 }
 
-object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlock] {
+object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlockResponse] {
   override val messageCode: MessageCode = 28: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] =
-    MicroBlock.parseBytes(bytes)
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
+    MicroBlock.parseBytes(bytes).map(MicroBlockResponse(_))
 
-  override def serializeData(resp: MicroBlock): Array[Byte] = resp.bytes()
+  override def serializeData(resp: MicroBlockResponse): Array[Byte] =
+    resp.microblock.bytes()
 
   override val maxLength: Int = 271 + TransactionSpec.maxLength * MaxTransactionsPerMicroblock
 }
@@ -236,15 +238,19 @@ object PBBlockSpec extends MessageSpec[Block] {
   override def serializeData(data: Block): Array[Byte] = PBBlocks.protobuf(data).toByteArray
 }
 
-object PBMicroBlockSpec extends MessageSpec[MicroBlock] {
+object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
   override val messageCode: MessageCode = 30: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] =
-    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes))
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
+    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes.dropRight(crypto.DigestLength))).map { mb =>
+      val blockId = bytes.takeRight(crypto.DigestLength)
+      MicroBlockResponse(mb, blockId)
+    }
 
-  override def serializeData(resp: MicroBlock): Array[Byte] = PBMicroBlocks.protobuf(resp).toByteArray
+  override def serializeData(resp: MicroBlockResponse): Array[Byte] =
+    PBMicroBlocks.protobuf(resp.microblock).toByteArray ++ resp.totalBlockId.arr
 
-  override val maxLength: Int = PBBlockSpec.maxLength
+  override val maxLength: Int = PBBlockSpec.maxLength + crypto.DigestLength
 }
 
 object PBTransactionSpec extends MessageSpec[Transaction] {
