@@ -5,13 +5,14 @@ import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.common.utils.EitherExt2
 
 class BlockInfoV5Suite extends BaseTransactionSuite {
-  val activationHeight = 3
+  val activationHeight = 4
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.Builder(Default, 1, Seq.empty)
@@ -27,41 +28,33 @@ class BlockInfoV5Suite extends BaseTransactionSuite {
       |@Callable(i)
       |func blockInfo(h: Int) = {
       |    let vrf = match blockInfoByHeight(h) {
-      |        case block: BlockInfo => block.generationSignature
-      |        case _ => throw("can't find block")
-      |    }
-      |
-      |    BinaryEntry("vrf", vrf)
-      |
-      |}
-      |""".stripMargin
-
-  private val dAppScriptV3 =
-    """{-# STDLIB_VERSION 3 #-}
-      |{-# CONTENT_TYPE DAPP #-}
-      |{-# SCRIPT_TYPE ACCOUNT #-}
-      |
-      |@Callable(i)
-      |func blockInfo(h: Int) = {
-      |    let vrf = match blockInfoByHeight(h) {
       |        case block: BlockInfo => block.vrf
       |        case _ => throw("can't find block")
       |    }
       |
-      |    WriteSet([DataEntry("vrf", vrf)])
+      |    [BinaryEntry("vrf", vrf.value())]
       |
       |}
       |""".stripMargin
 
   private val caller = firstAddress
   private val dApp = secondAddress
-  test("able to retrieve vrf from block V5 in RideV4") {
+  test("able to retrieve vrf from block V5") {
     val script = ScriptCompiler.compile(dAppScriptV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), waitForTx = true)
+    sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight)), waitForTx = true)
+    sender.getDataByKey(dApp, "vrf").value.toString shouldBe sender.blockAt(activationHeight).vrf.get
+  }
 
-    sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(3)), waitForTx = true)
+  test("not able to retrieve vrf from block V4") {
+    assertApiErrorRaised(
+      sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 1)))
+    )
+  }
 
-    println(sender.getDataByKey(dApp, "vrf"))
-
+  test("not able to retrieve vrf from block V3") {
+    assertApiErrorRaised(
+      sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 2)))
+    )
   }
 }
