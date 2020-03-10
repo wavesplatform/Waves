@@ -266,7 +266,7 @@ object CryptoContext {
     val bls12Groth16VerifyF: BaseFunction[NoContext] =
       NativeFunction(
         "groth16Verify",
-        4900,
+        3900,
         BLS12_GROTH16_VERIFY,
         BOOLEAN,
         ("verifying key", BYTESTR),
