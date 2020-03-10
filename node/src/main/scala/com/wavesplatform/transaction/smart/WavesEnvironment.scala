@@ -140,7 +140,7 @@ class WavesEnvironment(
     )
   }
 
-  override def transactionFromProtoBytes(b: Array[Byte]): Option[Tx.Transfer] =
+  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] =
     PBTransactionSerializer.parseBytes(b)
       .toOption
       .flatMap {

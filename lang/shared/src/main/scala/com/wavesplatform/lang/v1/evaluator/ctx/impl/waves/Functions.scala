@@ -511,26 +511,26 @@ object Functions {
 
   def transactionFromProtoBytesF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
-      "transactionFromProtoBytes",
+      "transferTransactionFromProto",
       10,
-      TRANSACTION_FROM_PROTO_BYTES,
+      TRANSFER_TRANSACTION_FROM_PROTO,
       UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("bytes", BYTESTR)
     ) {
       new ContextfulNativeFunction[Environment](
-        "transactionFromProtoBytes",
+        "transferTransactionFromProto",
         UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
         Seq(("bytes", BYTESTR))
       ) {
         override def ev[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
           input match {
             case (env, List(CONST_BYTESTR(bytes))) =>
-              (env.transactionFromProtoBytes(bytes)
+              (env.transferTransactionFromProto(bytes)
                   .map(transactionObject(_, proofsEnabled, version)): EVALUATED)
                   .asRight[ExecutionError]
                   .pure[F]
 
-            case (_, xs) => notImplemented[F](s"transactionFromProtoBytes(bytes: ByteVector)", xs)
+            case (_, xs) => notImplemented[F](s"transferTransactionFromProto(bytes: ByteVector)", xs)
           }
       }
     }

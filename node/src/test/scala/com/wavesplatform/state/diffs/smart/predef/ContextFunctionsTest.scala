@@ -698,8 +698,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | {-# CONTENT_TYPE EXPRESSION #-}
                  | {-# SCRIPT_TYPE ACCOUNT #-}
                  |
-                 | let transferTx  = transactionFromProtoBytes(base58'$txBytesBase58').value()
-                 | let incorrectTx = transactionFromProtoBytes(base58'aaaa')
+                 | let transferTx  = transferTransactionFromProto(base58'$txBytesBase58').value()
+                 | let incorrectTx = transferTransactionFromProto(base58'aaaa')
                  |
                  | incorrectTx          == unit                                                  &&
                  | transferTx.id        == base58'${transferTx.id.value()}'                      &&
