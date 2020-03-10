@@ -6,12 +6,13 @@ import com.wavesplatform.api.http.requests.SignedDataRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.state.DataEntry._
-import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.{TransactionGen, crypto}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import play.api.libs.json.{Format, Json}
+import play.api.libs.json.Json
 
 class DataTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
 
@@ -100,8 +101,6 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("JSON roundtrip") {
-    implicit val signedFormat: Format[SignedDataRequest] = Json.format[SignedDataRequest]
-
     forAll(dataTransactionGen) { tx =>
       val json = tx.json()
       json.toString shouldEqual tx.toString
@@ -148,9 +147,11 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   }
 
   property("negative validation cases") {
-    forAll(dataTransactionGen) {
-      case DataTransaction(version, sender, data, fee, timestamp, proofs) =>
-        val dataTooBig   = List.tabulate(100)(n => StringDataEntry((100 + n).toString, "a" * 1527))
+    val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
+    forAll(gen) {
+      case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs) =>
+        val dataSize     = if (tx.isProtobufVersion) 110 else 100
+        val dataTooBig   = List.tabulate(dataSize)(n => StringDataEntry((100 + n).toString, "a" * 1527))
         val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
         dataTooBigEi shouldBe Left(TxValidationError.TooBigArray)
 
@@ -158,7 +159,8 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
         val emptyKeyEi = DataTransaction.create(version, sender, emptyKey, fee, timestamp, proofs)
         emptyKeyEi shouldBe Left(TxValidationError.EmptyDataKey)
 
-        val keyTooLong   = data :+ BinaryDataEntry("a" * (MaxKeySize + 1), ByteStr(Array(1, 2)))
+        val maxKeySize   = if (tx.isProtobufVersion) MaxPBKeySize else MaxKeySize
+        val keyTooLong   = data :+ BinaryDataEntry("a" * (maxKeySize + 1), ByteStr(Array(1, 2)))
         val keyTooLongEi = DataTransaction.create(version, sender, keyTooLong, fee, timestamp, proofs)
         keyTooLongEi shouldBe Left(TxValidationError.TooBigArray)
 
@@ -179,38 +181,37 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     }
   }
 
-  property(testName = "JSON format validation") {
+  property("JSON format validation") {
     val js = Json.parse("""{
-                       "type": 12,
-                       "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
-                       "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
-                       "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
-                       "fee": 100000,
-                       "feeAssetId": null,
-                       "timestamp": 1526911531530,
-                       "proofs": [
-                       "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
-                       ],
-                       "version": 1,
-                       "data": [
-                       {
-                       "key": "int",
-                       "type": "integer",
-                       "value": 24
-                       },
-                       {
-                       "key": "bool",
-                       "type": "boolean",
-                       "value": true
-                       },
-                       {
-                       "key": "blob",
-                       "type": "binary",
-                       "value": "base64:YWxpY2U="
-                       }
-                       ]
-                       }
-  """)
+                          |  "type": 12,
+                          |  "id": "87SfuGJXH1cki2RGDH7WMTGnTXeunkc5mEjNKmmMdRzM",
+                          |  "sender": "3N5GRqzDBhjVXnCn44baHcz2GoZy5qLxtTh",
+                          |  "senderPublicKey": "FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z",
+                          |  "fee": 100000,
+                          |  "feeAssetId": null,
+                          |  "timestamp": 1526911531530,
+                          |  "proofs": [
+                          |    "32mNYSefBTrkVngG5REkmmGAVv69ZvNhpbegmnqDReMTmXNyYqbECPgHgXrX2UwyKGLFS45j7xDFyPXjF8jcfw94"
+                          |  ],
+                          |  "version": 1,
+                          |  "data": [
+                          |    {
+                          |      "key": "int",
+                          |      "type": "integer",
+                          |      "value": 24
+                          |    },
+                          |    {
+                          |      "key": "bool",
+                          |      "type": "boolean",
+                          |      "value": true
+                          |    },
+                          |    {
+                          |      "key": "blob",
+                          |      "type": "binary",
+                          |      "value": "base64:YWxpY2U="
+                          |    }
+                          |  ]
+                          |}""".stripMargin)
 
     val entry1 = IntegerDataEntry("int", 24)
     val entry2 = BooleanDataEntry("bool", value = true)
@@ -230,4 +231,14 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     js shouldEqual tx.json()
   }
 
+  property("handle null keys") {
+    val emptyDataEntry = EmptyDataEntry("123")
+
+    forAll(accountGen, dataTransactionGen) { (sender, tx) =>
+      val tx1 = DataTransaction.selfSigned(TxVersion.V1, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      tx1 shouldBe Left(GenericError("Empty data is not allowed in V1"))
+      val tx2 = DataTransaction.selfSigned(TxVersion.V2, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      tx2 shouldBe 'right
+    }
+  }
 }

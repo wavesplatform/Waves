@@ -12,19 +12,14 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.script.{ContractScript, Script}
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, TRUE}
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV1, _}
-import com.wavesplatform.lang.v1.traits.domain.AttachedPayments
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.smart.{DApp => DAppTarget, _}
-import com.wavesplatform.transaction.{Authorized, Proven, Transaction}
+import com.wavesplatform.transaction.{Authorized, Proven}
 import monix.eval.Coeval
-import shapeless._
 
 object ScriptRunner {
   type TxOrd         = BlockchainContext.In
-  type PaymentsTxOrd = (Transaction, Option[AttachedPayments]) :+: Order :+: ScriptTransfer :+: CNil
 
   def apply(
       in: TxOrd,
@@ -46,7 +41,8 @@ object ScriptRunner {
             blockchain,
             isAssetScript,
             isContract = false,
-            Coeval(scriptContainerAddress)
+            Coeval(scriptContainerAddress),
+            in.eliminate(_.id(), _ => ByteStr.empty)
           )
         } yield ctx
         EvaluatorV1().applyWithLogging[EVALUATED](evalCtx, s.expr)
@@ -54,6 +50,13 @@ object ScriptRunner {
         val r = for {
           ds <- DirectiveSet(script.stdLibVersion, if (isAssetScript) Asset else Account, Expression)
           mi <- buildThisValue(in, blockchain, ds, None)
+          entity_txId <- in.eliminate(
+            t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget).map(ContractEvaluator.verify(decls, vf, _) -> t.id()),
+            _.eliminate(
+              t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)).asRight[ExecutionError].map(_ -> ByteStr.empty),
+              _ => ???
+            )
+          )
           ctx <- BlockchainContext.build(
             script.stdLibVersion,
             AddressScheme.current.chainId,
@@ -62,16 +65,10 @@ object ScriptRunner {
             blockchain,
             isAssetScript,
             isContract = true,
-            Coeval(scriptContainerAddress)
+            Coeval(scriptContainerAddress),
+            entity_txId._2
           )
-          entity <- in.eliminate(
-            t => RealTransactionWrapper(t, blockchain, ds.stdLibVersion, DAppTarget).map(ContractEvaluator.verify(decls, vf, _)),
-            _.eliminate(
-              t => ContractEvaluator.verify(decls, vf, RealTransactionWrapper.ord(t)).asRight[ExecutionError],
-              _ => ???
-            )
-          )
-        } yield EvaluatorV1().evalWithLogging(ctx, entity)
+        } yield EvaluatorV1().evalWithLogging(ctx, entity_txId._1)
 
         r.fold(e => (Nil, e.asLeft[EVALUATED]), identity)
 

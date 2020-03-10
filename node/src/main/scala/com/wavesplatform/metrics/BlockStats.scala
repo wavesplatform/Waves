@@ -23,6 +23,7 @@ object BlockStats {
     case object Inv      extends Event
     case object Received extends Event
     case object Applied  extends Event
+    case object Appended extends Event
     case object Declined extends Event
     case object Mined    extends Event
   }
@@ -74,6 +75,14 @@ object BlockStats {
     Seq.empty
   )
 
+  def appended(b: Block, complexity: Long): Unit = write(
+    measurement(Type.Block)
+      .tag("id", id(b.uniqueId))
+      .addField("complexity", complexity),
+    Event.Appended,
+    Seq.empty
+  )
+
   def inv(m: MicroBlockInv, ch: Channel): Unit = write(
     measurement(Type.Micro)
       .tag("id", id(m.totalBlockSig))
@@ -121,11 +130,11 @@ object BlockStats {
     measurement(Type.Micro)
       .tag("id", id(m.totalResBlockSig))
 
-  private def measurement(t: Type): Point.Builder = Point.measurement("block").tag("type", t.toString)
+  private def measurement(t: Type): Point.Builder =
+    Point.measurement("block").tag("type", t.toString)
 
-  private def nodeName(ch: Channel): String = {
-    Option(ch.attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
-  }
+  private def nodeName(ch: Channel): String =
+    if (ch == null) "???" else Option(ch.attr(HandshakeHandler.NodeNameAttributeKey).get()).getOrElse("")
 
   private def id(x: ByteStr): String = x.toString.take(StringIdLength)
 

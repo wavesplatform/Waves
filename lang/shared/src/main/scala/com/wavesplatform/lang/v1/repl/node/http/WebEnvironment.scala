@@ -9,7 +9,7 @@ import com.wavesplatform.lang.v1.repl.node.http.response.ImplicitMappings
 import com.wavesplatform.lang.v1.repl.node.http.response.model._
 import com.wavesplatform.lang.v1.traits.Environment.InputEntity
 import com.wavesplatform.lang.v1.traits.domain.Recipient.{Address, Alias}
-import com.wavesplatform.lang.v1.traits.domain.{BlockHeader, BlockInfo, Recipient, ScriptAssetInfo, Tx}
+import com.wavesplatform.lang.v1.traits.domain.{BlockInfo, Recipient, ScriptAssetInfo, Tx}
 import com.wavesplatform.lang.v1.traits.{DataType, Environment}
 import io.circe.Decoder
 import io.circe.generic.auto._
@@ -68,10 +68,10 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
       case Alias(name)    => resolveAlias(name).map(_.explicitGet().bytes.toString)
     }
 
-  override def blockHeaderParser(bytes: Array[Byte]): Option[BlockHeader] = ???
   override def inputEntity: InputEntity                                   = ???
   override def transactionById(id: Array[Byte]): Future[Option[Tx]]       = ???
   override def multiPaymentAllowed: Boolean                               = ???
+  override def txId: ByteStr                                              = ???
 
   private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))

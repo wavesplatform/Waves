@@ -125,6 +125,10 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
+  property("rsaVerify illegal params") {
+    eval("rsaVerify(SHA512, base58'2345', base58'2345', base58'2345')") should produce("Illegal input params")
+  }
+
   private val evaluator = new EvaluatorV1[Id, NoContext]()
 
   private def eval[T <: EVALUATED](code: String): Either[String, T] = {

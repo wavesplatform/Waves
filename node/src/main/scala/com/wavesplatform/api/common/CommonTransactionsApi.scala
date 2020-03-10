@@ -1,6 +1,8 @@
 package com.wavesplatform.api.common
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.block.Block.TransactionProof
+import com.wavesplatform.block.{Block, BlockTransactionsRootOps}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.transaction.VanillaTransaction
@@ -38,6 +40,14 @@ private[api] class CommonTransactionsApi(
         case FeeDetails(asset, _, feeInAsset, feeInWaves) =>
           (asset, feeInAsset, feeInWaves)
       }
+
+  def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
+    for {
+      transactionId         <- transactionIds
+      (height, transaction) <- transactionById(transactionId)
+      block                 <- blockchain.blockAt(height) if block.header.version >= Block.ProtoBlockVersion
+      transactionProof      <- block.transactionProof(transaction)
+    } yield transactionProof
 
   def broadcastTransaction(tx: VanillaTransaction): TracedResult[ValidationError, Boolean] = publishTransaction(tx)
 }

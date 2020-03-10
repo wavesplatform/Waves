@@ -24,6 +24,8 @@ trait Script {
 
   val containsBlockV2: Coeval[Boolean]
 
+  val containsArray: Boolean
+
   override def equals(obj: scala.Any): Boolean = obj match {
     case that: Script => stdLibVersion == that.stdLibVersion && expr == that.expr
     case _            => false
@@ -71,14 +73,6 @@ object Script {
         ExprScript.estimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
       case ContractScriptImpl(version, contract) =>
         ContractScript.estimateComplexity(version, contract, estimator)
-    }
-
-  def limitFreeComplexity(s: Script, estimator: ScriptEstimator): Either[String, (Long, Map[String, Long])] =
-    s match {
-      case script: ExprScript =>
-        ExprScript.limitFreeEstimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
-      case ContractScriptImpl(version, contract) =>
-        ContractScript.limitFreeComplexity(version, contract, estimator)
     }
 
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =

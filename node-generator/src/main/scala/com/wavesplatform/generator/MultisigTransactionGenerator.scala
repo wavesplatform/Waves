@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.it.util._
+import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
@@ -44,7 +44,7 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         totalAmountOnNewAccount - 2 * enoughFee - i,
         Waves,
         enoughFee,
-        Array.emptyByteArray,
+        None,
         now + i,
         Proofs.empty
       )

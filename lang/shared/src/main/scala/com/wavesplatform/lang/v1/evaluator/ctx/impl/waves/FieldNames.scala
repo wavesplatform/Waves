@@ -14,7 +14,8 @@ object FieldNames {
   val BooleanEntry = "BooleanEntry"
   val StringEntry  = "StringEntry"
   val BinaryEntry  = "BinaryEntry"
-  val IntEntry     = "IntEntry"
+  val IntegerEntry = "IntegerEntry"
+  val DeleteEntry  = "DeleteEntry"
 
   val Recipient      = "recipient"
   val Amount         = "amount"
@@ -30,6 +31,7 @@ object FieldNames {
   val IssueDescription  = "description"
   val IssueScriptField  = "compiledScript"
   val IssueIsReissuable = "isReissuable"
+  val IssueNonce        = "nonce"
 
   val Reissue = "Reissue"
   val ReissueAssetId      = "assetId"

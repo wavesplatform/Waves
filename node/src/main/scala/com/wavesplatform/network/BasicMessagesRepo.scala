@@ -9,11 +9,12 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto._
 import com.wavesplatform.mining.Miner.MaxTransactionsPerMicroblock
+import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.network.message.Message._
 import com.wavesplatform.network.message._
-import com.wavesplatform.protobuf.block.PBBlocks
-import com.wavesplatform.protobuf.transaction.PBTransactions
-import com.wavesplatform.transaction.{Transaction, TransactionParsers}
+import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks, PBMicroBlocks, SignedMicroBlock}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.transaction.{DataTransaction, Transaction, TransactionParsers}
 
 import scala.util.Try
 
@@ -202,37 +203,44 @@ object MicroBlockRequestSpec extends MessageSpec[MicroBlockRequest] {
   override val maxLength: Int = 500
 }
 
-object MicroBlockResponseSpec extends MessageSpec[MicroBlockResponse] {
+object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlock] {
   override val messageCode: MessageCode = 28: Byte
 
-  override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
-    MicroBlock.parseBytes(bytes).map(MicroBlockResponse)
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] =
+    MicroBlock.parseBytes(bytes)
 
-  override def serializeData(resp: MicroBlockResponse): Array[Byte] = resp.microblock.bytes()
+  override def serializeData(resp: MicroBlock): Array[Byte] = resp.bytes()
 
   override val maxLength: Int = 271 + TransactionSpec.maxLength * MaxTransactionsPerMicroblock
-
 }
 
 object PBBlockSpec extends MessageSpec[Block] {
-  import com.wavesplatform.protobuf.block.PBBlock
-
   override val messageCode: MessageCode = 29: Byte
 
-  override def maxLength: Int = 1024 + PBTransactionSpec.maxLength * Block.MaxTransactionsPerBlockVer3
+  // Signed PBBlockHeader + max total transactions size
+  override val maxLength: Int = 390 + MiningConstraints.MaxTxsSizeInBytes + 100
 
-  override def deserializeData(bytes: Array[Byte]): Try[Block] =
-    PBBlocks.vanilla(PBBlock.parseFrom(bytes)).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
+  override def deserializeData(bytes: Array[Byte]): Try[Block] = PBBlocks.vanilla(PBBlock.parseFrom(bytes))
 
   override def serializeData(data: Block): Array[Byte] = PBBlocks.protobuf(data).toByteArray
 }
 
-object PBTransactionSpec extends MessageSpec[Transaction] {
-  import com.wavesplatform.protobuf.transaction.PBSignedTransaction
-
+object PBMicroBlockSpec extends MessageSpec[MicroBlock] {
   override val messageCode: MessageCode = 30: Byte
 
-  override def maxLength: Int = 150 * 1024
+  override def deserializeData(bytes: Array[Byte]): Try[MicroBlock] =
+    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes))
+
+  override def serializeData(resp: MicroBlock): Array[Byte] = PBMicroBlocks.protobuf(resp).toByteArray
+
+  override val maxLength: Int = PBBlockSpec.maxLength
+}
+
+object PBTransactionSpec extends MessageSpec[Transaction] {
+  override val messageCode: MessageCode = 31: Byte
+
+  // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry
+  override val maxLength: Int = 588 + DataTransaction.MaxProtoBytes + 100
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
     PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
@@ -260,8 +268,9 @@ object BasicMessagesRepo {
     TransactionSpec,
     MicroBlockInvSpec,
     MicroBlockRequestSpec,
-    MicroBlockResponseSpec,
+    LegacyMicroBlockResponseSpec,
     PBBlockSpec,
+    PBMicroBlockSpec,
     PBTransactionSpec
   )
 

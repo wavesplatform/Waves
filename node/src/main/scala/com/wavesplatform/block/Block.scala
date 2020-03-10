@@ -16,8 +16,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
 import monix.eval.Coeval
 import play.api.libs.json._
-import scorex.crypto.authds.merkle.MerkleTree
-import scorex.crypto.hash.Digest32
 
 import scala.util.{Failure, Try}
 
@@ -75,13 +73,14 @@ case class Block(
     !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
   }
 
-  private[block] val transactionsMerkleTree: Coeval[MerkleTree[Digest32]] = Coeval.evalOnce(mkMerkleTree(transactionData))
+  protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
+
+  private[block] val transactionsMerkleTree: Coeval[TransactionsMerkleTree] = Coeval.evalOnce(mkMerkleTree(transactionData))
 
   val transactionsRootValid: Coeval[Boolean] = Coeval.evalOnce {
-    header.version < Block.ProtoBlockVersion || ((transactionsMerkleTree().rootHash untag Digest32) sameElements header.transactionsRoot.arr)
+    require(header.version >= Block.ProtoBlockVersion, s"Block's version should be >= ${Block.ProtoBlockVersion} to retrieve transactionsRoot")
+    transactionsMerkleTree().transactionsRoot == header.transactionsRoot
   }
-
-  protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   override def toString: String =
     s"Block($signature -> ${header.reference.trim}, " +
@@ -165,9 +164,6 @@ object Block extends ScorexLogging {
     } yield validBlock
   }
 
-  private def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
-    if (version < ProtoBlockVersion) ByteStr.empty else ByteStr(mkMerkleTree(transactionData).rootHash)
-
   case class BlockInfo(
       header: BlockHeader,
       size: Int,
@@ -182,6 +178,8 @@ object Block extends ScorexLogging {
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   type BlockId = ByteStr
+  type TransactionsMerkleTree = Seq[Seq[Array[Byte]]]
+  case class TransactionProof(id: ByteStr, transactionIndex: Int, digests: Seq[Array[Byte]])
 
   val MaxTransactionsPerBlockVer1Ver2: Int = 100
   val MaxTransactionsPerBlockVer3: Int     = 6000
@@ -197,5 +195,5 @@ object Block extends ScorexLogging {
   val PlainBlockVersion: Byte   = 2
   val NgBlockVersion: Byte      = 3
   val RewardBlockVersion: Byte  = 4
-  val ProtoBlockVersion: Byte   = 5 // todo: (NODE-1927) relevant name
+  val ProtoBlockVersion: Byte   = 5
 }

@@ -3,6 +3,7 @@ package com.wavesplatform.http
 // [WAIT] import cats.kernel.Monoid
 import java.net.{URLDecoder, URLEncoder}
 
+import akka.http.scaladsl.testkit.RouteTestTimeout
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias}
 import com.wavesplatform.api.http.AddressApiRoute
@@ -14,8 +15,12 @@ import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature
+import com.wavesplatform.state.{AccountScriptInfo, StringDataEntry}
 import com.wavesplatform.state.StringDataEntry
+import com.wavesplatform.utils.Schedulers
+import io.netty.util.HashedWheelTimer
 
+import scala.concurrent.duration._
 import scala.util.Random
 // [WAIT] import com.wavesplatform.lang.{Global, StdLibVersion}
 import com.wavesplatform.lang.contract.DApp
@@ -42,13 +47,26 @@ class AddressRouteSpec
 
   private val allAccounts  = testWallet.privateKeyAccounts
   private val allAddresses = allAccounts.map(_.stringRepr)
+  private val address2account = (allAddresses zip allAccounts).toMap
   private val blockchain   = stub[Blockchain]
   (blockchain.activatedFeatures _).when().returning(Map())
 
   private[this] val utxPoolSynchronizer = DummyUtxPoolSynchronizer.accepting
 
   private val route =
-    AddressApiRoute(restAPISettings, testWallet, blockchain, utxPoolSynchronizer, new TestTime).route
+    AddressApiRoute(
+      restAPISettings,
+      testWallet,
+      blockchain,
+      utxPoolSynchronizer,
+      new TestTime,
+      Schedulers.timeBoundedFixedPool(
+        new HashedWheelTimer(),
+        5.seconds,
+        1,
+        "rest-time-limited"
+      )
+    ).route
 
   private val generatedMessages = for {
     account <- Gen.oneOf(allAccounts).label("account")
@@ -160,7 +178,9 @@ class AddressRouteSpec
   routePath(s"/scriptInfo/${allAddresses(1)}") in {
     (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(1).toAddress)
-      .onCall((_: AddressOrAlias) => Some((ExprScript(TRUE).explicitGet(), 1L)))
+      .onCall((a: AddressOrAlias) =>
+        Some(AccountScriptInfo(address2account(a.toString).publicKey, ExprScript(TRUE).explicitGet(), 1L, Map()))
+      )
 
     Get(routePath(s"/scriptInfo/${allAddresses(1)}")) ~> route ~> check {
       val response = responseAs[JsObject]
@@ -190,7 +210,7 @@ class AddressRouteSpec
         List(
           CallableFuncSignature(ByteString.copyFrom(Array[Byte](1, 2, 3))),
           CallableFuncSignature(ByteString.copyFrom(Array[Byte](8))),
-          CallableFuncSignature(ByteString.EMPTY),
+          CallableFuncSignature(ByteString.EMPTY)
         )
       ),
       decs = List(),
@@ -213,7 +233,9 @@ class AddressRouteSpec
 
     (blockchain.accountScriptWithComplexity _)
       .when(allAccounts(3).toAddress)
-      .onCall((_: AddressOrAlias) => Some((ContractScript(V3, contractWithMeta).explicitGet(), 11L)))
+      .onCall((a: AddressOrAlias) =>
+        Some(AccountScriptInfo(address2account(a.toString).publicKey, ContractScript(V3, contractWithMeta).explicitGet(), 11L, Map()))
+      )
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
       .onCall((_: AddressOrAlias) => Some(ContractScript(V3, contractWithMeta).explicitGet()))
@@ -250,6 +272,17 @@ class AddressRouteSpec
       val response = responseAs[JsObject]
       (response \ "address").as[String] shouldBe allAddresses(4)
       (response \ "meta" \ "version").as[String] shouldBe "0"
+    }
+
+    (blockchain.accountScriptWithComplexity _)
+      .when(allAccounts(5).toAddress)
+      .onCall((_: Address) => Thread.sleep(100000).asInstanceOf[Nothing])
+
+    implicit val routeTestTimeout = RouteTestTimeout(10.seconds)
+    implicit val timeout          = routeTestTimeout.duration
+    Get(routePath(s"/scriptInfo/${allAddresses(5)}")) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "message").as[String] shouldBe "The request took too long to complete"
     }
   }
 

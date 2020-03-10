@@ -3,10 +3,9 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.state.diffs.FeeValidation
-import com.wavesplatform.state.{Blockchain, BlockchainExt, DataEntry, Height}
+import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, BlockchainExt, DataEntry, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import monix.reactive.Observable
 
@@ -42,16 +41,16 @@ class CommonAccountApi(blockchain: Blockchain) {
     portfolio.assets ++ Map(Asset.Waves -> portfolio.balance)
   }
 
-  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+  def portfolioNFT(address: Address, from: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] =
     blockchain.nftObservable(address, from)
 
   def script(address: Address): AddressScriptInfo = {
-    val script: Option[(Script, Long)] = blockchain.accountScriptWithComplexity(address)
+    val script: Option[AccountScriptInfo] = blockchain.accountScriptWithComplexity(address)
 
     AddressScriptInfo(
-      script = script.map(_._1.bytes()),
-      scriptText = script.map(_._1.expr.toString), // [WAIT] script.map(Script.decompile),
-      complexity = script.map(_._2).getOrElse(0),
+      script = script.map(_.script),
+      scriptText = script.map(_.script.expr.toString), // [WAIT] script.map(Script.decompile),
+      complexity = script.map(_.maxComplexity).getOrElse(0),
       extraFee = if (script.isEmpty) 0 else FeeValidation.ScriptExtraFee
     )
   }
@@ -80,5 +79,5 @@ class CommonAccountApi(blockchain: Blockchain) {
 
 object CommonAccountApi {
   final case class BalanceDetails(regular: Long, generating: Long, available: Long, effective: Long, leaseIn: Long, leaseOut: Long)
-  final case class AddressScriptInfo(script: Option[ByteStr], scriptText: Option[String], complexity: Long, extraFee: Long)
+  final case class AddressScriptInfo(script: Option[Script], scriptText: Option[String], complexity: Long, extraFee: Long)
 }

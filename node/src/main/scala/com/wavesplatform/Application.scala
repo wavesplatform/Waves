@@ -22,6 +22,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.database.{DBExt, Keys, openDB}
+import com.wavesplatform.events.{BlockchainUpdateTriggersImpl, BlockchainUpdated}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.api.ActivationApiRoute
@@ -34,7 +35,7 @@ import com.wavesplatform.network.RxExtensionLoader.RxExtensionLoaderShutdownHook
 import com.wavesplatform.network._
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.state.appender.{BlockAppender, ExtensionAppender, MicroblockAppender}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.{Asset, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils.Schedulers._
@@ -100,9 +101,9 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
   private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
+  private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
 
-  private val blockchainUpdater =
-    StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdated)
+  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -127,13 +128,26 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val establishedConnections = new ConcurrentHashMap[Channel, PeerInfo]
     val allChannels            = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-    val utxStorage             = new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings)
+    val utxStorage =
+      new UtxPoolImpl(time, blockchainUpdater, spendableBalanceChanged, settings.utxSettings, enablePriorityPool = settings.minerSettings.enable)
     maybeUtx = Some(utxStorage)
 
     val timer = new HashedWheelTimer()
-    val utxSynchronizerScheduler = Schedulers.timeBoundedFixedPool(timer, 5.seconds, settings.synchronizationSettings.utxSynchronizer.maxThreads, "utx-pool-synchronizer")
+    val utxSynchronizerLogger = LoggerFacade(LoggerFactory.getLogger(classOf[UtxPoolSynchronizerImpl]))
+    val utxSynchronizerScheduler =
+      Schedulers.timeBoundedFixedPool(
+        timer,
+        5.seconds,
+        settings.synchronizationSettings.utxSynchronizer.maxThreads,
+        "utx-pool-synchronizer",
+        reporter = utxSynchronizerLogger.trace("Uncaught exception in UTX Synchronizer", _)
+      )
     val utxSynchronizer =
-      UtxPoolSynchronizer(utxStorage, settings.synchronizationSettings.utxSynchronizer, allChannels, blockchainUpdater.lastBlockInfo)(
+      UtxPoolSynchronizer(
+        utxStorage,
+        settings.synchronizationSettings.utxSynchronizer,
+        allChannels,
+        blockchainUpdater.lastBlockInfo,
         utxSynchronizerScheduler
       )
 
@@ -290,15 +304,24 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         }
       }
 
+      val limitedScheduler =
+        Schedulers.timeBoundedFixedPool(
+          new HashedWheelTimer(),
+          5.seconds,
+          settings.restAPISettings.limitedPoolThreads,
+          "rest-time-limited",
+          reporter = log.trace("Uncaught exception in time limited pool", _)
+        )
+
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, blockchainUpdater),
         TransactionsApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxStorage, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
-        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator),
+        UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler),
         DebugApiRoute(
           settings,
           time,
@@ -324,24 +347,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
         RewardApiRoute(blockchainUpdater)
       )
 
-      val apiTypes: Set[Class[_]] = Set(
-        classOf[NodeApiRoute],
-        classOf[BlocksApiRoute],
-        classOf[TransactionsApiRoute],
-        classOf[NxtConsensusApiRoute],
-        classOf[WalletApiRoute],
-        classOf[UtilsApiRoute],
-        classOf[PeersApiRoute],
-        classOf[AddressApiRoute],
-        classOf[DebugApiRoute],
-        classOf[AssetsApiRoute],
-        classOf[ActivationApiRoute],
-        classOf[LeaseApiRoute],
-        classOf[AliasApiRoute],
-        classOf[RewardApiRoute]
-      )
-
-      val combinedRoute = CompositeHttpService(apiTypes, apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
+      val combinedRoute = CompositeHttpService(apiRoutes, settings.restAPISettings)(actorSystem).loggingCompositeRoute
       val httpFuture    = Http().bindAndHandle(combinedRoute, settings.restAPISettings.bindAddress, settings.restAPISettings.port)
       serverBinding = Await.result(httpFuture, 20.seconds)
       log.info(s"REST API was bound on ${settings.restAPISettings.bindAddress}:${settings.restAPISettings.port}")
@@ -498,7 +504,6 @@ object Application {
             Point
               .measurement("config")
               .addField("miner-micro-block-interval", miner.microBlockInterval.toMillis)
-              .addField("miner-max-transactions-in-key-block", miner.maxTransactionsInKeyBlock)
               .addField("miner-max-transactions-in-micro-block", miner.maxTransactionsInMicroBlock)
               .addField("miner-min-micro-block-age", miner.minMicroBlockAge.toMillis)
               .addField("mbs-wait-response-timeout", microBlockSynchronizer.waitResponseTimeout.toMillis)

@@ -5,11 +5,11 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining._
 import com.wavesplatform.network._
-import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, BlockFromFuture, GenericError}
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -79,7 +79,7 @@ package object appender extends ScorexLogging {
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
       hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = blockchainUpdater.generatingBalance(block.sender, parent)
+        val balance = blockchainUpdater.generatingBalance(block.sender, Some(parent))
         Either.cond(
           blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
           balance,
@@ -116,11 +116,11 @@ package object appender extends ScorexLogging {
           parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
           effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
-          _                <- validateBlockVersion(height, block, blockchain.settings.functionalitySettings)
+          _                <- validateBlockVersion(height, block, blockchain)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
           _                <- pos.validateBaseTarget(height, block, parent, grandParent)
           hitSource        <- pos.validateGenerationSignature(block)
-          _                <- pos.validateBlockDelay(height, block, parent, effectiveBalance).orElse(checkExceptions(height, block))
+          _                <- pos.validateBlockDelay(height, block.header, parent, effectiveBalance).orElse(checkExceptions(height, block))
         } yield hitSource
       }
       .left
@@ -138,14 +138,11 @@ package object appender extends ScorexLogging {
       )
   }
 
-  private def validateBlockVersion(height: Int, block: Block, fs: FunctionalitySettings): Either[ValidationError, Unit] = {
-    val version3Height = fs.blockVersion3AfterHeight
+  private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
     Either.cond(
-      height > version3Height
-        || block.header.version == Block.GenesisBlockVersion
-        || block.header.version == Block.PlainBlockVersion,
+      blockchain.blockVersionAt(parentHeight + 1) == block.header.version,
       (),
-      GenericError(s"Block Version 3 can only appear at height greater than $version3Height")
+      GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
     )
   }
 

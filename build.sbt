@@ -75,7 +75,7 @@ lazy val langDoc = project
 lazy val node             = project.dependsOn(langJVM, `lang-testkit` % "test")
 lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
 lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node, `node-it` % "compile->test")
+lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
 lazy val benchmark        = project.dependsOn(node % "compile;test->test")
 
 lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
@@ -107,7 +107,7 @@ inScope(Global)(
     scalaVersion := "2.12.9",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 1, 5),
+    V.fallback := (1, 2, 2),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -146,7 +146,8 @@ inScope(Global)(
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
     },
-    network := Network(sys.props.get("network"))
+    network := Network(sys.props.get("network")),
+    resolvers += Resolver.sonatypeRepo("snapshots")
   )
 )
 

@@ -1,52 +1,41 @@
 package com.wavesplatform.api.http.requests
 
-import cats.implicits._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
-import io.swagger.annotations.{ApiModel, ApiModelProperty}
 import play.api.libs.functional.syntax._
 import play.api.libs.json._
 
 object SignedMassTransferRequest {
   implicit val MassTransferRequestReads: Reads[SignedMassTransferRequest] = (
-    (JsPath \ "senderPublicKey").read[String] and
+    (JsPath \ "version").readNullable[Byte] and
+      (JsPath \ "senderPublicKey").read[String] and
       (JsPath \ "assetId").readNullable[String] and
       (JsPath \ "transfers").read[List[Transfer]] and
       (JsPath \ "fee").read[Long] and
       (JsPath \ "timestamp").read[Long] and
-      (JsPath \ "attachment").readNullable[String] and
-      (JsPath \ "proofs").read[List[ProofStr]]
+      (JsPath \ "attachment").readNullable[Attachment] and
+      (JsPath \ "proofs").read[Proofs]
   )(SignedMassTransferRequest.apply _)
 }
 
-@ApiModel(value = "Signed Asset transfer transaction")
 case class SignedMassTransferRequest(
-    @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
+    version: Option[Byte],
     senderPublicKey: String,
-    @ApiModelProperty(value = "Base58 encoded Asset ID")
     assetId: Option[String],
-    @ApiModelProperty(value = "List of (recipient, amount) pairs", required = true)
     transfers: List[Transfer],
-    @ApiModelProperty(required = true)
     fee: Long,
-    @ApiModelProperty(required = true)
     timestamp: Long,
-    @ApiModelProperty(value = "Base58 encoded attachment")
-    attachment: Option[String],
-    @ApiModelProperty(required = true)
-    proofs: List[String]
+    attachment: Option[Attachment],
+    proofs: Proofs
 ) {
   def toTx: Either[ValidationError, MassTransferTransaction] =
     for {
-      _sender     <- PublicKey.fromBase58String(senderPublicKey)
-      _assetId    <- parseBase58ToAssetId(assetId.filter(_.length > 0), "invalid.assetId")
-      _proofBytes <- proofs.traverse(s => parseBase58(s, "invalid proof", Proofs.MaxProofStringSize))
-      _proofs     <- Proofs.create(_proofBytes)
-      _attachment <- parseBase58(attachment.filter(_.length > 0), "invalid.attachment", TransferTransaction.MaxAttachmentStringSize)
-      _transfers  <- MassTransferTransaction.parseTransfersList(transfers)
-      t           <- MassTransferTransaction.create(1.toByte, _sender, _assetId, _transfers, fee, timestamp, _attachment.arr, _proofs)
+      _sender    <- PublicKey.fromBase58String(senderPublicKey)
+      _assetId   <- parseBase58ToAsset(assetId.filter(_.length > 0), "invalid.assetId")
+      _transfers <- MassTransferTransaction.parseTransfersList(transfers)
+      t          <- MassTransferTransaction.create(version.getOrElse(1.toByte), _sender, _assetId, _transfers, fee, timestamp, attachment, proofs)
     } yield t
 }

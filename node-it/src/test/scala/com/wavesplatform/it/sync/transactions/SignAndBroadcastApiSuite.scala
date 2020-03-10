@@ -66,7 +66,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
                "amount"     -> 1,
                "fee"        -> 100000,
                "attachment" -> "W" * 524291)
-    assertSignBadJson(bigBaseTx, "base58Decode input exceeds")
+    assertSignBadJson(bigBaseTx, "failed to parse json message")
   }
 
   test("/transaction/calculateFee should handle coding size limit") {
@@ -80,7 +80,7 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
           "amount"          -> 1,
           "assetId"         -> "W" * 524291
         )
-      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "base58Decode input exceeds")
+      assertBadRequestAndMessage(sender.calculateFee(json).feeAmount, "failed to parse json message")
     }
   }
 
@@ -382,8 +382,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
       val amount = math.min(buy.amount, sell.amount)
       val tx =
         if (tver == 1) {
-          ExchangeTransaction.signed(1.toByte, matcher = matcher, buyOrder = buy.asInstanceOf[Order],
-              sellOrder = sell.asInstanceOf[Order],
+          ExchangeTransaction.signed(1.toByte, matcher = matcher, order1 = buy.asInstanceOf[Order],
+              order2 = sell.asInstanceOf[Order],
               amount = amount,
               price = sellPrice,
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
@@ -393,8 +393,8 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
             .explicitGet()
             .json()
         } else {
-          ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
-              sellOrder = sell,
+          ExchangeTransaction.signed(2.toByte, matcher = matcher, order1 = buy,
+              order2 = sell,
               amount = amount,
               price = sellPrice,
               buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
@@ -404,9 +404,6 @@ class SignAndBroadcastApiSuite extends BaseTransactionSuite with NTPTime {
             .explicitGet()
             .json()
         }
-      val s = sell.getReceiveAmount(amount, sellPrice).right.get
-      log.info(s"SELLER: ${s}")
-      log.info(s"BUYER: ${buy.getReceiveAmount(amount, sellPrice).right.get}")
 
       val txId = sender.signedBroadcast(tx).id
       sender.waitForTransaction(txId)

@@ -1,7 +1,4 @@
 package com.wavesplatform.state.diffs.smart.scenarios
-
-import java.nio.charset.StandardCharsets
-
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -25,7 +22,7 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
-import com.wavesplatform.utils.EmptyBlockchain
+import com.wavesplatform.utils.{EmptyBlockchain, _}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import monix.eval.Coeval
 import org.scalacheck.Gen
@@ -73,20 +70,19 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
       typedScript = ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), untypedScript).explicitGet()._1)
         .explicitGet()
 
-      issueTransaction = IssueTransaction
-        .selfSigned(
+      issueTransaction = IssueTransaction(
           TxVersion.V2,
-          company,
-          "name".getBytes(StandardCharsets.UTF_8),
-          "description".getBytes(StandardCharsets.UTF_8),
+          company.publicKey,
+          "name".utf8Bytes,
+          "description".utf8Bytes,
           100,
           0,
           false,
           Some(typedScript),
           1000000,
           ts
-        )
-        .explicitGet()
+        ).signWith(company.privateKey)
+
 
       assetId = IssuedAsset(issueTransaction.id())
 
@@ -95,11 +91,11 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
         .explicitGet()
 
       transferFromCompanyToA = TransferTransaction
-        .selfSigned(1.toByte, company, accountA, assetId, 1, Waves, 1000, Array.empty, ts + 20)
+        .selfSigned(1.toByte, company, accountA, assetId, 1, Waves, 1000, None, ts + 20)
         .explicitGet()
 
       transferFromAToB = TransferTransaction
-        .selfSigned(1.toByte, accountA, accountB, assetId, 1, Waves, 1000, Array.empty, ts + 30)
+        .selfSigned(1.toByte, accountA, accountB, assetId, 1, Waves, 1000, None, ts + 30)
         .explicitGet()
 
       notaryDataTransaction = DataTransaction
@@ -121,7 +117,7 @@ class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks 
 
   def dummyEvalContext(version: StdLibVersion): EvaluationContext[Environment, Id] = {
     val ds          = DirectiveSet(V1, Asset, Expression).explicitGet()
-    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ds)
+    val environment = new WavesEnvironment(chainId, Coeval(???), null, EmptyBlockchain, Coeval(null), ds, ByteStr.empty)
     lazyContexts(ds)().evaluationContext(environment)
   }
 

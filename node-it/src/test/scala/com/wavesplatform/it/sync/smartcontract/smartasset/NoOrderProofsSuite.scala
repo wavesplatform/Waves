@@ -42,7 +42,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
 
       fail("ScriptCompiler didn't throw expected error")
     } catch {
-      case ex: java.lang.Exception => ex.getMessage should include("Compilation failed: Matching not exhaustive")
+      case ex: java.lang.Exception => ex.getMessage should include("Compilation failed: [Matching not exhaustive")
       case _: Throwable            => fail("ScriptCompiler works incorrect for orders with smart assets")
     }
   }
@@ -83,7 +83,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       1,
       Waves,
       smartMinFee,
-      Array.emptyByteArray,
+      None,
       System.currentTimeMillis + 10.minutes.toMillis,
       Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
     )

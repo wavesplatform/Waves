@@ -12,7 +12,6 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Tx.ScriptTransfer
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
 
 object ContractEvaluator {
@@ -73,13 +72,10 @@ object ContractEvaluator {
   def verify(decls: List[DECLARATION], v: VerifierFunction, ord: Ord): EvalM[Id, Environment, EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.orderObject(ord, proofsEnabled = true)))
 
-  def verify(decls: List[DECLARATION], v: VerifierFunction, ct: ScriptTransfer): EvalM[Id, Environment, EVALUATED] =
-    withDecls(decls, verifierBlock(v, Bindings.scriptTransfer(ct)))
-
   def apply(ctx: EvaluationContext[Environment, Id], c: DApp, i: Invocation, version: StdLibVersion): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     val (log, result) = EvaluatorV1().evalWithLogging(ctx, eval(c, i, version))
     result
-      .flatMap(r => ScriptResult.fromObj(r, version).map((_, log)))
+      .flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r, version).map((_, log)))
       .leftMap((_, log))
   }
 }

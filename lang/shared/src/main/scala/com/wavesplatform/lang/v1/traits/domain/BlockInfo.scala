@@ -6,4 +6,5 @@ case class BlockInfo(timestamp: Long,
                      baseTarget: Long,
                      generationSignature: ByteStr,
                      generator: ByteStr,
-                     generatorPublicKey: ByteStr)
+                     generatorPublicKey: ByteStr,
+                     vrf: Option[ByteStr])

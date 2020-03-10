@@ -19,6 +19,7 @@ object TxValidationError {
   case class InsufficientFee(msg: String = "insufficient fee") extends ValidationError
   case object TooBigArray                                      extends ValidationError
   case object InvalidName                                      extends ValidationError
+  case object InvalidAssetId                                   extends ValidationError
   case object OverflowError                                    extends ValidationError
   case object ToSelf                                           extends ValidationError
   case object MissingSenderPrivateKey                          extends ValidationError
@@ -27,7 +28,7 @@ object TxValidationError {
   case class BlockFromFuture(ts: Long)                         extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int)   extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String])   extends ValidationError
-  case class AliasDoesNotExist(a: Alias)                       extends ValidationError
+  case class AliasDoesNotExist(a: Alias)                       extends ValidationError { override def toString = s"Alias '$a' does not exists." }
   case class AliasIsDisabled(a: Alias)                         extends ValidationError
   case class OrderValidationError(order: Order, err: String)   extends ValidationError
   case class SenderIsBlacklisted(addr: String)                 extends ValidationError
@@ -105,6 +106,6 @@ object TxValidationError {
   }
 
   case class ToBigProof(max: Int, actual: Int) extends ValidationError {
-    override def toString: String = s"Too large proof ($actual), must be max $max bytes" 
+    override def toString: String = s"Too large proof ($actual), must be max $max bytes"
   }
 }

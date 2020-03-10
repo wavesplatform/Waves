@@ -4,19 +4,13 @@ import cats.implicits._
 import com.wavesplatform.account.{Alias, PublicKey}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, Transaction}
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.json.{Format, Json}
 
 case class SignedCreateAliasV2Request(
-    @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
     senderPublicKey: String,
-    @ApiModelProperty(required = true)
     fee: Long,
-    @ApiModelProperty(value = "Alias", required = true)
     alias: String,
-    @ApiModelProperty(required = true)
     timestamp: Long,
-    @ApiModelProperty(required = true)
     proofs: List[String]
 ) {
   def toTx: Either[ValidationError, CreateAliasTransaction] =

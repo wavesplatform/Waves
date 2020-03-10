@@ -10,24 +10,26 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
+import com.wavesplatform.events.{BlockchainUpdateTriggers, BlockchainUpdateTriggersImpl, BlockchainUpdated}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.WavesSettings
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.appender.BlockAppender
-import com.wavesplatform.state.{Blockchain, BlockchainUpdated}
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, DiscardedBlocks, Transaction}
 import com.wavesplatform.utils._
 import com.wavesplatform.utx.{UtxPool, UtxPoolImpl}
 import com.wavesplatform.wallet.Wallet
+import kamon.Kamon
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.{ConcurrentSubject, PublishSubject}
 import monix.reactive.{Observable, Observer}
 import scopt.OParser
 
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.concurrent.{Await, Future}
 import scala.util.{Failure, Success, Try}
 
@@ -101,12 +103,12 @@ object Importer extends ScorexLogging {
       time: NTP,
       settings: WavesSettings,
       importOptions: ImportOptions,
-      blockchainUpdated: Observer[BlockchainUpdated]
+      blockchainUpdateTriggers: BlockchainUpdateTriggers
   ): (Blockchain with BlockchainUpdater, AppendBlock, UtxPoolImpl) = {
     val db = openDB(settings.dbSettings.directory)
     val blockchainUpdater =
-      StorageFactory(settings, db, time, Observer.empty, blockchainUpdated)
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings)
+      StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
+    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings, enablePriorityPool = false)
     val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
     val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
 
@@ -134,7 +136,7 @@ object Importer extends ScorexLogging {
         override def wallet: Wallet = ???
         override def utx: UtxPool   = utxPool
 
-        override def broadcastTransaction(tx: Transaction) = ???
+        override def broadcastTransaction(tx: Transaction)                 = ???
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
@@ -186,8 +188,8 @@ object Importer extends ScorexLogging {
           if (blocksToSkip > 0) {
             blocksToSkip -= 1
           } else {
-            val Right(block) =
-              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer).toEither
+            val Success(block) =
+              if (importOptions.format == Formats.Binary) Block.parseBytes(buffer)
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
             if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
@@ -229,13 +231,15 @@ object Importer extends ScorexLogging {
       time      = new NTP(wavesSettings.ntpServer)
 
       blockchainUpdated                         = ConcurrentSubject.publish[BlockchainUpdated]
-      (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdated)
+      blockchainUpdateTriggers                  = new BlockchainUpdateTriggersImpl(blockchainUpdated)
+      (blockchainUpdater, appendBlock, utxPool) = initBlockchain(scheduler, time, wavesSettings, importOptions, blockchainUpdateTriggers)
       extensions                                = initExtensions(wavesSettings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
       _                                         = startImport(scheduler, bis, blockchainUpdater, appendBlock, importOptions)
     } yield () => {
       Await.ready(Future.sequence(extensions.map(_.shutdown())), wavesSettings.extensionsShutdownTimeout)
       bis.close()
       fis.close()
+      Await.result(Kamon.stopAllReporters(), 10.seconds)
       time.close()
       utxPool.close()
       blockchainUpdated.onComplete()

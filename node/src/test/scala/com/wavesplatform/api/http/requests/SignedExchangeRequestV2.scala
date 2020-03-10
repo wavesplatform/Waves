@@ -4,7 +4,6 @@ import cats.implicits._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import io.swagger.annotations.ApiModelProperty
 import play.api.libs.functional.syntax._
 import play.api.libs.json.{Format, JsPath, Reads}
 
@@ -27,27 +26,16 @@ object SignedExchangeRequestV2 {
 }
 
 case class SignedExchangeRequestV2(
-    @ApiModelProperty(value = "Base58 encoded sender public key", required = true)
     senderPublicKey: String,
-    @ApiModelProperty(value = "Buy Order")
     order1: Order,
-    @ApiModelProperty(value = "Sell Order")
     order2: Order,
-    @ApiModelProperty(required = true)
     price: Long,
-    @ApiModelProperty(required = true, example = "1000000")
     amount: Long,
-    @ApiModelProperty(required = true)
     fee: Long,
-    @ApiModelProperty(required = true)
     buyMatcherFee: Long,
-    @ApiModelProperty(required = true)
     sellMatcherFee: Long,
-    @ApiModelProperty(required = true)
     timestamp: Long,
-    @ApiModelProperty(required = true, example = "2")
     version: Byte,
-    @ApiModelProperty(required = true)
     proofs: List[String]
 ) {
   def toTx: Either[ValidationError, ExchangeTransaction] =

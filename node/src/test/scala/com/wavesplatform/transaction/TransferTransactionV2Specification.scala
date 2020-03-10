@@ -55,10 +55,10 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
   }
 
   property("VersionedTransferTransactionSpecification id doesn't depend on proof") {
-    forAll(accountGen, accountGen, proofsGen, proofsGen, bytes32gen) {
-      case (acc1, acc2, proofs1, proofs2, attachment) =>
-        val tx1 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs1)
-        val tx2 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, attachment, 1, proofs2)
+    forAll(accountGen, accountGen, proofsGen, proofsGen, attachmentGen) {
+      case (_, acc2, proofs1, proofs2, attachment) =>
+        val tx1 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs1)
+        val tx2 = TransferTransaction(2.toByte, acc2, acc2.toAddress, Waves, 1, Waves, 1, Some(attachment), 1, proofs2)
         tx1.id() shouldBe tx2.id()
     }
   }
@@ -104,7 +104,7 @@ class TransferTransactionV2Specification extends PropSpec with PropertyChecks wi
       100000000,
       Waves,
       100000000,
-      Base58.tryDecodeWithLimit("4t2Xazb2SX").get,
+      Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
       1526641218066L,
       Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
     )

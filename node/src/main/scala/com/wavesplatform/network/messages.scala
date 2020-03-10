@@ -27,24 +27,31 @@ case class GetBlock(signature: ByteStr) extends Message
 
 case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 
-case class RawBytes(code: Byte, data: Array[Byte]) extends Message
+case class RawBytes(code: Byte, data: Array[Byte]) extends Message {
+  override def toString: String = s"RawBytes($code, ${data.length} bytes, ${data.take(100).mkString("[", ", ", "]")})"
+}
 
 object RawBytes {
-  def from(tx: Transaction): RawBytes = tx match {
+  def fromTransaction(tx: Transaction): RawBytes = tx match {
     case p: LegacyPBSwitch if p.isProtobufVersion => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
     case tx                                       => RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
   }
 
-  def from(b: Block): RawBytes =
+  def fromBlock(b: Block): RawBytes =
     if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))
     else RawBytes(PBBlockSpec.messageCode, PBBlockSpec.serializeData(b))
+
+  def fromMicroBlock(mb: MicroBlock): RawBytes =
+    if (mb.version < Block.ProtoBlockVersion)
+      RawBytes(LegacyMicroBlockResponseSpec.messageCode, LegacyMicroBlockResponseSpec.serializeData(mb))
+    else RawBytes(PBMicroBlockSpec.messageCode, PBMicroBlockSpec.serializeData(mb))
 }
 
 case class BlockForged(block: Block) extends Message
 
 case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
-case class MicroBlockResponse(microblock: MicroBlock) extends Message
+case class MicroBlockResponse(microblock: MicroBlock)
 
 case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =

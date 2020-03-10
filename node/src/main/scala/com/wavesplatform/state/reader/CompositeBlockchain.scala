@@ -1,8 +1,9 @@
 package com.wavesplatform.state.reader
 
+import cats.data.Ior
 import cats.implicits._
-import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, Alias}
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
@@ -12,9 +13,9 @@ import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.extensions.composite.{CompositeAddressTransactions, CompositeDistributions}
 import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled, GenericError}
-import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -37,7 +38,7 @@ final case class CompositeBlockchain(
     cats.Monoid.combine(inner.leaseBalance(address), diff.portfolios.getOrElse(address, Portfolio.empty).lease)
   }
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(Script, Long)] =
+  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] =
     maybeDiff
       .flatMap(_.assetScripts.get(asset))
       .getOrElse(inner.assetScriptWithComplexity(asset))
@@ -49,36 +50,70 @@ final case class CompositeBlockchain(
 
   override def assetDescription(asset: IssuedAsset): Option[AssetDescription] = {
     val script: Option[Script] = assetScript(asset)
-    inner.assetDescription(asset) match {
-      case Some(ad) =>
-        diff.issuedAssets
-          .get(asset)
-          .map { newAssetInfo =>
-            val oldAssetInfo = AssetInfo(ad.reissuable, ad.totalVolume)
-            val combination  = Monoid.combine(oldAssetInfo, newAssetInfo)
-            ad.copy(reissuable = combination.isReissuable, totalVolume = combination.volume, script = script)
+
+    val fromDiff = diff.issuedAssets
+      .get(asset)
+      .map {
+        case (static, info, volume) =>
+          val sponsorship = diff.sponsorship.get(asset).fold(0L) {
+            case SponsorshipValue(sp) => sp
+            case SponsorshipNoInfo    => 0L
           }
-          .orElse(Some(ad.copy(script = script)))
-          .map { ad =>
-            diff.sponsorship.get(asset).fold(ad) {
-              case SponsorshipValue(sponsorship) =>
-                ad.copy(sponsorship = sponsorship)
-              case SponsorshipNoInfo =>
-                ad
+
+          AssetDescription(
+            static.source,
+            static.issuer,
+            info.name,
+            info.description,
+            static.decimals,
+            volume.isReissuable,
+            volume.volume,
+            info.lastUpdatedAt,
+            script,
+            sponsorship,
+            static.nft
+          )
+      }
+
+    val assetDescription =
+      inner
+        .assetDescription(asset)
+        .orElse(fromDiff)
+        .map { description =>
+          diff.updatedAssets
+            .get(asset)
+            .fold(description) {
+              case Ior.Left(info) =>
+                description.copy(name = info.name, description = info.description, lastUpdatedAt = info.lastUpdatedAt)
+              case Ior.Right(vol) =>
+                description.copy(reissuable = description.reissuable && vol.isReissuable, totalVolume = description.totalVolume + vol.volume)
+              case Ior.Both(info, vol) =>
+                description
+                  .copy(
+                    reissuable = description.reissuable && vol.isReissuable,
+                    totalVolume = description.totalVolume + vol.volume,
+                    name = info.name,
+                    description = info.description,
+                    lastUpdatedAt = info.lastUpdatedAt
+                  )
             }
-          }
-      case None =>
-        val sponsorship = diff.sponsorship.get(asset).fold(0L) {
-          case SponsorshipValue(sp) => sp
-          case SponsorshipNoInfo    => 0L
         }
-        diff.transactions
-          .get(asset.id)
-          .collectFirst {
-            case (it: IssueTransaction, _) =>
-              AssetDescription(it.sender, it.name, it.description, it.decimals, it.reissuable, it.quantity, script, sponsorship)
-          }
-          .map(z => diff.issuedAssets.get(asset).fold(z)(r => z.copy(reissuable = r.isReissuable, totalVolume = r.volume, script = script)))
+        .map { description =>
+          diff.sponsorship
+            .get(asset)
+            .fold(description) {
+              case SponsorshipNoInfo   => description.copy(sponsorship = 0L)
+              case SponsorshipValue(v) => description.copy(sponsorship = v)
+            }
+        }
+
+    assetDescription map { z =>
+      diff.transactions
+        .foldLeft(z.copy(script = script)) {
+          case (acc, (_, (ut: UpdateAssetInfoTransaction, _))) if ut.assetId == asset =>
+            acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
+          case (acc, _)                                        => acc
+        }
     }
   }
 
@@ -143,6 +178,16 @@ final case class CompositeBlockchain(
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
     diff.orderFills.get(orderId).orEmpty.combine(inner.filledVolumeAndFee(orderId))
 
+  override def balanceOnlySnapshots(address: Address, h: Int, assetId: Asset = Waves): Option[(Int, Long)] = {
+    if (maybeDiff.isEmpty || h < this.height) {
+      inner.balanceOnlySnapshots(address, h, assetId)
+    } else {
+      val balance = this.balance(address, assetId)
+      val bs = height -> balance
+      Some(bs)
+    }
+  }
+
   override def balanceSnapshots(address: Address, from: Int, to: BlockId): Seq[BalanceSnapshot] = {
     if (inner.heightOf(to).isDefined || maybeDiff.isEmpty) {
       inner.balanceSnapshots(address, from, to)
@@ -154,7 +199,7 @@ final case class CompositeBlockchain(
     }
   }
 
-  override def accountScriptWithComplexity(address: Address): Option[(Script, Long)] = {
+  override def accountScriptWithComplexity(address: Address): Option[AccountScriptInfo] = {
     diff.scripts.get(address) match {
       case None            => inner.accountScriptWithComplexity(address)
       case Some(None)      => None
@@ -172,19 +217,21 @@ final case class CompositeBlockchain(
 
   override def accountDataKeys(acc: Address): Set[String] = {
     val fromInner = inner.accountDataKeys(acc)
-    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    fromInner ++ fromDiff
+    val AccountDataInfo(data) = diff.accountData.get(acc).orEmpty
+    def isRemoved(key: String) = data.get(key).exists(_.isEmpty)
+    val fromDiff  = data.keys
+    (fromInner ++ fromDiff).filterNot(isRemoved)
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
     val fromInner = inner.accountData(acc)
     val fromDiff  = diff.accountData.get(acc).orEmpty
-    fromInner.combine(fromDiff)
+    fromInner.combine(fromDiff).filterEmpty
   }
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = {
     val diffData = diff.accountData.get(acc).orEmpty
-    diffData.data.get(key).orElse(inner.accountData(acc, key))
+    diffData.data.get(key).orElse(inner.accountData(acc, key)).filterNot(_.isEmpty)
   }
 
   override def lastBlock: Option[Block] = newBlock.orElse(inner.lastBlock)
@@ -244,13 +291,18 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain extends AddressTransactions.Prov[CompositeBlockchain] with Distributions.Prov[CompositeBlockchain] {
+  def apply(blockchain: Blockchain, ngState: NgState): Blockchain =
+    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
+
   def addressTransactions(bu: CompositeBlockchain): AddressTransactions =
     new CompositeAddressTransactions(bu.inner, Height @@ bu.height, () => bu.maybeDiff)
 
   def distributions(bu: CompositeBlockchain): Distributions =
     new CompositeDistributions(bu, bu.inner, () => bu.maybeDiff)
 
-  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = {
+  def collectActiveLeases(inner: Blockchain, maybeDiff: Option[Diff], height: Int, from: Int, to: Int)(
+      filter: LeaseTransaction => Boolean
+  ): Seq[LeaseTransaction] = {
     val innerActiveLeases = inner.collectActiveLeases(from, to)(filter)
     maybeDiff match {
       case Some(ng) if to == height =>

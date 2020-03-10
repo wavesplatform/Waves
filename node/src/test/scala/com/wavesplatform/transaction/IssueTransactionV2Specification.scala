@@ -15,12 +15,20 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state.HistoryTest
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.{TransactionGen, WithDB, crypto}
+import com.wavesplatform.utils._
+import com.wavesplatform.{NoShrink, TransactionGen, WithDB, crypto}
 import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class IssueTransactionV2Specification extends PropSpec with PropertyChecks with Matchers with TransactionGen with WithDB with HistoryTest {
+class IssueTransactionV2Specification
+    extends PropSpec
+    with PropertyChecks
+    with Matchers
+    with TransactionGen
+    with WithDB
+    with HistoryTest
+    with NoShrink {
 
   property("IssueV2 serialization roundtrip") {
     forAll(issueV2TransactionGen()) { tx: IssueTransaction =>
@@ -29,11 +37,11 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
       tx.sender.stringRepr shouldEqual recovered.sender.stringRepr
       tx.timestamp shouldEqual recovered.timestamp
       tx.decimals shouldEqual recovered.decimals
+      tx.name shouldEqual recovered.name
       tx.description shouldEqual recovered.description
       tx.script shouldEqual recovered.script
       tx.reissuable shouldEqual recovered.reissuable
       tx.fee shouldEqual recovered.fee
-      tx.name shouldEqual recovered.name
       tx.chainByte shouldEqual recovered.chainByte
       tx.bytes() shouldEqual recovered.bytes()
     }
@@ -96,22 +104,19 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
                        }
     """)
 
-    val tx = IssueTransaction
-      .create(
-        TxVersion.V2,
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        "Gigacoin".getBytes("UTF-8"),
-        "Gigacoin".getBytes("UTF-8"),
-        10000000000L,
-        8,
-        true,
-        None,
-        100000000,
-        1526287561757L,
-        Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
-      )
-      .right
-      .get
+    val tx = IssueTransaction(
+      TxVersion.V2,
+      PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
+      "Gigacoin".utf8Bytes,
+      "Gigacoin".utf8Bytes,
+      10000000000L,
+      8.toByte,
+      reissuable = true,
+      None,
+      100000000,
+      1526287561757L,
+      Proofs(Seq(ByteStr.decodeBase58("43TCfWBa6t2o2ggsD4bU9FpvH3kmDbSBWKE1Z6B5i5Ax5wJaGT2zAvBihSbnSS3AikZLcicVWhUk1bQAMWVzTG5g").get))
+    )
 
     tx.json() shouldEqual js
   }
@@ -150,11 +155,11 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
     val tx = IssueTransaction.create(
       TxVersion.V2,
       PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-      "Gigacoin".getBytes("UTF-8"),
-      "Gigacoin".getBytes("UTF-8"),
+      "Gigacoin",
+      "Gigacoin",
       10000000000L,
       8,
-      true,
+      reissuable = true,
       script.toOption,
       100000000,
       1526287561757L,
@@ -163,4 +168,28 @@ class IssueTransactionV2Specification extends PropSpec with PropertyChecks with 
 
     tx shouldBe 'left
   }
+
+  /* property("parses invalid UTF-8 string") {
+    forAll(byteArrayGen(16), accountGen) { (bytes, sender) =>
+      val tx = IssueTransaction(
+        2.toByte,
+        sender,
+        bytes,
+        bytes,
+        1,
+        1,
+        reissuable = false,
+        None,
+        1000000,
+        System.currentTimeMillis()
+      ).signWith(sender)
+
+      tx.name.toByteArray shouldBe bytes
+      tx.description.toByteArray shouldBe bytes
+
+      val pb     = PBTransactions.protobuf(tx)
+      val fromPB = PBTransactions.vanillaUnsafe(pb)
+      fromPB shouldBe tx
+    }
+  } */
 }

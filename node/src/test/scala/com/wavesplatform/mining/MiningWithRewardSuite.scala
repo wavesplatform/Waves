@@ -9,11 +9,11 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.{Keys, LevelDBWriter}
 import com.wavesplatform.db.DBCacheSettings
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{BlockchainUpdated, BlockchainUpdaterImpl, NG}
+import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, BlockchainUpdater, GenesisTransaction, Transaction}
@@ -25,7 +25,6 @@ import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.Observer
-import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.compatible.Assertion
@@ -76,9 +75,9 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       (ts, reference, account) => {
         val recipient1 = createAccount.toAddress
         val recipient2 = createAccount.toAddress
-        val tx1 = TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, Array(), ts)
+        val tx1 = TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
           .explicitGet()
-        val tx2 = TransferTransaction.selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, Array(), ts)
+        val tx2 = TransferTransaction.selfSigned(2.toByte, account, recipient2, Waves, 5 * Constants.UnitsInWave, Waves, 400000, None, ts)
           .explicitGet()
         TestBlock.create(time = ts, ref = reference, txs = Seq(tx1, tx2), version = Block.NgBlockVersion)
       }
@@ -87,7 +86,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     val txs: Seq[TransactionProducer] = Seq(
       (ts, account) => {
         val recipient1 = createAccount.toAddress
-        TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, Array(), ts)
+        TransferTransaction.selfSigned(2.toByte, account, recipient1, Waves, 10 * Constants.UnitsInWave, Waves, 400000, None, ts)
           .explicitGet()
       }
     )
@@ -103,15 +102,24 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
           blockchain.height should be(3)
         }
     }
+
+    // Test for empty key block with NG
+    withEnv(bps, txs, settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)) {
+      case Env(_, account, miner, _) =>
+        val (_, block, _) = forgeBlock(miner)(account).explicitGet()
+        Task(block.transactionData shouldBe empty)
+    }
   }
 
-  private def withEnv(bps: Seq[BlockProducer], txs: Seq[TransactionProducer] = Seq())(f: Env => Task[Assertion]): Task[Assertion] =
-    resources.use {
+  private def withEnv(bps: Seq[BlockProducer], txs: Seq[TransactionProducer] = Seq(), settings: WavesSettings = MiningWithRewardSuite.settings)(
+      f: Env => Task[Assertion]
+  ): Task[Assertion] =
+    resources(settings).use {
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = new PoSSelector(blockchainUpdater, blockchainSettings, synchronizationSettings)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, utxSettings)
+          pos          = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
+          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
           scheduler    = Scheduler.singleThread("appender")
           allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
           wallet       = Wallet(WalletSettings(None, Some("123"), None))
@@ -137,11 +145,15 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
   private def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =
     miner.invokePrivate(PrivateMethod[Task[Unit]]('generateBlockTask)(account))
 
-  private def resources: Resource[Task, (BlockchainUpdater with NG, DB)] =
+  private def forgeBlock(miner: MinerImpl)(account: KeyPair): Either[String, (MiningConstraints, Block, MiningConstraint)] =
+    miner.invokePrivate(PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)(account))
+
+  private def resources(settings: WavesSettings): Resource[Task, (BlockchainUpdater with NG, DB)] =
     Resource.make {
-      val defaultWriter: LevelDbWriterWithReward = new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, blockchainSettings, dbSettings)
+      val defaultWriter: LevelDbWriterWithReward =
+        new LevelDbWriterWithReward(db, ignoreSpendableBalanceChanged, settings.blockchainSettings, dbSettings)
       val blockchainUpdater: BlockchainUpdater with NG =
-        new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, PublishSubject[BlockchainUpdated])
+        new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
       defaultWriter.saveReward(settings.blockchainSettings.rewardsSettings.initial)
       Task.now((blockchainUpdater, db))
     } {
@@ -162,20 +174,30 @@ object MiningWithRewardSuite {
 
   case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: BlockchainUpdater with NG)
 
-  val commonSettings: WavesSettings                    = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
-  val minerSettings: MinerSettings                     = commonSettings.minerSettings.copy(quorum = 0, intervalAfterLastBlockThenGenerationIsAllowed = 1 hour)
-  val synchronizationSettings: SynchronizationSettings = commonSettings.synchronizationSettings
-  val utxSettings: UtxSettings                         = commonSettings.utxSettings
+  val settings: WavesSettings = {
+    val commonSettings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
+    val minerSettings: MinerSettings =
+      commonSettings.minerSettings.copy(quorum = 0, intervalAfterLastBlockThenGenerationIsAllowed = 1 hour)
 
-  val functionalitySettings: FunctionalitySettings =
-    Enabled
-      .copy(preActivatedFeatures = Enabled.preActivatedFeatures + (BlockchainFeatures.BlockReward.id -> 0))
-  val blockchainSettings: BlockchainSettings =
-    commonSettings.blockchainSettings
-      .copy(functionalitySettings = functionalitySettings)
-      .copy(rewardsSettings = RewardsSettings.TESTNET)
+    val functionalitySettings: FunctionalitySettings =
+      Enabled
+        .copy(preActivatedFeatures = Enabled.preActivatedFeatures + (BlockchainFeatures.BlockReward.id -> 0))
+    val blockchainSettings: BlockchainSettings =
+      commonSettings.blockchainSettings
+        .copy(functionalitySettings = functionalitySettings)
+        .copy(rewardsSettings = RewardsSettings.TESTNET)
+    commonSettings.copy(minerSettings = minerSettings, blockchainSettings = blockchainSettings)
+  }
 
-  val settings: WavesSettings = commonSettings.copy(minerSettings = minerSettings, blockchainSettings = blockchainSettings)
+  def settingsWithFeatures(features: BlockchainFeature*): WavesSettings = {
+    val blockchainSettings = settings.blockchainSettings
+
+    settings.copy(
+      blockchainSettings = blockchainSettings.copy(
+        functionalitySettings = blockchainSettings.functionalitySettings.copy(preActivatedFeatures = features.map(_.id -> 0).toMap)
+      )
+    )
+  }
 
   def createAccount: KeyPair =
     Gen

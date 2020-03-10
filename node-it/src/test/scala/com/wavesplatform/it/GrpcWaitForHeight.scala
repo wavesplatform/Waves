@@ -1,7 +1,7 @@
 package com.wavesplatform.it
 
 import com.wavesplatform.utils.ScorexLogging
-import com.wavesplatform.it.api.AsyncHttpApi._
+import com.wavesplatform.it.api.AsyncGrpcApi._
 import org.scalatest.{BeforeAndAfterAll, Suite}
 
 import scala.concurrent.{Await, Future}
@@ -14,7 +14,7 @@ trait GrpcWaitForHeight extends BeforeAndAfterAll with ScorexLogging with Report
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
-    Await.result(traverse(nodes)(_.grpc.waitForHeight(2)), 1.minute)
+    Await.result(traverse(nodes)(_.waitForHeight(2)), 2.minute)
   }
 
   def waitForTxsToReachAllNodes(nodes: Seq[Node] = nodes, txIds: Seq[String]): Future[_] = {
@@ -22,7 +22,7 @@ trait GrpcWaitForHeight extends BeforeAndAfterAll with ScorexLogging with Report
       txId <- txIds
       node <- nodes
     } yield (node, txId)
-    traverse(txNodePairs) { case (node, tx) => node.grpc.waitForTransaction(tx) }
+    traverse(txNodePairs) { case (node, tx) => node.waitForTransaction(tx) }
   }
 
 }

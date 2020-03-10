@@ -46,11 +46,6 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       om.id() shouldBe recovered.id()
       om.buyOrder.idStr() shouldBe recovered.buyOrder.idStr()
       recovered.bytes() shouldEqual om.bytes()
-
-      if (Set(om.buyOrder.version, om.sellOrder.version) == Set(2.toByte, 3.toByte)) {
-        println(Base64.encode(om.bytes()))
-        println(om.toPrettyString)
-      }
     }
   }
 
@@ -249,8 +244,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             ExchangeTransaction.signed(
               1.toByte,
               matcher = sender1,
-              buyOrder = buyOrder,
-              sellOrder = sellOrder,
+              order1 = buyOrder,
+              order2 = sellOrder,
               amount = amount,
               price = price,
               buyMatcherFee = buyMatcherFee,
@@ -262,8 +257,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             ExchangeTransaction.signed(
               2.toByte,
               matcher = sender1,
-              buyOrder = buyOrder,
-              sellOrder = sellOrder,
+              order1 = buyOrder,
+              order2 = sellOrder,
               amount = amount,
               price = price,
               buyMatcherFee = buyMatcherFee,
@@ -288,8 +283,6 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
-        create(price = buy.price + 1) shouldBe an[Left[_, _]]
-        create(price = sell.price - 1) shouldBe an[Left[_, _]]
 
         create(buyOrder = buy.updateType(OrderType.SELL)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateAmount(0)) shouldBe an[Left[_, _]]
@@ -299,7 +292,6 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(buyOrder = buy.updateExpiration(1L)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateExpiration(buy.expiration + 1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updatePrice(-1)) shouldBe an[Left[_, _]]
-        create(buyOrder = buy.updatePrice(price = sellPrice - 1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
 
         create(sellOrder = sell.updateType(OrderType.BUY)) shouldBe an[Left[_, _]]
@@ -310,7 +302,6 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellOrder = sell.updateExpiration(1L)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updateExpiration(sell.expiration + 1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updatePrice(-1)) shouldBe an[Left[_, _]]
-        create(sellOrder = sell.updatePrice(price = buyPrice + 1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updateMatcher(sender2)) shouldBe an[Left[_, _]]
 
         create(
@@ -328,8 +319,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       ExchangeTransaction.signed(
         1.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = price,
         buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
@@ -341,8 +332,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
       ExchangeTransaction.signed(
         2.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = price,
         buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,

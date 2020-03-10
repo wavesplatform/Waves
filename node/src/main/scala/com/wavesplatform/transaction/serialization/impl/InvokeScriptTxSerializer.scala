@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms
-import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
+import com.wavesplatform.lang.v1.compiler.Terms.{EXPR, FUNCTION_CALL}
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
@@ -24,15 +24,21 @@ object InvokeScriptTxSerializer {
       "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
       "args" -> JsArray(
         fc.args.map {
-          case Terms.CONST_LONG(num)      => Json.obj("type" -> "integer", "value" -> num)
-          case Terms.CONST_BOOLEAN(bool)  => Json.obj("type" -> "boolean", "value" -> bool)
-          case Terms.CONST_BYTESTR(bytes) => Json.obj("type" -> "binary", "value" -> bytes.base64)
-          case Terms.CONST_STRING(str)    => Json.obj("type" -> "string", "value" -> str)
-          case arg                        => throw new NotImplementedError(s"Not supported: $arg")
+          case Terms.ARR(elements) => Json.obj("type" -> "list", "value" -> elements.map(mapSingleArg))
+          case other               => mapSingleArg(other)
         }
       )
     )
   }
+
+  private def mapSingleArg(arg: EXPR) =
+    arg match {
+      case Terms.CONST_LONG(num)      => Json.obj("type" -> "integer", "value" -> num)
+      case Terms.CONST_BOOLEAN(bool)  => Json.obj("type" -> "boolean", "value" -> bool)
+      case Terms.CONST_BYTESTR(bytes) => Json.obj("type" -> "binary", "value" -> bytes.base64)
+      case Terms.CONST_STRING(str)    => Json.obj("type" -> "string", "value" -> str)
+      case arg                        => throw new NotImplementedError(s"Not supported: $arg")
+    }
 
   def toJson(tx: InvokeScriptTransaction): JsObject = {
     import tx._
@@ -50,7 +56,7 @@ object InvokeScriptTxSerializer {
     version match {
       case TxVersion.V1 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
+          Array(builder.typeId, version, chainByte),
           sender,
           dAppAddressOrAlias.bytes.arr,
           Deser.serializeOption(funcCallOpt)(Serde.serialize(_)),
@@ -65,10 +71,9 @@ object InvokeScriptTxSerializer {
     }
   }
 
-  def toBytes(tx: InvokeScriptTransaction): Array[Byte] = {
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
-  }
+  def toBytes(tx: InvokeScriptTransaction): Array[Byte] =
+    if (tx.isProtobufVersion) PBTransactionSerializer.bytes(tx)
+    else Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
 
   def parseBytes(bytes: Array[Byte]): Try[InvokeScriptTransaction] = Try {
     def parsePayment(arr: Array[Byte]): Payment = {

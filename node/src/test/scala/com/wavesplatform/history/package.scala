@@ -9,7 +9,7 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
-import com.wavesplatform.transaction.{Transaction, TxVersion}
+import com.wavesplatform.transaction.Transaction
 
 package object history {
   val MaxTransactionsPerBlockDiff = 10
@@ -85,12 +85,7 @@ package object history {
   ): (Block, MicroBlock) = {
     val newTotalBlock = customBuildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
     val nonSigned = MicroBlock
-      .buildAndSign(
-        generator = signer,
-        transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
-      )
+      .buildAndSign(version, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
       .explicitGet()
     (newTotalBlock, nonSigned)
   }
@@ -98,12 +93,7 @@ package object history {
   def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlock) = {
     val newTotalBlock = buildBlockOfTxs(totalRefTo, prevTotal.transactionData ++ txs)
     val nonSigned = MicroBlock
-      .buildAndSign(
-        generator = signer,
-        transactionData = txs,
-        prevResBlockSig = prevTotal.uniqueId,
-        totalResBlockSig = newTotalBlock.uniqueId
-      )
+      .buildAndSign(3.toByte, generator = signer, transactionData = txs, prevResBlockSig = prevTotal.uniqueId, totalResBlockSig = newTotalBlock.uniqueId)
       .explicitGet()
     (newTotalBlock, nonSigned)
   }

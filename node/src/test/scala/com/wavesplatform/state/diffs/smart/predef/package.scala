@@ -36,12 +36,13 @@ package object predef {
                                              blockchain,
                                              isTokenContext = false,
                                              isContract = false,
-                                             Coeval(???))
+                                             Coeval(???),
+                                             ByteStr.empty)
       r <- EvaluatorV1().apply[T](evalContext, typedExpr)
     } yield r
   }
 
-  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1): Either[String, T] =
+  def runScript[T <: EVALUATED](script: String, t: In = null, ctxV: StdLibVersion = V1, chainId: Byte = chainId): Either[String, T] =
     runScript[T](script, ctxV, t, EmptyBlockchain, chainId)
 
   def runScript[T <: EVALUATED](script: String, t: In, chainId: Byte): Either[String, T] =

@@ -53,7 +53,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
         | let a = 1000
         | a > b
       """.stripMargin
-    ScriptCompiler.compile(script, estimator) shouldBe Left("Compilation failed: A definition of 'b' is not found in 46-47")
+    ScriptCompiler.compile(script, estimator) shouldBe Left("Compilation failed: [A definition of 'b' is not found in 46-47]")
   }
 
   property("fails with contract for asset") {
@@ -244,7 +244,7 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("transactionByID complexity") {
-    def transactionByIdComplexity(version: Int) = {
+    def transactionByIdComplexity(version: Int): Long = {
       val scriptWithoutTransactionById =
         s"""
           | {-# STDLIB_VERSION $version #-}

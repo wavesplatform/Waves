@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory
 
 import scala.concurrent.duration._
 import scala.util.Random
+import scala.util.Random._
 
 //noinspection ScalaStyle, TypeAnnotation
 class NarrowTransactionGenerator(
@@ -66,10 +67,8 @@ class NarrowTransactionGenerator(
         val tx: Option[Transaction] = typeGen.getRandom match {
           case IssueTransaction =>
             val sender      = randomFrom(accounts).get
-            val name        = new Array[Byte](10)
-            val description = new Array[Byte](10)
-            random.nextBytes(name)
-            random.nextBytes(description)
+            val name        = random.nextString(5)
+            val description = random.nextString(5)
             val reissuable = random.nextBoolean()
             val amount     = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
@@ -104,7 +103,7 @@ class NarrowTransactionGenerator(
                       500,
                       Waves,
                       500000L,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte),
+                      Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
                       timestamp
                     )
                 )
@@ -184,7 +183,7 @@ class NarrowTransactionGenerator(
               for {
                 lease  <- activeLeaseTransactions.headOption
                 sender <- accountByAddress(lease.sender.stringRepr)
-                tx     <- logOption(LeaseCancelTransaction.selfSigned(2.toByte, sender, lease.id(), 500000L, timestamp))
+                tx     <- logOption(LeaseCancelTransaction.signed(2.toByte, sender.publicKey, lease.id(), 500000L, timestamp, sender.privateKey))
               } yield tx
             ).logNone("There is no active lease transactions, may be you need to increase lease transaction's probability")
 
@@ -213,7 +212,7 @@ class NarrowTransactionGenerator(
                       transfers.toList,
                       100000L + 50000L * transferCount + 400000L,
                       timestamp,
-                      Array.fill(random.nextInt(100))(random.nextInt().toByte)
+                      Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
                     )
                 )
               } yield tx
@@ -268,7 +267,7 @@ class NarrowTransactionGenerator(
               if (function.name.isEmpty) None
               else Some(Terms.FUNCTION_CALL(FunctionHeader.User(function.name), data.toList))
 
-            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(new String(a.name))))
+            val asset = randomFrom(Universe.IssuedAssets.filter(a => script.paymentAssets.contains(a.name.toStringUtf8)))
               .fold(Waves: Asset)(tx => IssuedAsset(tx.id()))
 
             logOption(
@@ -436,7 +435,7 @@ object NarrowTransactionGenerator {
   def apply(settings: Settings, accounts: Seq[KeyPair], time: NTP, estimator: ScriptEstimator): NarrowTransactionGenerator = {
 
     val (setScriptInitTxs, setScriptTailInitTxs, setScriptAccounts, setScriptAssets) =
-      if (settings.probabilities.keySet.count(p => p == SetScriptTransaction || p == SetAssetScriptTransaction) > 0) {
+      if (settings.probabilities.get(SetScriptTransaction).exists(_ > 0) || settings.probabilities.get(SetAssetScriptTransaction).exists(_ > 0)) {
         require(settings.setScript.isDefined, "SetScript and SetAssetScript generations require additional settings [set-script]")
 
         val accountsSettings = settings.setScript.get.accounts
@@ -457,7 +456,7 @@ object NarrowTransactionGenerator {
               val account = GeneratorSettings.toKeyPair(s"${UUID.randomUUID().toString}")
 
               val transferTx = TransferTransaction
-                .selfSigned(2.toByte, richAccount, account, Waves, balance, Waves, fee, "Generator".getBytes("UTF-8"), time.correctedTime())
+                .selfSigned(2.toByte, richAccount, account, Waves, balance, Waves, fee, None, time.correctedTime())
                 .explicitGet()
 
               val Right((script, _)) = ScriptCompiler.compile(new String(Files.readAllBytes(Paths.get(scriptFile))), estimator)
@@ -479,8 +478,8 @@ object NarrowTransactionGenerator {
                   .selfSigned(
                     TxVersion.V2,
                     issuer,
-                    UUID.randomUUID().toString.getBytes("UTF-8").take(16),
-                    s"$description #$i".getBytes("UTF-8"),
+                    UUID.randomUUID().toString.take(16),
+                    s"$description #$i",
                     amount,
                     decimals.toByte,
                     reissuable,
@@ -503,8 +502,8 @@ object NarrowTransactionGenerator {
         .selfSigned(
           TxVersion.V2,
           trader,
-          "TRADE".getBytes("UTF-8"),
-          "Waves DEX is the best exchange ever".getBytes("UTF-8"),
+          "TRADE",
+          "Waves DEX is the best exchange ever",
           100000000,
           2,
           reissuable = true,
@@ -526,7 +525,7 @@ object NarrowTransactionGenerator {
               tradeAsset.quantity / Universe.Accounts.size,
               Waves,
               900000,
-              Array.fill(random.nextInt(100))(random.nextInt().toByte),
+              Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
               System.currentTimeMillis()
             )
             .right

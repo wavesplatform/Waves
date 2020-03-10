@@ -117,7 +117,7 @@ object Bindings {
 
   def senderObject(sender: Recipient.Address): CaseObj = CaseObj(addressType, Map("bytes" -> sender.bytes))
 
-  def scriptTransfer(ct: ScriptTransfer): CaseObj =
+  def scriptTransfer(ct: ScriptTransfer, version: StdLibVersion): CaseObj =
     transferTransactionObject(
       Transfer(
         Proven(h = Header(id = ct.id, fee = 0, timestamp = ct.timestamp, version = 0),
@@ -129,9 +129,10 @@ object Bindings {
         assetId = ct.assetId,
         amount = ct.amount,
         recipient = ct.recipient,
-        attachment = ByteStr.empty
+        attachment = ByteStrValue(ByteStr.empty)
       ),
-      proofsEnabled = false
+      proofsEnabled = false,
+      version
     )
 
   def mapReissuePseudoTx(r: ReissuePseudoTx): CaseObj =
@@ -170,7 +171,7 @@ object Bindings {
       case Tx.Payment(p, amount, recipient) =>
         CaseObj(buildPaymentTransactionType(proofsEnabled),
                 Map("amount" -> CONST_LONG(amount)) ++ provenTxPart(p, proofsEnabled) + mapRecipient(recipient))
-      case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled)
+      case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled, version)
       case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
           buildIssueTransactionType(proofsEnabled),
@@ -226,7 +227,7 @@ object Bindings {
                         provenTxPart(p, proofsEnabled)))
       case MassTransfer(p, assetId, transferCount, totalAmount, transfers, attachment) =>
         CaseObj(
-          buildMassTransferTransactionType(proofsEnabled),
+          buildMassTransferTransactionType(proofsEnabled, version),
           combine(
             Map(
               "transfers" -> transfers
@@ -234,7 +235,7 @@ object Bindings {
               "assetId"       -> assetId,
               "transferCount" -> transferCount,
               "totalAmount"   -> totalAmount,
-              "attachment"    -> attachment
+              "attachment"    -> attachment.evaluated
             ),
             provenTxPart(p, proofsEnabled)
           )
@@ -261,14 +262,18 @@ object Bindings {
             case _          => ???
          }
 
-        def mapDataEntry(d: DataItem[_]): EVALUATED = {
-          val (entryValue, entryType) = mapValue(d.value)
-          val fields = Map("key" -> CONST_STRING(d.key).explicitGet(), "value" -> entryValue)
-          if (version >= V4)
-            CaseObj(entryType, fields)
-          else
-            CaseObj(genericDataEntry, fields)
-        }
+        def mapDataEntry(d: DataItem[_]): EVALUATED =
+          d match {
+            case DataItem.Delete(key) =>
+              CaseObj(deleteDataEntry, Map("key" -> CONST_STRING(key).explicitGet()))
+            case writeItem =>
+              val (entryValue, entryType) = mapValue(writeItem.value)
+              val fields = Map("key" -> CONST_STRING(writeItem.key).explicitGet(), "value" -> entryValue)
+              if (version >= V4)
+                CaseObj(entryType, fields)
+              else
+                CaseObj(genericDataEntry, fields)
+          }
 
         CaseObj(
           buildDataTransactionType(proofsEnabled, version),
@@ -288,6 +293,18 @@ object Bindings {
               "price"          -> price,
               "buyMatcherFee"  -> buyMatcherFee,
               "sellMatcherFee" -> sellMatcherFee,
+            ),
+            provenTxPart(p, proofsEnabled)
+          )
+        )
+      case UpdateAssetInfo(p, assetId, name, description) =>
+        CaseObj(
+          buildUpdateAssetInfoTransactionType(proofsEnabled),
+          combine(
+            Map(
+              "assetId" -> assetId,
+              "name" -> name,
+              "description" -> description
             ),
             provenTxPart(p, proofsEnabled)
           )
@@ -330,40 +347,22 @@ object Bindings {
       )
     )
 
-  def blockHeaderObject(header: BlockHeader): CaseObj =
+  def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     CaseObj(
-      blockHeader,
-      Map[String, EVALUATED](
-        "timestamp"           -> header.timestamp,
-        "version"             -> header.version,
-        "reference"           -> header.reference,
-        "generator"           -> header.generator,
-        "generatorPublicKey"  -> header.generatorPublicKey,
-        "signature"           -> header.signature,
-        "baseTarget"          -> header.baseTarget,
-        "generationSignature" -> header.generationSignature,
-        "transactionCount"    -> header.transactionCount,
-        "featureVotes"        -> header.featureVotes.map(CONST_LONG)
-      )
-    )
-
-  def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean): CaseObj =
-    CaseObj(
-      buildTransferTransactionType(proofsEnabled),
+      buildTransferTransactionType(proofsEnabled, version),
       combine(
         Map(
-          "amount" -> tx.amount,
+          "amount"     -> tx.amount,
           "feeAssetId" -> tx.feeAssetId,
-          "assetId" -> tx.assetId,
-          "attachment" -> tx.attachment
+          "assetId"    -> tx.assetId,
+          "attachment" -> tx.attachment.evaluated
         ),
         provenTxPart(tx.p, proofsEnabled) + mapRecipient(tx.recipient)
       )
     )
 
-  def buildAssetInfo(sAInfo: ScriptAssetInfo) =
-    CaseObj(
-      assetType,
+  def buildAssetInfo(sAInfo: ScriptAssetInfo, version: StdLibVersion) = {
+    val commonFields: Map[String, EVALUATED] =
       Map(
         "id"              -> sAInfo.id,
         "quantity"        -> sAInfo.quantity,
@@ -371,14 +370,23 @@ object Bindings {
         "issuer"          -> mapRecipient(sAInfo.issuer)._2,
         "issuerPublicKey" -> sAInfo.issuerPk,
         "reissuable"      -> sAInfo.reissuable,
-        "scripted"        -> sAInfo.scripted,
-        "sponsored"       -> sAInfo.sponsored
+        "scripted"        -> sAInfo.scripted
       )
-    )
 
-  def buildLastBlockInfo(blockInf: BlockInfo) =
+    val sponsoredField: (String, EVALUATED) =
+      if (version >= V4)
+        "minSponsoredFee" -> sAInfo.minSponsoredFee
+      else
+        "sponsored" -> sAInfo.minSponsoredFee.isDefined
+
     CaseObj(
-      blockInfo,
+      assetType(version),
+      commonFields + sponsoredField
+    )
+  }
+
+  def buildLastBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+    val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
         "height"              -> blockInf.height.toLong,
@@ -387,6 +395,11 @@ object Bindings {
         "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
         "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
-    )
 
+    val vrfFieldOpt: Map[String, EVALUATED] =
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
+      else Map()
+
+    CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)
+  }
 }

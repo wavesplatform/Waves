@@ -14,8 +14,8 @@ object ExchangeTxSerializer {
   def toJson(tx: ExchangeTransaction): JsObject = {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
-      "order1"         -> buyOrder.json(),
-      "order2"         -> sellOrder.json(),
+      "order1"         -> order1.json(),
+      "order2"         -> order2.json(),
       "amount"         -> amount,
       "price"          -> price,
       "buyMatcherFee"  -> buyMatcherFee,
@@ -30,10 +30,10 @@ object ExchangeTxSerializer {
       case TxVersion.V1 =>
         Bytes.concat(
           Array(builder.typeId),
-          Ints.toByteArray(buyOrder.bytes().length),
-          Ints.toByteArray(sellOrder.bytes().length),
-          buyOrder.bytes(),
-          sellOrder.bytes(),
+          Ints.toByteArray(order1.bytes().length),
+          Ints.toByteArray(order2.bytes().length),
+          order1.bytes(),
+          order2.bytes(),
           Longs.toByteArray(price),
           Longs.toByteArray(amount),
           Longs.toByteArray(buyMatcherFee),
@@ -48,12 +48,12 @@ object ExchangeTxSerializer {
 
         Bytes.concat(
           Array(0: Byte, builder.typeId, version),
-          Ints.toByteArray(buyOrder.bytes().length),
-          orderMark(buyOrder.version),
-          buyOrder.bytes(),
-          Ints.toByteArray(sellOrder.bytes().length),
-          orderMark(sellOrder.version),
-          sellOrder.bytes(),
+          Ints.toByteArray(order1.bytes().length),
+          orderMark(order1.version),
+          order1.bytes(),
+          Ints.toByteArray(order2.bytes().length),
+          orderMark(order2.version),
+          order2.bytes(),
           Longs.toByteArray(price),
           Longs.toByteArray(amount),
           Longs.toByteArray(buyMatcherFee),
@@ -68,39 +68,38 @@ object ExchangeTxSerializer {
   }
 
   def toBytes(tx: ExchangeTransaction): Array[Byte] = {
-    import tx._
-    require(!isProtobufVersion, "Should be serialized with protobuf")
-    version match {
-      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), proofs.toSignature)
-      case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), proofs.bytes())
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+      case TxVersion.V2 => Bytes.concat(this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
   }
 
   def parseBytes(bytes: Array[Byte]): Try[ExchangeTransaction] = Try {
     def parseV1(buf: ByteBuffer): ExchangeTransaction = {
-      val buyLength      = buf.getInt
-      val sellLength     = buf.getInt
-      val buy            = Order.parseBytes(TxVersion.V1, buf.getByteArray(buyLength)).get
-      val sell           = Order.parseBytes(TxVersion.V1, buf.getByteArray(sellLength)).get
+      val order1Length   = buf.getInt
+      val order2Length   = buf.getInt
+      val order1         = Order.parseBytes(TxVersion.V1, buf.getByteArray(order1Length)).get
+      val order2         = Order.parseBytes(TxVersion.V1, buf.getByteArray(order2Length)).get
       val price          = buf.getLong
       val amount         = buf.getLong
       val buyMatcherFee  = buf.getLong
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V1, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty)
+      ExchangeTransaction(TxVersion.V1, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty)
     }
 
     def parseV2(buf: ByteBuffer): ExchangeTransaction = {
-      val buy            = buf.getVersionedOrder
-      val sell           = buf.getVersionedOrder
+      val order1         = buf.getVersionedOrder
+      val order2         = buf.getVersionedOrder
       val price          = buf.getLong
       val amount         = buf.getLong
       val buyMatcherFee  = buf.getLong
       val sellMatcherFee = buf.getLong
       val fee            = buf.getLong
       val timestamp      = buf.getLong
-      ExchangeTransaction(TxVersion.V2, buy, sell, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty)
+      ExchangeTransaction(TxVersion.V2, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, Proofs.empty)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

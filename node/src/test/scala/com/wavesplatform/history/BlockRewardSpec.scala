@@ -9,6 +9,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
@@ -18,7 +19,6 @@ import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.{NoShrink, TransactionGen}
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
@@ -58,7 +58,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = InitialReward - 1 * Constants.UnitsInWave, version = Block.RewardBlockVersion)
 
   private def mkEmptyBlockReward(ref: ByteStr, signer: KeyPair, vote: Long): Block =
-    TestBlock.create(ntpNow, ref, Seq.empty, signer,rewardVote = vote, version = Block.RewardBlockVersion)
+    TestBlock.create(ntpNow, ref, Seq.empty, signer, rewardVote = vote, version = Block.RewardBlockVersion)
 
   private val InitialMinerBalance = 10000 * Constants.UnitsInWave
   private val OneTotalFee         = 100000
@@ -215,10 +215,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val ngEmptyScenario = for {
       (sourceAddress, issuer, miner1, miner2, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner1)
       b3        = mkEmptyBlock(b2.uniqueId, miner1)
@@ -260,7 +260,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val betterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)
@@ -296,10 +296,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val sameButBetterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, Array.emptyByteArray, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
       b3        = mkEmptyBlock(b2.uniqueId, miner)

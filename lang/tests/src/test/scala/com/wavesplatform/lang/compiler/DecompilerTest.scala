@@ -743,10 +743,10 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("V4 - median") {
-    val script           = """[1, 2, 3].median()"""
+    val script           = """median([1, 2, 3]) + [1, 2, 3].median()"""
     val Right((expr, _)) = compileExpr(script, V4)
     val res              = Decompiler(expr, decompilerContextV4)
-    res shouldEq """median([1, 2, 3])"""
+    res shouldEq """(median([1, 2, 3]) + median([1, 2, 3]))"""
   }
 
   property("V4 - new contract result format") {
@@ -758,12 +758,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         | @Callable(i)
         | func foo() =
         |   [
-        |     IntEntry("key", 1),
+        |     IntegerEntry("key", 1),
         |     BooleanEntry("key", true),
         |     StringEntry("key", "str"),
         |     BinaryEntry("key", base58''),
+        |     DeleteEntry("key"),
         |     ScriptTransfer(i.caller, 1, base58''),
-        |     Issue(unit, 4, "description", true, "name", 1000),
+        |     Issue("name", "description", 1000, 4, true, unit, 0),
         |     Reissue(base58'', false, 1),
         |     Burn(base58'', 1)
         |   ]
@@ -782,7 +783,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     res shouldEq """
 
 @Callable(i)
-func foo () = [IntEntry("key", 1), BooleanEntry("key", true), StringEntry("key", "str"), BinaryEntry("key", base58''), ScriptTransfer(i.caller, 1, base58''), Issue(unit, 4, "description", true, "name", 1000), Reissue(base58'', false, 1), Burn(base58'', 1)]
+func foo () = [IntegerEntry("key", 1), BooleanEntry("key", true), StringEntry("key", "str"), BinaryEntry("key", base58''), DeleteEntry("key"), ScriptTransfer(i.caller, 1, base58''), Issue("name", "description", 1000, 4, true, unit, 0), Reissue(base58'', false, 1), Burn(base58'', 1)]
 
 """
   }

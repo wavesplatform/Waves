@@ -31,7 +31,7 @@ object Types {
     override val name        = if (n.nonEmpty) n.get else typeList.sortBy(_.toString).mkString("|")
   }
 
-  case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)]) extends REAL {
+  case class CASETYPEREF(override val name: String, override val fields: List[(String, FINAL)], hideConscructor: Boolean = false) extends REAL {
     override def typeList: List[REAL] = List(this)
   }
 
@@ -89,11 +89,4 @@ object Types {
   val optionLong           = UNION(LONG, UNIT)
   val listByteVector: LIST = LIST(BYTESTR)
   val listString: LIST     = LIST(STRING)
-
-  val nativeTypeList = List(
-    "Int",
-    "ByteVector",
-    "Boolean",
-    "String"
-  )
 }

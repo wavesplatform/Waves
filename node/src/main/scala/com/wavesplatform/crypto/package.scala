@@ -6,14 +6,14 @@ import com.wavesplatform.account.{PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils._
 import org.whispersystems.curve25519.OpportunisticCurve25519Provider
 import scorex.crypto.hash.{Blake2b256, Keccak256}
 import scorex.crypto.signatures.{Curve25519, Signature, PrivateKey => SPrivateKey, PublicKey => SPublicKey}
 
 import scala.util.Try
 
-package object crypto extends ScorexLogging {
+package object crypto {
   // Constants
   val SignatureLength: Int = Curve25519.SignatureLength
   val KeyLength: Int       = Curve25519.KeyLength
@@ -29,9 +29,9 @@ package object crypto extends ScorexLogging {
 
   // Digests
   def fastHash(m: Array[Byte]): Array[Byte]   = Blake2b256.hash(m)
-  def fastHash(s: String): Array[Byte]        = fastHash(s.getBytes("UTF-8"))
+  def fastHash(s: String): Array[Byte]        = fastHash(s.utf8Bytes)
   def secureHash(m: Array[Byte]): Array[Byte] = Keccak256.hash(Blake2b256.hash(m))
-  def secureHash(s: String): Array[Byte]      = secureHash(s.getBytes("UTF-8"))
+  def secureHash(s: String): Array[Byte]      = secureHash(s.utf8Bytes)
 
   // Signatures
   def sign(account: PrivateKey, message: ByteStr): ByteStr =
@@ -45,10 +45,7 @@ package object crypto extends ScorexLogging {
 
   def verifyVRF(signature: ByteStr, message: ByteStr, publicKey: PublicKey): Either[ValidationError, ByteStr] =
     Try(ByteStr(provider.verifyVrfSignature(publicKey.arr, message.arr, signature.arr))).toEither.left
-      .map { e =>
-        log.warn("Generation signatures does not match", e)
-        GenericError("Generation signatures does not match")
-      }
+      .map(_ => GenericError("Could not verify VRF proof"))
 
   def createKeyPair(seed: Array[Byte]): (Array[Byte], Array[Byte]) = Curve25519.createKeyPair(seed)
 

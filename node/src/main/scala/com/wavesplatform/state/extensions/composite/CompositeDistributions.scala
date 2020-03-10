@@ -2,11 +2,11 @@ package com.wavesplatform.state.extensions.composite
 
 import cats.kernel.Monoid
 import com.wavesplatform.account.Address
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, Blockchain, Diff, Portfolio}
+import com.wavesplatform.state.{AssetDescription, AssetDistribution, AssetDistributionPage, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.assets.IssueTransaction
 import monix.reactive.Observable
 
 private[state] final class CompositeDistributions(blockchain: Blockchain, baseProvider: Distributions, getDiff: () => Option[Diff])
@@ -15,16 +15,16 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
     val diffPf = {
       val full = getDiff().flatMap(_.portfolios.get(a)).getOrElse(Portfolio.empty)
       val nonNft = for {
-        (IssuedAsset(id), balance) <- full.assets
-        (_, tx: IssueTransaction)  <- blockchain.transactionInfo(id) if !tx.isNFT(blockchain)
-      } yield (IssuedAsset(id), balance)
+        (id, balance) <- full.assets
+        ad            <- blockchain.assetDescription(id) if !ad.nft
+      } yield (id, balance)
       full.copy(assets = nonNft)
     }
 
     Monoid.combine(baseProvider.portfolio(a), diffPf)
   }
 
-  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[IssueTransaction] =
+  override def nftObservable(address: Address, from: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] =
     com.wavesplatform.state.nftListFromDiff(blockchain, baseProvider, getDiff())(address, from)
 
   override def assetDistribution(assetId: IssuedAsset): AssetDistribution = {
@@ -38,11 +38,10 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
       height: Int,
       count: Int,
       fromAddress: Option[Address]
-  ): Either[ValidationError, AssetDistributionPage] = {
+  ): Either[ValidationError, AssetDistributionPage] =
     baseProvider.assetDistributionAtHeight(assetId, height, count, fromAddress)
-  }
 
-  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] = {
+  override def wavesDistribution(height: Int): Either[ValidationError, Map[Address, Long]] =
     getDiff().fold(baseProvider.wavesDistribution(height)) { _ =>
       val innerDistribution = baseProvider.wavesDistribution(height)
       if (height < blockchain.height) innerDistribution
@@ -50,9 +49,8 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
         innerDistribution.map(_ ++ changedBalances(_.balance != 0, blockchain.balance(_)))
       }
     }
-  }
 
-  private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] = {
+  private def changedBalances(pred: Portfolio => Boolean, f: Address => Long): Map[Address, Long] =
     getDiff()
       .fold(Map.empty[Address, Long]) { diff =>
         for {
@@ -60,5 +58,4 @@ private[state] final class CompositeDistributions(blockchain: Blockchain, basePr
           if pred(p)
         } yield address -> f(address)
       }
-  }
 }

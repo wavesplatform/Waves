@@ -15,7 +15,6 @@ import com.wavesplatform.transaction.validation.impl.InvokeScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class InvokeScriptTransaction(
@@ -43,15 +42,11 @@ case class InvokeScriptTransaction(
   val json: Coeval[JsObject]         = Coeval.evalOnce(builder.serializer.toJson(this))
 
   override def checkedAssets: Seq[IssuedAsset] = payments collect { case Payment(_, assetId: IssuedAsset) => assetId }
-  override def chainByte: Option[TxVersion]    = Some(AddressScheme.current.chainId)
 }
 
 object InvokeScriptTransaction extends TransactionParser {
-  override type TransactionT = InvokeScriptTransaction
-
   override val typeId: TxType                    = 16
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
-  override val classTag                          = ClassTag(classOf[DataTransaction])
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
 
@@ -79,7 +74,7 @@ object InvokeScriptTransaction extends TransactionParser {
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       proofs: Proofs
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, InvokeScriptTransaction] =
     InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs).validatedEither
 
   def signed(
@@ -92,7 +87,7 @@ object InvokeScriptTransaction extends TransactionParser {
       feeAssetId: Asset,
       timestamp: TxTimestamp,
       signer: PrivateKey
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, InvokeScriptTransaction] =
     create(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, Proofs.empty).map(_.signWith(signer))
 
   def selfSigned(
@@ -104,6 +99,6 @@ object InvokeScriptTransaction extends TransactionParser {
       fee: TxAmount,
       feeAssetId: Asset,
       timestamp: TxTimestamp
-  ): Either[ValidationError, TransactionT] =
+  ): Either[ValidationError, InvokeScriptTransaction] =
     signed(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, sender)
 }

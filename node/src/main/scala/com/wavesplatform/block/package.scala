@@ -2,14 +2,13 @@ package com.wavesplatform
 
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
+import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
+import com.wavesplatform.block.merkle.Merkle._
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.transaction.Transaction
-import scorex.crypto.authds.LeafData
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.hash.{CryptographicHash32, Digest32}
 
 import scala.util.Try
 
@@ -39,23 +38,38 @@ package object block {
   }
 
   // Merkle
-  private[block] implicit object FastHash extends CryptographicHash32 { // todo: (NODE-1972) Replace with appropriate hash function
-    override def hash(input: Message): Digest32 = Digest32(com.wavesplatform.crypto.fastHash(input))
+  implicit class BlockTransactionsRootOps(private val block: Block) extends AnyVal {
+    def transactionProof(transaction: Transaction): Option[TransactionProof] =
+      block.transactionData.indexWhere(transaction.id() == _.id()) match {
+        case -1  => None
+        case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, block.transactionsMerkleTree()).reverse))
+      }
+
+    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
+      block.transactionData
+        .lift(transactionProof.transactionIndex)
+        .filter(tx => tx.id() == transactionProof.id)
+        .exists(
+          tx =>
+            verify(
+              hash(PBTransactions.protobuf(tx).toByteArray),
+              transactionProof.transactionIndex,
+              transactionProof.digests.reverse,
+              block.header.transactionsRoot.arr
+            )
+        )
   }
 
-  private[block] val EmptyMerkleTree: MerkleTree[Digest32] = MerkleTree(Seq(LeafData @@ Array.emptyByteArray))
-
-  private[block] implicit class BlockMerkleOps(block: Block) {
-    def transactionProof(transaction: Transaction): Option[MerkleProof[Digest32]] =
-      block.transactionsMerkleTree().proofByElement(transaction.mkMerkleLeaf())
+  implicit class MerkleTreeOps(private val levels: TransactionsMerkleTree) extends AnyVal {
+    def transactionsRoot: ByteStr = {
+      require(levels.nonEmpty && levels.head.nonEmpty, "Invalid merkle tree")
+      ByteStr(levels.head.head)
+    }
   }
 
-  private[block] implicit class TransactionMerkleOps(transaction: Transaction) {
-    def mkMerkleLeaf(): Leaf[Digest32] = Leaf(LeafData @@ PBTransactions.protobuf(transaction).toByteArray)
-  }
+  def mkMerkleTree(txs: Seq[Transaction]): TransactionsMerkleTree = mkLevels(txs.map(PBTransactions.protobuf(_).toByteArray))
 
-  /** Creates transactions merkle root */
-  private[block] def mkMerkleTree(transactions: Seq[Transaction]): MerkleTree[Digest32] = {
-    if (transactions.isEmpty) EmptyMerkleTree else MerkleTree(transactions.map(_.mkMerkleLeaf().data))
-  }
+  def mkTransactionsRoot(version: Byte, transactionData: Seq[Transaction]): ByteStr =
+    if (version < Block.ProtoBlockVersion) ByteStr.empty
+    else ByteStr(mkLevels(transactionData.map(PBTransactions.protobuf(_).toByteArray)).transactionsRoot)
 }

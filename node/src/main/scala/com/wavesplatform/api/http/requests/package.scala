@@ -1,9 +1,7 @@
 package com.wavesplatform.api.http
 
-import java.nio.charset.StandardCharsets
-
+import cats.Applicative
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
 import com.wavesplatform.crypto.{DigestLength, SignatureLength}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -14,7 +12,6 @@ import play.api.libs.json._
 import supertagged.TaggedType
 
 package object requests {
-  import cats.instances.either._
   import cats.instances.list._
   import cats.syntax.either._
   import cats.syntax.traverse._
@@ -34,47 +31,56 @@ package object requests {
       parseBase58(s, error, maxLength).map(b => Option(b))
     }
 
-  def parseBase58ToAsset(v: String): Validation[IssuedAsset] =
+  def parseBase58ToIssuedAsset(v: String): Validation[IssuedAsset] =
     parseBase58(v, "invalid.assetId", AssetIdStringLength)
       .map(IssuedAsset)
 
-  def parseBase58ToAssetId(v: Option[String], err: String): Validation[Asset] =
+  def parseBase58ToAsset(v: Option[String], err: String): Validation[Asset] =
     parseBase58ToOption(v.filter(_.length > 0), err, AssetIdStringLength)
       .map {
         case Some(str) => IssuedAsset(str)
         case None      => Waves
       }
 
-  def toAsset(maybeAsset: Option[String]): Either[ValidationError, Asset] =
-    maybeAsset match {
-      case Some(v) if v.nonEmpty => ByteStr.decodeBase58(v).toEither.leftMap(e => GenericError(e.getMessage)).map(IssuedAsset)
-      case None                  => Waves.asRight
-      case _                     => GenericError("requirement failed: empty string").asLeft
-    }
-
-  def toAttachment(maybeAttachment: Option[String]): Either[ValidationError, Array[Byte]] =
-    maybeAttachment match {
-      case Some(v) if v.nonEmpty => Base58.tryDecodeWithLimit(v).toEither.leftMap(e => GenericError(e.getMessage))
-      case _                     => Array.emptyByteArray.asRight
-    }
-
-  def toProofs(version: Option[Byte], maybeSignature: Option[String], maybeProofs: Option[List[String]]): Either[ValidationError, Proofs] =
-    version match {
-      case Some(v) if v == 2.toByte =>
-        maybeProofs match {
-          case Some(proofs) =>
-            for {
-              proofsBytes <- proofs.traverse(s => parseBase58(s, "invalid.proofs", Proofs.MaxProofStringSize))
-              result      <- Proofs.create(proofsBytes)
-            } yield result
-          case None => Proofs.empty.asRight
-        }
+  def toProofs(maybeSignature: Option[ByteStr], maybeProofs: Option[Proofs]): Validation[Proofs] =
+    (maybeSignature, maybeProofs) match {
+      case (Some(sig), Some(proofs)) if proofs.nonEmpty && proofs.head != sig =>
+        Left(GenericError("Both proofs and signature are provided, but proofs do not match signature"))
       case _ =>
-        maybeSignature match {
-          case Some(str) => parseBase58(str, "invalid.signature", SignatureStringLength).map(sig => Proofs(sig))
-          case None      => Proofs.empty.asRight
-        }
+        maybeProofs
+          .orElse(maybeSignature.map(s => Proofs(List(s))))
+          .fold[Either[ValidationError, Proofs]](Proofs.empty.asRight)(p => Proofs.create(p))
     }
+
+  implicit val jsResultApplicative: Applicative[JsResult] = new Applicative[JsResult] {
+    override def pure[A](x: A): JsResult[A] = JsSuccess(x)
+
+    override def ap[A, B](ff: JsResult[A => B])(fa: JsResult[A]): JsResult[B] = (ff, fa) match {
+      case (JsSuccess(f, _), JsSuccess(a, _)) => JsSuccess(f(a))
+      case (JsError(e1), JsError(e2))         => JsError(JsError.merge(e1, e2))
+      case (JsError(e), _)                    => JsError(e)
+      case (_, JsError(e))                    => JsError(e)
+    }
+  }
+
+  implicit val proofsReads: Reads[Proofs] = Reads {
+    case JsArray(values) =>
+      values.toList
+        .traverse {
+          case JsString(v) =>
+            JsSuccess(v).flatMap(s => ByteStr.decodeBase58(s).fold(e => JsError(JsonValidationError("invalid.base58", e.getMessage)), JsSuccess(_)))
+          case _ => JsError("expected.string")
+        }
+        .map(Proofs.apply)
+    case JsNull => JsSuccess(Proofs.empty)
+    case _      => JsError("invalid.proofs")
+  }
+
+  implicit val proofsWrites: Writes[Proofs] = Writes { proofs =>
+    JsArray(proofs.map(s => JsString(s.toString)))
+  }
+
+  implicit val byteStrFormat: Format[ByteStr] = com.wavesplatform.utils.byteStrFormat
 
   object ProofStr extends TaggedType[String]
   type ProofStr = ProofStr.Type
@@ -87,10 +93,6 @@ package object requests {
     }
   }
 
-  private[requests] implicit class RequestStrExt(private val str: String) extends AnyVal {
-    def utf8Bytes: Array[Byte] = str.getBytes(StandardCharsets.UTF_8)
-  }
-
-  private[requests] def defaultVersion = TxVersion.V1
+  private[requests] def defaultVersion   = TxVersion.V1
   private[requests] def defaultTimestamp = 0L
 }

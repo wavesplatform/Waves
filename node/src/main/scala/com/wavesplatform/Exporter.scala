@@ -1,20 +1,20 @@
 package com.wavesplatform
 
 import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
-import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
 import com.wavesplatform.database.openDB
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.history.StorageFactory
+import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Blockchain
 import com.wavesplatform.utils._
+import kamon.Kamon
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
 import scopt.OParser
-import kamon.Kamon
-import com.wavesplatform.metrics.Metrics
 
 import scala.concurrent.Await
 import scala.concurrent.duration._
@@ -44,7 +44,7 @@ object Exporter extends ScorexLogging {
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val blockchain       = StorageFactory(settings, db, time, Observer.empty, Observer.empty)
+        val blockchain       = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
         val blockchainHeight = blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
@@ -71,6 +71,7 @@ object Exporter extends ScorexLogging {
           case Failure(ex) => log.error(s"Failed to create file '$outputFilename': $ex")
         }
 
+        Await.result(Kamon.stopAllReporters(), 10.seconds)
         time.close()
         Await.ready(Kamon.stopAllReporters(), 20.seconds)
         Metrics.shutdown()
@@ -101,11 +102,11 @@ object Exporter extends ScorexLogging {
       maybeBlock
         .map { block =>
           val len = if (height != 2) {
-            val bytes = ",\n".getBytes(StandardCharsets.UTF_8)
+            val bytes = ",\n".utf8Bytes
             stream.write(bytes)
             bytes.length
           } else 0
-          val bytes = block.json().toString().getBytes(StandardCharsets.UTF_8)
+          val bytes = block.json().toString().utf8Bytes
           stream.write(bytes)
           len + bytes.length
         }
@@ -119,16 +120,18 @@ object Exporter extends ScorexLogging {
       if (format == "JSON") writeString(stream, "]\n") else 0
 
     def writeString(stream: OutputStream, str: String): Int = {
-      val bytes = str.getBytes(StandardCharsets.UTF_8)
+      val bytes = str.utf8Bytes
       stream.write(bytes)
       bytes.length
     }
   }
 
-  private[this] final case class ExporterOptions(configFileName: File = new File("waves-testnet.conf"),
-                                                 outputFileNamePrefix: String = "blockchain",
-                                                 exportHeight: Option[Int] = None,
-                                                 format: String = Formats.Binary)
+  private[this] final case class ExporterOptions(
+      configFileName: File = new File("waves-testnet.conf"),
+      outputFileNamePrefix: String = "blockchain",
+      exportHeight: Option[Int] = None,
+      format: String = Formats.Binary
+  )
 
   private[this] lazy val commandParser = {
     import scopt.OParser
@@ -153,6 +156,10 @@ object Exporter extends ScorexLogging {
           case f if Formats.isSupported(f.toUpperCase) => success
           case f                                       => failure(s"Unsupported format: $f")
         },
+      opt[Int]('h', "height")
+        .text("Export to height")
+        .action((h, c) => c.copy(exportHeight = Some(h)))
+        .validate(h => if (h > 0) success else failure("Export height must be > 0")),
       help("help").hidden()
     )
   }

@@ -1,26 +1,30 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.api.http.requests.{
-  CreateAliasRequest,
-  DataRequest,
-  LeaseCancelRequest,
-  LeaseRequest,
-  MassTransferRequest,
-  SponsorFeeRequest,
-  TransferRequest
-}
+import com.typesafe.config.Config
+import com.wavesplatform.api.http.requests.{CreateAliasRequest, DataRequest, LeaseCancelRequest, LeaseRequest, MassTransferRequest, SponsorFeeRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.Transaction
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import play.api.libs.json.{Json, Writes}
 
 class ObsoleteHandlersSuite extends BaseTransactionSuite {
+
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures(BlockchainFeatures.BlockV5.id.toInt -> 0))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 
   test("alias create") {
     val json =
@@ -33,7 +37,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val fee                                     = calcMassTransferFee(2)
     implicit val w: Writes[MassTransferRequest] = Json.writes[MassTransferRequest]
     val transfers                               = List(Transfer(secondAddress, 1.waves), Transfer(thirdAddress, 2.waves))
-    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(None, firstAddress, transfers, fee, None))
+    val json                                    = sender.postJson("/assets/masstransfer", MassTransferRequest(None, None, firstAddress, transfers, fee, None))
     val tx                                      = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }
@@ -87,7 +91,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
     val reissue = Json.parse(reissueJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(reissue)
 
-    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(firstAddress, issue, Some(100L), sponsorFee))
+    val sponsorJson = sender.postJson("/assets/sponsor", SponsorFeeRequest(Some(1.toByte), firstAddress, issue, Some(100L), sponsorFee))
     val sponsor     = Json.parse(sponsorJson.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(sponsor)
   }
@@ -127,8 +131,8 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
       BinaryDataEntry("blob", ByteStr(Array.tabulate(445)(_.toByte))),
       StringDataEntry("str", "AAA-AAA")
     )
-    val fee  = calcDataFee(data)
-    val json = sender.postJson("/addresses/data", DataRequest(firstAddress, data, fee))
+    val fee  = calcDataFee(data, TxVersion.V1)
+    val json = sender.postJson("/addresses/data", DataRequest(1.toByte, firstAddress, data, fee))
     val tx   = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)
   }

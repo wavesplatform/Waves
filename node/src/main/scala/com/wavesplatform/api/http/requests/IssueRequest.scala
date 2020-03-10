@@ -1,10 +1,12 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction.assets.IssueTransaction
-import play.api.libs.json.Json
+import com.wavesplatform.transaction.{Proofs, TxVersion}
+import play.api.libs.json.{Format, Json}
 
 case class IssueRequest(
     version: Option[Byte],
@@ -18,21 +20,23 @@ case class IssueRequest(
     script: Option[String],
     fee: Long,
     timestamp: Option[Long],
-    signature: Option[String],
-    proofs: Option[List[String]]
+    signature: Option[ByteStr],
+    proofs: Option[Proofs]
 ) extends TxBroadcastRequest {
-  def toTxFrom(sender: PublicKey): Either[ValidationError, IssueTransaction] =
+  def toTxFrom(sender: PublicKey): Either[ValidationError, IssueTransaction] = {
+    val actualVersion = version.getOrElse(TxVersion.V3)
+
     for {
-      validProofs <- toProofs(version, signature, proofs)
+      validProofs <- toProofs(signature, proofs)
       validScript <- script match {
         case None         => Right(None)
         case Some(script) => Script.fromBase64String(script).map(Some(_))
       }
       tx <- IssueTransaction.create(
-        version.getOrElse(defaultVersion),
+        actualVersion,
         sender,
-        name.utf8Bytes,
-        description.utf8Bytes,
+        name,
+        description,
         quantity,
         decimals,
         reissuable,
@@ -42,8 +46,9 @@ case class IssueRequest(
         validProofs
       )
     } yield tx
+  }
 }
 
 object IssueRequest {
-  implicit val jsonFormat = Json.format[IssueRequest]
+  implicit val jsonFormat: Format[IssueRequest] = Json.format
 }

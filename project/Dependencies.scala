@@ -14,7 +14,7 @@ object Dependencies {
   private def bouncyCastle(module: String)                 = "org.bouncycastle"              % s"$module-jdk15on" % "1.59"
 
   private def catsModule(module: String)  = Def.setting("org.typelevel" %%% s"cats-$module"  % "2.0.0")
-  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.0.0")
+  private def monixModule(module: String) = Def.setting("io.monix"      %%% s"monix-$module" % "3.1.0")
 
   private val kindProjector = compilerPlugin("org.spire-math"  %% "kind-projector" % "0.9.6")
   private val paradise      = compilerPlugin("org.scalamacros" % "paradise"        % "2.1.1" cross CrossVersion.full)
@@ -22,10 +22,11 @@ object Dependencies {
   val akkaHttp                   = akkaHttpModule("akka-http")
   private val jacksonModuleScala = jacksonModule("module", "module-scala").withCrossVersion(CrossVersion.Binary())
   private val googleGuava        = "com.google.guava" % "guava" % "27.0.1-jre"
-  private val kamonCore          = kamonModule("core", "1.1.5")
+  private val kamonCore          = kamonModule("core", "1.1.6")
   private val machinist          = "org.typelevel" %% "machinist" % "0.6.6"
   val logback                    = "ch.qos.logback" % "logback-classic" % "1.2.3"
   val janino                     = "org.codehaus.janino" % "janino" % "3.0.12"
+  val asyncHttpClient            = "org.asynchttpclient" % "async-http-client" % "2.7.0"
 
   private val catsEffect = catsModule("effect")
   private val catsCore   = catsModule("core")
@@ -89,15 +90,16 @@ object Dependencies {
         .exclude("org.typelevel", "cats-effect_sjs0.6_2.12")
         .exclude("org.scala-js", "scalajs-library_2.12"),
       catsCore.value.exclude("org.scala-js", "scalajs-library_2.12"),
-      ("org.rudogma" %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
-      ("com.lihaoyi" %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.rudogma"   %%% "supertagged" % "1.4").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("com.lihaoyi"   %%% "fastparse"   % "1.0.0").exclude("org.scala-js", "scalajs-library_2.12"),
+      ("org.parboiled" %%% "parboiled"   % "2.1.8").exclude("org.scala-js", "scalajs-library_2.12"),
       shapeless.value.exclude("org.scala-js", "scalajs-library_2.12"),
       machinist.exclude("org.scala-js", "scalajs-library_2.12"),
       catsEffect.value.exclude("org.typelevel", "cats-core_sjs0.6_2.12"),
       ("org.typelevel" %% "cats-mtl-core" % "0.4.0").exclude("org.scalacheck", "scalacheck_2.12"),
       "ch.obermuhlner" % "big-math" % "2.1.0",
       ("org.scorexfoundation" %% "scrypto" % "2.0.4").exclude("org.whispersystems", "curve25519-java"),
-      "com.wavesplatform" % "curve25519-java" % "0.6.0",
+      "com.wavesplatform" % "curve25519-java" % "0.6.1",
       ("org.bykn" %% "fastparse-cats-core" % "0.1.0")
         .exclude("org.scalatest", "scalatest_2.12")
         .exclude("org.scalacheck", "scalacheck_2.12")
@@ -106,17 +108,17 @@ object Dependencies {
       bouncyCastle("bcprov"),
       kindProjector,
       compilerPlugin("com.olegpy" %% "better-monadic-for" % "0.3.0-M4"),
-      "com.softwaremill.sttp" %%% "core" % "1.6.4"
+      "com.softwaremill.sttp" %%% "core" % "1.6.4",
+      "com.wavesplatform"     % "zwaves" % "0.1.0-SNAPSHOT"
     ) ++ scalapbRuntime.value ++ circe.value
   )
 
   lazy val it = scalaTest +: Seq(
     logback,
-    // Swagger is using Jersey 1.1, hence the shading (https://github.com/spotify/docker-client#a-note-on-shading)
-    ("com.spotify" % "docker-client" % "8.15.1").classifier("shaded"),
+    "com.spotify" % "docker-client" % "8.15.1",
     jacksonModule("dataformat", "dataformat-properties"),
-    "org.asynchttpclient" % "async-http-client" % "2.7.0",
-    "org.scalacheck"      %% "scalacheck"       % "1.14.0"
+    asyncHttpClient,
+    "org.scalacheck" %% "scalacheck" % "1.14.0"
   ).map(_ % Test)
 
   lazy val test = scalaTest +: Seq(
@@ -128,28 +130,39 @@ object Dependencies {
   ).map(_ % Test)
 
   lazy val logDeps = Seq(
-    logback                % Runtime,
-    janino                 % Runtime,
+    logback             % Runtime,
+    janino              % Runtime,
     akkaModule("slf4j") % Runtime
   )
 
+  private[this] val levelDBJNA = {
+    val levelDbVersion = "1.22.1"
+    Seq(
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-core"   % levelDbVersion,
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "linux-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "windows-x86_64",
+      "com.wavesplatform.leveldb-jna" % "leveldb-jna-native" % levelDbVersion classifier "osx"
+    )
+  }
+
   lazy val node = Def.setting(
     Seq(
-      "commons-net"          % "commons-net" % "3.6",
-      "com.iheart"           %% "ficus" % "1.4.2",
+      "commons-net"          % "commons-net"              % "3.6",
+      "org.apache.commons"   % "commons-lang3"            % "3.9",
+      "com.iheart"           %% "ficus"                   % "1.4.2",
       "net.logstash.logback" % "logstash-logback-encoder" % "4.11" % Runtime,
       kamonCore,
-      kamonModule("system-metrics", "1.0.0"),
-      kamonModule("influxdb", "1.0.2"),
+      kamonModule("system-metrics", "1.0.1"),
+      kamonModule("influxdb", "1.0.3"),
       "org.influxdb" % "influxdb-java" % "2.14",
       googleGuava,
-      "com.google.code.findbugs"     % "jsr305"             % "3.0.2" % Compile, // javax.annotation stubs
-      "com.typesafe.play"            %% "play-json"         % "2.7.1",
-      "org.ethereum"                 % "leveldbjni-all"     % "1.18.3",
-      "com.github.swagger-akka-http" %% "swagger-akka-http" % "1.1.0",
-      "javax.xml.bind"               % "jaxb-api"           % "2.3.1", // javax.xml.bind replacement for JAXB in swagger
+      "com.google.code.findbugs" % "jsr305"         % "3.0.2" % Compile, // javax.annotation stubs
+      "com.typesafe.play"        %% "play-json"     % "2.7.1",
+      "org.ethereum"             % "leveldbjni-all" % "1.18.3",
+      akkaModule("actor"),
+      akkaModule("stream"),
       akkaHttp,
-      "org.bitlet"        % "weupnp" % "0.1.4",
+      "org.bitlet" % "weupnp" % "0.1.4",
       kindProjector,
       paradise,
       monixModule("reactive").value,
@@ -158,18 +171,18 @@ object Dependencies {
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console ++ logDeps
+    ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
   )
 
   private[this] val protoSchemasLib =
-    "com.wavesplatform" % "protobuf-schemas" % "1.0.1-SNAPSHOT" classifier "proto" changing()
+    "com.wavesplatform" % "protobuf-schemas" % "1.1.0-SNAPSHOT" classifier "proto" changing ()
 
   lazy val scalapbRuntime = Def.setting {
     val version = scalapb.compiler.Version.scalapbVersion
     Seq(
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version,
       "com.thesamet.scalapb" %%% "scalapb-runtime" % version % "protobuf",
-      "com.thesamet.scalapb" %% "scalapb-json4s" % "0.7.0"
+      "com.thesamet.scalapb" %% "scalapb-json4s"   % "0.7.0"
     )
   }
 

@@ -47,7 +47,8 @@ package object network extends ScorexLogging {
 
   def id(ctx: ChannelHandlerContext): String = id(ctx.channel())
 
-  def id(chan: Channel, prefix: String = ""): String = s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
+  def id(chan: Channel, prefix: String = ""): String =
+    if (chan == null) "???" else s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
 
   def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
 
@@ -94,9 +95,9 @@ package object network extends ScorexLogging {
       allChannels.flush(channelMatcher)
     }
 
-    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit = allChannels.broadcast(RawBytes.from(tx), except)
+    def broadcastTx(tx: Transaction, except: Option[Channel] = None): Unit = allChannels.broadcast(RawBytes.fromTransaction(tx), except)
 
-    def broadcastTx(txs: Seq[Transaction]): Unit = allChannels.broadcastMany(txs.map(RawBytes.from))
+    def broadcastTx(txs: Seq[Transaction]): Unit = allChannels.broadcastMany(txs.map(RawBytes.fromTransaction))
 
     private def logBroadcast(message: AnyRef, except: Set[Channel]): Unit = message match {
       case RawBytes(TransactionSpec.messageCode | PBTransactionSpec.messageCode, _) =>

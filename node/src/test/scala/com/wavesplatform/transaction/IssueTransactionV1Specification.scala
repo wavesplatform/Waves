@@ -1,9 +1,9 @@
 package com.wavesplatform.transaction
-
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.utils._
 import com.wavesplatform.{TransactionGen, crypto}
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -74,22 +74,19 @@ class IssueTransactionV1Specification extends PropSpec with PropertyChecks with 
                        }
     """)
 
-    val tx = IssueTransaction
-      .create(
+    val tx = IssueTransaction(
         TxVersion.V1,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        "Gigacoin".getBytes("UTF-8"),
-        "Gigacoin".getBytes("UTF-8"),
+        "Gigacoin".utf8Bytes,
+        "Gigacoin".utf8Bytes,
         10000000000L,
-        8,
+        8.toByte,
         true,
         script = None,
         100000000,
         1526287561757L,
         Proofs(ByteStr.decodeBase58("28kE1uN1pX2bwhzr9UHw5UuB9meTFEDFgeunNgy6nZWpHX4pzkGYotu8DhQ88AdqUG6Yy5wcXgHseKPBUygSgRMJ").get)
       )
-      .right
-      .get
 
     tx.json() shouldEqual js
   }

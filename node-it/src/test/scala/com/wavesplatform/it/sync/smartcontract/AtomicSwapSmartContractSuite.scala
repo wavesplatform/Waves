@@ -7,6 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
@@ -102,7 +103,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount + setScriptFee + smartFee,
           feeAsset = Waves,
           fee = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray,
+          attachment = None,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -124,7 +125,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
           amount = transferAmount,
           feeAsset = Waves,
           fee = setScriptFee + smartFee,
-          attachment = Array.emptyByteArray,
+          attachment = None,
           timestamp = System.currentTimeMillis()
         )
         .explicitGet()
@@ -148,7 +149,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         feeAssetId = Waves,
         fee = setScriptFee + smartFee,
-        attachment = Array.emptyByteArray,
+        attachment = None,
         timestamp = System.currentTimeMillis(),
         proofs = Proofs.empty
       )
@@ -174,7 +175,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
     nodes.waitForHeight(height + 20)
 
     miner.accountBalances(swapBC1)
-    assertBadRequestAndMessage(miner.transactionInfo(versionedTransferId), "transactions does not exist", 404)
+    assertBadRequestAndMessage(miner.transactionInfo[TransactionInfo](versionedTransferId), "transactions does not exist", 404)
 
     val selfSignedToAlice = TransferTransaction
       .selfSigned(
@@ -185,7 +186,7 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         amount = transferAmount,
         feeAsset = Waves,
         fee = setScriptFee + smartFee,
-        attachment = Array.emptyByteArray,
+        attachment = None,
         timestamp = System.currentTimeMillis()
       )
       .explicitGet()

@@ -4,7 +4,7 @@ import cats.implicits._
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ExecutionError
-import com.wavesplatform.lang.directives.values.StdLibVersion
+import com.wavesplatform.lang.directives.values.{StdLibVersion, _}
 import com.wavesplatform.lang.v1.compiler.Terms.EVALUATED
 import com.wavesplatform.lang.v1.traits.domain.Tx.{Header, Proven}
 import com.wavesplatform.lang.v1.traits.domain._
@@ -68,9 +68,9 @@ object RealTransactionWrapper {
   ): Either[ExecutionError, Tx] =
     tx match {
       case g: GenesisTransaction  => Tx.Genesis(header(g), g.amount, g.recipient).asRight
-      case t: TransferTransaction => mapTransferTx(t).asRight
+      case t: TransferTransaction => mapTransferTx(t, stdLibVersion).asRight
       case i: IssueTransaction =>
-        Tx.Issue(proven(i), i.quantity, ByteStr(i.name), ByteStr(i.description), i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
+        Tx.Issue(proven(i), i.quantity, i.name.toByteArray, i.description.toByteArray, i.reissuable, i.decimals, i.script.map(_.bytes())).asRight
       case r: ReissueTransaction     => Tx.ReIssue(proven(r), r.quantity, r.asset.id, r.reissuable).asRight
       case b: BurnTransaction        => Tx.Burn(proven(b), b.quantity, b.asset.id).asRight
       case b: LeaseTransaction       => Tx.Lease(proven(b), b.amount, b.recipient).asRight
@@ -83,7 +83,7 @@ object RealTransactionWrapper {
             transferCount = ms.transfers.length,
             totalAmount = ms.transfers.map(_.amount).sum,
             transfers = ms.transfers.map(r => com.wavesplatform.lang.v1.traits.domain.Tx.TransferItem(r.address, r.amount)).toIndexedSeq,
-            attachment = ByteStr(ms.attachment)
+            attachment = convertAttachment(ms.attachment, stdLibVersion)
           )
           .asRight
       case ss: SetScriptTransaction      => Tx.SetScript(proven(ss), ss.script.map(_.bytes())).asRight
@@ -94,11 +94,12 @@ object RealTransactionWrapper {
       case d: DataTransaction =>
         Tx.Data(
             proven(d),
-            d.data.map {
+            d.data.collect {
               case IntegerDataEntry(key, value) => DataItem.Lng(key, value)
               case StringDataEntry(key, value)  => DataItem.Str(key, value)
               case BooleanDataEntry(key, value) => DataItem.Bool(key, value)
               case BinaryDataEntry(key, value)  => DataItem.Bin(key, value)
+              case EmptyDataEntry(key)          => DataItem.Delete(key)
             }.toIndexedSeq
           )
           .asRight
@@ -115,15 +116,29 @@ object RealTransactionWrapper {
               ci.funcCallOpt.map(_.args.map(arg => arg.asInstanceOf[EVALUATED])).getOrElse(List.empty)
             )
           }
+
+      case u: UpdateAssetInfoTransaction =>
+        Tx.UpdateAssetInfo(proven(u), u.assetId.id, u.name, u.description).asRight
     }
 
-  def mapTransferTx(t: TransferTransaction): Tx.Transfer =
+  def mapTransferTx(t: TransferTransaction, version: StdLibVersion): Tx.Transfer =
     Tx.Transfer(
       proven(t),
       feeAssetId = t.feeAssetId.compatId,
       assetId = t.assetId.compatId,
       amount = t.amount,
       recipient = t.recipient,
-      attachment = ByteStr(t.attachment)
+      attachment = convertAttachment(t.attachment, version)
     )
+
+  private def convertAttachment(attachment: Option[Attachment], version: StdLibVersion): TransferAttachment = version match {
+    case V1 | V2 | V3 => ByteStrValue(attachment.toBytes)
+    case V4 =>
+      attachment.fold[TransferAttachment](EmptyAttachment) {
+        case Attachment.Num(value)  => IntValue(value)
+        case Attachment.Bool(value) => BooleanValue(value)
+        case Attachment.Bin(value)  => ByteStrValue(value)
+        case Attachment.Str(value)  => StringValue(value)
+      }
+  }
 }

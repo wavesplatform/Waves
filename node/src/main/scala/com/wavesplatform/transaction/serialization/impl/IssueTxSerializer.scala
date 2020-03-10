@@ -1,11 +1,9 @@
 package com.wavesplatform.transaction.serialization.impl
 
 import java.nio.ByteBuffer
-import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform.serialization.ByteBufferOps
-import com.wavesplatform.serialization.Deser
+import com.wavesplatform.serialization.{ByteBufferOps, Deser}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
 import play.api.libs.json.{JsObject, Json}
@@ -17,20 +15,21 @@ object IssueTxSerializer {
     import tx._
     BaseTxJson.toJson(tx) ++ Json.obj(
       "assetId"     -> id().toString,
-      "name"        -> new String(name, StandardCharsets.UTF_8),
+      "name"        -> name.toStringUtf8,
       "quantity"    -> quantity,
       "reissuable"  -> reissuable,
       "decimals"    -> decimals,
-      "description" -> new String(description, StandardCharsets.UTF_8)
-    ) ++ (if (version >= TxVersion.V2) Json.obj("chainId" -> chainByte, "script" -> script.map(_.bytes().base64)) else JsObject.empty)
+      "description" -> description.toStringUtf8
+    ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
+      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
     import tx._
     lazy val baseBytes = Bytes.concat(
       sender,
-      Deser.serializeArrayWithLength(name),
-      Deser.serializeArrayWithLength(description),
+      Deser.serializeArrayWithLength(name.toByteArray),
+      Deser.serializeArrayWithLength(description.toByteArray),
       Longs.toByteArray(quantity),
       Array(decimals),
       Deser.serializeBoolean(reissuable),
@@ -39,29 +38,19 @@ object IssueTxSerializer {
     )
 
     version match {
-      case TxVersion.V1 =>
-        Bytes.concat(Array(typeId), baseBytes)
-
+      case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 =>
-        Bytes.concat(
-          Array(builder.typeId, version, chainByte.get),
-          baseBytes,
-          Deser.serializeOptionOfArrayWithLength(script)(_.bytes())
-        )
-
-      case _ =>
-        PBTransactionSerializer.bodyBytes(tx)
+        Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
+      case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }
 
-  def toBytes(tx: IssueTransaction): Array[Byte] = {
-    import tx._
-    require(!tx.isProtobufVersion, "Should be serialized with protobuf")
-    version match {
-      case TxVersion.V1 => Bytes.concat(Array(typeId), proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
-      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), proofs.bytes())
+  def toBytes(tx: IssueTransaction): Array[Byte] =
+    tx.version match {
+      case TxVersion.V1 => Bytes.concat(Array(tx.typeId), tx.proofs.toSignature, this.bodyBytes(tx)) // Signature before body, typeId appears twice
+      case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
+      case _            => PBTransactionSerializer.bytes(tx)
     }
-  }
 
   def parseBytes(bytes: Array[Byte]): Try[IssueTransaction] = Try {
     def parseCommonPart(version: TxVersion, buf: ByteBuffer): IssueTransaction = {
@@ -73,7 +62,18 @@ object IssueTxSerializer {
       val reissuable  = buf.getBoolean
       val fee         = buf.getLong
       val timestamp   = buf.getLong
-      IssueTransaction(version, sender, name, description, quantity, decimals, reissuable, None, fee, timestamp, Nil)
+      IssueTransaction(
+        version,
+        sender,
+        name,
+        description,
+        quantity,
+        decimals,
+        reissuable,
+        None,
+        fee,
+        timestamp,
+      )
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

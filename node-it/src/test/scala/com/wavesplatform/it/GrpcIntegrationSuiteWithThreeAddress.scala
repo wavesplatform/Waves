@@ -1,26 +1,25 @@
 package com.wavesplatform.it
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.KeyPair
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.util._
+import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.protobuf.transaction.{PBTransactions, Recipient}
+import com.wavesplatform.it.api.SyncGrpcApi._
+import com.wavesplatform.it.util._
+import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions, Recipient}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils.ScorexLogging
-import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
 import org.scalatest.concurrent.{IntegrationPatience, ScalaFutures}
+import org.scalatest.{BeforeAndAfterAll, Matchers, RecoverMethods, Suite}
 
 trait GrpcIntegrationSuiteWithThreeAddress
-  extends BeforeAndAfterAll
-  with Matchers
-  with ScalaFutures
-  with IntegrationPatience
-  with RecoverMethods
-  with IntegrationTestsScheme
-  with Nodes
-  with ScorexLogging {
+    extends BeforeAndAfterAll
+    with Matchers
+    with ScalaFutures
+    with IntegrationPatience
+    with RecoverMethods
+    with IntegrationTestsScheme
+    with Nodes
+    with ScorexLogging {
   this: Suite =>
 
   def miner: Node    = nodes.head
@@ -32,9 +31,9 @@ trait GrpcIntegrationSuiteWithThreeAddress
   protected lazy val secondAcc: KeyPair = KeyPair("second_acc".getBytes("UTF-8"))
   protected lazy val thirdAcc: KeyPair  = KeyPair("third_acc".getBytes("UTF-8"))
 
-  protected lazy val firstAddress: ByteString  = ByteString.copyFrom(Base58.decode(firstAcc.stringRepr))
-  protected lazy val secondAddress: ByteString = ByteString.copyFrom(Base58.decode(secondAcc.stringRepr))
-  protected lazy val thirdAddress: ByteString  = ByteString.copyFrom(Base58.decode(thirdAcc.stringRepr))
+  protected lazy val firstAddress: ByteString  = PBRecipients.create(Address.fromPublicKey(firstAcc.publicKey)).getPublicKeyHash
+  protected lazy val secondAddress: ByteString = PBRecipients.create(Address.fromPublicKey(secondAcc.publicKey)).getPublicKeyHash
+  protected lazy val thirdAddress: ByteString  = PBRecipients.create(Address.fromPublicKey(thirdAcc.publicKey)).getPublicKeyHash
 
   abstract protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -43,41 +42,45 @@ trait GrpcIntegrationSuiteWithThreeAddress
 
     def dumpBalances(node: Node, accounts: Seq[ByteString], label: String): Unit = {
       accounts.foreach(acc => {
-        val balance = miner.grpc.wavesBalance(acc).available
-        val eff = miner.grpc.wavesBalance(acc).effective
+        val balance = miner.wavesBalance(acc).available
+        val eff     = miner.wavesBalance(acc).effective
 
         val formatted = s"$acc: balance = $balance, effective = $eff"
         log.debug(s"$label account balance:\n$formatted")
       })
     }
 
-    def waitForTxsToReachAllNodes(txIds: Seq[String]) = {
+    def waitForTxsToReachAllNodes(txIds: Seq[String]): Unit = {
       val txNodePairs = for {
         txId <- txIds
         node <- nodes
       } yield (node, txId)
 
-      txNodePairs.foreach({ case (node, tx) => node.grpc.waitForTransaction(tx) })
+      txNodePairs.foreach({ case (node, tx) => node.waitForTransaction(tx) })
     }
 
     def makeTransfers(accounts: Seq[ByteString]): Seq[String] = accounts.map { acc =>
-      PBTransactions.vanilla(
-        sender.grpc.broadcastTransfer(sender.privateKey, Recipient().withAddress(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
-      ).explicitGet().id().toString
+      PBTransactions
+        .vanilla(
+          sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(acc), defaultBalance, sender.fee(TransferTransaction.typeId))
+        )
+        .explicitGet()
+        .id()
+        .toString
     }
 
     def correctStartBalancesFuture(): Unit = {
-      nodes.foreach(n => n.grpc.waitForHeight(2))
+      nodes.foreach(n => n.waitForHeight(2))
       val accounts = Seq(firstAddress, secondAddress, thirdAddress)
 
       dumpBalances(sender, accounts, "initial")
       val txs = makeTransfers(accounts)
 
-
-      val height = nodes.map(_.grpc.height).max
+      val height = nodes.map(_.height).max
 
       withClue(s"waitForHeight(${height + 2})") {
-        nodes.foreach(n => n.grpc.waitForHeight(height + 2))
+        nodes.foreach(n => n.waitForHeight(height + 1))
+        nodes.foreach(n => n.waitForHeight(height + 2))
       }
 
       withClue("waitForTxsToReachAllNodes") {
@@ -85,8 +88,8 @@ trait GrpcIntegrationSuiteWithThreeAddress
       }
 
       dumpBalances(sender, accounts, "after transfer")
-      accounts.foreach(acc => miner.grpc.wavesBalance(acc).available shouldBe defaultBalance)
-      accounts.foreach(acc => miner.grpc.wavesBalance(acc).effective shouldBe defaultBalance)
+      accounts.foreach(acc => miner.wavesBalance(acc).available shouldBe defaultBalance)
+      accounts.foreach(acc => miner.wavesBalance(acc).effective shouldBe defaultBalance)
     }
 
     withClue("beforeAll") {

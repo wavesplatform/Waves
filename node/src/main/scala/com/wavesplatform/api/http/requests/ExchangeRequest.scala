@@ -1,10 +1,11 @@
 package com.wavesplatform.api.http.requests
 
 import com.wavesplatform.account.PublicKey
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
-import com.wavesplatform.transaction.{TxAmount, TxTimestamp, TxVersion}
-import play.api.libs.json.Json
+import com.wavesplatform.transaction.{Proofs, TxAmount, TxTimestamp, TxVersion}
+import play.api.libs.json.{Format, Json}
 
 case class ExchangeRequest(
     order1: Order,
@@ -18,12 +19,12 @@ case class ExchangeRequest(
     senderPublicKey: Option[String] = None,
     fee: Option[TxAmount] = None,
     timestamp: Option[TxTimestamp] = None,
-    signature: Option[String] = None,
-    proofs: Option[List[String]] = None
+    signature: Option[ByteStr] = None,
+    proofs: Option[Proofs] = None
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, ExchangeTransaction] =
     for {
-      validProofs <- toProofs(version, signature, proofs)
+      validProofs <- toProofs(signature, proofs)
       tx <- ExchangeTransaction.create(
         version.getOrElse(1.toByte),
         order1,
@@ -40,5 +41,5 @@ case class ExchangeRequest(
 }
 
 object ExchangeRequest {
-  implicit val jsonFormat = Json.format[ExchangeRequest]
+  implicit val jsonFormat: Format[ExchangeRequest] = Json.format
 }

@@ -1,10 +1,11 @@
 package com.wavesplatform.transaction
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import monix.eval.Coeval
-import play.api.libs.json.{JsObject, Json}
+import play.api.libs.json.JsObject
 
 trait Transaction {
   val id: Coeval[ByteStr]
@@ -13,19 +14,20 @@ trait Transaction {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
-  def chainByte: Option[Byte] = None
+  def chainByte: Byte = AddressScheme.current.chainId
 
+  def bytesSize: Int = bytes().length
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
+
   override def toString: String = json().toString
-  def toPrettyString: String = json.map(Json.prettyPrint).value
 
   override def equals(other: Any): Boolean = other match {
     case tx: Transaction => id() == tx.id()
     case _               => false
   }
 
-  override def hashCode(): Int = id().hashCode()
+  override def hashCode(): Int = id().hashCode
 
   val bodyBytes: Coeval[Array[Byte]]
   def checkedAssets: Seq[IssuedAsset] = Nil
@@ -44,5 +46,4 @@ object Transaction {
       case (Waves, fee) => Portfolio(balance = fee, lease = LeaseBalance.empty, assets = Map.empty)
     }
   }
-
 }

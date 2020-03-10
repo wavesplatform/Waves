@@ -5,7 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.generator.OracleTransactionGenerator.Settings
 import com.wavesplatform.generator.utils.Gen
-import com.wavesplatform.it.util._
+import com.wavesplatform.generator.utils.Implicits.DoubleExt
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
@@ -37,7 +37,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
     val now = System.currentTimeMillis()
     val transactions: List[Transaction] = (1 to settings.transactions).map { i =>
       TransferTransaction
-        .selfSigned(2.toByte, scriptedAccount, oracle, Waves, 1.waves, Waves, enoughFee, Array.emptyByteArray, now + i)
+        .selfSigned(2.toByte, scriptedAccount, oracle, Waves, 1.waves, Waves, enoughFee, None, now + i)
         .explicitGet()
     }.toList
 
