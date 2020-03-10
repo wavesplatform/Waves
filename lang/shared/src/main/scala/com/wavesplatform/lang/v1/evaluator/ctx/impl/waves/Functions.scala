@@ -471,7 +471,7 @@ object Functions {
   val calculateAssetIdF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "calculateAssetId",
-      10,
+      5,
       CALCULATE_ASSET_ID,
       BYTESTR,
       ("issue", issueActionType)
