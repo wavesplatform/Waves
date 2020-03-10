@@ -201,13 +201,13 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     inside(eval(script, limit = 12)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 12
         decompiled shouldBe "111333"
     }
 
     inside(eval(script, limit = 13)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 12
         decompiled shouldBe "111333"
     }
@@ -576,7 +576,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     val script = "if (2 > 1) then 1 + 2 + 3 else 3 + 4"
 
     inside(eval(script, limit = 0)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 0
         decompiled shouldBe
           """
@@ -587,7 +587,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     inside(eval(script, limit = 1)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 1
         decompiled shouldBe
           """
@@ -598,19 +598,19 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     inside(eval(script, limit = 2)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 2
         decompiled shouldBe "((1 + 2) + 3)"
     }
 
     inside(eval(script, limit = 3)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 3
         decompiled shouldBe "(3 + 3)"
     }
 
     inside(eval(script, limit = 4)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 4
         decompiled shouldBe "6"
     }
@@ -624,13 +624,13 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
       """.stripMargin.trim
 
     inside(eval(script, limit = 0)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 0
         decompiled shouldBe script
     }
 
     inside(eval(script, limit = 1)) {
-      case (result, decompiled, cost) =>
+      case (_, decompiled, cost) =>
         cost shouldBe 1
         decompiled shouldBe
         """
@@ -644,8 +644,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
     }
 
     inside(eval(script, limit = 2)) {
-      case (result, decompiled, cost) =>
-        val expected = CONST_BYTESTR(ByteStr.decodeBase58("aaaa").get).explicitGet()
+      case (_, decompiled, cost) =>
         cost shouldBe 2
         decompiled shouldBe "base58'aaaa'"
     }
