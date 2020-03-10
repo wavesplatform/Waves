@@ -14,7 +14,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
-import com.wavesplatform.protobuf.transaction.{Script => _, _}
+import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order

@@ -75,7 +75,7 @@ class InvokeScriptTransactionGrpcSuite extends GrpcBaseTransactionSuite {
     sender.setScript(thirdContract, Right(Some(script2)), setScriptFee, waitForTx = true)
 
     val scriptInfo = sender.scriptInfo(firstAddress)
-    scriptInfo.script.map(PBTransactions.toVanillaScript) shouldBe Some(script)
+    PBTransactions.toVanillaScript(scriptInfo.scriptBytes) shouldBe Some(script)
   }
 
   test("dApp caller invokes a function on a dApp") {

@@ -478,8 +478,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     ExchangeTransaction.signed(
       1.toByte,
       matcher = matcher,
-      buyOrder = buy.asInstanceOf[Order],
-      sellOrder = sell.asInstanceOf[Order],
+      order1 = buy.asInstanceOf[Order],
+      order2 = sell.asInstanceOf[Order],
       amount = amount,
       price = price,
       buyMatcherFee = (BigInt(mf) * amount / buy.amount).toLong,
@@ -613,8 +613,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       .signed(
         1.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = 425532,
         price = 238,
         buyMatcherFee = 41,
@@ -753,10 +753,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         val exchangeWithResignedOrder = (exchange: @unchecked) match {
           case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _) =>
             val newSig = ByteStr(crypto.sign(PrivateKey(so.senderPublicKey), bo.bodyBytes()))
-            e1.copy(buyOrder = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[Order])
+            e1.copy(order1 = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[Order])
           case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _) =>
             val newSig = ByteStr(crypto.sign(PrivateKey(bo.senderPublicKey), so.bodyBytes()))
-            e2.copy(sellOrder = so.updateProofs(Proofs(Seq(newSig))))
+            e2.copy(order2 = so.updateProofs(Proofs(Seq(newSig))))
         }
 
         val preconBlocks = Seq(
@@ -786,9 +786,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
 
         val exchangeWithResignedOrder = (exchange: @unchecked) match {
           case e1 @ ExchangeTransaction(TxVersion.V1, _, so, _, _, _, _, _, _, _) =>
-            e1.copy(buyOrder = so.updateProofs(newProofs).asInstanceOf[Order])
+            e1.copy(order1 = so.updateProofs(newProofs).asInstanceOf[Order])
           case e2 @ ExchangeTransaction(TxVersion.V2, _, so, _, _, _, _, _, _, _) =>
-            e2.copy(buyOrder = so.updateProofs(newProofs))
+            e2.copy(order1 = so.updateProofs(newProofs))
         }
 
         val preconBlocks = Seq(
@@ -1191,8 +1191,8 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
             .signed(
               2.toByte,
               matcher = matcher,
-              buyOrder = bigBuyOrder,
-              sellOrder = sellOrder,
+              order1 = bigBuyOrder,
+              order2 = sellOrder,
               amount = sellOrder.amount,
               price = bigBuyOrder.price,
               buyMatcherFee = buyMatcherFee,

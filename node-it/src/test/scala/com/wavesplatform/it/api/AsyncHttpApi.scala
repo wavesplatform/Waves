@@ -20,7 +20,9 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
-import com.wavesplatform.protobuf.transaction.{Script => _}
+import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.transaction.{Recipient => PBRecipient, Attachment => PBAttachment, _}
 import com.wavesplatform.state.{AssetDistribution, AssetDistributionPage, DataEntry, EmptyDataEntry, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets._
@@ -717,8 +719,8 @@ object AsyncHttpApi extends Assertions {
       val tx = ExchangeTx
         .signed(
           matcher = matcher,
-          buyOrder = buyOrder,
-          sellOrder = sellOrder,
+          order1 = buyOrder,
+          order2 = sellOrder,
           amount = amount,
           price = price,
           buyMatcherFee = buyMatcherFee,

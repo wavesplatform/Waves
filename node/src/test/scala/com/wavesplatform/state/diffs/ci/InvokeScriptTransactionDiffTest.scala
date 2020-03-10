@@ -778,7 +778,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._3, r._6, r._5)) {
       case (acc, amount, genesis, setScript, aliasTx, ciWithFakeAlias) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(aliasTx, setScript))), TestBlock.create(Seq(ciWithFakeAlias)), fs) {
-          _ should produce("AliasDoesNotExist")
+          _ should produce("does not exist")
         }
     }
   }

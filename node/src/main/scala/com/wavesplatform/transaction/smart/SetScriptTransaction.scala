@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError

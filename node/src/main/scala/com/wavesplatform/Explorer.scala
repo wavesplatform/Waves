@@ -6,16 +6,18 @@ import java.util
 
 import com.google.common.primitives.{Longs, Shorts}
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.{Height, Portfolio, TxNum}
+import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
+import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
@@ -27,8 +29,12 @@ import scala.util.Try
 object Explorer extends ScorexLogging {
   case class Stats(entryCount: Long, totalKeySize: Long, totalValueSize: Long)
 
-  // todo: replace with actual implementation
-  def portfolio(address: Address): Portfolio = ???
+  def portfolio(db: DB, blockchain: Blockchain, address: Address): Portfolio =
+    Portfolio(
+      blockchain.balance(address),
+      blockchain.leaseBalance(address),
+      db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).toMap)
+    )
 
   private val keys = Array(
     "version",
@@ -125,7 +131,7 @@ object Explorer extends ScorexLogging {
           val balances = mutable.Map[BigInt, Long]()
           db.iterateOver(6: Short) { e =>
             val addressId = BigInt(e.getKey.drop(6))
-            val balance = Longs.fromByteArray(e.getValue)
+            val balance   = Longs.fromByteArray(e.getValue)
             balances += (addressId -> balance)
           }
 
@@ -134,20 +140,22 @@ object Explorer extends ScorexLogging {
             actualTotalReward += Longs.fromByteArray(e.getValue)
           }
 
-          val actualTotalBalance = balances.values.sum + reader.carryFee
+          val actualTotalBalance   = balances.values.sum + reader.carryFee
           val expectedTotalBalance = Constants.UnitsInWave * Constants.TotalWaves + actualTotalReward
-          val byKeyTotalBalance = reader.wavesAmount(blockchainHeight)
+          val byKeyTotalBalance    = reader.wavesAmount(blockchainHeight)
 
           if (actualTotalBalance != expectedTotalBalance || expectedTotalBalance != byKeyTotalBalance)
-            log.error(s"Something wrong, actual total waves balance: $actualTotalBalance," +
-              s" expected total waves balance: $expectedTotalBalance, total waves balance by key: $byKeyTotalBalance")
+            log.error(
+              s"Something wrong, actual total waves balance: $actualTotalBalance," +
+                s" expected total waves balance: $expectedTotalBalance, total waves balance by key: $byKeyTotalBalance"
+            )
           else
             log.info(s"Correct total waves balance: $actualTotalBalance WAVELETS")
 
         case "DA" =>
           val addressIds = mutable.Seq[(BigInt, Address)]()
           db.iterateOver(25: Short) { e =>
-            val address = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
+            val address   = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
             val addressId = BigInt(e.getValue)
             addressIds :+ (addressId -> address)
           }
@@ -303,17 +311,17 @@ object Explorer extends ScorexLogging {
           txs.foreach(println)
 
         case "AP" =>
-          val address   = Address.fromString(argument(1, "address")).explicitGet()
-          val pf = portfolio(address)
+          val address = Address.fromString(argument(1, "address")).explicitGet()
+          val pf      = portfolio(db, reader, address)
           log.info(s"$address : ${pf.balance} WAVES, ${pf.lease}, ${pf.assets.size} assets")
           pf.assets.toSeq.sortBy(_._1.toString) foreach {
             case (assetId, balance) => log.info(s"$assetId : $balance")
           }
 
         case "HS" =>
-          val height = argument(1, "height").toInt
+          val height       = argument(1, "height").toInt
           val hitSourceKey = Keys.hitSource(height)
-          val hitSource = db.get(hitSourceKey.keyBytes)
+          val hitSource    = db.get(hitSourceKey.keyBytes)
           log.info(s"HitSource at height=$height: ${Base64.encode(hitSource)}")
       }
     } finally db.close()

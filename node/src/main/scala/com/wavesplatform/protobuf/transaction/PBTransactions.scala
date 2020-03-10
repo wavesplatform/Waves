@@ -1,6 +1,5 @@
 package com.wavesplatform.protobuf.transaction
 
-import com.google.common.primitives.Bytes
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressOrAlias, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
@@ -24,7 +23,6 @@ import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{transaction => vt}
 
 import scala.util.Try
-import com.wavesplatform.common.utils.EitherExt2
 
 object PBTransactions {
   import com.wavesplatform.protobuf.utils.PBImplicitConversions._
@@ -143,7 +141,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -160,7 +158,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId),
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -170,7 +168,7 @@ object PBTransactions {
         vt.smart.SetScriptTransaction.create(
           version.toByte,
           sender,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -185,11 +183,11 @@ object PBTransactions {
       case Data.LeaseCancel(LeaseCancelTransactionData(leaseId)) =>
         vt.lease.LeaseCancelTransaction.create(version.toByte, sender, leaseId.toByteArray, feeAmount, timestamp, proofs)
 
-      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(buyOrder, sellOrder))) =>
+      case Data.Exchange(ExchangeTransactionData(amount, price, buyMatcherFee, sellMatcherFee, Seq(order1, order2))) =>
         vt.assets.exchange.ExchangeTransaction.create(
           version.toByte,
-          PBOrders.vanilla(buyOrder),
-          PBOrders.vanilla(sellOrder),
+          PBOrders.vanilla(order1),
+          PBOrders.vanilla(order2),
           amount,
           price,
           buyMatcherFee,
@@ -332,7 +330,7 @@ object PBTransactions {
           quantity,
           decimals.toByte,
           reissuable,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -349,7 +347,7 @@ object PBTransactions {
           version.toByte,
           sender,
           IssuedAsset(assetId),
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -359,7 +357,7 @@ object PBTransactions {
         vt.smart.SetScriptTransaction(
           version.toByte,
           sender,
-          script.map(toVanillaScript),
+          toVanillaScript(script),
           feeAmount,
           timestamp,
           proofs
@@ -476,13 +474,13 @@ object PBTransactions {
           price,
           buyMatcherFee,
           sellMatcherFee,
-          Seq(PBOrders.protobuf(buyOrder), PBOrders.protobuf(sellOrder))
+          Seq(PBOrders.protobuf(order1), PBOrders.protobuf(order2))
         )
         PBTransactions.create(tx.sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Exchange(data))
 
       case tx: vt.assets.IssueTransaction =>
         import tx._
-        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, script.map(toPBScript))
+        val data = IssueTransactionData(name.toStringUtf8, description.toStringUtf8, quantity, decimals, reissuable, toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Issue(data))
 
       case tx: vt.assets.ReissueTransaction =>
@@ -496,11 +494,11 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, version, proofs, Data.Burn(data))
 
       case tx @ vt.assets.SetAssetScriptTransaction(_, sender, assetId, script, fee, timestamp, proofs) =>
-        val data = SetAssetScriptTransactionData(assetId.id, script.map(toPBScript))
+        val data = SetAssetScriptTransactionData(assetId.id, toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetAssetScript(data))
 
       case tx @ vt.smart.SetScriptTransaction(_, sender, script, fee, timestamp, proofs) =>
-        val data = SetScriptTransactionData(script.map(toPBScript))
+        val data = SetScriptTransactionData(toPBScript(script))
         PBTransactions.create(sender, chainId, fee, tx.assetFee._1, timestamp, tx.version, proofs, Data.SetScript(data))
 
       case tx: vt.lease.LeaseTransaction =>
@@ -607,14 +605,13 @@ object PBTransactions {
       .map(Attachment.of)
   }
 
-  def toVanillaScript(script: Script): com.wavesplatform.lang.script.Script = {
+  def toVanillaScript(script: ByteString): Option[com.wavesplatform.lang.script.Script] = {
     import com.wavesplatform.common.utils._
-    val array = Bytes.concat(Array(script.version.toByte), script.bytes.toByteArray)
-    ScriptReader.fromBytes(array).explicitGet()
+    if (script.isEmpty) None else Some(ScriptReader.fromBytes(script.toByteArray).explicitGet())
   }
 
-  def toPBScript(script: com.wavesplatform.lang.script.Script): Script = {
-    val Array(ver, body @ _*) = script.bytes().arr
-    Script.of(ByteString.copyFrom(body.toArray), ver)
+  def toPBScript(script: Option[com.wavesplatform.lang.script.Script]): ByteString = script match {
+    case Some(sc) => ByteString.copyFrom(sc.bytes())
+    case None => ByteString.EMPTY
   }
 }

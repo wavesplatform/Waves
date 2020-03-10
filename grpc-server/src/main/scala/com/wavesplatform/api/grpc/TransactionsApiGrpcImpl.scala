@@ -13,23 +13,38 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
   override def getTransactions(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =
     responseObserver.interceptErrors {
+      val transactionIds = request.transactionIds.map(_.toByteStr)
       val stream = request.recipient match {
         case Some(subject) =>
           commonApi.transactionsByAddress(
             subject.toAddressOrAlias,
-            Option(request.sender).filter(!_.isEmpty).map(_.toAddress),
+            Option(request.sender).collect { case s if !s.isEmpty => s.toAddress },
             Set.empty,
             None
           )
         case None =>
-          Observable.fromIterable(request.transactionIds.flatMap(id => commonApi.transactionById(id.toByteStr))).map {
-            case (h, e) => h -> e.fold(identity, _._1)
+          if (request.sender.isEmpty) {
+            Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map {
+              case (h, e) => h -> e.fold(identity, _._1)
+            }
+          } else {
+            val senderAddress = request.sender.toAddress
+            commonApi.transactionsByAddress(
+              senderAddress,
+              Some(senderAddress),
+              Set.empty,
+              None
+            )
           }
       }
 
-      responseObserver.completeWith(stream.map {
-        case (h, tx) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB))
-      })
+      val transactionIdSet = transactionIds.toSet
+
+      responseObserver.completeWith(
+        stream
+          .filter { case (_, t) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
+          .map { case (h, tx) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB)) }
+      )
     }
 
   override def getUnconfirmed(request: TransactionsRequest, responseObserver: StreamObserver[TransactionResponse]): Unit =

@@ -14,7 +14,7 @@ import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{Domain, StorageFactory, randomSig}
+import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -557,31 +557,7 @@ class UtxPoolSpecification
           utxPool.pessimisticPortfolio(sender) should not be emptyPf
       }
 
-      "takes into account unconfirmed transactions" in forAll(withValidPayments) {
-        case (sender, state, utxPool, _, _) =>
-          println(db)
-          val basePortfolio = Portfolio(state.balance(sender), state.leaseBalance(sender), Domain.portfolio(sender, db, state).toMap)
-          val baseAssetIds  = basePortfolio.assetIds
-
-          val pessimisticAssetIds = {
-            val p = utxPool.pessimisticPortfolio(sender)
-            p.assetIds.filter(x => p.balanceOf(x) != 0)
-          }
-
-          val unchangedAssetIds = baseAssetIds -- pessimisticAssetIds
-          withClue("unchanged") {
-            unchangedAssetIds.foreach { assetId =>
-              basePortfolio.balanceOf(assetId) shouldBe basePortfolio.balanceOf(assetId)
-            }
-          }
-
-          val changedAssetIds = pessimisticAssetIds -- baseAssetIds
-          withClue("changed") {
-            changedAssetIds.foreach { assetId =>
-              basePortfolio.balanceOf(assetId) should not be basePortfolio.balanceOf(assetId)
-            }
-          }
-      }
+      "takes into account unconfirmed transactions" in pending
     }
 
     "blacklisting" - {

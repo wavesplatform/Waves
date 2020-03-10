@@ -22,7 +22,7 @@ class AssetsApiGrpcImpl(assetsApi: CommonAssetsApi)(implicit sc: Scheduler) exte
           info.description.script.map {
             case (script, complexity) =>
               ScriptData(
-                Some(PBTransactions.toPBScript(script)),
+                PBTransactions.toPBScript(Some(script)),
                 script.expr.toString,
                 complexity
               )

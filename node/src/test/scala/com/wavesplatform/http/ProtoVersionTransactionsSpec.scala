@@ -63,6 +63,7 @@ class ProtoVersionTransactionsSpec
 
   private def test(f: => Any): Unit = {
     (utxPoolSynchronizer.publish _).expects(*).anyNumberOfTimes().returning(TracedResult(Right(true)))
+    f
   }
 
   "Proto transactions should be able to broadcast " - {
