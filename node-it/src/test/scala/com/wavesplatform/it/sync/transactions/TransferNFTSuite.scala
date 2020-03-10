@@ -173,8 +173,8 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
       .signed(
         2.toByte,
         matcher = matcher,
-        buyOrder = buy,
-        sellOrder = sell,
+        order1 = buy,
+        order2 = sell,
         amount = 1,
         price = 1.waves,
         buyMatcherFee = matcherFee,
