@@ -728,8 +728,8 @@ object AsyncHttpApi extends Assertions {
       val tx = ExchangeTx
         .signed(
           matcher = matcher,
-          buyOrder = buyOrder,
-          sellOrder = sellOrder,
+          order1 = buyOrder,
+          order2 = sellOrder,
           amount = amount,
           price = price,
           buyMatcherFee = buyMatcherFee,
