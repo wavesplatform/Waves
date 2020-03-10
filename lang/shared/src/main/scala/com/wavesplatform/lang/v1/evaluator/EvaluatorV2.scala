@@ -83,7 +83,14 @@ class EvaluatorV2(
           case nonEvaluated => unused
         }
 
-      case REF(key) => visitRef(key, update, limit, parentBlocks)
+      case REF(key) =>
+        ctx.letDefs.get(key)
+          .map { v =>
+            val globalValue = v.value.value.explicitGet()
+            update(globalValue)
+            limit - 1
+          }
+          .getOrElse(visitRef(key, update, limit, parentBlocks))
       case fc: FUNCTION_CALL =>
         val unusedArgsEval = fc.args.indices.foldLeft(limit) {
           case (unused, argIndex) =>

@@ -750,7 +750,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
         |     }
         |     f(a)
         |   }
-        |   1 + f(a) + 1
+        |   1 + f(a) + height
         | }
         | func g(a: Int) = f(1) + f(a)
         | func h(a: Int) = f(1) + g(a) + g(a)
