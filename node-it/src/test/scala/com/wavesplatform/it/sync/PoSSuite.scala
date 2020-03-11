@@ -12,7 +12,7 @@ import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.AsyncNetworkApi.NodeAsyncNetworkApi
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
-import com.wavesplatform.it.{Docker, NodeConfigs, WaitForHeight2}
+import com.wavesplatform.it.{NodeConfigs, WaitForHeight2}
 import com.wavesplatform.network.RawBytes
 import org.scalatest.{CancelAfterFailure, FunSuite, Matchers}
 import play.api.libs.json.{JsSuccess, Json, Reads}
