@@ -50,7 +50,7 @@ private[node] class ChainDependentMapper(chainId: Byte) {
       pkToAddress(b.generator),
       b.generator.byteStr,
       b.VRF.map(_.byteStr),
-      b.transactionsRoot
+      b.transactionsRoot.byteStr
     )
 
 
