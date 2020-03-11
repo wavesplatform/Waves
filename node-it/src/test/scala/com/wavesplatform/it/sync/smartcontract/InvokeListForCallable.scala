@@ -31,15 +31,13 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
       |{-# CONTENT_TYPE DAPP #-}
       |{-# SCRIPT_TYPE ACCOUNT #-}
       |
-      |func parse(asset: ByteVector|Unit) = if asset.isDefined() then asset.value() else base58''
       |
       |@Callable(inv)
-      |func default(a:List[Int], b:List[String], c:List[ByteVector], y: List[Boolean], z:List[List[Int]]) = [
-      |  IntegerEntry('a', a[0]),
-      |  StringEntry['b', b[0]],
-      |  BooleanEntry['y', y[0]],
-      |  BinaryEntry['c', c[0]],
-      |  IntegerEntry['z', z[0][0]]
+      |func f(a:List[Int], b:List[String], c:List[ByteVector], y: List[Boolean]) = [
+      |  IntegerEntry("a", a[0]),
+      |  StringEntry("b", b[0]),
+      |  BinaryEntry("c", c[0]),
+      |  BooleanEntry("y", y[0])
       |]
       """.stripMargin
     val script = ScriptCompiler.compile(source, ScriptEstimatorV2).explicitGet()._1.bytes().base64
@@ -50,16 +48,18 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     val rndString = Random.nextString(10)
     val intList = ARR(IndexedSeq(CONST_LONG(Long.MaxValue)))
     val strList = ARR(IndexedSeq(CONST_STRING(rndString).explicitGet()))
-    val byteList = ARR(IndexedSeq(CONST_BYTESTR(Base58.decode(rndString)).explicitGet()))
-    val listOfListOfInt = ARR(IndexedSeq(ARR(IndexedSeq(CONST_LONG(Long.MaxValue)))))
+    val byteList = ARR(IndexedSeq(CONST_BYTESTR(rndString.getBytes()).explicitGet()))
     val boolList = ARR(IndexedSeq(CONST_BOOLEAN(true)))
+    //not supported yet
+    //val listOfListOfInt = ARR(IndexedSeq(ARR(IndexedSeq(CONST_LONG(Long.MaxValue)))))
+
 
     sender
       .invokeScript(
         caller,
         dApp,
         Some("f"),
-        args = List(intList, strList, byteList, boolList, listOfListOfInt),
+        args = List(intList, strList, byteList, boolList),
         waitForTx = true
       )
 
@@ -67,7 +67,6 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
     sender.getData(dApp, "b") shouldBe rndString
     sender.getData(dApp, "c") shouldBe Base58.decode(rndString)
     sender.getData(dApp, "y") shouldBe true
-    sender.getData(dApp, "z") shouldBe Long.MaxValue
 
   }
 
