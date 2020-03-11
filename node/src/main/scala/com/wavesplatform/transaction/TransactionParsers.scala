@@ -60,7 +60,10 @@ object TransactionParsers {
       val typeId  = bytes(1)
       val version = bytes(2)
       modern.get((typeId, version)) match {
-        case Some(parser) => parser.parseBytes(bytes)
+        case Some(parser) => parser.parseBytes(bytes).flatMap { tx =>
+          import parser._
+          tx.validatedEither.left.map(ve => new RuntimeException(ve.toString)).toTry
+        }
         case None =>
           Failure[Transaction](UnknownTypeAndVersion(typeId, version))
       }

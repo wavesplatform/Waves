@@ -6,16 +6,21 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
-import com.wavesplatform.transaction.validation.TxValidator
-import com.wavesplatform.transaction.validation.impl.TxFeeValidator
+import com.wavesplatform.transaction.validation.impl.CreateAliasTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
-final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, alias: Alias, fee: TxAmount, timestamp: TxTimestamp, proofs: Proofs)
-    extends SigProofsSwitch
+final case class CreateAliasTransaction(
+    version: TxVersion,
+    sender: PublicKey,
+    alias: Alias,
+    fee: TxAmount,
+    timestamp: TxTimestamp,
+    proofs: Proofs,
+    chainId: Byte
+) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
     with LegacyPBSwitch.V3 {
@@ -35,11 +40,11 @@ final case class CreateAliasTransaction(version: TxVersion, sender: PublicKey, a
 
 object CreateAliasTransaction extends TransactionParser {
   type TransactionT = CreateAliasTransaction
-  val classTag: ClassTag[CreateAliasTransaction] = ClassTag(classOf[CreateAliasTransaction])
-  val supportedVersions: Set[TxVersion]          = Set(1, 2, 3)
-  val typeId: TxType                             = 10
 
-  implicit val validator = TxFeeValidator.asInstanceOf[TxValidator[CreateAliasTransaction]]
+  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  val typeId: TxType                    = 10: Byte
+
+  implicit val validator = CreateAliasTxValidator
   val serializer         = CreateAliasTxSerializer
 
   implicit def sign(tx: CreateAliasTransaction, privateKey: PrivateKey): CreateAliasTransaction =
@@ -56,7 +61,7 @@ object CreateAliasTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransactionT] =
-    CreateAliasTransaction(version, sender, alias, fee, timestamp, proofs).validatedEither
+    CreateAliasTransaction(version, sender, alias, fee, timestamp, proofs, alias.chainId).validatedEither
 
   def signed(
       version: TxVersion,

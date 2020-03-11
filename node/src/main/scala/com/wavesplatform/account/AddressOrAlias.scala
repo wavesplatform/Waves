@@ -9,6 +9,7 @@ import com.wavesplatform.transaction.TxValidationError._
 trait AddressOrAlias {
   def stringRepr: String
   def bytes: ByteStr
+  def chainId: Byte
 
   override def toString: String = stringRepr
 

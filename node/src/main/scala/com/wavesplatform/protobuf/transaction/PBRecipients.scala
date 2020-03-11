@@ -14,35 +14,40 @@ object PBRecipients {
     case _          => sys.error("Should not happen " + addressOrAlias)
   }
 
-  def toAddress(bytes: ByteStr): Either[ValidationError, Address] = bytes.length match {
+  def toAddress(bytes: ByteStr, chainId: Byte): Either[ValidationError, Address] = bytes.length match {
     case Address.HashLength => // Compressed address
-      val withHeader = Bytes.concat(Array(Address.AddressVersion, AddressScheme.current.chainId), bytes)
+      val withHeader = Bytes.concat(Array(Address.AddressVersion, chainId), bytes)
       val checksum   = Address.calcCheckSum(withHeader)
-      Address.fromBytes(Bytes.concat(withHeader, checksum))
+      Address.fromBytes(Bytes.concat(withHeader, checksum), chainId)
 
     case Address.AddressLength => // Regular address
-      Address.fromBytes(bytes)
+      Address.fromBytes(bytes, chainId)
 
     case crypto.KeyLength => // Public key
-      Right(PublicKey(bytes).toAddress)
+      Right(PublicKey(bytes).toAddress(chainId))
 
     case _ =>
       Left(GenericError(s"Invalid address length: ${bytes.length}"))
   }
 
-  def toAddress(r: Recipient): Either[ValidationError, Address] = r.recipient match {
-    case Recipient.Recipient.PublicKeyHash(bytes) => toAddress(bytes.toByteArray)
+  def toAddress(r: Recipient, chainId: Byte): Either[ValidationError, Address] = r.recipient match {
+    case Recipient.Recipient.PublicKeyHash(bytes) => toAddress(bytes.toByteArray, chainId)
     case _                                        => Left(GenericError(s"Not an address: $r"))
   }
 
-  def toAlias(r: Recipient): Either[ValidationError, Alias] = r.recipient match {
-    case Recipient.Recipient.Alias(alias) => Alias.create(alias)
+  def toAlias(r: Recipient, chainId: Byte): Either[ValidationError, Alias] = r.recipient match {
+    case Recipient.Recipient.Alias(alias) => Alias.createWithChainId(alias, chainId)
     case _                                => Left(GenericError(s"Not an alias: $r"))
   }
 
-  def toAddressOrAlias(r: Recipient): Either[ValidationError, AddressOrAlias] = {
-    if (r.recipient.isPublicKeyHash) toAddress(r)
-    else if (r.recipient.isAlias) toAlias(r)
+  def toAlias(r: Recipient): Either[ValidationError, Alias] = r.recipient match {
+    case Recipient.Recipient.Alias(alias) => Alias.fromString(alias)
+    case _                                => Left(GenericError(s"Not an alias: $r"))
+  }
+
+  def toAddressOrAlias(r: Recipient, chainId: Byte): Either[ValidationError, AddressOrAlias] = {
+    if (r.recipient.isPublicKeyHash) toAddress(r, chainId)
+    else if (r.recipient.isAlias) toAlias(r, chainId)
     else Left(GenericError(s"Not an address or alias: $r"))
   }
 }

@@ -323,30 +323,33 @@ class TransactionSerializeSuite extends BaseTransactionSuite with TableDrivenPro
     .right
     .get
 
+  private val recipient = Address.fromString(sender.address).right.get
   private val transferV1 = TransferTransaction(
     1.toByte,
     publicKey,
-    Address.fromString(sender.address).right.get,
+    recipient,
     Waves,
     1900000,
     Waves,
     minFee,
     None,
     ts,
-    Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get))
+    Proofs(Seq(ByteStr.decodeBase58("eaV1i3hEiXyYQd6DQY7EnPg9XzpAvB9VA3bnpin2qJe4G36GZXaGnYKCgSf9xiQ61DcAwcBFzjSXh6FwCgazzFz").get)),
+    recipient.chainId
   )
 
   private val transferV2 = TransferTransaction(
     2.toByte,
     publicKey,
-    Address.fromString(sender.address).right.get,
+    recipient,
     Waves,
     100000000,
     Waves,
     minFee,
     None,
     ts,
-    Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+    Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
+    recipient.chainId
   )
 
   private val invokeScript = InvokeScriptTransaction

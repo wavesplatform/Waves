@@ -8,7 +8,7 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.SetScriptTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
-import com.wavesplatform.transaction.validation.impl.TxFeeValidator
+import com.wavesplatform.transaction.validation.impl.SetScriptTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -20,7 +20,8 @@ case class SetScriptTransaction(
     script: Option[Script],
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -36,16 +37,16 @@ case class SetScriptTransaction(
 }
 
 object SetScriptTransaction extends TransactionParser {
-  override val typeId: TxType                    = 13
+  type TransactionT = SetScriptTransaction
+
+  override val typeId: TxType                    = 13: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
-  implicit val validator: TxValidator[SetScriptTransaction] =
-    TxFeeValidator.asInstanceOf[TxValidator[SetScriptTransaction]]
+  implicit val validator: TxValidator[SetScriptTransaction] = SetScriptTxValidator
+  val serializer                                            = SetScriptTxSerializer
 
   implicit def sign(tx: SetScriptTransaction, privateKey: PrivateKey): SetScriptTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
-
-  val serializer = SetScriptTxSerializer
 
   override def parseBytes(bytes: Array[TxVersion]): Try[SetScriptTransaction] =
     serializer.parseBytes(bytes)
@@ -56,9 +57,10 @@ object SetScriptTransaction extends TransactionParser {
       script: Option[Script],
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, SetScriptTransaction] =
-    SetScriptTransaction(version, sender, script, fee, timestamp, proofs).validatedEither
+    SetScriptTransaction(version, sender, script, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

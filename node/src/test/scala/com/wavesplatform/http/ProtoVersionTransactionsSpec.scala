@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
@@ -400,7 +400,6 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
       val updateAssetInfoTx = UpdateAssetInfoTransaction
         .selfSigned(
           TxVersion.V1,
-          AddressScheme.current.chainId,
           account,
           asset.id,
           "Test",

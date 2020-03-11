@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.state.DataEntry
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
@@ -54,6 +55,6 @@ object DataTxSerializer {
     val data      = parseDataEntries(buf)
     val timestamp = buf.getLong // Timestamp before fee
     val fee       = buf.getLong
-    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs)
+    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 }

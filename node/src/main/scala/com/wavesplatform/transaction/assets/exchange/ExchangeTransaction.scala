@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets.exchange
 
-import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -22,7 +22,8 @@ case class ExchangeTransaction(
     sellMatcherFee: Long,
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with TxWithFee.InWaves
@@ -47,6 +48,8 @@ case class ExchangeTransaction(
 }
 
 object ExchangeTransaction extends TransactionParser {
+  type TransactionT = ExchangeTransaction
+
   implicit val validator = ExchangeTxValidator
   val serializer         = ExchangeTxSerializer
 
@@ -70,9 +73,10 @@ object ExchangeTransaction extends TransactionParser {
       sellMatcherFee: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs = Proofs.empty
+      proofs: Proofs = Proofs.empty,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, ExchangeTransaction] =
-    ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs).validatedEither
+    ExchangeTransaction(version, order1, order2, amount, price, buyMatcherFee, sellMatcherFee, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

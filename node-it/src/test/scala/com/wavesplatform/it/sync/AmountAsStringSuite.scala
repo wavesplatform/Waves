@@ -1,18 +1,14 @@
 package com.wavesplatform.it.sync
 
-import com.wavesplatform.account.{AddressOrAlias, KeyPair, PublicKey}
-import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.state.IntegerDataEntry
-import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, TxVersion}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
-import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.SponsorFeeTransaction
-import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
+import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.state.IntegerDataEntry
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.{CreateAliasTransaction, TxVersion}
 import org.asynchttpclient.Response
 import org.scalatest
 import org.scalatest.Assertion

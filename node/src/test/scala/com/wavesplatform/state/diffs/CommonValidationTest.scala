@@ -1,5 +1,7 @@
 package com.wavesplatform.state.diffs
 
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{AddressScheme, Alias}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -10,10 +12,12 @@ import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
-import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.assets._
+import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, PaymentTransaction, Proofs, Transaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
@@ -209,5 +213,86 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
 
   property("checkFee for smart tokens sunny") {
     smartTokensCheckFeeTest(feeInAssets = false, feeAmount = 1)(_ shouldBe 'right)
+  }
+
+  property("disallows other network") {
+    val preconditionsAndPayment: Gen[(GenesisTransaction, Transaction)] = for {
+      master    <- accountGen
+      recipient <- accountGen
+      timestamp <- positiveLongGen
+      amount    <- smallFeeGen
+      script    <- scriptGen
+      asset     <- bytes32gen.map(IssuedAsset(_))
+      genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, timestamp).explicitGet()
+
+      invChainId <- invalidChainIdGen
+      invChainAddr  = recipient.toAddress(invChainId)
+      invChainAlias = Alias.createWithChainId("test", invChainId).explicitGet()
+      invChainAddrOrAlias <- Gen.oneOf(invChainAddr, invChainAlias)
+
+      tx <- Gen.oneOf(
+        GenesisTransaction.create(invChainAddr, amount, timestamp).explicitGet(),
+        PaymentTransaction.create(master, invChainAddr, amount, amount, timestamp).explicitGet(),
+        TransferTransaction(
+          TxVersion.V3,
+          master.publicKey,
+          invChainAddrOrAlias,
+          Waves,
+          amount,
+          Waves,
+          amount,
+          None,
+          timestamp,
+          Proofs.empty,
+          invChainId
+        ).signWith(master),
+        CreateAliasTransaction(TxVersion.V3, master.publicKey, invChainAlias, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        LeaseTransaction(TxVersion.V3, master.publicKey, invChainAddrOrAlias, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        InvokeScriptTransaction(TxVersion.V2, master, invChainAddrOrAlias, None, Nil, amount, Waves, timestamp, Proofs.empty, invChainId)
+          .signWith(master),
+        exchangeV1GeneratorP(master, recipient, asset, Waves, None, invChainId).sample.get,
+        IssueTransaction(
+          TxVersion.V2,
+          master.publicKey,
+          ByteString.copyFrom(asset.id),
+          ByteString.copyFrom(asset.id),
+          amount,
+          8: Byte,
+          reissuable = true,
+          None,
+          amount,
+          timestamp,
+          Proofs.empty,
+          invChainId
+        ).signWith(master),
+        MassTransferTransaction(
+          TxVersion.V2,
+          master,
+          Waves,
+          Seq(ParsedTransfer(invChainAddrOrAlias, amount)),
+          amount,
+          timestamp,
+          None,
+          Proofs.empty,
+          invChainId
+        ).signWith(master),
+        LeaseCancelTransaction(TxVersion.V3, master, asset.id, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        SetScriptTransaction(TxVersion.V2, master, Some(script), amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        SetAssetScriptTransaction(TxVersion.V2, master, asset, Some(script), amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        BurnTransaction(TxVersion.V2, master, asset, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        ReissueTransaction(TxVersion.V2, master, asset, amount, reissuable = false, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        SponsorFeeTransaction(TxVersion.V2, master, asset, Some(amount), amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        UpdateAssetInfoTransaction(TxVersion.V2, master, asset, "1", "2", timestamp, amount, Waves, Proofs.empty, invChainId).signWith(master),
+        DataTransaction(TxVersion.V2, master, Nil, amount, timestamp, Proofs.empty, invChainId).signWith(master)
+      )
+    } yield (genesis, tx)
+
+    forAll(preconditionsAndPayment) {
+      case (genesis, tx) =>
+        tx.chainId should not be AddressScheme.current.chainId
+        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(tx))) { blockDiffEi =>
+          blockDiffEi should produce("Data from other network")
+        }
+    }
   }
 }
