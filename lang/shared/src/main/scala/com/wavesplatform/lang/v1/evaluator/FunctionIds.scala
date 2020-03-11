@@ -90,7 +90,7 @@ object FunctionIds {
   val ADDRESSFROMRECIPIENT: Short = 1060
   val ADDRESSTOSTRING: Short      = 1061
 
-  val BLOCKHEADER_FROM_BYTES: Short = 1070
+  val TRANSFER_TRANSACTION_FROM_PROTO: Short = 1070
 
   val CALCULATE_ASSET_ID: Short = 1080
 }
