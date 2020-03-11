@@ -9,8 +9,8 @@ import com.google.common.primitives.{Bytes, Ints, Shorts}
 import com.google.protobuf.{CodedInputStream, CodedOutputStream, WireFormat}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
-import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.serialization.mkTxsCountBytes
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
@@ -647,7 +647,7 @@ class LevelDBWriter(
           }
 
           rw.delete(Keys.blockInfoAt(h))
-          rw.delete(Keys.heightOf(discardedSignature))
+          rw.delete(Keys.heightOf(Block.uniqueId(discardedHeader, discardedSignature)))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
@@ -958,7 +958,7 @@ class LevelDBWriter(
         db.get(Keys.blockInfoAt(height))
       }
       .collect {
-        case Some(BlockInfo(_, _, _, signature)) => signature
+        case Some(bi) => bi.uniqueId
       }
   }
 
@@ -970,7 +970,7 @@ class LevelDBWriter(
           db.get(Keys.blockInfoAt(height))
         }
         .collect {
-          case Some(BlockInfo(_, _, _, signature)) => signature
+          case Some(bi) => bi.uniqueId
         }
     }
   }

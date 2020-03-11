@@ -23,11 +23,18 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     // With a spec
     case GetPeers             => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
     case k: KnownPeers        => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
-    case gs: GetSignatures    => out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
-    case s: Signatures        => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
     case g: GetBlock          => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
     case m: MicroBlockInv     => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
     case m: MicroBlockRequest => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
+
+    // Version switch
+    case gs: GetSignatures if isNewMsgsSupported(ctx) =>
+      out.add(RawBytes(GetHashesOrSignaturesSpec.messageCode, GetHashesOrSignaturesSpec.serializeData(gs)))
+    case gs: GetSignatures if SignaturesSpec.isSupported(gs.signatures) =>
+      out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
+    case s: Signatures if isNewMsgsSupported(ctx)                  => out.add(RawBytes(HashesOrSignaturesSpec.messageCode, HashesOrSignaturesSpec.serializeData(s)))
+    case s: Signatures if SignaturesSpec.isSupported(s.signatures) => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
+    case _ => log.warn(s"Can't encode message $msg for $ctx")
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
@@ -41,4 +48,13 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     peerDatabase.blacklistAndClose(ctx.channel(), s"Invalid message. ${e.getMessage}")
   }
 
+  private[this] def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
+    val version = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
+    version match {
+      case (0, _, _)            => false
+      case (1, v1, _) if v1 < 2 => false
+      case (1, 2, v) if v < 2   => false // TODO change to 3 on release
+      case _                    => true // >= 1.2.3
+    }
+  }
 }

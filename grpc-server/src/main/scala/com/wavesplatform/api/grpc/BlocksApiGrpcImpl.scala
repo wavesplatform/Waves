@@ -31,7 +31,7 @@ class BlocksApiGrpcImpl(blockchain: Blockchain)(implicit sc: Scheduler) extends 
           .map { case (block, height) => BlockWithHeight(Some(block.toPB), height) } else
         commonApi
           .blockHeadersRange(request.fromHeight, request.toHeight)
-          .map { case (BlockInfo(header, _, _, signature), height) => BlockWithHeight(Some(PBBlock(Some(header.toPBHeader), signature)), height) }
+          .map { case (bi, height) => BlockWithHeight(Some(PBBlock(Some(bi.header.toPBHeader), bi.uniqueId)), height) }
 
     responseObserver.completeWith(request.filter.generator match {
       case Some(generator) => stream.filter(_.block.exists(_.header.exists(h => h.generator.toAddress == generator.toAddress)))

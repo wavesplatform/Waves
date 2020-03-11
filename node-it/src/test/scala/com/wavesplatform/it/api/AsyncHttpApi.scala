@@ -977,8 +977,8 @@ object AsyncHttpApi extends Assertions {
 
       def waitSameBlockHeaders =
         waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
-          val sig = blocks.map(_.signature)
-          sig.forall(_ == sig.head)
+          val id = blocks.map(_.id)
+          id.forall(_ == id.head)
         })
 
       for {

@@ -3,7 +3,7 @@ package com.wavesplatform
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.Block.{BlockId, BlockInfo}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures
@@ -183,9 +183,9 @@ package object state {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val BlockInfo(_, _, _, signature) =
+      val blockInfo =
         blockchain.blockInfo(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
-      val balances = blockchain.balanceSnapshots(address, bottomLimit, signature)
+      val balances = blockchain.balanceSnapshots(address, bottomLimit, blockInfo.uniqueId)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 

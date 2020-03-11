@@ -107,7 +107,8 @@ class NgState(
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
-  def contains(blockId: BlockId): Boolean = base.uniqueId == blockId || microBlocks.exists(_.idEquals(blockId))
+  def contains(blockId: BlockId): Boolean =
+    base.uniqueId == blockId || microBlocks.exists(_.idEquals(blockId))
 
   def microBlock(id: BlockId): Option[MicroBlock] =
     microBlocks.find(_.idEquals(id)).map(_.microBlock)

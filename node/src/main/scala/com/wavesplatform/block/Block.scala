@@ -187,7 +187,9 @@ object Block extends ScorexLogging {
       size: Int,
       transactionCount: Int,
       signature: ByteStr
-  )
+  ) {
+    lazy val uniqueId: BlockId = Block.uniqueId(header, signature)
+  }
 
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
