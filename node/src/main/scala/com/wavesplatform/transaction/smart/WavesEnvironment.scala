@@ -121,10 +121,14 @@ class WavesEnvironment(
     blockchain.lastBlock
       .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
 
-  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
+  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] = {
+    val vrf =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockHeight))
+        blockchain.hitSourceAtHeight(blockHeight)
+      else None
     blockchain.blockInfo(blockHeight)
-      .map(blockHAndSize =>
-        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(blockHeight)))
+      .map(info => toBlockInfo(info.header, blockHeight, vrf))
+  }
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(

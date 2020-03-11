@@ -385,7 +385,7 @@ object Bindings {
     )
   }
 
-  def buildLastBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
     val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
