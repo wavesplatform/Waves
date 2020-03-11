@@ -393,12 +393,11 @@ object Bindings {
         "baseTarget"          -> blockInf.baseTarget,
         "generationSignature" -> blockInf.generationSignature,
         "generator"           -> CaseObj(addressType, Map("bytes" -> blockInf.generator)),
-        "generatorPublicKey"  -> blockInf.generatorPublicKey,
-        "transactionsRoot"    -> blockInf.transactionsRoot
+        "generatorPublicKey"  -> blockInf.generatorPublicKey
       )
 
     val vrfFieldOpt: Map[String, EVALUATED] =
-      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf, "transactionsRoot" -> blockInf.transactionsRoot)
       else Map()
 
     CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)
