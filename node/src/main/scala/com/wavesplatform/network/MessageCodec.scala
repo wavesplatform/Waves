@@ -61,6 +61,6 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
 
   private[this] def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
     val (v1, v2, _) = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
-    v1 >= 1 && v2 >= 2 // >= 1.2.0
+    v1 > 1 || (v1 == 1 && v2 >= 2) // >= 1.2.0
   }
 }
