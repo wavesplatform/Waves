@@ -15,35 +15,46 @@ object InvokeScriptRequest {
   case class FunctionCallPart(function: String, args: List[EVALUATED])
 
   implicit val EvaluatedReads: Reads[EVALUATED] = (jv: JsValue) => {
-    jv \ "type" match {
-      case JsDefined(JsString("integer")) =>
-        jv \ "value" match {
-          case JsDefined(JsNumber(n)) => JsSuccess(CONST_LONG(n.toLong))
-          case _                      => JsError("value is missing or not an integer")
-        }
-      case JsDefined(JsString("boolean")) =>
-        jv \ "value" match {
-          case JsDefined(JsBoolean(n)) => JsSuccess(CONST_BOOLEAN(n))
-          case _                       => JsError("value is missing or not an boolean")
-        }
-      case JsDefined(JsString("string")) =>
-        jv \ "value" match {
-          case JsDefined(JsString(n)) => CONST_STRING(n).fold(JsError(_), JsSuccess(_))
-          case _                      => JsError("value is missing or not an string")
-        }
-      case JsDefined(JsString("binary")) =>
-        jv \ "value" match {
-          case JsDefined(JsString(n)) =>
-            ByteStr
-              .decodeBase64(n)
-              .toEither
-              .leftMap(_.getMessage)
-              .flatMap(CONST_BYTESTR(_))
-              .fold(JsError(_), JsSuccess(_))
-          case _ => JsError("value is missing or not an base64 encoded string")
-        }
-      case _ => JsError("type is missing")
-    }
+    def read(jv: JsValue): JsResult[EVALUATED] =
+      jv \ "type" match {
+        case JsDefined(JsString("integer")) =>
+          jv \ "value" match {
+            case JsDefined(JsNumber(n)) => JsSuccess(CONST_LONG(n.toLong))
+            case _ => JsError("value is missing or not an integer")
+          }
+        case JsDefined(JsString("boolean")) =>
+          jv \ "value" match {
+            case JsDefined(JsBoolean(n)) => JsSuccess(CONST_BOOLEAN(n))
+            case _ => JsError("value is missing or not an boolean")
+          }
+        case JsDefined(JsString("string")) =>
+          jv \ "value" match {
+            case JsDefined(JsString(n)) => CONST_STRING(n).fold(JsError(_), JsSuccess(_))
+            case _ => JsError("value is missing or not an string")
+          }
+        case JsDefined(JsString("binary")) =>
+          jv \ "value" match {
+            case JsDefined(JsString(n)) =>
+              ByteStr
+                .decodeBase64(n)
+                .toEither
+                .leftMap(_.getMessage)
+                .flatMap(CONST_BYTESTR(_))
+                .fold(JsError(_), JsSuccess(_))
+            case _ => JsError("value is missing or not an base64 encoded string")
+          }
+        case JsDefined(JsString("list")) =>
+          jv \ "value" match {
+            case JsDefined(JsArray(args)) =>
+              for {
+                parsedArgs <- args.toStream.traverse(read)
+                arr        <- ARR(parsedArgs.toIndexedSeq, limited = true).fold(JsError(_), JsSuccess(_))
+              } yield arr
+          }
+        case _ => JsError("type is missing")
+      }
+
+    read(jv)
   }
 
   implicit val functionCallReads: Reads[FunctionCallPart] = (jv: JsValue) => {

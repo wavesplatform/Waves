@@ -22,21 +22,17 @@ object InvokeScriptTxSerializer {
   def functionCallToJson(fc: Terms.FUNCTION_CALL): JsObject = {
     Json.obj(
       "function" -> JsString(fc.function.asInstanceOf[com.wavesplatform.lang.v1.FunctionHeader.User].internalName),
-      "args" -> JsArray(
-        fc.args.map {
-          case Terms.ARR(elements) => Json.obj("type" -> "list", "value" -> elements.map(mapSingleArg))
-          case other               => mapSingleArg(other)
-        }
-      )
+      "args" -> fc.args.map(argToJson)
     )
   }
 
-  private def mapSingleArg(arg: EXPR) =
+  private def argToJson(arg: EXPR): JsObject =
     arg match {
       case Terms.CONST_LONG(num)      => Json.obj("type" -> "integer", "value" -> num)
       case Terms.CONST_BOOLEAN(bool)  => Json.obj("type" -> "boolean", "value" -> bool)
       case Terms.CONST_BYTESTR(bytes) => Json.obj("type" -> "binary", "value" -> bytes.base64)
       case Terms.CONST_STRING(str)    => Json.obj("type" -> "string", "value" -> str)
+      case Terms.ARR(elements)        => Json.obj("type" -> "list", "value" -> elements.map(argToJson))
       case arg                        => throw new NotImplementedError(s"Not supported: $arg")
     }
 
