@@ -8,7 +8,6 @@ class AddressTransactionsSpec extends FreeSpec with WithDB {
     "without pagination" in pending
 
     "with pagination" - {
-
       "after txs is in the middle of ngState" in pending
       "after txs is the last of ngState" in pending
       "after txs is in levelDb" in pending
