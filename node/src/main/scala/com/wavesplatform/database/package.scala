@@ -435,8 +435,7 @@ package object database extends ScorexLogging {
     def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(key.keyBytes, readOptions))
     def has(key: Key[_]): Boolean                        = db.get(key.keyBytes) != null
 
-    def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
-      iterateOver(Shorts.toByteArray(prefix))(f)
+    def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
     def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
       val iterator = db.iterator()

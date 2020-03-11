@@ -490,7 +490,7 @@ class LevelDBWriter(
             val addressId = AddressId(aId)
             val address   = rw.get(Keys.idToAddress(addressId))
 
-            rw.iterateOver(Shorts.toByteArray(Keys.AssetBalanceHistoryPrefix) ++ aId.toByteArray) { e =>
+            rw.iterateOver(KeyTags.AssetBalanceHistory.prefixBytes ++ aId.toByteArray) { e =>
               val assetId = IssuedAsset(ByteStr(e.getKey.drop(aId.toByteArray.length).dropRight(4)))
               val history = readIntSeq(e.getKey)
               if (history.nonEmpty && history.head == currentHeight) {
@@ -764,7 +764,7 @@ class LevelDBWriter(
 
   override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = readOnly { db =>
     val activeLeaseIds = mutable.Set.empty[ByteStr]
-    db.iterateOver(Keys.LeaseStatusPrefix) { e =>
+    db.iterateOver(KeyTags.LeaseStatus) { e =>
       val leaseId = e.getKey.slice(2, e.getKey.length - 4)
       if (e.getValue.headOption.contains(1.toByte)) {
         activeLeaseIds += leaseId
@@ -843,7 +843,7 @@ class LevelDBWriter(
 
     val prefix = ByteBuffer
       .allocate(6)
-      .putShort(Keys.TransactionInfoPrefix)
+      .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
       .putInt(h)
       .array()
 

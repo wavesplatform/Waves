@@ -3,7 +3,7 @@ package com.wavesplatform.database.patch
 import java.util
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.database.{Keys, RW}
+import com.wavesplatform.database.{KeyTags, Keys, RW}
 import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 
@@ -14,7 +14,7 @@ object DisableHijackedAliases extends ScorexLogging {
     log.info("Collecting hijacked aliases")
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
 
-    rw.iterateOver(Keys.TransactionInfoPrefix) { e =>
+    rw.iterateOver(KeyTags.NthTransactionInfoAtHeight) { e =>
       val transactionBytes = e.getValue
       val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
         transactionBytes(0) == 0 &&

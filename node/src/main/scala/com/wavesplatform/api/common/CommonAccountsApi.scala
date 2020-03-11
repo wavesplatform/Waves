@@ -1,12 +1,11 @@
 package com.wavesplatform.api.common
 
 import com.google.common.base.Charsets
-import com.google.common.primitives.Shorts
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common
 import com.wavesplatform.api.common.AddressPortfolio.{assetBalanceIterator, nftIterator}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.{DBExt, Keys}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
@@ -97,7 +96,7 @@ object CommonAccountsApi extends ScorexLogging {
 
       db.readOnly { ro =>
         val addressId = db.get(Keys.addressId(address)).get
-        db.iterateOver(Shorts.toByteArray(Keys.DataHistoryPrefix) ++ addressId.toByteArray) { e =>
+        db.iterateOver(KeyTags.DataHistory.prefixBytes ++ addressId.toByteArray) { e =>
           val key = new String(e.getKey.drop(2 + addressId.toByteArray.length), Charsets.UTF_8)
           if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
             for (h <- ro.get(Keys.dataHistory(addressId, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {

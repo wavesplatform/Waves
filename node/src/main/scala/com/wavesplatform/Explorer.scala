@@ -9,7 +9,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter, openDB}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -35,59 +35,6 @@ object Explorer extends ScorexLogging {
       blockchain.leaseBalance(address),
       db.withResource(r => AddressPortfolio.assetBalanceIterator(r, address, Diff.empty, _ => true).toMap)
     )
-
-  private val keys = Array(
-    "version",
-    "height",
-    "score",
-    "height-of",
-    "waves-balance-history",
-    "waves-balance",
-    "asset-balance-history",
-    "asset-balance",
-    "asset-details-history",
-    "asset-details",
-    "lease-balance-history",
-    "lease-balance",
-    "lease-status-history",
-    "lease-status",
-    "filled-volume-and-fee-history",
-    "filled-volume-and-fee",
-    "changed-addresses",
-    "address-id-of-alias",
-    "last-address-id",
-    "address-id",
-    "id-to-address",
-    "address-script-history",
-    "address-script",
-    "approved-features",
-    "activated-features",
-    "data-key-chunk-count",
-    "data-key-chunk",
-    "data-history",
-    "data",
-    "sponsorship-history",
-    "sponsorship",
-    "carry-fee",
-    "asset-script-history",
-    "asset-script",
-    "safe-rollback-height",
-    "changed-data-keys",
-    "block-info-at-height",
-    "nth-transaction-info-at-height",
-    "address-transaction-seq-nr",
-    "address-transaction-height-type-and-nums",
-    "transaction-height-and-nums-by-id",
-    "block-transactions-fee",
-    "invoke-script-result",
-    "block-reward",
-    "waves-amount",
-    "hit-source",
-    "disabled-aliases",
-    "asset-static-info",
-    "nft-count",
-    "nft-possession"
-  )
 
   def main(argsRaw: Array[String]): Unit = {
     if (argsRaw.isEmpty) {
@@ -129,14 +76,14 @@ object Explorer extends ScorexLogging {
       flag match {
         case "WB" =>
           val balances = mutable.Map[BigInt, Long]()
-          db.iterateOver(6: Short) { e =>
+          db.iterateOver(KeyTags.WavesBalance) { e =>
             val addressId = BigInt(e.getKey.drop(6))
             val balance   = Longs.fromByteArray(e.getValue)
             balances += (addressId -> balance)
           }
 
           var actualTotalReward = 0L
-          db.iterateOver(Keys.BlockRewardPrefix) { e =>
+          db.iterateOver(KeyTags.BlockReward) { e =>
             actualTotalReward += Longs.fromByteArray(e.getValue)
           }
 
@@ -154,7 +101,7 @@ object Explorer extends ScorexLogging {
 
         case "DA" =>
           val addressIds = mutable.Seq[(BigInt, Address)]()
-          db.iterateOver(25: Short) { e =>
+          db.iterateOver(KeyTags.AddressId) { e =>
             val address   = Address.fromBytes(ByteStr(e.getKey.drop(2)), settings.blockchainSettings.addressSchemeCharacter.toByte)
             val addressId = BigInt(e.getValue)
             addressIds :+ (addressId -> address)
@@ -275,7 +222,7 @@ object Explorer extends ScorexLogging {
 
           log.info("key-space,entry-count,total-key-size,total-value-size")
           for ((prefix, stats) <- result.asScala) {
-            log.info(s"${keys(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
+            log.info(s"${KeyTags(prefix)},${stats.entryCount},${stats.totalKeySize},${stats.totalValueSize}")
           }
 
         case "TXBH" =>
@@ -285,7 +232,7 @@ object Explorer extends ScorexLogging {
 
           val prefix = ByteBuffer
             .allocate(6)
-            .putShort(Keys.TransactionInfoPrefix)
+            .put(KeyTags.NthTransactionInfoAtHeight.prefixBytes)
             .putInt(h)
             .array()
 
