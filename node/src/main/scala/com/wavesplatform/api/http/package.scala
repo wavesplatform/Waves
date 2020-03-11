@@ -105,7 +105,7 @@ package object http extends ApiMarshallers with ScorexLogging {
     ByteStr.decodeBase58(str) match {
       case Success(value) =>
         if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
-        else throw ApiException(InvalidTransactionId(s"Transcaction ID $str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
+        else throw ApiException(InvalidTransactionId(s"Transaction ID $str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
       case Failure(exception) =>
         throw ApiException(InvalidTransactionId(exception.getMessage))
     }
