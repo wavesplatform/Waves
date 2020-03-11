@@ -43,7 +43,7 @@ import scala.concurrent.duration._
 object AsyncGrpcApi {
   implicit class NodeAsyncGrpcApi(val n: Node) {
 
-    import com.wavesplatform.protobuf.transaction.{Script => PBScript, Transaction => PBTransaction, _}
+    import com.wavesplatform.protobuf.transaction.{Transaction => PBTransaction, _}
     import monix.execution.Scheduler.Implicits.global
 
     private[this] lazy val assets       = AssetsApiGrpc.stub(n.grpcChannel)
@@ -226,10 +226,10 @@ object AsyncGrpcApi {
       transactions.broadcast(transaction)
     }
 
-    private def toPBScript(v: Either[Array[Byte], Option[Script]]): Option[PBScript] = v match {
-      case Left(bytes) if bytes.length > 0 => Some(PBScript.of(ByteString.copyFrom(bytes.tail), bytes.head))
-      case Right(maybeScript)              => maybeScript.map(PBTransactions.toPBScript)
-      case _                               => None
+    private def toPBScript(v: Either[Array[Byte], Option[Script]]): ByteString = v match {
+      case Left(bytes) if bytes.length > 0 => ByteString.copyFrom(bytes)
+      case Right(maybeScript)              => PBTransactions.toPBScript(maybeScript)
+      case _                               => ByteString.EMPTY
     }
 
     def setScript(

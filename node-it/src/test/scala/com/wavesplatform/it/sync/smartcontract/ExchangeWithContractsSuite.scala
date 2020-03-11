@@ -172,8 +172,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
         val amount = math.min(buy.amount, sell.amount)
-        val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
-            sellOrder = sell,
+        val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, order1 = buy,
+            order2 = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,
@@ -209,8 +209,8 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
       val (buy, sell) = orders(pair, o1ver, o2ver, orderFee, ntpTime, acc1, acc0, acc2)
 
       val amount = math.min(buy.amount, sell.amount)
-      val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, buyOrder = buy,
-          sellOrder = sell,
+      val tx = ExchangeTransaction.signed(2.toByte, matcher = matcher, order1 = buy,
+          order2 = sell,
           amount = amount,
           price = sellPrice,
           buyMatcherFee = (BigInt(orderFee) * amount / buy.amount).toLong,

@@ -100,7 +100,7 @@ class SetAssetScriptGrpcSuite extends GrpcBaseTransactionSuite {
     val firstEffBalance = sender.wavesBalance(firstAddress).effective
 
     sender.setAssetScript(firstAcc, assetWScript, Right(Some(script2)), setAssetScriptFee, waitForTx = true)
-    sender.assetInfo(assetWScript).script.map(sd => PBTransactions.toVanillaScript(sd.getScript)) shouldBe Some(script2)
+    sender.assetInfo(assetWScript).script.flatMap(sd => PBTransactions.toVanillaScript(sd.scriptBytes)) should contain (script2)
 
     sender.wavesBalance(firstAddress).available shouldBe firstBalance - setAssetScriptFee
     sender.wavesBalance(firstAddress).effective shouldBe firstEffBalance - setAssetScriptFee

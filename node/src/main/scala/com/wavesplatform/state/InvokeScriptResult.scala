@@ -86,7 +86,7 @@ object InvokeScriptResult {
 
   private def toPbIssue(r: Issue) = {
     assert(r.compiledScript.isEmpty)
-    PBInvokeScriptResult.Issue(ByteString.copyFrom(r.id.arr), r.name, r.description, r.quantity, r.decimals, r.isReissuable, None, r.nonce)
+    PBInvokeScriptResult.Issue(ByteString.copyFrom(r.id.arr), r.name, r.description, r.quantity, r.decimals, r.isReissuable, ByteString.EMPTY, r.nonce)
   }
 
   private def toPbReissue(r: Reissue) =
