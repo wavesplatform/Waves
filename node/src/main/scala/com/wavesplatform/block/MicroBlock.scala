@@ -14,7 +14,7 @@ import monix.eval.Coeval
 import scala.util.{Failure, Try}
 
 case class MicroBlock(
-    version: TxVersion,
+    version: Byte,
     sender: PublicKey,
     transactionData: Seq[Transaction],
     reference: BlockId,
@@ -33,13 +33,13 @@ case class MicroBlock(
 
 object MicroBlock extends ScorexLogging {
   def buildAndSign(
-      version: TxVersion,
+      version: Byte,
       generator: KeyPair,
       transactionData: Seq[Transaction],
-      prevResBlockRef: BlockId,
+      reference: BlockId,
       totalResBlockSig: BlockId
   ): Either[ValidationError, MicroBlock] =
-    MicroBlock(version, generator, transactionData, prevResBlockRef, totalResBlockSig, ByteStr.empty).validate
+    MicroBlock(version, generator, transactionData, reference, totalResBlockSig, ByteStr.empty).validate
       .map(_.sign(generator))
 
   def parseBytes(bytes: Array[Byte]): Try[MicroBlock] =

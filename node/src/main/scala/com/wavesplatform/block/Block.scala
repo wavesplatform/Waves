@@ -38,9 +38,10 @@ case class Block(
 ) extends Signed {
   import Block._
 
-  lazy val uniqueId: ByteStr =
+  val id: Coeval[ByteStr] = Coeval.evalOnce(
     if (header.version >= ProtoBlockVersion) Block.protoHeaderHash(header)
     else this.signature
+  )
 
   val sender: PublicKey = header.generator
 
@@ -86,12 +87,12 @@ case class Block(
   }
 
   override def toString: String =
-    s"Block($uniqueId -> ${header.reference.trim}, " +
+    s"Block(${id()} -> ${header.reference.trim}, " +
       s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
-  def uniqueId(h: BlockHeader, signature: ByteStr): ByteStr =
+  def idFromHeader(h: BlockHeader, signature: ByteStr): ByteStr =
     if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
     else signature
 
@@ -188,7 +189,7 @@ object Block extends ScorexLogging {
       transactionCount: Int,
       signature: ByteStr
   ) {
-    lazy val uniqueId: BlockId = Block.uniqueId(header, signature)
+    val id: Coeval[ByteStr] = Coeval.evalOnce(Block.idFromHeader(header, signature))
   }
 
   case class Fraction(dividend: Int, divider: Int) {

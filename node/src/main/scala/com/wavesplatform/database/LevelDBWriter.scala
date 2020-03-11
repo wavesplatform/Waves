@@ -296,7 +296,7 @@ class LevelDBWriter(
       }.toMap
 
     rw.put(Keys.blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
-    rw.put(Keys.heightOf(block.uniqueId), Some(height))
+    rw.put(Keys.heightOf(block.id()), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
 
@@ -647,7 +647,7 @@ class LevelDBWriter(
           }
 
           rw.delete(Keys.blockInfoAt(h))
-          rw.delete(Keys.heightOf(Block.uniqueId(discardedHeader, discardedSignature)))
+          rw.delete(Keys.heightOf(Block.idFromHeader(discardedHeader, discardedSignature)))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
@@ -958,7 +958,7 @@ class LevelDBWriter(
         db.get(Keys.blockInfoAt(height))
       }
       .collect {
-        case Some(bi) => bi.uniqueId
+        case Some(bi) => bi.id()
       }
   }
 
@@ -970,7 +970,7 @@ class LevelDBWriter(
           db.get(Keys.blockInfoAt(height))
         }
         .collect {
-          case Some(bi) => bi.uniqueId
+          case Some(bi) => bi.id()
         }
     }
   }

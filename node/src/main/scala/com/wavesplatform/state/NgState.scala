@@ -5,6 +5,7 @@ import java.util.concurrent.TimeUnit
 import cats.kernel.Monoid
 import com.google.common.cache.CacheBuilder
 import com.wavesplatform.account.Address
+import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
@@ -48,7 +49,7 @@ class NgState(
 
   def diffFor(totalResBlockRef: BlockId): (Diff, Long, Long) = {
     val (diff, carry, totalFee) =
-      if (totalResBlockRef == base.uniqueId)
+      if (totalResBlockRef == base.id())
         (baseBlockDiff, baseBlockCarry, baseBlockTotalFee)
       else
         internalCaches.blockDiffCache.get(
@@ -68,7 +69,7 @@ class NgState(
   }
 
   def bestLiquidBlockId: BlockId =
-    microBlocks.headOption.map(_.totalBlockId).getOrElse(base.uniqueId)
+    microBlocks.headOption.map(_.totalBlockId).getOrElse(base.id())
 
   def lastMicroBlock: Option[MicroBlock] =
     microBlocks.headOption.map(_.microBlock)
@@ -103,12 +104,12 @@ class NgState(
   def balanceDiffAt(address: Address, blockId: BlockId): Portfolio =
     cancelExpiredLeases(diffFor(blockId)._1).portfolios.getOrElse(address, Portfolio.empty)
 
-  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.uniqueId)(_.totalBlockId))
+  def bestLiquidDiffAndFees: (Diff, Long, Long) = diffFor(microBlocks.headOption.fold(base.id())(_.totalBlockId))
 
   def bestLiquidDiff: Diff = bestLiquidDiffAndFees._1
 
   def contains(blockId: BlockId): Boolean =
-    base.uniqueId == blockId || microBlocks.exists(_.idEquals(blockId))
+    base.id() == blockId || microBlocks.exists(_.idEquals(blockId))
 
   def microBlock(id: BlockId): Option[MicroBlock] =
     microBlocks.find(_.idEquals(id)).map(_.microBlock)
@@ -117,7 +118,7 @@ class NgState(
     val blockId = microBlocks
       .find(mi => microDiffs(mi.microBlock.totalResBlockSig).timestamp <= maxTimeStamp)
       .map(_.totalBlockId)
-      .getOrElse(base.uniqueId)
+      .getOrElse(base.id())
 
     BlockMinerInfo(NxtLikeConsensusBlockData(base.header.baseTarget, base.header.generationSignature), base.header.timestamp, blockId)
   }
@@ -136,9 +137,9 @@ class NgState(
 
   private[this] def createBlockId(transactions: Seq[Transaction], signature: ByteStr): ByteStr = {
     val newTransactions = this.transactions ++ transactions
-    val transactionsRoot = com.wavesplatform.block.mkTransactionsRoot(base.header.version, newTransactions)
+    val transactionsRoot = block.mkTransactionsRoot(base.header.version, newTransactions)
     val fullBlock = base.copy(transactionData = newTransactions, signature = signature, header = base.header.copy(transactionsRoot = transactionsRoot))
-    fullBlock.uniqueId
+    fullBlock.id()
   }
 
   private[this] def forgeBlock(blockId: BlockId): Option[(Block, DiscardedMicroBlocks)] =
@@ -146,7 +147,7 @@ class NgState(
       blockId, { () =>
         val microBlocksAsc = microBlocks.reverse
 
-        if (base.uniqueId == blockId) {
+        if (base.id() == blockId) {
           Some((base, microBlocksAsc.map(_.microBlock)))
         } else if (!microBlocksAsc.exists(_.idEquals(blockId))) None
         else {

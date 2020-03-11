@@ -50,8 +50,8 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
-    (blockchainUpdater.isLastBlockId _).when(genesis.uniqueId).returning(true)
-    (blockchainUpdater.heightOf _).when(genesis.uniqueId).returning(Some(1))
+    (blockchainUpdater.isLastBlockId _).when(genesis.id()).returning(true)
+    (blockchainUpdater.heightOf _).when(genesis.id()).returning(Some(1))
     (blockchainUpdater.height _).when().returning(1)
     (blockchainUpdater.settings _).when().returning(wavesSettings.blockchainSettings)
     (blockchainUpdater.lastBlock _).when().returning(Some(genesis))
@@ -66,7 +66,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
           BlockMinerInfo(
             NxtLikeConsensusBlockData(genesis.header.baseTarget, genesis.header.generationSignature),
             genesis.header.timestamp,
-            genesis.uniqueId
+            genesis.id()
           )
         )
       )

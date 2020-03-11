@@ -77,7 +77,7 @@ object BlockStats {
 
   def appended(b: Block, complexity: Long): Unit = write(
     measurement(Type.Block)
-      .tag("id", id(b.uniqueId))
+      .tag("id", id(b.id()))
       .addField("complexity", complexity),
     Event.Appended,
     Seq.empty
@@ -85,8 +85,8 @@ object BlockStats {
 
   def inv(m: MicroBlockInv, ch: Channel): Unit = write(
     measurement(Type.Micro)
-      .tag("id", id(m.totalBlockRef))
-      .tag("parent-id", id(m.prevBlockRef))
+      .tag("id", id(m.totalBlockId))
+      .tag("parent-id", id(m.reference))
       .addField("from", nodeName(ch)),
     Event.Inv,
     Seq.empty
@@ -123,7 +123,7 @@ object BlockStats {
 
   private def block(b: Block, source: Source): Point.Builder =
     measurement(Type.Block)
-      .tag("id", id(b.uniqueId))
+      .tag("id", id(b.id()))
       .tag("source", source.name)
 
   private def micro(m: MicroBlock): Point.Builder =

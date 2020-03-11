@@ -279,14 +279,14 @@ class BlockV5Test
 
   private val updaterScenario = for {
     (miner1, miner2, b1) <- genesis
-    b2        = TestBlock.create(ntpNow, b1.uniqueId, Seq.empty, miner1, version = Block.PlainBlockVersion)
-    b3        = TestBlock.create(ntpNow, b2.uniqueId, Seq.empty, miner1, version = Block.NgBlockVersion)
+    b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion)
+    b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion)
     tx1       = createTx(miner1, miner2)
     tx2       = createTx(miner2, miner1)
     tx3       = createTx(miner1, miner2)
     tx4       = createTx(miner2, miner1)
     tx5       = createTx(miner1, miner2)
-    (b4, m4s) = chainBaseAndMicro(b3.uniqueId, Seq.empty, Seq(Seq(tx1)), miner2, Block.NgBlockVersion, ntpNow)
+    (b4, m4s) = chainBaseAndMicro(b3.id(), Seq.empty, Seq(Seq(tx1)), miner2, Block.NgBlockVersion, ntpNow)
     (b5, m5s) = chainBaseAndMicro(m4s.head.totalBlockId, Seq.empty, Seq(Seq(tx2)), miner1, Block.RewardBlockVersion, ntpNow)
     (b6, m6s) = chainBaseAndMicro(m5s.head.totalBlockId, Seq(tx3), Seq(Seq(tx4)), miner2, Block.ProtoBlockVersion, ntpNow)
     (b7, m7s) = chainBaseAndMicro(m6s.head.totalBlockId, Seq.empty, Seq(Seq(tx5)), miner1, Block.ProtoBlockVersion, ntpNow)
@@ -351,26 +351,26 @@ class BlockV5Test
               d.blockchainUpdater.lastBlock.get
 
             val block1 = applyBlock(genesis) // h=1
-            block1.uniqueId shouldBe block1.signature
-            block1.uniqueId should have length crypto.SignatureLength
+            block1.id() shouldBe block1.signature
+            block1.id() should have length crypto.SignatureLength
 
             val block2 = applyBlock() // h=2
             block2.header.reference shouldBe block1.signature
-            block2.uniqueId should have length crypto.DigestLength
+            block2.id() should have length crypto.DigestLength
 
             val block3 = applyBlock()
-            block3.header.reference shouldBe block2.uniqueId
-            block3.uniqueId should have length crypto.DigestLength
+            block3.header.reference shouldBe block2.id()
+            block3.id() should have length crypto.DigestLength
 
             val (keyBlock, microBlocks) =
-              UnsafeBlocks.unsafeChainBaseAndMicro(block3.uniqueId, Nil, Seq(Nil, Nil), acc, Block.ProtoBlockVersion, System.currentTimeMillis())
+              UnsafeBlocks.unsafeChainBaseAndMicro(block3.id(), Nil, Seq(Nil, Nil), acc, Block.ProtoBlockVersion, System.currentTimeMillis())
             d.appendBlock(keyBlock)
             microBlocks.foreach(d.appendMicroBlock)
 
             val mb1 = d.blockchainUpdater.microBlock(d.blockchainUpdater.microblockIds.head).get
             mb1.totalResBlockSig should have length crypto.SignatureLength
             mb1.reference should not be keyBlock.signature
-            mb1.reference shouldBe keyBlock.uniqueId
+            mb1.reference shouldBe keyBlock.id()
         }
     }
   }

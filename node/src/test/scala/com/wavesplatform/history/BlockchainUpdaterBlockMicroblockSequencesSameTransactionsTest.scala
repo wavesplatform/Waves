@@ -58,7 +58,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (miner, genesis, payment, ts)) =>
         val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
-        val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, Seq(Seq(payment)), miner, 3, ts)
+        val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, Seq(Seq(payment)), miner, 3, ts)
         val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
         domain.blockchainUpdater.processBlock(genBlock).explicitGet()
         domain.blockchainUpdater.processBlock(base).explicitGet()
@@ -89,7 +89,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     scenario(preconditionsAndPayments, MicroblocksActivatedAt0WavesSettings) {
       case (domain, (miner, genesis, microBlockTxs, ts)) =>
         val genBlock       = buildBlockOfTxs(randomSig, Seq(genesis))
-        val (base, micros) = chainBaseAndMicro(genBlock.uniqueId, Seq.empty, microBlockTxs, miner, 3, ts)
+        val (base, micros) = chainBaseAndMicro(genBlock.id(), Seq.empty, microBlockTxs, miner, 3, ts)
         val emptyBlock     = customBuildBlockOfTxs(micros.last.totalResBlockSig, Seq.empty, miner, 3, ts)
         domain.blockchainUpdater.processBlock(genBlock).explicitGet()
         domain.blockchainUpdater.processBlock(base).explicitGet()
@@ -146,7 +146,7 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
     } yield {
       val version = 3: Byte
       val blocksAndMicros = intSeqs.map { intSeq =>
-        val blockAndMicroblockSequence = r(payments, intSeq, genesis.uniqueId, miner, version, ts)
+        val blockAndMicroblockSequence = r(payments, intSeq, genesis.id(), miner, version, ts)
         val ref                        = bestRef(blockAndMicroblockSequence.last)
         val lastBlock                  = customBuildBlockOfTxs(ref, Seq.empty, miner, version, ts)
         (blockAndMicroblockSequence, lastBlock)
@@ -211,7 +211,7 @@ object BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest {
 
   def bestRef(r: BlockAndMicroblocks): ByteStr = r._2.lastOption match {
     case Some(mb) => mb.totalBlockId
-    case None     => r._1.uniqueId
+    case None     => r._1.id()
   }
 
   def r(

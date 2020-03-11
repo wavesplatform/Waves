@@ -135,7 +135,7 @@ trait BlocksTransactionsHelpers { self: TransactionGen =>
         ts: Long
     ): (Block, MicroBlock) = {
       val newTotalBlock = unsafeBlock(totalRefTo, prevTotal.transactionData ++ txs, signer, version, ts)
-      val unsigned = new MicroBlock(version, signer, txs, prevTotal.uniqueId, newTotalBlock.signature, ByteStr.empty)
+      val unsigned = new MicroBlock(version, signer, txs, prevTotal.id(), newTotalBlock.signature, ByteStr.empty)
       val signature = crypto.sign(signer, unsigned.bytes())
       val signed    = unsigned.copy(signature = ByteStr(signature))
       (newTotalBlock, signed)

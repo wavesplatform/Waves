@@ -91,7 +91,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
       val heightToRollbackTo = Math.max(kafkaHeight - 1, 1)
       val sigToRollback = context.blockchain
         .blockInfo(heightToRollbackTo)
-        .map(_.uniqueId)
+        .map(_.id())
         .get // guaranteed not to fail by previous checks on heights
 
       log.info(s"Kafka is at $kafkaHeight, while node is at $blockchainHeight. Rolling node back to $heightToRollbackTo")

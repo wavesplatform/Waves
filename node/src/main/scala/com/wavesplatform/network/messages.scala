@@ -61,11 +61,11 @@ object MicroBlockResponse {
   }
 }
 
-case class MicroBlockInv(sender: PublicKey, totalBlockRef: ByteStr, prevBlockRef: ByteStr, signature: ByteStr) extends Message with Signed {
+case class MicroBlockInv(sender: PublicKey, totalBlockId: ByteStr, reference: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =
-    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockRef.arr ++ prevBlockRef.arr, sender))
+    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockId.arr ++ reference.arr, sender))
 
-  override def toString: String = s"MicroBlockInv(${totalBlockRef.trim} ~> ${prevBlockRef.trim})"
+  override def toString: String = s"MicroBlockInv(${totalBlockId.trim} ~> ${reference.trim})"
 }
 
 object MicroBlockInv {

@@ -46,18 +46,18 @@ object MicroBlockSynchronizer {
     }
 
     def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
-      import mbInv.totalBlockRef
+      import mbInv.totalBlockId
 
-      def randomOwner(exclude: Set[Channel]) = random(owners(mbInv.totalBlockRef) -- exclude)
+      def randomOwner(exclude: Set[Channel]) = random(owners(mbInv.totalBlockId) -- exclude)
 
       def task(attemptsAllowed: Int, exclude: Set[Channel]): Task[Unit] = Task.unit.flatMap { _ =>
-        if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockRef)) Task.unit
+        if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockId)) Task.unit
         else
           randomOwner(exclude).fold(Task.unit) { channel =>
             if (channel.isOpen) {
-              val request = MicroBlockRequest(totalBlockRef)
+              val request = MicroBlockRequest(totalBlockId)
               channel.writeAndFlush(request)
-              awaiting.put(totalBlockRef, mbInv)
+              awaiting.put(totalBlockId, mbInv)
               task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
             } else task(attemptsAllowed, exclude + channel)
           }

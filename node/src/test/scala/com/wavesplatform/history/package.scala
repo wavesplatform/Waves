@@ -89,11 +89,11 @@ package object history {
         version,
         generator = signer,
         transactionData = txs,
-        prevResBlockRef = prevTotal.uniqueId,
+        reference = prevTotal.id(),
         totalResBlockSig = newTotalBlock.signature
       )
       .explicitGet()
-    (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.uniqueId))
+    (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.id()))
   }
 
   def buildMicroBlockOfTxs(totalRefTo: ByteStr, prevTotal: Block, txs: Seq[Transaction], signer: KeyPair): (Block, MicroBlockWithTotalId) = {
@@ -103,11 +103,11 @@ package object history {
         3.toByte,
         generator = signer,
         transactionData = txs,
-        prevResBlockRef = prevTotal.uniqueId,
+        reference = prevTotal.id(),
         totalResBlockSig = newTotalBlock.signature
       )
       .explicitGet()
-    (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.uniqueId))
+    (newTotalBlock, new MicroBlockWithTotalId(nonSigned, newTotalBlock.id()))
   }
 
   def randomSig: ByteStr = TestBlock.randomOfLength(Block.BlockIdLength)
@@ -116,7 +116,7 @@ package object history {
     def chainBlocksR(refTo: ByteStr, txs: Seq[Seq[Transaction]]): Seq[Block] = txs match {
       case (x :: xs) =>
         val block = buildBlockOfTxs(refTo, x)
-        block +: chainBlocksR(block.uniqueId, xs)
+        block +: chainBlocksR(block.id(), xs)
       case _ => Seq.empty
     }
 

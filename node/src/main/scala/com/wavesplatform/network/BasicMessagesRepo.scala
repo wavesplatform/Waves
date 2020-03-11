@@ -221,23 +221,23 @@ object MicroBlockInvSpec extends MessageSpec[MicroBlockInv] {
         case l if l == (KeyLength + SignatureLength * 3) =>
           MicroBlockInv(
             sender = PublicKey.apply(bytes.take(KeyLength)),
-            totalBlockRef = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
-            prevBlockRef = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
+            totalBlockId = ByteStr(bytes.view.slice(KeyLength, KeyLength + SignatureLength).toArray),
+            reference = ByteStr(bytes.view.slice(KeyLength + SignatureLength, KeyLength + SignatureLength * 2).toArray),
             signature = ByteStr(bytes.view.slice(KeyLength + SignatureLength * 2, KeyLength + SignatureLength * 3).toArray)
           )
 
         case l if l == (KeyLength + (DigestLength * 2) + SignatureLength) =>
           MicroBlockInv(
             sender = PublicKey.apply(bytes.take(KeyLength)),
-            totalBlockRef = ByteStr(bytes.view.slice(KeyLength, KeyLength + DigestLength).toArray),
-            prevBlockRef = ByteStr(bytes.view.slice(KeyLength + DigestLength, KeyLength + DigestLength * 2).toArray),
+            totalBlockId = ByteStr(bytes.view.slice(KeyLength, KeyLength + DigestLength).toArray),
+            reference = ByteStr(bytes.view.slice(KeyLength + DigestLength, KeyLength + DigestLength * 2).toArray),
             signature = ByteStr(bytes.view.slice(KeyLength + DigestLength * 2, KeyLength + (DigestLength * 2) + SignatureLength).toArray)
           )
       }
     )
 
   override def serializeData(inv: MicroBlockInv): Array[Byte] = {
-    inv.sender ++ inv.totalBlockRef.arr ++ inv.prevBlockRef.arr ++ inv.signature.arr
+    inv.sender ++ inv.totalBlockId.arr ++ inv.reference.arr ++ inv.signature.arr
   }
 
   override val maxLength: Int = 300

@@ -34,7 +34,7 @@ class BlockV5GrpcSuite
       val currentHeight = sender.height
 
       val blockV5 = sender.blockAt(currentHeight)
-      val blockV5ById = sender.blockById(ByteString.copyFrom(blockV5.uniqueId))
+      val blockV5ById = sender.blockById(ByteString.copyFrom(blockV5.id()))
 
       blockV5.header.version shouldBe Block.ProtoBlockVersion
       blockV5.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
@@ -46,7 +46,7 @@ class BlockV5GrpcSuite
       sender.waitForHeight(currentHeight + 1, 2.minutes)
 
       val blockAfterVRFUsing = sender.blockAt(currentHeight + 1)
-      val blockAfterVRFUsingById = sender.blockById(ByteString.copyFrom(blockAfterVRFUsing.uniqueId))
+      val blockAfterVRFUsingById = sender.blockById(ByteString.copyFrom(blockAfterVRFUsing.id()))
 
       blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsing.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength

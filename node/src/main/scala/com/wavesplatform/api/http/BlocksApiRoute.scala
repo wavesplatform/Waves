@@ -50,7 +50,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
   def child: Route = (path("child" / Segment) & get) { encodedSignature =>
     withBlock(blockchain, encodedSignature) { block =>
       val childJson =
-        for ((child, height) <- commonApi.childBlock(block.uniqueId))
+        for ((child, height) <- commonApi.childBlock(block.id()))
           yield child.json().addBlockFields(height)
 
       complete(childJson.getOrElse[JsObject](Json.obj("status" -> "error", "details" -> "No child blocks")))
@@ -63,7 +63,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
         Left(CustomValidationError("Block count should be positive"))
       } else {
         commonApi
-          .calcBlocksDelay(block.uniqueId, count)
+          .calcBlocksDelay(block.id(), count)
           .map(delay => Json.obj("delay" -> delay))
       }
 
@@ -169,7 +169,7 @@ case class BlocksApiRoute(settings: RestAPISettings, blockchain: Blockchain) ext
           .toRight(InvalidSignature)
 
         block <- commonApi.blockBySignature(blockId).toRight(BlockDoesNotExist)
-      } yield block.json().addBlockFields(block.uniqueId)
+      } yield block.json().addBlockFields(block.id())
 
       complete(result)
     }

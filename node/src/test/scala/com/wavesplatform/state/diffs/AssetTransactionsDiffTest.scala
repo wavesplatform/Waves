@@ -399,7 +399,7 @@ class AssetTransactionsDiffTest
           d.appendBlock(genesisBlock)
 
           val (keyBlock, Seq(microBlock)) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.uniqueId, Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.id(), Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
           d.appendBlock(keyBlock)
           val microBlockId = d.appendMicroBlock(microBlock)
 
