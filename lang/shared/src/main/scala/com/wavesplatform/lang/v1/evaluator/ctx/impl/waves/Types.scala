@@ -38,7 +38,8 @@ object Types {
       "baseTarget"          -> LONG,
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
-      "generatorPublicKey"  -> BYTESTR
+      "generatorPublicKey"  -> BYTESTR,
+      "transactionsRoot"    -> BYTESTR
     ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil)
   )
 
