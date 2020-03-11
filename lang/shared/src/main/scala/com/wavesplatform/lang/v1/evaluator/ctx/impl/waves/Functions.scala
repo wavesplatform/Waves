@@ -471,7 +471,7 @@ object Functions {
   val calculateAssetIdF: BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "calculateAssetId",
-      5,
+      10,
       CALCULATE_ASSET_ID,
       BYTESTR,
       ("issue", issueActionType)
@@ -512,7 +512,7 @@ object Functions {
   def transactionFromProtoBytesF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
     NativeFunction.withEnvironment[Environment](
       "transferTransactionFromProto",
-      10,
+      5,
       TRANSFER_TRANSACTION_FROM_PROTO,
       UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
       ("bytes", BYTESTR)
