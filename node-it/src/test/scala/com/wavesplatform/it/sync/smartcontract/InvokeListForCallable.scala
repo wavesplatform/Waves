@@ -63,11 +63,10 @@ class InvokeListForCallable extends BaseTransactionSuite with CancelAfterFailure
         waitForTx = true
       )
 
-    sender.getData(dApp, "a") shouldBe Long.MaxValue
-    sender.getData(dApp, "b") shouldBe rndString
-    sender.getData(dApp, "c") shouldBe Base58.decode(rndString)
-    sender.getData(dApp, "y") shouldBe true
-
+    sender.getData(dApp, "a") shouldBe List(IntegerDataEntry("a", Long.MaxValue))
+    sender.getData(dApp, "b") shouldBe List(StringDataEntry("b", rndString))
+    sender.getData(dApp, "c") shouldBe List(BinaryDataEntry("c", ByteStr(rndString.getBytes)))
+    sender.getData(dApp, "y") shouldBe List(BooleanDataEntry("y", true))
   }
 
 }
