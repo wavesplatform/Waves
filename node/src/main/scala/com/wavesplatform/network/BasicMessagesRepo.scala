@@ -100,8 +100,8 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   }
 }
 
-trait HashesOrSignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
-  def wrap(signatures: Seq[Array[Byte]]): A
+trait BlockIdSeqSpec[A <: AnyRef] extends MessageSpec[A] {
+  def wrap(blockIds: Seq[Array[Byte]]): A
 
   def unwrap(v: A): Seq[Array[Byte]]
 
@@ -148,14 +148,14 @@ object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
   override val messageCode: MessageCode = 21: Byte
 }
 
-object GetHashesOrSignaturesSpec extends HashesOrSignaturesSeqSpec[GetSignatures] {
-  override def wrap(signatures: Seq[Array[Byte]]): GetSignatures = GetSignatures(signatures.map(ByteStr(_)))
+object GetBlockIdsSpec extends BlockIdSeqSpec[GetSignatures] {
+  override def wrap(blockIds: Seq[Array[Byte]]): GetSignatures = GetSignatures(blockIds.map(ByteStr(_)))
   override def unwrap(v: GetSignatures): Seq[Array[MessageCode]] = v.signatures.map(_.arr)
   override val messageCode: MessageCode                          = 32: Byte
 }
 
-object HashesOrSignaturesSpec extends HashesOrSignaturesSeqSpec[Signatures] {
-  override def wrap(signatures: Seq[Array[Byte]]): Signatures = Signatures(signatures.map(ByteStr(_)))
+object BlockIdsSpec extends BlockIdSeqSpec[Signatures] {
+  override def wrap(blockIds: Seq[Array[Byte]]): Signatures = Signatures(blockIds.map(ByteStr(_)))
   override def unwrap(v: Signatures): Seq[Array[Byte]]        = v.signatures.map(_.arr)
   override val messageCode: MessageCode                       = 33: Byte
 }
@@ -328,8 +328,8 @@ object BasicMessagesRepo {
     PBBlockSpec,
     PBMicroBlockSpec,
     PBTransactionSpec,
-    GetHashesOrSignaturesSpec,
-    HashesOrSignaturesSpec
+    GetBlockIdsSpec,
+    BlockIdsSpec
   )
 
   val specsByCodes: Map[Byte, Spec]       = specs.map(s => s.messageCode  -> s).toMap

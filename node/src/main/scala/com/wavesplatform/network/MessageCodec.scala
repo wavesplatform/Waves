@@ -30,13 +30,13 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
 
     // Version switch
     case gs: GetSignatures if isNewMsgsSupported(ctx) =>
-      out.add(RawBytes(GetHashesOrSignaturesSpec.messageCode, GetHashesOrSignaturesSpec.serializeData(gs)))
+      out.add(RawBytes(GetBlockIdsSpec.messageCode, GetBlockIdsSpec.serializeData(gs)))
     case gs: GetSignatures if GetSignaturesSpec.isSupported(gs.signatures) =>
       out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
 
     case s: Signatures =>
       if (isNewMsgsSupported(ctx)) {
-        out.add(RawBytes(HashesOrSignaturesSpec.messageCode, HashesOrSignaturesSpec.serializeData(s)))
+        out.add(RawBytes(BlockIdsSpec.messageCode, BlockIdsSpec.serializeData(s)))
       } else {
         val supported = s.signatures
           .dropWhile(_.length != crypto.SignatureLength)
