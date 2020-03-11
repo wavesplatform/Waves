@@ -49,7 +49,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
 
       _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight - 1))
       _ <- txRequestsGen(200, 2.waves)
-      _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight + 2))
+      _ <- traverse(nodes)(_.waitForHeight(microblockActivationHeight + 3))
 
       initialBalances <- notMiner.debugStateAt(microblockActivationHeight - 1) //100%
 
@@ -103,7 +103,7 @@ class MicroblocksFeeTestSuite extends FreeSpec with Matchers with CancelAfterFai
   override protected def nodeConfigs: Seq[Config] = Seq(
     notMinerConfig.withFallback(Default.head),
     notMinerConfig.withFallback(Default(1)),
-    minerConfig.withFallback(Default(2)),
+    notMinerConfig.withFallback(Default(2)),
     minerConfig.withFallback(Default(3))
   )
 }

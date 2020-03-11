@@ -6,15 +6,15 @@ import java.util.concurrent.{ThreadLocalRandom, TimeUnit}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account._
 import com.wavesplatform.api.BlockMeta
-import com.wavesplatform.block.Block
+import com.wavesplatform.api.common.CommonBlocksApi
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
-import com.wavesplatform.history.History
+import com.wavesplatform.database
+import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.Asset
-import monix.reactive.subjects.{PublishSubject, Subject}
+import com.wavesplatform.transaction.{Asset, Transaction}
+import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -95,10 +95,17 @@ object LevelDBWriterBenchmark {
     private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
 
     val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
-    val history = History(db, _ => None, _ => None, rawDB)
 
-    def blockById(id: ByteStr): Option[Block] = ???
-    def blockHeaderAndSize(id: ByteStr): Option[BlockMeta] = ???
+    def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
+      loadBlockMetaAt(height).map { meta =>
+        meta -> rawDB.readOnly(ro => database.loadBlock(Height(height), ro)).fold(Seq.empty[Transaction])(_.transactionData)
+      }
+
+    def loadBlockMetaAt(height: Int): Option[BlockMeta] = rawDB.get(Keys.blockMetaAt(Height(height)))
+
+    val cba = CommonBlocksApi(db, loadBlockMetaAt, loadBlockAt)
+
+    def blockById(id: ByteStr): Option[(BlockMeta, Seq[Transaction])] = cba.block(id)
 
     @TearDown
     def close(): Unit = {

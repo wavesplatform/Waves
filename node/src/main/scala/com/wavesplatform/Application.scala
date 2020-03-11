@@ -211,21 +211,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           case Left(error) => Left(error)
         }
 
-    val cba: CommonBlocksApi   = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
-    val cca: CommonAccountsApi = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-    val csa: CommonAssetsApi   = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
-    val cta: CommonTransactionsApi = CommonTransactionsApi(
-      blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
-      db,
-      blockchainUpdater,
-      utxStorage,
-      wallet,
-      utxSynchronizer.publish,
-      loadBlockAt
-    )
-
     // Extensions start
-    val extensionContext = new Context {
+    val extensionContext: Context = new Context {
       override def settings: WavesSettings                                                       = app.settings
       override def blockchain: Blockchain                                                        = app.blockchainUpdater
       override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]]  = rollbackTask(blockId, returnTxsToUtx = false)
@@ -237,10 +224,18 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       override def actorSystem: ActorSystem                                                      = app.actorSystem
       override def blockchainUpdated: Observable[BlockchainUpdated]                              = app.blockchainUpdated
 
-      override def transactionsApi: CommonTransactionsApi = cta
-      override def blocksApi: CommonBlocksApi             = cba
-      override def accountsApi: CommonAccountsApi         = cca
-      override def assetsApi: CommonAssetsApi             = csa
+      override val transactionsApi: CommonTransactionsApi = CommonTransactionsApi(
+        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+        db,
+        blockchainUpdater,
+        utxStorage,
+        wallet,
+        utxSynchronizer.publish,
+        loadBlockAt
+      )
+      override val blocksApi: CommonBlocksApi             = CommonBlocksApi(blockchainUpdater, loadBlockMetaAt, loadBlockAt)
+      override val accountsApi: CommonAccountsApi         = CommonAccountsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
+      override val assetsApi: CommonAssetsApi             = CommonAssetsApi(blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), db, blockchainUpdater)
     }
 
     extensions = settings.extensions.map { extensionClassName =>
@@ -348,21 +343,21 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
-        BlocksApiRoute(settings.restAPISettings, cba),
-        TransactionsApiRoute(settings.restAPISettings, cta, wallet, blockchainUpdater, Coeval(utxStorage.size), utxSynchronizer, time),
+        BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
+        TransactionsApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, blockchainUpdater, Coeval(utxStorage.size), utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler),
         PeersApiRoute(settings.restAPISettings, network.connect, peerDatabase, establishedConnections),
-        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, cca),
+        AddressApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, limitedScheduler, extensionContext.accountsApi),
         DebugApiRoute(
           settings,
           time,
           blockchainUpdater,
           wallet,
-          cca,
-          cta,
-          csa,
+          extensionContext.accountsApi,
+          extensionContext.transactionsApi,
+          extensionContext.assetsApi,
           peerDatabase,
           establishedConnections,
           (id, returnTxs) => rollbackTask(id, returnTxs).map(_.map(_ => ())),
@@ -375,10 +370,10 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
           configRoot,
           loadBalanceHistory
         ),
-        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time, cca, csa),
+        AssetsApiRoute(settings.restAPISettings, wallet, utxSynchronizer, blockchainUpdater, time, extensionContext.accountsApi, extensionContext.assetsApi),
         ActivationApiRoute(settings.restAPISettings, settings.featuresSettings, blockchainUpdater),
-        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, cca),
-        AliasApiRoute(settings.restAPISettings, cta, wallet, utxSynchronizer, time, blockchainUpdater),
+        LeaseApiRoute(settings.restAPISettings, wallet, blockchainUpdater, utxSynchronizer, time, extensionContext.accountsApi),
+        AliasApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, utxSynchronizer, time, blockchainUpdater),
         RewardApiRoute(blockchainUpdater)
       )
 
