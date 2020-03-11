@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.util
 
+import com.wavesplatform.crypto
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
@@ -30,11 +31,21 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     // Version switch
     case gs: GetSignatures if isNewMsgsSupported(ctx) =>
       out.add(RawBytes(GetHashesOrSignaturesSpec.messageCode, GetHashesOrSignaturesSpec.serializeData(gs)))
-    case gs: GetSignatures if SignaturesSpec.isSupported(gs.signatures) =>
+    case gs: GetSignatures if GetSignaturesSpec.isSupported(gs.signatures) =>
       out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
-    case s: Signatures if isNewMsgsSupported(ctx)                  => out.add(RawBytes(HashesOrSignaturesSpec.messageCode, HashesOrSignaturesSpec.serializeData(s)))
-    case s: Signatures if SignaturesSpec.isSupported(s.signatures) => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
-    case _ => log.warn(s"Can't encode message $msg for $ctx")
+
+    case s: Signatures =>
+      if (isNewMsgsSupported(ctx)) {
+        out.add(RawBytes(HashesOrSignaturesSpec.messageCode, HashesOrSignaturesSpec.serializeData(s)))
+      } else {
+        val supported = s.signatures
+          .dropWhile(_.length != crypto.SignatureLength)
+          .takeWhile(_.length == crypto.SignatureLength)
+        out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s.copy(signatures = supported))))
+      }
+
+    case _ =>
+      throw new IllegalArgumentException(s"Can't send message $msg to $ctx (unsupported)")
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
@@ -49,12 +60,7 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
   }
 
   private[this] def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
-    val version = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
-    version match {
-      case (0, _, _)            => false
-      case (1, v1, _) if v1 < 2 => false
-      case (1, 2, v) if v < 2   => false // TODO change to 3 on release
-      case _                    => true // >= 1.2.3
-    }
+    val (v1, v2, _) = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
+    v1 >= 1 && v2 >= 2 // >= 1.2.0
   }
 }

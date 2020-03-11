@@ -96,12 +96,7 @@ trait SignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
   }
 
   override def serializeData(v: A): Array[Byte] = {
-    val signatures  = unwrap(v)
-    val length      = signatures.size
-    val lengthBytes = Ints.toByteArray(length)
-
-    //WRITE SIGNATURES
-    signatures.foldLeft(lengthBytes) { case (bs, header) => Bytes.concat(bs, header) }
+    Bytes.concat(Ints.toByteArray(unwrap(v).length) +: unwrap(v): _*)
   }
 }
 
@@ -118,11 +113,12 @@ trait HashesOrSignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 
     require(bytes.length <= Ints.BYTES + (length * SignatureLength) + length, "Data does not match length")
 
-    val (_, arrays) = (0 until length).foldLeft((Ints.BYTES, Seq.empty[Array[Byte]])) { case ((pos, arrays), _) =>
-      val length = bytes(pos)
-      val result = bytes.slice(pos + 1, pos + 1 + length)
-      require(result.length == length, "Data does not match length")
-      (pos + length + 1, arrays :+ result)
+    val (_, arrays) = (0 until length).foldLeft((Ints.BYTES, Seq.empty[Array[Byte]])) {
+      case ((pos, arrays), _) =>
+        val length = bytes(pos)
+        val result = bytes.slice(pos + 1, pos + 1 + length)
+        require(result.length == length, "Data does not match length")
+        (pos + length + 1, arrays :+ result)
     }
     wrap(arrays)
   }
@@ -132,41 +128,36 @@ trait HashesOrSignaturesSeqSpec[A <: AnyRef] extends MessageSpec[A] {
     val length      = signatures.size
     val lengthBytes = Ints.toByteArray(length)
 
-    signatures.foldLeft(lengthBytes) { case (bs, sig) =>
-      Bytes.concat(bs, Array(sig.length.ensuring(_.isValidByte).toByte), sig)
+    signatures.foldLeft(lengthBytes) {
+      case (bs, sig) =>
+        Bytes.concat(bs, Array(sig.length.ensuring(_.isValidByte).toByte), sig)
     }
   }
 }
 
 object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
+  def isSupported(signatures: Seq[ByteStr]): Boolean = signatures.forall(_.length == SignatureLength)
   override def wrap(signatures: Seq[Array[Byte]]): GetSignatures = GetSignatures(signatures.map(ByteStr(_)))
-
   override def unwrap(v: GetSignatures): Seq[Array[MessageCode]] = v.signatures.map(_.arr)
-
   override val messageCode: MessageCode = 20: Byte
 }
 
 object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
-  def isSupported(signatures: Seq[ByteStr]): Boolean =
-    signatures.forall(_.length == SignatureLength)
-
   override def wrap(signatures: Seq[Array[Byte]]): Signatures = Signatures(signatures.map(ByteStr(_)))
-
   override def unwrap(v: Signatures): Seq[Array[Byte]] = v.signatures.map(_.arr)
-
   override val messageCode: MessageCode = 21: Byte
 }
 
 object GetHashesOrSignaturesSpec extends HashesOrSignaturesSeqSpec[GetSignatures] {
   override def wrap(signatures: Seq[Array[Byte]]): GetSignatures = GetSignatures(signatures.map(ByteStr(_)))
   override def unwrap(v: GetSignatures): Seq[Array[MessageCode]] = v.signatures.map(_.arr)
-  override val messageCode: MessageCode = 32: Byte
+  override val messageCode: MessageCode                          = 32: Byte
 }
 
 object HashesOrSignaturesSpec extends HashesOrSignaturesSeqSpec[Signatures] {
   override def wrap(signatures: Seq[Array[Byte]]): Signatures = Signatures(signatures.map(ByteStr(_)))
-  override def unwrap(v: Signatures): Seq[Array[Byte]] = v.signatures.map(_.arr)
-  override val messageCode: MessageCode = 33: Byte
+  override def unwrap(v: Signatures): Seq[Array[Byte]]        = v.signatures.map(_.arr)
+  override val messageCode: MessageCode                       = 33: Byte
 }
 
 object GetBlockSpec extends MessageSpec[GetBlock] {
