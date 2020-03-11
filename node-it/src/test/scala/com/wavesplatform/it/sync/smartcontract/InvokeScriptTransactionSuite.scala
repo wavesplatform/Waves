@@ -5,13 +5,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
-import com.wavesplatform.it.sync.{minFee, setScriptFee}
+import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.CONST_BYTESTR
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state._
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import org.scalatest.CancelAfterFailure
@@ -63,6 +65,9 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | @Callable(inv)
         |func bar() = [IntegerEntry("", 2)]
         |
+        |@Callable(inv)
+        | func biz() = [IntegerEntry("numb", 1)]
+        |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
@@ -94,8 +99,9 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         contract.stringRepr,
         func = Some("foo"),
         args = List(CONST_BYTESTR(arg).explicitGet()),
-        payment = Seq(),
+        payment = Seq(Payment(1.waves, Waves)),
         fee = 1.waves,
+        version = v,
         waitForTx = true
       )
 
@@ -115,6 +121,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         func = None,
         payment = Seq(),
         fee = 1.waves,
+        version = v,
         waitForTx = true
       )
       sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "b")
@@ -168,5 +175,14 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
     nodes.waitForHeightArise()
     sender.getData(thirdContract.stringRepr).filter(_.key.isEmpty) shouldBe List.empty
+  }
+
+  test("invoke script via dApp alias") {
+    sender.createAlias(thirdContract.stringRepr, "dappalias", smartMinFee, waitForTx = true)
+    val dAppAlias = sender.aliasByAddress(thirdContract.stringRepr).find(_.endsWith("dappalias")).get
+    for (v <- invokeScrTxSupportedVersions) {
+      sender.invokeScript(caller.stringRepr, dAppAlias, fee = smartMinFee + smartFee, func = Some("biz"), version = v, waitForTx = true)
+      sender.getDataByKey(thirdContract.stringRepr, "numb") shouldBe IntegerDataEntry("numb", 1)
+    }
   }
 }
