@@ -52,6 +52,6 @@ object PaymentTxSerializer {
     val amount    = buf.getLong
     val fee       = buf.getLong
     val signature = buf.getSignature
-    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature)
+    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId)
   }
 }

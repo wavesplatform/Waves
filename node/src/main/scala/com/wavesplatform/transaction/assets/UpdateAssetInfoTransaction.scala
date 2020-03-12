@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -8,7 +8,7 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
-import com.wavesplatform.transaction.{Asset, ChainSpecific, FastHashId, Proofs, ProvenTransaction, Transaction, TransactionParser, TxAmount, TxTimestamp, TxType, TxVersion, UnexpectedTransaction, VersionedTransaction, _}
+import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -16,7 +16,6 @@ import scala.util.{Failure, Success, Try}
 
 case class UpdateAssetInfoTransaction(
     version: TxVersion,
-    chainId: Byte,
     sender: PublicKey,
     assetId: IssuedAsset,
     name: String,
@@ -24,9 +23,9 @@ case class UpdateAssetInfoTransaction(
     timestamp: TxTimestamp,
     feeAmount: TxAmount,
     feeAsset: Asset,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
-    with ChainSpecific
     with FastHashId
     with ProvenTransaction { self =>
 
@@ -51,8 +50,10 @@ case class UpdateAssetInfoTransaction(
 }
 
 object UpdateAssetInfoTransaction extends TransactionParser {
-  override val typeId: TxType                                 = 17: Byte
-  override val supportedVersions: Set[TxVersion]              = Set(1)
+  type TransactionT = UpdateAssetInfoTransaction
+
+  override val typeId: TxType                    = 17: Byte
+  override val supportedVersions: Set[TxVersion] = Set(1)
 
   implicit def sign(tx: UpdateAssetInfoTransaction, privateKey: PrivateKey): UpdateAssetInfoTransaction =
     tx.copy(proofs = Proofs(crypto.sign(privateKey, tx.bodyBytes())))
@@ -69,7 +70,6 @@ object UpdateAssetInfoTransaction extends TransactionParser {
 
   def create(
       version: Byte,
-      chainId: Byte,
       sender: PublicKey,
       assetId: ByteStr,
       name: String,
@@ -77,11 +77,11 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       feeAmount: TxAmount,
       feeAsset: Asset,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, UpdateAssetInfoTransaction] = {
     UpdateAssetInfoTransaction(
       version,
-      chainId,
       sender,
       IssuedAsset(assetId),
       name,
@@ -89,13 +89,13 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       timestamp,
       feeAmount,
       feeAsset,
-      proofs
+      proofs,
+      chainId
     ).validatedEither
   }
 
   def selfSigned(
       version: Byte,
-      chainId: Byte,
       sender: KeyPair,
       assetId: ByteStr,
       name: String,
@@ -104,5 +104,5 @@ object UpdateAssetInfoTransaction extends TransactionParser {
       feeAmount: TxAmount,
       feeAsset: Asset
   ): Either[ValidationError, UpdateAssetInfoTransaction] =
-    create(version, chainId, sender, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender))
+    create(version, sender, assetId, name, description, timestamp, feeAmount, feeAsset, Proofs.empty).map(_.signWith(sender))
 }

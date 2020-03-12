@@ -15,7 +15,7 @@ import scala.util.Try
 object LeaseCancelTxSerializer {
   def toJson(tx: LeaseCancelTransaction): JsObject =
     BaseTxJson.toJson(tx) ++ Json.obj("leaseId" -> tx.leaseId.toString) ++
-      (if (tx.version == TxVersion.V2) Json.obj("chainId" -> tx.chainByte) else Json.obj())
+      (if (tx.version == TxVersion.V2) Json.obj("chainId" -> tx.chainId) else Json.obj())
 
   def bodyBytes(tx: LeaseCancelTransaction): Array[Byte] = {
     import tx._
@@ -23,7 +23,7 @@ object LeaseCancelTxSerializer {
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
-      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainByte), baseBytes)
+      case TxVersion.V2 => Bytes.concat(Array(typeId, version, chainId), baseBytes)
       case _            => PBTransactionSerializer.bodyBytes(tx)
     }
   }
@@ -42,7 +42,7 @@ object LeaseCancelTxSerializer {
       val fee       = buf.getLong
       val timestamp = buf.getLong
       val leaseId   = buf.getByteArray(crypto.DigestLength)
-      LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil)
+      LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, Nil, AddressScheme.current.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")
@@ -50,7 +50,6 @@ object LeaseCancelTxSerializer {
     if (bytes(0) == 0) {
       require(bytes(1) == LeaseCancelTransaction.typeId, "transaction type mismatch")
       require(bytes(2) == TxVersion.V2, "transaction version mismatch")
-      require(bytes(3) == AddressScheme.current.chainId, "transaction chainId mismatch")
       val buf = ByteBuffer.wrap(bytes, 4, bytes.length - 4)
       parseCommonPart(TxVersion.V2, buf).copy(proofs = buf.getProofs)
     } else {

@@ -101,7 +101,8 @@ class SetScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFai
           fee = minFee + 0.004.waves,
           attachment = None,
           timestamp = System.currentTimeMillis(),
-          proofs = Proofs.empty
+          proofs = Proofs.empty,
+          acc3.chainId
         )
       val sig1   = ByteStr(crypto.sign(acc1, unsigned.bodyBytes()))
       val sig2   = ByteStr(crypto.sign(acc2, unsigned.bodyBytes()))

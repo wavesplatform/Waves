@@ -13,7 +13,8 @@ object MassTransferTxValidator extends TxValidator[MassTransferTransaction] {
       V.cond(transfers.length <= MaxTransferCount, GenericError(s"Number of transfers ${transfers.length} is greater than $MaxTransferCount")),
       V.transferAttachment(isProtobufVersion, attachment),
       V.cond(transfers.forall(_.amount >= 0), GenericError("One of the transfers has negative amount")),
-      V.fee(fee)
+      V.fee(fee),
+      V.chainIds(chainId, transfers.map(_.address.chainId): _*)
     )
   }
 }

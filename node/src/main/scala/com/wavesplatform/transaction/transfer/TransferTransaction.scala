@@ -12,7 +12,6 @@ import com.wavesplatform.utils.base58Length
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 case class TransferTransaction(
@@ -25,7 +24,8 @@ case class TransferTransaction(
     fee: TxAmount,
     attachment: Option[Attachment],
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with SigProofsSwitch
     with FastHashId
@@ -47,12 +47,13 @@ case class TransferTransaction(
 }
 
 object TransferTransaction extends TransactionParser {
+  type TransactionT = TransferTransaction
+
   val MaxAttachmentSize            = 140
   val MaxAttachmentStringSize: Int = base58Length(MaxAttachmentSize)
 
-  val typeId: TxType                    = 4
+  val typeId: TxType                    = 4: Byte
   val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
-  val classTag                          = ClassTag(classOf[TransferTransaction])
 
   implicit val validator: TxValidator[TransferTransaction] = TransferTxValidator
 
@@ -75,7 +76,7 @@ object TransferTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs).validatedEither
+    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
 
   def signed(
       version: TxVersion,
