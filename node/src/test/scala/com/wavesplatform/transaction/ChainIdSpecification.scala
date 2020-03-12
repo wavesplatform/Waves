@@ -59,7 +59,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("CreateAliasTransaction alias validation") {
-    forAll(Gen.oneOf(TransferTransaction.supportedVersions.toSeq)) { v =>
+    forAll(Gen.oneOf(CreateAliasTransaction.supportedVersions.toSeq)) { v =>
       CreateAliasTransaction(
         v,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
@@ -73,7 +73,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("LeaseTransaction recipient validation") {
-    forAll(Gen.oneOf(TransferTransaction.supportedVersions.toSeq)) { v =>
+    forAll(Gen.oneOf(LeaseTransaction.supportedVersions.toSeq)) { v =>
       LeaseTransaction(
         v,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
@@ -99,7 +99,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
   }
 
   property("InvokeScriptTransaction dAppAddressOrAlias validation") {
-    forAll(Gen.oneOf(TransferTransaction.supportedVersions.toSeq)) { v =>
+    forAll(Gen.oneOf(InvokeScriptTransaction.supportedVersions.toSeq)) { v =>
       InvokeScriptTransaction(
         v,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
