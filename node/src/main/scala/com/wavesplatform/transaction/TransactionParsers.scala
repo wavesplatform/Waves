@@ -56,21 +56,21 @@ object TransactionParsers {
   def by(typeId: Byte, version: TxVersion): Option[TransactionParser] = all.get((typeId, version))
 
   def parseBytes(bytes: Array[Byte]): Try[Transaction] = {
+    def validate(parser: TransactionParser)(tx: parser.TransactionT): Try[Transaction] = {
+      import parser._
+      tx.validatedEither.left.map(ve => new RuntimeException(ve.toString)).toTry
+    }
     def modernParseBytes: Try[Transaction] = {
       val typeId  = bytes(1)
       val version = bytes(2)
       modern.get((typeId, version)) match {
-        case Some(parser) => parser.parseBytes(bytes).flatMap { tx =>
-          import parser._
-          tx.validatedEither.left.map(ve => new RuntimeException(ve.toString)).toTry
-        }
-        case None =>
-          Failure[Transaction](UnknownTypeAndVersion(typeId, version))
+        case Some(parser) => parser.parseBytes(bytes).flatMap(validate(parser))
+        case None         => Failure[Transaction](UnknownTypeAndVersion(typeId, version))
       }
     }
     def oldParseBytes: Try[Transaction] = {
       old.get(bytes(0)) match {
-        case Some(parser) => parser.parseBytes(bytes)
+        case Some(parser) => parser.parseBytes(bytes).flatMap(validate(parser))
         case None         => Failure[Transaction](UnknownType(bytes(0)))
       }
     }

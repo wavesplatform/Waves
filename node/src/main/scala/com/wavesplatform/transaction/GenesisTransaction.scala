@@ -8,7 +8,7 @@ import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.serialization.impl.GenesisTxSerializer
-import com.wavesplatform.transaction.validation.TxValidator
+import com.wavesplatform.transaction.validation.{TxConstraints, TxValidator}
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -36,7 +36,10 @@ object GenesisTransaction extends TransactionParser {
     serializer.parseBytes(bytes)
 
   implicit val validator: TxValidator[GenesisTransaction] =
-    tx => Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves"))
+    tx => TxConstraints.seq(tx)(
+      Validated.condNel(tx.amount >= 0, tx, TxValidationError.NegativeAmount(tx.amount, "waves")),
+      TxConstraints.addressChainId(tx.recipient, tx.chainId)
+    )
 
   def generateSignature(recipient: Address, amount: Long, timestamp: Long): Array[Byte] = {
     val payload = Bytes.concat(Ints.toByteArray(typeId), Longs.toByteArray(timestamp), recipient.bytes, Longs.toByteArray(amount))

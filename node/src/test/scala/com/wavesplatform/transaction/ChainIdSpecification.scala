@@ -127,4 +127,14 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
       ).validatedEither shouldBe Left(GenericError("Address or alias from other network"))
     }
   }
+
+  property("GenesisTransaction recipient validation") {
+    GenesisTransaction(
+      Address.fromBytes(Base58.tryDecodeWithLimit("3P3oxTkpCWJgCr6SJrBzdP5N8jFqHCiy7L2").get, chainId = 'W'.toByte).explicitGet(),
+      100000000,
+      1526641218066L,
+      ByteStr.empty,
+      AddressScheme.current.chainId
+    ).validatedEither shouldBe Left(GenericError("Address or alias from other network"))
+  }
 }
