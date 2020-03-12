@@ -384,7 +384,7 @@ object Functions {
             case (env, CONST_LONG(height: Long) :: Nil) =>
               env
                 .blockInfoByHeight(height.toInt)
-                .map(v => fromOptionCO(v.map(bi => Bindings.buildLastBlockInfo(bi, version))))
+                .map(v => fromOptionCO(v.map(bi => Bindings.buildBlockInfo(bi, version))))
                 .map(_.asRight[ExecutionError])
             case (_, xs) => notImplemented[F](s"blockInfoByHeight(u: Int)", xs)
           }
