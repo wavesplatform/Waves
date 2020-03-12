@@ -334,7 +334,7 @@ object FPPoSSelectorTest {
         .buildAndSign(
           blockVersion,
           forkChain.head._1.header.timestamp + delay,
-          forkChain.head._1.uniqueId,
+          forkChain.head._1.id(),
           bt,
           ByteStr(gs),
           Seq.empty,
@@ -385,7 +385,7 @@ object FPPoSSelectorTest {
       .buildAndSign(
         blockVersion,
         lastBlock.header.timestamp + delay,
-        lastBlock.uniqueId,
+        lastBlock.id(),
         updateBT(cData.baseTarget),
         updateGS(cData.generationSignature),
         Seq.empty,
@@ -421,7 +421,7 @@ object FPPoSSelectorTest {
           val newBlock = TestBlock
             .create(
               lastTxTimestamp + 1 + d,
-              blocks.head.uniqueId,
+              blocks.head.id(),
               Seq.empty,
               version = blockVersion
             )

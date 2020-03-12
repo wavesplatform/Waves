@@ -398,9 +398,9 @@ class AssetTransactionsDiffTest
           d.appendBlock(genesisBlock)
 
           val (keyBlock, Seq(microBlock)) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.uniqueId, Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.id(), Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
           d.appendBlock(keyBlock)
-          d.appendMicroBlock(microBlock)
+          val microBlockId = d.appendMicroBlock(microBlock)
 
           { // Check liquid block
             val desc = blockchain.assetDescription(IssuedAsset(issue.assetId)).get
@@ -416,7 +416,7 @@ class AssetTransactionsDiffTest
           }
 
           val (keyBlock1, Nil) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(microBlock.totalResBlockSig, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(microBlockId, Nil, Nil, signer, Block.ProtoBlockVersion, keyBlock.header.timestamp + 100)
           d.appendBlock(keyBlock1)
 
           { // Check after new key block

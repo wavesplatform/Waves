@@ -136,7 +136,7 @@ case class DebugApiRoute(
     jsonPost[RollbackParams] { params =>
       ng.blockAt(params.rollbackTo) match {
         case Some(block) =>
-          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+          rollbackToBlock(block.id(), params.returnTransactionsToUtx)
         case None =>
           (StatusCodes.BadRequest, "Block at height not found")
       }

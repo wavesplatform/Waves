@@ -132,7 +132,7 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
             (ts + 1, Seq[Block](genesisBlock))
           } {
             case ((ts, chain), bp) =>
-              (ts + 3, bp(ts + 3, chain.head.uniqueId, account) +: chain)
+              (ts + 3, bp(ts + 3, chain.head.id(), account) +: chain)
           }._2
           added <- Task.traverse(blocks.reverse)(b => Task(blockchainUpdater.processBlock(b, b.header.generationSignature)))
           _   = added.foreach(_.explicitGet())

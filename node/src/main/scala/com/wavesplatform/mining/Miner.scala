@@ -196,7 +196,7 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: Block, account: KeyPair): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.uniqueId))
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.id()))
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)

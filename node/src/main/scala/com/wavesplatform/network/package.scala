@@ -50,7 +50,7 @@ package object network extends ScorexLogging {
   def id(chan: Channel, prefix: String = ""): String =
     if (chan == null) "???" else s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
 
-  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
+  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.id()))
 
   def formatSignatures(signatures: Seq[ByteStr]): String =
     if (signatures.isEmpty) "[Empty]"

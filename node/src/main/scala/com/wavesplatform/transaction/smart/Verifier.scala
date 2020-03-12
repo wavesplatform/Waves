@@ -128,7 +128,6 @@ object Verifier extends ScorexLogging {
 
   def verifyOrder(blockchain: Blockchain, script: Script, order: Order): ValidationResult[Order] =
     for {
-      _ <- Script.estimate(script, blockchain.estimator).leftMap(GenericError(_))
       result <- Try {
         val eval = ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
         val scriptResult = eval match {

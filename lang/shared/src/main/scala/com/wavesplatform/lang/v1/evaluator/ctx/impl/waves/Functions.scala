@@ -384,7 +384,7 @@ object Functions {
             case (env, CONST_LONG(height: Long) :: Nil) =>
               env
                 .blockInfoByHeight(height.toInt)
-                .map(v => fromOptionCO(v.map(bi => Bindings.buildLastBlockInfo(bi, version))))
+                .map(v => fromOptionCO(v.map(bi => Bindings.buildBlockInfo(bi, version))))
                 .map(_.asRight[ExecutionError])
             case (_, xs) => notImplemented[F](s"blockInfoByHeight(u: Int)", xs)
           }
@@ -505,6 +505,32 @@ object Functions {
               ).pure[F]
 
             case (env, xs) => notImplemented[F](s"calculateAssetId(i: Issue)", xs)
+          }
+      }
+    }
+
+  def transactionFromProtoBytesF(proofsEnabled: Boolean, version: StdLibVersion): BaseFunction[Environment] =
+    NativeFunction.withEnvironment[Environment](
+      "transferTransactionFromProto",
+      5,
+      TRANSFER_TRANSACTION_FROM_PROTO,
+      UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+      ("bytes", BYTESTR)
+    ) {
+      new ContextfulNativeFunction[Environment](
+        "transferTransactionFromProto",
+        UNION(buildTransferTransactionType(proofsEnabled, version), UNIT),
+        Seq(("bytes", BYTESTR))
+      ) {
+        override def ev[F[_] : Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
+          input match {
+            case (env, List(CONST_BYTESTR(bytes))) =>
+              (env.transferTransactionFromProto(bytes)
+                  .map(transactionObject(_, proofsEnabled, version)): EVALUATED)
+                  .asRight[ExecutionError]
+                  .pure[F]
+
+            case (_, xs) => notImplemented[F](s"transferTransactionFromProto(bytes: ByteVector)", xs)
           }
       }
     }

@@ -103,7 +103,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val exchangeTxHeight    = sender.waitForTransaction(exchangeTx.id).height
     val exchangeTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
     val exchangeTxBlockAt   = sender.blockAt(exchangeTxHeight, amountsAsStrings = true).transactions.head
-    val exchangeTxBlockBySignature   = sender.blockBySignature(sender.blockAt(exchangeTxHeight).signature, amountsAsStrings = true).transactions.head
+    val exchangeTxBlockBySignature   = sender.blockBySignature(sender.blockAt(exchangeTxHeight).id, amountsAsStrings = true).transactions.head
     val exchangeTxBlockSeq   = sender.blockSeq(exchangeTxHeight, exchangeTxHeight, amountsAsStrings = true).head.transactions.head
     checkExchangeTx(exchangeTxBlockLast)
     checkExchangeTx(exchangeTxBlockAt)
@@ -134,7 +134,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val dataTxHeight    = sender.waitForTransaction(dataTx.id).height
     sender.lastBlock(amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.blockAt(dataTxHeight, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.blockBySignature(sender.lastBlock().id, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true).head.transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
 
     sender.transactionInfo[TransactionInfo](dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
@@ -157,7 +157,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val sponsorshipTxHeight    = sender.waitForTransaction(sponsorshipTx.id).height
     val sponsorshipTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
     val sponsorshipTxBlockAt   = sender.blockAt(sponsorshipTxHeight, amountsAsStrings = true).transactions.head
-    val sponsorshipTxBlockBySignature   = sender.blockBySignature(sender.blockAt(sponsorshipTxHeight).signature, amountsAsStrings = true).transactions.head
+    val sponsorshipTxBlockBySignature   = sender.blockBySignature(sender.blockAt(sponsorshipTxHeight).id, amountsAsStrings = true).transactions.head
     val sponsorshipTxBlockSeq   = sender.blockSeq(sponsorshipTxHeight, sponsorshipTxHeight, amountsAsStrings = true).head.transactions.head
     checkSponsorshipTx(sponsorshipTxBlockLast)
     checkSponsorshipTx(sponsorshipTxBlockAt)
@@ -184,7 +184,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val massTransferTxHeight    = sender.waitForTransaction(massTransferTx.id).height
     val massTransferTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
     val massTransferTxBlockAt   = sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.head
-    val massTransferTxBlockBySignature   = sender.blockBySignature(sender.blockAt(massTransferTxHeight).signature, amountsAsStrings = true).transactions.head
+    val massTransferTxBlockBySignature   = sender.blockBySignature(sender.blockAt(massTransferTxHeight).id, amountsAsStrings = true).transactions.head
     val massTransferTxBlockSeq   = sender.blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true).head.transactions.head
     checkMassTransferTx(massTransferTxBlockLast)
     checkMassTransferTx(massTransferTxBlockAt)
@@ -214,7 +214,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val reward           = sender.rewardStatus().currentReward
     val blockLast        = sender.lastBlock(amountsAsStrings = true)
     val blockAt          = sender.blockAt(currentHeight, amountsAsStrings = true)
-    val blockBySignature = sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true)
+    val blockBySignature = sender.blockBySignature(sender.lastBlock().id, amountsAsStrings = true)
     val blockHeadersAt   = sender.blockHeadersAt(currentHeight, amountsAsStrings = true)
     val blockHeadersLast = sender.lastBlockHeaders(amountsAsStrings = true)
 

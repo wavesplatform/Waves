@@ -1,6 +1,6 @@
 package com.wavesplatform.network
 
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block
 import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.{Schedulers, ScorexLogging}
 import io.netty.channel.ChannelHandler.Sharable
@@ -21,13 +21,13 @@ class MessageObserver extends ChannelInboundHandlerAdapter with ScorexLogging {
   private val transactions        = ConcurrentSubject.publish[(Channel, Transaction)]
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
-    case b: Block             => blocks.onNext((ctx.channel(), b))
-    case sc: BigInt           => blockchainScores.onNext((ctx.channel(), sc))
-    case s: Signatures        => signatures.onNext((ctx.channel(), s))
-    case mbInv: MicroBlockInv => microblockInvs.onNext((ctx.channel(), mbInv))
-    case mb: MicroBlock       => microblockResponses.onNext((ctx.channel(), MicroBlockResponse(mb)))
-    case tx: Transaction      => transactions.onNext((ctx.channel(), tx))
-    case _                    => super.channelRead(ctx, msg)
+    case b: Block               => blocks.onNext((ctx.channel(), b))
+    case sc: BigInt             => blockchainScores.onNext((ctx.channel(), sc))
+    case s: Signatures          => signatures.onNext((ctx.channel(), s))
+    case mbInv: MicroBlockInv   => microblockInvs.onNext((ctx.channel(), mbInv))
+    case mb: MicroBlockResponse => microblockResponses.onNext((ctx.channel(), mb))
+    case tx: Transaction        => transactions.onNext((ctx.channel(), tx))
+    case _                      => super.channelRead(ctx, msg)
 
   }
 

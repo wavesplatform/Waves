@@ -39,7 +39,7 @@ object Types {
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
-    ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil)
+    ) ::: (if (version >= V4) List("vrf" -> optionByteVector, "transactionsRoot" -> BYTESTR) else Nil)
   )
 
   def optionAsset(version: StdLibVersion) =

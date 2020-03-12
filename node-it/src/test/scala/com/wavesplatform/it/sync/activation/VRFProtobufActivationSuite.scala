@@ -45,7 +45,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     blockHeadersBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     ByteStr.decodeBase58(blockBeforeActivationHeight.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
-    ByteStr.decodeBase58(sender.blockGenerationSignature(blockBeforeActivationHeight.signature).generationSignature).get.length shouldBe Block.GenerationSignatureLength
+    ByteStr.decodeBase58(sender.blockGenerationSignature(blockBeforeActivationHeight.id).generationSignature).get.length shouldBe Block.GenerationSignatureLength
     blockBeforeActivationHeight.baseTarget shouldBe blockHeadersBeforeActivationHeight.baseTarget
   }
 
@@ -130,7 +130,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     nodes.waitForHeightArise()
 
     //rollback to height after activation height using rollback to block with signature method
-    nodes.rollbackToBlockWithSignature(sender.blockAt(activationHeight + 1).signature)
+    nodes.rollbackToBlockWithSignature(sender.blockAt(activationHeight + 1).id)
 
     val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
     blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion

@@ -2,6 +2,7 @@ package com.wavesplatform.network
 
 import java.util
 
+import com.wavesplatform.crypto
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.ChannelHandlerContext
@@ -23,11 +24,28 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     // With a spec
     case GetPeers             => out.add(RawBytes(GetPeersSpec.messageCode, Array[Byte]()))
     case k: KnownPeers        => out.add(RawBytes(PeersSpec.messageCode, PeersSpec.serializeData(k)))
-    case gs: GetSignatures    => out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
-    case s: Signatures        => out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s)))
     case g: GetBlock          => out.add(RawBytes(GetBlockSpec.messageCode, GetBlockSpec.serializeData(g)))
     case m: MicroBlockInv     => out.add(RawBytes(MicroBlockInvSpec.messageCode, MicroBlockInvSpec.serializeData(m)))
     case m: MicroBlockRequest => out.add(RawBytes(MicroBlockRequestSpec.messageCode, MicroBlockRequestSpec.serializeData(m)))
+
+    // Version switch
+    case gs: GetSignatures if isNewMsgsSupported(ctx) =>
+      out.add(RawBytes(GetBlockIdsSpec.messageCode, GetBlockIdsSpec.serializeData(gs)))
+    case gs: GetSignatures if GetSignaturesSpec.isSupported(gs.signatures) =>
+      out.add(RawBytes(GetSignaturesSpec.messageCode, GetSignaturesSpec.serializeData(gs)))
+
+    case s: Signatures =>
+      if (isNewMsgsSupported(ctx)) {
+        out.add(RawBytes(BlockIdsSpec.messageCode, BlockIdsSpec.serializeData(s)))
+      } else {
+        val supported = s.signatures
+          .dropWhile(_.length != crypto.SignatureLength)
+          .takeWhile(_.length == crypto.SignatureLength)
+        out.add(RawBytes(SignaturesSpec.messageCode, SignaturesSpec.serializeData(s.copy(signatures = supported))))
+      }
+
+    case _ =>
+      throw new IllegalArgumentException(s"Can't send message $msg to $ctx (unsupported)")
   }
 
   override def decode(ctx: ChannelHandlerContext, msg: RawBytes, out: util.List[AnyRef]): Unit = {
@@ -41,4 +59,8 @@ class MessageCodec(peerDatabase: PeerDatabase) extends MessageToMessageCodec[Raw
     peerDatabase.blacklistAndClose(ctx.channel(), s"Invalid message. ${e.getMessage}")
   }
 
+  private[this] def isNewMsgsSupported(ctx: ChannelHandlerContext): Boolean = {
+    val (v1, v2, _) = ctx.channel().attr(HandshakeHandler.NodeVersionAttributeKey).get()
+    v1 > 1 || (v1 == 1 && v2 >= 2) // >= 1.2.0
+  }
 }
