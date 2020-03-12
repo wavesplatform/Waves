@@ -1,9 +1,10 @@
 package com.wavesplatform.transaction
 
 import com.google.common.primitives.Bytes
-import com.wavesplatform.account.{Alias, KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, Alias, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.serialization.impl.CreateAliasTxSerializer
 import com.wavesplatform.transaction.validation.impl.CreateAliasTxValidator
@@ -15,7 +16,7 @@ import scala.util.Try
 final case class CreateAliasTransaction(
     version: TxVersion,
     sender: PublicKey,
-    alias: Alias,
+    aliasName: String,
     fee: TxAmount,
     timestamp: TxTimestamp,
     proofs: Proofs,
@@ -24,6 +25,9 @@ final case class CreateAliasTransaction(
     with VersionedTransaction
     with TxWithFee.InWaves
     with LegacyPBSwitch.V3 {
+
+  lazy val alias: Alias = Alias.createWithChainId(aliasName, chainId).explicitGet()
+
   override def builder: TransactionParser          = CreateAliasTransaction
   override val bodyBytes: Coeval[Array[TxVersion]] = Coeval.evalOnce(CreateAliasTransaction.serializer.bodyBytes(this))
   override val bytes: Coeval[Array[TxVersion]]     = Coeval.evalOnce(CreateAliasTransaction.serializer.toBytes(this))
@@ -56,17 +60,18 @@ object CreateAliasTransaction extends TransactionParser {
   def create(
       version: TxVersion,
       sender: PublicKey,
-      alias: Alias,
+      aliasName: String,
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
-    CreateAliasTransaction(version, sender, alias, fee, timestamp, proofs, alias.chainId).validatedEither
+    CreateAliasTransaction(version, sender, aliasName, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,
       sender: PublicKey,
-      alias: Alias,
+      alias: String,
       fee: TxAmount,
       timestamp: TxTimestamp,
       signer: PrivateKey
@@ -74,5 +79,5 @@ object CreateAliasTransaction extends TransactionParser {
     create(version, sender, alias, fee, timestamp, Nil).map(_.signWith(signer))
 
   def selfSigned(version: TxVersion, sender: KeyPair, alias: Alias, fee: TxAmount, timestamp: TxTimestamp): Either[ValidationError, TransactionT] =
-    signed(version, sender, alias, fee, timestamp, sender)
+    signed(version, sender, alias.name, fee, timestamp, sender)
 }

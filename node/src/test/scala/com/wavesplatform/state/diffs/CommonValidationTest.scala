@@ -246,7 +246,7 @@ class CommonValidationTest extends PropSpec with PropertyChecks with Matchers wi
           Proofs.empty,
           invChainId
         ).signWith(master),
-        CreateAliasTransaction(TxVersion.V3, master.publicKey, invChainAlias, amount, timestamp, Proofs.empty, invChainId).signWith(master),
+        CreateAliasTransaction(TxVersion.V3, master.publicKey, invChainAlias.name, amount, timestamp, Proofs.empty, invChainId).signWith(master),
         LeaseTransaction(TxVersion.V3, master.publicKey, invChainAddrOrAlias, amount, amount, timestamp, Proofs.empty, invChainId).signWith(master),
         InvokeScriptTransaction(TxVersion.V2, master, invChainAddrOrAlias, None, Nil, amount, Waves, timestamp, Proofs.empty, invChainId)
           .signWith(master),

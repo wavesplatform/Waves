@@ -12,7 +12,7 @@ import scala.util.Try
 object CreateAliasTxSerializer {
   def toJson(tx: CreateAliasTransaction): JsObject = {
     import tx._
-    BaseTxJson.toJson(tx) ++ Json.obj("alias" -> alias.name)
+    BaseTxJson.toJson(tx) ++ Json.obj("alias" -> aliasName)
   }
 
   def bodyBytes(tx: CreateAliasTransaction): Array[Byte] = {
@@ -48,7 +48,7 @@ object CreateAliasTxSerializer {
         val fee       = buf.getLong
         val timestamp = buf.getLong
         val signature = buf.getSignature
-        CreateAliasTransaction(Transaction.V1, sender, alias, fee, timestamp, Proofs(signature), alias.chainId)
+        CreateAliasTransaction(Transaction.V1, sender, alias.name, fee, timestamp, Proofs(signature), alias.chainId)
 
       case Array(0, CreateAliasTransaction.typeId, 2) =>
         val buf       = ByteBuffer.wrap(bytes, 3, bytes.length - 3)
@@ -57,7 +57,7 @@ object CreateAliasTxSerializer {
         val fee       = buf.getLong
         val timestamp = buf.getLong
         val proofs    = buf.getProofs
-        CreateAliasTransaction(Transaction.V2, sender, alias, fee, timestamp, proofs, alias.chainId)
+        CreateAliasTransaction(Transaction.V2, sender, alias.name, fee, timestamp, proofs, alias.chainId)
 
       case Array(b1, b2, b3) => throw new IllegalArgumentException(s"Invalid tx header bytes: $b1, $b2, $b3")
     }

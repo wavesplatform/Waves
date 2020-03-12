@@ -58,20 +58,6 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
     ).validatedEither shouldBe Left(GenericError("Address or alias from other network"))
   }
 
-  property("CreateAliasTransaction alias validation") {
-    forAll(Gen.oneOf(CreateAliasTransaction.supportedVersions.toSeq)) { v =>
-      CreateAliasTransaction(
-        v,
-        PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").explicitGet(),
-        Alias.createWithChainId("sasha", 'W'.toByte).explicitGet(),
-        100000000,
-        1526641218066L,
-        Proofs.empty,
-        AddressScheme.current.chainId
-      ).validatedEither shouldBe Left(GenericError("Address or alias from other network"))
-    }
-  }
-
   property("LeaseTransaction recipient validation") {
     forAll(Gen.oneOf(LeaseTransaction.supportedVersions.toSeq)) { v =>
       LeaseTransaction(

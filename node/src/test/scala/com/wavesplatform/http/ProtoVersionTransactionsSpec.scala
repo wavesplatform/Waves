@@ -61,7 +61,7 @@ class ProtoVersionTransactionsSpec extends RouteSpec("/transactions") with RestA
     "CreateAliasTransaction" in {
       val alias = aliasGen.sample.get
 
-      val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias, MinFee, Now, Proofs.empty).explicitGet()
+      val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias.name, MinFee, Now, Proofs.empty).explicitGet()
 
       val (proofs, aliasTxJson) = Post(routePath("/sign"), aliasTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, aliasTxUnsigned)

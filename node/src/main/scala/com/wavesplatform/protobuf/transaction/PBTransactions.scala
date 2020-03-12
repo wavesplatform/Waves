@@ -128,8 +128,7 @@ object PBTransactions {
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>
         for {
-          alias <- com.wavesplatform.account.Alias.createWithChainId(alias, chainId)
-          tx    <- vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, Proofs(Seq(signature)))
+          tx <- vt.CreateAliasTransaction.create(version.toByte, sender, alias, feeAmount, timestamp, Proofs(Seq(signature)), chainId)
         } yield tx
 
       case Data.Issue(IssueTransactionData(name, description, quantity, decimals, reissuable, script)) =>
@@ -322,7 +321,7 @@ object PBTransactions {
         vt.CreateAliasTransaction(
           version.toByte,
           sender,
-          com.wavesplatform.account.Alias.createWithChainId(alias, chainId).explicitGet(),
+          alias,
           feeAmount,
           timestamp,
           Proofs(signature),
