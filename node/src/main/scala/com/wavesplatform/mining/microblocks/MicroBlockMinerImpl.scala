@@ -3,6 +3,7 @@ package com.wavesplatform.mining.microblocks
 import cats.effect.concurrent.Ref
 import cats.implicits._
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.metrics._
@@ -88,8 +89,8 @@ class MicroBlockMinerImpl(
                 .leftWiden[Throwable]
                 .liftTo[Task]
               (signedBlock, microBlock) = blocks
-              _ <- appendMicroBlock(microBlock)
-              _ <- broadcastMicroBlock(account, microBlock)
+              blockId <- appendMicroBlock(microBlock)
+              _ <- broadcastMicroBlock(account, microBlock, blockId)
             } yield {
               if (updatedTotalConstraint.isFull) Stop
               else Success(signedBlock, updatedTotalConstraint)
@@ -105,10 +106,10 @@ class MicroBlockMinerImpl(
         }
       }
 
-  private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock): Task[Unit] =
-    Task(allChannels.broadcast(MicroBlockInv(account, microBlock.totalResBlockSig, microBlock.prevResBlockSig)))
+  private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
+    Task(allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
-  private def appendMicroBlock(microBlock: MicroBlock): Task[Unit] =
+  private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
     MicroblockAppender(blockchainUpdater, utx, appenderScheduler, verify = false)(microBlock)
       .flatMap {
         case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
@@ -136,7 +137,7 @@ class MicroBlockMinerImpl(
           )
           .leftMap(BlockBuildError)
         microBlock <- MicroBlock
-          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.signature, signedBlock.signature)
+          .buildAndSign(signedBlock.header.version, account, unconfirmed, accumulatedBlock.id(), signedBlock.signature)
           .leftMap(MicroBlockBuildError)
         _ = BlockStats.mined(microBlock)
       } yield (signedBlock, microBlock)

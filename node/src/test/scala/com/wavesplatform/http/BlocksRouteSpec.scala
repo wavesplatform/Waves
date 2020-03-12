@@ -24,7 +24,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
 
   val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 10L)
-  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 10L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)
+  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 10L, "reward" -> 5, "VRF" -> testBlock2.id().toString)
 
   val testBlock1HeaderJson = BlockHeaderSerializer.toJson(testBlock1.header, testBlock1.bytes().size, 0, testBlock1.signature) ++ Json.obj(
     "height"   -> 1,
@@ -34,7 +34,7 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     "height"   -> 2,
     "totalFee" -> 10L,
     "reward"   -> 5,
-    "VRF"      -> testBlock2.uniqueId.toString
+    "VRF"      -> testBlock2.id().toString
   )
 
   (blockchain.blockBytes(_: Int)).when(1).returning(Some(testBlock1.bytes()))
@@ -43,17 +43,17 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   (blockchain.blockInfo(_: Int)).when(1).returning(Some(BlockInfo(testBlock1.header, testBlock1.bytes().size, 0, testBlock1.signature)))
   (blockchain.blockInfo(_: Int)).when(2).returning(Some(BlockInfo(testBlock2.header, testBlock2.bytes().size, 0, testBlock2.signature)))
 
-  (blockchain.blockBytes(_: ByteStr)).when(testBlock1.uniqueId).returning(Some(testBlock1.bytes()))
-  (blockchain.blockBytes(_: ByteStr)).when(testBlock2.uniqueId).returning(Some(testBlock2.bytes()))
+  (blockchain.blockBytes(_: ByteStr)).when(testBlock1.id()).returning(Some(testBlock1.bytes()))
+  (blockchain.blockBytes(_: ByteStr)).when(testBlock2.id()).returning(Some(testBlock2.bytes()))
 
-  (blockchain.heightOf(_: ByteStr)).when(testBlock1.uniqueId).returning(Some(1))
-  (blockchain.heightOf(_: ByteStr)).when(testBlock2.uniqueId).returning(Some(2))
+  (blockchain.heightOf(_: ByteStr)).when(testBlock1.id()).returning(Some(1))
+  (blockchain.heightOf(_: ByteStr)).when(testBlock2.id()).returning(Some(2))
 
   (blockchain.lastBlock _).when().returning(Some(testBlock2))
 
   (blockchain.blockReward _).when(*).returning(Some(5L))
   (blockchain.totalFee _).when(*).returning(Some(10L))
-  (blockchain.hitSourceAtHeight _).when(2).returning(Some(testBlock2.uniqueId))
+  (blockchain.hitSourceAtHeight _).when(2).returning(Some(testBlock2.id()))
 
   (blockchain.activatedFeatures _)
     .when()
@@ -91,13 +91,13 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/signature") in {
-    Get(routePath(s"/signature/${testBlock1.uniqueId}")) ~> route ~> check {
+    Get(routePath(s"/signature/${testBlock1.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
       response
     }
 
-    Get(routePath(s"/signature/${testBlock2.uniqueId}")) ~> route ~> check {
+    Get(routePath(s"/signature/${testBlock2.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
       response

@@ -3,7 +3,7 @@ package com.wavesplatform.network
 import java.util
 
 import com.google.common.cache.CacheBuilder
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.Base64
 import com.wavesplatform.crypto
 import com.wavesplatform.network.message.Message._
@@ -72,10 +72,10 @@ class LegacyFrameCodec(peerDatabase: PeerDatabase, receivedTxsCacheTimeout: Fini
 
   override def encode(ctx: ChannelHandlerContext, msg1: Any, out: ByteBuf): Unit = {
     val msg = msg1 match {
-      case rb: RawBytes => rb
-      case tx: Transaction => RawBytes.fromTransaction(tx)
-      case block: Block => RawBytes.fromBlock(block)
-      case mb: MicroBlock => RawBytes.fromMicroBlock(mb)
+      case rb: RawBytes           => rb
+      case tx: Transaction        => RawBytes.fromTransaction(tx)
+      case block: Block           => RawBytes.fromBlock(block)
+      case mb: MicroBlockResponse => RawBytes.fromMicroBlock(mb)
     }
 
     out.writeInt(Magic)

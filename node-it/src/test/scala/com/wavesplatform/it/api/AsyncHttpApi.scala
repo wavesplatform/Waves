@@ -38,6 +38,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, TxVersion}
+import com.wavesplatform.utils.ScorexLogging
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
@@ -976,8 +977,8 @@ object AsyncHttpApi extends Assertions {
 
       def waitSameBlockHeaders =
         waitFor[BlockHeaders](s"same blocks at height = $height")(retryInterval)(_.blockHeadersAt(height), { blocks =>
-          val sig = blocks.map(_.signature)
-          sig.forall(_ == sig.head)
+          val id = blocks.map(_.id)
+          id.forall(_ == id.head)
         })
 
       for {

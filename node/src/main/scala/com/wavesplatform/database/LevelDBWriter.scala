@@ -9,8 +9,8 @@ import com.google.common.primitives.{Bytes, Ints, Shorts}
 import com.google.protobuf.{CodedInputStream, CodedOutputStream, WireFormat}
 import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.block.Block.{BlockId, BlockInfo}
-import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.block.serialization.mkTxsCountBytes
+import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
 import com.wavesplatform.database.patch.DisableHijackedAliases
@@ -296,7 +296,7 @@ class LevelDBWriter(
       }.toMap
 
     rw.put(Keys.blockInfoAt(Height(height)), Some(BlockInfo(block.header, block.bytes().length, block.transactionData.size, block.signature)))
-    rw.put(Keys.heightOf(block.uniqueId), Some(height))
+    rw.put(Keys.heightOf(block.id()), Some(height))
 
     val lastAddressId = loadMaxAddressId() + newAddresses.size
 
@@ -647,7 +647,7 @@ class LevelDBWriter(
           }
 
           rw.delete(Keys.blockInfoAt(h))
-          rw.delete(Keys.heightOf(discardedSignature))
+          rw.delete(Keys.heightOf(Block.idFromHeader(discardedHeader, discardedSignature)))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
@@ -958,7 +958,7 @@ class LevelDBWriter(
         db.get(Keys.blockInfoAt(height))
       }
       .collect {
-        case Some(BlockInfo(_, _, _, signature)) => signature
+        case Some(bi) => bi.id()
       }
   }
 
@@ -970,7 +970,7 @@ class LevelDBWriter(
           db.get(Keys.blockInfoAt(height))
         }
         .collect {
-          case Some(BlockInfo(_, _, _, signature)) => signature
+          case Some(bi) => bi.id()
         }
     }
   }
