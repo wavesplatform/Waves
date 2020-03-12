@@ -17,11 +17,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   private val blocksApi = mock[CommonBlocksApi]
   private val route     = BlocksApiRoute(restAPISettings, blocksApi).route
 
-  val testBlock1 = TestBlock.create(Nil)
-  val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
+  private val testBlock1 = TestBlock.create(Nil)
+  private val testBlock2 = TestBlock.create(Nil, Block.ProtoBlockVersion)
 
-  val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
-  val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.uniqueId.toString)
+  private val testBlock1Json = testBlock1.json() ++ Json.obj("height" -> 1, "totalFee" -> 0L)
+  private val testBlock2Json = testBlock2.json() ++ Json.obj("height" -> 2, "totalFee" -> 0L, "reward" -> 5, "VRF" -> testBlock2.id().toString)
 
   private val testBlock1HeaderJson = BlockHeaderSerializer.toJson(testBlock1.header, testBlock1.bytes().length, 0, testBlock1.signature) ++ Json.obj(
     "height"   -> 1,
@@ -32,11 +32,11 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
     "height"   -> 2,
     "totalFee" -> 0L,
     "reward"   -> 5,
-    "VRF"      -> testBlock2.uniqueId.toString
+    "VRF"      -> testBlock2.id().toString
   )
 
   private val testBlock1Meta = BlockMeta.fromBlock(testBlock1, 1, 0L, None, None)
-  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.uniqueId))
+  private val testBlock2Meta = BlockMeta.fromBlock(testBlock2, 2, 0L, Some(5), Some(testBlock2.id()))
 
   routePath("/first") in {
     (blocksApi.blockAtHeight _).expects(1).returning(Some(testBlock1Meta -> Seq.empty)).once()
@@ -74,15 +74,15 @@ class BlocksRouteSpec extends RouteSpec("/blocks") with PathMockFactory with Pro
   }
 
   routePath("/signature/{signature}") in {
-    (blocksApi.block _).expects(testBlock1.uniqueId).returning(Some(testBlock1Meta -> Seq.empty)).once()
-    (blocksApi.block _).expects(testBlock2.uniqueId).returning(Some(testBlock2Meta -> Seq.empty)).once()
-    Get(routePath(s"/signature/${testBlock1.uniqueId}")) ~> route ~> check {
+    (blocksApi.block _).expects(testBlock1.id()).returning(Some(testBlock1Meta -> Seq.empty)).once()
+    (blocksApi.block _).expects(testBlock2.id()).returning(Some(testBlock2Meta -> Seq.empty)).once()
+    Get(routePath(s"/signature/${testBlock1.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock1Json
       response
     }
 
-    Get(routePath(s"/signature/${testBlock2.uniqueId}")) ~> route ~> check {
+    Get(routePath(s"/signature/${testBlock2.id()}")) ~> route ~> check {
       val response = responseAs[JsObject]
       response shouldBe testBlock2Json
       response

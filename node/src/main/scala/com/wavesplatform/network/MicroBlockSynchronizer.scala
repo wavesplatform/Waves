@@ -35,29 +35,29 @@ object MicroBlockSynchronizer {
 
     val lastBlockId = lastObserved(lastBlockIdEvents)
 
-    def owners(totalResBlockSig: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalResBlockSig)).getOrElse(MSet.empty).toSet
+    def owners(totalRef: BlockId): Set[Channel] = Option(microBlockOwners.getIfPresent(totalRef)).getOrElse(MSet.empty).toSet
 
-    def alreadyRequested(totalSig: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalSig)).isDefined
+    def alreadyRequested(totalRef: MicroBlockSignature): Boolean = Option(awaiting.getIfPresent(totalRef)).isDefined
 
-    def alreadyProcessed(totalSig: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalSig)).isDefined
+    def alreadyProcessed(totalRef: MicroBlockSignature): Boolean = Option(successfullyReceived.getIfPresent(totalRef)).isDefined
 
     val cacheSizesReporter = Coeval.eval {
       CacheSizes(microBlockOwners.size(), nextInvs.size(), awaiting.size(), successfullyReceived.size())
     }
 
     def requestMicroBlock(mbInv: MicroBlockInv): CancelableFuture[Unit] = {
-      import mbInv.totalBlockSig
+      import mbInv.totalBlockId
 
-      def randomOwner(exclude: Set[Channel]) = random(owners(mbInv.totalBlockSig) -- exclude)
+      def randomOwner(exclude: Set[Channel]) = random(owners(mbInv.totalBlockId) -- exclude)
 
       def task(attemptsAllowed: Int, exclude: Set[Channel]): Task[Unit] = Task.unit.flatMap { _ =>
-        if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockSig)) Task.unit
+        if (attemptsAllowed <= 0 || alreadyProcessed(totalBlockId)) Task.unit
         else
           randomOwner(exclude).fold(Task.unit) { channel =>
             if (channel.isOpen) {
-              val request = MicroBlockRequest(totalBlockSig)
+              val request = MicroBlockRequest(totalBlockId)
               channel.writeAndFlush(request)
-              awaiting.put(totalBlockSig, mbInv)
+              awaiting.put(totalBlockId, mbInv)
               task(attemptsAllowed - 1, exclude + channel).delayExecution(settings.waitResponseTimeout)
             } else task(attemptsAllowed, exclude + channel)
           }
@@ -72,19 +72,19 @@ object MicroBlockSynchronizer {
 
     microblockInvs
       .mapEval {
-        case (ch, mbInv @ MicroBlockInv(_, totalSig, prevSig, _)) =>
+        case (ch, mbInv @ MicroBlockInv(_, totalRef, prevRef, _)) =>
           Task {
             mbInv.signaturesValid() match {
               case Left(err) =>
                 peerDatabase.blacklistAndClose(ch, err.toString)
               case Right(_) =>
-                microBlockOwners.get(totalSig, () => MSet.empty) += ch
-                nextInvs.get(prevSig, { () =>
+                microBlockOwners.get(totalRef, () => MSet.empty) += ch
+                nextInvs.get(prevRef, { () =>
                   BlockStats.inv(mbInv, ch)
                   mbInv
                 })
                 lastBlockId()
-                  .filter(_ == prevSig && !alreadyRequested(totalSig))
+                  .filter(_ == prevRef && !alreadyRequested(totalRef))
                   .foreach(tryDownloadNext)
             }
           }
@@ -94,15 +94,14 @@ object MicroBlockSynchronizer {
       .subscribe()
 
     val observable = microblockResponses.observeOn(scheduler).flatMap {
-      case (ch, MicroBlockResponse(mb)) =>
-        import mb.{totalResBlockSig => totalSig}
-        successfullyReceived.put(totalSig, dummy)
+      case (ch, MicroBlockResponse(mb, totalRef)) =>
+        successfullyReceived.put(totalRef, dummy)
         BlockStats.received(mb, ch)
-        Option(awaiting.getIfPresent(totalSig)) match {
+        Option(awaiting.getIfPresent(totalRef)) match {
           case None => Observable.empty
           case Some(mi) =>
-            awaiting.invalidate(totalSig)
-            Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalSig)))))
+            awaiting.invalidate(totalRef)
+            Observable((ch, MicroblockData(Option(mi), mb, Coeval.evalOnce(owners(totalRef)))))
         }
     }
     (observable, cacheSizesReporter)

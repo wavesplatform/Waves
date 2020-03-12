@@ -72,7 +72,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
       b1 = TestBlock
         .create(
           ts + 10,
-          genesisBlock.uniqueId,
+          genesisBlock.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2),
@@ -83,7 +83,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         )
       b2 = TestBlock.create(
         ts + 20,
-        b1.uniqueId,
+        b1.id(),
         Seq(
           createTransfer(master, recipient.toAddress, ts + 11),
           createTransfer(recipient, master.toAddress, ts + 12),
@@ -257,7 +257,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             (triggersMock.onProcessMicroBlock _)
               .expects(where {
                 case (microBlock, diff, bc) =>
-                  bc.height == 2 && microBlock.prevResBlockSig == block2.signature
+                  bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()
           }

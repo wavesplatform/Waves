@@ -484,6 +484,11 @@ object ApiError {
     override val code = StatusCodes.BadRequest
   }
 
+  case class InvalidBlockId(message: String) extends ApiError {
+    override val id = 4002
+    override val code = StatusCodes.BadRequest
+  }
+
   case object InvalidAssetId extends ApiError {
     override val id = 4007
     override val message = "Invalid asset id"

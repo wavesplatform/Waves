@@ -41,7 +41,7 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
     assert(microBlock.signature == parsedBlock.signature)
     assert(microBlock.sender == parsedBlock.sender)
     assert(microBlock.totalResBlockSig == parsedBlock.totalResBlockSig)
-    assert(microBlock.prevResBlockSig == parsedBlock.prevResBlockSig)
+    assert(microBlock.reference == parsedBlock.reference)
     assert(microBlock.transactionData == parsedBlock.transactionData)
     assert(microBlock == parsedBlock)
   }
@@ -61,7 +61,6 @@ class MicroBlockSpecification extends FunSuite with Matchers with MockFactory wi
     val transactions = Seq.fill(Miner.MaxTransactionsPerMicroblock + 1)(transaction)
 
     val eitherBlockOrError = MicroBlock.buildAndSign(3.toByte, sender, transactions, prevResBlockSig, totalResBlockSig)
-
     eitherBlockOrError should produce("too many txs in MicroBlock")
   }
 }

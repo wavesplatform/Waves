@@ -623,6 +623,7 @@ object ExchangeTransaction {
 }
 
 case class Block(
+    id: String,
     signature: String,
     height: Int,
     timestamp: Long,
@@ -645,6 +646,7 @@ object Block {
   implicit val blockFormat: Format[Block] = Format(
     Reads( jsv =>
       for {
+        id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
@@ -663,6 +665,7 @@ object Block {
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf <- (jsv \ "VRF").validateOpt[String]
       } yield Block(
+        id,
         signature,
         height,
         timestamp,
@@ -687,6 +690,7 @@ object Block {
 }
 
 case class BlockHeader(
+    id: String,
     signature: String,
     height: Int,
     timestamp: Long,
@@ -707,6 +711,7 @@ object BlockHeader {
   implicit val blockHeadersFormat: Format[BlockHeader] = Format(
     Reads( jsv =>
       for {
+        id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
@@ -723,6 +728,7 @@ object BlockHeader {
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf <- (jsv \ "VRF").validateOpt[String]
       } yield BlockHeader(
+        id,
         signature,
         height,
         timestamp,

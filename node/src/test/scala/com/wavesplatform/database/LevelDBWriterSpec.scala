@@ -89,7 +89,7 @@ class LevelDBWriterSpec
 
     def gen(ts: Long): Gen[(KeyPair, Seq[Block])] = baseGen(ts).map {
       case (master, blocks) =>
-        val nextBlock = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq())
+        val nextBlock = TestBlock.create(ts + 1, blocks.last.id(), Seq())
         (master, blocks :+ nextBlock)
     }
 
@@ -99,8 +99,8 @@ class LevelDBWriterSpec
           .selfSigned(1.toByte, master, None, 5000000, ts + 1)
           .explicitGet()
 
-        val block1 = TestBlock.create(ts + 1, blocks.last.uniqueId, Seq(unsetScriptTx))
-        val block2 = TestBlock.create(ts + 2, block1.uniqueId, Seq())
+        val block1 = TestBlock.create(ts + 1, blocks.last.id(), Seq(unsetScriptTx))
+        val block2 = TestBlock.create(ts + 2, block1.id(), Seq())
         (master, blocks ++ List(block1, block2))
     }
 
@@ -175,13 +175,13 @@ class LevelDBWriterSpec
       block1 = TestBlock
         .create(
           ts + 3,
-          genesisBlock.uniqueId,
+          genesisBlock.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2)
           )
         )
-      emptyBlock = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      emptyBlock = TestBlock.create(ts + 5, block1.id(), Seq())
     } yield (master, List(genesisBlock, block1, emptyBlock))
   }
 
@@ -206,17 +206,17 @@ class LevelDBWriterSpec
       val block1 = TestBlock
         .create(
           ts + 3,
-          genesisBlock.uniqueId,
+          genesisBlock.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 1),
             createTransfer(master, recipient.toAddress, ts + 2)
           )
         )
-      val block2 = TestBlock.create(ts + 5, block1.uniqueId, Seq())
+      val block2 = TestBlock.create(ts + 5, block1.id(), Seq())
       val block3 = TestBlock
         .create(
           ts + 10,
-          block2.uniqueId,
+          block2.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 6),
             createTransfer(master, recipient.toAddress, ts + 7)
@@ -226,7 +226,7 @@ class LevelDBWriterSpec
       val block4 = TestBlock
         .create(
           ts + 17,
-          block3.uniqueId,
+          block3.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 13),
             createTransfer(master, recipient.toAddress, ts + 14)
@@ -237,7 +237,7 @@ class LevelDBWriterSpec
       val block5 = TestBlock
         .create(
           ts + 24,
-          block4.uniqueId,
+          block4.id(),
           Seq(
             createTransfer(master, recipient.toAddress, ts + 20),
             createTransfer(master, recipient.toAddress, ts + 21)
@@ -254,7 +254,7 @@ class LevelDBWriterSpec
 
       def blockAt(height: Int): Option[Block] = bcu.liquidBlockMeta
         .filter(_ => bcu.height == height)
-        .flatMap(m => bcu.liquidBlock(m.signature))
+        .flatMap(m => bcu.liquidBlock(m.id))
         .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
 
       blockAt(1).get shouldBe genesisBlock

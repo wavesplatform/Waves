@@ -26,6 +26,7 @@ package object utils {
     override def height: Long                                                                                    = 0
     override def chainId: Byte                                                                                   = 1: Byte
     override def inputEntity: Environment.InputEntity                                                            = null
+    override val txId: ByteStr                                                                                   = ByteStr.empty
     override def transactionById(id: Array[Byte]): Option[Tx]                                                    = ???
     override def transferTransactionById(id: Array[Byte]): Option[Tx]                                            = ???
     override def transactionHeightById(id: Array[Byte]): Option[Long]                                            = ???
@@ -37,7 +38,7 @@ package object utils {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
-    override val txId: ByteStr                                                                                   = ByteStr.empty
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                  = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

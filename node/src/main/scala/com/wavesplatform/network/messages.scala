@@ -3,6 +3,7 @@ package com.wavesplatform.network
 import java.net.InetSocketAddress
 
 import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -41,8 +42,8 @@ object RawBytes {
     if (b.header.version < Block.ProtoBlockVersion) RawBytes(BlockSpec.messageCode, BlockSpec.serializeData(b))
     else RawBytes(PBBlockSpec.messageCode, PBBlockSpec.serializeData(b))
 
-  def fromMicroBlock(mb: MicroBlock): RawBytes =
-    if (mb.version < Block.ProtoBlockVersion)
+  def fromMicroBlock(mb: MicroBlockResponse): RawBytes =
+    if (mb.microblock.version < Block.ProtoBlockVersion)
       RawBytes(LegacyMicroBlockResponseSpec.messageCode, LegacyMicroBlockResponseSpec.serializeData(mb))
     else RawBytes(PBMicroBlockSpec.messageCode, PBMicroBlockSpec.serializeData(mb))
 }
@@ -51,19 +52,26 @@ case class BlockForged(block: Block) extends Message
 
 case class MicroBlockRequest(totalBlockSig: ByteStr) extends Message
 
-case class MicroBlockResponse(microblock: MicroBlock)
+case class MicroBlockResponse(microblock: MicroBlock, totalBlockId: BlockId)
 
-case class MicroBlockInv(sender: PublicKey, totalBlockSig: ByteStr, prevBlockSig: ByteStr, signature: ByteStr) extends Message with Signed {
+object MicroBlockResponse {
+  def apply(mb: MicroBlock): MicroBlockResponse = {
+    require(mb.version < Block.ProtoBlockVersion)
+    MicroBlockResponse(mb, mb.totalResBlockSig)
+  }
+}
+
+case class MicroBlockInv(sender: PublicKey, totalBlockId: ByteStr, reference: ByteStr, signature: ByteStr) extends Message with Signed {
   override val signatureValid: Coeval[Boolean] =
-    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr, sender))
+    Coeval.evalOnce(crypto.verify(signature.arr, sender.toAddress.bytes.arr ++ totalBlockId.arr ++ reference.arr, sender))
 
-  override def toString: String = s"MicroBlockInv(${totalBlockSig.trim} ~> ${prevBlockSig.trim})"
+  override def toString: String = s"MicroBlockInv(${totalBlockId.trim} ~> ${reference.trim})"
 }
 
 object MicroBlockInv {
 
-  def apply(sender: KeyPair, totalBlockSig: ByteStr, prevBlockSig: ByteStr): MicroBlockInv = {
-    val signature = crypto.sign(sender, sender.toAddress.bytes.arr ++ totalBlockSig.arr ++ prevBlockSig.arr)
-    new MicroBlockInv(sender, totalBlockSig, prevBlockSig, ByteStr(signature))
+  def apply(sender: KeyPair, totalBlockRef: ByteStr, prevBlockRef: ByteStr): MicroBlockInv = {
+    val signature = crypto.sign(sender, sender.toAddress.bytes.arr ++ totalBlockRef.arr ++ prevBlockRef.arr)
+    new MicroBlockInv(sender, totalBlockRef, prevBlockRef, ByteStr(signature))
   }
 }

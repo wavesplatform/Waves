@@ -225,7 +225,7 @@ class LevelDBWriter(
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult]
   ): Unit = {
-    log.trace(s"Persisting block ${block.uniqueId} at height $height")
+    log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
       val expiredKeys = new ArrayBuffer[Array[Byte]]
 
@@ -251,7 +251,7 @@ class LevelDBWriter(
           BlockMeta.fromBlock(block, height, totalFee, reward, if (block.header.version >= Block.ProtoBlockVersion) Some(hitSource) else None)
         )
       )
-      rw.put(Keys.heightOf(block.uniqueId), Some(height))
+      rw.put(Keys.heightOf(block.id()), Some(height))
 
       val lastAddressId = loadMaxAddressId() + newAddresses.size
 
@@ -459,7 +459,7 @@ class LevelDBWriter(
       rw.put(Keys.hitSource(height), Some(hitSource))
     }
 
-    log.trace(s"Finished persisting block ${block.uniqueId} at height $height")
+    log.trace(s"Finished persisting block ${block.id()} at height $height")
   }
 
   override protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)] = {
@@ -593,7 +593,7 @@ class LevelDBWriter(
           }
 
           rw.delete(Keys.blockMetaAt(h))
-          rw.delete(Keys.heightOf(discardedMeta.signature))
+          rw.delete(Keys.heightOf(discardedMeta.id))
           rw.delete(Keys.carryFee(currentHeight))
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))

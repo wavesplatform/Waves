@@ -57,7 +57,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadHeightOf(blockId: ByteStr): Option[Int]
   override def heightOf(blockId: ByteStr): Option[Int] = {
     val c = current
-    if (c._3.exists(_.uniqueId == blockId)) {
+    if (c._3.exists(_.id() == blockId)) {
       Some(c._1)
     } else {
       loadHeightOf(blockId)

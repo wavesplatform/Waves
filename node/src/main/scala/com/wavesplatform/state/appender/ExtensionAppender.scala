@@ -54,7 +54,7 @@ object ExtensionAppender extends ScorexLogging {
                   case (i, declinedBlock, e) =>
                     e match {
                       case _: TxValidationError.BlockFromFuture =>
-                      case _                                    => invalidBlocks.add(declinedBlock.uniqueId, e)
+                      case _                                    => invalidBlocks.add(declinedBlock.id(), e)
                     }
 
                     extension.view

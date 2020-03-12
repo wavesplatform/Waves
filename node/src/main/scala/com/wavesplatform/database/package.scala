@@ -306,6 +306,7 @@ package object database extends ScorexLogging {
     pb.BlockMeta(
         Some(PBBlocks.protobuf(data.header)),
         ByteString.copyFrom(data.signature),
+        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh)),
         data.height,
         data.size,
         data.transactionCount,
@@ -320,6 +321,7 @@ package object database extends ScorexLogging {
     BlockMeta(
       PBBlocks.vanilla(pbbm.header.get),
       ByteStr(pbbm.signature.toByteArray),
+      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) },
       pbbm.height,
       pbbm.size,
       pbbm.transactionCount,

@@ -42,12 +42,12 @@ class HistoryReplier(score: => BigInt, history: History, settings: Synchronizati
           }
       )
 
-    case MicroBlockRequest(totalResBlockSig) =>
+    case MicroBlockRequest(microBlockId) =>
       respondWith(
         ctx,
-        Future(history.loadMicroBlock(totalResBlockSig)).map {
-          case Some(microBlock) => RawBytes.fromMicroBlock(microBlock)
-          case _ => throw new NoSuchElementException(s"Error loading microblock $totalResBlockSig")
+        Future(history.loadMicroBlock(microBlockId)).map {
+          case Some(microBlock) => RawBytes.fromMicroBlock(MicroBlockResponse(microBlock, microBlockId))
+          case _                => throw new NoSuchElementException(s"Error loading microblock $microBlockId")
         }
       )
 

@@ -38,8 +38,8 @@ class BlockV5TestSuite
       val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeader()
       val blockAtActivationHeight = nodes.head.blockAt(currentHeight)
       val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(currentHeight)
-      val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAtActivationHeight.signature)
-      val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtActivationHeight.signature).generationSignature).get
+      val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAtActivationHeight.id)
+      val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtActivationHeight.id).generationSignature).get
       val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtActivationHeight.generationSignature.get).get
 
       blockAtActivationHeight.version.value shouldBe Block.ProtoBlockVersion

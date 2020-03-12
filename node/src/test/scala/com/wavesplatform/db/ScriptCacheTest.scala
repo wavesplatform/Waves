@@ -2,7 +2,7 @@ package com.wavesplatform.db
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
@@ -65,7 +65,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
           TestBlock
             .create(
               time = setScriptTxs.last.timestamp + 1,
-              ref = genesisBlock.uniqueId,
+              ref = genesisBlock.id(),
               txs = setScriptTxs
             )
 
@@ -105,16 +105,16 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
         case (List(account), bcu) =>
           bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account, script, complexity))
 
-          val SignedBlockHeader(lastBlock, uniqueId) = bcu.lastBlockHeader.get
+          val lastBlockHeader = bcu.lastBlockHeader.get
 
           val newScriptTx = SetScriptTransaction
-            .selfSigned(1.toByte, account, None, FEE, lastBlock.timestamp + 1)
+            .selfSigned(1.toByte, account, None, FEE, lastBlockHeader.header.timestamp + 1)
             .explicitGet()
 
           val blockWithEmptyScriptTx = TestBlock
             .create(
-              time = lastBlock.timestamp + 2,
-              ref = uniqueId,
+              time = lastBlockHeader.header.timestamp + 2,
+              ref = lastBlockHeader.id(),
               txs = Seq(newScriptTx)
             )
 
@@ -123,8 +123,8 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             .explicitGet()
 
           bcu.accountScript(account.toAddress) shouldEqual None
-          bcu.removeAfter(uniqueId)
-          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account, script, complexity))
+          bcu.removeAfter(lastBlockHeader.id())
+          bcu.accountScript(account.toAddress).map(_.script) shouldEqual Some(script)
       }
     }
 

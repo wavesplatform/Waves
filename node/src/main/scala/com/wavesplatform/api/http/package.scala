@@ -8,7 +8,7 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
+import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBlockId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
@@ -101,15 +101,18 @@ package object http extends ApiMarshallers with ScorexLogging {
     }
   }
 
-  val TransactionId: PathMatcher1[ByteStr] = Segment.map { str =>
+  private def idOrHash(error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
     ByteStr.decodeBase58(str) match {
       case Success(value) =>
         if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
-        else throw ApiException(InvalidTransactionId(s"Transaction ID $str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
+        else throw ApiException(error(s"$str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
       case Failure(exception) =>
-        throw ApiException(InvalidTransactionId(exception.getMessage))
+        throw ApiException(error(exception.getMessage))
     }
   }
+
+  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
+  val BlockId: PathMatcher1[ByteStr] = idOrHash(InvalidBlockId)
 
   val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset)
 
@@ -122,7 +125,7 @@ package object http extends ApiMarshallers with ScorexLogging {
     } yield addr).fold(ae => throw ApiException(ApiError.fromValidationError(ae)), identity)
   }
 
-  val PublicKeySegment = base58Segment(Some(crypto.KeyLength), _ => InvalidPublicKey).map(s => PublicKey(s))
+  val PublicKeySegment: PathMatcher1[PublicKey] = base58Segment(Some(crypto.KeyLength), _ => InvalidPublicKey).map(s => PublicKey(s))
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()

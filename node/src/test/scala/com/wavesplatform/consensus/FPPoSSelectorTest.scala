@@ -4,7 +4,7 @@ import java.nio.file.Files
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.state.diffs.ProduceError
 import com.wavesplatform.common.utils.EitherExt2
@@ -339,7 +339,7 @@ object FPPoSSelectorTest {
         .buildAndSign(
           blockVersion,
           forkChain.head._1.header.timestamp + delay,
-          forkChain.head._1.uniqueId,
+          forkChain.head._1.id(),
           bt,
           ByteStr(gs),
           Seq.empty,
@@ -359,7 +359,7 @@ object FPPoSSelectorTest {
       updateGS: ByteStr => ByteStr = identity
   ): Block = {
     val height                                 = blockchain.height
-    val SignedBlockHeader(lastBlock, uniqueId) = blockchain.lastBlockHeader.get
+    val lastBlockHeader = blockchain.lastBlockHeader.get
     val ggParentTS                             = blockchain.blockHeader(height - 2).map(_.header.timestamp)
     val minerBalance                           = blockchain.effectiveBalance(miner.toAddress, 0)
     val delay = updateDelay(
@@ -367,7 +367,7 @@ object FPPoSSelectorTest {
         .getValidBlockDelay(
           height,
           miner,
-          lastBlock.baseTarget,
+          lastBlockHeader.header.baseTarget,
           minerBalance
         )
         .explicitGet()
@@ -378,18 +378,18 @@ object FPPoSSelectorTest {
         miner,
         height,
         60.seconds,
-        lastBlock.baseTarget,
-        lastBlock.timestamp,
+        lastBlockHeader.header.baseTarget,
+        lastBlockHeader.header.timestamp,
         ggParentTS,
-        lastBlock.timestamp + delay
+        lastBlockHeader.header.timestamp + delay
       )
       .explicitGet()
 
     Block
       .buildAndSign(
         blockVersion,
-        lastBlock.timestamp + delay,
-        uniqueId,
+        lastBlockHeader.header.timestamp + delay,
+        lastBlockHeader.id(),
         updateBT(cData.baseTarget),
         updateGS(cData.generationSignature),
         Seq.empty,
@@ -425,7 +425,7 @@ object FPPoSSelectorTest {
           val newBlock = TestBlock
             .create(
               lastTxTimestamp + 1 + d,
-              blocks.head.uniqueId,
+              blocks.head.id(),
               Seq.empty,
               version = blockVersion
             )

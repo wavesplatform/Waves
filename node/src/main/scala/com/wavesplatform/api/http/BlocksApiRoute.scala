@@ -24,18 +24,18 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       at(commonApi.currentHeight, true)
     } ~ path("height") {
       complete(Json.obj("height" -> commonApi.currentHeight))
-    } ~ path("delay" / Signature / IntNumber) { (signature, count) =>
+    } ~ path("delay" / BlockId / IntNumber) { (blockId, count) =>
       complete(
         commonApi
-          .blockDelay(signature, count)
+          .blockDelay(blockId, count)
           .map(delay => Json.obj("delay" -> delay))
           .toRight(BlockDoesNotExist)
       )
-    } ~ path("height" / Signature) { signature =>
+    } ~ path("height" / BlockId) { signature =>
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> meta.height))
-    } ~ path("signature" / Signature) { signature =>
+    } ~ path("signature" / BlockId) { signature =>
       complete(commonApi.block(signature).map(toJson))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) extractScheduler { implicit ec =>

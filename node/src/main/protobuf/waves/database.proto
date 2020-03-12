@@ -15,12 +15,13 @@ message AssetDetails {
 message BlockMeta {
     Block.Header header = 1;
     bytes signature = 2;
-    int32 height = 3;
-    int32 size = 4;
-    int32 transaction_count = 5;
-    int64 total_fee_in_waves = 6;
-    int64 reward = 7;
-    bytes vrf = 8;
+    bytes header_hash = 3;
+    int32 height = 4;
+    int32 size = 5;
+    int32 transaction_count = 6;
+    int64 total_fee_in_waves = 7;
+    int64 reward = 8;
+    bytes vrf = 9;
 }
 
 message AccountScriptInfo {

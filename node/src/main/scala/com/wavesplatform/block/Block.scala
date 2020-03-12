@@ -8,7 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlockHeaders, PBBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
@@ -40,7 +40,8 @@ case class Block(
 ) {
   import Block._
 
-  val uniqueId: ByteStr = signature
+  val id: Coeval[ByteStr] = Coeval.evalOnce(Block.idFromHeader(header, signature))
+
   val sender: PublicKey = header.generator
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(BlockSerializer.toBytes(this))
@@ -85,11 +86,26 @@ case class Block(
   }
 
   override def toString: String =
-    s"Block($signature -> ${header.reference.trim}, " +
+    s"Block(${id()} -> ${header.reference.trim}, " +
       s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
+  def idFromHeader(h: BlockHeader, signature: ByteStr): ByteStr =
+    if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
+    else signature
+
+  def protoHeaderHash(h: BlockHeader): ByteStr = {
+    require(h.version >= ProtoBlockVersion)
+    crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray)
+  }
+
+  def referenceLength(version: Byte): Int =
+    if (version >= ProtoBlockVersion) DigestLength
+    else SignatureLength
+
+  def validateReferenceLength(length: Int): Boolean =
+    length == DigestLength || length == SignatureLength
 
   def create(
       version: Byte,
@@ -172,7 +188,7 @@ object Block extends ScorexLogging {
 
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
-  type BlockId = ByteStr
+  type BlockId                = ByteStr
   type TransactionsMerkleTree = Seq[Seq[Array[Byte]]]
   case class TransactionProof(id: ByteStr, transactionIndex: Int, digests: Seq[Array[Byte]])
 
@@ -216,4 +232,6 @@ object Block extends ScorexLogging {
   }
 }
 
-case class SignedBlockHeader(header: BlockHeader, signature: ByteStr)
+case class SignedBlockHeader(header: BlockHeader, signature: ByteStr) {
+  val id: Coeval[ByteStr] = Coeval.evalOnce(Block.idFromHeader(header, signature))
+}

@@ -34,7 +34,7 @@ object BlockAppender extends ScorexLogging {
       metrics.blockProcessingTimeStats.measureSuccessful {
         if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
           appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-        else if (blockchainUpdater.contains(newBlock.uniqueId) || blockchainUpdater.isLastBlockId(newBlock.uniqueId))
+        else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
           Right(None)
         else
           Left(BlockAppendError("Block is not a child of the last block", newBlock))

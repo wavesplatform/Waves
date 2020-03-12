@@ -87,27 +87,27 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     (sourceAddress, _, miner, _, genesisBlock) <- genesis
     recipient                                  <- accountGen
     transfers                                  <- Gen.listOfN(10, transferGeneratorP(ntpNow, sourceAddress, recipient, 1000 * Constants.UnitsInWave))
-    b2              = TestBlock.create(ntpNow, genesisBlock.uniqueId, transfers, miner)
-    b3              = mkEmptyBlock(b2.uniqueId, miner)
-    b4              = mkEmptyBlock(b3.uniqueId, miner)
-    b5              = mkEmptyBlock(b4.uniqueId, miner)
-    b6              = mkEmptyBlock(b5.uniqueId, miner)
-    b7              = mkEmptyBlock(b6.uniqueId, miner)
-    b8              = mkEmptyBlock(b7.uniqueId, miner)
-    b9              = mkEmptyBlock(b8.uniqueId, miner)
-    b10             = mkEmptyBlock(b9.uniqueId, miner)
-    b11             = mkEmptyBlockIncReward(b10.uniqueId, miner)
-    b12             = mkEmptyBlockIncReward(b11.uniqueId, miner)
-    b13             = mkEmptyBlockIncReward(b12.uniqueId, miner)
-    b14             = mkEmptyBlockIncReward(b13.uniqueId, miner)
-    b15             = mkEmptyBlockIncReward(b14.uniqueId, miner)
+    b2              = TestBlock.create(ntpNow, genesisBlock.id(), transfers, miner)
+    b3              = mkEmptyBlock(b2.id(), miner)
+    b4              = mkEmptyBlock(b3.id(), miner)
+    b5              = mkEmptyBlock(b4.id(), miner)
+    b6              = mkEmptyBlock(b5.id(), miner)
+    b7              = mkEmptyBlock(b6.id(), miner)
+    b8              = mkEmptyBlock(b7.id(), miner)
+    b9              = mkEmptyBlock(b8.id(), miner)
+    b10             = mkEmptyBlock(b9.id(), miner)
+    b11             = mkEmptyBlockIncReward(b10.id(), miner)
+    b12             = mkEmptyBlockIncReward(b11.id(), miner)
+    b13             = mkEmptyBlockIncReward(b12.id(), miner)
+    b14             = mkEmptyBlockIncReward(b13.id(), miner)
+    b15             = mkEmptyBlockIncReward(b14.id(), miner)
     secondTermStart = BlockRewardActivationHeight + 10
     b16 = Range
       .inclusive(secondTermStart + 1, secondTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b15)) {
         case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
-          prev :+ mkEmptyBlockDecReward(prev.last.uniqueId, miner)
-        case (prev, _) => prev :+ mkEmptyBlock(prev.last.uniqueId, miner)
+          prev :+ mkEmptyBlockDecReward(prev.last.id(), miner)
+        case (prev, _) => prev :+ mkEmptyBlock(prev.last.id(), miner)
       }
       .tail
     thirdTermStart = BlockRewardActivationHeight + 10 + 10
@@ -115,8 +115,8 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       .inclusive(thirdTermStart + 1, thirdTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b16.last)) {
         case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
-          prev :+ mkEmptyBlockReward(prev.last.uniqueId, miner, -1L)
-        case (prev, _) => prev :+ mkEmptyBlock(prev.last.uniqueId, miner)
+          prev :+ mkEmptyBlockReward(prev.last.id(), miner, -1L)
+        case (prev, _) => prev :+ mkEmptyBlock(prev.last.id(), miner)
       }
       .tail
     fourthTermStart = BlockRewardActivationHeight + 10 + 10 + 10
@@ -124,8 +124,8 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       .inclusive(fourthTermStart + 1, fourthTermStart + rewardSettings.blockchainSettings.rewardsSettings.term)
       .foldLeft(Seq(b17.last)) {
         case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
-          prev :+ mkEmptyBlockReward(prev.last.uniqueId, miner, 0)
-        case (prev, _) => prev :+ mkEmptyBlock(prev.last.uniqueId, miner)
+          prev :+ mkEmptyBlockReward(prev.last.id(), miner, 0)
+        case (prev, _) => prev :+ mkEmptyBlock(prev.last.id(), miner)
       }
       .tail
   } yield (miner, transfers, Seq(genesisBlock, b2), Seq(b3, b4), b5, Seq(b6, b7, b8, b9), Seq(b10, b11, b12, b13, b14), b15, b16, b17, b18)
@@ -221,10 +221,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       tx2 = TransferTransaction
         .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
-      b2        = mkEmptyBlock(genesisBlock.uniqueId, miner1)
-      b3        = mkEmptyBlock(b2.uniqueId, miner1)
-      b4        = TestBlock.create(ntpNow, b3.uniqueId, Seq(tx1), miner1)
-      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx2)), miner2, 3.toByte, ntpNow)
+      b2        = mkEmptyBlock(genesisBlock.id(), miner1)
+      b3        = mkEmptyBlock(b2.id(), miner1)
+      b4        = TestBlock.create(ntpNow, b3.id(), Seq(tx1), miner1)
+      (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx2)), miner2, 3.toByte, ntpNow)
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, m5s)
 
     def differ(blockchain: Blockchain, prevBlock: Option[Block], b: Block): BlockDiffer.Result =
@@ -263,10 +263,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       tx = TransferTransaction
         .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
-      b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
-      b3        = mkEmptyBlock(b2.uniqueId, miner)
-      b4        = mkEmptyBlock(b3.uniqueId, miner)
-      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx)), miner, 3.toByte, ntpNow)
+      b2        = mkEmptyBlock(genesisBlock.id(), miner)
+      b3        = mkEmptyBlock(b2.id(), miner)
+      b4        = mkEmptyBlock(b3.id(), miner)
+      (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx)), miner, 3.toByte, ntpNow)
       b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
       b6b = TestBlock.sign(
         miner,
@@ -302,10 +302,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
       tx2 = TransferTransaction
         .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
-      b2        = mkEmptyBlock(genesisBlock.uniqueId, miner)
-      b3        = mkEmptyBlock(b2.uniqueId, miner)
-      b4        = mkEmptyBlock(b3.uniqueId, miner)
-      (b5, m5s) = chainBaseAndMicro(b4.uniqueId, Seq.empty, Seq(Seq(tx1)), miner, 3.toByte, ntpNow)
+      b2        = mkEmptyBlock(genesisBlock.id(), miner)
+      b3        = mkEmptyBlock(b2.id(), miner)
+      b4        = mkEmptyBlock(b3.id(), miner)
+      (b5, m5s) = chainBaseAndMicro(b4.id(), Seq.empty, Seq(Seq(tx1)), miner, 3.toByte, ntpNow)
       b6a       = TestBlock.create(ntpNow, m5s.last.totalResBlockSig, Seq.empty, miner)
       b6b       = TestBlock.sign(miner, b6a.copy(transactionData = Seq(tx2)))
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5), m5s, b6a, b6b)
@@ -332,16 +332,16 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
     val blockWithoutFeesScenario = for {
       (_, _, miner1, miner2, genesisBlock) <- genesis
-      b2 = mkEmptyBlock(genesisBlock.uniqueId, miner1)
-      b3 = mkEmptyBlock(b2.uniqueId, miner1)
-      b4 = mkEmptyBlock(b3.uniqueId, miner1)
-      b5 = mkEmptyBlockIncReward(b4.uniqueId, miner1)
+      b2 = mkEmptyBlock(genesisBlock.id(), miner1)
+      b3 = mkEmptyBlock(b2.id(), miner1)
+      b4 = mkEmptyBlock(b3.id(), miner1)
+      b5 = mkEmptyBlockIncReward(b4.id(), miner1)
       b6s = Range
         .inclusive(BlockRewardActivationHeight + 1, BlockRewardActivationHeight + rewardSettings.blockchainSettings.rewardsSettings.term)
         .foldLeft(Seq(b5)) {
           case (prev, i) if rewardSettings.blockchainSettings.rewardsSettings.votingWindow(BlockRewardActivationHeight, i).contains(i) =>
-            prev :+ mkEmptyBlockIncReward(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
-          case (prev, i) => prev :+ mkEmptyBlock(prev.last.uniqueId, if (i % 2 == 0) miner2 else miner1)
+            prev :+ mkEmptyBlockIncReward(prev.last.id(), if (i % 2 == 0) miner2 else miner1)
+          case (prev, i) => prev :+ mkEmptyBlock(prev.last.id(), if (i % 2 == 0) miner2 else miner1)
         }
         .tail
     } yield (miner1, miner2, Seq(genesisBlock, b2, b3, b4), b5, b6s.init, b6s.last)
@@ -397,21 +397,21 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
   private val calcScenario = for {
     (_, _, miner, _, genesisBlock) <- genesis
-    b2  = mkEmptyBlock(genesisBlock.uniqueId, miner)
-    b3  = mkEmptyBlock(b2.uniqueId, miner)
-    b4  = mkEmptyBlock(b3.uniqueId, miner)
-    b5  = mkEmptyBlock(b4.uniqueId, miner)
-    b6  = mkEmptyBlock(b5.uniqueId, miner)
-    b7  = mkEmptyBlock(b6.uniqueId, miner)
-    b8  = mkEmptyBlock(b7.uniqueId, miner)
-    b9  = mkEmptyBlock(b8.uniqueId, miner)
-    b10 = mkEmptyBlockIncReward(b9.uniqueId, miner)
-    b11 = mkEmptyBlockIncReward(b10.uniqueId, miner)
-    b12 = mkEmptyBlockIncReward(b11.uniqueId, miner)
-    b13 = mkEmptyBlockIncReward(b12.uniqueId, miner)
-    b14 = mkEmptyBlockIncReward(b13.uniqueId, miner)
-    b15 = mkEmptyBlockIncReward(b14.uniqueId, miner)
-    b16 = mkEmptyBlockIncReward(b15.uniqueId, miner)
+    b2  = mkEmptyBlock(genesisBlock.id(), miner)
+    b3  = mkEmptyBlock(b2.id(), miner)
+    b4  = mkEmptyBlock(b3.id(), miner)
+    b5  = mkEmptyBlock(b4.id(), miner)
+    b6  = mkEmptyBlock(b5.id(), miner)
+    b7  = mkEmptyBlock(b6.id(), miner)
+    b8  = mkEmptyBlock(b7.id(), miner)
+    b9  = mkEmptyBlock(b8.id(), miner)
+    b10 = mkEmptyBlockIncReward(b9.id(), miner)
+    b11 = mkEmptyBlockIncReward(b10.id(), miner)
+    b12 = mkEmptyBlockIncReward(b11.id(), miner)
+    b13 = mkEmptyBlockIncReward(b12.id(), miner)
+    b14 = mkEmptyBlockIncReward(b13.id(), miner)
+    b15 = mkEmptyBlockIncReward(b14.id(), miner)
+    b16 = mkEmptyBlockIncReward(b15.id(), miner)
   } yield (Seq(genesisBlock, b2, b3), b4, Seq(b5, b6, b7, b8, b9, b10, b11, b12, b13, b14, b15), b16)
 
   "Reward calculated correctly" in forAll(calcScenario) {
@@ -461,12 +461,12 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
   private val smallCalcScenario = for {
     (_, _, miner, _, genesisBlock) <- genesis
-    b2 = mkEmptyBlock(genesisBlock.uniqueId, miner)
-    b3 = mkEmptyBlock(b2.uniqueId, miner)
-    b4 = mkEmptyBlock(b3.uniqueId, miner)
-    b5 = mkEmptyBlockIncReward(b4.uniqueId, miner)
-    b6 = mkEmptyBlockIncReward(b5.uniqueId, miner)
-    b7 = mkEmptyBlockIncReward(b6.uniqueId, miner)
+    b2 = mkEmptyBlock(genesisBlock.id(), miner)
+    b3 = mkEmptyBlock(b2.id(), miner)
+    b4 = mkEmptyBlock(b3.id(), miner)
+    b5 = mkEmptyBlockIncReward(b4.id(), miner)
+    b6 = mkEmptyBlockIncReward(b5.id(), miner)
+    b7 = mkEmptyBlockIncReward(b6.id(), miner)
   } yield (Seq(genesisBlock, b2, b3), b4, Seq(b5, b6, b7))
 
   "Reward calculated correctly for small voting period" in forAll(smallCalcScenario) {

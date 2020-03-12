@@ -73,6 +73,11 @@ class WavesEnvironmentBenchmark {
     bh.consume(st.environment.data(Recipient.Address(x.addr), x.key, x.dataType))
   }
 
+  @Benchmark
+  def transferTransactionFromProto(st: TransferFromProtoSt, bh: Blackhole): Unit = {
+    bh.consume(st.environment.transferTransactionFromProto(st.transferTxBytes))
+  }
+
 }
 
 object WavesEnvironmentBenchmark {
@@ -105,6 +110,17 @@ object WavesEnvironmentBenchmark {
     val data: Vector[DataTestData] = load("data", benchSettings.dataFile) { line =>
       DataTestData.codec.decode(BitVector.fromBase64(line).get).require.value
     }
+  }
+
+  @State(Scope.Benchmark)
+  class TransferFromProtoSt extends BaseSt {
+    val transferTxBytesBase58: String =
+      "3nec7yqpNKXGsmPw7eTRUi8WPEaRmHfnHHSc8NZJggjsMp7SKGyLNnFk5NmZLTHQXaXqUEiSWqfPaXznZ3Drh" +
+      "8siJpCzS9AtSTUKS7yYBFUrj4jeQZM5axqbJHeYgLoDNwCXUcfwNdQ2XfQceSoYx6cEDc4MrXsA4GGnXWvoPD" +
+      "TKrX8EQCtcwJ8QbErSZEhK5Gv3EVjrC16i5v92ok9WS"
+
+    val transferTxBytes: Array[Byte] =
+      Base58.decode(transferTxBytesBase58)
   }
 
   @State(Scope.Benchmark)

@@ -49,7 +49,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
   test("BlockV4: Accept correct block") {
     val height = nodes.head.height
 
-    val block  = forgeBlock(height, signerPK)()
+    val block = forgeBlock(height, signerPK)()
 
     waitForBlockTime(block)
 
@@ -60,7 +60,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig sameElements block.uniqueId.arr
+    newBlockSig sameElements block.id().arr
   }
 
   test("BlockV4: Reject block with invalid delay") {
@@ -74,7 +74,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV4: Reject block with invalid BT") {
@@ -89,7 +89,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV4: Reject block with invalid generation signature") {
@@ -111,7 +111,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV4: Reject block with invalid signature") {
@@ -133,7 +133,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be resignedBlock.uniqueId.arr
+    newBlockSig should not be resignedBlock.id().arr
   }
 
   test("BlockV5: Node mines several blocks, integration test checks that block timestamps equal to time of appearence (+-1100ms)") {
@@ -167,7 +167,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig sameElements block.uniqueId.arr
+    newBlockSig sameElements block.id().arr
   }
 
   test("BlockV5: Reject block with invalid delay") {
@@ -181,7 +181,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV5: Reject block with invalid BT") {
@@ -196,7 +196,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV5: Reject block with invalid generation signature") {
@@ -218,7 +218,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be block.uniqueId.arr
+    newBlockSig should not be block.id().arr
   }
 
   test("BlockV5: Reject block with invalid signature") {
@@ -240,7 +240,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
 
     val newBlockSig = blockSignature(height + 1)
 
-    newBlockSig should not be resignedBlock.uniqueId.arr
+    newBlockSig should not be resignedBlock.id().arr
   }
 
   def waitForBlockTime(block: Block): Unit = {

@@ -150,7 +150,7 @@ final case class CompositeBlockchain(
       case _                                => inner.blockHeader(height)
     }
 
-  override def heightOf(blockId: ByteStr): Option[Int] = newBlock.filter(_.uniqueId == blockId).map(_ => height) orElse inner.heightOf(blockId)
+  override def heightOf(blockId: ByteStr): Option[Int] = newBlock.filter(_.id() == blockId).map(_ => height) orElse inner.heightOf(blockId)
 
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = inner.approvedFeatures

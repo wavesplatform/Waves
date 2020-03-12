@@ -50,7 +50,7 @@ package object network extends ScorexLogging {
   def id(chan: Channel, prefix: String = ""): String =
     if (chan == null) "???" else s"[$prefix${chan.id().asShortText()}${formatAddress(chan.remoteAddress())}]"
 
-  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.uniqueId))
+  def formatBlocks(blocks: Seq[Block]): String = formatSignatures(blocks.view.map(_.id()))
 
   def formatSignatures(signatures: Seq[ByteStr]): String =
     if (signatures.isEmpty) "[Empty]"
@@ -106,7 +106,7 @@ package object network extends ScorexLogging {
           val exceptMsg = if (except.isEmpty) "" else s" (except ${except.map(id(_)).mkString(", ")})"
           val msgString = message match {
             case t: Transaction => s"transaction ${t.id()}"
-            case BlockForged(b) => s"block ${b.uniqueId}"
+            case BlockForged(b) => s"block ${b.id()}"
             case other          => other.toString
           }
           s"Broadcasting $msgString to ${allChannels.size()} channels$exceptMsg"
