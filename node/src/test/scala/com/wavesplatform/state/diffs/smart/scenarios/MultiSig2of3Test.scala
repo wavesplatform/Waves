@@ -49,20 +49,20 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with 
     s0        <- accountGen
     s1        <- accountGen
     s2        <- accountGen
-    recepient <- accountGen
+    recipient <- accountGen
     ts        <- positiveIntGen
     genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    setSctipt <- selfSignedSetScriptTransactionGenP(master, ExprScript(multisigTypedExpr(s0, s1, s2)).explicitGet())
+    setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(multisigTypedExpr(s0, s1, s2)).explicitGet())
     amount    <- positiveLongGen
     fee       <- smallFeeGen
     timestamp <- timestampGen
   } yield {
     val unsigned =
-      TransferTransaction(2.toByte, master, recepient, Waves, amount, Waves, fee, None, timestamp, proofs = Proofs.empty)
+      TransferTransaction(2.toByte, master, recipient, Waves, amount, Waves, fee, None, timestamp, proofs = Proofs.empty, recipient.chainId)
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(s2, unsigned.bodyBytes()))
-    (genesis, setSctipt, unsigned, Seq(sig0, sig1, sig2))
+    (genesis, setScript, unsigned, Seq(sig0, sig1, sig2))
   }
 
   property("2 of 3 multisig") {

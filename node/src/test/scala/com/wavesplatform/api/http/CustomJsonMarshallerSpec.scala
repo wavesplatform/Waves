@@ -12,13 +12,12 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
-import monix.eval.Coeval
 import org.scalactic.source.Position
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatest.{Matchers, PropSpec}
@@ -65,7 +64,7 @@ class CustomJsonMarshallerSpec
   }
 
   private val transactionsRoute =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, Coeval(utx.size), utxSynchronizer, ntpTime).route
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, utxSynchronizer, ntpTime).route
 
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>

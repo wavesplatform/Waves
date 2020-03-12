@@ -20,7 +20,6 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
-import monix.eval.Coeval
 import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -55,7 +54,7 @@ class TransactionsRouteSpec
         addressTransactions,
         testWallet,
         blockchain,
-        Coeval(utxPoolSize.apply()),
+        utxPoolSize,
         utxPoolSynchronizer,
         new TestTime
       ).route

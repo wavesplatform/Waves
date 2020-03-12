@@ -751,10 +751,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     forAll(exchangeWithV2Tx) {
       case (gen1, gen2, issue1, issue2, exchange) =>
         val exchangeWithResignedOrder = (exchange: @unchecked) match {
-          case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _) =>
+          case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _, _) =>
             val newSig = ByteStr(crypto.sign(PrivateKey(so.senderPublicKey), bo.bodyBytes()))
             e1.copy(order1 = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[Order])
-          case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _) =>
+          case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _, _) =>
             val newSig = ByteStr(crypto.sign(PrivateKey(bo.senderPublicKey), so.bodyBytes()))
             e2.copy(order2 = so.updateProofs(Proofs(Seq(newSig))))
         }
@@ -785,9 +785,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         )
 
         val exchangeWithResignedOrder = (exchange: @unchecked) match {
-          case e1 @ ExchangeTransaction(TxVersion.V1, _, so, _, _, _, _, _, _, _) =>
+          case e1 @ ExchangeTransaction(TxVersion.V1, _, so, _, _, _, _, _, _, _, _) =>
             e1.copy(order1 = so.updateProofs(newProofs).asInstanceOf[Order])
-          case e2 @ ExchangeTransaction(TxVersion.V2, _, so, _, _, _, _, _, _, _) =>
+          case e2 @ ExchangeTransaction(TxVersion.V2, _, so, _, _, _, _, _, _, _, _) =>
             e2.copy(order1 = so.updateProofs(newProofs))
         }
 

@@ -202,7 +202,8 @@ class AssetsBroadcastRouteSpec
         fee = Waves / 3,
         attachment = None,
         timestamp = System.currentTimeMillis(),
-        proofs = Proofs(Seq.empty)
+        proofs = Proofs(Seq.empty),
+        chainId = receiverPrivateKey.toAddress.chainId
       )
     )
 

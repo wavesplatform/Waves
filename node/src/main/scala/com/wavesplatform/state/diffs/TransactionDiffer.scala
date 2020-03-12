@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
@@ -44,6 +45,7 @@ object TransactionDiffer {
         stats.commonValidation
           .measureForType(tx.typeId) {
             for {
+              _ <- CommonValidation.disallowFromAnotherNetwork(tx, AddressScheme.current.chainId)
               _ <- CommonValidation.disallowTxFromFuture(blockchain.settings.functionalitySettings, currentBlockTimestamp, tx)
               _ <- CommonValidation.disallowTxFromPast(blockchain.settings.functionalitySettings, prevBlockTimestamp, tx)
               _ <- CommonValidation.disallowBeforeActivationTime(blockchain, tx)

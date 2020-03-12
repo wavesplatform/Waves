@@ -374,7 +374,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         Some(unchangeableScript),
         setAssetScriptFee + smartFee,
         System.currentTimeMillis,
-        Proofs.empty
+        Proofs.empty,
+        accountA.toAddress.chainId
       )
 
       val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
@@ -395,7 +396,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         Some(script),
         setAssetScriptFee + smartFee,
         System.currentTimeMillis,
-        Proofs.empty
+        Proofs.empty,
+        accountA.toAddress.chainId
       )
 
       val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))

@@ -24,7 +24,6 @@ import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
-import monix.eval.Coeval
 import monix.execution.Scheduler
 import monix.reactive.Observable
 import play.api.libs.json._
@@ -37,7 +36,7 @@ case class TransactionsApiRoute(
     commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
-    utxPoolSize: Coeval[Int],
+    utxPoolSize: () => Int,
     utxPoolSynchronizer: UtxPoolSynchronizer,
     time: Time
 ) extends ApiRoute

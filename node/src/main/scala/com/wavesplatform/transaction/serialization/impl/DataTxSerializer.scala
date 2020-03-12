@@ -5,6 +5,7 @@ import java.nio.charset.StandardCharsets.UTF_8
 
 import com.google.common.primitives.{Bytes, Longs, Shorts}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.state.DataEntry.Type
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, IntegerDataEntry, StringDataEntry}
@@ -69,7 +70,7 @@ object DataTxSerializer {
     val data      = parseDataEntries(buf)
     val timestamp = buf.getLong // Timestamp before fee
     val fee       = buf.getLong
-    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs)
+    DataTransaction(TxVersion.V1, sender, data, fee, timestamp, buf.getProofs, AddressScheme.current.chainId)
   }
 
   private def parseEntry(buf: ByteBuffer): DataEntry[_] = {

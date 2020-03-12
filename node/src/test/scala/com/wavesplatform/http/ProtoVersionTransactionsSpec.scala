@@ -2,7 +2,7 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.TransactionsApiRoute
 import com.wavesplatform.common.state.ByteStr
@@ -26,7 +26,6 @@ import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransacti
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, DataTransaction, Proofs, Transaction, TxVersion, VersionedTransaction}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{TestWallet, TransactionGen}
-import monix.eval.Coeval
 import org.scalacheck.Gen
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.Matchers
@@ -59,7 +58,7 @@ class ProtoVersionTransactionsSpec
 
   private val transactionsApi = mock[CommonTransactionsApi]
   private val route: Route =
-    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, Coeval(utx.size), utxPoolSynchronizer, ntpTime).route
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, utxPoolSynchronizer, ntpTime).route
 
   private def test(f: => Any): Unit = {
     (utxPoolSynchronizer.publish _).expects(*).anyNumberOfTimes().returning(TracedResult(Right(true)))
@@ -70,7 +69,7 @@ class ProtoVersionTransactionsSpec
     "CreateAliasTransaction" in test {
       val alias = aliasGen.sample.get
 
-      val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias, MinFee, Now, Proofs.empty).explicitGet()
+      val aliasTxUnsigned = CreateAliasTransaction.create(TxVersion.V3, account, alias.name, MinFee, Now, Proofs.empty).explicitGet()
 
       val (proofs, aliasTxJson) = Post(routePath("/sign"), aliasTxUnsigned.json()) ~> ApiKeyHeader ~> route ~> check {
         checkProofs(response, aliasTxUnsigned)
@@ -409,7 +408,6 @@ class ProtoVersionTransactionsSpec
       val updateAssetInfoTx = UpdateAssetInfoTransaction
         .selfSigned(
           TxVersion.V1,
-          AddressScheme.current.chainId,
           account,
           asset.id,
           "Test",

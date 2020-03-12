@@ -7,6 +7,7 @@ import java.util.{NoSuchElementException, UUID}
 
 import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.ConnectReq
+import com.wavesplatform.account.{AddressScheme, KeyPair}
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.{IssueRequest, TransferRequest}
 import com.wavesplatform.common.state.ByteStr
@@ -43,6 +44,7 @@ import scala.concurrent.Future
 import scala.concurrent.Future.traverse
 import scala.concurrent.duration._
 import scala.util.{Failure, Success}
+import com.wavesplatform.transaction.assets.exchange.{Order, ExchangeTransaction => ExchangeTx}
 
 object AsyncHttpApi extends Assertions {
 
@@ -477,7 +479,6 @@ object AsyncHttpApi extends Assertions {
     ): Future[(Transaction, JsValue)] = {
       val tx = UpdateAssetInfoTransaction(
         version,
-        AddressScheme.current.chainId,
         sender.publicKey,
         IssuedAsset(ByteStr(Base58.decode(assetId))),
         name,
@@ -485,7 +486,8 @@ object AsyncHttpApi extends Assertions {
         timestamp.getOrElse(System.currentTimeMillis()),
         fee,
         if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
-        Proofs.empty
+        Proofs.empty,
+        AddressScheme.current.chainId
       ).signWith(sender.privateKey)
       signedTraceBroadcast(tx.json())
     }
@@ -616,7 +618,8 @@ object AsyncHttpApi extends Assertions {
         data,
         fee,
         timestamp.getOrElse(System.currentTimeMillis()),
-        Proofs.empty
+        Proofs.empty,
+        AddressScheme.current.chainId,
       ).signWith(sender.privateKey)
       signedBroadcast(tx.json())
     }

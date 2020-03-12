@@ -226,22 +226,4 @@ class TransferTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     sender.getTransaction(txWithIntAtt).getTransaction.getTransfer.getAttachment.getIntValue shouldBe 123
     sender.getTransaction(txWithBinaryAtt).getTransaction.getTransfer.getAttachment.getBinaryValue shouldBe firstAddress
   }
-
-  test("not able to pass typed attachment for transactions V < 3") {
-    for (v <- transferTxSupportedVersions if v < 3) {
-      assertGrpcError(
-        sender.broadcastTransfer(
-          firstAcc,
-          Recipient().withPublicKeyHash(secondAddress),
-          transferAmount,
-          minFee,
-          version = v,
-          attachment = Attachment.StringValue("somestring"),
-          waitForTx = true
-        ),
-        "Str\\(somestring\\) can not be strictly converted to bytes",
-        Code.INTERNAL
-      )
-    }
-  }
 }

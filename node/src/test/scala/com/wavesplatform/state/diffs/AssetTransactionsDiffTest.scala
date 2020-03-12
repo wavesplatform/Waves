@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
@@ -455,7 +454,6 @@ class AssetTransactionsDiffTest
       update = UpdateAssetInfoTransaction
         .selfSigned(
           TxVersion.V1,
-          AddressScheme.current.chainId,
           accountA,
           assetId.id,
           updName,
@@ -489,7 +487,6 @@ class AssetTransactionsDiffTest
     update1 = UpdateAssetInfoTransaction
       .selfSigned(
         TxVersion.V1,
-        AddressScheme.current.chainId,
         accountС,
         issue1.assetId,
         "Invalid",

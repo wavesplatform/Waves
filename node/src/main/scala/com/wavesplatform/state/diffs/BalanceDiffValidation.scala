@@ -60,5 +60,7 @@ object BalanceDiffValidation extends ScorexLogging {
   }
 
   private def negativeAssetsInfo(b: Blockchain, acc: Address, diff: Portfolio): Map[ByteStr, Long] =
-    diff.assets.map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
+    diff.assets
+      .map { case (aid, balanceChange) => aid.id -> (b.balance(acc, aid) + balanceChange) }
+      .filter(_._2 < 0)
 }

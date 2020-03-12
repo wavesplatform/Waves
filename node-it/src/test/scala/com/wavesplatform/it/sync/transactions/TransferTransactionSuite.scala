@@ -194,8 +194,8 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
           typedAttachment = Some(Attachment.Num(123))
         )
       ) { error =>
-        error.id shouldBe 10
-        error.message shouldBe "Too big sequences requested"
+        error.id shouldBe 199
+        error.message shouldBe "Typed attachment not allowed"
       }
     }
   }

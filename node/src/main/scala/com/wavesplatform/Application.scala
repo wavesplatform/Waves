@@ -344,7 +344,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       val apiRoutes = Seq(
         NodeApiRoute(settings.restAPISettings, blockchainUpdater, () => apiShutdown()),
         BlocksApiRoute(settings.restAPISettings, extensionContext.blocksApi),
-        TransactionsApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, blockchainUpdater, Coeval(utxStorage.size), utxSynchronizer, time),
+        TransactionsApiRoute(settings.restAPISettings, extensionContext.transactionsApi, wallet, blockchainUpdater, () => utxStorage.size, utxSynchronizer, time),
         NxtConsensusApiRoute(settings.restAPISettings, blockchainUpdater),
         WalletApiRoute(settings.restAPISettings, wallet),
         UtilsApiRoute(time, settings.restAPISettings, blockchainUpdater.estimator, limitedScheduler),

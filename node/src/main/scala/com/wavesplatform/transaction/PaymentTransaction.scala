@@ -12,8 +12,15 @@ import play.api.libs.json.JsObject
 
 import scala.util.Try
 
-case class PaymentTransaction private (sender: PublicKey, recipient: Address, amount: Long, fee: Long, timestamp: Long, signature: ByteStr)
-    extends SignedTransaction
+case class PaymentTransaction private (
+    sender: PublicKey,
+    recipient: Address,
+    amount: Long,
+    fee: Long,
+    timestamp: Long,
+    signature: ByteStr,
+    chainId: Byte
+) extends SignedTransaction
     with TxWithFee.InWaves {
 
   override val builder             = PaymentTransaction
@@ -25,14 +32,15 @@ case class PaymentTransaction private (sender: PublicKey, recipient: Address, am
 }
 
 object PaymentTransaction extends TransactionParser {
-  override val typeId: TxType                    = 2
+  type TransactionT = PaymentTransaction
+
+  override val typeId: TxType                    = 2: Byte
   override val supportedVersions: Set[TxVersion] = Set(1)
 
   val serializer = PaymentTxSerializer
 
   override def parseBytes(bytes: Array[TxVersion]): Try[PaymentTransaction] =
     serializer.parseBytes(bytes)
-
 
   implicit val validator: TxValidator[PaymentTransaction] = PaymentTxValidator
 
@@ -50,5 +58,5 @@ object PaymentTransaction extends TransactionParser {
       timestamp: Long,
       signature: ByteStr
   ): Either[ValidationError, PaymentTransaction] =
-    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature).validatedEither
+    PaymentTransaction(sender, recipient, amount, fee, timestamp, signature, recipient.chainId).validatedEither
 }
