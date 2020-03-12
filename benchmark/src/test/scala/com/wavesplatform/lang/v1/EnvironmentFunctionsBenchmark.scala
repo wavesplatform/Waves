@@ -93,7 +93,8 @@ object EnvironmentFunctionsBenchmark {
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = ???
-    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                  = ???
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
+    override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte]        = ???
     override def txId: ByteStr                                                                                   = ByteStr(new Array[Byte](64))
   }
 

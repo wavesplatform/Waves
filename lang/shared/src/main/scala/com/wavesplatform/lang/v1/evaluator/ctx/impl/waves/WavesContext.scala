@@ -70,7 +70,8 @@ object WavesContext {
   private def fromV4Funcs(proofsEnabled: Boolean, version: StdLibVersion) =
     fromV3Funcs(proofsEnabled, version) ++ Array(
       calculateAssetIdF,
-      transactionFromProtoBytesF(proofsEnabled, version)
+      transactionFromProtoBytesF(proofsEnabled, version),
+      createMerkleRootF
     )
 
   private def variableFuncs(version: StdLibVersion, c: ContentType, proofsEnabled: Boolean) = {

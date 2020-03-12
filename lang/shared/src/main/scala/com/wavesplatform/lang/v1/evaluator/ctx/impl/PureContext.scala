@@ -47,13 +47,21 @@ object PureContext {
   lazy val sumString: BaseFunction[NoContext] =
     createRawOp(SUM_OP, STRING, STRING, SUM_STRING, 10) {
       case (CONST_STRING(a), CONST_STRING(b)) =>
-        CONST_STRING(a + b).filterOrElse(_.s.length <= MaxStringResult, "String is too large")
+        if(a.length + b.length <= MaxStringResult) {
+          CONST_STRING(a + b)
+        } else {
+          Left("String is too large")
+        }
       case _ => ???
     }
   lazy val sumByteStr: BaseFunction[NoContext] =
     createRawOp(SUM_OP, BYTESTR, BYTESTR, SUM_BYTES, 10) {
       case (CONST_BYTESTR(a), CONST_BYTESTR(b)) =>
-        CONST_BYTESTR(a ++ b).filterOrElse(_.bs.length <= MaxBytesResult, "ByteVector is too large")
+        if(a.length + b.length <= MaxStringResult) {
+          CONST_BYTESTR(a ++ b)
+        } else {
+          Left("ByteVector is too large")
+        }
       case _ => ???
     }
   lazy val ge: BaseFunction[NoContext] = createOp(GE_OP, LONG, BOOLEAN, GE_LONG)(_ >= _)
