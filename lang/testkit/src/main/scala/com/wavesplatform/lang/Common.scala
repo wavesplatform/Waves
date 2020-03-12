@@ -89,7 +89,7 @@ object Common {
     override def multiPaymentAllowed: Boolean                                                                    =  true
     override def txId: ByteStr                                                                                   = ???
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
-    override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte] i      = ???
+    override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte]        = ???
   }
 
   def addressFromPublicKey(chainId: Byte, pk: Array[Byte], addressVersion: Byte = EnvironmentFunctions.AddressVersion): Array[Byte] = {
