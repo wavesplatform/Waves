@@ -18,7 +18,7 @@ import scala.util.Random
 @Measurement(iterations = 10)
 class MerkleBenchmark {
 
-  val messages: Seq[Array[Byte]] = (0 until 2048).map { i =>
+  val messages: Seq[Array[Byte]] = (0 until 2048).map { _ =>
     val message = new Array[Byte](2048)
     Random.nextBytes(message)
     message
