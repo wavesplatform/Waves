@@ -552,8 +552,10 @@ object Functions {
           override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
             input._2 match {
               case ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
-                CONST_BYTESTR(input._1.createMerkleRoot(value, Math.toIntExact(index), proof.map({ case CONST_BYTESTR(v) => v.arr })))
-                  .left.map(_.toString).pure[F]
+                CONST_BYTESTR(input._1.createMerkleRoot(value, Math.toIntExact(index), proof.map({
+                   case CONST_BYTESTR(v) => v.arr
+                   case _ => throw(new Exception("Expect ByteStr"))
+                }))) .left.map(_.toString).pure[F]
               case xs => notImplemented[F](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
             }
         }
