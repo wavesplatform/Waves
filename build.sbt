@@ -184,7 +184,7 @@ checkPRRaw := {
   } finally {
     test.all(ScopeFilter(inProjects(langTests, node), inConfigurations(Test))).value
     (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`, `blockchain-updates`), inConfigurations(Test))).value
   }
 }
 
