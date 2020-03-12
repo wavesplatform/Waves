@@ -40,11 +40,6 @@ object PBRecipients {
     case _                                => Left(GenericError(s"Not an alias: $r"))
   }
 
-  def toAlias(r: Recipient): Either[ValidationError, Alias] = r.recipient match {
-    case Recipient.Recipient.Alias(alias) => Alias.fromString(alias)
-    case _                                => Left(GenericError(s"Not an alias: $r"))
-  }
-
   def toAddressOrAlias(r: Recipient, chainId: Byte): Either[ValidationError, AddressOrAlias] = {
     if (r.recipient.isPublicKeyHash) toAddress(r, chainId)
     else if (r.recipient.isAlias) toAlias(r, chainId)

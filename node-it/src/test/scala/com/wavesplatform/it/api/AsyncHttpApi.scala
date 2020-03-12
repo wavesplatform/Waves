@@ -485,7 +485,7 @@ object AsyncHttpApi extends Assertions {
         fee,
         if (feeAssetId.isDefined) IssuedAsset(ByteStr(Base58.decode(feeAssetId.get))) else Waves,
         Proofs.empty,
-        AddressScheme.current.chainId,
+        AddressScheme.current.chainId
       ).signWith(sender.privateKey)
       signedTraceBroadcast(tx.json())
     }

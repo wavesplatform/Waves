@@ -94,7 +94,7 @@ object TxConstraints {
       cond(attachment match {
         case Some(Attachment.Bin(_)) | None => true
         case _                              => allowTyped
-      }, TxValidationError.TooBigArray)
+      }, GenericError("Typed attachment not allowed"))
     )
   }
 
