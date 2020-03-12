@@ -137,7 +137,7 @@ case class DebugApiRoute(
     jsonPost[RollbackParams] { params =>
       blockchain.blockHeader(params.rollbackTo) match {
         case Some(sh) =>
-          rollbackToBlock(sh.signature, params.returnTransactionsToUtx)
+          rollbackToBlock(sh.id(), params.returnTransactionsToUtx)
         case None =>
           (StatusCodes.BadRequest, "Block at height not found")
       }

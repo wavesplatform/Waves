@@ -3,7 +3,6 @@ package com.wavesplatform.http
 import akka.http.scaladsl.server.Route
 import com.wavesplatform.BlockGen
 import com.wavesplatform.api.http.ApiError.BlockDoesNotExist
-import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.consensus.nxt.api.http.NxtConsensusApiRoute
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.http.ApiMarshallers._
@@ -36,22 +35,22 @@ class ConsensusRouteSpec
     }
 
     "for existing block" in routeTest { (h, route) =>
-      val SignedBlockHeader(header, id) = h.blockHeader(3).get
-      Get(routePath(s"/generationsignature/$id")) ~> route ~> check {
-        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual header.generationSignature.toString
+      val sh = h.blockHeader(3).get
+      Get(routePath(s"/generationsignature/${sh.id()}")) ~> route ~> check {
+        (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual sh.header.generationSignature.toString
       }
     }
 
-    "for non-existent block" in routeTest { (h, route) =>
+    "for non-existent block" in routeTest { (_, route) =>
       Get(routePath(s"/generationsignature/24aTK4mg6DMFKw4SuQCfSRG52MXg8DSjDWQopahs38Cm3tPMFM1m6fGqCoPY69kstM7TE4mpJAMYmG7LWTTjndCH")) ~> route should produce(BlockDoesNotExist)
     }
   }
 
   routePath("/basetarget") - {
     "for existing block" in routeTest { (h, route) =>
-      val SignedBlockHeader(header, id) = h.blockHeader(3).get
-      Get(routePath(s"/basetarget/$id")) ~> route ~> check {
-        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual header.baseTarget
+      val sh = h.blockHeader(3).get
+      Get(routePath(s"/basetarget/${sh.id()}")) ~> route ~> check {
+        (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual sh.header.baseTarget
       }
     }
 

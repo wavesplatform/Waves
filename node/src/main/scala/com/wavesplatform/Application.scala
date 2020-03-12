@@ -188,7 +188,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
     def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
       loadBlockMetaAt(height).map { meta =>
         meta -> blockchainUpdater
-          .liquidBlock(meta.signature)
+          .liquidBlock(meta.id)
           .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
           .fold(Seq.empty[Transaction])(_.transactionData)
       }

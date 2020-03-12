@@ -537,7 +537,7 @@ class BlockchainUpdaterImpl(
       .map(_.bestLastBlockInfo(maxTimestamp))
       .orElse(
         leveldb.lastBlockHeader.map { sh =>
-          BlockMinerInfo(sh.header.baseTarget, sh.header.generationSignature, sh.header.timestamp, sh.signature)
+          BlockMinerInfo(sh.header.baseTarget, sh.header.generationSignature, sh.header.timestamp, sh.id())
         }
       )
   }

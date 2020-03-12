@@ -45,23 +45,15 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
   def loadBlockInfo(height: Int): Option[SignedBlockHeader]
-  override def blockHeader(height: Int): Option[SignedBlockHeader] = {
-    val c = current
-    if (height == c._1) {
-      c._3.map(b => SignedBlockHeader(b.header, b.signature))
-    } else {
-      loadBlockInfo(height)
-    }
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = current match {
+    case (`height`, _, maybeBlock) => maybeBlock.map(b => SignedBlockHeader(b.header, b.signature))
+    case _                         => loadBlockInfo(height)
   }
 
   def loadHeightOf(blockId: ByteStr): Option[Int]
-  override def heightOf(blockId: ByteStr): Option[Int] = {
-    val c = current
-    if (c._3.exists(_.id() == blockId)) {
-      Some(c._1)
-    } else {
-      loadHeightOf(blockId)
-    }
+  override def heightOf(blockId: ByteStr): Option[Int] = current match {
+    case (height, _, Some(block)) if block.id() == blockId => Some(height)
+    case _                                                 => loadHeightOf(blockId)
   }
 
   private val blocksTs                               = new util.TreeMap[Int, Long] // Height -> block timestamp, assume sorted by key.
@@ -97,7 +89,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
-  protected def clearBalancesCache(): Unit = balancesCache.invalidateAll()
+  protected def clearBalancesCache(): Unit                          = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long

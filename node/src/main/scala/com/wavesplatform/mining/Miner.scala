@@ -196,7 +196,7 @@ class MinerImpl(
     else settings.rewardsSettings.desired.getOrElse(-1L)
 
   private def nextBlockGenerationTime(fs: FunctionalitySettings, height: Int, block: SignedBlockHeader, account: KeyPair): Either[String, Long] = {
-    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.signature))
+    val balance = blockchainUpdater.generatingBalance(account.toAddress, Some(block.id()))
 
     if (blockchainUpdater.isMiningAllowed(height, balance)) {
       val blockDelayE = pos.getValidBlockDelay(height, account, block.header.baseTarget, balance)
@@ -298,7 +298,7 @@ class MinerImpl(
     microBlockAttempt := microBlockMiner
       .generateMicroBlockSequence(account, lastBlock, Duration.Zero, constraints, restTotalConstraint)
       .runAsyncLogErr
-    log.trace(s"MicroBlock mining scheduled for $account")
+    log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }
 
   override def state: MinerDebugInfo.State = debugStateRef.get.runSyncUnsafe(1.second)(minerScheduler, CanBlock.permit)
