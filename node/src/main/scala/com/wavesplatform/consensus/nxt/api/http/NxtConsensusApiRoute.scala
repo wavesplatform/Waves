@@ -30,7 +30,7 @@ case class NxtConsensusApiRoute(settings: RestAPISettings, blockchain: Blockchai
       } yield f(meta.header)).toRight[ApiError](BlockDoesNotExist)
     }
 
-  def generationSignatureId: Route = (path("generationsignature" / Signature) & get) { signature =>
+  def generationSignatureId: Route = (path("generationsignature" / BlockId) & get) { signature =>
     headerForId(signature, m => Json.obj("generationSignature" -> m.generationSignature.toString))
   }
 
