@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction.smart
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.account._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -31,9 +30,9 @@ case class SetScriptTransaction(
   //noinspection TypeAnnotation
   override val builder = SetScriptTransaction
 
-  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(builder.serializer.bodyBytes(this))
-  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(Bytes.concat(Array(0: Byte), bodyBytes(), proofs.bytes()))
-  override val json: Coeval[JsObject]     = Coeval.evalOnce(builder.serializer.toJson(this))
+  val bodyBytes: Coeval[Array[Byte]]      = Coeval.evalOnce(SetScriptTransaction.serializer.bodyBytes(this))
+  override val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(SetScriptTransaction.serializer.toBytes(this))
+  override val json: Coeval[JsObject]     = Coeval.evalOnce(SetScriptTransaction.serializer.toJson(this))
 }
 
 object SetScriptTransaction extends TransactionParser {

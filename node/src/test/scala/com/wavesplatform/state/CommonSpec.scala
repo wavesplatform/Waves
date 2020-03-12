@@ -28,7 +28,7 @@ class CommonSpec extends FreeSpec with Matchers with WithDomain with Transaction
       case (sender, initialBalance, assetId) =>
         withDomain() { d =>
           d.appendBlock(genesisBlock(nextTs, sender, initialBalance))
-          d.portfolio(sender).balanceOf(IssuedAsset(ByteStr(assetId))) shouldEqual 0L
+          d.balance(sender, IssuedAsset(ByteStr(assetId))) shouldEqual 0L
         }
     }
   }

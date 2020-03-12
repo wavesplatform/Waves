@@ -1,4 +1,5 @@
 package com.wavesplatform.account
+
 import java.nio.ByteBuffer
 
 import com.wavesplatform.common.state.ByteStr

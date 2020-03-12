@@ -26,7 +26,7 @@ object SetScriptTransactionDiff {
     } yield Diff(
       tx = tx,
       portfolios = Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty)),
-      scripts    = Map(tx.sender.toAddress -> scriptWithComplexities),
+      scripts    = Map(tx.sender.toAddress    -> scriptWithComplexities),
       scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
     )
 

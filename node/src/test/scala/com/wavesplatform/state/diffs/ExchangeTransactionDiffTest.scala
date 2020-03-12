@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -25,12 +26,12 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{Inside, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
+class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with Inside with NoShrink {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 

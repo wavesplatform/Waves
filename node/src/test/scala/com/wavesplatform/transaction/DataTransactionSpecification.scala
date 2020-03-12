@@ -234,10 +234,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   property("handle null keys") {
     val emptyDataEntry = EmptyDataEntry("123")
 
-    forAll(accountGen, dataTransactionGen) { (sender, tx) =>
-      val tx1 = DataTransaction.selfSigned(TxVersion.V1, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+    forAll(accountGen) { sender =>
+      val tx1 = DataTransaction.create(TxVersion.V1, sender, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
       tx1 shouldBe Left(GenericError("Empty data is not allowed in V1"))
-      val tx2 = DataTransaction.selfSigned(TxVersion.V2, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      val tx2 = DataTransaction.create(TxVersion.V2, sender, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
       tx2 shouldBe 'right
     }
   }

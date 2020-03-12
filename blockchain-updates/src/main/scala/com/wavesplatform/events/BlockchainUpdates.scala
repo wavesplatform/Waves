@@ -90,7 +90,7 @@ class BlockchainUpdates(private val context: Context) extends Extension with Sco
     if (kafkaHeight != 0) {
       val heightToRollbackTo = Math.max(kafkaHeight - 1, 1)
       val sigToRollback = context.blockchain
-        .blockInfo(heightToRollbackTo)
+        .blockHeader(heightToRollbackTo)
         .map(_.id())
         .get // guaranteed not to fail by previous checks on heights
 

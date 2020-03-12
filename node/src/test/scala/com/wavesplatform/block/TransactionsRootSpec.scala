@@ -21,6 +21,7 @@ class TransactionsRootSpec
     with TransactionGen
     with NoShrink
     with Matchers {
+
   val commonGen: Gen[(KeyPair, List[TransferTransaction])] =
     for {
       signer    <- accountGen
@@ -145,3 +146,4 @@ class TransactionsRootSpec
       block.verifyTransactionProof(proof) shouldBe false
   }
 }
+

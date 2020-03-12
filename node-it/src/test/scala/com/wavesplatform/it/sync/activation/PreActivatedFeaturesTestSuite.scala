@@ -63,6 +63,7 @@ class PreActivatedFeaturesTestSuite
     }
   }
 }
+
 object PreActivatedFeaturesTestSuite {
   import com.wavesplatform.it.NodeConfigs._
   val votingInterval             = 10
@@ -81,17 +82,18 @@ object PreActivatedFeaturesTestSuite {
                                                                 |  blockchain.custom.functionality {
                                                                 |  feature-check-blocks-period = $votingInterval
                                                                 |  pre-activated-features {
-                                                                |        1: 0
-                                                                |        2: 100
-                                                                |        3: 100
-                                                                |        4: 100
-                                                                |        5: 100
-                                                                |        6: 100
-                                                                |        7: 100
-                                                                |        8: 100
-                                                                |        9: 100
-                                                                |        10: 100
-                                                                |        11: 100
+                                                                |        1 = 0
+                                                                |        2 = 100
+                                                                |        3 = 100
+                                                                |        4 = 100
+                                                                |        5 = 100
+                                                                |        6 = 100
+                                                                |        7 = 100
+                                                                |        8 = 100
+                                                                |        9 = 100
+                                                                |        10 = 100
+                                                                |        11 = 100
+                                                                |        15 = 0
                                                                 |      }
                                                                 |  }
                                                                 |  features.supported = [$featureNum]

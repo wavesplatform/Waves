@@ -1,87 +1,63 @@
 package com.wavesplatform.network
 
-import com.google.common.cache.{CacheBuilder, CacheLoader}
-import com.google.common.util.concurrent.UncheckedExecutionException
-import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.block.Block
+import com.wavesplatform.history.History
 import com.wavesplatform.network.HistoryReplier._
-import com.wavesplatform.network.MicroBlockSynchronizer.MicroBlockSignature
 import com.wavesplatform.settings.SynchronizationSettings
-import com.wavesplatform.state.NG
 import com.wavesplatform.utils.ScorexLogging
 import io.netty.channel.ChannelHandler.Sharable
 import io.netty.channel.{ChannelHandlerContext, ChannelInboundHandlerAdapter}
-import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
+
+import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success}
 
 @Sharable
-class HistoryReplier(ng: NG, settings: SynchronizationSettings, scheduler: SchedulerService) extends ChannelInboundHandlerAdapter with ScorexLogging {
-  private lazy val historyReplierSettings = settings.historyReplier
+class HistoryReplier(score: => BigInt, history: History, settings: SynchronizationSettings)(implicit ec: ExecutionContext)
+    extends ChannelInboundHandlerAdapter
+    with ScorexLogging {
 
-  private implicit val s: SchedulerService = scheduler
-
-  // both caches call .get so that NoSuchElementException is thrown and only successfully loaded (micro)blocks are cached
-
-  private val knownMicroBlocks = CacheBuilder
-    .newBuilder()
-    .maximumSize(historyReplierSettings.maxMicroBlockCacheSize)
-    .build(new CacheLoader[MicroBlockSignature, RawBytes] {
-      override def load(key: MicroBlockSignature): RawBytes = RawBytes.fromMicroBlock(MicroBlockResponse(ng.microBlock(key).get, key))
-    })
-
-  private val knownBlocks = CacheBuilder
-    .newBuilder()
-    .maximumSize(historyReplierSettings.maxBlockCacheSize)
-    .build(new CacheLoader[ByteStr, RawBytes] {
-      override def load(key: ByteStr): RawBytes = RawBytes.fromBlock(ng.blockById(key).get)
-    })
-
-  private def respondWith(ctx: ChannelHandlerContext, loader: Task[Option[Message]]): Unit =
-    loader.map {
-      case Some(msg) if ctx.channel().isOpen => ctx.writeAndFlush(msg)
-      case _                                 =>
-    }.runAsyncLogErr
-
-  private def handlingNSE[A](f: => A): Option[A] =
-    try Some(f)
-    catch {
-      case uee: UncheckedExecutionException if uee.getCause != null && uee.getCause.isInstanceOf[NoSuchElementException] => None
+  private def respondWith(ctx: ChannelHandlerContext, value: Future[Message]): Unit =
+    value.onComplete {
+      case Failure(e) => log.debug(s"${id(ctx)} Error processing request", e)
+      case Success(value) =>
+        if (ctx.channel().isOpen) {
+          ctx.writeAndFlush(value)
+        } else {
+          log.trace(s"${id(ctx)} Channel is closed")
+        }
     }
 
   override def channelRead(ctx: ChannelHandlerContext, msg: AnyRef): Unit = msg match {
     case GetSignatures(otherSigs) =>
+      respondWith(ctx, Future(Signatures(history.blockIdsAfter(otherSigs, settings.maxRollback))))
+
+    case GetBlock(sig) =>
       respondWith(
         ctx,
-        Task {
-          val nextIds = otherSigs.view
-            .map(id => id -> ng.blockIdsAfter(id, settings.maxChainLength))
-            .collectFirst { case (parent, Some(ids)) => parent +: ids }
-
-          nextIds match {
-            case Some(extension) =>
-              log.debug(
-                s"${id(ctx)} Got GetSignatures with ${otherSigs.length}, found common parent ${extension.head} and sending total of ${extension.length} signatures"
-              )
-              Some(Signatures(extension))
-            case None =>
-              log.debug(s"${id(ctx)} Got GetSignatures with ${otherSigs.length} signatures, but could not find an extension")
-              None
+        Future(history.loadBlockBytes(sig))
+          .map {
+            case Some((blockVersion, bytes)) =>
+              RawBytes(if (blockVersion < Block.ProtoBlockVersion) BlockSpec.messageCode else PBBlockSpec.messageCode, bytes)
+            case _ => throw new NoSuchElementException(s"Error loading block $sig")
           }
+      )
+
+    case MicroBlockRequest(microBlockId) =>
+      respondWith(
+        ctx,
+        Future(history.loadMicroBlock(microBlockId)).map {
+          case Some(microBlock) => RawBytes.fromMicroBlock(MicroBlockResponse(microBlock, microBlockId))
+          case _                => throw new NoSuchElementException(s"Error loading microblock $microBlockId")
         }
       )
 
-    case GetBlock(sig) =>
-      respondWith(ctx, Task(handlingNSE(knownBlocks.get(sig))))
-
-    case MicroBlockRequest(microBlockId) =>
-      respondWith(ctx, Task(handlingNSE(knownMicroBlocks.get(microBlockId))))
-
     case _: Handshake =>
-      respondWith(ctx, Task(Some(LocalScoreChanged(ng.score))))
+      respondWith(ctx, Future(LocalScoreChanged(score)))
 
     case _ => super.channelRead(ctx, msg)
   }
 
-  def cacheSizes: CacheSizes = CacheSizes(knownBlocks.size(), knownMicroBlocks.size())
+  def cacheSizes: CacheSizes = CacheSizes(0, 0)
 }
 
 object HistoryReplier {

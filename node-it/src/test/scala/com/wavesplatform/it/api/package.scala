@@ -2,7 +2,6 @@ package com.wavesplatform.it
 
 import java.nio.charset.StandardCharsets
 
-import com.fasterxml.jackson.core.JsonProcessingException
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset

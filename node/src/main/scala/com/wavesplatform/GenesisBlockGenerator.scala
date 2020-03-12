@@ -147,14 +147,14 @@ object GenesisBlockGenerator extends App {
     }
 
     val confBody = s"""genesis {
-         |  average-block-delay: ${settings.averageBlockDelay.toMillis}ms
-         |  initial-base-target: ${settings.initialBaseTarget}
-         |  timestamp: ${settings.timestamp}
-         |  block-timestamp: ${settings.blockTimestamp}
-         |  signature: "${settings.signature.get}"
-         |  initial-balance: ${settings.initialBalance}
+         |  average-block-delay = ${settings.averageBlockDelay.toMillis}ms
+         |  initial-base-target = ${settings.initialBaseTarget}
+         |  timestamp = ${settings.timestamp}
+         |  block-timestamp = ${settings.blockTimestamp}
+         |  signature = "${settings.signature.get}"
+         |  initial-balance = ${settings.initialBalance}
          |  transactions = [
-         |    ${settings.transactions.map(x => s"""{recipient: "${x.recipient}", amount: ${x.amount}}""").mkString(",\n    ")}
+         |    ${settings.transactions.map(x => s"""{recipient = "${x.recipient}", amount = ${x.amount}}""").mkString(",\n    ")}
          |  ]
          |}
          |""".stripMargin

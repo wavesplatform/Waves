@@ -25,11 +25,11 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     sender.assetsDetails(assetId, amountsAsStrings = true).quantity shouldBe someAssetAmount
     sender.assetBalance(firstAddress, assetId, amountsAsStrings = true).balance shouldBe someAssetAmount
     sender.assetsBalance(firstAddress, amountsAsStrings = true).balances.head.balance shouldBe someAssetAmount
-    sender.nftAssetsBalance(firstAddress,1, amountsAsStrings = true).head.quantity shouldBe 1
+    sender.nftList(firstAddress,1, amountsAsStrings = true).head.quantity shouldBe 1
 
     sender.waitForHeight(currentHeight + 1)
     val assetDistribution = sender.getWithCustomHeader(s"/assets/$assetId/distribution/$currentHeight/limit/1", headerValue = "application/json;large-significand-format=string")
-    (parseResponse(assetDistribution) \ "items" \ 0 \ 1).as[String] shouldBe s"$someAssetAmount"
+    (parseResponse(assetDistribution) \ "items" \ firstAddress).as[String] shouldBe s"$someAssetAmount"
   }
 
   test("amount as string in addresses api") {
@@ -216,7 +216,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val blockAt          = sender.blockAt(currentHeight, amountsAsStrings = true)
     val blockBySignature = sender.blockBySignature(sender.lastBlock().id, amountsAsStrings = true)
     val blockHeadersAt   = sender.blockHeadersAt(currentHeight, amountsAsStrings = true)
-    val blockHeadersLast = sender.lastBlockHeaders(amountsAsStrings = true)
+    val blockHeadersLast = sender.lastBlockHeader(amountsAsStrings = true)
 
     for (block <- Seq(blockLast, blockAt, blockBySignature)) {
       block.reward shouldBe Some(reward)

@@ -5,14 +5,16 @@ import akka.http.scaladsl.model.MediaTypes.`application/json`
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
 import akka.http.scaladsl.testkit.ScalatestRouteTest
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.DefaultBlockchainSettings
 import com.wavesplatform.http.{ApiErrorMatchers, RestAPISettingsHelper}
 import com.wavesplatform.network.UtxPoolSynchronizer
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.state.reader.LeaseDetails
+import com.wavesplatform.state.{Blockchain, Height}
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.{NTPTime, NoShrink, TestWallet, TransactionGen}
@@ -39,6 +41,9 @@ class CustomJsonMarshallerSpec
   private val blockchain      = mock[Blockchain]
   private val utx             = mock[UtxPool]
   private val utxSynchronizer = mock[UtxPoolSynchronizer]
+  private val transactionsApi = mock[CommonTransactionsApi]
+  private val accountsApi     = mock[CommonAccountsApi]
+  private val assetsApi       = mock[CommonAssetsApi]
 
   private val numberFormat = Accept(`application/json`.withParams(Map("large-significand-format" -> "string")))
 
@@ -58,11 +63,12 @@ class CustomJsonMarshallerSpec
     }
   }
 
-  private val transactionsRoute = TransactionsApiRoute(restAPISettings, testWallet, blockchain, utx, utxSynchronizer, ntpTime).route
+  private val transactionsRoute =
+    TransactionsApiRoute(restAPISettings, transactionsApi, testWallet, blockchain, () => utx.size, utxSynchronizer, ntpTime).route
 
   property("/transactions/info/{id}") {
     forAll(leaseGen) { lt =>
-      (blockchain.transactionInfo _).expects(lt.id()).returning(Some(1 -> lt)).twice()
+      (transactionsApi.transactionById _).expects(lt.id()).returning(Some(Height(1) -> Left(lt))).twice()
       (blockchain.leaseDetails _)
         .expects(lt.id())
         .returning(Some(LeaseDetails(lt.sender, lt.recipient, 1, lt.amount, true)))
@@ -73,9 +79,10 @@ class CustomJsonMarshallerSpec
 
   property("/transactions/calculateFee") {
     (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
-    (blockchain.hasAssetScript _).expects(*).returning(false).anyNumberOfTimes()
-    (blockchain.hasScript _).expects(*).returning(false).anyNumberOfTimes()
+    (blockchain.assetScript _).expects(*).returning(None).anyNumberOfTimes()
+
     forAll(transferV2Gen) { tx =>
+      (transactionsApi.calculateFee _).expects(*).returning(Right((Asset.Waves, 1, 1))).twice()
       checkRoute(Post("/transactions/calculateFee", tx.json()), transactionsRoute, "feeAmount")
     }
   }
@@ -95,7 +102,7 @@ class CustomJsonMarshallerSpec
     pending // todo: fix when distributions/portfolio become testable
   }
 
-  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, utxSynchronizer, blockchain, ntpTime).route
+  private val assetsRoute = AssetsApiRoute(restAPISettings, testWallet, utxSynchronizer, blockchain, ntpTime, accountsApi, assetsApi).route
 
   property("/assets/{assetId}/distribution/{height}/limit/{limit}") {
     pending // todo: fix when distributions/portfolio become testable

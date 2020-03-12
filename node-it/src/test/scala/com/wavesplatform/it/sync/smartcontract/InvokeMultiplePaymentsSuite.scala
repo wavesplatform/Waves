@@ -169,7 +169,6 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
         payment = Seq(Payment(3, Waves), Payment(6, Waves), Payment(7, Waves))
       )
     ) { error =>
-      println(error)
       error.message should include("Script payment amount=3 should not exceed 2")
       error.id shouldBe StateCheckFailed.Id
       error.statusCode shouldBe 400

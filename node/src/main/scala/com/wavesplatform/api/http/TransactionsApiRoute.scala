@@ -2,12 +2,12 @@ package com.wavesplatform.api.http
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
+import cats.instances.either._
 import cats.instances.list._
 import cats.instances.try_._
-import cats.syntax.traverse._
-import cats.syntax.either._
-import cats.instances.either._
 import cats.syntax.alternative._
+import cats.syntax.either._
+import cats.syntax.traverse._
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.api.http.ApiError._
@@ -23,9 +23,9 @@ import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.lease._
 import com.wavesplatform.utils.Time
-import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
+import monix.reactive.Observable
 import play.api.libs.json._
 
 import scala.concurrent.Future
@@ -33,9 +33,10 @@ import scala.util.Success
 
 case class TransactionsApiRoute(
     settings: RestAPISettings,
+    commonApi: CommonTransactionsApi,
     wallet: Wallet,
     blockchain: Blockchain,
-    utx: UtxPool,
+    utxPoolSize: () => Int,
     utxPoolSynchronizer: UtxPoolSynchronizer,
     time: Time
 ) extends ApiRoute
@@ -44,33 +45,31 @@ case class TransactionsApiRoute(
     with AutoParamsDirective {
   import TransactionsApiRoute._
 
-  private[this] val commonApi = new CommonTransactionsApi(blockchain, utx, wallet, utxPoolSynchronizer.publish)
-
   override lazy val route: Route =
     pathPrefix("transactions") {
       unconfirmed ~ addressLimit ~ info ~ status ~ sign ~ calculateFee ~ signedBroadcast ~ merkleProof
     }
 
   def addressLimit: Route = {
-    (get & path("address" / Segment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
-      extractScheduler(implicit sc => complete(transactionsByAddress(address, limit, maybeAfter)))
+    (get & path("address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, maybeAfter) =>
+      val after =
+        maybeAfter.map(s => ByteStr.decodeBase58(s).getOrElse(throw ApiException(CustomValidationError(s"Unable to decode transaction id $s"))))
+      if (limit > settings.transactionsByAddressLimit) throw ApiException(TooBigArrayAllocation)
+      extractScheduler { implicit sc =>
+        complete(transactionsByAddress(address, limit, after).map(txs => List(txs)))
+      }
     }
   }
 
   def info: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
-      complete(InvalidSignature)
-    } ~
-      path(Segment) { encoded =>
-        ByteStr.decodeBase58(encoded) match {
-          case Success(id) =>
-            commonApi.transactionById(id) match {
-              case Some((h, tx)) => complete(txToExtendedJson(tx) + ("height" -> JsNumber(h)))
-              case None          => complete(ApiError.TransactionDoesNotExist)
-            }
-          case _ => complete(InvalidSignature)
-        }
+      complete(InvalidTransactionId("Transaction ID was not specified"))
+    } ~ path(TransactionId) { id =>
+      commonApi.transactionById(id) match {
+        case Some((h, either)) => complete(txToExtendedJson(either.fold(identity, _._1)) + ("height" -> JsNumber(h)))
+        case None              => complete(ApiError.TransactionDoesNotExist)
       }
+    }
   }
 
   def status: Route = path("status") {
@@ -87,7 +86,7 @@ case class TransactionsApiRoute(
                   Json.obj("status" -> "confirmed", "height" -> height, "confirmations" -> (blockchain.height - height).max(0))
 
                 case None =>
-                  utx.transactionById(id) match {
+                  commonApi.unconfirmedTransactionById(id) match {
                     case Some(_) => Json.obj("status" -> "unconfirmed")
                     case None    => Json.obj("status" -> "not_found")
                   }
@@ -103,28 +102,24 @@ case class TransactionsApiRoute(
 
   def unconfirmed: Route = (pathPrefix("unconfirmed") & get) {
     pathEndOrSingleSlash {
-      complete(JsArray(commonApi.unconfirmedTransactions().map(txToExtendedJson)))
+      complete(JsArray(commonApi.unconfirmedTransactions.map(txToExtendedJson)))
     } ~ utxSize ~ utxTransactionInfo
   }
 
   def utxSize: Route = (pathPrefix("size") & get) {
-    complete(Json.obj("size" -> JsNumber(utx.size)))
+    complete(Json.obj("size" -> JsNumber(utxPoolSize())))
   }
 
   def utxTransactionInfo: Route = (pathPrefix("info") & get) {
     pathEndOrSingleSlash {
       complete(InvalidSignature)
     } ~
-      path(Segment) { encoded =>
-        ByteStr.decodeBase58(encoded) match {
-          case Success(id) =>
-            commonApi.unconfirmedTransactionById(id) match {
-              case Some(tx) =>
-                complete(txToExtendedJson(tx))
-              case None =>
-                complete(ApiError.TransactionDoesNotExist)
-            }
-          case _ => complete(InvalidSignature)
+      path(TransactionId) { id =>
+        commonApi.unconfirmedTransactionById(id) match {
+          case Some(tx) =>
+            complete(txToExtendedJson(tx))
+          case None =>
+            complete(ApiError.TransactionDoesNotExist)
         }
       }
   }
@@ -151,30 +146,28 @@ case class TransactionsApiRoute(
     }) ~ signWithSigner
   }
 
-  def signWithSigner: Route = pathPrefix(Segment) { signerAddress =>
-    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, signerAddress, time, _))
+  def signWithSigner: Route = path(AddrSegment) { address =>
+    jsonPost[JsObject](TransactionFactory.parseRequestAndSign(wallet, address.stringRepr, time, _))
   }
 
   def signedBroadcast: Route = path("broadcast")(broadcast[JsValue](TransactionFactory.fromSignedRequest))
 
-  def merkleProof: Route = path("merkleProof")(merkleProofGet ~ merkleProofPost)
-
-  def merkleProofGet: Route = (get & parameters('id.*))(ids => complete(merkleProof(ids.toList)))
-
-  def merkleProofPost: Route =
-    jsonPost[JsObject](
-      jsv =>
-        (jsv \ "ids").validate[List[String]] match {
-          case JsSuccess(ids, _) => merkleProof(ids)
-          case JsError(err)      => WrongJson(errors = err)
-        }
-    )
+  def merkleProof: Route = path("merkleProof") {
+    (get & parameters('id.*))(ids => complete(merkleProof(ids.toList.reverse))) ~
+      jsonPost[JsObject](
+        jsv =>
+          (jsv \ "ids").validate[List[String]] match {
+            case JsSuccess(ids, _) => merkleProof(ids)
+            case JsError(err)      => WrongJson(errors = err)
+          }
+      )
+  }
 
   private def merkleProof(encodedIds: List[String]): ToResponseMarshallable =
     encodedIds.traverse(ByteStr.decodeBase58) match {
       case Success(txIds) =>
         commonApi.transactionProofs(txIds) match {
-          case Nil    => CustomValidationError(s"transactions do not exists or block version < ${Block.ProtoBlockVersion}")
+          case Nil    => CustomValidationError(s"transactions do not exist or block version < ${Block.ProtoBlockVersion}")
           case proofs => proofs
         }
       case _ => InvalidSignature
@@ -194,47 +187,31 @@ case class TransactionsApiRoute(
     }
   }
 
-  def transactionsByAddress(addressParam: String, limitParam: Int, maybeAfterParam: Option[String])(
-      implicit sc: Scheduler
-  ): Either[ApiError, Future[JsArray]] = {
-    def createTransactionsJsonArray(address: Address, limit: Int, fromId: Option[ByteStr]): Future[JsArray] = {
-      lazy val addressesCached = concurrent.blocking(blockchain.aliasesOfAddress(address).toVector :+ address).toSet
+  def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
+      Observable
+        .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
+        .flatMap { aliases =>
+          val addressesCached = (aliases :+ address).toSet
 
-      /**
-        * Produces compact representation for large transactions by stripping unnecessary data.
-        * Currently implemented for MassTransfer transaction only.
-        */
-      def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-        import com.wavesplatform.transaction.transfer._
-        tx match {
-          case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
-          case _                                                               => txToExtendedJson(tx)
+          /**
+            * Produces compact representation for large transactions by stripping unnecessary data.
+            * Currently implemented for MassTransfer transaction only.
+            */
+          def txToCompactJson(address: Address, tx: Transaction): JsObject = {
+            import com.wavesplatform.transaction.transfer._
+            tx match {
+              case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
+              case _                                                               => txToExtendedJson(tx)
+            }
+          }
+
+          commonApi
+            .transactionsByAddress(address, None, Set.empty, maybeAfter)
+            .take(limitParam)
+            .map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }
         }
-      }
-
-      commonApi
-        .transactionsByAddress(address, fromId)
-        .take(limit)
-        .toListL
-        .map(txs => Json.arr(JsArray(txs.map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) })))
-        .runToFuture
-    }
-
-    for {
-      address <- Address.fromString(addressParam).left.map(ApiError.fromValidationError)
-      limit   <- Either.cond(limitParam <= settings.transactionsByAddressLimit, limitParam, TooBigArrayAllocation)
-      maybeAfter <- maybeAfterParam match {
-        case Some(v) =>
-          ByteStr
-            .decodeBase58(v)
-            .fold(
-              _ => Left(CustomValidationError(s"Unable to decode transaction id $v")),
-              id => Right(Some(id))
-            )
-        case None => Right(None)
-      }
-    } yield createTransactionsJsonArray(address, limit, maybeAfter)
-  }
+    .toListL
+    .runToFuture
 }
 
 object TransactionsApiRoute {

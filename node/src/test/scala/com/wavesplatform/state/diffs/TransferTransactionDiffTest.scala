@@ -3,10 +3,10 @@ package com.wavesplatform.state.diffs
 import cats.implicits._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.{LeaseBalance, Portfolio}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
@@ -14,10 +14,10 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, GenesisTransaction, TxValidationError}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransferTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val preconditionsAndTransfer: Gen[(GenesisTransaction, IssueTransaction, IssueTransaction, TransferTransaction)] = for {
     master    <- accountGen
@@ -42,11 +42,13 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
             assertBalanceInvariant(totalDiff)
 
             val recipient: Address = transfer.recipient.asInstanceOf[Address]
-            val recipientPortfolio = newState.portfolio(recipient)
             if (transfer.sender.toAddress != recipient) {
               transfer.assetId match {
-                case aid @ IssuedAsset(_) => recipientPortfolio shouldBe Portfolio(0, LeaseBalance.empty, Map(aid -> transfer.amount))
-                case Waves                => recipientPortfolio shouldBe Portfolio(transfer.amount, LeaseBalance.empty, Map.empty)
+                case aid @ IssuedAsset(_) =>
+                  newState.balance(recipient) shouldBe 0
+                  newState.balance(recipient, aid) shouldBe transfer.amount
+                case Waves =>
+                  newState.balance(recipient) shouldBe transfer.amount
               }
             }
         }
@@ -74,8 +76,10 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
       ts        <- positiveIntGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       issue: IssueTransaction <- issueReissueBurnGeneratorP(Long.MaxValue, master).map(_._1)
-      asset    = IssuedAsset(issue.id())
-      transfer = TransferTransaction.selfSigned(1.toByte, master, recepient, asset, Long.MaxValue, Waves, 100000, None, ts).explicitGet()
+      asset = IssuedAsset(issue.id())
+      transfer = TransferTransaction
+        .selfSigned(1.toByte, master, recepient, asset, Long.MaxValue, Waves, 100000, None, ts)
+        .explicitGet()
     } yield (genesis, issue, transfer)
 
     val rdEnabled = TestFunctionalitySettings.Stub
@@ -85,7 +89,8 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         BlockchainFeatures.SmartAccounts.id -> 0,
         BlockchainFeatures.SmartAssets.id   -> 0,
         BlockchainFeatures.FairPoS.id       -> 0
-      ))
+      )
+    )
 
     forAll(precs) {
       case (genesis, issue, transfer) =>

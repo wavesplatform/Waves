@@ -125,7 +125,7 @@ object Importer extends ScorexLogging {
       utxPool: UtxPool,
       blockchainUpdatedObservable: Observable[BlockchainUpdated]
   ): Seq[Extension] = {
-    val extensionContext = {
+    val extensionContext: Context = {
       val t = time
       new Context {
         override def settings: WavesSettings = wavesSettings
@@ -140,6 +140,11 @@ object Importer extends ScorexLogging {
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
+
+        override def transactionsApi = ???
+        override def blocksApi       = ???
+        override def accountsApi     = ???
+        override def assetsApi       = ???
       }
     }
 
@@ -173,8 +178,7 @@ object Importer extends ScorexLogging {
     log.info(s"Skipping $blocksToSkip block(s)")
 
     sys.addShutdownHook {
-      import scala.concurrent.duration._
-      val millis = (System.nanoTime() - start).nanos.toMillis
+      val millis = System.currentTimeMillis() - start
       log.info(s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}")
     }
 

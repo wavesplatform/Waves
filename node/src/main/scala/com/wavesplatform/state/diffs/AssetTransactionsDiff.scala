@@ -1,6 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
+import cats.syntax.semigroup._
+import cats.syntax.ior._
+import cats.instances.either._
+import cats.syntax.flatMap._
 import com.google.common.base.Utf8
 import com.google.protobuf.ByteString
 import com.wavesplatform.features.BlockchainFeatures
@@ -12,8 +15,9 @@ import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets._
+import com.wavesplatform.utils.ScorexLogging
 
-object AssetTransactionsDiff {
+object AssetTransactionsDiff extends ScorexLogging {
   def issue(blockchain: Blockchain)(tx: IssueTransaction): Either[ValidationError, Diff] = {
     def requireValidUtf(): Boolean = {
       def isValid(str: ByteString): Boolean = {
@@ -41,7 +45,7 @@ object AssetTransactionsDiff {
               tx = tx,
               portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map(asset -> tx.quantity))),
               issuedAssets = Map(asset             -> ((staticInfo, info, volumeInfo))),
-              assetScripts = Map(asset             -> script.map(script => (tx.sender, script._1, script._2))),
+              assetScripts = Map(asset             -> script),
               scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
             )
         )
@@ -53,21 +57,20 @@ object AssetTransactionsDiff {
       if (blockchain.hasAssetScript(tx.asset)) {
         DiffsCommon
           .countVerifierComplexity(tx.script, blockchain)
-          .map(
-            script =>
-              Diff(
-                tx = tx,
-                portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
-                assetScripts = Map(tx.asset          -> script.map(script => (tx.sender, script._1, script._2))),
-                scriptsRun =
-                  // Asset script doesn't count before Ride4DApps activation
-                  if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
-                    DiffsCommon.countScriptRuns(blockchain, tx)
-                  } else {
-                    Some(tx.sender.toAddress).count(blockchain.hasScript)
-                  }
-              )
-          )
+          .map { script =>
+            Diff(
+              tx = tx,
+              portfolios = Map(tx.sender.toAddress -> Portfolio(balance = -tx.fee, lease = LeaseBalance.empty, assets = Map.empty)),
+              assetScripts = Map(tx.asset -> script),
+              scriptsRun =
+                // Asset script doesn't count before Ride4DApps activation
+                if (blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps, blockchain.height)) {
+                  DiffsCommon.countScriptRuns(blockchain, tx)
+                } else {
+                  Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
+                }
+            )
+          }
       } else {
         Left(GenericError("Cannot set script on an asset issued without a script"))
       }

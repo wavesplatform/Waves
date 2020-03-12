@@ -4,9 +4,10 @@ import cats._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
@@ -56,7 +57,7 @@ class AssetTransactionsDiffTest
             totalPortfolioDiff.assets shouldBe Map(reissue.asset -> (reissue.quantity - burn.quantity))
 
             val totalAssetVolume = issue.quantity + reissue.quantity - burn.quantity
-            newState.portfolio(issue.sender).assets shouldBe Map(reissue.asset -> totalAssetVolume)
+            newState.balance(issue.sender, reissue.asset) shouldEqual totalAssetVolume
         }
     }
   }
@@ -128,7 +129,7 @@ class AssetTransactionsDiffTest
       case (genesis, issue, assetTransfer, wavesTransfer, burn) =>
         assertDiffAndState(Seq(TestBlock.create(Seq(genesis, issue, assetTransfer, wavesTransfer))), TestBlock.create(Seq(burn)), fs) {
           case (_, newState) =>
-            newState.portfolio(burn.sender).assets shouldBe Map(burn.asset -> 0)
+            newState.balance(burn.sender, burn.asset) shouldEqual 0
         }
     }
   }
@@ -287,7 +288,7 @@ class AssetTransactionsDiffTest
                 issue.reissuable,
                 BigInt(issue.quantity),
                 Height @@ 2,
-                issue.script,
+                issue.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator).explicitGet()),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )

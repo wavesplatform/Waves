@@ -8,14 +8,15 @@ import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server._
 import com.wavesplatform.account.{Address, PublicKey}
-import com.wavesplatform.api.http.ApiError.WrongJson
+import com.wavesplatform.api.http.ApiError.{InvalidAssetId, InvalidBlockId, InvalidPublicKey, InvalidSignature, InvalidTransactionId, WrongJson}
 import com.wavesplatform.api.http.requests.DataRequest._
 import com.wavesplatform.api.http.requests.SponsorFeeRequest._
 import com.wavesplatform.api.http.requests._
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.crypto
 import com.wavesplatform.http.{ApiMarshallers, PlayJsonException}
 import com.wavesplatform.lang.contract.meta.RecKeyValueFolder
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -30,7 +31,7 @@ import play.api.libs.json._
 
 import scala.concurrent.Future
 import scala.util.control.NonFatal
-import scala.util.{Success, Try}
+import scala.util.{Failure, Success, Try}
 
 package object http extends ApiMarshallers with ScorexLogging {
   val versionReads: Reads[Byte] = {
@@ -93,10 +94,38 @@ package object http extends ApiMarshallers with ScorexLogging {
     }
   }
 
-  val B58Segment: PathMatcher1[ByteStr] = PathMatcher("[123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz]+".r)
-    .flatMap(str => Base58.tryDecodeWithLimit(str).toOption.map(ByteStr(_)))
+  private def base58Segment(requiredLength: Option[Int], error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
+    ByteStr.decodeBase58(str) match {
+      case Success(value) if requiredLength.forall(_ == value.length) => value
+      case _                                                          => throw ApiException(error(str))
+    }
+  }
 
-  val AddrSegment: PathMatcher1[Address] = B58Segment.flatMap(Address.fromBytes(_).toOption)
+  private def idOrHash(error: String => ApiError): PathMatcher1[ByteStr] = Segment.map { str =>
+    ByteStr.decodeBase58(str) match {
+      case Success(value) =>
+        if (value.arr.length == crypto.DigestLength || value.arr.length == crypto.SignatureLength) value
+        else throw ApiException(error(s"$str has invalid length ${value.length}. Length can either be ${crypto.DigestLength} or ${crypto.SignatureLength}"))
+      case Failure(exception) =>
+        throw ApiException(error(exception.getMessage))
+    }
+  }
+
+  val TransactionId: PathMatcher1[ByteStr] = idOrHash(InvalidTransactionId)
+  val BlockId: PathMatcher1[ByteStr] = idOrHash(InvalidBlockId)
+
+  val AssetId: PathMatcher1[IssuedAsset] = base58Segment(Some(crypto.DigestLength), _ => InvalidAssetId).map(IssuedAsset)
+
+  val Signature: PathMatcher1[ByteStr] = base58Segment(Some(crypto.SignatureLength), _ => InvalidSignature)
+
+  val AddrSegment: PathMatcher1[Address] = Segment.map { str =>
+    (for {
+      bytes <- ByteStr.decodeBase58(str).toEither.left.map(t => GenericError(t))
+      addr  <- Address.fromBytes(bytes)
+    } yield addr).fold(ae => throw ApiException(ApiError.fromValidationError(ae)), identity)
+  }
+
+  val PublicKeySegment: PathMatcher1[PublicKey] = base58Segment(Some(crypto.KeyLength), _ => InvalidPublicKey).map(s => PublicKey(s))
 
   private val jsonRejectionHandler = RejectionHandler
     .newBuilder()
@@ -130,7 +159,8 @@ package object http extends ApiMarshallers with ScorexLogging {
 
   def extractScheduler: Directive1[Scheduler] = extractExecutionContext.map(ec => Scheduler(ec))
 
-  private val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
+  val uncaughtExceptionHandler: ExceptionHandler = ExceptionHandler {
+    case ApiException(error)   => complete(error)
     case e: StackOverflowError => log.error("Stack overflow error", e); complete(ApiError.Unknown)
     case NonFatal(e)           => log.error("Uncaught error", e); complete(ApiError.Unknown)
   }

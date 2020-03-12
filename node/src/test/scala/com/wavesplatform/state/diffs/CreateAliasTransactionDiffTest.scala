@@ -3,19 +3,21 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.utils.addressTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{Asset, CreateAliasTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val fs =
     TestFunctionalitySettings.Enabled.copy(
@@ -49,7 +51,12 @@ class CreateAliasTransactionDiffTest extends PropSpec with PropertyChecks with M
             val senderAcc = anotherAliasTx.sender.toAddress
             blockDiff.aliases shouldBe Map(anotherAliasTx.alias -> senderAcc)
 
-            newState.aliasesOfAddress(senderAcc).toSet shouldBe Set(anotherAliasTx.alias, aliasTx.alias)
+            addressTransactions(db, Some(Height(newState.height + 1) -> blockDiff), senderAcc, Set(CreateAliasTransaction.typeId), None).collect {
+              case (_, cat: CreateAliasTransaction) => cat.alias
+            }.toSet shouldBe Set(
+              anotherAliasTx.alias,
+              aliasTx.alias
+            )
             newState.resolveAlias(aliasTx.alias) shouldBe Right(senderAcc)
             newState.resolveAlias(anotherAliasTx.alias) shouldBe Right(senderAcc)
         }

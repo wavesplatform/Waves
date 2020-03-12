@@ -9,7 +9,6 @@ import com.wavesplatform.block
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.transaction.{DiscardedMicroBlocks, Transaction}
 
 import scala.collection.mutable.{ListBuffer => MList, Map => MMap}
@@ -120,7 +119,7 @@ class NgState(
       .map(_.totalBlockId)
       .getOrElse(base.id())
 
-    BlockMinerInfo(NxtLikeConsensusBlockData(base.header.baseTarget, base.header.generationSignature), base.header.timestamp, blockId)
+    BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)
   }
 
   def append(microBlock: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): BlockId = {

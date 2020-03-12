@@ -95,7 +95,7 @@ object CommonValidation {
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
-              case Some(ContractScriptImpl(version, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
+              case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                          => false
             }
             check <- foldPayments(citx.payments)

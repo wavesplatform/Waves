@@ -5,7 +5,6 @@ import cats.implicits._
 import com.google.common.base.Throwables
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.TermPrinter
 import com.wavesplatform.lang.v1.compiler.Terms.{EVALUATED, FALSE, TRUE}
@@ -38,7 +37,7 @@ object Verifier extends ScorexLogging {
     val validatedTx: TracedResult[ValidationError, Transaction] = tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
-        (pt, blockchain.accountScript(pt.sender)) match {
+        (pt, blockchain.accountScript(pt.sender).map(_.script)) match {
           case (stx: SignedTransaction, None) =>
             stats.signatureVerification
               .measureForType(stx.typeId)(stx.signaturesValid())
@@ -62,12 +61,12 @@ object Verifier extends ScorexLogging {
           case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
           case _                  => None
         }
-        .foldRight(TracedResult(tx.asRight[ValidationError])) { (assetInfo, txr) =>
-          txr.flatMap(
-            tx =>
+        .foldRight(TracedResult(tx.asRight[ValidationError])) {
+          case (((script, _), id), txr) =>
+            txr.flatMap { tx =>
               stats.assetScriptExecution
-                .measureForType(tx.typeId)(verifyTx(blockchain, assetInfo._1, tx, Some(assetInfo._2.id)))
-          )
+                .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(id.id)))
+            }
         }
     }
   }
@@ -170,9 +169,9 @@ object Verifier extends ScorexLogging {
     def orderVerification(order: Order): TracedResult[ValidationError, Order] = {
       val verificationResult = blockchain
         .accountScript(order.sender.toAddress)
-        .map { script =>
+        .map { asi =>
           if (order.version != 1) {
-            stats.orderValidation.measure(verifyOrder(blockchain, script, order))
+            stats.orderValidation.measure(verifyOrder(blockchain, asi.script, order))
           } else {
             Left(GenericError("Can't process order with signature from scripted account"))
           }
@@ -186,7 +185,7 @@ object Verifier extends ScorexLogging {
       case Waves => Right(et)
       case asset: IssuedAsset =>
         blockchain.assetScript(asset).fold[TracedResult[ValidationError, Transaction]](Right(et)) { script =>
-          verifyTx(blockchain, script, et, assetId.compatId) leftMap {
+          verifyTx(blockchain, script._1, et, assetId.compatId) leftMap {
             case x: HasScriptType => x
             case GenericError(x)  => ScriptExecutionError(x, List.empty, isAssetScript = true)
             case x                => ScriptExecutionError(x.toString, List.empty, isAssetScript = true)

@@ -35,7 +35,7 @@ class BlockV5TestSuite
       val currentHeight = nodes.head.height
 
       val lastBlockAfterActivationHeight = nodes.head.lastBlock()
-      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeaders()
+      val lastBlockHeadersAfterActivationHeight = nodes.head.lastBlockHeader()
       val blockAtActivationHeight = nodes.head.blockAt(currentHeight)
       val blockHeadersAfterActivationHeight = nodes.head.blockHeadersAt(currentHeight)
       val blockBySignatureAfterActivation = nodes.head.blockBySignature(blockAtActivationHeight.id)

@@ -6,9 +6,9 @@ import java.util.concurrent.TimeoutException
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
+import com.wavesplatform.api.http.ApiError
 import com.wavesplatform.api.http.RewardApiRoute.RewardStatus
 import com.wavesplatform.api.http.requests.IssueRequest
-import com.wavesplatform.api.http.{AddressApiRoute, ApiError}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.api.{ActivationStatus, FeatureActivationStatus}
@@ -181,9 +181,9 @@ object SyncHttpApi extends Assertions {
 
     def blockBySignature(signature: String, amountsAsStrings: Boolean = false): Block = sync(async(n).blockBySignature(signature, amountsAsStrings))
 
-    def lastBlockHeaders(amountsAsStrings: Boolean = false): BlockHeaders = sync(async(n).lastBlockHeaders(amountsAsStrings))
+    def lastBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).lastBlockHeader(amountsAsStrings))
 
-    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): BlockHeaders = sync(async(n).blockHeadersAt(height, amountsAsStrings))
+    def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeadersAt(height, amountsAsStrings))
 
     def postForm(path: String, params: (String, String)*): Response =
       sync(async(n).postForm(path, params: _*))
@@ -227,14 +227,14 @@ object SyncHttpApi extends Assertions {
     def assetsDetails(assetId: String, fullInfo: Boolean = false, amountsAsStrings: Boolean = false): AssetInfo =
       sync(async(n).assetsDetails(assetId, fullInfo, amountsAsStrings))
 
-    def addressScriptInfo(address: String): AddressApiRoute.AddressScriptInfo =
+    def addressScriptInfo(address: String): AddressScriptInfo =
       sync(async(n).scriptInfo(address))
 
     def assetsBalance(address: String, amountsAsStrings: Boolean = false): FullAssetsInfo =
       sync(async(n).assetsBalance(address, amountsAsStrings))
 
-    def nftAssetsBalance(address: String, limit: Int, maybeAfter: Option[String] = None, amountsAsStrings: Boolean = false): Seq[NFTAssetInfo] =
-      sync(async(n).nftAssetsBalance(address, limit, maybeAfter, amountsAsStrings))
+    def nftList(address: String, limit: Int, maybeAfter: Option[String] = None, amountsAsStrings: Boolean = false): Seq[NFTAssetInfo] =
+      sync(async(n).nftList(address, limit, maybeAfter, amountsAsStrings))
 
     def assetDistributionAtHeight(asset: String, height: Int, limit: Int, maybeAfter: Option[String] = None, amountsAsStrings: Boolean = false): AssetDistributionPage =
       sync(async(n).assetDistributionAtHeight(asset, height, limit, maybeAfter, amountsAsStrings))
@@ -581,7 +581,7 @@ object SyncHttpApi extends Assertions {
 
     def blockSeqByAddress(address: String, from: Int, to: Int, amountsAsStrings: Boolean = false): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to, amountsAsStrings))
 
-    def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeaders] = sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
+    def blockHeadersSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[BlockHeader] = sync(async(n).blockHeadersSeq(fromHeight, toHeight, amountsAsStrings))
 
     def blockGenerationSignature(signature: String): GenerationSignatureResponse = sync(async(n).blockGenerationSignature(signature))
 

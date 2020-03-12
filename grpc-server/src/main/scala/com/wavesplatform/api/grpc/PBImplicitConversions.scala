@@ -1,6 +1,7 @@
 package com.wavesplatform.api.grpc
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.block.BlockHeader
 import com.wavesplatform.common.state.ByteStr
@@ -49,7 +50,9 @@ trait PBImplicitConversions {
       header.featureVotes.map(shortToInt),
       header.timestamp,
       header.version,
-      ByteString.copyFrom(header.generator)
+      ByteString.copyFrom(header.generator),
+      header.rewardVote,
+      ByteString.copyFrom(header.transactionsRoot.arr)
     )
   }
 

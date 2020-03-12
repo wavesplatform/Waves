@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, MultiPaymentInvokeScript}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
@@ -13,7 +14,6 @@ import com.wavesplatform.lang.directives.{DirectiveDictionary, DirectiveSet}
 import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
-import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.{ExpressionCompiler, Terms}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -24,7 +24,7 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
 import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
@@ -34,11 +34,11 @@ import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVer
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import shapeless.Coproduct
 
-class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
     for {
@@ -49,7 +49,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       tx   <- dataTransactionGenP(sender, List(long, bool, bin, str))
     } yield tx
 
-  val preconditionsAndPayments = for {
+  private val preconditionsAndPayments = for {
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
@@ -424,8 +424,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       withVrf <- Gen.oneOf(false, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
-        val generatorSignature =
-          if (withVrf) ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)) else ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
+        val generationSignature =
+          if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
         val fs =
           if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
@@ -462,7 +462,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | let block = extract(blockInfoByHeight(3))
                  | let checkHeight = block.height == 3
                  | let checkBaseTarget = block.baseTarget == 2
-                 | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
+                 | let checkGenSignature = block.generationSignature == base58'$generationSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  | $v4DeclOpt

@@ -5,7 +5,7 @@ import java.util.Arrays
 object StdBase58 extends BaseXXEncDec {
   import java.nio.charset.StandardCharsets.US_ASCII
 
-  private val Alphabet: Array[Byte] = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz".getBytes(US_ASCII)
+  private val Alphabet: Array[Byte] = Base58Alphabet.getBytes(US_ASCII)
 
   private val DecodeTable: Array[Byte] = Array(
     -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1, -1,

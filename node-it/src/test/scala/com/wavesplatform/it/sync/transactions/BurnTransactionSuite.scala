@@ -2,11 +2,10 @@ package com.wavesplatform.it.sync.transactions
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.it.api.BurnTransactionInfo
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{BurnTransactionInfo, TransactionInfo}
-import com.wavesplatform.it.sync.{issueAmount, issueFee}
+import com.wavesplatform.it.sync.{issueAmount, issueFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.sync._
 
 class BurnTransactionSuite extends BaseTransactionSuite {
 

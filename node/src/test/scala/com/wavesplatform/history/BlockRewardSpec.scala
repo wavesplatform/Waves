@@ -6,6 +6,7 @@ import com.wavesplatform.api.http.RewardApiRoute
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.database.Keys
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
@@ -13,7 +14,7 @@ import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, RewardsSettings}
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, Height}
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
@@ -240,19 +241,19 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
           d.levelDBWriter.height shouldBe BlockRewardActivationHeight - 1
           d.levelDBWriter.balance(miner1.toAddress) shouldBe InitialMinerBalance + OneFee
-          d.levelDBWriter.totalFee(BlockRewardActivationHeight - 1) shouldBe OneTotalFee.some
+          d.db.get(Keys.blockMetaAt(Height(BlockRewardActivationHeight - 1))).map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.levelDBWriter.carryFee shouldBe OneCarryFee
 
           d.blockchainUpdater.processBlock(b3).explicitGet()
           d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneCarryFee
-          d.blockchainUpdater.totalFee(BlockRewardActivationHeight) shouldBe 0L.some
+          d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
           d.blockchainUpdater.carryFee shouldBe 0L
 
           m3s.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
 
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.balance(miner2.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + OneCarryFee
-          d.blockchainUpdater.totalFee(BlockRewardActivationHeight) shouldBe OneTotalFee.some
+          d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.blockchainUpdater.carryFee shouldBe OneCarryFee
         }
     }
@@ -281,14 +282,14 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
-          d.blockchainUpdater.totalFee(BlockRewardActivationHeight) shouldBe OneTotalFee.some
+          d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.blockchainUpdater.carryFee shouldBe OneCarryFee
 
           d.blockchainUpdater.processBlock(b2a).explicitGet()
           d.blockchainUpdater.processBlock(b2b).explicitGet()
 
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneCarryFee
-          d.blockchainUpdater.totalFee(BlockRewardActivationHeight + 1) shouldBe 0L.some
+          d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe 0L.some
           d.blockchainUpdater.carryFee shouldBe 0L
         }
     }
@@ -317,14 +318,14 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
 
           d.blockchainUpdater.height shouldBe BlockRewardActivationHeight
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee
-          d.blockchainUpdater.totalFee(BlockRewardActivationHeight) shouldBe OneTotalFee.some
+          d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.blockchainUpdater.carryFee shouldBe OneCarryFee
 
           d.blockchainUpdater.processBlock(b2a).explicitGet()
           d.blockchainUpdater.processBlock(b2b).explicitGet()
 
           d.blockchainUpdater.balance(miner.toAddress) shouldBe InitialMinerBalance + InitialReward + OneFee + InitialReward + OneFee + OneCarryFee
-          d.blockchainUpdater.totalFee(BlockRewardActivationHeight + 1) shouldBe OneTotalFee.some
+          d.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) shouldBe OneTotalFee.some
           d.blockchainUpdater.carryFee shouldBe OneCarryFee
         }
     }

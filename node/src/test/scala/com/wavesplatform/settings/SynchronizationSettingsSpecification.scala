@@ -47,7 +47,6 @@ class SynchronizationSettingsSpecification extends FlatSpec with Matchers {
 
     val settings = config.as[SynchronizationSettings]("waves.synchronization")
     settings.maxRollback should be(100)
-    settings.maxChainLength should be(101)
     settings.synchronizationTimeout should be(30.seconds)
     settings.scoreTTL should be(90.seconds)
     settings.invalidBlocksStorage shouldBe InvalidBlockStorageSettings(

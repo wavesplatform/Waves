@@ -1,17 +1,31 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.common.AddressTransactions
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.database.{DBResource, LevelDBWriter}
 import com.wavesplatform.settings.{BlockchainSettings, DBSettings, FunctionalitySettings, GenesisSettings, RewardsSettings}
-import com.wavesplatform.transaction.TransactionParsers.all
-import com.wavesplatform.transaction.{Asset, Transaction, TransactionParser}
+import com.wavesplatform.transaction.assets.IssueTransaction
+import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.reactive.Observer
 import org.iq80.leveldb.DB
 
-import scala.concurrent.duration.Duration
-
 package object utils {
+
+  def addressTransactions(
+      db: DB,
+      diff: => Option[(Height, Diff)],
+      address: Address,
+      types: Set[Transaction.Type],
+      fromId: Option[ByteStr]
+  ): Seq[(Height, Transaction)] = {
+    val resource = DBResource(db)
+    try AddressTransactions.allAddressTransactions(resource, diff, address, None, types, fromId).toSeq
+    finally resource.close()
+  }
+
+  def nftList(address: Address): Seq[IssueTransaction] = ???
+
   object TestLevelDB {
     def withFunctionalitySettings(
         writableDB: DB,
@@ -28,28 +42,5 @@ package object utils {
 
     def createTestBlockchainSettings(fs: FunctionalitySettings): BlockchainSettings =
       BlockchainSettings('T', fs, GenesisSettings.TESTNET, RewardsSettings.TESTNET)
-  }
-
-  private def forTypeSet(types: Set[Byte]): Set[TransactionParser] =
-    all.values.filter(tp => types.contains(tp.typeId)).toSet
-
-  implicit class BlockchainAddressTransactionsList(b: Blockchain) {
-    def addressTransactions(address: Address,
-                            types: Set[Transaction.Type],
-                            count: Int,
-                            fromId: Option[ByteStr]): Either[String, Seq[(Height, Transaction)]] = {
-      import monix.execution.Scheduler.Implicits.global
-
-      def createTransactionsList(): Seq[(Height, Transaction)] =
-        b.addressTransactionsObservable(address, forTypeSet(types), fromId)
-          .take(count)
-          .toListL
-          .runSyncUnsafe(Duration.Inf)
-
-      fromId match {
-        case Some(id) => b.transactionInfo(id).toRight(s"Transaction $id does not exist").map(_ => createTransactionsList())
-        case None     => Right(createTransactionsList())
-      }
-    }
   }
 }
