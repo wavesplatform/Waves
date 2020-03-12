@@ -347,23 +347,6 @@ object Bindings {
       )
     )
 
-  def blockHeaderObject(header: BlockHeader): CaseObj =
-    CaseObj(
-      blockHeader,
-      Map[String, EVALUATED](
-        "timestamp"           -> header.timestamp,
-        "version"             -> header.version,
-        "reference"           -> header.reference,
-        "generator"           -> header.generator,
-        "generatorPublicKey"  -> header.generatorPublicKey,
-        "signature"           -> header.signature,
-        "baseTarget"          -> header.baseTarget,
-        "generationSignature" -> header.generationSignature,
-        "transactionCount"    -> header.transactionCount,
-        "featureVotes"        -> header.featureVotes.map(CONST_LONG)
-      )
-    )
-
   def transferTransactionObject(tx: Tx.Transfer, proofsEnabled: Boolean, version: StdLibVersion): CaseObj =
     CaseObj(
       buildTransferTransactionType(proofsEnabled, version),
@@ -402,7 +385,7 @@ object Bindings {
     )
   }
 
-  def buildLastBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
     val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
@@ -414,7 +397,7 @@ object Bindings {
       )
 
     val vrfFieldOpt: Map[String, EVALUATED] =
-      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf, "transactionsRoot" -> blockInf.transactionsRoot)
       else Map()
 
     CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)

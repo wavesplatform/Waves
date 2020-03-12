@@ -36,7 +36,7 @@ class ConsensusRouteSpec
 
     "for existing block" in routeTest { (h, route) =>
       val block = h.blockAt(3).get
-      Get(routePath(s"/generationsignature/${block.uniqueId.toString}")) ~> route ~> check {
+      Get(routePath(s"/generationsignature/${block.id().toString}")) ~> route ~> check {
         (responseAs[JsObject] \ "generationSignature").as[String] shouldEqual block.header.generationSignature.toString
       }
     }
@@ -49,7 +49,7 @@ class ConsensusRouteSpec
   routePath("/basetarget") - {
     "for existing block" in routeTest { (h, route) =>
       val block = h.blockAt(3).get
-      Get(routePath(s"/basetarget/${block.uniqueId.toString}")) ~> route ~> check {
+      Get(routePath(s"/basetarget/${block.id().toString}")) ~> route ~> check {
         (responseAs[JsObject] \ "baseTarget").as[Long] shouldEqual block.header.baseTarget
       }
     }

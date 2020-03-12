@@ -217,8 +217,10 @@ final case class CompositeBlockchain(
 
   override def accountDataKeys(acc: Address): Set[String] = {
     val fromInner = inner.accountDataKeys(acc)
-    val fromDiff  = diff.accountData.get(acc).toSeq.flatMap(_.data.keys)
-    fromInner ++ fromDiff
+    val AccountDataInfo(data) = diff.accountData.get(acc).orEmpty
+    def isRemoved(key: String) = data.get(key).exists(_.isEmpty)
+    val fromDiff  = data.keys
+    (fromInner ++ fromDiff).filterNot(isRemoved)
   }
 
   override def accountData(acc: Address): AccountDataInfo = {
@@ -238,7 +240,7 @@ final case class CompositeBlockchain(
 
   override def score: BigInt = newBlock.fold(BigInt(0))(_.blockScore()) + inner.score
 
-  private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.uniqueId == blockId)
+  private def filterById(blockId: BlockId): Option[Block] = newBlock.filter(_.id() == blockId)
   private def filterByHeight(height: Int): Option[Block]  = newBlock.filter(_ => this.height == height)
 
   private def blockInfo(block: Block): BlockInfo =
@@ -256,13 +258,13 @@ final case class CompositeBlockchain(
 
   /** Returns the most recent block IDs, starting from the most recent  one */
   override def lastBlockIds(howMany: Int): Seq[ByteStr] =
-    if (howMany <= 0) Seq.empty else newBlock.map(_.uniqueId).toSeq ++ inner.lastBlockIds(howMany - 1)
+    if (howMany <= 0) Seq.empty else newBlock.map(_.id()).toSeq ++ inner.lastBlockIds(howMany - 1)
 
   /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
   override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] =
     for {
       ids <- inner.blockIdsAfter(parentSignature, howMany)
-      newId = newBlock.filter(_.header.reference == parentSignature).map(_.uniqueId).fold(Seq.empty[ByteStr])(Seq(_))
+      newId = newBlock.filter(_.header.reference == parentSignature).map(_.id()).fold(Seq.empty[ByteStr])(Seq(_))
     } yield newId ++ ids
 
   override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = inner.parentHeader(block, back)

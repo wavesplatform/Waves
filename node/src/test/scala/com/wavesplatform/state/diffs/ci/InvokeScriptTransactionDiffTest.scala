@@ -1,10 +1,11 @@
 package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, AddressScheme, Alias, KeyPair}
+import com.wavesplatform.account._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -27,10 +28,11 @@ import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi, assertDiffEiTraced, produce}
 import com.wavesplatform.state.utils._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.TransactionNotAllowedByScript
+import com.wavesplatform.transaction.TxValidationError.{InvalidAssetId, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -45,7 +47,15 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.collection.immutable
 
-class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class InvokeScriptTransactionDiffTest
+    extends PropSpec
+    with PropertyChecks
+    with Matchers
+    with TransactionGen
+    with NoShrink
+    with Inside
+    with WithDB
+    with DBCacheSettings {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -176,7 +186,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
   def defaultPaymentContract(
       senderBinding: String,
       argName: String,
-      recipientAddress: Address,
+      recipientAddress: AddressOrAlias,
       recipientAmount: Long,
       assets: List[Asset] = List(Waves)
   ): DApp = {
@@ -186,7 +196,10 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
         FUNCTION_CALL(
           User(FieldNames.ScriptTransfer),
           List(
-            FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet())),
+            (recipientAddress match {
+              case  recipientAddress : Address => FUNCTION_CALL(User("Address"), List(CONST_BYTESTR(recipientAddress.bytes).explicitGet()))
+              case  recipientAddress : Alias => FUNCTION_CALL(User("Alias"), List(CONST_STRING(recipientAddress.name).explicitGet()))
+            }),
             CONST_LONG(recipientAmount),
             a.fold(REF("unit"): EXPR)(asset => CONST_BYTESTR(asset.id).explicitGet())
           )
@@ -306,22 +319,22 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     compileContractFromExpr(expr)
   }
 
-  def compileContractFromExpr(expr: Expressions.DAPP): DApp = {
+  def compileContractFromExpr(expr: Expressions.DAPP, stdLibVersion: StdLibVersion = V3): DApp = {
     val ctx = {
-      utils.functionCosts(V3)
+      utils.functionCosts(stdLibVersion)
       Monoid
         .combineAll(
           Seq(
-            PureContext.build(Global, V3).withEnvironment[Environment],
-            CryptoContext.build(Global, V3).withEnvironment[Environment],
+            PureContext.build(Global, stdLibVersion).withEnvironment[Environment],
+            CryptoContext.build(Global, stdLibVersion).withEnvironment[Environment],
             WavesContext.build(
-              DirectiveSet(V3, Account, DAppType).explicitGet()
+              DirectiveSet(stdLibVersion, Account, DAppType).explicitGet()
             )
           )
         )
     }
 
-    compiler.ContractCompiler(ctx.compilerContext, expr, V3).right.get
+    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
   }
 
   def simplePreconditionsAndSetContract(
@@ -384,7 +397,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       argBinding    <- validAliasStringGen
     } yield paymentContract(senderBinging, argBinding, func, address, amount, assets, version)
 
-  def defaultPaymentContractGen(address: Address, amount: Long, assets: List[Asset] = List(Waves))(someName: String): Gen[DApp] =
+  def defaultPaymentContractGen(address: AddressOrAlias, amount: Long, assets: List[Asset] = List(Waves))(someName: String): Gen[DApp] =
     for {
       senderBinging <- validAliasStringGen
       argBinding    <- validAliasStringGen
@@ -399,11 +412,12 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       sponsored: Boolean = false,
       isCIDefaultFunc: Boolean = false,
       version: StdLibVersion = V3,
-      txVersion: TxVersion = TxVersion.V1
+      txVersion: TxVersion = TxVersion.V1,
+      selfSend: Boolean = false
   ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, IssueTransaction, SponsorFeeTransaction)] =
     for {
       master  <- masterGen
-      invoker <- invokerGen
+      invoker <- if (selfSend) Gen.const(master) else invokerGen
       ts      <- timestampGen
       genesis: GenesisTransaction  = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
       genesis2: GenesisTransaction = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
@@ -413,7 +427,8 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
       contract    <- senderBindingToContract(funcBinding)
       script      = ContractScript(version, contract)
       setContract = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
-      (issueTx, sponsorTx, sponsor1Tx, cancelTx) <- sponsorFeeCancelSponsorFeeGen(master)
+      (issueTx, sponsorTx, _, _) <- sponsorFeeCancelSponsorFeeGen(master)
+      sponsoredFee = Sponsorship.fromWaves(900000L, sponsorTx.minSponsoredAssetFee.get)
       fc = if (!isCIDefaultFunc)
         Some(Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List(CONST_BYTESTR(ByteStr(arg)).explicitGet())))
       else
@@ -425,20 +440,16 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
           master,
           fc,
           payment.toSeq,
-          if (sponsored) {
-            sponsorTx.minSponsoredAssetFee.get * 5
-          } else {
+          if (sponsored) sponsoredFee else
             fee
-          },
-          if (sponsored) {
-            IssuedAsset(issueTx.id())
-          } else {
+          ,
+          if (sponsored) sponsorTx.asset else
             Waves
-          },
+          ,
           ts + 3
         )
         .explicitGet()
-    } yield (List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
+    } yield (if (selfSend) List(genesis) else List(genesis, genesis2), setContract, ci, master, issueTx, sponsorTx)
 
   def preconditionsAndSetContractWithVerifier(
       verifier: DApp,
@@ -661,6 +672,47 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     }
   }
 
+  property("invoking default func payment to alias contract results in accounts state") {
+    forAll(for {
+      ts <- timestampGen
+      fee <- ciFee(0)
+      a  <- accountGen
+      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      alias = Alias.create("alias").explicitGet()
+      aliasTx <- createAliasGen(a, alias, fee, ts)
+      am <- smallFeeGen
+      contractGen = defaultPaymentContractGen(alias, am) _
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
+      case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), features) {
+          case (blockDiff, newState) =>
+            newState.balance(acc, Waves) shouldBe amount
+        }
+    }
+  }
+
+  property("payment to alias before feature activation") {
+    forAll(for {
+      ts <- timestampGen
+      fee <- ciFee(0)
+      a  <- accountGen
+      genesis2: GenesisTransaction = GenesisTransaction.create(a, fee, ts).explicitGet()
+      alias = Alias.create("alias").explicitGet()
+      aliasTx <- createAliasGen(a, alias, fee, ts)
+      am <- smallFeeGen
+      contractGen = defaultPaymentContractGen(alias, am) _
+      r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
+    } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
+      case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
+          _ shouldBe 'Left
+        }
+    }
+  }
+
+
   property("suitable verifier error message on incorrect proofs number") {
     forAll(for {
       proofCount <- Gen.oneOf(0, 2)
@@ -729,7 +781,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (a, am, r._1, r._3, r._6, r._5)) {
       case (acc, amount, genesis, setScript, aliasTx, ciWithFakeAlias) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(aliasTx, setScript))), TestBlock.create(Seq(ciWithFakeAlias)), fs) {
-          _ should produce("AliasDoesNotExist")
+          _ should produce("does not exist")
         }
     }
   }
@@ -1384,7 +1436,7 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
     } yield (a, am, r._1, r._2, r._3)) {
       case (acc, amount, genesis, setScript, ci) =>
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci)), fs) {
-          _ should produce(s"doesn't exist in the script")
+          _ should produce("Cannot find callable function `default` complexity")
         }
     }
   }
@@ -1487,5 +1539,94 @@ class InvokeScriptTransactionDiffTest extends PropSpec with PropertyChecks with 
             newState.balance(acc, IssuedAsset(asset.id())) shouldBe amount
         }
     }
+  }
+
+  private def issueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = [Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)]
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val uniqueAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      assetTx     <- issueGen
+      fee         <- ciFee()
+      funcBinding <- funcNameGen
+      contract    = issueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (assetTx, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+  property("issuing asset with existed id should produce error") {
+    import InvokeScriptTransactionDiffTest.LevelDBWriterPredefAsset
+    forAll(uniqueAssetIdScenario) {
+      case (asset, invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          )
+          val state =
+            new LevelDBWriterPredefAsset(asset, db, ignoreSpendableBalanceChanged, TestLevelDB.createTestBlockchainSettings(features), dbSettings)
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
+            ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
+          }
+        }
+    }
+  }
+
+  property("correctly counts sponsored fee") {
+    forAll(for {
+      (genesis, setScript, invoke, _, issue, sponsorFee) <- preconditionsAndSetContract(s => writeSet(s, 1), sponsored = true, selfSend = true)
+    } yield (genesis, setScript, issue, sponsorFee, invoke)) {
+      case (genesis, setScript, issue, sponsorFee, invoke) =>
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(issue, sponsorFee, setScript))), TestBlock.create(Seq(invoke)), fs) { diff =>
+          invoke.feeAssetId shouldBe sponsorFee.asset
+          invoke.dAppAddressOrAlias shouldBe invoke.sender.toAddress
+
+          val dv           = diff.explicitGet()
+          val senderChange = dv.portfolios(invoke.sender).balanceOf(sponsorFee.asset)
+          senderChange shouldBe 0L
+        }
+    }
+  }
+}
+
+object InvokeScriptTransactionDiffTest {
+  import com.wavesplatform.database.LevelDBWriter
+  import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
+  import monix.reactive.Observer
+  import org.iq80.leveldb.DB
+
+  private class LevelDBWriterPredefAsset(
+      val asset: IssueTransaction,
+      val db: DB,
+      val spendableBalanceChanged: Observer[(Address, Asset)],
+      override val settings: BlockchainSettings,
+      override val dbSettings: DBSettings
+  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
+    import asset._
+    override def assetDescription(ia: IssuedAsset): Option[AssetDescription] =
+      Some(AssetDescription(id(), sender, name, description, decimals, reissuable, quantity, Height(2), script, 0, false))
   }
 }

@@ -13,7 +13,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class ContractParserTest extends PropSpec with PropertyChecks with Matchers with ScriptGenParser with NoShrink {
 
   private def parse(x: String): DAPP = Parser.parseContract(x) match {
-    case Success(r, _) => r
+    case Success(r, _)            => r
     case e: Failure[Char, String] => catchParseError(x, e)
   }
 
@@ -311,4 +311,20 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
         |""".stripMargin
     Parser.parseContract(code).toString.contains("Local functions should be defined before @Callable one") shouldBe true
   }
+
+  property("V4 - new result after let") {
+    val code =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(inv)
+        |func paySelf(asset: String) = {
+        |  let id = asset.someFunc()
+        |  [IntEntry("key", 1)]
+        |}
+        |""".stripMargin
+    parse(code)
+  }
+
 }

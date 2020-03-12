@@ -37,7 +37,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   private val transactionV2versions = for {
     o1ver <- 1 to 3
     o2ver <- 1 to 3
-  } yield (o1ver.toByte, o2ver.toByte, 2.toByte)
+    txVer <- 2 to 3
+  } yield (o1ver.toByte, o2ver.toByte, txVer.toByte)
 
   private val versions = transactionV1versions +: transactionV2versions
 
@@ -68,8 +69,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           .signed(
             TxVersion.V2,
             matcher = matcher,
-            buyOrder = buy,
-            sellOrder = sell,
+            order1 = buy,
+            order2 = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
@@ -89,8 +90,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           .signed(
             1.toByte,
             matcher = matcher,
-            buyOrder = buy,
-            sellOrder = sell,
+            order1 = buy,
+            order2 = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
@@ -183,8 +184,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           .signed(
             2.toByte,
             matcher = matcher,
-            buyOrder = buy,
-            sellOrder = sell,
+            order1 = buy,
+            order2 = sell,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
@@ -268,8 +269,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         .signed(
           3.toByte,
           matcher = matcher,
-          buyOrder = buyNftForWaves,
-          sellOrder = sellNftForWaves,
+          order1 = buyNftForWaves,
+          order2 = sellNftForWaves,
           amount = amount,
           price = nftWavesPrice,
           buyMatcherFee = (BigInt(matcherFee) * amount / sellNftForWaves.amount).toLong,
@@ -296,8 +297,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
         .signed(
           3.toByte,
           matcher = matcher,
-          buyOrder = buyNftForOtherAsset,
-          sellOrder = sellNftForOtherAsset,
+          order1 = buyNftForOtherAsset,
+          order2 = sellNftForOtherAsset,
           amount = amount,
           price = nftForAssetPrice,
           buyMatcherFee = (BigInt(matcherFee) * amount / buyNftForOtherAsset.amount).toLong,

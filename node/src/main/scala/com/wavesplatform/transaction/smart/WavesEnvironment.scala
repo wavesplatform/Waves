@@ -15,6 +15,8 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 import monix.eval.Coeval
 import shapeless._
@@ -121,10 +123,14 @@ class WavesEnvironment(
     blockchain.lastBlock
       .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
 
-  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
+  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] = {
+    val vrf =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockHeight))
+        blockchain.hitSourceAtHeight(blockHeight)
+      else None
     blockchain.blockInfo(blockHeight)
-      .map(blockHAndSize =>
-        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(blockHeight)))
+      .map(info => toBlockInfo(info.header, blockHeight, vrf))
+  }
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
@@ -134,7 +140,16 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
       generatorPublicKey = ByteStr(blockH.generator),
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      blockH.transactionsRoot
     )
   }
+
+  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] =
+    PBTransactionSerializer.parseBytes(b)
+      .toOption
+      .flatMap {
+        case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
+        case _                       => None
+      }
 }

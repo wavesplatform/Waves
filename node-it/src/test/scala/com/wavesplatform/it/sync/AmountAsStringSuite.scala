@@ -9,7 +9,7 @@ import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, T
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.{ParsedTransfer, Transfer}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.SponsorFeeTransaction
 import com.wavesplatform.transaction.transfer.{Attachment, MassTransferTransaction}
@@ -54,7 +54,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
   test("amount as string in exchange transaction") {
     val exchanger      = KeyPair("exchanger".getBytes)
     val transferTxId   = sender.transfer(firstAddress, exchanger.stringRepr, transferAmount, minFee, waitForTx = true).id
-    val transferTxInfo = sender.transactionInfo(transferTxId, amountsAsStrings = true)
+    val transferTxInfo = sender.transactionInfo[TransactionInfo](transferTxId, amountsAsStrings = true)
     transferTxInfo.amount shouldBe Some(transferAmount)
     transferTxInfo.fee shouldBe minFee
 
@@ -107,14 +107,14 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val exchangeTxHeight    = sender.waitForTransaction(exchangeTx.id).height
     val exchangeTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
     val exchangeTxBlockAt   = sender.blockAt(exchangeTxHeight, amountsAsStrings = true).transactions.head
-    val exchangeTxBlockBySignature   = sender.blockBySignature(sender.blockAt(exchangeTxHeight).signature, amountsAsStrings = true).transactions.head
+    val exchangeTxBlockBySignature   = sender.blockBySignature(sender.blockAt(exchangeTxHeight).id, amountsAsStrings = true).transactions.head
     val exchangeTxBlockSeq   = sender.blockSeq(exchangeTxHeight, exchangeTxHeight, amountsAsStrings = true).head.transactions.head
     checkExchangeTx(exchangeTxBlockLast)
     checkExchangeTx(exchangeTxBlockAt)
     checkExchangeTx(exchangeTxBlockBySignature)
     checkExchangeTx(exchangeTxBlockSeq)
 
-    val exchangeTxInfo = sender.transactionInfo(exchangeTx.id, amountsAsStrings = true)
+    val exchangeTxInfo = sender.transactionInfo[TransactionInfo](exchangeTx.id, amountsAsStrings = true)
     exchangeTxInfo.amount shouldBe Some(amount)
     exchangeTxInfo.price shouldBe Some(price)
     exchangeTxInfo.sellMatcherFee shouldBe Some(matcherFee)
@@ -127,7 +127,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
   test("amount as string in data transaction") {
     nodes.waitForHeightArise()
     val dataEntries         = List(IntegerDataEntry("int", 666))
-    val dataFee             = calcDataFee(dataEntries)
+    val dataFee             = calcDataFee(dataEntries, TxVersion.V1)
     val dataTx              = sender.putData(sender.address, dataEntries, dataFee, amountsAsStrings = true)
     dataTx.fee shouldBe dataFee
     dataTx.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
@@ -138,10 +138,10 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val dataTxHeight    = sender.waitForTransaction(dataTx.id).height
     sender.lastBlock(amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.blockAt(dataTxHeight, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
-    sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.blockBySignature(sender.lastBlock().id, amountsAsStrings = true).transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.blockSeq(dataTxHeight, dataTxHeight, amountsAsStrings = true).head.transactions.head.data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
 
-    sender.transactionInfo(dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
+    sender.transactionInfo[TransactionInfo](dataTx.id, amountsAsStrings = true).data.map(d => d.filter(_.key == "int").head.value) shouldBe Some(666)
     sender.getData(sender.address, amountsAsStrings = true).filter(_.key == "int").head.value shouldBe 666
   }
 
@@ -161,14 +161,14 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val sponsorshipTxHeight    = sender.waitForTransaction(sponsorshipTx.id).height
     val sponsorshipTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
     val sponsorshipTxBlockAt   = sender.blockAt(sponsorshipTxHeight, amountsAsStrings = true).transactions.head
-    val sponsorshipTxBlockBySignature   = sender.blockBySignature(sender.blockAt(sponsorshipTxHeight).signature, amountsAsStrings = true).transactions.head
+    val sponsorshipTxBlockBySignature   = sender.blockBySignature(sender.blockAt(sponsorshipTxHeight).id, amountsAsStrings = true).transactions.head
     val sponsorshipTxBlockSeq   = sender.blockSeq(sponsorshipTxHeight, sponsorshipTxHeight, amountsAsStrings = true).head.transactions.head
     checkSponsorshipTx(sponsorshipTxBlockLast)
     checkSponsorshipTx(sponsorshipTxBlockAt)
     checkSponsorshipTx(sponsorshipTxBlockBySignature)
     checkSponsorshipTx(sponsorshipTxBlockSeq)
 
-    val sponsorshipTxInfo = sender.transactionInfo(sponsorshipTx.id)
+    val sponsorshipTxInfo = sender.transactionInfo[TransactionInfo](sponsorshipTx.id)
     sponsorshipTxInfo.minSponsoredAssetFee shouldBe Some(10000)
     sponsorshipTxInfo.fee shouldBe sponsorFee
   }
@@ -188,14 +188,14 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val massTransferTxHeight    = sender.waitForTransaction(massTransferTx.id).height
     val massTransferTxBlockLast = sender.lastBlock(amountsAsStrings = true).transactions.head
     val massTransferTxBlockAt   = sender.blockAt(massTransferTxHeight, amountsAsStrings = true).transactions.head
-    val massTransferTxBlockBySignature   = sender.blockBySignature(sender.blockAt(massTransferTxHeight).signature, amountsAsStrings = true).transactions.head
+    val massTransferTxBlockBySignature   = sender.blockBySignature(sender.blockAt(massTransferTxHeight).id, amountsAsStrings = true).transactions.head
     val massTransferTxBlockSeq   = sender.blockSeq(massTransferTxHeight, massTransferTxHeight, amountsAsStrings = true).head.transactions.head
     checkMassTransferTx(massTransferTxBlockLast)
     checkMassTransferTx(massTransferTxBlockAt)
     checkMassTransferTx(massTransferTxBlockBySignature)
     checkMassTransferTx(massTransferTxBlockSeq)
 
-    val massTransferTxInfo = sender.transactionInfo(massTransferTx.id)
+    val massTransferTxInfo = sender.transactionInfo[TransactionInfo](massTransferTx.id)
     massTransferTxInfo.transfers.get.head.amount shouldBe transferAmount
     massTransferTxInfo.totalAmount shouldBe Some(transferAmount)
 
@@ -218,7 +218,7 @@ class AmountAsStringSuite extends BaseTransactionSuite {
     val reward           = sender.rewardStatus().currentReward
     val blockLast        = sender.lastBlock(amountsAsStrings = true)
     val blockAt          = sender.blockAt(currentHeight, amountsAsStrings = true)
-    val blockBySignature = sender.blockBySignature(sender.lastBlock().signature, amountsAsStrings = true)
+    val blockBySignature = sender.blockBySignature(sender.lastBlock().id, amountsAsStrings = true)
     val blockHeadersAt   = sender.blockHeadersAt(currentHeight, amountsAsStrings = true)
     val blockHeadersLast = sender.lastBlockHeaders(amountsAsStrings = true)
 

@@ -546,7 +546,7 @@ object Docker {
 
     val genesisConfig    = timestampOverrides.withFallback(configTemplate)
     val gs               = genesisConfig.as[GenesisSettings]("waves.blockchain.custom.genesis")
-    val genesisSignature = Block.genesis(gs).explicitGet().uniqueId
+    val genesisSignature = Block.genesis(gs).explicitGet().id()
 
     parseString(s"waves.blockchain.custom.genesis.signature = $genesisSignature").withFallback(timestampOverrides)
   }

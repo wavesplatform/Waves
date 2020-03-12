@@ -25,7 +25,9 @@ object BlockHeaderSerializer {
           "base-target"          -> blockHeader.baseTarget,
           "generation-signature" -> blockHeader.generationSignature.toString
         )
-      ) ++ (if (blockHeader.version >= ProtoBlockVersion) Json.obj("transactionsRoot" -> blockHeader.transactionsRoot.toString) else Json.obj())
+      ) ++ (if (blockHeader.version >= ProtoBlockVersion)
+              Json.obj("transactionsRoot" -> blockHeader.transactionsRoot.toString, "id" -> Block.protoHeaderHash(blockHeader).toString)
+            else Json.obj())
 
     val featuresJson =
       if (blockHeader.version < NgBlockVersion) JsObject.empty
@@ -46,7 +48,11 @@ object BlockHeaderSerializer {
   }
 
   def toJson(header: BlockHeader, blockSize: Int, transactionCount: Int, signature: ByteStr): JsObject =
-    toJson(header) ++ Json.obj("signature" -> signature.toString, "blocksize" -> blockSize, "transactionCount" -> transactionCount)
+    toJson(header) ++ Json.obj(
+      "signature"        -> signature.toString,
+      "blocksize"        -> blockSize,
+      "transactionCount" -> transactionCount
+    ) ++ (if (header.version < ProtoBlockVersion) Json.obj("id" -> signature.toString) else Json.obj())
 }
 
 object BlockSerializer {

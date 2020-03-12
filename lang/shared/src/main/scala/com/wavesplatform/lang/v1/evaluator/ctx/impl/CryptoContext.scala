@@ -171,7 +171,7 @@ object CryptoContext {
           else if (proof.size != 192)
             Left(s"Groth16Verify proof size should be exactly 192 bytes, but ${proof.size} found")
           else if (inputs.size > 512)
-            Left(s"Groth16Verify inputs size should not exceed 384 bytes, but ${inputs.size} found")
+            Left(s"Groth16Verify inputs size should not exceed 512 bytes, but ${inputs.size} found")
           else if (inputs.size % 32 != 0)
             Left(s"Groth16Verify inputs size should be multiple of 32, but ${inputs.size} found")
           else

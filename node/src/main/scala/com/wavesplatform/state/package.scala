@@ -3,7 +3,7 @@ package com.wavesplatform
 import cats.kernel.Monoid
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
 import com.wavesplatform.block.Block
-import com.wavesplatform.block.Block.{BlockId, BlockInfo}
+import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
 import com.wavesplatform.features.BlockchainFeatures
@@ -144,7 +144,7 @@ package object state {
   implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
     def isEmpty: Boolean = blockchain.height == 0
 
-    def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
+    def contains(block: Block): Boolean       = blockchain.contains(block.id())
     def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
 
     def blockById(blockId: ByteStr): Option[Block] = blockchain.heightOf(blockId).flatMap(blockAt)
@@ -154,7 +154,7 @@ package object state {
       else Block.parseBytes(bb).toOption
     }
 
-    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
+    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.id())
     def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.header.timestamp)
 
     def lastBlocks(howMany: Int): Seq[Block] = {
@@ -183,9 +183,9 @@ package object state {
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val BlockInfo(_, _, _, signature) =
+      val blockInfo =
         blockchain.blockInfo(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
-      val balances = blockchain.balanceSnapshots(address, bottomLimit, signature)
+      val balances = blockchain.balanceSnapshots(address, bottomLimit, blockInfo.id())
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
