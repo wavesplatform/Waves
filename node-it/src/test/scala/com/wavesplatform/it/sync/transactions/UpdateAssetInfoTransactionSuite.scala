@@ -12,6 +12,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.transaction.TxVersion
 
 import scala.concurrent.duration._
 import scala.util.Random
@@ -25,12 +26,14 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   val nonIssuer    = pkByAddress(secondAddress)
   var assetId      = ""
   var otherAssetId = ""
+  var smartAssetId = ""
   var nftId        = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
     assetId = sender.broadcastIssue(issuer, "asset", "description", someAssetAmount, decimals = 8, reissuable = true, script = None, waitForTx = true).id
     otherAssetId = sender.broadcastIssue(issuer, "otherAsset", "otherDescription", someAssetAmount, decimals = 8, reissuable = true, script = None, waitForTx = true).id
+    smartAssetId = sender.broadcastIssue(issuer, "smartAsset", "smartDescription", someAssetAmount, decimals = 8, reissuable = true, script = Some(scriptBase64), waitForTx = true).id
     nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0,reissuable =  false, script = None, waitForTx = true).id
   }
 
@@ -231,6 +234,26 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.assetsDetails(nftId).name shouldBe "updatedName"
     sender.assetsDetails(nftId).description shouldBe "updatedDescription"
+  }
+
+  test("reissue/burn/setassetscript should not affect update interval") {
+    sender.reissue(issuer.stringRepr, assetId, 100, reissuable = true, version = TxVersion.V2, waitForTx = true)
+    sender.updateAssetInfo(issuer, assetId, "afterReissue", "asset after reissue", waitForTx = true)
+    sender.assetsDetails(assetId).name shouldBe "afterReissue"
+    sender.assetsDetails(assetId).description shouldBe "asset after reissue"
+
+    sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
+    sender.burn(issuer.stringRepr, assetId, 100, version = TxVersion.V2, fee = smartMinFee, waitForTx = true)
+    sender.updateAssetInfo(issuer, assetId, "afterBurn", "asset after burn", waitForTx = true)
+    sender.assetsDetails(assetId).name shouldBe "afterBurn"
+    sender.assetsDetails(assetId).description shouldBe "asset after burn"
+
+    sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
+    sender.setAssetScript(smartAssetId, issuer.stringRepr, script = Some(scriptBase64), version = TxVersion.V2, fee = setAssetScriptFee + 2 * smartFee, waitForTx = true)
+    sender.updateAssetInfo(issuer, smartAssetId, "afterSAScript", "asset after set asset script", waitForTx = true)
+    sender.assetsDetails(smartAssetId).name shouldBe "afterSAScript"
+    sender.assetsDetails(smartAssetId).description shouldBe "asset after set asset script"
+
   }
 
   def checkUpdateAssetInfoTx(transaction: Transaction, updatedName: String, updatedDescription: String): Unit = {
