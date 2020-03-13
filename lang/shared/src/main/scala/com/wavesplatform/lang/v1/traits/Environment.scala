@@ -27,5 +27,4 @@ trait Environment[F[_]] {
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
   def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]
-  def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte]
 }

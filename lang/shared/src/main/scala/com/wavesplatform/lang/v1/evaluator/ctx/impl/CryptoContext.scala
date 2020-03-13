@@ -4,6 +4,7 @@ import cats.implicits._
 import cats.{Id, Monad}
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.merkle.Merkle.createRoot
 import com.wavesplatform.lang.directives.values.{StdLibVersion, V3, _}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -224,6 +225,24 @@ object CryptoContext {
         case xs => notImplemented[Id, EVALUATED](s"checkMerkleProof(merkleRoot: ByteVector, merkleProof: ByteVector, valueBytes: ByteVector)", xs)
       }
 
+  val createMerkleRootF: BaseFunction[NoContext] =
+    NativeFunction(
+      "createMerkleRoot",
+      30,
+      CREATE_MERKLE_PROOF,
+      BYTESTR,
+      ("merkleProof", LIST(BYTESTR)),
+      ("valueBytes", BYTESTR),
+      ("index", LONG)
+    ) {
+        case ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
+          CONST_BYTESTR(createRoot(value, Math.toIntExact(index), proof.map({
+             case CONST_BYTESTR(v) => v.arr
+             case _ => throw(new Exception("Expect ByteStr"))
+          }))) .left.map(_.toString)
+        case xs => notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
+    }
+
     def toBase16StringF: BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
       case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
@@ -340,11 +359,14 @@ object CryptoContext {
       )
 
     val v4Functions =
-      Array(bls12Groth16VerifyF) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
+      Array(
+        bls12Groth16VerifyF, createMerkleRootF,  // new in V4
+        rsaVerifyF, toBase16StringF, fromBase16StringF // from V3
+        ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
     val fromV3Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v3Functions)
-    val fromV4Ctx = fromV3Ctx |+| CTX[NoContext](Seq(), Map(), v4Functions)
+    val fromV4Ctx = fromV1Ctx |+| CTX[NoContext](v3Types, v3Vars, v4Functions)
 
     version match {
       case V1 | V2      => fromV1Ctx
