@@ -1,6 +1,6 @@
 package com.wavesplatform.lang.v1.estimator
 
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils.functionCosts
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 
@@ -112,5 +112,15 @@ class ScriptEstimatorV3Test extends ScriptEstimatorTestBase(ScriptEstimatorV3) {
   property("getter") {
     val script = "lastBlock.height"
     estimate(functionCosts(V3), compile(script)) shouldBe Right(2) /* ref eval and field access */
+  }
+
+  property("groth16Verify_1inputs") {
+    implicit val version : StdLibVersion = V4
+    estimate(functionCosts(V4), compile("groth16Verify_1inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(1903)
+  }
+
+  property("groth16Verify_15inputs") {
+    implicit val version : StdLibVersion = V4
+    estimate(functionCosts(V4), compile("groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')")) shouldBe Right(3753)
   }
 }
