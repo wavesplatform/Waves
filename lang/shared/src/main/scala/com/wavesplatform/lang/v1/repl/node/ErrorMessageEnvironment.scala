@@ -25,7 +25,6 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def multiPaymentAllowed: Boolean                                                                            = unavailable
   override def txId: ByteStr                                                                                           = unavailable
   override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                       = unavailable
-  override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte]                = unavailable
 }
 
 class BlockchainUnavailableException extends RuntimeException {

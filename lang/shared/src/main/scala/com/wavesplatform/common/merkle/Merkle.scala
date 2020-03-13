@@ -1,6 +1,6 @@
-package com.wavesplatform.block.merkle
+package com.wavesplatform.common.merkle
 
-import scorex.crypto.hash.Blake2b256
+import com.wavesplatform.lang.Global
 
 import scala.annotation.tailrec
 
@@ -15,7 +15,7 @@ object Merkle {
   @inline private def isLeft(i: Int): Boolean = i % 2 == 0
 
   /** Hash function */
-  def hash(input: Message): Digest = Blake2b256.hash(input)
+  def hash(input: Message): Digest = Global.blake2b256(input)
 
   /** Makes levels of merkle tree (from top to bottom) */
   def mkLevels(data: Seq[Message]): Seq[Level] = {
