@@ -231,7 +231,7 @@ object Types {
     )
 
   val genericAttachmentType: UNION =
-    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR, UNIT)
+    UNION(BYTESTR, LONG, BOOLEAN, STRING, UNIT)
 
   private def buildAttachmentType(version: StdLibVersion) =
     "attachment" -> (if (version >= V4) genericAttachmentType else BYTESTR)
