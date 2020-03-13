@@ -39,7 +39,6 @@ package object utils {
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
     override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
-    override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte]        = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {
