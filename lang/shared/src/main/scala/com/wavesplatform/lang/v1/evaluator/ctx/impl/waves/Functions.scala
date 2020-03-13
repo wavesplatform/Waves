@@ -530,7 +530,7 @@ object Functions {
                   .asRight[ExecutionError]
                   .pure[F]
 
-            case (_, xs) => notImplemented[F](s"transferTransactionFromProto(bytes: ByteVector)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"transferTransactionFromProto(bytes: ByteVector)", xs)
           }
       }
     }
@@ -556,7 +556,7 @@ object Functions {
                    case CONST_BYTESTR(v) => v.arr
                    case _ => throw(new Exception("Expect ByteStr"))
                 }))) .left.map(_.toString).pure[F]
-              case xs => notImplemented[F](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
+              case xs => notImplemented[F, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
             }
         }
     }

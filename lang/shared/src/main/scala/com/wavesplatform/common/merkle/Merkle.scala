@@ -1,4 +1,4 @@
-package com.wavesplatform.block.merkle
+package com.wavesplatform.common.merkle
 
 import scorex.crypto.hash.Blake2b256
 

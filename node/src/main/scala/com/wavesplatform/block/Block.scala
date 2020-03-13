@@ -2,7 +2,7 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.merkle.Merkle.{hash, mkProofs, verify}
+import com.wavesplatform.common.merkle.Merkle.{hash, mkProofs, verify}
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto

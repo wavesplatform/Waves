@@ -2,7 +2,7 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
-import com.wavesplatform.block.merkle.Merkle
+import com.wavesplatform.common.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
