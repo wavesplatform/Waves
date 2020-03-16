@@ -14,7 +14,6 @@ import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-
 case class Asset(t: String, n: String, ds: String, q: Long, r: Boolean, d: Byte, nc: Long)
 
 class InvokeReissueBurnAssetSuite extends BaseSuite {
@@ -28,6 +27,14 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
        |{-# STDLIB_VERSION 4 #-}
        |{-# SCRIPT_TYPE ACCOUNT #-}
        |{-# CONTENT_TYPE DAPP #-}
+       |
+       |@Callable (i)
+       |func issue2Assets() = {
+       |  [
+       |    Issue($issueParams, 0),
+       |    Issue($issueParams, 0)
+       |  ]
+       |}
        |
        |@Callable (i)
        |func issue10Assets() = {
@@ -74,8 +81,8 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
   }
 
   val simpleNonreissuableAsset = Asset("Simple", "SimpleAsset", "description", 100500, false, 8, 0)
-  val simpleReissuableAsset = Asset("Reissuable", "ReissuableAsset", "description", 100000000, true, 3, 0)
-  val nftAsset = Asset("NFT", "NFTAsset", "description", 1, false, 0, 0)
+  val simpleReissuableAsset    = Asset("Reissuable", "ReissuableAsset", "description", 100000000, true, 3, 0)
+  val nftAsset                 = Asset("NFT", "NFTAsset", "description", 1, false, 0, 0)
 
   for (method <- Seq("@Callable", "Transaction")) s"Asset Issue/Reissue/Burn via $method" - {
 
@@ -144,7 +151,15 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
   "Restrictions in @Callable" - {
     val method = "@Callable"
 
-    "Issue two identical with the same nonce should not produce an error " in {
+    "Issue two identical assets with the same nonce (one invocation) should produce an error" ignore { /* SC-576  */
+      val acc = createDapp(script(simpleNonreissuableAsset))
+      assertBadRequestAndMessage(
+        invokeScript(acc, "issue2Assets"),
+        "State check failed. Reason: Reason should be here"
+      )
+    }
+
+    "Issue two identical assets with the same nonce (different invocations) should not produce an error" in {
       val acc      = createDapp(script(simpleNonreissuableAsset))
       val txIssue1 = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
       val txIssue2 = issue(acc, method, simpleNonreissuableAsset, invocationCost(1))
@@ -202,6 +217,14 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
         "State check failed. Reason: Too many script actions: max: 10, actual: 11"
       )
     }
+
+    "More than 10 action in one invocation should produce an error" in {
+      val acc = createDapp(script(simpleNonreissuableAsset))
+      assertBadRequestAndMessage(
+        invokeScript(acc, "issue11Assets"),
+        "State check failed. Reason: Too many script actions: max: 10, actual: 11"
+      )
+    }
   }
 
   def createDapp(scriptParts: String*): String = {
@@ -243,6 +266,7 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
   ): Transaction = {
     val args = function match {
       case "issueAsset"    => List.empty
+      case "issue2Assets"  => List.empty
       case "issue10Assets" => List.empty
       case "issue11Assets" => List.empty
       case "burnAsset"     => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
