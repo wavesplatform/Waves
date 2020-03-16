@@ -174,12 +174,12 @@ object Bindings {
       case transfer: Tx.Transfer => transferTransactionObject(transfer, proofsEnabled, version)
       case Tx.Issue(p, quantity, name, description, reissuable, decimals, scriptOpt) =>
         CaseObj(
-          buildIssueTransactionType(proofsEnabled),
+          buildIssueTransactionType(proofsEnabled, version),
           combine(
             Map(
               "quantity"    -> quantity,
-              "name"        -> name,
-              "description" -> description,
+              "name"        -> (if (version >= V4) name.toUTF8String else name),
+              "description" -> (if (version >= V4) description.toUTF8String else description),
               "reissuable"  -> reissuable,
               "decimals"    -> decimals,
               "script"      -> scriptOpt
