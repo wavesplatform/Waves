@@ -2,7 +2,8 @@ package com.wavesplatform
 
 import java.io.File
 import java.nio.ByteBuffer
-import java.util.{Map => JMap}
+import java.util
+import java.util.{Comparator, Map => JMap}
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -28,6 +29,8 @@ import com.wavesplatform.utils.{ScorexLogging, _}
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
+
+import scala.collection.mutable
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -408,6 +411,27 @@ package object database extends ScorexLogging {
     }
   }
 
+  class SB extends WriteBatch {
+    val addedEntries = mutable.TreeMap[ByteStr, Array[Byte]]()
+    val deletedEntries = mutable.TreeSet[ByteStr]()
+
+    override def put(bytes: Array[Byte], bytes1: Array[Byte]): WriteBatch = {
+      val k = ByteStr(bytes)
+      addedEntries.put(k, bytes1)
+      deletedEntries.remove(k)
+      this
+    }
+
+    override def delete(bytes: Array[Byte]): WriteBatch = {
+      val k = ByteStr(bytes)
+      addedEntries.remove(k)
+      deletedEntries.add(k)
+      this
+    }
+
+    override def close(): Unit = {}
+  }
+
   implicit class DBExt(val db: DB) extends AnyVal {
     def readOnly[A](f: ReadOnlyDB => A): A = {
       val snapshot = db.getSnapshot
@@ -421,11 +445,14 @@ package object database extends ScorexLogging {
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
-      val batch       = db.createWriteBatch()
+      val batch       = new SB
       val rw          = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
-        db.write(batch)
+        val nativeBatch = db.createWriteBatch()
+        batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
+        batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
+        db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
         r
       } finally {
         batch.close()

@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
@@ -53,7 +54,8 @@ class UtxPoolImpl(
   import com.wavesplatform.utx.UtxPoolImpl._
 
   // Context
-  private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
+  private[this] val cleanupScheduler: SchedulerService =
+    Schedulers.singleThread("utx-pool-cleanup", executionModel = ExecutionModel.AlwaysAsyncExecution)
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
@@ -227,11 +229,12 @@ class UtxPoolImpl(
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress).filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.sender.toAddress)
+        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
-    case _                                                         => Set.empty
+    case _                                                                => Set.empty
   }
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
@@ -381,7 +384,7 @@ class UtxPoolImpl(
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
+    def runCleanupAsync(): Unit = if (!transactions.isEmpty && scheduled.compareAndSet(false, true)) {
       cleanupScheduler.execute { () =>
         try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
         finally scheduled.set(false)

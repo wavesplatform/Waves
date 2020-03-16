@@ -1,11 +1,13 @@
 package com.wavesplatform.database
 
+import java.io.{File, FileInputStream, FileOutputStream}
 import java.nio.ByteBuffer
 
 import cats.data.Ior
 import cats.implicits._
 import com.google.common.cache.CacheBuilder
-import com.google.common.primitives.Shorts
+import com.google.common.hash.{BloomFilter, Funnels}
+import com.google.common.primitives.{Bytes, Shorts}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.Block.BlockId
@@ -29,9 +31,9 @@ import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.utils.ScorexLogging
+import com.wavesplatform.utils.{ScorexLogging, StringBytes}
 import monix.reactive.Observer
-import org.iq80.leveldb.{DB, ReadOptions, Snapshot}
+import org.iq80.leveldb.DB
 
 import scala.annotation.tailrec
 import scala.collection.mutable
@@ -84,7 +86,8 @@ class LevelDBWriter(
     val settings: BlockchainSettings,
     val dbSettings: DBSettings
 ) extends Caches(spendableBalanceChanged)
-    with ScorexLogging {
+    with ScorexLogging
+    with AutoCloseable {
 
   private[this] var disabledAliases = writableDB.get(Keys.disabledAliases)
 
@@ -93,9 +96,31 @@ class LevelDBWriter(
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private[database] def readOnlyNoClose[A](f: (Snapshot, ReadOnlyDB) => A): A = {
-    val snapshot = writableDB.getSnapshot
-    f(snapshot, new ReadOnlyDB(writableDB, new ReadOptions().snapshot(snapshot)))
+  private def readBloomFilter(fileName: String): BloomFilter[Array[Byte]] = try {
+    val in = new FileInputStream(new File(dbSettings.directory, fileName))
+    log.info(s"Loading bloom filter from $fileName")
+    try BloomFilter.readFrom(in, Funnels.byteArrayFunnel())
+    finally in.close()
+  } catch {
+    case e: Exception =>
+      log.info(s"Error loading bloom filter from $fileName", e)
+      BloomFilter.create(Funnels.byteArrayFunnel(), 10000000L)
+  }
+
+  private[this] val orderFilter: BloomFilter[Array[Byte]] = readBloomFilter("orders.bin")
+  private[this] val dataKeyFilter: BloomFilter[Array[Byte]] = readBloomFilter("account-data.bin")
+
+  private def saveBloomFilter(filter: BloomFilter[_], fileName: String): Unit = {
+    log.info(s"Saving bloom filter to $fileName")
+    val out = new FileOutputStream(new File(dbSettings.directory, fileName))
+    try filter.writeTo(out)
+    finally out.close()
+  }
+
+  override def close(): Unit = {
+    saveBloomFilter(orderFilter, "orders.bin")
+    saveBloomFilter(dataKeyFilter, "account-data.bin")
+    log.info("Saved all filters")
   }
 
   private[this] def readWrite[A](f: RW => A): A = writableDB.readWrite(f)
@@ -141,7 +166,9 @@ class LevelDBWriter(
 
     readOnly { db =>
       addressId(address).fold(Option.empty[DataEntry[_]]) { addressId =>
-        db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+        if (dataKeyFilter.mightContain(Bytes.concat(address.bytes, key.utf8Bytes))) {
+          db.fromHistory(Keys.dataHistory(addressId, key), Keys.data(addressId, key)).flatten
+        } else None
       }
     }
   }
@@ -173,9 +200,10 @@ class LevelDBWriter(
   override protected def loadAssetDescription(asset: IssuedAsset): Option[AssetDescription] =
     writableDB.withResource(r => database.loadAssetDescription(r, asset))
 
-  override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee = readOnly { db =>
-    db.fromHistory(Keys.filledVolumeAndFeeHistory(orderId), Keys.filledVolumeAndFee(orderId)).getOrElse(VolumeAndFee.empty)
-  }
+  override protected def loadVolumeAndFee(orderId: ByteStr): VolumeAndFee =
+    if (orderFilter.mightContain(orderId.arr)) readOnly { db =>
+      db.fromHistory(Keys.filledVolumeAndFeeHistory(orderId), Keys.filledVolumeAndFee(orderId)).getOrElse(VolumeAndFee.empty)
+    } else VolumeAndFee.empty
 
   override protected def loadApprovedFeatures(): Map[Short, Int] = {
     readOnly(_.get(Keys.approvedFeatures))
@@ -314,6 +342,7 @@ class LevelDBWriter(
       }
 
       for ((orderId, volumeAndFee) <- filledQuantity) {
+        orderFilter.put(orderId.arr)
         rw.put(Keys.filledVolumeAndFee(orderId)(height), volumeAndFee)
         expiredKeys ++= updateHistory(rw, Keys.filledVolumeAndFeeHistory(orderId), threshold, Keys.filledVolumeAndFee(orderId))
       }
@@ -365,6 +394,7 @@ class LevelDBWriter(
             kdh   = Keys.dataHistory(addressId, key)
             isNew = rw.get(kdh).isEmpty
             _     = rw.put(Keys.data(addressId, key)(height), Some(value))
+            _     = dataKeyFilter.put(kdh.keyBytes.drop(2))
             _     = expiredKeys ++= updateHistory(rw, kdh, threshold, Keys.data(addressId, key))
             if isNew
           } yield key
