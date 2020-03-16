@@ -94,71 +94,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     } yield (master, List(genesisBlock, b1, b2))
   }
 
-  "addressTransactions" - {
-    "correctly applies transaction type filter" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "without pagination" in {
-      baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-        val txs = updater
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 10, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 9
-        txs.sorted(ordering) shouldEqual txs
-      }
-    }
-
-    "with pagination" - {
-      val LIMIT = 8
-      def paginationTest(firstPageLength: Int): Unit = {
-        baseTest(time => commonPreconditions(time.correctedTime())) { (updater, account) =>
-          // using pagination
-          val firstPage = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), firstPageLength, None)
-            .explicitGet()
-
-          val rest = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT - firstPageLength, Some(firstPage.last._2.id()))
-            .explicitGet()
-
-          // without pagination
-          val txs = updater
-            .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), LIMIT, None)
-            .explicitGet()
-
-          (firstPage ++ rest) shouldBe txs
-        }
-      }
-
-      "after txs is in the middle of ngState" in paginationTest(3)
-      "after txs is the last of ngState" in paginationTest(4)
-      "after txs is in levelDb" in paginationTest(6)
-    }
-  }
-
-  "blockchain update events sending" - {
+  "blochain update events sending" - {
     "without NG" - {
       "genesis block and two transfers blocks" in {
         val triggersMock = mock[BlockchainUpdateTriggers]

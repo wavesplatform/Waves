@@ -37,7 +37,7 @@ class BlockchainUpdaterInMemoryDiffTest
         val blockTriggersCompaction = buildBlockOfTxs(blocksWithoutCompaction.last.id(), Seq(payment2))
 
         blocksWithoutCompaction.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
-        val mastersBalanceAfterPayment1 = domain.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1 = domain.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1

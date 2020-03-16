@@ -142,7 +142,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
         {
           domain.blockchainUpdater.processBlock(block0) shouldBe 'right
-          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee)
+          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee)
         }
 
         {
@@ -154,7 +154,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
             .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
             .sum
 
-          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee + microBlocksWavesFee)
+          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee + microBlocksWavesFee)
         }
     }
   }

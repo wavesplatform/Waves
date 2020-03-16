@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.db.WithState
 import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
@@ -16,7 +17,7 @@ import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json.Json
 
-class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with Matchers with TransactionGen {
+class SponsorFeeTransactionSpecification extends PropSpec with PropertyChecks with WithState with TransactionGen {
   val One = 100000000L
   val NgAndSponsorshipSettings: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(NG.id -> 0, FeeSponsorship.id -> 0, SmartAccounts.id -> 0),

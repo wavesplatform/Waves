@@ -19,9 +19,9 @@ object PBImplicitConversions {
   implicit def fromAddress(address: VAddress): PBByteString                  = PBByteString.copyFrom(address.bytes)
 
   implicit class PBRecipientImplicitConversionOps(recipient: Recipient) {
-    def toAddress: Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient)
-    def toAlias: Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient)
-    def toAddressOrAlias: Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient)
+    def toAddress(chainId: Byte): Either[ValidationError, VAddress]              = PBRecipients.toAddress(recipient, chainId)
+    def toAlias(chainId: Byte): Either[ValidationError, VAlias]                  = PBRecipients.toAlias(recipient, chainId)
+    def toAddressOrAlias(chainId: Byte): Either[ValidationError, AddressOrAlias] = PBRecipients.toAddressOrAlias(recipient, chainId)
   }
 
   implicit def fromAssetIdAndAmount(v: (VanillaAssetId, Long)): Amount = v match {

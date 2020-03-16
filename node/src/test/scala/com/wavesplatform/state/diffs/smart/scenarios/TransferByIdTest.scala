@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.common.utils._
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -8,17 +9,17 @@ import com.wavesplatform.lang.utils.compilerContext
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.BinaryDataEntry
+import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffEi}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
-class TransferByIdTest extends PropSpec with ScalaCheckPropertyChecks with Matchers with TransactionGen with NoShrink {
+class TransferByIdTest extends PropSpec with ScalaCheckPropertyChecks with WithState with TransactionGen with NoShrink {
 
   val scriptSrc =
     s"""

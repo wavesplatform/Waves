@@ -24,7 +24,7 @@ object ErrorMessageEnvironment extends Environment[Future] {
   override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Future[Either[String, Long]] = unavailable
   override def multiPaymentAllowed: Boolean                                                                            = unavailable
   override def txId: ByteStr                                                                                           = unavailable
-  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                          = unavailable
+  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                       = unavailable
 }
 
 class BlockchainUnavailableException extends RuntimeException {

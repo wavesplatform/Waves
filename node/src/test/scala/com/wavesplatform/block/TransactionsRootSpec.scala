@@ -2,7 +2,7 @@ package com.wavesplatform.block
 
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.TransactionProof
-import com.wavesplatform.block.merkle.Merkle._
+import com.wavesplatform.common.merkle.Merkle._
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.Transaction
@@ -21,6 +21,7 @@ class TransactionsRootSpec
     with TransactionGen
     with NoShrink
     with Matchers {
+
   val commonGen: Gen[(KeyPair, List[TransferTransaction])] =
     for {
       signer    <- accountGen
@@ -145,3 +146,4 @@ class TransactionsRootSpec
       block.verifyTransactionProof(proof) shouldBe false
   }
 }
+

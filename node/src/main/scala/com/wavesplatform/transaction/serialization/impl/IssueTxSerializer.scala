@@ -21,7 +21,7 @@ object IssueTxSerializer {
       "decimals"    -> decimals,
       "description" -> description.toStringUtf8
     ) ++ (if (version >= TxVersion.V2) Json.obj("script" -> script.map(_.bytes().base64)) else JsObject.empty) ++
-      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainByte) else JsObject.empty)
+      (if (version == TxVersion.V2) Json.obj("chainId"   -> chainId) else JsObject.empty)
   }
 
   def bodyBytes(tx: IssueTransaction): Array[Byte] = {
@@ -40,7 +40,7 @@ object IssueTxSerializer {
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
       case TxVersion.V2 =>
-        Bytes.concat(Array(builder.typeId, version, chainByte), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
+        Bytes.concat(Array(builder.typeId, version, chainId), baseBytes, Deser.serializeOptionOfArrayWithLength(script)(_.bytes()))
       case _ => PBTransactionSerializer.bodyBytes(tx)
     }
   }

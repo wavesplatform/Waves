@@ -2,7 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats._
 import cats.implicits._
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.OverdraftValidationProvider._
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
@@ -95,7 +95,7 @@ object CommonValidation {
           for {
             address <- blockchain.resolveAlias(citx.dAppAddressOrAlias)
             allowFeeOverdraft = blockchain.accountScript(address) match {
-              case Some(ContractScriptImpl(version, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
+              case Some(AccountScriptInfo(_, ContractScriptImpl(version, _), _, _)) if version >= V4 && blockchain.useCorrectPaymentCheck => true
               case _                                                                                          => false
             }
             check <- foldPayments(citx.payments)
@@ -115,8 +115,16 @@ object CommonValidation {
       Either.cond(!blockchain.containsTransaction(tx), tx, AlreadyInTheState(id, blockchain.transactionInfo(id).get._1))
   }
 
-  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
+  def disallowFromAnotherNetwork[T <: Transaction](tx: T, currentChainId: Byte): Either[ValidationError, T] =
+    Either.cond(
+      tx.chainId == currentChainId,
+      tx,
+      GenericError(
+        s"Data from other network: expected: ${AddressScheme.current.chainId}(${AddressScheme.current.chainId.toChar}), actual: ${tx.chainId}(${tx.chainId.toChar})"
+      )
+    )
 
+  def disallowBeforeActivationTime[T <: Transaction](blockchain: Blockchain, tx: T): Either[ValidationError, T] = {
     def activationBarrier(b: BlockchainFeature, msg: Option[String] = None): Either[ActivationError, T] =
       Either.cond(
         blockchain.isFeatureActivated(b, blockchain.height),

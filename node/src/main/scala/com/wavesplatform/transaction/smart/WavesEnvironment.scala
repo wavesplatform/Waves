@@ -100,7 +100,7 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
+    blockchain.transactionInfo(ByteStr(id)).map(_._1.toLong)
 
   override def tthis: Address = Recipient.Address(address())
 
@@ -120,17 +120,13 @@ class WavesEnvironment(
   }
 
   override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock
-      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
+    blockchain.lastBlockHeader
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
-  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] = {
-    val vrf =
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, blockHeight))
-        blockchain.hitSourceAtHeight(blockHeight)
-      else None
-    blockchain.blockInfo(blockHeight)
-      .map(info => toBlockInfo(info.header, blockHeight, vrf))
-  }
+  override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
+    blockchain.blockHeader(blockHeight)
+      .map(blockHAndSize =>
+        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(

@@ -10,6 +10,6 @@ class CompositeBlockchainSpec extends FreeSpec with Matchers with PropertyChecks
   "blockHeaderAndSize at current height is last block" in forAll(randomSignerBlockGen) { block =>
     val comp = CompositeBlockchain(EmptyBlockchain, newBlock = Some(block))
 
-    comp.blockInfo(comp.height).map(_.id()) should contain(block.id())
+    comp.blockHeader(comp.height).map(_.id()) should contain(block.id())
   }
 }

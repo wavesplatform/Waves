@@ -1348,4 +1348,9 @@ class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with
 
     Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
   }
+
+  property("underscore") {
+    val script = "groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')"
+    Parser.parseExpr(script) shouldBe an[Success[_, _, _]]
+  }
 }

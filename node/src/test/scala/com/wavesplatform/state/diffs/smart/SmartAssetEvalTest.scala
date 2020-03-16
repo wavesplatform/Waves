@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.values.{Expression, V3}
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
@@ -14,10 +15,10 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class SmartAssetEvalTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
   val preconditions: Gen[(GenesisTransaction, IssueTransaction, SetAssetScriptTransaction, TransferTransaction)] =
     for {
       firstAcc  <- accountGen

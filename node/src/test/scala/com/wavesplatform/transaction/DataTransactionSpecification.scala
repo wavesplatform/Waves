@@ -128,10 +128,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
     import DataTransaction.MaxEntryCount
     import com.wavesplatform.state._
     forAll(dataTransactionGen, dataEntryGen(500)) {
-      case (DataTransaction(version, sender, _, fee, timestamp, proofs), _) =>
+      case (DataTransaction(version, sender, _, fee, timestamp, proofs, chainId), _) =>
         def check(data: List[DataEntry[_]]): Assertion = {
           val txEi = DataTransaction.create(version, sender, data, fee, timestamp, proofs)
-          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs))
+          txEi shouldBe Right(DataTransaction(version, sender, data, fee, timestamp, proofs, chainId))
           checkSerialization(txEi.explicitGet())
         }
 
@@ -149,7 +149,7 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   property("negative validation cases") {
     val gen = Arbitrary.arbBool.arbitrary.flatMap(proto => dataTransactionGen(DataTransaction.MaxEntryCount, withDeleteEntry = proto))
     forAll(gen) {
-      case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs) =>
+      case tx @ DataTransaction(version, sender, data, fee, timestamp, proofs, _) =>
         val dataSize     = if (tx.isProtobufVersion) 110 else 100
         val dataTooBig   = List.tabulate(dataSize)(n => StringDataEntry((100 + n).toString, "a" * 1527))
         val dataTooBigEi = DataTransaction.create(version, sender, dataTooBig, fee, timestamp, proofs)
@@ -234,10 +234,10 @@ class DataTransactionSpecification extends PropSpec with PropertyChecks with Mat
   property("handle null keys") {
     val emptyDataEntry = EmptyDataEntry("123")
 
-    forAll(accountGen, dataTransactionGen) { (sender, tx) =>
-      val tx1 = DataTransaction.selfSigned(TxVersion.V1, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+    forAll(accountGen) { sender =>
+      val tx1 = DataTransaction.create(TxVersion.V1, sender, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
       tx1 shouldBe Left(GenericError("Empty data is not allowed in V1"))
-      val tx2 = DataTransaction.selfSigned(TxVersion.V2, sender, Seq(emptyDataEntry), tx.fee, tx.timestamp)
+      val tx2 = DataTransaction.create(TxVersion.V2, sender, Seq(emptyDataEntry), 15000000, System.currentTimeMillis(), Proofs.empty)
       tx2 shouldBe 'right
     }
   }

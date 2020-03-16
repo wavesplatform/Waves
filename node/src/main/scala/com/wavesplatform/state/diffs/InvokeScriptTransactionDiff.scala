@@ -1,7 +1,9 @@
 package com.wavesplatform.state.diffs
 
-import cats.implicits._
+import cats.instances.map._
 import cats.kernel.Monoid
+import cats.syntax.either._
+import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
@@ -54,7 +56,7 @@ object InvokeScriptTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
-    val accScriptEi   = dAppAddressEi.map(blockchain.accountScriptWithComplexity)
+    val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
     val functionCall  = tx.funcCall
 
     accScriptEi match {
@@ -194,10 +196,10 @@ object InvokeScriptTransactionDiff {
             )
           )
 
-          verifierComplexity = blockchain.accountScriptWithComplexity(tx.sender).map(_.maxComplexity)
+          verifierComplexity = blockchain.accountScript(tx.sender).map(_.maxComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
-            .flatMap(id => blockchain.assetScriptWithComplexity(IssuedAsset(id)))
-            .map(_._3)
+            .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
+            .map(_._2)
 
           scriptsInvoked <- TracedResult {
             val smartAssetInvocations =
@@ -207,8 +209,7 @@ object InvokeScriptTransactionDiff {
                 burns.map(b => IssuedAsset(b.assetId))
             val totalScriptsInvoked =
               smartAssetInvocations.count(blockchain.hasAssetScript) +
-                (if (blockchain.hasScript(tx.sender)) 1 else 0)
-
+                (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
             val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
@@ -374,7 +375,7 @@ object InvokeScriptTransactionDiff {
             )
             blockchain.assetScript(a) match {
               case None => nextDiff.asRight[ValidationError]
-              case Some(script) =>
+              case Some((script, _)) =>
                 val assetVerifierDiff =
                   if (blockchain.disallowSelfPayment) nextDiff
                   else
@@ -433,7 +434,7 @@ object InvokeScriptTransactionDiff {
                   tx = itx,
                   portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
                   issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                  assetScripts = Map(asset      -> script.map(script => (pk, script._1, script._2)))
+                  assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
                 )
             )
         }
@@ -459,7 +460,7 @@ object InvokeScriptTransactionDiff {
       ): TracedResult[ValidationError, Diff] =
         blockchain.assetScript(IssuedAsset(assetId)) match {
           case None => actionDiff
-          case Some(script) =>
+          case Some((script, _)) =>
             val assetValidationDiff =
               for {
                 acc             <- diffAcc.resultE

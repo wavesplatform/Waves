@@ -20,6 +20,7 @@ object KeyPair {
 
   implicit class KeyPairImplicitOps(private val kp: KeyPair) extends AnyVal {
     def toAddress: Address = PublicKey.toAddress(kp)
+    def toAddress(chainId: Byte): Address = kp.publicKey.toAddress(chainId)
   }
 
   implicit def toPublicKey(kp: KeyPair): PublicKey   = kp.publicKey

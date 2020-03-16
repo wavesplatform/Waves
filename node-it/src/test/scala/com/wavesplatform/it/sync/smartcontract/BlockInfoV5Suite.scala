@@ -1,15 +1,14 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
-import com.wavesplatform.it.sync._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.common.utils.EitherExt2
 
 class BlockInfoV5Suite extends BaseTransactionSuite {
   val activationHeight = 4

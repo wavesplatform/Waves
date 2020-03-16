@@ -90,7 +90,7 @@ object PBEvents {
       description = toString(a.description),
       reissuable = a.reissuable,
       volume = a.volume.longValue,
-      script = PBTransactions.toPBScript(a.script),
+      script = PBTransactions.toPBScript(a.script.map(_._1)),
       sponsorship = a.sponsorship.getOrElse(0),
       nft = a.nft,
       assetExistedBefore = a.assetExistedBefore,

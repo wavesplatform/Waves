@@ -57,13 +57,13 @@ object ExchangeTransactionDiff {
         (),
         GenericError(s"Smart assets can't participate in ExchangeTransactions (SmartAssetsFeature is disabled)")
       )
-      buyerScripted = blockchain.hasScript(buyer)
+      buyerScripted = blockchain.hasAccountScript(buyer)
       _ <- Either.cond(
         smartTradesEnabled || !buyerScripted,
         (),
         GenericError(s"Buyer $buyer can't participate in ExchangeTransaction because it has assigned Script (SmartAccountsTrades is disabled)")
       )
-      sellerScripted = blockchain.hasScript(seller)
+      sellerScripted = blockchain.hasAccountScript(seller)
       _ <- Either.cond(
         smartTradesEnabled || !sellerScripted,
         (),
@@ -80,7 +80,7 @@ object ExchangeTransactionDiff {
       scripts = {
         import com.wavesplatform.features.FeatureProvider._
 
-        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasScript)
+        val addressScripted = Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
         // Don't count before Ride4DApps activation
         val ordersScripted = Seq(buyerScripted, sellerScripted)
@@ -93,11 +93,11 @@ object ExchangeTransactionDiff {
       }
 
       assetsComplexity = assetIds
-        .flatMap(blockchain.assetScriptWithComplexity)
-        .map(_._3)
+        .flatMap(blockchain.assetScript)
+        .map(_._2)
 
       accountsComplexity = List(tx.sender.toAddress, buyer, seller)
-        .flatMap(blockchain.accountScriptWithComplexity)
+        .flatMap(blockchain.accountScript)
         .map(_.maxComplexity)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum

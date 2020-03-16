@@ -44,7 +44,7 @@ object LeaseTxSerializer {
       val amount    = buf.getLong
       val fee       = buf.getLong
       val timestamp = buf.getLong
-      LeaseTransaction(version, sender, recipient, amount, fee, timestamp, Nil)
+      LeaseTransaction(version, sender, recipient, amount, fee, timestamp, Nil, recipient.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

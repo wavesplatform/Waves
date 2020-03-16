@@ -14,14 +14,14 @@ import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.{TestFunctionalitySettings, WavesSettings, loadConfig}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.utils.{BlockchainAddressTransactionsList, _}
+import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utils.Time
-import com.wavesplatform.{RequestGen, TransactionGen, WithDB}
+import com.wavesplatform.{RequestGen, TransactionGen, WithDB, database}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
@@ -59,14 +59,14 @@ class LevelDBWriterSpec
   "hasScript" - {
     "returns false if a script was not set" in {
       val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-      writer.hasScript(accountGen.sample.get.toAddress) shouldBe false
+      writer.hasAccountScript(accountGen.sample.get.toAddress) shouldBe false
     }
 
     "returns false if a script was set and then unset" in {
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
         val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-        writer.hasScript(account) shouldBe false
+        writer.hasAccountScript(account) shouldBe false
       }
     }
 
@@ -75,14 +75,14 @@ class LevelDBWriterSpec
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
           val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
-          writer.hasScript(account) shouldBe true
+          writer.hasAccountScript(account) shouldBe true
         }
       }
 
       "if there is a script in cache" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (defaultWriter, account) =>
-          defaultWriter.hasScript(account) shouldBe true
+          defaultWriter.hasAccountScript(account) shouldBe true
         }
       }
     }
@@ -252,23 +252,21 @@ class LevelDBWriterSpec
       bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
       bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
 
-      bcu.blockAt(1).get shouldBe genesisBlock
-      bcu.blockAt(2).get shouldBe block1
-      bcu.blockAt(3).get shouldBe block2
-      bcu.blockAt(4).get shouldBe block3
-      bcu.blockAt(5).get shouldBe block4
-      bcu.blockAt(6).get shouldBe block5
+      def blockAt(height: Int): Option[Block] = bcu.liquidBlockMeta
+        .filter(_ => bcu.height == height)
+        .flatMap(m => bcu.liquidBlock(m.id))
+        .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+
+      blockAt(1).get shouldBe genesisBlock
+      blockAt(2).get shouldBe block1
+      blockAt(3).get shouldBe block2
+      blockAt(4).get shouldBe block3
+      blockAt(5).get shouldBe block4
+      blockAt(6).get shouldBe block5
 
       for (i <- 1 to db.get(Keys.height)) {
-        db.get(Keys.blockInfoAt(Height(i))).isDefined shouldBe true
+        db.get(Keys.blockMetaAt(Height(i))).isDefined shouldBe true
       }
-
-      bcu.blockBytes(1).get shouldBe genesisBlock.bytes()
-      bcu.blockBytes(2).get shouldBe block1.bytes()
-      bcu.blockBytes(3).get shouldBe block2.bytes()
-      bcu.blockBytes(4).get shouldBe block3.bytes()
-      bcu.blockBytes(5).get shouldBe block4.bytes()
-      bcu.blockBytes(6).get shouldBe block5.bytes()
 
     } finally {
       bcu.shutdown()
@@ -278,90 +276,17 @@ class LevelDBWriterSpec
 
   "addressTransactions" - {
 
-    "return txs in correct ordering without fromId" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, None)
-          .explicitGet()
-
-        val ordering = Ordering
-          .by[(Int, Transaction), (Int, Long)]({ case (h, t) => (-h, -t.timestamp) })
-
-        txs.length shouldBe 2
-
-        txs.sorted(ordering) shouldBe txs
-      }
-    }
-
-    "correctly applies transaction type filter" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(GenesisTransaction.typeId), 10, None)
-          .explicitGet()
-
-        txs.length shouldBe 1
-      }
-    }
-
-    "return Left if fromId argument is a non-existent transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val nonExistentTxId = GenesisTransaction.create(account, ENOUGH_AMT, 1).explicitGet().id()
-
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 3, Some(nonExistentTxId))
-
-        txs shouldBe Left(s"Transaction $nonExistentTxId does not exist")
-      }
-    }
-
-    "return txs in correct ordering starting from a given id" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        // using pagination
-        val firstTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, None)
-          .explicitGet()
-          .head
-
-        val secondTx = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 1, Some(firstTx._2.id()))
-          .explicitGet()
-          .head
-
-        // without pagination
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
-          .explicitGet()
-
-        txs shouldBe Seq(firstTx, secondTx)
-      }
-    }
-
-    "return an empty Seq when paginating from the last transaction" in {
-      baseTest(time => preconditions(time.correctedTime())) { (writer, account) =>
-        val txs = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, None)
-          .explicitGet()
-
-        val txsFromLast = writer
-          .addressTransactions(account.toAddress, Set(TransferTransaction.typeId), 2, Some(txs.last._2.id()))
-          .explicitGet()
-
-        txs.length shouldBe 2
-        txsFromLast shouldBe Seq.empty
-      }
-    }
-
     "don't parse irrelevant transactions in transferById" ignore {
       val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
 
       forAll(randomTransactionGen) { tx =>
         val transactionId = tx.id()
         db.put(Keys.transactionHNById(TransactionId @@ transactionId).keyBytes, Ints.toByteArray(1) ++ Shorts.toByteArray(0))
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
+        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](1, 2, 3, 4, 5, 6))
 
         writer.transferById(transactionId) shouldBe None
 
-        db.put(Keys.transactionBytesAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
+        db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
       }
     }

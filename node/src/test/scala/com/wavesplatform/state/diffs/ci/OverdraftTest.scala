@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.DirectiveDictionary
@@ -11,18 +12,18 @@ import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffEi, produce}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OverdraftTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class OverdraftTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
   private val InvokeFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
   private val SetScriptFee = FeeConstants(SetScriptTransaction.typeId)    * FeeValidation.FeeUnit
   private val IssueFee     = FeeConstants(IssueTransaction.typeId)        * FeeValidation.FeeUnit

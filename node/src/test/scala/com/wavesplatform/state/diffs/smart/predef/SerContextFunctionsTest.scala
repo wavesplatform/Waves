@@ -36,18 +36,20 @@ class SerContextFunctionsTest extends PropSpec with PropertyChecks with Matchers
       .right
       .get
 
+    val recipient = Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get
     val ttx =
       TransferTransaction(
         2.toByte,
         PublicKey.fromBase58String("FM5ojNqW7e9cZ9zhPYGkpSP1Pcd8Z3e3MNKYVS5pGJ8Z").right.get,
-        Address.fromString("3My3KZgFQ3CrVHgz6vGRt8687sH4oAA1qp8").right.get,
+        recipient,
         Waves,
         100000000,
         Waves,
         100000000,
         Some(Attachment.Bin(Base58.tryDecodeWithLimit("4t2Xazb2SX").get)),
         1526641218066L,
-        Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get))
+        Proofs(Seq(ByteStr.decodeBase58("4bfDaqBcnK3hT8ywFEFndxtS1DTSYfncUqd4s5Vyaa66PZHawtC73rDswUur6QZu5RpqM7L9NFgBHT1vhCoox4vi").get)),
+        recipient.chainId
       )
 
     val untypedScript  = Parser.parseExpr(scriptWithAllV1Functions(dtx, ttx)).get.value

@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs
 import cats._
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
@@ -11,10 +12,10 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   private val allowMultipleLeaseCancelTransactionUntilTimestamp = Long.MaxValue / 2
   private val settings =

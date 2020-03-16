@@ -38,7 +38,7 @@ package object utils {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def tthis: Recipient.Address                                                                        = ???
     override def multiPaymentAllowed: Boolean                                                                    = true
-    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                                  = ???
+    override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]                               = ???
   }
 
   val lazyContexts: Map[DirectiveSet, Coeval[CTX[Environment]]] = {

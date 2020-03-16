@@ -14,7 +14,6 @@ import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
   publishMavenStyle := true,
-  credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
   publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
   homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-contracts-language-description/maven-compiler-package.html")),
   developers := List(
