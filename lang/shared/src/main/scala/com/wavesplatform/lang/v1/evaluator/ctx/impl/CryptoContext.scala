@@ -235,11 +235,18 @@ object CryptoContext {
       ("valueBytes", BYTESTR),
       ("index", LONG)
     ) {
-        case ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
-          CONST_BYTESTR(createRoot(value, Math.toIntExact(index), proof.map({
-             case CONST_BYTESTR(v) => v.arr
-             case _ => throw(new Exception("Expect ByteStr"))
-          }))) .left.map(_.toString)
+        case xs@(ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil) =>
+          if(value.size == 32 && proof.length <= 16 && proof.forall({
+              case CONST_BYTESTR(v) => v.size == 32
+              case _ => false
+            })) {
+            CONST_BYTESTR(createRoot(value, Math.toIntExact(index), proof.map({
+               case CONST_BYTESTR(v) => v.arr
+               case _ => throw(new Exception("Expect ByteStr"))
+            }))) .left.map(_.toString)
+          } else {
+            notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
+          }
         case xs => notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
     }
 
