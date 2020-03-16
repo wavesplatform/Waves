@@ -86,7 +86,7 @@ object Common {
     override def resolveAlias(name: String): Either[String, Recipient.Address]                                   = ???
     override def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): Either[String, Long] = ???
     override def tthis: Recipient.Address                                                                        = ???
-    override def multiPaymentAllowed: Boolean                                                                    = ???
+    override def multiPaymentAllowed: Boolean                                                                    =  true
     override def txId: ByteStr                                                                                   = ???
   }
 
