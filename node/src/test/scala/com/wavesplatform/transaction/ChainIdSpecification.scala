@@ -4,7 +4,7 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction}
+import com.wavesplatform.protobuf.transaction.{PBTransactions, SignedTransaction => PBSignedTransaction}
 import com.wavesplatform.state.StringDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -40,7 +40,7 @@ class ChainIdSpecification extends PropSpec with PropertyChecks with Matchers wi
     tx.chainId should not be AddressScheme.current.chainId
 
     val protoTx       = PBTransactions.protobuf(tx)
-    val recoveredTxEi = PBTransactions.vanilla(SignedTransaction.parseFrom(protoTx.toByteArray))
+    val recoveredTxEi = PBTransactions.vanilla(PBSignedTransaction.parseFrom(protoTx.toByteArray))
 
     recoveredTxEi shouldBe 'right
 
