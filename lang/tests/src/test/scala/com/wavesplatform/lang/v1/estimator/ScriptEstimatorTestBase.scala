@@ -37,13 +37,15 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
 
   private val v3FunctionCosts = utils.functionCosts(V3)
 
-  private val ctx = {
-    val transactionType = Types.buildTransferTransactionType(true, V3)
+  implicit val version : StdLibVersion = V3
+
+  private def ctx(implicit version: StdLibVersion) = {
+    val transactionType = Types.buildTransferTransactionType(true, version)
     val tx              = CaseObj(transactionType, Map("amount" -> CONST_LONG(100000000L)))
     Monoid
       .combineAll(Seq(
-        PureContext.build(Global, V3).withEnvironment[Environment],
-        CryptoContext.build(Global, V3).withEnvironment[Environment],
+        PureContext.build(Global, version).withEnvironment[Environment],
+        CryptoContext.build(Global, version).withEnvironment[Environment],
         WavesContext.build(DirectiveSet.contractDirectiveSet),
         CTX[NoContext](
           Seq(transactionType),
@@ -57,7 +59,7 @@ class ScriptEstimatorTestBase(estimators: ScriptEstimator*)
   private val lets: Set[String] =
     ctx.evaluationContext(env).letDefs.keySet
 
-  protected def compile(code: String): EXPR = {
+  protected def compile(code: String)(implicit version: StdLibVersion): EXPR = {
     val untyped = Parser.parseExpr(code).get.value
     ExpressionCompiler(ctx.compilerContext, untyped).map(_._1).explicitGet()
   }

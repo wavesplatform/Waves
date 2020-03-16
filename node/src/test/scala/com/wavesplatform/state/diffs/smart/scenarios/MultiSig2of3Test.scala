@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -18,10 +19,10 @@ import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class MultiSig2of3Test extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   def multisigTypedExpr(pk0: PublicKey, pk1: PublicKey, pk2: PublicKey): EXPR = {
     val script =
@@ -48,20 +49,20 @@ class MultiSig2of3Test extends PropSpec with PropertyChecks with Matchers with T
     s0        <- accountGen
     s1        <- accountGen
     s2        <- accountGen
-    recepient <- accountGen
+    recipient <- accountGen
     ts        <- positiveIntGen
     genesis = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-    setSctipt <- selfSignedSetScriptTransactionGenP(master, ExprScript(multisigTypedExpr(s0, s1, s2)).explicitGet())
+    setScript <- selfSignedSetScriptTransactionGenP(master, ExprScript(multisigTypedExpr(s0, s1, s2)).explicitGet())
     amount    <- positiveLongGen
     fee       <- smallFeeGen
     timestamp <- timestampGen
   } yield {
     val unsigned =
-      TransferTransaction(2.toByte, master, recepient, Waves, amount, Waves, fee, None, timestamp, proofs = Proofs.empty)
+      TransferTransaction(2.toByte, master, recipient, Waves, amount, Waves, fee, None, timestamp, proofs = Proofs.empty, recipient.chainId)
     val sig0 = ByteStr(crypto.sign(s0, unsigned.bodyBytes()))
     val sig1 = ByteStr(crypto.sign(s1, unsigned.bodyBytes()))
     val sig2 = ByteStr(crypto.sign(s2, unsigned.bodyBytes()))
-    (genesis, setSctipt, unsigned, Seq(sig0, sig1, sig2))
+    (genesis, setScript, unsigned, Seq(sig0, sig1, sig2))
   }
 
   property("2 of 3 multisig") {

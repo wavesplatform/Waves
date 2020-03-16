@@ -39,7 +39,7 @@ object Types {
       "generationSignature" -> BYTESTR,
       "generator"           -> addressType,
       "generatorPublicKey"  -> BYTESTR
-    ) ::: (if (version >= V4) List("vrf" -> optionByteVector) else Nil)
+    ) ::: (if (version >= V4) List("vrf" -> optionByteVector, "transactionsRoot" -> BYTESTR) else Nil)
   )
 
   def optionAsset(version: StdLibVersion) =
@@ -231,7 +231,7 @@ object Types {
     )
 
   val genericAttachmentType: UNION =
-    UNION(BYTESTR, LONG, BOOLEAN, BYTESTR, UNIT)
+    UNION(BYTESTR, LONG, BOOLEAN, STRING, UNIT)
 
   private def buildAttachmentType(version: StdLibVersion) =
     "attachment" -> (if (version >= V4) genericAttachmentType else BYTESTR)

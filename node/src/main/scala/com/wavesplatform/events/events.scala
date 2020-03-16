@@ -15,7 +15,7 @@ final case class AssetStateUpdate(
     description: ByteStr,
     reissuable: Boolean,
     volume: BigInt,
-    script: Option[Script],
+    script: Option[(Script, Long)],
     sponsorship: Option[Long],
     nft: Boolean,
     assetExistedBefore: Boolean,

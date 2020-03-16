@@ -33,6 +33,7 @@ object InvokeScriptTxValidator extends TxValidator[InvokeScriptTransaction] {
       else tx.bytes().length <= ContractLimits.MaxInvokeScriptSizeInBytes
 
     V.seq(tx)(
+      V.addressChainId(dAppAddressOrAlias, chainId),
       V.cond(
         funcCallOpt.isEmpty || funcCallOpt.get.args.size <= ContractLimits.MaxInvokeScriptArgs,
         GenericError(s"InvokeScript can't have more than ${ContractLimits.MaxInvokeScriptArgs} arguments")

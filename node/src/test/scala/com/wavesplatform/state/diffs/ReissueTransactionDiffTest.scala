@@ -34,7 +34,7 @@ class ReissueTransactionDiffTest
       reissue      <- reissueTx(issuer, IssuedAsset(issue.assetId), BeforeActivationFee)
       b2 = TestBlock.create(
         ntpNow,
-        b1.uniqueId,
+        b1.id(),
         Seq(issue),
         issuer
       )
@@ -60,13 +60,13 @@ class ReissueTransactionDiffTest
       reissue      <- reissueTx(issuer, IssuedAsset(issue1.assetId), AfterActivationFee)
       b2 = TestBlock.create(
         ntpNow,
-        b1.uniqueId,
+        b1.id(),
         Seq(issue1),
         issuer
       )
       b3 = TestBlock.create(
         ntpNow,
-        b2.uniqueId,
+        b2.id(),
         Seq(issue2),
         issuer
       )

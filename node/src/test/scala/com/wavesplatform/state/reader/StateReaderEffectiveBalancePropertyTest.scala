@@ -1,6 +1,7 @@
 package com.wavesplatform.state.reader
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.TestFunctionalitySettings.Enabled
@@ -10,10 +11,10 @@ import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class StateReaderEffectiveBalancePropertyTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
   property("No-interactions genesis account's effectiveBalance doesn't depend on depths") {
     val setup: Gen[(GenesisTransaction, Int, Int, Int)] = for {
       master <- accountGen

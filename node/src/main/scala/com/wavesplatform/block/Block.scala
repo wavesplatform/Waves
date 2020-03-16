@@ -2,12 +2,14 @@ package com.wavesplatform.block
 
 import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
+import com.wavesplatform.common.merkle.Merkle.{hash, mkProofs, verify}
 import com.wavesplatform.block.serialization.BlockSerializer
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.PBBlocks
+import com.wavesplatform.protobuf.block.{PBBlockHeaders, PBBlocks}
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -35,10 +37,11 @@ case class Block(
     header: BlockHeader,
     signature: ByteStr,
     transactionData: Seq[Transaction]
-) extends Signed {
+) {
   import Block._
 
-  val uniqueId: ByteStr = signature
+  val id: Coeval[ByteStr] = Coeval.evalOnce(Block.idFromHeader(header, signature))
+
   val sender: PublicKey = header.generator
 
   val bytes: Coeval[Array[Byte]] = Coeval.evalOnce(BlockSerializer.toBytes(this))
@@ -68,12 +71,12 @@ case class Block(
     else PBBlocks.protobuf(this).header.get.toByteArray
   }
 
-  override val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
+  val signatureValid: Coeval[Boolean] = Coeval.evalOnce {
     val publicKey = header.generator
     !crypto.isWeakPublicKey(publicKey.arr) && crypto.verify(signature, ByteStr(bytesWithoutSignature()), publicKey)
   }
 
-  protected override val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
+  protected val signedDescendants: Coeval[Seq[Signed]] = Coeval.evalOnce(transactionData.flatMap(_.cast[Signed]))
 
   private[block] val transactionsMerkleTree: Coeval[TransactionsMerkleTree] = Coeval.evalOnce(mkMerkleTree(transactionData))
 
@@ -83,11 +86,26 @@ case class Block(
   }
 
   override def toString: String =
-    s"Block($signature -> ${header.reference.trim}, " +
+    s"Block(${id()} -> ${header.reference.trim}, " +
       s"txs=${transactionData.size}, features=${header.featureVotes}${if (header.rewardVote >= 0) s", rewardVote=${header.rewardVote}" else ""})"
 }
 
 object Block extends ScorexLogging {
+  def idFromHeader(h: BlockHeader, signature: ByteStr): ByteStr =
+    if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
+    else signature
+
+  def protoHeaderHash(h: BlockHeader): ByteStr = {
+    require(h.version >= ProtoBlockVersion)
+    crypto.fastHash(PBBlockHeaders.protobuf(h).toByteArray)
+  }
+
+  def referenceLength(version: Byte): Int =
+    if (version >= ProtoBlockVersion) DigestLength
+    else SignatureLength
+
+  def validateReferenceLength(length: Int): Boolean =
+    length == DigestLength || length == SignatureLength
 
   def create(
       version: Byte,
@@ -164,20 +182,13 @@ object Block extends ScorexLogging {
     } yield validBlock
   }
 
-  case class BlockInfo(
-      header: BlockHeader,
-      size: Int,
-      transactionCount: Int,
-      signature: ByteStr
-  )
-
   case class Fraction(dividend: Int, divider: Int) {
     def apply(l: Long): Long = l / divider * dividend
   }
 
   val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
-  type BlockId = ByteStr
+  type BlockId                = ByteStr
   type TransactionsMerkleTree = Seq[Seq[Array[Byte]]]
   case class TransactionProof(id: ByteStr, transactionIndex: Int, digests: Seq[Array[Byte]])
 
@@ -196,4 +207,31 @@ object Block extends ScorexLogging {
   val NgBlockVersion: Byte      = 3
   val RewardBlockVersion: Byte  = 4
   val ProtoBlockVersion: Byte   = 5
+
+  // Merkle
+  implicit class BlockTransactionsRootOps(private val block: Block) extends AnyVal {
+    def transactionProof(transaction: Transaction): Option[TransactionProof] =
+      block.transactionData.indexWhere(transaction.id() == _.id()) match {
+        case -1  => None
+        case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, block.transactionsMerkleTree()).reverse))
+      }
+
+    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
+      block.transactionData
+        .lift(transactionProof.transactionIndex)
+        .filter(tx => tx.id() == transactionProof.id)
+        .exists(
+          tx =>
+            verify(
+              hash(PBTransactions.protobuf(tx).toByteArray),
+              transactionProof.transactionIndex,
+              transactionProof.digests.reverse,
+              block.header.transactionsRoot.arr
+            )
+        )
+  }
+}
+
+case class SignedBlockHeader(header: BlockHeader, signature: ByteStr) {
+  val id: Coeval[ByteStr] = Coeval.evalOnce(Block.idFromHeader(header, signature))
 }

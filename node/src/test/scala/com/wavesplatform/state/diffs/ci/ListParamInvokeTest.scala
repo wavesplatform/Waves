@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.ci
 
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -14,16 +15,16 @@ import com.wavesplatform.lang.v1.evaluator.FunctionIds
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, assertDiffAndState, assertDiffEi, produce}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, produce}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class ListParamInvokeTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class ListParamInvokeTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithState with Inside {
   property("unactivated") {
     // precompiled to avoid compilation error
     val v3DApp =

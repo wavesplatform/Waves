@@ -100,7 +100,7 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionHeight(ByteStr(id)).map(_.toLong)
+    blockchain.transactionInfo(ByteStr(id)).map(_._1.toLong)
 
   override def tthis: Address = Recipient.Address(address())
 
@@ -120,13 +120,13 @@ class WavesEnvironment(
   }
 
   override def lastBlockOpt(): Option[BlockInfo] =
-    blockchain.lastBlock
-      .map(block => toBlockInfo(block.header, height.toInt, blockchain.hitSourceAtHeight(height.toInt)))
+    blockchain.lastBlockHeader
+      .map(block => toBlockInfo(block.header, height.toInt, blockchain.vrf(height.toInt)))
 
   override def blockInfoByHeight(blockHeight: Int): Option[BlockInfo] =
-    blockchain.blockInfo(blockHeight)
+    blockchain.blockHeader(blockHeight)
       .map(blockHAndSize =>
-        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.hitSourceAtHeight(blockHeight)))
+        toBlockInfo(blockHAndSize.header, blockHeight, blockchain.vrf(blockHeight)))
 
   private def toBlockInfo(blockH: BlockHeader, bHeight: Int, vrf: Option[ByteStr]) = {
     BlockInfo(
@@ -136,7 +136,8 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
       generatorPublicKey = ByteStr(blockH.generator),
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
+      blockH.transactionsRoot
     )
   }
 

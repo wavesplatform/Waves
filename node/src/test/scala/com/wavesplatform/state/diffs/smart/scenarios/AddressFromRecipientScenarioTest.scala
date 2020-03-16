@@ -1,7 +1,8 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
-import com.wavesplatform.account.{KeyPair, AddressOrAlias}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BYTESTR, CaseObj}
 import com.wavesplatform.state.diffs._
@@ -11,10 +12,10 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, GenesisTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class AddressFromRecipientScenarioTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val preconditionsAndAliasCreations: Gen[(Seq[GenesisTransaction], CreateAliasTransaction, TransferTransaction, TransferTransaction)] = for {
     master                   <- accountGen

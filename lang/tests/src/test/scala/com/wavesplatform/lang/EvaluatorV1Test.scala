@@ -35,15 +35,15 @@ import scorex.crypto.signatures.{Curve25519, PublicKey, Signature}
 
 class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
-  val version = V3
+  implicit val version : StdLibVersion = V3
 
-  private val pureContext = PureContext.build(Global, version)
+  private def pureContext(implicit version : StdLibVersion)  = PureContext.build(Global, version)
 
-  private val defaultCryptoContext = CryptoContext.build(Global, version)
+  private def defaultCryptoContext(implicit version : StdLibVersion) = CryptoContext.build(Global, version)
 
   val blockBuilder: Gen[(LET, EXPR) => EXPR] = Gen.oneOf(true, false).map(if (_) BLOCK.apply else LET_BLOCK.apply)
 
-  private val defaultFullContext: CTX[Environment] =
+  private def defaultFullContext(implicit version : StdLibVersion): CTX[Environment] =
     Monoid.combineAll(
       Seq(
         defaultCryptoContext.withEnvironment[Environment],
@@ -54,7 +54,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       )
     )
 
-  private val pureEvalContext: EvaluationContext[NoContext, Id] =
+  private def pureEvalContext(implicit version : StdLibVersion): EvaluationContext[NoContext, Id] =
     PureContext.build(Global, version).evaluationContext
 
   private val noContextEvaluator = new EvaluatorV1[Id, NoContext]()
@@ -339,6 +339,31 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
 
     val r = sigVerifyTest(bodyBytes, publicKey, signature)
     r.isRight shouldBe true
+  }
+
+  property("returns an success if sigVerify_NKb return a success") {
+    implicit val version = V4
+    val seed                    = "seed".getBytes("UTF-8")
+    val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
+
+    val bodyBytes = ("m" * (32*1024 + 1)).getBytes("UTF-8")
+    val signature = Curve25519.sign(privateKey, bodyBytes)
+
+    val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(2))
+    r.isRight shouldBe true
+  }
+
+
+  property("fail if sigVerify_NKb limits exhausted") {
+    implicit val version = V4
+    val seed                    = "seed".getBytes("UTF-8")
+    val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
+
+    val bodyBytes = ("m" * (64*1024 + 1)).getBytes("UTF-8")
+    val signature = Curve25519.sign(privateKey, bodyBytes)
+
+    val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(2))
+    r.isLeft shouldBe true
   }
 
   property("returns correct context") {
@@ -667,7 +692,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
-  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature): Either[ExecutionError, Boolean] = {
+  private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature, lim_n: Option[Short] = None)(implicit version: StdLibVersion): Either[ExecutionError, Boolean] = {
     val txType = CASETYPEREF(
       "Transaction",
       List(
@@ -700,7 +725,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     ev[EVALUATED](
       context = context,
       expr = FUNCTION_CALL(
-        function = FunctionHeader.Native(SIGVERIFY),
+        function = FunctionHeader.Native(lim_n.fold(SIGVERIFY)(n => (SIGVERIFY_LIM + n).toShort)),
         args = List(
           GETTER(REF("tx"), "bodyBytes"),
           GETTER(REF("tx"), "proof0"),

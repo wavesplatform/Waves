@@ -2,16 +2,17 @@ package com.wavesplatform.state.diffs
 
 import cats.Monoid
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{GenesisTransaction, PaymentTransaction}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class PaymentTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   val preconditionsAndPayments: Gen[(GenesisTransaction, PaymentTransaction, PaymentTransaction)] = for {
     master    <- accountGen

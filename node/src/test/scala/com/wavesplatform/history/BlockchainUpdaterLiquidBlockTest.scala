@@ -64,7 +64,7 @@ class BlockchainUpdaterLiquidBlockTest
           } yield ()
 
           val r = microBlocks.foldLeft(blocksApplied) {
-            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr)
+            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr).map(_ => ())
             case (x, _)           => x
           }
 

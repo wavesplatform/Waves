@@ -8,7 +8,7 @@ import com.wavesplatform.http.{ApiMarshallers, `X-Api-Key`, api_key}
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.utils._
 
-trait ApiRoute extends Directives with ApiMarshallers with ScorexLogging {
+trait ApiRoute extends Directives with CustomDirectives with ApiMarshallers with ScorexLogging {
   def route: Route
 }
 

@@ -5,6 +5,7 @@ import com.wavesplatform.account._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
@@ -29,8 +30,8 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState, assertDiffEi, assertDiffEiTraced, produce}
-import com.wavesplatform.state.utils._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
+import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{InvalidAssetId, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction.assets._
@@ -40,7 +41,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -54,7 +55,7 @@ class InvokeScriptTransactionDiffTest
     with TransactionGen
     with NoShrink
     with Inside
-    with WithDB
+    with WithState
     with DBCacheSettings {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
@@ -84,7 +85,7 @@ class InvokeScriptTransactionDiffTest
 
   val throwingAsset: Script = ExprScript(FUNCTION_CALL(Native(THROW), Nil)).explicitGet()
 
-  def dataContract(senderBinding: String, argName: String, funcName: String, bigData: Boolean, emptyData: Boolean): DApp = {
+  private def dataContract(senderBinding: String, argName: String, funcName: String, bigData: Boolean, emptyData: Boolean): DApp = {
     val datas =
       if (bigData)
         List(
@@ -580,18 +581,14 @@ class InvokeScriptTransactionDiffTest
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
-          case (blockDiff, newState) => {
+          case (blockDiff, newState) =>
             blockDiff.scriptsRun shouldBe 1
-            newState.accountData(genesis(0).recipient) shouldBe AccountDataInfo(
-              Map(
-                "sender"   -> BinaryDataEntry("sender", ci.sender.toAddress.bytes),
-                "argument" -> BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs)
-              )
-            )
+            newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
+            newState.accountData(genesis(0).recipient, "argument") shouldBe Some(BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs))
 
             blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
           }
-        }
+
     }
   }
 
@@ -649,10 +646,10 @@ class InvokeScriptTransactionDiffTest
       contractGen = paymentContractGen(a, am) _
       r <- preconditionsAndSetContract(contractGen)
     } yield (a, am, r._1, r._2, r._3)) {
-      case (acc, amount, genesis, setScript, ci) =>
+      case (_, _, genesis, setScript, ci) =>
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
-          case (blockDiff, newState) =>
-            newState.addressTransactions(acc.toAddress, Set.empty, Int.MaxValue, None).right.get.head._2 shouldBe ci
+          case (blockDiff, _) =>
+            blockDiff.transactions should contain key (ci.id())
         }
     }
   }
@@ -1627,6 +1624,6 @@ object InvokeScriptTransactionDiffTest {
   ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
     import asset._
     override def assetDescription(ia: IssuedAsset): Option[AssetDescription] =
-      Some(AssetDescription(id(), sender, name, description, decimals, reissuable, quantity, Height(2), script, 0, false))
+      Some(AssetDescription(id(), sender, name, description, decimals, reissuable, quantity, Height(2), script.map(_ -> 1L), 0, false))
   }
 }

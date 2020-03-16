@@ -6,7 +6,6 @@ import com.wavesplatform.settings.SynchronizationSettings._
 import scala.concurrent.duration.FiniteDuration
 
 case class SynchronizationSettings(maxRollback: Int,
-                                   maxChainLength: Int,
                                    synchronizationTimeout: FiniteDuration,
                                    scoreTTL: FiniteDuration,
                                    maxBaseTargetOpt: Option[Long],

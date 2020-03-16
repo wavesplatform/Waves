@@ -4,7 +4,6 @@ import java.security.SecureRandom
 
 import akka.http.scaladsl.marshalling.ToResponseMarshallable
 import akka.http.scaladsl.server.Route
-import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.api.http.ApiError.{ScriptCompilerError, TooBigArrayAllocation}
 import com.wavesplatform.api.http.requests.ScriptWithImportsRequest
 import com.wavesplatform.common.utils._
@@ -37,7 +36,7 @@ case class UtilsApiRoute(
   }
 
   override val route: Route = pathPrefix("utils") {
-    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ sign ~ transactionSerialize
+    decompile ~ compile ~ compileCode ~ compileWithImports ~ scriptMeta ~ estimate ~ time ~ seedRoute ~ length ~ hashFast ~ hashSecure ~ transactionSerialize
   }
 
   def decompile: Route = path("script" / "decompile") {
@@ -191,18 +190,6 @@ case class UtilsApiRoute(
   def hashFast: Route = (path("hash" / "fast") & post) {
     entity(as[String]) { message =>
       complete(Json.obj("message" -> message, "hash" -> Base58.encode(crypto.fastHash(message))))
-    }
-  }
-
-  def sign: Route = (path("sign" / Segment) & post) { pk =>
-    entity(as[String]) { message =>
-      complete(
-        Json.obj(
-          "message" -> message,
-          "signature" ->
-            Base58.encode(crypto.sign(PrivateKey(Base58.tryDecodeWithLimit(pk).get), Base58.tryDecodeWithLimit(message).get))
-        )
-      )
     }
   }
 

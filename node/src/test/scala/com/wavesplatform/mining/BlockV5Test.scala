@@ -4,7 +4,8 @@ import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.db.WithDomain
@@ -12,16 +13,16 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.chainBaseAndMicro
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.settings.{Constants, FunctionalitySettings, WalletSettings, WavesSettings}
-import com.wavesplatform.state.{BlockchainUpdaterImpl, NG}
+import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
+import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{NoShrink, TestTime, TransactionGen, crypto}
+import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TestTime, TransactionGen, crypto}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -29,6 +30,7 @@ import monix.execution.Scheduler
 import monix.reactive.Observer
 import org.scalacheck.Gen
 import org.scalatest._
+import org.scalatest.enablers.Length
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
 
 import scala.concurrent.Await
@@ -43,7 +45,8 @@ class BlockV5Test
     with NoShrink
     with OptionValues
     with EitherValues
-    with PrivateMethodTester {
+    with PrivateMethodTester
+    with BlocksTransactionsHelpers {
   import BlockV5Test._
 
   private val testTime = new TestTime(1)
@@ -81,13 +84,13 @@ class BlockV5Test
 
             Await.result(appender(blockAtActivationHeight).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
             blockchain.height shouldBe BlockV5ActivationHeight
-            blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
-            blockAtActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
+            blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
+            blockAtActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
 
-            val hitSourceBeforeActivationHeight = blockchain.hitSourceAtHeight(BlockV5ActivationHeight - 1).get
-            hitSourceBeforeActivationHeight shouldBe blockchain.blockAt(BlockV5ActivationHeight - 1).get.header.generationSignature
+            val hitSourceBeforeActivationHeight = blockchain.hitSource(BlockV5ActivationHeight - 1).get
+            hitSourceBeforeActivationHeight shouldBe blockchain.blockHeader(BlockV5ActivationHeight - 1).get.header.generationSignature
 
-            val hitSourceAtActivationHeight = blockchain.hitSourceAtHeight(BlockV5ActivationHeight).get
+            val hitSourceAtActivationHeight = blockchain.hitSource(BlockV5ActivationHeight).get
             hitSourceAtActivationHeight shouldBe crypto
               .verifyVRF(
                 blockAtActivationHeight.header.generationSignature,
@@ -105,10 +108,10 @@ class BlockV5Test
 
             Await.result(appender(blockAfterActivationHeight).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
             blockchain.height shouldBe BlockV5ActivationHeight + 1
-            blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
-            blockAfterActivationHeight.signature shouldBe blockchain.lastBlock.value.signature
+            blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
+            blockAfterActivationHeight.signature shouldBe blockchain.lastBlockHeader.value.signature
 
-            val hitSourceAfterActivationHeight = blockchain.hitSourceAtHeight(BlockV5ActivationHeight + 1).get
+            val hitSourceAfterActivationHeight = blockchain.hitSource(BlockV5ActivationHeight + 1).get
             hitSourceAfterActivationHeight shouldBe crypto
               .verifyVRF(
                 blockAfterActivationHeight.header.generationSignature,
@@ -126,10 +129,10 @@ class BlockV5Test
 
             Await.result(appender(blockAfterVRFUsing).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
             blockchain.height shouldBe BlockV5ActivationHeight + 2
-            blockchain.lastBlock.value.header.version shouldBe Block.ProtoBlockVersion
-            blockAfterVRFUsing.signature shouldBe blockchain.lastBlock.value.signature
+            blockchain.lastBlockHeader.value.header.version shouldBe Block.ProtoBlockVersion
+            blockAfterVRFUsing.signature shouldBe blockchain.lastBlockHeader.value.signature
 
-            val hitSourceAfterVRFUsing = blockchain.hitSourceAtHeight(BlockV5ActivationHeight + 2).get
+            val hitSourceAfterVRFUsing = blockchain.hitSource(BlockV5ActivationHeight + 2).get
             hitSourceAfterVRFUsing shouldBe crypto
               .verifyVRF(
                 blockAfterVRFUsing.header.generationSignature,
@@ -138,9 +141,9 @@ class BlockV5Test
               )
               .explicitGet()
 
-            blockchain.blockAt(BlockV5ActivationHeight).value shouldBe blockAtActivationHeight
-            blockchain.blockAt(BlockV5ActivationHeight + 1).value shouldBe blockAfterActivationHeight
-            blockchain.blockAt(BlockV5ActivationHeight + 2).value shouldBe blockAfterVRFUsing
+            blockchain.blockHeader(BlockV5ActivationHeight).value.signature shouldBe blockAtActivationHeight.signature
+            blockchain.blockHeader(BlockV5ActivationHeight + 1).value.signature shouldBe blockAfterActivationHeight.signature
+            blockchain.blockHeader(BlockV5ActivationHeight + 2).value.signature shouldBe blockAfterVRFUsing.signature
 
             blockchain.parentHeader(blockAfterVRFUsing.header).value shouldBe blockAfterActivationHeight.header
             blockchain.parentHeader(blockAfterVRFUsing.header, 2).value shouldBe blockAtActivationHeight.header
@@ -169,9 +172,9 @@ class BlockV5Test
               Await.result(appender(block).runToFuture(scheduler), 10.seconds).right.value shouldBe 'defined
               blockchain.height shouldBe (h + 1)
 
-              val hitSource     = blockchain.hitSourceAtHeight(if (h > 100) h - 100 else h).value
-              val nextHitSource = blockchain.hitSourceAtHeight(h + 1).value
-              val lastBlock     = blockchain.lastBlock.value
+              val hitSource     = blockchain.hitSource(if (h > 100) h - 100 else h).value
+              val nextHitSource = blockchain.hitSource(h + 1).value
+              val lastBlock     = blockchain.lastBlockHeader.value
 
               nextHitSource shouldBe crypto
                 .verifyVRF(
@@ -276,17 +279,17 @@ class BlockV5Test
 
   private val updaterScenario = for {
     (miner1, miner2, b1) <- genesis
-    b2        = TestBlock.create(ntpNow, b1.uniqueId, Seq.empty, miner1, version = Block.PlainBlockVersion)
-    b3        = TestBlock.create(ntpNow, b2.uniqueId, Seq.empty, miner1, version = Block.NgBlockVersion)
+    b2        = TestBlock.create(ntpNow, b1.id(), Seq.empty, miner1, version = Block.PlainBlockVersion)
+    b3        = TestBlock.create(ntpNow, b2.id(), Seq.empty, miner1, version = Block.NgBlockVersion)
     tx1       = createTx(miner1, miner2)
     tx2       = createTx(miner2, miner1)
     tx3       = createTx(miner1, miner2)
     tx4       = createTx(miner2, miner1)
     tx5       = createTx(miner1, miner2)
-    (b4, m4s) = chainBaseAndMicro(b3.uniqueId, Seq.empty, Seq(Seq(tx1)), miner2, Block.NgBlockVersion, ntpNow)
-    (b5, m5s) = chainBaseAndMicro(m4s.head.totalResBlockSig, Seq.empty, Seq(Seq(tx2)), miner1, Block.RewardBlockVersion, ntpNow)
-    (b6, m6s) = chainBaseAndMicro(m5s.head.totalResBlockSig, Seq(tx3), Seq(Seq(tx4)), miner2, Block.ProtoBlockVersion, ntpNow)
-    (b7, m7s) = chainBaseAndMicro(m6s.head.totalResBlockSig, Seq.empty, Seq(Seq(tx5)), miner1, Block.ProtoBlockVersion, ntpNow)
+    (b4, m4s) = chainBaseAndMicro(b3.id(), Seq.empty, Seq(Seq(tx1)), miner2, Block.NgBlockVersion, ntpNow)
+    (b5, m5s) = chainBaseAndMicro(m4s.head.totalBlockId, Seq.empty, Seq(Seq(tx2)), miner1, Block.RewardBlockVersion, ntpNow)
+    (b6, m6s) = chainBaseAndMicro(m5s.head.totalBlockId, Seq(tx3), Seq(Seq(tx4)), miner2, Block.ProtoBlockVersion, ntpNow)
+    (b7, m7s) = chainBaseAndMicro(m6s.head.totalBlockId, Seq.empty, Seq(Seq(tx5)), miner1, Block.ProtoBlockVersion, ntpNow)
   } yield (Seq(b1, b2, b3), (b4, m4s), (b5, m5s), (b6, m6s), (b7, m7s))
 
   "BlockchainUpdater" should "accept valid key blocks and microblocks" in forAll(updaterScenario) {
@@ -308,6 +311,68 @@ class BlockV5Test
       }
   }
 
+  "blockId" should "be header hash" in {
+    implicit val byteStrLength: Length[ByteStr] = (obj: ByteStr) => obj.length
+
+    val preconditions = for {
+      acc <- accountGen
+      ts      = System.currentTimeMillis()
+      genesis = GenesisTransaction.create(acc, diffs.ENOUGH_AMT, ts).explicitGet()
+    } yield (acc, genesis)
+
+    forAll(preconditions) {
+      case (acc, genesis) =>
+        val fs = TestFunctionalitySettings.Stub.copy(
+          preActivatedFeatures = Map(
+            BlockchainFeatures.NG.id -> 0,
+            BlockchainFeatures.BlockV5.id -> 2
+          )
+        )
+
+        withDomain(WavesSettings.default().copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = fs))) {
+          d =>
+            def applyBlock(txs: Transaction*): SignedBlockHeader = {
+              d.appendBlock(
+                TestBlock.create(
+                  System.currentTimeMillis(),
+                  d.blockchainUpdater.lastBlockId.getOrElse(TestBlock.randomSignature()),
+                  txs,
+                  version =
+                    if (d.blockchainUpdater.height >= 1) Block.ProtoBlockVersion
+                    else Block.PlainBlockVersion
+                )
+              )
+              lastBlock
+            }
+
+            def lastBlock: SignedBlockHeader =
+              d.blockchainUpdater.lastBlockHeader.get
+
+            val block1 = applyBlock(genesis) // h=1
+            block1.id() shouldBe block1.signature
+            block1.id() should have length crypto.SignatureLength
+
+            val block2 = applyBlock() // h=2
+            block2.header.reference shouldBe block1.signature
+            block2.id() should have length crypto.DigestLength
+
+            val block3 = applyBlock()
+            block3.header.reference shouldBe block2.id()
+            block3.id() should have length crypto.DigestLength
+
+            val (keyBlock, microBlocks) =
+              UnsafeBlocks.unsafeChainBaseAndMicro(block3.id(), Nil, Seq(Nil, Nil), acc, Block.ProtoBlockVersion, System.currentTimeMillis())
+            d.appendBlock(keyBlock)
+            microBlocks.foreach(d.appendMicroBlock)
+
+            val mb1 = d.blockchainUpdater.microBlock(d.blockchainUpdater.microblockIds.head).get
+            mb1.totalResBlockSig should have length crypto.SignatureLength
+            mb1.reference should not be keyBlock.signature
+            mb1.reference shouldBe keyBlock.id()
+        }
+    }
+  }
+
   private val forgeBlock = PrivateMethod[Either[String, (MiningConstraints, Block, MiningConstraint)]]('forgeBlock)
 
   private def genesis: Gen[(KeyPair, KeyPair, Block)] =
@@ -327,7 +392,7 @@ class BlockV5Test
     } yield (miner1, miner2, genesisBlock)
 
   private def withBlockchain(disabledFeatures: AtomicReference[Set[Short]], time: Time = ntpTime, settings: WavesSettings = testSettings)(
-      f: BlockchainUpdater with NG => Unit
+      f: Blockchain with BlockchainUpdater with NG => Unit
   ): Unit = {
     withLevelDBWriter(settings.blockchainSettings) { blockchain =>
       val bcu: BlockchainUpdaterImpl = new BlockchainUpdaterImpl(blockchain, Observer.stopped, settings, time, ignoreBlockchainUpdateTriggers) {
@@ -340,13 +405,13 @@ class BlockV5Test
 
   type Appender = Block => Task[Either[ValidationError, Option[BigInt]]]
 
-  private def withMiner(blockchain: BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
+  private def withMiner(blockchain: Blockchain with BlockchainUpdater with NG, time: Time, settings: WavesSettings = testSettings)(
       f: (MinerImpl, Appender, Scheduler) => Unit
   ): Unit = {
     val pos               = new PoSSelector(blockchain, settings.blockchainSettings, settings.synchronizationSettings)
     val allChannels       = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
     val wallet            = Wallet(WalletSettings(None, Some("123"), None))
-    val utxPool           = new UtxPoolImpl(time, blockchain, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = false)
+    val utxPool           = new UtxPoolImpl(time, blockchain, Observer.stopped, settings.utxSettings, enablePriorityPool = false)
     val minerScheduler    = Scheduler.singleThread("miner")
     val appenderScheduler = Scheduler.singleThread("appender")
     val miner             = new MinerImpl(allChannels, blockchain, settings, time, utxPool, wallet, pos, minerScheduler, appenderScheduler)

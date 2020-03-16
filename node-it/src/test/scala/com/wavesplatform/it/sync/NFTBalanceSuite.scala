@@ -145,7 +145,7 @@ class NFTBalanceSuite extends FreeSpec with BaseTransactionSuiteLike {
         .recoverWith {
           case ex: Throwable =>
             Future.successful {
-              assert(ex.getMessage contains "Unable to decode asset id")
+              assert(ex.getMessage contains "Invalid asset id")
             }
         }
 

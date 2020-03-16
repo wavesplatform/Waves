@@ -6,7 +6,6 @@ import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.transfer.Attachment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
 import io.grpc.{Metadata, Status => GrpcStatus}
-import org.scalatest.Assertions
 import play.api.libs.json._
 
 import scala.util.{Failure, Success}
@@ -624,6 +623,7 @@ object ExchangeTransaction {
 }
 
 case class Block(
+    id: String,
     signature: String,
     height: Int,
     timestamp: Long,
@@ -646,6 +646,7 @@ object Block {
   implicit val blockFormat: Format[Block] = Format(
     Reads( jsv =>
       for {
+        id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
@@ -664,6 +665,7 @@ object Block {
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf <- (jsv \ "VRF").validateOpt[String]
       } yield Block(
+        id,
         signature,
         height,
         timestamp,
@@ -687,7 +689,8 @@ object Block {
   )
 }
 
-case class BlockHeaders(
+case class BlockHeader(
+    id: String,
     signature: String,
     height: Int,
     timestamp: Long,
@@ -704,10 +707,11 @@ case class BlockHeaders(
     vrf: Option[String],
     version: Option[Byte] = None
 )
-object BlockHeaders {
-  implicit val blockHeadersFormat: Format[BlockHeaders] = Format(
+object BlockHeader {
+  implicit val blockHeadersFormat: Format[BlockHeader] = Format(
     Reads( jsv =>
       for {
+        id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
@@ -723,7 +727,8 @@ object BlockHeaders {
         baseTarget <- (jsv \ "nxt-consensus" \ "base-target").validateOpt[Int]
         transactionsRoot <- (jsv \ "transactionsRoot").validateOpt[String]
         vrf <- (jsv \ "VRF").validateOpt[String]
-      } yield BlockHeaders(
+      } yield BlockHeader(
+        id,
         signature,
         height,
         timestamp,
@@ -741,7 +746,7 @@ object BlockHeaders {
         version
       )
     ),
-    Json.writes[BlockHeaders]
+    Json.writes[BlockHeader]
   )
 }
 

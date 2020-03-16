@@ -1,6 +1,6 @@
-package com.wavesplatform.block.merkle
+package com.wavesplatform.common.merkle
 
-import scorex.crypto.hash.Blake2b256
+import com.wavesplatform.lang.Global
 
 import scala.annotation.tailrec
 
@@ -15,7 +15,7 @@ object Merkle {
   @inline private def isLeft(i: Int): Boolean = i % 2 == 0
 
   /** Hash function */
-  def hash(input: Message): Digest = Blake2b256.hash(input)
+  def hash(input: Message): Digest = Global.blake2b256(input)
 
   /** Makes levels of merkle tree (from top to bottom) */
   def mkLevels(data: Seq[Message]): Seq[Level] = {
@@ -55,6 +55,14 @@ object Merkle {
     result
   }
 
+  def createRoot(digest: Digest, index: Int, proofs: Seq[Digest]): Digest = {
+    val (calculated, _) = proofs.reverse.foldLeft((digest, index)) {
+      case ((left, idx), right) if isLeft(idx) => (hash(left ++ right), idx / 2)
+      case ((right, idx), left)                => (hash(left ++ right), idx / 2)
+    }
+    calculated
+  }
+
   /** Verifies proofs
     *
     * @param digest data digest
@@ -63,10 +71,6 @@ object Merkle {
     * @param root merkle root
     */
   def verify(digest: Digest, index: Int, proofs: Seq[Digest], root: Digest): Boolean = {
-    val (calculated, _) = proofs.reverse.foldLeft((digest, index)) {
-      case ((left, idx), right) if isLeft(idx) => (hash(left ++ right), idx / 2)
-      case ((right, idx), left)                => (hash(left ++ right), idx / 2)
-    }
-    calculated sameElements root
+    createRoot(digest, index, proofs) sameElements root
   }
 }

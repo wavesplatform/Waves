@@ -2,16 +2,12 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync.{dataTxSupportedVersions, minFee}
 import com.wavesplatform.it.util._
-import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.{DataTransactionData, PBRecipients, PBTransactions, Recipient}
-import com.wavesplatform.state.{DataEntry => VanillaDataEntry}
-import com.wavesplatform.state.DataEntry.{MaxKeySize, MaxValueSize}
-import com.wavesplatform.transaction.DataTransaction.MaxEntryCount
-import com.wavesplatform.transaction.TxValidationError.TooBigArray
 import com.wavesplatform.transaction.TxVersion
 import io.grpc.Status.Code
 

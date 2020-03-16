@@ -6,9 +6,9 @@ import com.wavesplatform.lang.v1.compiler.Terms.{CaseObj, EVALUATED}
 import com.wavesplatform.lang.v1.compiler.Types.UNIT
 
 package object impl {
-  def notImplemented[F[_] : Monad](funcName: String, args: List[Any]): F[Either[String, EVALUATED]] =
+  def notImplemented[F[_] : Monad, R](funcName: String, args: List[Any]): F[Either[String, R]] =
       s"Can't apply (${args.map(_.getClass.getSimpleName).mkString(", ")}) to '$funcName'"
-        .asLeft[EVALUATED].pure[F]
+        .asLeft[R].pure[F]
 
   lazy val unit: CaseObj = CaseObj(UNIT, Map.empty)
 

@@ -9,7 +9,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync.{script, someAssetAmount, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Proofs
 import com.wavesplatform.transaction.assets.SetAssetScriptTransaction
@@ -22,19 +22,18 @@ import scala.concurrent.duration._
 import scala.util.Random
 
 class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
-  val estimator = ScriptEstimatorV2
+  val estimator = ScriptEstimatorV1
 
   var assetWOScript    = ""
   var assetWScript     = ""
   var assetWScript2     = ""
   private val accountB = pkByAddress(secondAddress)
   private val unchangeableScript = ScriptCompiler(
-    s"""
-       |match tx {
+    s"""match tx {
        |  case s : SetAssetScriptTransaction => false
        |  case _ => true
        |}
-       """.stripMargin,
+       |""".stripMargin,
     isAssetScript = true,
     estimator
   ).explicitGet()._1
@@ -125,7 +124,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
             s"""match tx {
                |case s : SetAssetScriptTransaction => s.sender == addressFromPublicKey(base58'${ByteStr(pkByAddress(secondAddress).publicKey).toString}')
                |case _ => false
-               |}""".stripMargin,
+               |}
+               |""".stripMargin,
             isAssetScript = true,
             estimator
           ).explicitGet()._1.bytes.value.base64
@@ -182,7 +182,7 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
       nodes.waitForHeightAriseAndTxPresent(txId)
       miner.assertBalances(firstAddress, balance - setAssetScriptFee, eff - setAssetScriptFee)
       val details2 = miner.assetsDetails(assetWScript, true).scriptDetails.getOrElse(fail("Expecting to get asset details"))
-      assert(details2.scriptComplexity == 18)
+      assert(details2.scriptComplexity == 6)
       assert(details2.script == script2)
     }
   }
@@ -374,7 +374,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         Some(unchangeableScript),
         setAssetScriptFee + smartFee,
         System.currentTimeMillis,
-        Proofs.empty
+        Proofs.empty,
+        accountA.toAddress.chainId
       )
 
       val sigTxB = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx.bodyBytes()))
@@ -395,7 +396,8 @@ class SetAssetScriptTransactionSuite extends BaseTransactionSuite {
         Some(script),
         setAssetScriptFee + smartFee,
         System.currentTimeMillis,
-        Proofs.empty
+        Proofs.empty,
+        accountA.toAddress.chainId
       )
 
       val sigTxB2 = ByteStr(crypto.sign(accountB, nonIssuerUnsignedTx2.bodyBytes()))

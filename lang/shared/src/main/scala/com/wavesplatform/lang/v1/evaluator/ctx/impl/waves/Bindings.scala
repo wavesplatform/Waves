@@ -385,7 +385,7 @@ object Bindings {
     )
   }
 
-  def buildLastBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
+  def buildBlockInfo(blockInf: BlockInfo, version: StdLibVersion) = {
     val commonFields: Map[String, EVALUATED] =
       Map(
         "timestamp"           -> blockInf.timestamp,
@@ -397,7 +397,7 @@ object Bindings {
       )
 
     val vrfFieldOpt: Map[String, EVALUATED] =
-      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf, "transactionsRoot" -> blockInf.transactionsRoot)
       else Map()
 
     CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)

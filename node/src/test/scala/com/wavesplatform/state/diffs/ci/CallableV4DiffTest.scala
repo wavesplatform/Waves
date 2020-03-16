@@ -3,6 +3,7 @@ package com.wavesplatform.state.diffs.ci
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Asset, V4}
@@ -13,18 +14,18 @@ import com.wavesplatform.settings.TestFunctionalitySettings
 import com.wavesplatform.state.EmptyDataEntry
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs._
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, _}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction, TxVersion}
+import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDomain {
   property("reissue and burn actions result state") {
     forAll(paymentPreconditions(feeMultiplier = 0)) {
       case (genesis, setScript, invoke, issue, master, reissueAmount, burnAmount) =>
@@ -384,7 +385,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   private def issuePreconditions(
       assetScript: Option[Script] = None,
       feeMultiplier: Int
-  ): Gen[(List[GenesisTransaction], SetScriptTransaction, InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
+  ): Gen[(List[Transaction], InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
@@ -398,7 +399,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
         genesis2 <- GenesisTransaction.create(invoker, ENOUGH_AMT, ts)
         setDApp  <- SetScriptTransaction.selfSigned(1.toByte, master, dApp, fee, ts + 2)
         ci       <- InvokeScriptTransaction.selfSigned(1.toByte, invoker, master, None, Nil, fee, Waves, ts + 3)
-      } yield (List(genesis, genesis2), setDApp, ci, master, invoker, amount)
+      } yield (List(genesis, genesis2, setDApp), ci, master, invoker, amount)
     }.explicitGet()
 
   private def issueDApp(
@@ -418,18 +419,20 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
 
   property("issue action results state") {
     forAll(issuePreconditions(feeMultiplier = 7)) {
-      case (genesis, setScript, invoke, master, invoker, amount) =>
-        assertDiffAndState(
-          Seq(TestBlock.create(genesis :+ setScript)),
-          TestBlock.create(Seq(invoke)),
-          features
-        ) {
-          case (_, blockchain) =>
-            val assets = blockchain.portfolio(master).assets
-            assets.values.toList shouldBe List(amount)
+      case (genesis, invoke, master, invoker, amount) =>
+        withDomain() { d =>
+          val tb1 = TestBlock.create(genesis)
+          d.blockchainUpdater.processBlock(tb1, new Array[Byte](32), false).explicitGet()
+          val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
+          d.blockchainUpdater.processBlock(tb2, new Array[Byte](32), false).explicitGet()
 
-            val assetsi = blockchain.portfolio(invoker).assets
-            assetsi.values.toList shouldBe List()
+          d.portfolio(master).map(_._2) shouldEqual Seq(amount)
+          d.portfolio(invoker) shouldEqual Seq()
+
+          d.blockchainUpdater.processBlock(TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty), new Array[Byte](32), verify = false)
+
+          d.portfolio(master).map(_._2) shouldEqual Seq(amount)
+          d.portfolio(invoker) shouldEqual Seq()
         }
     }
   }

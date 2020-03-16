@@ -45,7 +45,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       paymentTransaction: TransferTransaction <- wavesTransferGeneratorP(time, sender, recipient)
     } yield Block
       .buildAndSign(
-        3,
+        3.toByte,
         time,
         reference,
         baseTarget,
@@ -75,8 +75,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             )
             .explicitGet()
           val parsedBlock = Block.parseBytes(block.bytes()).get
-          assert(block.signaturesValid().isRight)
-          assert(parsedBlock.signaturesValid().isRight)
+          assert(block.signatureValid())
+          assert(parsedBlock.signatureValid())
           assert(parsedBlock.header.generationSignature == generationSignature)
           assert(parsedBlock.header.version.toInt == version)
           assert(parsedBlock.header.generator == recipient.publicKey)
@@ -143,8 +143,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
           )
           .explicitGet()
         val parsedBlock = Block.parseBytes(block.bytes()).get
-        assert(block.signaturesValid().isRight)
-        assert(parsedBlock.signaturesValid().isRight)
+        assert(block.signatureValid())
+        assert(parsedBlock.signatureValid())
         assert(parsedBlock.header.generationSignature == generationSignature)
         assert(parsedBlock.header.version.toInt == version)
         assert(parsedBlock.header.generator == recipient.publicKey)
@@ -158,7 +158,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       case (baseTarget, reference, generationSignature, recipient, transactionData) =>
         val block = Block
           .create(
-            3,
+            3.toByte,
             time,
             reference,
             baseTarget,
@@ -168,7 +168,7 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
             -1L,
             transactionData
           ).copy(signature = ByteStr(Array.fill(64)(0: Byte)))
-        block.signaturesValid() shouldBe 'left
+        block.signatureValid() shouldBe false
     }
   }
 
@@ -177,12 +177,11 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
       case ((txs, acc, ref, gs)) =>
         val (block, t0) =
           Instrumented.withTimeMillis(
-            Block.buildAndSign(3, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L).explicitGet()
+            Block.buildAndSign(3.toByte, 1, ByteStr(ref), 1, ByteStr(gs), txs, acc, Seq.empty, -1L).explicitGet()
           )
         val (bytes, t1) = Instrumented.withTimeMillis(block.bytes().dropRight(crypto.SignatureLength))
         val (hash, t2)  = Instrumented.withTimeMillis(crypto.fastHash(bytes))
         val (sig, t3)   = Instrumented.withTimeMillis(crypto.sign(acc, hash))
-        println((t0, t1, t2, t3))
     }
   }
 
@@ -190,8 +189,8 @@ class BlockSpecification extends PropSpec with PropertyChecks with TransactionGe
     forAll(bigBlockGen(100 * 1000)) {
       case block =>
         val parsedBlock = Block.parseBytes(block.bytes()).get
-        block.signaturesValid() shouldBe 'right
-        parsedBlock.signaturesValid() shouldBe 'right
+        block.signatureValid() shouldBe true
+        parsedBlock.signatureValid() shouldBe true
     }
   }
 }

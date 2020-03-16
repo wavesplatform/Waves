@@ -42,7 +42,7 @@ class IssueTransactionV2Specification
       tx.script shouldEqual recovered.script
       tx.reissuable shouldEqual recovered.reissuable
       tx.fee shouldEqual recovered.fee
-      tx.chainByte shouldEqual recovered.chainByte
+      tx.chainId shouldEqual recovered.chainId
       tx.bytes() shouldEqual recovered.bytes()
     }
   }

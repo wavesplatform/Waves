@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import cats.kernel.Monoid
 import com.wavesplatform.common.utils._
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
@@ -19,8 +20,8 @@ import com.wavesplatform.transaction.lease._
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
-import com.wavesplatform.{NoShrink, TransactionGen, WithDB}
-import org.scalatest.{Inside, Matchers, PropSpec}
+import com.wavesplatform.{NoShrink, TransactionGen}
+import org.scalatest.{Inside, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 object ScriptsCountTest {
@@ -33,7 +34,7 @@ object ScriptsCountTest {
     import com.wavesplatform.transaction.{Authorized, Transaction}
 
     val smartAccountRun = tx match {
-      case x: Transaction with Authorized if blockchain.hasScript(x.sender) => 1
+      case x: Transaction with Authorized if blockchain.hasAccountScript(x.sender) => 1
       case _                                                                => 0
     }
 
@@ -62,7 +63,7 @@ object ScriptsCountTest {
 }
 
 //noinspection NameBooleanParameters
-class ScriptsCountTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink with WithDB with Inside {
+class ScriptsCountTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink with Inside {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
