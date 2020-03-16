@@ -80,7 +80,7 @@ class EvaluatorV2(
               parentBlocks = parentBlocks
             )
           case e: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
-          case nonEvaluated => unused
+          case _ => unused
         }
 
       case REF(key) =>

@@ -6,10 +6,11 @@ import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.FunctionHeader
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
 import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
+import com.wavesplatform.lang.v1.task.imports
 import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
@@ -27,7 +28,7 @@ object ContractEvaluator {
                         fee: Long,
                         feeAssetId: Option[ByteStr])
 
-  private def eval(c: DApp, i: Invocation, version: StdLibVersion): EvalM[Id, Environment, EVALUATED] = {
+  private def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[String, EXPR] = {
     val functionName = i.funcCall.function.funcName
 
     val contractFuncAndCallOpt = c.callableFuncs.find(_.u.name == functionName).map((_, i.funcCall))
@@ -39,29 +40,31 @@ object ContractEvaluator {
           if (otherFuncs contains functionName)
             s"function '$functionName exists in the script but is not marked as @Callable, therefore cannot not be invoked"
           else s"@Callable function '$functionName' doesn't exist in the script"
-        raiseError[Id, LoggedEvaluationContext[Environment, Id], ExecutionError, EVALUATED](message)
+        message.asLeft[EXPR]
 
       case Some((f, fc)) =>
         val takingArgsNumber = f.u.args.size
         val passedArgsNumber = fc.args.size
         if (takingArgsNumber == passedArgsNumber) {
-          withDecls(
+          foldDeclarations(
             c.decs,
             BLOCK(
               LET(f.annotation.invocationArgName, Bindings.buildInvocation(i, version)),
               BLOCK(f.u, fc)
             )
-          )
+          ).asRight[ExecutionError]
         } else {
-          raiseError[Id, LoggedEvaluationContext[Environment, Id], ExecutionError, EVALUATED](
             s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
-          )
+              .asLeft[EXPR]
         }
     }
   }
 
   private def withDecls(dec: List[DECLARATION], block: BLOCK): EvalM[Id, Environment, EVALUATED] =
-    EvaluatorV1().evalExpr(dec.foldRight(block)((d, e) => BLOCK(d, e)))
+    EvaluatorV1().evalExpr(foldDeclarations(dec, block))
+
+  private def foldDeclarations(dec: List[DECLARATION], block: BLOCK) =
+    dec.foldRight(block)((d, e) => BLOCK(d, e))
 
   private def verifierBlock(v: VerifierFunction, entity: CaseObj) =
     BLOCK(LET(v.annotation.invocationArgName, entity), BLOCK(v.u, FUNCTION_CALL(FunctionHeader.User(v.u.name), List(entity))))
@@ -73,9 +76,21 @@ object ContractEvaluator {
     withDecls(decls, verifierBlock(v, Bindings.orderObject(ord, proofsEnabled = true)))
 
   def apply(ctx: EvaluationContext[Environment, Id], c: DApp, i: Invocation, version: StdLibVersion): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
-    val (log, result) = EvaluatorV1().evalWithLogging(ctx, eval(c, i, version))
-    result
+    ???
+    /*buildExprFromInvocation(c, i, version)
+      .map(expr => EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr))
+    val (log, result) = EvaluatorV1().applyWithLogging(ctx, expr)
+    result???
       .flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r, version).map((_, log)))
-      .leftMap((_, log))
+      .leftMap((_, log))*/
   }
+
+  def applyV2(ctx: EvaluationContext[Environment, Id], dApp: DApp, i: Invocation, version: StdLibVersion): Either[String, ScriptResult] =
+    buildExprFromInvocation(dApp, i, version)
+      .map {
+        expr =>
+          val evaluator = new EvaluatorV2(ctx, version)
+          evaluator(expr, ContractLimits.MaxComplexityByVersion(version))
+      }
+      .flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r._1.asInstanceOf[EVALUATED], version))
 }

@@ -38,7 +38,7 @@ object SetScriptTransactionDiff {
     val callables = dApp.copy(verifierFuncOpt = None)
     val actualComplexities =
       for {
-        currentComplexity <- ContractScript.estimateComplexity(version, callables, blockchain.estimator)
+        currentComplexity <- ContractScript.estimateComplexity(version, callables, blockchain.estimator, checkLimit = false)
         nextComplexities  <- estimateNext(blockchain, version, callables)
         complexitiesByEstimator =
           (currentComplexity :: nextComplexities)

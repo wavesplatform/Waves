@@ -105,6 +105,13 @@ object InvokeScriptTransactionDiff {
 
           })
 
+          stepLimit = ContractLimits.MaxComplexityByVersion(version)
+          stepsNumber =
+            if (invocationComplexity % stepLimit == 0)
+              invocationComplexity / stepLimit
+            else
+              invocationComplexity / stepLimit + 1
+
           scriptResult <- {
             val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({
               val invoker = tx.sender.toAddress.bytes
@@ -129,7 +136,7 @@ object InvokeScriptTransactionDiff {
               )
 
               val result = for {
-                evaluator <- ContractEvaluator(
+                scriptResult <- ContractEvaluator.applyV2(
                   Monoid
                     .combineAll(
                       Seq(
@@ -143,18 +150,18 @@ object InvokeScriptTransactionDiff {
                   invocation,
                   version
                 )
-              } yield (evaluator, invocationComplexity)
+              } yield (scriptResult, invocationComplexity)
 
-              result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
+              result.leftMap { case (error) => ScriptExecutionError(error, Nil, isAssetScript = false) }
             })
             TracedResult(
               scriptResultE,
-              List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
+              List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1), scriptResultE.fold(_.log, _ => Nil)))
             )
           }
 
           invocationComplexity = scriptResult._2
-          actions = scriptResult._1._1 match {
+          actions = scriptResult._1 match {
             case ScriptResultV3(dataItems, transfers) => dataItems ::: transfers
             case ScriptResultV4(actions)              => actions
           }
