@@ -130,7 +130,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   private val balancesCache: LoadingCache[(Address, Asset), java.lang.Long] =
     observedCache(dbSettings.maxCacheSize * 16, spendableBalanceChanged, loadBalance)
-  protected def clearBalancesCache(): Unit = balancesCache.invalidateAll()
+  protected def clearBalancesCache(): Unit                          = balancesCache.invalidateAll()
   protected def discardBalance(key: (Address, Asset)): Unit         = balancesCache.invalidate(key)
   override def balance(address: Address, mayBeAssetId: Asset): Long = balancesCache.get(address -> mayBeAssetId)
   protected def loadBalance(req: (Address, Asset)): Long
@@ -156,7 +156,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def hasScript(address: Address): Boolean =
     Option(scriptCache.getIfPresent(address)).map(_.nonEmpty).getOrElse(hasScriptBytes(address))
 
-  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] = cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
+  private val assetScriptCache: LoadingCache[IssuedAsset, Option[(Script, Long)]] =
+    cache(dbSettings.maxCacheSize, loadAssetScript(_).map(withComplexity))
   protected def loadAssetScript(asset: IssuedAsset): Option[Script]
   protected def hasAssetScriptBytes(asset: IssuedAsset): Boolean
   protected def discardAssetScript(asset: IssuedAsset): Unit = assetScriptCache.invalidate(asset)
@@ -198,24 +199,27 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def lastBlockReward: Option[Long] = loadLastBlockReward()
 
   //noinspection ScalaStyle
-  protected def doAppend(block: Block,
-                         carry: Long,
-                         newAddresses: Map[Address, BigInt],
-                         wavesBalances: Map[BigInt, Long],
-                         assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
-                         leaseBalances: Map[BigInt, LeaseBalance],
-                         addressTransactions: Map[AddressId, List[TransactionId]],
-                         leaseStates: Map[ByteStr, Boolean],
-                         reissuedAssets: Map[IssuedAsset, AssetInfo],
-                         filledQuantity: Map[ByteStr, VolumeAndFee],
-                         scripts: Map[BigInt, Option[(Script, Long)]],
-                         assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
-                         data: Map[BigInt, AccountDataInfo],
-                         aliases: Map[Alias, BigInt],
-                         sponsorship: Map[IssuedAsset, Sponsorship],
-                         totalFee: Long,
-                         reward: Option[Long],
-                         scriptResults: Map[ByteStr, InvokeScriptResult]): Unit
+  protected def doAppend(
+      block: Block,
+      carry: Long,
+      newAddresses: Map[Address, BigInt],
+      wavesBalances: Map[BigInt, Long],
+      assetBalances: Map[BigInt, Map[IssuedAsset, Long]],
+      leaseBalances: Map[BigInt, LeaseBalance],
+      addressTransactions: Map[AddressId, List[TransactionId]],
+      leaseStates: Map[ByteStr, Boolean],
+      reissuedAssets: Map[IssuedAsset, AssetInfo],
+      filledQuantity: Map[ByteStr, VolumeAndFee],
+      scripts: Map[BigInt, Option[(Script, Long)]],
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
+      data: Map[BigInt, AccountDataInfo],
+      aliases: Map[Alias, BigInt],
+      sponsorship: Map[IssuedAsset, Sponsorship],
+      totalFee: Long,
+      reward: Option[Long],
+      scriptResults: Map[ByteStr, InvokeScriptResult],
+      stateHash: StateHashBuilder.Result
+  ): Unit
 
   def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], block: Block): Unit = {
     val newHeight = current._1 + 1
@@ -243,6 +247,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val updatedLeaseBalances = Map.newBuilder[Address, LeaseBalance]
     val newPortfolios        = Seq.newBuilder[Address]
     val newBalances          = Map.newBuilder[(Address, Asset), java.lang.Long]
+    val stateHash            = new StateHashBuilder
 
     for ((address, portfolioDiff) <- diff.portfolios) {
       val aid = addressId(address)
@@ -250,6 +255,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         val wbalance = portfolioDiff.balance + balance(address, Waves)
         wavesBalances += aid            -> wbalance
         newBalances += (address, Waves) -> wbalance
+        stateHash.addBalance(address, Waves, wbalance)
       }
 
       if (portfolioDiff.lease != LeaseBalance.empty) {
@@ -259,10 +265,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       }
 
       if (portfolioDiff.assets.nonEmpty) {
-        val newAssetBalances = for { (k, v) <- portfolioDiff.assets if v != 0 } yield {
-          val abalance = v + balance(address, k)
-          newBalances += (address, k) -> abalance
-          k                           -> abalance
+        val newAssetBalances = for { (asset, balanceDiff) <- portfolioDiff.assets if balanceDiff != 0 } yield {
+          val abalance = balance(address, asset) + balanceDiff
+          newBalances += (address, asset) -> abalance
+          stateHash.addBalance(address, asset, abalance)
+          asset -> abalance
         }
         if (newAssetBalances.nonEmpty) {
           assetBalances += aid -> newAssetBalances
@@ -301,6 +308,39 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     current = (newHeight, current._2 + block.blockScore(), Some(block))
 
+    for {
+      (address, data) <- diff.accountData
+      entry           <- data.data.values
+    } stateHash.addDataEntry(address, entry)
+
+    diff.aliases.foreach {
+      case (alias, address) =>
+        stateHash.addAlias(address, alias.name)
+    }
+
+    for {
+      (address, sv) <- diff.scripts
+      script = sv.map(_._1)
+    } stateHash.addAccountScript(address, script)
+
+    for {
+      (address, sv) <- diff.assetScripts
+      script = sv.map(_._1)
+    } stateHash.addAssetScript(address, script)
+
+    diff.leaseState.foreach {
+      case (leaseId, status) =>
+        stateHash.addLease(TransactionId @@ leaseId, status)
+    }
+
+    diff.sponsorship.foreach {
+      case (asset, sponsorship) =>
+        stateHash.addSponsor(asset, sponsorship match {
+          case SponsorshipValue(minFee) => minFee
+          case SponsorshipNoInfo        => 0L
+        })
+    }
+
     doAppend(
       block,
       carryFee,
@@ -319,7 +359,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.sponsorship,
       totalFee,
       reward,
-      diff.scriptResults
+      diff.scriptResults,
+      stateHash.result()
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]

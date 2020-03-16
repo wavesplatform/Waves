@@ -15,6 +15,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.nxt.NxtLikeConsensusBlockData
 import com.wavesplatform.crypto._
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Transaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
@@ -374,6 +375,30 @@ package object database extends ScorexLogging {
     ndo.writeInt(h)
     ndo.writeShort(num)
 
+    ndo.toByteArray
+  }
+
+  def readStateHash(bs: Array[Byte]): StateHash = {
+    val ndi = newDataInput(bs)
+    val totalHash = ndi.readByteStr(DigestSize)
+    val count = ndi.readInt()
+    val sections = (0 until count).map { _ =>
+      val sectionId = ndi.readByte()
+      val value = ndi.readByteStr(DigestSize)
+      SectionId(sectionId) -> value
+    }
+    StateHash(totalHash, sections.toMap)
+  }
+
+  def writeStateHash(sh: StateHash): Array[Byte] = {
+    val sorted = sh.bySection.toSeq.sortBy(_._1)
+    val ndo = newDataOutput(crypto.DigestSize + Ints.BYTES + sorted.length * (1 + crypto.DigestSize))
+    ndo.write(sh.totalHash)
+    ndo.write(sorted.length)
+    sorted.foreach { case (sectionId, value) =>
+      ndo.write(sectionId.id.toByte)
+      ndo.write(value)
+    }
     ndo.toByteArray
   }
 

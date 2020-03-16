@@ -2,7 +2,7 @@ package com.wavesplatform.database
 
 import java.nio.ByteBuffer
 
-import cats.{Monoid, kernel}
+import cats.Monoid
 import com.google.common.cache.CacheBuilder
 import com.google.common.primitives.{Ints, Shorts}
 import com.wavesplatform.account.{Address, Alias}
@@ -54,7 +54,6 @@ object LevelDBWriter extends AddressTransactions.Prov[LevelDBWriter] with Distri
   private[database] def closest(v: Seq[Int], h: Int): Option[Int] = {
     v.takeWhile(_ <= h).lastOption // Should we use binary search?
   }
-
 
   implicit class ReadOnlyDBExt(val db: ReadOnlyDB) extends AnyVal {
     def fromHistory[A](historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
@@ -251,7 +250,8 @@ class LevelDBWriter(
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
-      scriptResults: Map[ByteStr, InvokeScriptResult]
+      scriptResults: Map[ByteStr, InvokeScriptResult],
+      stateHash: StateHashBuilder.Result
   ): Unit = readWrite { rw =>
     val expiredKeys = new ArrayBuffer[Array[Byte]]
 
@@ -475,6 +475,15 @@ class LevelDBWriter(
     if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(height)) {
       DisableHijackedAliases(rw)
     }
+
+    if (dbSettings.storeStateHashes) {
+      val prevStateHash = rw.get(Keys.stateHash(height - 1)).getOrElse(StateHash.empty)
+      val newStateHash = {
+        val totalHash = stateHash.totalHash(prevStateHash.totalHash)
+        StateHash(totalHash, stateHash.bySection)
+      }
+      rw.put(Keys.stateHash(height), Some(newStateHash))
+    }
   }
 
   override protected def doRollback(targetBlockId: ByteStr): Seq[Block] = {
@@ -605,6 +614,7 @@ class LevelDBWriter(
           rw.delete(Keys.blockTransactionsFee(currentHeight))
           rw.delete(Keys.blockReward(currentHeight))
           rw.delete(Keys.wavesAmount(currentHeight))
+          rw.delete(Keys.stateHash(currentHeight))
 
           if (activatedFeatures.get(BlockchainFeatures.DataTransaction.id).contains(currentHeight)) {
             DisableHijackedAliases.revert(rw)
@@ -726,15 +736,15 @@ class LevelDBWriter(
     db.get(Keys.addressId(address)).flatMap { addressId =>
       assetId match {
         case Waves =>
-            closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
-              val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.wavesBalanceHistory(addressId)), height).map { wh =>
+            val b: Long = db.get(Keys.wavesBalance(addressId)(wh))
+            (wh, b)
+          }
         case asset @ IssuedAsset(_) =>
-            closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
-              val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
-              (wh, b)
-            }
+          closest(db.get(Keys.assetBalanceHistory(addressId, asset)), height).map { wh =>
+            val b: Long = db.get(Keys.assetBalance(addressId, asset)(wh))
+            (wh, b)
+          }
       }
     }
   }

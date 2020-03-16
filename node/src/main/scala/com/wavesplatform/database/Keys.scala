@@ -178,4 +178,8 @@ object Keys {
   val PatchStatusPrefix: Short = 61
   def patchStatus(patchId: Short): Key[Option[Int]] =
     Key.opt("patch-status", Bytes.concat(Shorts.toByteArray(PatchStatusPrefix), Shorts.toByteArray(patchId)), Ints.fromByteArray, Ints.toByteArray)
+
+  val StateHashPrefix: Short = 62
+  def stateHash(height: Int): Key[Option[StateHash]] =
+    Key.opt("state-hash", h(StateHashPrefix, height), readStateHash, writeStateHash)
 }
