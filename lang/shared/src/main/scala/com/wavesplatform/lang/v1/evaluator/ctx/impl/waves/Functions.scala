@@ -50,7 +50,7 @@ object Functions {
                     }
                 })
 
-            case (_, xs) => notImplemented[F](s"$name(s: String)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"$name(s: String)", xs)
           }
       }
     }
@@ -82,7 +82,7 @@ object Functions {
           case _                                                        => unit.asRight[ExecutionError]
         }
         result
-      case xs => notImplemented[Id](s"$name(s: String)", xs)
+      case xs => notImplemented[Id, EVALUATED](s"$name(s: String)", xs)
     }
 
   def getIntegerFromArrayF(v: StdLibVersion): BaseFunction[Environment] = getDataFromArrayF("getInteger", DATA_LONG_FROM_ARRAY, DataType.Long, v)
@@ -272,7 +272,7 @@ object Functions {
               new EnvironmentFunctions(env)
                 .addressFromAlias(fields("alias").asInstanceOf[CONST_STRING].s)
                 .map(_.map(resolved => CaseObj(addressType, Map("bytes" -> CONST_BYTESTR(resolved.bytes).explicitGet()))))
-            case (_, xs) => notImplemented[F](s"addressFromRecipient(a: AddressOrAlias)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"addressFromRecipient(a: AddressOrAlias)", xs)
           }
         }
       }
@@ -289,7 +289,7 @@ object Functions {
       case CaseObj(`addressType`, fields) :: Nil =>
         CONST_STRING(fields("bytes").asInstanceOf[CONST_BYTESTR].bs.toString)
           .asInstanceOf[Either[ExecutionError, EVALUATED]]
-      case xs => notImplemented[Id](s"toString(a: Address)", xs)
+      case xs => notImplemented[Id, EVALUATED](s"toString(a: Address)", xs)
     }
 
   private def caseObjToRecipient(c: CaseObj): Recipient = c.caseType.name match {
@@ -316,7 +316,7 @@ object Functions {
             case (env, (c: CaseObj) :: CONST_BYTESTR(assetId: ByteStr) :: Nil) =>
               env.accountBalanceOf(caseObjToRecipient(c), Some(assetId.arr)).map(_.map(CONST_LONG))
 
-            case (_, xs) => notImplemented[F](s"assetBalance(u: ByteVector|Unit)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"assetBalance(u: ByteVector|Unit)", xs)
           }
       }
     }
@@ -339,7 +339,7 @@ object Functions {
                   case Some(result) => result.asRight[String]
                   case _            => unit.asRight[String]
                 })
-            case (_, xs) => notImplemented[F](s"assetInfo(u: ByteVector)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"assetInfo(u: ByteVector)", xs)
           }
       }
     }
@@ -365,7 +365,7 @@ object Functions {
                 .transactionHeightById(id.arr)
                 .map(fromOptionL)
                 .map(_.asRight[String])
-            case (_, xs) => notImplemented[F](s"transactionHeightById(u: ByteVector)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"transactionHeightById(u: ByteVector)", xs)
           }
       }
     }
@@ -386,7 +386,7 @@ object Functions {
                 .blockInfoByHeight(height.toInt)
                 .map(v => fromOptionCO(v.map(bi => Bindings.buildBlockInfo(bi, version))))
                 .map(_.asRight[ExecutionError])
-            case (_, xs) => notImplemented[F](s"blockInfoByHeight(u: Int)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"blockInfoByHeight(u: Int)", xs)
           }
       }
     }
@@ -440,7 +440,7 @@ object Functions {
                 .map(_.map(transactionObject(_, proofsEnabled, version)))
                 .map(fromOptionCO)
                 .map(_.asRight[String])
-            case (_, xs) => notImplemented[F](s"transactionById(u: ByteVector)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"transactionById(u: ByteVector)", xs)
           }
       }
     }
@@ -463,7 +463,7 @@ object Functions {
                 .map(fromOptionCO)
                 .map(_.asRight[String])
 
-            case (_, xs) => notImplemented[F](s"transferTransactionById(u: ByteVector)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"transferTransactionById(u: ByteVector)", xs)
           }
       }
     }
@@ -504,7 +504,7 @@ object Functions {
                 )):Either[String, EVALUATED]
               ).pure[F]
 
-            case (env, xs) => notImplemented[F](s"calculateAssetId(i: Issue)", xs)
+            case (env, xs) => notImplemented[F, EVALUATED](s"calculateAssetId(i: Issue)", xs)
           }
       }
     }
@@ -530,34 +530,8 @@ object Functions {
                   .asRight[ExecutionError]
                   .pure[F]
 
-            case (_, xs) => notImplemented[F](s"transferTransactionFromProto(bytes: ByteVector)", xs)
+            case (_, xs) => notImplemented[F, EVALUATED](s"transferTransactionFromProto(bytes: ByteVector)", xs)
           }
       }
-    }
-
-  val createMerkleRootF: BaseFunction[Environment] =
-    NativeFunction.withEnvironment[Environment](
-      "createMerkleRoot",
-      30,
-      CREATE_MERKLE_PROOF,
-      BYTESTR,
-      ("merkleProof", LIST(BYTESTR)),
-      ("valueBytes", BYTESTR),
-      ("index", LONG)
-    ) {
-      new ContextfulNativeFunction[Environment](
-        "createMerkleRoot",
-        BYTESTR,
-        Seq(("merkleProof", LIST(BYTESTR)), ("valueBytes", BYTESTR), ("index", LONG))) {
-          override def ev[F[_]: Monad](input: (Environment[F], List[EVALUATED])): F[Either[ExecutionError, EVALUATED]] =
-            input._2 match {
-              case ARR(proof) :: CONST_BYTESTR(value) :: CONST_LONG(index) :: Nil =>
-                CONST_BYTESTR(input._1.createMerkleRoot(value, Math.toIntExact(index), proof.map({
-                   case CONST_BYTESTR(v) => v.arr
-                   case _ => throw(new Exception("Expect ByteStr"))
-                }))) .left.map(_.toString).pure[F]
-              case xs => notImplemented[F](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
-            }
-        }
     }
 }

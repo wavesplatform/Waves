@@ -73,7 +73,6 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
   override def multiPaymentAllowed: Boolean                                   = ???
   override def txId: ByteStr                                                  = ???
   override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] = ???
-  override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte] = ???
 
   private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))

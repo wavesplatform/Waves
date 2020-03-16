@@ -2,7 +2,6 @@ package com.wavesplatform.transaction.smart
 
 import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.block.BlockHeader
-import com.wavesplatform.block.merkle.Merkle
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
@@ -149,6 +148,4 @@ class WavesEnvironment(
         case tx: TransferTransaction => Some(RealTransactionWrapper.mapTransferTx(tx, ds.stdLibVersion))
         case _                       => None
       }
-
-  override def createMerkleRoot(digest: Array[Byte], index: Int, proofs: Seq[Array[Byte]]): Array[Byte] = Merkle.createRoot(digest, index, proofs)
 }
