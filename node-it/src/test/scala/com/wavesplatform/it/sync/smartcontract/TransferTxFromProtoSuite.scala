@@ -36,7 +36,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |        case integer:Int => integer.toString()
       |        case bool:Boolean => bool.toString()
       |        case s:String => s
-      |        case _ => throw("None description")
+      |        case _ => throw("Empty description")
       |      }
       |    let assetId = if (!transferTx.assetId.isDefined()) then {"WAVES"} else {transferTx.assetId.value().toBase58String()}
       |    let feeAssetId = if (!transferTx.feeAssetId.isDefined()) then {"WAVES"} else {transferTx.feeAssetId.value().toBase58String()}
@@ -182,7 +182,7 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
 
     assertApiError(
       sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet())),
-      AssertiveApiError(ScriptExecutionError.Id, "None description", matchMessage = true)
+      AssertiveApiError(ScriptExecutionError.Id, "Empty description", matchMessage = true)
     )
   }
 }
