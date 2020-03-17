@@ -23,7 +23,7 @@ import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
-import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
+import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -70,7 +70,7 @@ case class DebugApiRoute(
 
   override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
-    stateChanges ~ balanceHistory ~ withAuth {
+    stateChanges ~ balanceHistory ~ stateHash ~ withAuth {
       blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
     }
   }
@@ -287,6 +287,16 @@ case class DebugApiRoute(
 
           complete(result.runAsyncLogErr)
       }
+    }
+
+  def stateHash: Route =
+    (get & path("stateHash" / IntNumber)) { height =>
+      val result = for {
+        sh <- blockchain.stateHash(height)
+        blockId <- blockchain.blockAt(height)
+      } yield Json.toJson(sh).as[JsObject] ++ Json.obj("blockId" -> blockId.uniqueId.toString)
+
+      complete(result.toRight(GenericError(s"State hash not found at $height")))
     }
 }
 

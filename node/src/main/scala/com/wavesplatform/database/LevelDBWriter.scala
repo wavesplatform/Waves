@@ -995,6 +995,10 @@ class LevelDBWriter(
       }).toEither.left.map(err => GenericError(s"Couldn't load InvokeScript result: ${err.getMessage}"))
     } yield result
 
+  override def stateHash(height: Int): Option[StateHash] = readOnly { db =>
+    db.get(Keys.stateHash(height))
+  }
+
   private[database] def loadBlock(height: Height): Option[Block] = readOnly { db =>
     loadBlock(height, db)
   }

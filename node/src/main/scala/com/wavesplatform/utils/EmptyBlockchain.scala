@@ -109,4 +109,6 @@ case object EmptyBlockchain extends Blockchain {
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
+
+  override def stateHash(height: Int): Option[StateHash] = None
 }

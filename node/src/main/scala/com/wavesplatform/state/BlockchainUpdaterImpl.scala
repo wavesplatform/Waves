@@ -754,6 +754,10 @@ class BlockchainUpdaterImpl(
     }
   }
 
+  override def stateHash(height: Int): Option[StateHash] = {
+    blockchain.stateHash(height)
+  }
+
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = readLock {
     ngState.fold(blockchain.invokeScriptResult(txId)) { ng =>
       ng.bestLiquidDiff.scriptResults

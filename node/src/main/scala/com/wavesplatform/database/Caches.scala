@@ -255,20 +255,21 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
         val wbalance = portfolioDiff.balance + balance(address, Waves)
         wavesBalances += aid            -> wbalance
         newBalances += (address, Waves) -> wbalance
-        stateHash.addBalance(address, Waves, wbalance)
+        stateHash.addWavesBalance(address, wbalance)
       }
 
       if (portfolioDiff.lease != LeaseBalance.empty) {
         val lease = leaseBalance(address).combine(portfolioDiff.lease)
         leaseBalances += aid            -> lease
         updatedLeaseBalances += address -> lease
+        stateHash.addLeaseBalance(address, lease.in, lease.out)
       }
 
       if (portfolioDiff.assets.nonEmpty) {
         val newAssetBalances = for { (asset, balanceDiff) <- portfolioDiff.assets if balanceDiff != 0 } yield {
           val abalance = balance(address, asset) + balanceDiff
           newBalances += (address, asset) -> abalance
-          stateHash.addBalance(address, asset, abalance)
+          stateHash.addAssetBalance(address, asset, abalance)
           asset -> abalance
         }
         if (newAssetBalances.nonEmpty) {
@@ -330,7 +331,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     diff.leaseState.foreach {
       case (leaseId, status) =>
-        stateHash.addLease(TransactionId @@ leaseId, status)
+        stateHash.addLeaseStatus(TransactionId @@ leaseId, status)
     }
 
     diff.sponsorship.foreach {

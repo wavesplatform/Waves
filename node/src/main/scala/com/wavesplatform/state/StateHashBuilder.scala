@@ -3,42 +3,37 @@ package com.wavesplatform.state
 import java.nio.charset.StandardCharsets
 
 import com.google.common.primitives.{Bytes, Longs}
-import com.wavesplatform
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.serialization.Deser
 import com.wavesplatform.state.StateHash.SectionId
 import com.wavesplatform.state.StateHashBuilder.Result
-import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.collection.mutable
 
 object StateHashBuilder {
+  val EmptySectionHash: ByteStr = createSectionHash(ByteStr.empty)
+
   case class Result(bySection: Map[SectionId.Value, ByteStr]) {
     def totalHash(prevHash: ByteStr): ByteStr = {
-      val sortedHashes = bySection.toSeq.sortBy(_._1).map(_._2.arr)
+      val sortedHashes = SectionId.values.toSeq.map(bySection.getOrElse(_, EmptySectionHash).arr)
       Bytes.concat(prevHash.arr +: sortedHashes: _*)
     }
   }
 
-  private def createHash(bs: ByteStr): ByteStr =
-    wavesplatform.crypto.fastHash(bs)
+  private def createSectionHash(bs: ByteStr): ByteStr =
+    crypto.fastHash(bs)
 }
 
 class StateHashBuilder {
   type Entry = Seq[ByteStr]
   case class Section(entries: Seq[Entry]) {
-    def sortedEntries: Seq[Entry] = entries.sortBy {
-      case e1 +: e2 +: _ => (e1, e2)
-      case _             => ???
-    }
-
-    def payload: ByteStr = sortedEntries.foldLeft(ByteStr.empty) { case (bs, entry) => Bytes.concat((bs +: entry).map(_.arr): _*) }
+    def sortedEntries: Seq[Entry] = entries.sortBy(_.init)
+    def payload: ByteStr          = sortedEntries.foldLeft(ByteStr.empty) { case (bs, entry) => Bytes.concat((bs +: entry).map(_.arr): _*) }
   }
 
-  // TODO should empty sections be included in total result?
   private[this] val map = mutable.AnyRefMap
     .empty[SectionId.Value, Section]
     .withDefaultValue(Section(Nil))
@@ -48,17 +43,23 @@ class StateHashBuilder {
     map(id) = Section(entries :+ entry)
   }
 
-  def addBalance(address: Address, asset: Asset, balance: Long): Unit = {
-    addEntry(SectionId.Balance)(
+  def addWavesBalance(address: Address, balance: Long): Unit = {
+    addEntry(SectionId.WavesBalance)(
       address.bytes,
-      asset.byteRepr, // TODO is 0/1 prefix required?
+      Longs.toByteArray(balance)
+    )
+  }
+
+  def addAssetBalance(address: Address, asset: IssuedAsset, balance: Long): Unit = {
+    addEntry(SectionId.AssetBalance)(
+      address.bytes,
+      asset.id,
       Longs.toByteArray(balance)
     )
   }
 
   def addDataEntry(address: Address, dataEntry: DataEntry[_]): Unit = {
-    // TODO filter empty entries in master
-    addEntry(SectionId.DataChanges)(
+    addEntry(SectionId.DataEntry)(
       address.bytes,
       dataEntry.key.getBytes(StandardCharsets.UTF_8),
       dataEntry.valueBytes
@@ -73,28 +74,36 @@ class StateHashBuilder {
   }
 
   def addAccountScript(address: Address, script: Option[Script]): Unit = {
-    addEntry(SectionId.SetScript)(
+    addEntry(SectionId.AccountScript)(
       address.bytes,
-      Deser.serializeOption(script)(_.bytes())
+      script.fold(ByteStr.empty)(_.bytes())
     )
   }
 
   def addAssetScript(asset: IssuedAsset, script: Option[Script]): Unit = {
-    addEntry(SectionId.SetAssetScript)(
+    addEntry(SectionId.AssetScript)(
       asset.id,
-      Deser.serializeOption(script)(_.bytes())
+      script.fold(ByteStr.empty)(_.bytes())
     )
   }
 
-  def addLease(leaseId: TransactionId, status: Boolean): Unit = {
-    addEntry(SectionId.Lease)(
+  def addLeaseBalance(address: Address, leaseIn: Long, leaseOut: Long): Unit = {
+    addEntry(SectionId.LeaseBalance)(
+      address.bytes,
+      Longs.toByteArray(leaseIn),
+      Longs.toByteArray(leaseOut)
+    )
+  }
+
+  def addLeaseStatus(leaseId: TransactionId, status: Boolean): Unit = {
+    addEntry(SectionId.LeaseStatus)(
       leaseId,
       if (status) Array(1: Byte) else Array(0: Byte)
     )
   }
 
   def addSponsor(asset: IssuedAsset, minSponsoredFee: Long): Unit = {
-    addEntry(SectionId.Sponsor)(
+    addEntry(SectionId.Sponsorship)(
       asset.id,
       Longs.toByteArray(minSponsoredFee)
     )
@@ -103,7 +112,7 @@ class StateHashBuilder {
   def result(): Result = {
     val sectHashes =
       for ((id, section) <- this.map.toMap if section.entries.nonEmpty)
-        yield id -> StateHashBuilder.createHash(section.payload)
+        yield id -> StateHashBuilder.createSectionHash(section.payload)
 
     Result(sectHashes)
   }

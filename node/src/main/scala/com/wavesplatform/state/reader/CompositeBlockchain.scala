@@ -138,6 +138,10 @@ final case class CompositeBlockchain(
       .orElse(inner.invokeScriptResult(txId))
   }
 
+  override def stateHash(height: Int): Option[StateHash] = {
+    inner.stateHash(height)
+  }
+
   override def containsTransaction(tx: Transaction): Boolean = diff.transactions.contains(tx.id()) || inner.containsTransaction(tx)
 
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee =
