@@ -336,7 +336,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     diff.sponsorship.foreach {
       case (asset, sponsorship) =>
-        stateHash.addSponsor(asset, sponsorship match {
+        stateHash.addSponsorship(asset, sponsorship match {
           case SponsorshipValue(minFee) => minFee
           case SponsorshipNoInfo        => 0L
         })

@@ -13,13 +13,12 @@ import com.wavesplatform.transaction.Asset.IssuedAsset
 
 import scala.collection.mutable
 
-object StateHashBuilder {
-  val EmptySectionHash: ByteStr = createSectionHash(ByteStr.empty)
-
-  case class Result(bySection: Map[SectionId.Value, ByteStr]) {
-    def totalHash(prevHash: ByteStr): ByteStr = {
-      val sortedHashes = SectionId.values.toSeq.map(bySection.getOrElse(_, EmptySectionHash).arr)
-      Bytes.concat(prevHash.arr +: sortedHashes: _*)
+object StateHashBuilder {  val EmptySectionHash: ByteStr = createSectionHash(ByteStr.empty)
+  final case class Result(hashes: Map[SectionId.Value, ByteStr]) {
+    def createStateHash(prevHash: ByteStr): StateHash = {
+      val sortedHashes = SectionId.values.toSeq.map(hashes.getOrElse(_, EmptySectionHash).arr)
+      val payload = Bytes.concat(prevHash.arr +: sortedHashes: _*)
+      StateHash(createSectionHash(payload), hashes)
     }
   }
 
@@ -30,7 +29,11 @@ object StateHashBuilder {
 class StateHashBuilder {
   type Entry = Seq[ByteStr]
   case class Section(entries: Seq[Entry]) {
-    def sortedEntries: Seq[Entry] = entries.sortBy(_.init)
+    private[this] implicit val ordering = Ordering.fromLessThan[Entry] { (s1, s2) =>
+      s1.init.zip(s2.init).exists { case (b1, b2) => Ordering[ByteStr].lt(b1, b2) }
+    }
+
+    def sortedEntries: Seq[Entry] = entries.sorted
     def payload: ByteStr          = sortedEntries.foldLeft(ByteStr.empty) { case (bs, entry) => Bytes.concat((bs +: entry).map(_.arr): _*) }
   }
 
@@ -102,7 +105,7 @@ class StateHashBuilder {
     )
   }
 
-  def addSponsor(asset: IssuedAsset, minSponsoredFee: Long): Unit = {
+  def addSponsorship(asset: IssuedAsset, minSponsoredFee: Long): Unit = {
     addEntry(SectionId.Sponsorship)(
       asset.id,
       Longs.toByteArray(minSponsoredFee)

@@ -296,7 +296,10 @@ case class DebugApiRoute(
         blockId <- blockchain.blockAt(height)
       } yield Json.toJson(sh).as[JsObject] ++ Json.obj("blockId" -> blockId.uniqueId.toString)
 
-      complete(result.toRight(GenericError(s"State hash not found at $height")))
+      result match {
+        case Some(value) => complete(value)
+        case None => complete(StatusCodes.NotFound)
+      }
     }
 }
 

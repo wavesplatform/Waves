@@ -477,11 +477,17 @@ class LevelDBWriter(
     }
 
     if (dbSettings.storeStateHashes) {
-      val prevStateHash = rw.get(Keys.stateHash(height - 1)).getOrElse(StateHash.empty)
-      val newStateHash = {
-        val totalHash = stateHash.totalHash(prevStateHash.totalHash)
-        StateHash(totalHash, stateHash.bySection)
-      }
+      val prevStateHash =
+        if (height == 1) ByteStr.empty
+        else
+          rw.get(Keys.stateHash(height - 1))
+            .fold(
+              throw new IllegalStateException(
+                s"Couldn't load state hash for ${height - 1}. Please rebuild the state or disable db.store-state-hashes"
+              )
+            )(_.totalHash)
+
+      val newStateHash = stateHash.createStateHash(prevStateHash)
       rw.put(Keys.stateHash(height), Some(newStateHash))
     }
   }

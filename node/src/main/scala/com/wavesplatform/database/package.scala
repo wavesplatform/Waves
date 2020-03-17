@@ -380,25 +380,25 @@ package object database extends ScorexLogging {
 
   def readStateHash(bs: Array[Byte]): StateHash = {
     val ndi = newDataInput(bs)
-    val totalHash = ndi.readByteStr(DigestSize)
-    val count = ndi.readInt()
-    val sections = (0 until count).map { _ =>
+    val sectionsCount = ndi.readByte()
+    val sections = (0 until sectionsCount).map { _ =>
       val sectionId = ndi.readByte()
       val value = ndi.readByteStr(DigestSize)
       SectionId(sectionId) -> value
     }
+    val totalHash = ndi.readByteStr(DigestSize)
     StateHash(totalHash, sections.toMap)
   }
 
   def writeStateHash(sh: StateHash): Array[Byte] = {
-    val sorted = sh.bySection.toSeq.sortBy(_._1)
-    val ndo = newDataOutput(crypto.DigestSize + Ints.BYTES + sorted.length * (1 + crypto.DigestSize))
-    ndo.write(sh.totalHash)
-    ndo.write(sorted.length)
+    val sorted = sh.sectionHashes.toSeq.sortBy(_._1)
+    val ndo = newDataOutput(crypto.DigestSize + 1 + sorted.length * (1 + crypto.DigestSize))
+    ndo.writeByte(sorted.length)
     sorted.foreach { case (sectionId, value) =>
-      ndo.write(sectionId.id.toByte)
-      ndo.write(value)
+      ndo.writeByte(sectionId.id.toByte)
+      ndo.writeByteStr(value.ensuring(_.length == DigestSize))
     }
+    ndo.writeByteStr(sh.totalHash.ensuring(_.length == DigestSize))
     ndo.toByteArray
   }
 
