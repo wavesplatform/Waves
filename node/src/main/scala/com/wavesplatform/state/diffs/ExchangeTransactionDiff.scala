@@ -50,11 +50,6 @@ object ExchangeTransactionDiff {
     }
 
     for {
-      _ <- Either.cond(
-        blockchain.isFeatureActivated(BlockchainFeatures.BlockV5) || (tx.order1.orderType == OrderType.BUY && tx.order2.orderType == OrderType.SELL),
-        (),
-        GenericError("order1 should have OrderType.BUY type and order2 should have OrderType.SELL type")
-      )
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
       assetScripted = assets.values.count(_.flatMap(_.script).isDefined)
       _ <- Either.cond(

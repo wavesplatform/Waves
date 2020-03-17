@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.OrderValidationError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, OrderValidationError}
 import com.wavesplatform.transaction.assets.exchange.AssetPair.extractAssetId
 import com.wavesplatform.transaction.assets.exchange.{Order, _}
 import com.wavesplatform.{NTPTime, NoShrink, TransactionGen, crypto}
@@ -188,7 +188,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
     assert(crypto.verify(tx.signature, tx.bodyBytes(), tx.sender), "signature should be valid")
   }
 
-  property("ExchangeTransaction balance changes") {
+  property("ExchangeTransaction invariants validation") {
 
     forAll(preconditions) {
       case (sender1, sender2, matcher, pair, buyerMatcherFeeAssetId, sellerMatcherFeeAssetId, versions) =>
@@ -238,9 +238,10 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             buyMatcherFee: Long = buyMatcherFee,
             sellMatcherFee: Long = 1,
             fee: Long = 1,
-            timestamp: Long = expirationTimestamp - Order.MaxLiveTime
+            timestamp: Long = expirationTimestamp - Order.MaxLiveTime,
+            version: Byte = exchangeV
         ): Either[ValidationError, ExchangeTransaction] = {
-          if (exchangeV == 1) {
+          if (version == 1) {
             ExchangeTransaction.signed(
               1.toByte,
               matcher = sender1,
@@ -255,7 +256,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
             )
           } else {
             ExchangeTransaction.signed(
-              2.toByte,
+              version,
               matcher = sender1,
               order1 = buyOrder,
               order2 = sellOrder,
@@ -303,6 +304,9 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(sellOrder = sell.updateExpiration(sell.expiration + 1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updatePrice(-1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updateMatcher(sender2)) shouldBe an[Left[_, _]]
+
+        create(sellOrder = buy, buyOrder = sell) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
+        create(version = TxVersion.V3, sellOrder = buy, buyOrder = sell) shouldBe an[Right[_, _]]
 
         create(
           buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = Waves)),
