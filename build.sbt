@@ -14,7 +14,6 @@ import sbtcrossproject.CrossPlugin.autoImport.{CrossType, crossProject}
 val langPublishSettings = Seq(
   coverageExcludedPackages := "",
   publishMavenStyle := true,
-  credentials += Credentials(Path.userHome / ".sbt" / ".credentials"),
   publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2"),
   homepage := Some(url("https://docs.wavesplatform.com/en/technical-details/waves-contracts-language-description/maven-compiler-package.html")),
   developers := List(
@@ -107,7 +106,7 @@ inScope(Global)(
     scalaVersion := "2.12.9",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
-    V.fallback := (1, 2, 2),
+    V.fallback := (1, 2, 3),
     organizationHomepage := Some(url("https://wavesplatform.com")),
     scmInfo := Some(ScmInfo(url("https://github.com/wavesplatform/Waves"), "git@github.com:wavesplatform/Waves.git", None)),
     licenses := Seq(("MIT", url("https://github.com/wavesplatform/Waves/blob/master/LICENSE"))),
@@ -184,7 +183,7 @@ checkPRRaw := {
   } finally {
     test.all(ScopeFilter(inProjects(langTests, node), inConfigurations(Test))).value
     (langJS / Compile / fastOptJS).value
-    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`), inConfigurations(Test))).value
+    compile.all(ScopeFilter(inProjects(`node-generator`, benchmark, `node-it`, `blockchain-updates`), inConfigurations(Test))).value
   }
 }
 

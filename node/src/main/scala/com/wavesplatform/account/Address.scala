@@ -25,7 +25,7 @@ object Address extends ScorexLogging {
   val AddressLength        = 1 + 1 + HashLength + ChecksumLength
   val AddressStringLength  = base58Length(AddressLength)
 
-  private[this] val publicKeyBytesCache: Cache[ByteStr, Address] = CacheBuilder
+  private[this] val publicKeyBytesCache: Cache[(ByteStr, Byte), Address] = CacheBuilder
     .newBuilder()
     .softValues()
     .maximumSize(200000)
@@ -39,7 +39,7 @@ object Address extends ScorexLogging {
 
   def fromPublicKey(publicKey: PublicKey, chainId: Byte = scheme.chainId): Address = {
     publicKeyBytesCache.get(
-      publicKey, { () =>
+      (publicKey, chainId), { () =>
         val withoutChecksum = ByteBuffer
           .allocate(1 + 1 + HashLength)
           .put(AddressVersion)
@@ -69,7 +69,7 @@ object Address extends ScorexLogging {
           )
           .right
           .flatMap {
-            res =>
+            _ =>
               val Array(version, network, _*) = addressBytes.arr
 
               (for {
@@ -112,7 +112,9 @@ object Address extends ScorexLogging {
 
   // Optimization, should not be used externally
   private[wavesplatform] def createUnsafe(address: ByteStr): Address = {
-    final case class AddressImpl(bytes: ByteStr) extends Address
+    final case class AddressImpl(bytes: ByteStr) extends Address {
+      override val chainId: Byte = bytes.arr(1)
+    }
     AddressImpl(address)
   }
 }

@@ -19,12 +19,11 @@ import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransac
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{CreateAliasTransaction, DataTransaction, GenesisTransaction, Transaction, TxVersion}
-import com.wavesplatform.utils._
+import com.wavesplatform.utils.StringBytes
 import com.wavesplatform.{NoShrink, TestTime, TransactionGen, history}
 import org.scalacheck.Gen
 import org.scalatest.{Assertions, FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
-import com.wavesplatform.utils.StringBytes
 
 class RollbackSpec extends FreeSpec with Matchers with WithDomain with TransactionGen with PropertyChecks with NoShrink {
   private val time   = new TestTime
@@ -82,13 +81,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             } else {
               val block = TestBlock.create(nextTs + i, d.lastBlockId, Seq())
               d.appendBlock(block)
-              block.uniqueId :: newBlocks(i + 1)
+              block.id() :: newBlocks(i + 1)
             }
           }
           val blocks        = newBlocks(0)
           val droppedBlocks = d.removeAfter(genesisSignature).map(_._1)
           droppedBlocks(0).header.reference shouldBe genesisSignature
-          droppedBlocks.map(_.uniqueId).toList shouldBe blocks
+          droppedBlocks.map(_.id()).toList shouldBe blocks
           droppedBlocks foreach d.appendBlock
         }
     }
@@ -144,8 +143,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val genesisSignature = d.lastBlockId
 
-          d.portfolio(sender.toAddress).balance shouldBe initialBalance
-          d.portfolio(recipient.toAddress).balance shouldBe 0
+          d.balance(sender.toAddress) shouldBe initialBalance
+          d.balance(recipient.toAddress) shouldBe 0
 
           val totalTxCount   = txCount.sum
           val transferAmount = initialBalance / (totalTxCount * 2)
@@ -160,13 +159,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           }
 
-          d.portfolio(recipient).balance shouldBe (transferAmount * totalTxCount)
-          d.portfolio(sender).balance shouldBe (initialBalance - (transferAmount + 1) * totalTxCount)
+          d.balance(recipient) shouldBe (transferAmount * totalTxCount)
+          d.balance(sender) shouldBe (initialBalance - (transferAmount + 1) * totalTxCount)
 
           d.removeAfter(genesisSignature)
 
-          d.portfolio(sender).balance shouldBe initialBalance
-          d.portfolio(recipient).balance shouldBe 0
+          d.balance(sender) shouldBe initialBalance
+          d.balance(recipient) shouldBe 0
         }
     }
 
@@ -183,8 +182,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.height shouldBe 2
           val blockWithLeaseId = d.lastBlockId
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, isActive = true))
-          d.portfolio(sender).lease.out shouldEqual leaseAmount
-          d.portfolio(recipient).lease.in shouldEqual leaseAmount
+          d.blockchainUpdater.leaseBalance(sender).out shouldEqual leaseAmount
+          d.blockchainUpdater.leaseBalance(recipient).in shouldEqual leaseAmount
 
           d.appendBlock(
             TestBlock.create(
@@ -194,18 +193,18 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           )
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, isActive = false))
-          d.portfolio(sender).lease.out shouldEqual 0
-          d.portfolio(recipient).lease.in shouldEqual 0
+          d.blockchainUpdater.leaseBalance(sender).out shouldEqual 0
+          d.blockchainUpdater.leaseBalance(recipient).in shouldEqual 0
 
           d.removeAfter(blockWithLeaseId)
           d.blockchainUpdater.leaseDetails(lt.id()) should contain(LeaseDetails(sender, recipient, 2, leaseAmount, isActive = true))
-          d.portfolio(sender).lease.out shouldEqual leaseAmount
-          d.portfolio(recipient).lease.in shouldEqual leaseAmount
+          d.blockchainUpdater.leaseBalance(sender).out shouldEqual leaseAmount
+          d.blockchainUpdater.leaseBalance(recipient).in shouldEqual leaseAmount
 
           d.removeAfter(genesisBlockId)
           d.blockchainUpdater.leaseDetails(lt.id()) shouldBe 'empty
-          d.portfolio(sender).lease.out shouldEqual 0
-          d.portfolio(recipient).lease.in shouldEqual 0
+          d.blockchainUpdater.leaseBalance(sender).out shouldEqual 0
+          d.blockchainUpdater.leaseBalance(recipient).in shouldEqual 0
         }
     }
 
@@ -228,8 +227,8 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockIdWithIssue = d.lastBlockId
 
-          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(assetAmount)
-          d.portfolio(recipient).assets.get(IssuedAsset(issueTransaction.id())) shouldBe 'empty
+          d.balance(sender, IssuedAsset(issueTransaction.id())) should be(assetAmount)
+          d.balance(recipient, IssuedAsset(issueTransaction.id())) shouldBe 0
 
           d.appendBlock(
             TestBlock.create(
@@ -243,13 +242,13 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           )
 
-          d.portfolio(sender).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual 0
-          d.portfolio(recipient).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual assetAmount
+          d.balance(sender, IssuedAsset(issueTransaction.id())) shouldEqual 0
+          d.balance(recipient, IssuedAsset(issueTransaction.id())) shouldEqual assetAmount
 
           d.removeAfter(blockIdWithIssue)
 
-          d.portfolio(sender).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual assetAmount
-          d.portfolio(recipient).assets.getOrElse(IssuedAsset(issueTransaction.id()), 0) shouldEqual 0
+          d.balance(sender, IssuedAsset(issueTransaction.id())) shouldEqual assetAmount
+          d.balance(recipient, IssuedAsset(issueTransaction.id())) shouldEqual 0
         }
     }
 
@@ -366,7 +365,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
 
           val blockWithScriptId = d.lastBlockId
 
-          d.blockchainUpdater.accountScript(sender) should contain(script)
+          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(sender, script, 1))
 
           d.appendBlock(
             TestBlock.create(
@@ -379,7 +378,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
 
           d.removeAfter(blockWithScriptId)
-          d.blockchainUpdater.accountScript(sender) should contain(script)
+          d.blockchainUpdater.accountScript(sender) should contain(AccountScriptInfo(sender, script, 1))
 
           d.removeAfter(genesisBlockId)
           d.blockchainUpdater.accountScript(sender) shouldBe 'empty
@@ -429,7 +428,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           val blockIdWithSponsor = d.lastBlockId
 
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
-          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
+          d.balance(sender, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity
 
           d.appendBlock(
             TestBlock.create(
@@ -444,7 +443,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
           d.removeAfter(blockIdWithSponsor)
 
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor1.minSponsoredAssetFee.get
-          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
+          d.balance(sender, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity
 
           d.appendBlock(
             TestBlock.create(
@@ -454,7 +453,7 @@ class RollbackSpec extends FreeSpec with Matchers with WithDomain with Transacti
             )
           )
 
-          d.portfolio(sender).assets.get(IssuedAsset(issueTransaction.id())) should contain(issueTransaction.quantity)
+          d.balance(sender, IssuedAsset(issueTransaction.id())) shouldEqual issueTransaction.quantity
           d.blockchainUpdater.assetDescription(sponsor1.asset).get.sponsorship shouldBe sponsor2.minSponsoredAssetFee.get
 
           d.removeAfter(blockIdWithIssue)

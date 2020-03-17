@@ -1,6 +1,6 @@
 package com.wavesplatform.api.http.requests
 
-import com.wavesplatform.account.{Alias, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.{CreateAliasTransaction, Proofs, TxAmount, TxTimestamp, TxVersion}
@@ -18,9 +18,8 @@ case class CreateAliasRequest(
 ) extends TxBroadcastRequest {
   def toTxFrom(sender: PublicKey): Either[ValidationError, CreateAliasTransaction] =
     for {
-      validAlias  <- Alias.create(alias)
       validProofs <- toProofs(signature, proofs)
-      tx          <- CreateAliasTransaction.create(version.getOrElse(1.toByte), sender, validAlias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
+      tx          <- CreateAliasTransaction.create(version.getOrElse(1.toByte), sender, alias, fee.getOrElse(0L), timestamp.getOrElse(0L), validProofs)
     } yield tx
 }
 

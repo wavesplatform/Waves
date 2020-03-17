@@ -1,10 +1,8 @@
 package com.wavesplatform.utils
 
-import cats.kernel.Monoid
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{Address, Alias, PublicKey}
-import com.wavesplatform.block.Block.BlockInfo
-import com.wavesplatform.block.{Block, BlockHeader}
+import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.block.SignedBlockHeader
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -24,29 +22,13 @@ case object EmptyBlockchain extends Blockchain {
 
   override def score: BigInt = 0
 
-  override def blockInfo(height: Int): Option[BlockInfo] = None
+  override def blockHeader(height: Int): Option[SignedBlockHeader] = None
 
-  override def blockInfo(blockId: ByteStr): Option[BlockInfo] = None
-
-  override def lastBlock: Option[Block] = None
+  override def hitSource(height: Int): Option[ByteStr] = None
 
   override def carryFee: Long = 0
 
-  override def blockBytes(height: Int): Option[Array[Byte]] = None
-
-  override def blockBytes(blockId: ByteStr): Option[Array[Byte]] = None
-
   override def heightOf(blockId: ByteStr): Option[Int] = None
-
-  /** Returns the most recent block IDs, starting from the most recent  one */
-  override def lastBlockIds(howMany: Int): Seq[ByteStr] = Seq.empty
-
-  /** Returns a chain of blocks starting with the block with the given ID (from oldest to newest) */
-  override def blockIdsAfter(parentSignature: ByteStr, howMany: Int): Option[Seq[ByteStr]] = None
-
-  override def parentHeader(block: BlockHeader, back: Int): Option[BlockHeader] = None
-
-  override def totalFee(height: Int): Option[Long] = None
 
   /** Features related */
   override def approvedFeatures: Map[Short, Int] = Map.empty
@@ -57,8 +39,6 @@ case object EmptyBlockchain extends Blockchain {
 
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = None
-
-  override def lastBlockReward: Option[Long] = None
 
   override def blockRewardVotes(height: Int): Seq[Long] = Seq.empty
 
@@ -82,19 +62,13 @@ case object EmptyBlockchain extends Blockchain {
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
   override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
-  override def balanceSnapshots(address: Address, from: Int, to: ByteStr): Seq[BalanceSnapshot] = Seq.empty
+  override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]         = Seq.empty
 
-  override def accountScriptWithComplexity(address: Address): Option[AccountScriptInfo] = None
+  override def accountScript(address: Address): Option[AccountScriptInfo] = None
 
-  override def hasScript(address: Address): Boolean = false
+  override def hasAccountScript(address: Address): Boolean = false
 
-  override def assetScriptWithComplexity(asset: IssuedAsset): Option[(PublicKey, Script, Long)] = None
-
-  override def hasAssetScript(asset: IssuedAsset): Boolean = false
-
-  override def accountDataKeys(acc: Address): Set[String] = Set.empty
-
-  override def accountData(acc: Address): AccountDataInfo = AccountDataInfo(Map.empty)
+  override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = None
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = None
 
@@ -102,14 +76,11 @@ case object EmptyBlockchain extends Blockchain {
 
   override def leaseBalance(address: Address): LeaseBalance = LeaseBalance.empty
 
-  override def collectActiveLeases(from: Int, to: Int)(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
+  override def collectActiveLeases(filter: LeaseTransaction => Boolean): Seq[LeaseTransaction] = Seq.empty
 
   /** Builds a new portfolio map by applying a partial function to all portfolios on which the function is defined.
     *
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
-  override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = Right(Monoid[InvokeScriptResult].empty)
-
-  override def hitSourceAtHeight(height: Int): Option[ByteStr] = None
 }

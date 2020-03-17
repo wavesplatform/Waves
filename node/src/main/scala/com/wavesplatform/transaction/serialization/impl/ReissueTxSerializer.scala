@@ -3,6 +3,7 @@ package com.wavesplatform.transaction.serialization.impl
 import java.nio.ByteBuffer
 
 import com.google.common.primitives.{Bytes, Longs}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.serialization._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.{Proofs, TxVersion}
@@ -17,7 +18,7 @@ object ReissueTxSerializer {
       "assetId"    -> asset.id.toString,
       "quantity"   -> quantity,
       "reissuable" -> reissuable
-    ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainByte) else Json.obj())
+    ) ++ (if (tx.version == TxVersion.V2) Json.obj("chainId" -> chainId) else Json.obj())
   }
 
   def bodyBytes(tx: ReissueTransaction): Array[Byte] = {
@@ -37,7 +38,7 @@ object ReissueTxSerializer {
 
       case TxVersion.V2 =>
         Bytes.concat(
-          Array(builder.typeId, version, chainByte),
+          Array(builder.typeId, version, chainId),
           baseBytes
         )
 
@@ -62,7 +63,7 @@ object ReissueTxSerializer {
       val reissuable = buf.getBoolean
       val fee        = buf.getLong
       val timestamp  = buf.getLong
-      ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil)
+      ReissueTransaction(version, sender, asset, quantity, reissuable, fee, timestamp, Nil, AddressScheme.current.chainId)
     }
 
     require(bytes.length > 2, "buffer underflow while parsing transaction")

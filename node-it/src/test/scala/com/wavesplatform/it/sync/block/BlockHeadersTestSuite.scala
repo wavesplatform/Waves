@@ -6,6 +6,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api._
 import com.wavesplatform.it.transactions.NodesFromDocker
 import com.wavesplatform.it.{Node, NodeConfigs, TransferSending}
+import org.scalactic.source.Position
 import org.scalatest._
 
 import scala.concurrent.duration._
@@ -47,13 +48,13 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
 
   private val nodeAddresses = nodeConfigs.map(_.getString("address")).toSet
 
-  def assertBlockInfo(blocks: Block, blockHeaders: BlockHeaders): Unit = {
-    blockHeaders.generator shouldBe blocks.generator
-    blockHeaders.timestamp shouldBe blocks.timestamp
-    blockHeaders.signature shouldBe blocks.signature
-    blockHeaders.desiredReward shouldBe blocks.desiredReward
-    blockHeaders.reward shouldBe blocks.reward
-    blockHeaders.transactionCount shouldBe blocks.transactions.size
+  def assertBlockInfo(block: Block, blockHeader: BlockHeader)(implicit pos: Position): Unit = {
+    blockHeader.generator shouldBe block.generator
+    blockHeader.timestamp shouldBe block.timestamp
+    blockHeader.signature shouldBe block.signature
+    blockHeader.desiredReward shouldBe block.desiredReward
+    blockHeader.reward shouldBe block.reward
+    blockHeader.transactionCount shouldBe block.transactions.size
   }
 
   test("blockAt content should be equal to blockHeaderAt, except transactions info") {
@@ -62,16 +63,12 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
     nodes.waitForHeight(baseHeight + 4)
     notMiner.blockHeadersAt(activationHeight).reward shouldBe Some(initialReward)
     notMiner.blockHeadersAt(activationHeight + 1).desiredReward shouldBe Some(minerDesiredReward)
-    val blocks        = notMiner.blockAt(baseHeight + 1)
-    val blocksHeaders = notMiner.blockHeadersAt(baseHeight + 1)
+    val block        = notMiner.blockAt(baseHeight + 1)
+    val blocksHeader = notMiner.blockHeadersAt(baseHeight + 1)
 
-    assertBlockInfo(blocks, blocksHeaders)
+    assertBlockInfo(block, blocksHeader)
     nodes.waitForHeight(activationHeight + rewardTerm)
-//    println(notMiner.blockSeq(1, activationHeight + rewardTerm).map(_.desiredReward))
-
     notMiner.blockHeadersAt(activationHeight + rewardTerm).reward shouldBe Some(initialReward + minIncrement)
-
-
   }
 
   test("lastBlock content should be equal to lastBlockHeader, except transactions info") {
@@ -79,7 +76,7 @@ class BlockHeadersTestSuite extends FunSuite with CancelAfterFailure with Transf
     Await.result(processRequests(generateTransfersToRandomAddresses(30, nodeAddresses)), 2.minutes)
     nodes.waitForHeight(baseHeight + 1)
     val blocks        = nodes.map(_.lastBlock())
-    val blocksHeaders = nodes.map(_.lastBlockHeaders())
+    val blocksHeaders = nodes.map(_.lastBlockHeader())
     blocks.zip(blocksHeaders).foreach { case (k, v) => assertBlockInfo(k, v) }
   }
 

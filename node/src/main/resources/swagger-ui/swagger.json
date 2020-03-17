@@ -2106,58 +2106,6 @@
         }
       }
     },
-    "/utils/sign/{privateKey}": {
-      "post": {
-        "tags": [
-          "utils"
-        ],
-        "summary": "Hash",
-        "description": "Return FastCryptographicHash of specified message",
-        "operationId": "sign_1",
-        "produces": [
-          "application/json"
-        ],
-        "parameters": [
-          {
-            "name": "privateKey",
-            "in": "path",
-            "description": "privateKey",
-            "required": true,
-            "type": "string",
-            "x-example": "3kMEhU5z3v8bmer1ERFUUhW58Dtuhyo9hE5vrhjqAWYT"
-          },
-          {
-            "in": "body",
-            "name": "message",
-            "description": "Message to hash (base58 string)",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "successful operation",
-            "schema": {
-              "type": "object",
-              "required": [
-                "message",
-                "signature"
-              ],
-              "properties": {
-                "message": {
-                  "type": "string"
-                },
-                "signature": {
-                  "type": "string"
-                }
-              }
-            }
-          }
-        }
-      }
-    },
     "/utils/script/decompile": {
       "post": {
         "tags": [

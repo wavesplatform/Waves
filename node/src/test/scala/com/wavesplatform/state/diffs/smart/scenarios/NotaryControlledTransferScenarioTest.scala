@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.smart.scenarios
 import cats.Id
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -26,10 +27,10 @@ import com.wavesplatform.utils.{EmptyBlockchain, _}
 import com.wavesplatform.{NoShrink, TransactionGen}
 import monix.eval.Coeval
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class NotaryControlledTransferScenarioTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
   val preconditions: Gen[(Seq[GenesisTransaction], IssueTransaction, DataTransaction, TransferTransaction, DataTransaction, DataTransaction, TransferTransaction)] =
     for {
       company  <- accountGen

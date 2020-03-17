@@ -283,8 +283,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     sender.signedBroadcast(tx.json(), waitForTx = true)
 
-    sender.nftAssetsBalance(sellerAddress, limit = 1) shouldBe empty
-    sender.nftAssetsBalance(buyerAddress, 1).head.assetId shouldBe nftAsset
+    sender.nftList(sellerAddress, limit = 1) shouldBe empty
+    sender.nftList(buyerAddress, 1).head.assetId shouldBe nftAsset
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + nftWavesPrice - matcherFee
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - nftWavesPrice - matcherFee
 
@@ -311,13 +311,12 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     sender.signedBroadcast(tx2.json(), waitForTx = true)
 
-    sender.nftAssetsBalance(buyerAddress, limit = 1) shouldBe empty
-    sender.nftAssetsBalance(sellerAddress, 1).head.assetId shouldBe nftAsset
+    sender.nftList(buyerAddress, limit = 1) shouldBe empty
+    sender.nftList(sellerAddress, 1, None).head.assetId shouldBe nftAsset
     sender.assetBalance(sellerAddress, dec6AssetId).balance shouldBe 0
     sender.assetBalance(buyerAddress, dec6AssetId).balance shouldBe 1000000
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalanceAfterFirstExchange - matcherFee
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfgerFirstExchange - matcherFee
-
 
   }
 

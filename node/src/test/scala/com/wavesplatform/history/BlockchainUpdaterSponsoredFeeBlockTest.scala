@@ -115,9 +115,9 @@ class BlockchainUpdaterSponsoredFeeBlockTest
         val (block0, microBlocks) = chainBaseAndMicro(randomSig, genesis, Seq(masterToAlice, feeAsset, sponsor).map(Seq(_)))
         val block1 =
           customBuildBlockOfTxs(microBlocks.last.totalResBlockSig, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
-        val block2 = customBuildBlockOfTxs(block1.uniqueId, Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
-        val block3 = buildBlockOfTxs(block2.uniqueId, Seq(aliceToBob, bobToMaster))
-        val block4 = buildBlockOfTxs(block3.uniqueId, Seq(bobToMaster2))
+        val block2 = customBuildBlockOfTxs(block1.id(), Seq.empty, KeyPair(Array.fill(KeyLength)(1: Byte)), 3: Byte, sponsor.timestamp + 1)
+        val block3 = buildBlockOfTxs(block2.id(), Seq(aliceToBob, bobToMaster))
+        val block4 = buildBlockOfTxs(block3.id(), Seq(bobToMaster2))
 
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processMicroBlock(microBlocks(0)).explicitGet()
@@ -142,7 +142,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
         {
           domain.blockchainUpdater.processBlock(block0) shouldBe 'right
-          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee)
+          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee)
         }
 
         {
@@ -154,7 +154,7 @@ class BlockchainUpdaterSponsoredFeeBlockTest
             .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
             .sum
 
-          domain.blockchainUpdater.totalFee(domain.blockchainUpdater.height) should contain(block0TotalFee + microBlocksWavesFee)
+          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee + microBlocksWavesFee)
         }
     }
   }

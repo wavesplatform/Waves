@@ -1,6 +1,5 @@
 coverageExcludedPackages := ""
 publishMavenStyle := true
-credentials += Credentials(Path.userHome / ".sbt" / ".credentials")
 publishTo := Some("Sonatype Nexus" at "https://oss.sonatype.org/service/local/staging/deploy/maven2")
 name := "RIDE Compiler"
 normalizedName := "lang"

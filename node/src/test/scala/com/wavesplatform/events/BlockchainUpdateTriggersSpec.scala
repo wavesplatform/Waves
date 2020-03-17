@@ -4,8 +4,10 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.MicroBlock
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
 import com.wavesplatform.settings.{Constants, WavesSettings}
 import com.wavesplatform.state.diffs.ENOUGH_AMT
@@ -18,7 +20,6 @@ import com.wavesplatform.{BlockGen, TestHelpers, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
-
 class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with EventsHelpers {
   private val WAVES_AMOUNT = Constants.UnitsInWave * Constants.TotalWaves
 
@@ -176,7 +177,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
           decimals shouldBe tx.decimals
           reissuable shouldBe tx.reissuable
           volume.toLong shouldBe tx.quantity
-          script shouldBe tx.script
+          script.map(_._1) shouldBe tx.script
           nft shouldBe isNFT(tx)
           sponsorship shouldBe None
           assetExistedBefore shouldBe false
@@ -229,7 +230,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
             val scriptUpd = upds.last.assets.head
 
             scriptUpd shouldBe issueUpd.copy(
-              script = setAssetScript.script,
+              script = setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator).explicitGet()),
               assetExistedBefore = !issueUpd.assetExistedBefore
             )
           }
