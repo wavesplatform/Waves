@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -65,6 +66,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     }
   }
 
+  test("only able to get block by signature (that is equal to id) before activation") {
+    sender.blockBySignature(sender.blockAt(sender.height).signature) shouldBe sender.blockAt(sender.height)
+    sender.blockAt(sender.height).signature shouldBe sender.blockAt(sender.height).id
+    ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
+    ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.SignatureLength
+  }
+
   test("not able to update asset info after activation if update interval has not been reached after asset issue") {
     sender.waitForHeight(activationHeight, 2.minutes)
     assertApiError(sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee)) { error =>
@@ -78,6 +86,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
     blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+  }
+
+  test("only able to get block by id (that is not equal to signature) before activation") {
+    sender.blockBySignature(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
+    sender.blockAt(sender.height).signature should not be sender.blockAt(sender.height).id
+    ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
+    ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.DigestLength
   }
 
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {

@@ -577,6 +577,8 @@ object SyncHttpApi extends Assertions {
 
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Block = sync(async(n).blockAt(height, amountsAsStrings))
 
+    def blockById(id: String): Block = sync(async(n).blockById(id))
+
     def blockSeq(fromHeight: Int, toHeight: Int, amountsAsStrings: Boolean = false): Seq[Block] = sync(async(n).blockSeq(fromHeight, toHeight, amountsAsStrings))
 
     def blockSeqByAddress(address: String, from: Int, to: Int, amountsAsStrings: Boolean = false): Seq[Block] = sync(async(n).blockSeqByAddress(address, from, to, amountsAsStrings))
