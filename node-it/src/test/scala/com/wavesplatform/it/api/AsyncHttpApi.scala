@@ -185,8 +185,6 @@ object AsyncHttpApi extends Assertions {
 
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] = get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
 
-    def blockById(id: String): Future[Block] = get(s"/blocks/${id}").as[Block]
-
     def blockBySignature(signature: String, amountsAsStrings: Boolean = false): Future[Block] = get(s"/blocks/signature/$signature", amountsAsStrings).as[Block](amountsAsStrings)
 
     def utx(amountsAsStrings: Boolean = false): Future[Seq[Transaction]] = {
