@@ -230,7 +230,7 @@ case class DebugApiRoute(
       val t0 = System.nanoTime
       val tracedDiff = for {
         tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-        _  <- Verifier(blockchain, h)(tx)
+        _  <- Verifier(blockchain, h, verifySigs = true)(tx)
         ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), h)(blockchain, tx)
       } yield ei
       val timeSpent = (System.nanoTime - t0) * 1e-6

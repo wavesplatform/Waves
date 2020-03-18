@@ -29,11 +29,10 @@ object StateHashBuilder {  val EmptySectionHash: ByteStr = createSectionHash(Byt
 class StateHashBuilder {
   type Entry = Seq[ByteStr]
   case class Section(entries: Seq[Entry]) {
-    private[this] implicit val ordering = Ordering.fromLessThan[Entry] { (s1, s2) =>
-      s1.init.zip(s2.init).exists { case (b1, b2) => Ordering[ByteStr].lt(b1, b2) }
+    def sortedEntries: Seq[Entry] = entries.sortBy {
+      case e1 +: _ +: Nil => (e1, e1)
+      case e1 +: e2 +: _ => (e1, e2)
     }
-
-    def sortedEntries: Seq[Entry] = entries.sorted
     def payload: ByteStr          = sortedEntries.foldLeft(ByteStr.empty) { case (bs, entry) => Bytes.concat((bs +: entry).map(_.arr): _*) }
   }
 

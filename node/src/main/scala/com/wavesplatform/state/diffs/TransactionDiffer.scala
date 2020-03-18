@@ -28,18 +28,16 @@ object TransactionDiffer extends ScorexLogging {
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
-    val func =
-      if (verify) verified(prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight) _
-      else unverified(currentBlockTimestamp, currentBlockHeight) _
+    val func = verified(prevBlockTimestamp, currentBlockTimestamp, currentBlockHeight, verify) _
     func(blockchain, tx)
   }
 
-  def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int)(
+  private def verified(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, currentBlockHeight: Int, verifySigs: Boolean)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
     for {
-      _ <- Verifier(blockchain, currentBlockHeight)(tx)
+      _ <- Verifier(blockchain, currentBlockHeight, verifySigs)(tx)
       _ <- TracedResult(
         stats.commonValidation
           .measureForType(tx.builder.typeId) {
