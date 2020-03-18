@@ -24,6 +24,9 @@ case class ByteStr(arr: Array[Byte]) {
 
   def size: Int = arr.length
 
+  // java replaces invalid chars
+  def toUTF8String = new String(arr, "UTF-8")
+
   def ++(other: ByteStr): ByteStr =
     if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
 
