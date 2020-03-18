@@ -25,14 +25,14 @@ object BlockDiffer extends ScorexLogging {
                                                 maybePrevBlock: Option[Block],
                                                 block: Block,
                                                 constraint: Constraint,
-                                                verify: Boolean = true): Either[ValidationError, Result[Constraint]] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, verify).resultE
+                                                verifySigs: Boolean = true): Either[ValidationError, Result[Constraint]] =
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, verifySigs).resultE
 
   def fromBlockTraced[Constraint <: MiningConstraint](blockchain: Blockchain,
                                                       maybePrevBlock: Option[Block],
                                                       block: Block,
                                                       constraint: Constraint,
-                                                      verify: Boolean = true): TracedResult[ValidationError, Result[Constraint]] = {
+                                                      verifySigs: Boolean = true): TracedResult[ValidationError, Result[Constraint]] = {
     val stateHeight = blockchain.height
 
     // height switch is next after activation
@@ -58,7 +58,7 @@ object BlockDiffer extends ScorexLogging {
     val initDiff = Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerRewardDistr |+| currentBlockFeeDistr |+| prevBlockFeeDistr)))
 
     for {
-      _ <- TracedResult(if (verify) block.signaturesValid() else Right(()))
+      _ <- TracedResult(if (verifySigs) block.signaturesValid() else Right(()))
       r <- apply(
         CompositeBlockchain(blockchain, newBlock = Some(block)),
         constraint,
@@ -66,7 +66,7 @@ object BlockDiffer extends ScorexLogging {
         initDiff,
         stateHeight >= ngHeight,
         block.transactionData,
-        verify
+        verifySigs
       )
     } yield r
   }
@@ -112,7 +112,7 @@ object BlockDiffer extends ScorexLogging {
                                                           initDiff: Diff,
                                                           hasNg: Boolean,
                                                           txs: Seq[Transaction],
-                                                          verify: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
+                                                          verifySigs: Boolean): TracedResult[ValidationError, Result[Constraint]] = {
     def updateConstraint(constraint: Constraint, blockchain: Blockchain, tx: Transaction, diff: Diff): Constraint =
       constraint.put(blockchain, tx, diff).asInstanceOf[Constraint]
 
@@ -121,7 +121,7 @@ object BlockDiffer extends ScorexLogging {
     val lastBlock          = blockchain.lastBlock.get
     val blockGenerator     = lastBlock.sender.toAddress
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verify) _
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, currentBlockHeight, verifySigs = verifySigs) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     def clearSponsorship(blockchain: Blockchain, portfolio: Portfolio): (Portfolio, Long) = {

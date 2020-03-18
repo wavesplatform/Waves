@@ -1,6 +1,5 @@
 package com.wavesplatform.common.state
 
-import com.google.common.primitives.Bytes
 import com.wavesplatform.common.utils.{Base58, Base64}
 
 import scala.util.Try
