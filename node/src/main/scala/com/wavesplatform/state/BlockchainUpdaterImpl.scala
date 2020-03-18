@@ -32,7 +32,7 @@ import monix.reactive.subjects.ReplaySubject
 import monix.reactive.{Observable, Observer}
 
 class BlockchainUpdaterImpl(
-    private val blockchain: LevelDBWriter,
+    val blockchain: LevelDBWriter,
     spendableBalanceChanged: Observer[(Address, Asset)],
     wavesSettings: WavesSettings,
     time: Time
@@ -752,10 +752,6 @@ class BlockchainUpdaterImpl(
 
       blockchain.collectLposPortfolios(pf) ++ b.result()
     }
-  }
-
-  override def stateHash(height: Int): Option[StateHash] = {
-    blockchain.stateHash(height)
   }
 
   override def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult] = readLock {

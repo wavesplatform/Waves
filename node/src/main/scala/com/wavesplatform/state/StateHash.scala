@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.google.common.base.CaseFormat
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.state.StateHash.SectionId
@@ -18,8 +19,8 @@ object StateHash {
 
   implicit val writes: OWrites[StateHash] = OWrites { sh =>
     def decapitalize(sectionId: SectionId.Value): String = {
-      val str = sectionId.toString
-      str.head.toLower +: str.tail
+      val converter = CaseFormat.UPPER_CAMEL.converterTo(CaseFormat.LOWER_CAMEL)
+      converter.convert(sectionId.toString)
     }
 
     def toHexString(bs: ByteStr) = Hex.toHexString(bs)

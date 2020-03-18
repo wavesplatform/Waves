@@ -94,8 +94,6 @@ trait Blockchain {
   def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A]
 
   def invokeScriptResult(txId: TransactionId): Either[ValidationError, InvokeScriptResult]
-
-  def stateHash(height: Int): Option[StateHash] // TODO move to api in master
 }
 
 object Blockchain extends BlockchainExtensions {

@@ -2,7 +2,6 @@ package com.wavesplatform.http
 
 import akka.http.scaladsl.model.StatusCodes
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
-import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings.WavesSettings
@@ -20,8 +19,18 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   val wavesSettings = WavesSettings.default()
   val configObject  = wavesSettings.config.root()
   val blockchain    = stub[Blockchain]
+  val block         = TestBlock.create(Nil)
+  val testStateHash = {
+    def randomHash: ByteStr = Array.fill(32)(Random.nextInt(256).toByte)
+    val hashes              = SectionId.values.map((_, randomHash)).toMap
+    StateHash(randomHash, hashes)
+  }
+
   val debugApiRoute =
-    DebugApiRoute(wavesSettings, ntpTime, blockchain, null, null, null, null, null, null, null, null, null, null, null, configObject, _ => Seq.empty)
+    DebugApiRoute(wavesSettings, ntpTime, blockchain, null, null, null, null, null, null, null, null, null, null, null, configObject, _ => Seq.empty, {
+      case 2 => Some(testStateHash)
+      case _ => None
+    })
   import debugApiRoute._
 
   routePath("/configInfo") - {
@@ -33,18 +42,10 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
 
   routePath("/stateHash") - {
     "works" in {
-      val block = TestBlock.create(Nil)
-      val hash = {
-        def randomHash: ByteStr = Array.fill(32)(Random.nextInt(256).toByte)
-        val hashes              = SectionId.values.map((_, randomHash)).toMap
-        StateHash(randomHash, hashes)
-      }
       (blockchain.blockBytes(_: Int)).when(*).returning(Some(block.bytes()))
-      (blockchain.stateHash _).when(2).returning(Some(hash))
-      (blockchain.stateHash _).when(*).returning(None)
       Get(routePath("/stateHash/2")) ~> route ~> check {
         status shouldBe StatusCodes.OK
-        responseAs[JsObject] shouldBe (Json.toJson(hash).as[JsObject] ++ Json.obj("blockId" -> block.uniqueId.toString))
+        responseAs[JsObject] shouldBe (Json.toJson(testStateHash).as[JsObject] ++ Json.obj("blockId" -> block.uniqueId.toString))
       }
 
       Get(routePath("/stateHash/3")) ~> route ~> check {

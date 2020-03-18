@@ -22,8 +22,8 @@ import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, InvalidRequestSignature}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, StateHash, TransactionId}
+import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
@@ -56,7 +56,8 @@ case class DebugApiRoute(
     mbsCacheSizesReporter: Coeval[MicroBlockSynchronizer.CacheSizes],
     scoreReporter: Coeval[RxScoreObserver.Stats],
     configRoot: ConfigObject,
-    loadBalanceHistory: Address => Seq[(Int, Long)]
+    loadBalanceHistory: Address => Seq[(Int, Long)],
+    loadStateHash: Int => Option[StateHash]
 ) extends ApiRoute
     with AuthRoute
     with ScorexLogging {
@@ -292,13 +293,13 @@ case class DebugApiRoute(
   def stateHash: Route =
     (get & path("stateHash" / IntNumber)) { height =>
       val result = for {
-        sh <- blockchain.stateHash(height)
+        sh      <- loadStateHash(height)
         blockId <- blockchain.blockAt(height)
       } yield Json.toJson(sh).as[JsObject] ++ Json.obj("blockId" -> blockId.uniqueId.toString)
 
       result match {
         case Some(value) => complete(value)
-        case None => complete(StatusCodes.NotFound)
+        case None        => complete(StatusCodes.NotFound)
       }
     }
 }
