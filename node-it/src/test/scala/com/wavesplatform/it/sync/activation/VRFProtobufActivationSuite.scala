@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.activation
 
 import com.typesafe.config.Config
-import com.wavesplatform.api.http.ApiError.StateCheckFailed
+import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
@@ -12,6 +12,7 @@ import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.TxVersion
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 
 import scala.concurrent.duration._
 
@@ -26,10 +27,10 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
       .overrideBase(_.raw(s"waves.blockchain.custom.functionality.min-asset-info-update-interval = $updateInterval"))
       .buildNonConflicting()
 
-  private val senderAcc  = pkByAddress(firstAddress)
+  private val senderAcc    = pkByAddress(firstAddress)
   private val recipientAcc = pkByAddress(secondAddress)
-  var assetId = ""
-  var otherAssetId = ""
+  var assetId              = ""
+  var otherAssetId         = ""
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -40,12 +41,15 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v4 before activation") {
-    val blockBeforeActivationHeight = sender.blockAt(sender.height)
+    val blockBeforeActivationHeight        = sender.blockAt(sender.height)
     val blockHeadersBeforeActivationHeight = sender.blockHeadersAt(sender.height)
     blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     blockHeadersBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
     ByteStr.decodeBase58(blockBeforeActivationHeight.generationSignature.get).get.length shouldBe Block.GenerationSignatureLength
-    ByteStr.decodeBase58(sender.blockGenerationSignature(blockBeforeActivationHeight.id).generationSignature).get.length shouldBe Block.GenerationSignatureLength
+    ByteStr
+      .decodeBase58(sender.blockGenerationSignature(blockBeforeActivationHeight.id).generationSignature)
+      .get
+      .length shouldBe Block.GenerationSignatureLength
     blockBeforeActivationHeight.baseTarget shouldBe blockHeadersBeforeActivationHeight.baseTarget
   }
 
@@ -65,6 +69,27 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     }
   }
 
+  test("not able to broadcast ExchangeTransaction with reversed buy/sell orders") {
+    val (buyOrder, sellOrder) = mkOrders
+
+    assertApiError(
+      sender.broadcastExchange(
+        sender.privateKey,
+        sellOrder,
+        buyOrder,
+        buyOrder.amount,
+        buyOrder.price,
+        matcherFee,
+        matcherFee,
+        matcherFee,
+        validate = false
+      )
+    ) { error =>
+      error.id shouldBe CustomValidationError.Id
+      error.message shouldBe "order1 should have OrderType.BUY"
+    }
+  }
+
   test("not able to update asset info after activation if update interval has not been reached after asset issue") {
     sender.waitForHeight(activationHeight, 2.minutes)
     assertApiError(sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee)) { error =>
@@ -74,7 +99,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("miner generates block v5 after activation") {
-    val blockAtActivationHeight = sender.blockAt(sender.height)
+    val blockAtActivationHeight        = sender.blockAt(sender.height)
     val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
     blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
@@ -91,12 +116,46 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("able to broadcast tx of new version after activation") {
-    val senderWavesBalance = sender.balanceDetails(senderAcc.stringRepr)
+    val senderWavesBalance    = sender.balanceDetails(senderAcc.stringRepr)
     val recipientWavesBalance = sender.balanceDetails(recipientAcc.stringRepr)
     sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3, waitForTx = true)
 
     sender.balanceDetails(senderAcc.stringRepr).available shouldBe senderWavesBalance.available - transferAmount - minFee
     sender.balanceDetails(recipientAcc.stringRepr).available shouldBe recipientWavesBalance.available + transferAmount
+  }
+
+  test("able to broadcast ExchangeTransaction with reversed buy/sell orders") {
+    val (buyOrder, sellOrder) = mkOrders
+
+    assertApiError(
+      sender.broadcastExchange(
+        sender.privateKey,
+        sellOrder,
+        buyOrder,
+        buyOrder.amount,
+        buyOrder.price,
+        matcherFee,
+        matcherFee * 10,
+        matcherFee * 10,
+        validate = false
+      )
+    ) { error =>
+      error.id shouldBe CustomValidationError.Id
+      error.message shouldBe "order1 should have OrderType.BUY"
+    }
+
+    sender.broadcastExchange(
+      sender.privateKey,
+      sellOrder,
+      buyOrder,
+      buyOrder.amount,
+      buyOrder.price,
+      matcherFee,
+      matcherFee,
+      matcherFee,
+      version = TxVersion.V3,
+      waitForTx = true
+    )
   }
 
   test("rollback to height before activation/at activation/after activation height") {
@@ -134,5 +193,34 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
 
     val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
     blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion
+  }
+
+  private def mkOrders: (Order, Order) = {
+    val ts     = System.currentTimeMillis()
+    val amount = 1000000
+    val price  = 1000
+    val buyOrder = Order.buy(
+      version = TxVersion.V2,
+      sender.privateKey,
+      sender.publicKey,
+      AssetPair.createAssetPair("WAVES", assetId).get,
+      amount,
+      price,
+      ts,
+      ts + Order.MaxLiveTime,
+      matcherFee
+    )
+    val sellOrder = Order.sell(
+      version = TxVersion.V2,
+      sender.privateKey,
+      sender.publicKey,
+      AssetPair.createAssetPair("WAVES", assetId).get,
+      amount,
+      price,
+      ts,
+      ts + Order.MaxLiveTime,
+      matcherFee
+    )
+    (buyOrder, sellOrder)
   }
 }
