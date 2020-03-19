@@ -57,7 +57,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         ("value", pointType),
       ) {
         case _ :: Nil => throw new Exception("test exception")
-        case xs => notImplemented[Id]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+        case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)

@@ -68,10 +68,11 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
       case Alias(name)    => resolveAlias(name).map(_.explicitGet().bytes.toString)
     }
 
-  override def inputEntity: InputEntity                                   = ???
-  override def transactionById(id: Array[Byte]): Future[Option[Tx]]       = ???
-  override def multiPaymentAllowed: Boolean                               = ???
-  override def txId: ByteStr                                              = ???
+  override def inputEntity: InputEntity                                       = ???
+  override def transactionById(id: Array[Byte]): Future[Option[Tx]]           = ???
+  override def multiPaymentAllowed: Boolean                                   = ???
+  override def txId: ByteStr                                                  = ???
+  override def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer] = ???
 
   private def getEntity[F[_] : Functor : ResponseWrapper, A <% B : Decoder, B](url: String): Future[F[B]] =
     client.get[F, A](url).map(_.map(r => r))

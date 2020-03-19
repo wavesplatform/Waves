@@ -6,9 +6,9 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.lang.v1.evaluator.FunctionIds._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
-import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.diffs._
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -269,6 +269,27 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
     }
 
     transactionByIdComplexity(2) shouldBe 100
+  }
+
+  property("can compile V4 with new result") {
+    val source =
+      """{-# STDLIB_VERSION 4 #-}
+        |{-# CONTENT_TYPE DAPP #-}
+        |{-# SCRIPT_TYPE ACCOUNT #-}
+        |
+        |@Callable(inv)
+        |func default() = nil
+        |
+        |@Callable(inv)
+        |func default2() = []
+        |
+        |@Callable(inv)
+        |func paySelf(asset: String) = {
+        |  let id = asset.fromBase58String()
+        |  [ ScriptTransfer(this, 1, (if id.size() > 0 then id else unit)) ]
+        |}
+        |""".stripMargin
+    ScriptCompiler.compile(source, estimator) shouldBe 'right
   }
 
   property("library") {

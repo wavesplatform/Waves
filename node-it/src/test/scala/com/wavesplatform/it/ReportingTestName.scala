@@ -14,7 +14,7 @@ trait ReportingTestName extends SuiteMixin with ScorexLogging {
   abstract override protected def runTest(testName: String, args: Args): Status = {
     print(s"Test '$testName' started")
     val r = super.runTest(testName, args)
-    print(s"Test `$testName` finished with $r")
+    print(s"Test '$testName' ${if (r.succeeds()) "SUCCEEDED" else "FAILED"}")
     r
   }
 

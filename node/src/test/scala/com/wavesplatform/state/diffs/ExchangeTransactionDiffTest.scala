@@ -5,6 +5,7 @@ import com.wavesplatform.account.{Address, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
@@ -25,18 +26,18 @@ import com.wavesplatform.transaction.transfer.{MassTransferTransaction, Transfer
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen, crypto}
 import org.scalacheck.Gen
-import org.scalatest.{Inside, Matchers, PropSpec}
+import org.scalatest.{Inside, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 import scala.util.Random
 
-class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with Inside with NoShrink {
+class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with WithState with TransactionGen with Inside with NoShrink {
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
   val MATCHER: KeyPair = KeyPair(Base58.decode("matcher"))
 
-  val fs = TestFunctionalitySettings.Enabled.copy(
+  val fs: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
       BlockchainFeatures.SmartAccounts.id       -> 0,
       BlockchainFeatures.SmartAssets.id         -> 0,
@@ -48,7 +49,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
   val fsWithOrderFeature: FunctionalitySettings =
     fs.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.OrderV3.id -> 0, BlockchainFeatures.BlockV5.id -> 0))
 
-  val fsOrderMassTransfer =
+  val fsOrderMassTransfer: FunctionalitySettings =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
   private val estimator = ScriptEstimatorV2
@@ -144,7 +145,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     forAll(preconditionsAndExchange) {
       case (gen1, gen2, gen3, issue1, issue2, exchange) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) {
+        assertDiffAndState(
+          Seq(TestBlock.create(Seq(gen1, gen2, gen3, issue1, issue2))),
+          TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+          fsWithOrderFeature
+        ) {
           case (blockDiff, state) =>
             val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
             totalPortfolioDiff.balance shouldBe 0
@@ -458,7 +463,11 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(preconditions) {
       case (gen1, gen2, issue1, exchange) =>
         whenever(exchange.amount > 300000) {
-          assertDiffAndState(Seq(TestBlock.create(Seq(gen1, gen2, issue1))), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) {
+          assertDiffAndState(
+            Seq(TestBlock.create(Seq(gen1, gen2, issue1))),
+            TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+            fsWithOrderFeature
+          ) {
             case (blockDiff, _) =>
               val totalPortfolioDiff: Portfolio = Monoid.combineAll(blockDiff.portfolios.values)
               totalPortfolioDiff.balance shouldBe 0
@@ -750,10 +759,10 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
     forAll(exchangeWithV2Tx) {
       case (gen1, gen2, issue1, issue2, exchange) =>
         val exchangeWithResignedOrder = (exchange: @unchecked) match {
-          case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _) =>
+          case e1 @ ExchangeTransaction(TxVersion.V1, bo, so, _, _, _, _, _, _, _, _) =>
             val newSig = ByteStr(crypto.sign(PrivateKey(so.senderPublicKey), bo.bodyBytes()))
             e1.copy(order1 = bo.updateProofs(Proofs(Seq(newSig))).asInstanceOf[Order])
-          case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _) =>
+          case e2 @ ExchangeTransaction(TxVersion.V2, bo, so, _, _, _, _, _, _, _, _) =>
             val newSig = ByteStr(crypto.sign(PrivateKey(bo.senderPublicKey), so.bodyBytes()))
             e2.copy(order2 = so.updateProofs(Proofs(Seq(newSig))))
         }
@@ -784,9 +793,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
         )
 
         val exchangeWithResignedOrder = (exchange: @unchecked) match {
-          case e1 @ ExchangeTransaction(TxVersion.V1, _, so, _, _, _, _, _, _, _) =>
+          case e1 @ ExchangeTransaction(TxVersion.V1, _, so, _, _, _, _, _, _, _, _) =>
             e1.copy(order1 = so.updateProofs(newProofs).asInstanceOf[Order])
-          case e2 @ ExchangeTransaction(TxVersion.V2, _, so, _, _, _, _, _, _, _) =>
+          case e2 @ ExchangeTransaction(TxVersion.V2, _, so, _, _, _, _, _, _, _, _) =>
             e2.copy(order1 = so.updateProofs(newProofs))
         }
 
@@ -950,6 +959,82 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
         // all portfolios built on the state and on the composite blockchain are equal
         portfolios.forall(_ == portfolios.head) shouldBe true
+    }
+  }
+
+  property("ExchangeTransaction V3 can have SELL order as order1 after BlockV5 activation") {
+    def normalizePrice(pad: Byte, aad: Byte)(orderVersion: Byte, price: Long): Long = {
+      if (orderVersion < Order.V4) (price * math.pow(10, 8 + pad - aad)).toLong
+      else (price * math.pow(10, 8)).toLong
+    }
+    val scenario =
+      for {
+        buyer  <- accountGen
+        seller <- accountGen
+        gtx1 = GenesisTransaction.create(buyer, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet()
+        gtx2 = GenesisTransaction.create(seller, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet()
+        gtx3 = GenesisTransaction.create(MATCHER, ENOUGH_AMT, ntpTime.getTimestamp()).explicitGet()
+        fee  = 100000000L
+        itx1 <- issueGen(MATCHER, Some(ENOUGH_AMT))
+        itx2 <- issueGen(MATCHER, Some(ENOUGH_AMT))
+        ttx1 = TransferTransaction
+          .selfSigned(TxVersion.V3, MATCHER, seller, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx1.timestamp + 1)
+          .explicitGet()
+        ttx2 = TransferTransaction
+          .selfSigned(TxVersion.V3, MATCHER, buyer, IssuedAsset(itx1.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx1.timestamp + 1)
+          .explicitGet()
+        ttx3 = TransferTransaction
+          .selfSigned(TxVersion.V3, MATCHER, seller, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx2.timestamp + 1)
+          .explicitGet()
+        ttx4 = TransferTransaction
+          .selfSigned(TxVersion.V3, MATCHER, buyer, IssuedAsset(itx2.assetId), ENOUGH_AMT / 2, Waves, fee, None, itx2.timestamp + 1)
+          .explicitGet()
+        assets        = Seq(IssuedAsset(itx1.assetId), IssuedAsset(itx2.assetId), Waves)
+        assetsDecimal = Map(IssuedAsset(itx1.assetId) -> itx1.decimals, IssuedAsset(itx2.assetId) -> itx2.decimals, Waves -> 8.toByte)
+        amountAsset <- Gen.oneOf(assets)
+        priceAsset  <- Gen.oneOf(assets).filter(_ != amountAsset)
+        np = normalizePrice(assetsDecimal(priceAsset), assetsDecimal(amountAsset)) _
+        amount <- Gen.choose(1, 1000)
+        price  <- Gen.choose(1, 1000)
+        tx     <- exchangeGeneratorP(buyer, seller, amountAsset, priceAsset, fixedMatcher = Some(MATCHER))
+        fixed = tx
+          .copy(
+            version = TxVersion.V3,
+            amount = amount,
+            price = np(Order.V4, price),
+            buyMatcherFee = fee,
+            sellMatcherFee = fee,
+            fee = fee,
+            order1 = tx.order1.copy(amount = amount, price = np(tx.order1.version, price), matcherFee = fee).signWith(buyer),
+            order2 = tx.order2.copy(amount = amount, price = np(tx.order2.version, price), matcherFee = fee).signWith(seller)
+          )
+          .signWith(MATCHER)
+        reversed = fixed
+          .copy(
+            version = TxVersion.V3,
+            amount = amount,
+            price = np(Order.V4, price),
+            buyMatcherFee = fee,
+            sellMatcherFee = fee,
+            fee = fee,
+            order1 = fixed.order2,
+            order2 = fixed.order1
+          )
+          .signWith(MATCHER)
+      } yield (Seq(TestBlock.create(Seq(gtx1, gtx2, gtx3)), TestBlock.create(Seq(itx1, itx2, ttx1, ttx2, ttx3, ttx4))), fixed, reversed)
+    forAll(scenario) {
+      case (preconditions, fixed, reversed) =>
+        val portfolios = collection.mutable.ListBuffer[Map[Address, Portfolio]]()
+
+        assertDiffAndState(preconditions, TestBlock.create(Seq(fixed)), fsWithOrderFeature) { case (diff, _) =>
+          portfolios += diff.portfolios
+        }
+
+        assertDiffAndState(preconditions, TestBlock.create(Seq(reversed)), fsWithOrderFeature) { case (diff, _) =>
+          portfolios += diff.portfolios
+        }
+
+        portfolios.tail.forall(_ == portfolios.head) shouldBe true
     }
   }
 

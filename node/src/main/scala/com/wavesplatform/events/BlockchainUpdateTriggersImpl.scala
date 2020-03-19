@@ -21,7 +21,7 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
     // updatedWavesAmount can change as a result of either genesis transactions or miner rewards
     val updatedWavesAmount = blockchainBefore.height match {
       // genesis case
-      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _) => amount }.sum
+      case 0 => block.transactionData.collect { case GenesisTransaction(_, amount, _, _, _) => amount }.sum
       // miner reward case
       case _ => blockchainBefore.wavesAmount(blockchainBefore.height).toLong + minerReward.getOrElse(0L)
     }

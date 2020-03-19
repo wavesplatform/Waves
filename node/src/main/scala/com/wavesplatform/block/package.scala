@@ -3,7 +3,7 @@ package com.wavesplatform
 import cats.syntax.either._
 import com.wavesplatform.account.PrivateKey
 import com.wavesplatform.block.Block.{TransactionProof, TransactionsMerkleTree}
-import com.wavesplatform.block.merkle.Merkle._
+import com.wavesplatform.common.merkle.Merkle._
 import com.wavesplatform.block.validation.Validators._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.protobuf.transaction.PBTransactions
@@ -37,28 +37,11 @@ package object block {
     def sign(signer: PrivateKey): MicroBlock = microBlock.copy(signature = crypto.sign(signer, ByteStr(microBlock.bytesWithoutSignature())))
   }
 
-  // Merkle
-  implicit class BlockTransactionsRootOps(private val block: Block) extends AnyVal {
-    def transactionProof(transaction: Transaction): Option[TransactionProof] =
-      block.transactionData.indexWhere(transaction.id() == _.id()) match {
-        case -1  => None
-        case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, block.transactionsMerkleTree()).reverse))
-      }
-
-    def verifyTransactionProof(transactionProof: TransactionProof): Boolean =
-      block.transactionData
-        .lift(transactionProof.transactionIndex)
-        .filter(tx => tx.id() == transactionProof.id)
-        .exists(
-          tx =>
-            verify(
-              hash(PBTransactions.protobuf(tx).toByteArray),
-              transactionProof.transactionIndex,
-              transactionProof.digests.reverse,
-              block.header.transactionsRoot.arr
-            )
-        )
-  }
+  def transactionProof(transaction: Transaction, transactionData: Seq[Transaction]): Option[TransactionProof] =
+    transactionData.indexWhere(transaction.id() == _.id()) match {
+      case -1  => None
+      case idx => Some(TransactionProof(transaction.id(), idx, mkProofs(idx, mkMerkleTree(transactionData)).reverse))
+    }
 
   implicit class MerkleTreeOps(private val levels: TransactionsMerkleTree) extends AnyVal {
     def transactionsRoot: ByteStr = {

@@ -79,6 +79,6 @@ object ScriptRunner {
           case Right(_)                => Right(TRUE)
           case Left(GenericError(err)) => Left(err)
         })
-      case _ => (List.empty, "Unsupported script version".asLeft[EVALUATED])
+      case other => (List.empty, s"$other: Unsupported script version".asLeft[EVALUATED])
     }
 }

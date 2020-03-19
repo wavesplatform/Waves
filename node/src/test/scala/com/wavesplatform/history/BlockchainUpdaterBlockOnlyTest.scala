@@ -40,7 +40,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
         domain.blockchainUpdater.height shouldBe 1
         domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
         domain.blockchainUpdater.height shouldBe 2
-        domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe 'right
+        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
         domain.blockchainUpdater.height shouldBe 1
         domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
         domain.blockchainUpdater.processBlock(blocks(2)) shouldBe 'right
@@ -53,7 +53,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
       case (domain, (genesis, payment)) =>
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
         domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
-        domain.blockchainUpdater.processBlock(spoilSignature(blocks.last)) should produce("InvalidSignature")
+        domain.blockchainUpdater.processBlock(spoilSignature(blocks.last)) should produce("invalid signature")
     }
   }
 
@@ -64,8 +64,8 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
         val blocks = chainBlocks(Seq(Seq(genesis), payment))
         domain.blockchainUpdater.processBlock(blocks.head) shouldBe 'right
         domain.blockchainUpdater.processBlock(blocks(1)) shouldBe 'right
-        domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe 'right
-        domain.blockchainUpdater.processBlock(spoilSignature(blocks(1))) should produce("InvalidSignature")
+        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
+        domain.blockchainUpdater.processBlock(spoilSignature(blocks(1))) should produce("invalid signature")
     }
   }
 
@@ -77,7 +77,7 @@ class BlockchainUpdaterBlockOnlyTest extends PropSpec with PropertyChecks with D
         blocks.foreach { b =>
           domain.blockchainUpdater.processBlock(b) shouldBe 'right
         }
-        domain.blockchainUpdater.removeAfter(blocks.head.uniqueId) shouldBe 'right
+        domain.blockchainUpdater.removeAfter(blocks.head.id()) shouldBe 'right
     }
   }
 }

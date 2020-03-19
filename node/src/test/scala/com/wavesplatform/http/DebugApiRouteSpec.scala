@@ -1,8 +1,10 @@
 package com.wavesplatform.http
 
 import com.wavesplatform.api.http.ApiError.ApiKeyNotValid
+import com.wavesplatform.network.PeerDatabase
 import com.wavesplatform.settings.WavesSettings
 import com.wavesplatform.{NTPTime, TestWallet}
+import monix.eval.Task
 
 //noinspection ScalaStyle
 class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper with TestWallet with NTPTime {
@@ -11,7 +13,26 @@ class DebugApiRouteSpec extends RouteSpec("/debug") with RestAPISettingsHelper w
   private val wavesSettings = WavesSettings.fromRootConfig(sampleConfig)
   private val configObject  = sampleConfig.root()
   private val route =
-    DebugApiRoute(wavesSettings, ntpTime, null, null, null, null, null, null, null, null, null, null, null, null, configObject, _ => Seq.empty).route
+    DebugApiRoute(
+      wavesSettings,
+      ntpTime,
+      null,
+      null,
+      null,
+      null,
+      null,
+      PeerDatabase.NoOp,
+      null,
+      (_, _) => Task.raiseError(new NotImplementedError("")),
+      null,
+      null,
+      null,
+      null,
+      null,
+      null,
+      configObject,
+      _ => Seq.empty
+    ).route
 
   routePath("/configInfo") - {
     "requires api-key header" in {

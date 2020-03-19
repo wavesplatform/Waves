@@ -24,8 +24,9 @@ class AccountOrAliasTests extends PropSpec with PropertyChecks with Matchers {
     alias2.chainId shouldBe 'T'
 
   }
-  property("Alias cannot be from other network") {
-    AddressOrAlias.fromString("alias:Q:sasha") shouldBe 'left
+
+  property("Alias can be from other network") {
+    AddressOrAlias.fromString("alias:Q:sasha") shouldBe Alias.createWithChainId("sasha", 'Q'.toByte)
   }
 
   property("Malformed aliases cannot be reconstructed") {

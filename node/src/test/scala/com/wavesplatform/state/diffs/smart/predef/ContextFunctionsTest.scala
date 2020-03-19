@@ -5,6 +5,7 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
+import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, MultiPaymentInvokeScript}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
@@ -23,20 +24,21 @@ import com.wavesplatform.lang.v1.{FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, assertDiffAndState}
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.assets.{IssueTransaction, SponsorFeeTransaction}
+import com.wavesplatform.transaction.serialization.impl.PBTransactionSerializer
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.{DataTransaction, GenesisTransaction, TxVersion}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import shapeless.Coproduct
 
-class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   def compactDataTransactionGen(sender: KeyPair): Gen[DataTransaction] =
     for {
@@ -47,7 +49,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       tx   <- dataTransactionGenP(sender, List(long, bool, bin, str))
     } yield tx
 
-  val preconditionsAndPayments = for {
+  private val preconditionsAndPayments = for {
     master    <- accountGen
     recipient <- accountGen
     ts        <- positiveIntGen
@@ -422,8 +424,8 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
       withVrf <- Gen.oneOf(false, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
-        val generatorSignature =
-          if (withVrf) ByteStr(Array.fill(Block.GenerationVRFSignatureLength)(0: Byte)) else ByteStr(Array.fill(Block.GenerationSignatureLength)(0: Byte))
+        val generationSignature =
+          if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
         val fs =
           if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
@@ -460,7 +462,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | let block = extract(blockInfoByHeight(3))
                  | let checkHeight = block.height == 3
                  | let checkBaseTarget = block.baseTarget == 2
-                 | let checkGenSignature = block.generationSignature == base58'$generatorSignature'
+                 | let checkGenSignature = block.generationSignature == base58'$generationSignature'
                  | let checkGenerator = block.generator.bytes == base58'${defaultSigner.publicKey.toAddress.bytes}'
                  | let checkGeneratorPublicKey = block.generatorPublicKey == base58'${ByteStr(defaultSigner.publicKey)}'
                  | $v4DeclOpt
@@ -662,6 +664,50 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with Matchers wi
                  | checkAddressToStrRight && checkAddressToStr
                  |
               """.stripMargin,
+              estimator
+            )
+            .explicitGet()
+            ._1
+
+          val setScriptTx = SetScriptTransaction
+            .selfSigned(1.toByte, masterAcc, Some(script), 1000000L, transferTx.timestamp + 5)
+            .explicitGet()
+
+          append(Seq(setScriptTx)).explicitGet()
+          append(Seq(transfer2)).explicitGet()
+        }
+    }
+  }
+
+  property("transactionFromProtoBytes") {
+    forAll(preconditionsAndPayments) {
+      case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
+
+        val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+
+        assertDiffAndState(fs) { append =>
+          append(genesis).explicitGet()
+          append(Seq(setScriptTransaction, dataTransaction)).explicitGet()
+          append(Seq(transferTx)).explicitGet()
+
+          val txBytesBase58 = Base58.encode(PBTransactionSerializer.bytes(transferTx))
+          val script = ScriptCompiler.compile(
+              s"""
+                 |
+                 | {-# STDLIB_VERSION 4 #-}
+                 | {-# CONTENT_TYPE EXPRESSION #-}
+                 | {-# SCRIPT_TYPE ACCOUNT #-}
+                 |
+                 | let transferTx  = transferTransactionFromProto(base58'$txBytesBase58').value()
+                 | let incorrectTx = transferTransactionFromProto(base58'aaaa')
+                 |
+                 | incorrectTx          == unit                                                  &&
+                 | transferTx.id        == base58'${transferTx.id.value()}'                      &&
+                 | transferTx.amount    == ${transferTx.amount}                                  &&
+                 | transferTx.sender    == Address(base58'${transferTx.sender.toAddress.bytes}') &&
+                 | transferTx.recipient == Address(base58'${transferTx.recipient}')
+                 |
+               """.stripMargin,
               estimator
             )
             .explicitGet()

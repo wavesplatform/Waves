@@ -2,6 +2,7 @@ package com.wavesplatform.transaction
 
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.GenericError
@@ -84,7 +85,7 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
     import MassTransferTransaction.create
 
     forAll(massTransferGen) {
-      case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs) =>
+      case MassTransferTransaction(_, sender, assetId, transfers, fee, timestamp, attachment, proofs,_ ) =>
         val tooManyTransfers   = List.fill(MaxTransferCount + 1)(ParsedTransfer(sender.toAddress, 1L))
         val tooManyTransfersEi = create(1.toByte, sender, assetId, tooManyTransfers, fee, timestamp, attachment, proofs)
         tooManyTransfersEi shouldBe Left(GenericError(s"Number of transfers ${tooManyTransfers.length} is greater than $MaxTransferCount"))
@@ -111,6 +112,14 @@ class MassTransferTransactionSpecification extends PropSpec with PropertyChecks 
 
         val negativeFeeEi = create(1.toByte, sender, assetId, feeOverflow, -100, timestamp, attachment, proofs)
         negativeFeeEi shouldBe Left(TxValidationError.InsufficientFee())
+
+        val differentChainIds = Seq(ParsedTransfer(sender.toAddress, 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
+        val invalidChainIdEi = create(1.toByte, sender, assetId, differentChainIds, 100, timestamp, attachment, proofs)
+        invalidChainIdEi should produce("One of chain ids not match")
+
+        val otherChainIds = Seq(ParsedTransfer(sender.toAddress('?'.toByte), 100), ParsedTransfer(sender.toAddress('?'.toByte), 100))
+        val invalidOtherChainIdEi = create(1.toByte, sender, assetId, otherChainIds, 100, timestamp, attachment, proofs)
+        invalidOtherChainIdEi should produce("One of chain ids not match")
     }
   }
 

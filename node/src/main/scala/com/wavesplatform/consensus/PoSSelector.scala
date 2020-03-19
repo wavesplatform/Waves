@@ -39,7 +39,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           getHitSource(height)
             .map(hs => NxtLikeConsensusBlockData(bt, crypto.signVRF(account.privateKey, hs)))
         else
-          blockchain.blockInfo(height)
+          blockchain.blockHeader(height)
             .map(_.header.generationSignature.arr)
             .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generationSignature(gs, account.publicKey))))
             .toRight(GenericError("No blocks in blockchain"))
@@ -77,7 +77,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     if (vrfActivated(height + 1)) {
       getHitSource(height).flatMap(hs => crypto.verifyVRF(blockGenSig, hs, block.header.generator))
     } else {
-      blockchain.lastBlock
+      blockchain.lastBlockHeader
         .toRight(GenericError("No blocks in blockchain"))
         .map(b => generationSignature(b.header.generationSignature.arr, block.header.generator))
         .ensureOr { expectedGenSig =>
@@ -128,7 +128,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   private def getHitSource(height: Int): Either[ValidationError, ByteStr] = {
-    val hitSource = if (fairPosActivated(height) && height > 100) blockchain.hitSourceAtHeight(height - 100) else blockchain.hitSourceAtHeight(height)
+    val hitSource = if (fairPosActivated(height) && height > 100) blockchain.hitSource(height - 100) else blockchain.hitSource(height)
     hitSource.toRight(GenericError(s"Couldn't find hit source for height: $height"))
   }
 

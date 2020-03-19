@@ -64,6 +64,7 @@ class RollbackSuite
   }
 
   test("Just rollback transactions") {
+    nodes.waitForHeightArise() // so that NG fees won't affect miner's balances
     val startHeight      = sender.height
     val stateBeforeApply = sender.debugStateAt(startHeight)
 

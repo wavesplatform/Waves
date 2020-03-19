@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs
 
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values.{Expression, V1}
 import com.wavesplatform.lang.script.v1.ExprScript
@@ -15,7 +16,7 @@ import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils._
 import org.scalatest.{Inside, PropSpec}
 
-class TransactionValidationErrorPrintTest extends PropSpec with Inside {
+class TransactionValidationErrorPrintTest extends PropSpec with Inside with WithState {
   property("output transaction error should be easy to read") {
     val assetScript =
       s"""

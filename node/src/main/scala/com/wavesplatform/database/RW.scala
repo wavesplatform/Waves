@@ -11,6 +11,8 @@ class RW(db: DB, readOptions: ReadOptions, batch: WriteBatch) extends ReadOnlyDB
     batch.put(key.keyBytes, bytes)
   }
 
+  def put(key: Array[Byte], value: Array[Byte]): Unit = batch.put(key, value)
+
   def update[V](key: Key[V])(f: V => V): Unit = put(key, f(get(key)))
 
   /** Because of how leveldb batches work, you can increment a specific value only once! */

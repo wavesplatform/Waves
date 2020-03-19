@@ -11,7 +11,8 @@ object PaymentTxValidator extends TxValidator[PaymentTransaction] {
     V.seq(transaction)(
       V.fee(fee),
       V.positiveAmount(amount, "waves"),
-      V.noOverflow(fee, amount)
+      V.noOverflow(fee, amount),
+      V.addressChainId(recipient, chainId)
     )
   }
 }

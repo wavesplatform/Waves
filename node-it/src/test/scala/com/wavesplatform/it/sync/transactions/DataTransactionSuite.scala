@@ -2,19 +2,18 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Ints
 import com.typesafe.config.Config
-import com.wavesplatform.account.{AddressScheme, KeyPair}
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, TooBigArrayAllocation}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{TransactionInfo, UnexpectedStatusCodeException}
-import com.wavesplatform.it.sync.{calcDataFee, minFee}
+import com.wavesplatform.it.sync.{calcDataFee, minFee, _}
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.{DataTransaction, TxVersion}
-import com.wavesplatform.it.sync._
 import org.scalatest.{Assertion, Assertions, EitherValues}
 import play.api.libs.json._
 
@@ -71,11 +70,6 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
         newDataEntries ++                                                 // 20 new keys
         putDataEntries.takeRight(25).map(kv => EmptyDataEntry(kv.key)) ++ // 25 keys to remove
         (1 to 25).map(k => EmptyDataEntry(s"unknown-$k"))                 // 20 unknown keys to remove
-
-    assertApiError(
-      sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V1), version = TxVersion.V1),
-      CustomValidationError("Empty data is not allowed in V1")
-    )
 
     val updateAndRemoveTxId =
       sender.broadcastData(sender.privateKey, updateAndRemoveDataEntries, calcDataFee(updateAndRemoveDataEntries, TxVersion.V2)).id

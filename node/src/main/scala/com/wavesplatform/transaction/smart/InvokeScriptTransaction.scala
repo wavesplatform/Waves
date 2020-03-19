@@ -26,7 +26,8 @@ case class InvokeScriptTransaction(
     fee: TxAmount,
     feeAssetId: Asset,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with TxWithFee.InCustomAsset
@@ -45,7 +46,9 @@ case class InvokeScriptTransaction(
 }
 
 object InvokeScriptTransaction extends TransactionParser {
-  override val typeId: TxType                    = 16
+  type TransactionT = InvokeScriptTransaction
+
+  override val typeId: TxType                    = 16: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2)
 
   implicit val validator: TxValidator[InvokeScriptTransaction] = InvokeScriptTxValidator
@@ -75,7 +78,7 @@ object InvokeScriptTransaction extends TransactionParser {
       timestamp: TxTimestamp,
       proofs: Proofs
   ): Either[ValidationError, InvokeScriptTransaction] =
-    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs).validatedEither
+    InvokeScriptTransaction(version, sender, dappAddress, fc, p, fee, feeAssetId, timestamp, proofs, dappAddress.chainId).validatedEither
 
   def signed(
       version: TxVersion,

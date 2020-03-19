@@ -23,15 +23,14 @@ class GetTransactionGrpcSuite extends GrpcBaseTransactionSuite {
   }
 
   test("get multiple transactions") {
-    val txs = List.fill(10)(sender.broadcastTransfer(firstAcc, Recipient().withPublicKeyHash(secondAddress), transferAmount / 10, minFee, waitForTx = true))
+    val txs = List.fill(10)(sender.broadcastTransfer(thirdAcc, Recipient().withPublicKeyHash(secondAddress), transferAmount / 10, minFee, waitForTx = true))
     val txsIds = txs.map(tx => PBTransactions.vanilla(tx).explicitGet().id().toString)
 
-    val transactionsByIds = sender.getTransactionSeq(txsIds, sender = firstAddress, recipient = Some(Recipient().withPublicKeyHash(secondAddress)))
+    val transactionsByIds = sender.getTransactionSeq(txsIds, sender = thirdAddress, recipient = Some(Recipient().withPublicKeyHash(secondAddress)))
     transactionsByIds.size shouldBe 10
     for(tx <- transactionsByIds) {
-      tx.getTransaction.senderPublicKey shouldBe ByteString.copyFrom(Base58.decode(firstAcc.publicKey.toString))
-      tx.getTransaction.getTransfer.getRecipient shouldBe PBRecipients.create(secondAcc.toAddress)
+      tx.getTransaction.getTransaction.senderPublicKey shouldBe ByteString.copyFrom(thirdAcc.publicKey.arr)
+      tx.getTransaction.getTransaction.getTransfer.getRecipient shouldBe PBRecipients.create(secondAcc.toAddress)
     }
   }
-
 }

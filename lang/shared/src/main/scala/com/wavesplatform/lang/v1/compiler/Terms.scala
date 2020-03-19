@@ -98,7 +98,7 @@ object Terms {
 
   }
   object CONST_BYTESTR {
-    def apply(bs: ByteStr): Either[ExecutionError, CONST_BYTESTR] =
+    def apply(bs: ByteStr): Either[ExecutionError, EVALUATED] =
       Either.cond(
         bs.size <= DATA_TX_BYTES_MAX,
         new CONST_BYTESTR(bs),
@@ -128,7 +128,7 @@ object Terms {
     override def prettyString(level: Int) : String = "\"" ++ escape(s) ++ "\""
   }
   object CONST_STRING {
-    def apply(s: String): Either[ExecutionError, CONST_STRING] =
+    def apply(s: String): Either[ExecutionError, EVALUATED] =
       Either.cond(
         s.getBytes("UTF-8").length <= DATA_TX_BYTES_MAX,
         new CONST_STRING(s),

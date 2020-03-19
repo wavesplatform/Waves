@@ -10,23 +10,24 @@ import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.PublicKey
-import com.wavesplatform.block.Block.BlockInfo
-import com.wavesplatform.block.serialization.BlockSerializer._
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto._
-import com.wavesplatform.database.protobuf.BlockInfo.{Custom, Proto}
-import com.wavesplatform.database.protobuf.{AssetDetails => PBAssetDetails, BlockInfo => PBBlockInfo}
+import com.wavesplatform.database.protobuf.DataEntry.Value
+import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
-import com.wavesplatform.protobuf.block.PBBlockHeaders
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
-import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.{Transaction, TransactionParsers, TxValidationError}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
-import org.iq80.leveldb.{DB, Options, ReadOptions}
+import monix.eval.Task
+import monix.reactive.Observable
+import org.iq80.leveldb._
 
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
@@ -261,7 +262,7 @@ package object database extends ScorexLogging {
 
   def readAssetDetails(data: Array[Byte]): (AssetInfo, AssetVolumeInfo) = {
 
-    val pbad = PBAssetDetails.parseFrom(data)
+    val pbad = pb.AssetDetails.parseFrom(data)
 
     (
       AssetInfo(pbad.name, pbad.description, Height(pbad.lastRenamedAt)),
@@ -272,91 +273,63 @@ package object database extends ScorexLogging {
   def writeAssetDetails(ai: (AssetInfo, AssetVolumeInfo)): Array[Byte] = {
     val (info, volumeInfo) = ai
 
-    PBAssetDetails(
-      info.name,
-      info.description,
-      info.lastUpdatedAt,
-      volumeInfo.isReissuable,
-      ByteString.copyFrom(volumeInfo.volume.toByteArray)
-    ).toByteArray
-  }
-
-  def writeAssetStaticInfo(ai: AssetStaticInfo): Array[Byte] = {
-    val ndo = newDataOutput()
-
-    ndo.writeByteStr(ai.source)
-    ndo.writeByteStr(ai.issuer)
-    ndo.writeInt(ai.decimals)
-    ndo.writeBoolean(ai.nft)
-
-    ndo.toByteArray
-  }
-
-  def readAssetStaticInfo(arr: Array[Byte]): AssetStaticInfo = {
-    import com.wavesplatform.crypto._
-
-    val ndi = newDataInput(arr)
-
-    val source   = TransactionId @@ ndi.readByteStr(DigestLength)
-    val issuer   = ndi.readPublicKey
-    val decimals = ndi.readInt()
-    val nft      = ndi.readBoolean()
-
-    AssetStaticInfo(source, issuer, decimals, nft)
-  }
-
-  def writeBlockInfo(data: BlockInfo): Array[Byte] = {
-    val BlockInfo(bh, size, transactionCount, signature) = data
-
-    val info =
-      if (bh.version < Block.ProtoBlockVersion)
-        PBBlockInfo.Info.Custom(
-          Custom(
-            ByteString.copyFrom(mkPrefixBytes(bh)),
-            ByteString.copyFrom(mkSuffixBytes(bh, signature))
-          )
-        )
-      else
-        PBBlockInfo.Info.Proto(
-          Proto(
-            Some(PBBlockHeaders.protobuf(bh)),
-            ByteString.copyFrom(signature)
-          )
-        )
-
-    PBUtils.encodeDeterministic(PBBlockInfo(size, transactionCount, info))
-  }
-
-  def readBlockInfo(bs: Array[Byte]): BlockInfo = {
-    val blockInfo = PBBlockInfo.parseFrom(bs)
-
-    if (blockInfo.info.isCustom) {
-      val info  = blockInfo.info.custom.get
-      val bytes = Bytes.concat(info.prefix.toByteArray, info.suffix.toByteArray)
-      val buf   = ByteBuffer.wrap(bytes).asReadOnlyBuffer()
-
-      val Prefix(version, timestamp, reference, baseTarget, generationSignature)   = parsePrefix(buf)
-      val Suffix(generator, featureVotes, rewardVote, transactionsRoot, signature) = parseSuffix(buf, version)
-
-      val header = BlockHeader(version, timestamp, reference, baseTarget, generationSignature, generator, featureVotes, rewardVote, transactionsRoot)
-
-      BlockInfo(header, blockInfo.size, blockInfo.transactionCount, signature)
-    } else {
-      val info = blockInfo.info.proto.get
-      BlockInfo(
-        PBBlockHeaders.vanilla(info.header.get),
-        blockInfo.size,
-        blockInfo.transactionCount,
-        ByteStr(info.signature.toByteArray)
+    pb.AssetDetails(
+        info.name,
+        info.description,
+        info.lastUpdatedAt,
+        volumeInfo.isReissuable,
+        ByteString.copyFrom(volumeInfo.volume.toByteArray)
       )
-    }
+      .toByteArray
   }
 
-  def writeTransactionAt(isProto: Boolean)(tx: Transaction): Array[Byte] =
-    if (isProto) PBUtils.encodeDeterministic(PBTransactions.protobuf(tx)) else tx.bytes()
+  def writeAssetStaticInfo(sai: AssetStaticInfo): Array[Byte] =
+    pb.StaticAssetInfo(
+        ByteString.copyFrom(sai.source.arr),
+        ByteString.copyFrom(sai.issuer.arr),
+        sai.decimals,
+        sai.nft
+      )
+      .toByteArray
 
-  def readTransactionAt(isProto: Boolean)(bs: Array[Byte]): Transaction =
-    if (isProto) PBTransactions.vanillaUnsafe(PBSignedTransaction.parseFrom(bs)) else TransactionParsers.parseBytes(bs).get
+  def readAssetStaticInfo(bb: Array[Byte]): AssetStaticInfo = {
+    val sai = pb.StaticAssetInfo.parseFrom(bb)
+    AssetStaticInfo(
+      TransactionId(ByteStr(sai.sourceId.toByteArray)),
+      PublicKey(sai.issuerPublicKey.toByteArray),
+      sai.decimals,
+      sai.isNft
+    )
+  }
+
+  def writeBlockMeta(data: BlockMeta): Array[Byte] =
+    pb.BlockMeta(
+        Some(PBBlocks.protobuf(data.header)),
+        ByteString.copyFrom(data.signature),
+        data.headerHash.fold(ByteString.EMPTY)(hh => ByteString.copyFrom(hh)),
+        data.height,
+        data.size,
+        data.transactionCount,
+        data.totalFeeInWaves,
+        data.reward.getOrElse(-1L),
+        data.vrf.fold(ByteString.EMPTY)(vrf => ByteString.copyFrom(vrf))
+      )
+      .toByteArray
+
+  def readBlockMeta(height: Int)(bs: Array[Byte]): BlockMeta = {
+    val pbbm = pb.BlockMeta.parseFrom(bs)
+    BlockMeta(
+      PBBlocks.vanilla(pbbm.header.get),
+      ByteStr(pbbm.signature.toByteArray),
+      Option(pbbm.headerHash).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) },
+      pbbm.height,
+      pbbm.size,
+      pbbm.transactionCount,
+      pbbm.totalFeeInWaves,
+      Option(pbbm.reward).filter(_ >= 0),
+      Option(pbbm.vrf).collect { case bs if !bs.isEmpty => ByteStr(bs.toByteArray) }
+    )
+  }
 
   def readTransactionHNSeqAndType(bs: Array[Byte]): (Height, Seq[(Byte, TxNum)]) = {
     val ndi          = newDataInput(bs)
@@ -407,6 +380,25 @@ package object database extends ScorexLogging {
     ndo.toByteArray
   }
 
+  def readDataEntry(key: String)(bs: Array[Byte]): DataEntry[_] =
+    pb.DataEntry.parseFrom(bs).value match {
+      case Value.Empty              => EmptyDataEntry(key)
+      case Value.IntValue(value)    => IntegerDataEntry(key, value)
+      case Value.BoolValue(value)   => BooleanDataEntry(key, value)
+      case Value.BinaryValue(value) => BinaryDataEntry(key, ByteStr(value.toByteArray))
+      case Value.StringValue(value) => StringDataEntry(key, value)
+    }
+
+  def writeDataEntry(e: DataEntry[_]): Array[Byte] =
+    pb.DataEntry(e match {
+        case IntegerDataEntry(_, value) => pb.DataEntry.Value.IntValue(value)
+        case BooleanDataEntry(_, value) => pb.DataEntry.Value.BoolValue(value)
+        case BinaryDataEntry(_, value)  => pb.DataEntry.Value.BinaryValue(ByteString.copyFrom(value.arr))
+        case StringDataEntry(_, value)  => pb.DataEntry.Value.StringValue(value)
+        case _: EmptyDataEntry          => pb.DataEntry.Value.Empty
+      })
+      .toByteArray
+
   implicit class EntryExt(val e: JMap.Entry[Array[Byte], Array[Byte]]) extends AnyVal {
     import com.wavesplatform.crypto.DigestLength
     def extractId(offset: Int = 2, length: Int = DigestLength): ByteStr = {
@@ -441,11 +433,11 @@ package object database extends ScorexLogging {
       }
     }
 
-    def get[A](key: Key[A]): A    = key.parse(db.get(key.keyBytes))
-    def has(key: Key[_]): Boolean = db.get(key.keyBytes) != null
+    def get[A](key: Key[A]): A                           = key.parse(db.get(key.keyBytes))
+    def get[A](key: Key[A], readOptions: ReadOptions): A = key.parse(db.get(key.keyBytes, readOptions))
+    def has(key: Key[_]): Boolean                        = db.get(key.keyBytes) != null
 
-    def iterateOver(prefix: Short)(f: DBEntry => Unit): Unit =
-      iterateOver(Shorts.toByteArray(prefix))(f)
+    def iterateOver(tag: KeyTags.KeyTag)(f: DBEntry => Unit): Unit = iterateOver(tag.prefixBytes)(f)
 
     def iterateOver(prefix: Array[Byte], seekPrefix: Array[Byte] = Array.emptyByteArray)(f: DBEntry => Unit): Unit = {
       val iterator = db.iterator()
@@ -454,78 +446,96 @@ package object database extends ScorexLogging {
         while (iterator.hasNext && iterator.peekNext().getKey.startsWith(prefix)) f(iterator.next())
       } finally iterator.close()
     }
+
+    def resourceObservable: Observable[DBResource] = Observable.resource(Task(DBResource(db)))(r => Task(r.close()))
+
+    def withResource[A](f: DBResource => A): A = {
+      val resource = DBResource(db)
+      try f(resource)
+      finally resource.close()
+    }
   }
 
   def createBlock(header: BlockHeader, signature: ByteStr, txs: Seq[Transaction]): Either[TxValidationError.GenericError, Block] =
     Validators.validateBlock(Block(header, signature, txs))
 
-  def writeAssetScript(script: (PublicKey, Script, Long)): Array[Byte] = {
-    script match {
-      case (pk, script, c) =>
-        val pkb = pk.arr
-        assert(pkb.size == KeyLength)
-        pkb ++ script.bytes().arr ++ Longs.toByteArray(c)
-    }
-  }
+  def writeAssetScript(script: (Script, Long)): Array[Byte] =
+    Longs.toByteArray(script._2) ++ script._1.bytes().arr
 
-  def readAssetScript(b: Array[Byte]): (PublicKey, Script, Long) = {
-    val pkb    = b.take(KeyLength)
-    val script = b.slice(KeyLength, b.length - 8)
-    (
-      PublicKey(pkb),
-      ScriptReader.fromBytes(script).explicitGet(),
-      ByteBuffer.wrap(b, b.length - 8, 8).getLong
+  def readAssetScript(b: Array[Byte]): (Script, Long) =
+    ScriptReader.fromBytes(b.drop(8)).explicitGet() -> Longs.fromByteArray(b)
+
+  def writeAccountScriptInfo(scriptInfo: AccountScriptInfo): Array[Byte] =
+    pb.AccountScriptInfo.toByteArray(
+      pb.AccountScriptInfo(
+        ByteString.copyFrom(scriptInfo.publicKey.arr),
+        ByteString.copyFrom(scriptInfo.script.bytes()),
+        scriptInfo.maxComplexity,
+        scriptInfo.complexitiesByEstimator.map {
+          case (version, complexities) =>
+            pb.AccountScriptInfo.ComplexityByVersion(version, complexities)
+        }.toSeq
+      )
+    )
+
+  def readAccountScriptInfo(b: Array[Byte]): AccountScriptInfo = {
+    val asi = pb.AccountScriptInfo.parseFrom(b)
+    AccountScriptInfo(
+      PublicKey(asi.publicKey.toByteArray),
+      ScriptReader.fromBytes(asi.scriptBytes.toByteArray).explicitGet(),
+      asi.maxComplexity,
+      asi.callableComplexity.map { c =>
+        c.version -> c.callableComplexity
+      }.toMap
     )
   }
 
-  def writeScript(script: AccountScriptInfo): Array[Byte] = {
-    val AccountScriptInfo(pk, expr, complexity, complexitiesByEstimator) = script
-    val pkb                                                              = pk.arr
-    assert(pkb.size == KeyLength)
-    val output = newDataOutput()
-
-    output.writeByteStr(pkb)
-
-    output.writeInt(expr.bytes().size)
-    output.writeByteStr(expr.bytes())
-
-    output.writeLong(complexity)
-
-    output.writeInt(complexitiesByEstimator.size)
-    complexitiesByEstimator.foreach {
-      case (version, complexitiesByCallable) =>
-        output.writeInt(version)
-
-        output.writeInt(complexitiesByCallable.size)
-        complexitiesByCallable.foreach {
-          case (name, cost) =>
-            output.writeUTF(name)
-            output.writeLong(cost)
-        }
-    }
-    output.toByteArray
+  def readTransaction(b: Array[Byte]): Transaction = b.head match {
+    case 0 => TransactionParsers.parseBytes(b.tail).get
+    case 1 => PBTransactions.vanilla(PBSignedTransaction.parseFrom(b.tail)).explicitGet()
   }
 
-  def readScript(b: Array[Byte]): AccountScriptInfo = {
-    val input      = newDataInput(b)
-    val pk         = PublicKey(input.readByteStr(KeyLength))
-    val scriptSize = input.readInt()
-    val script     = ScriptReader.fromBytes(input.readByteStr(scriptSize)).explicitGet()
-    val complexity = input.readLong()
+  def writeTransaction(t: Transaction): Array[Byte] = Bytes.concat(
+    t match {
+      case _: GenesisTransaction                         => Array(0.toByte)
+      case _: PaymentTransaction                         => Array(0.toByte)
+      case lps: LegacyPBSwitch if !lps.isProtobufVersion => Array(0.toByte)
+      case _                                             => Array(1.toByte)
+    },
+    t.bytes()
+  )
 
-    val callableComplexities =
-      (1 to input.readInt())
-        .map(
-          _ =>
-            (
-              input.readInt(),
-              (1 to input.readInt())
-                .map(_ => (input.readUTF(), input.readLong()))
-                .toMap
-            )
-        )
-        .toMap
+  def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
+    for {
+      meta <- db.get(Keys.blockMetaAt(height))
+      txs = (0 until meta.transactionCount).toList.flatMap { n =>
+        db.get(Keys.transactionAt(height, TxNum(n.toShort)))
+      }
+      block <- createBlock(meta.header, meta.signature, txs).toOption
+    } yield block
 
-    AccountScriptInfo(pk, script, complexity, callableComplexities)
-  }
+  def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =
+    for {
+      h <- resource.get(historyKey).headOption
+    } yield resource.get(valueKey(h))
+
+  def loadAssetDescription(resource: DBResource, asset: IssuedAsset): Option[AssetDescription] =
+    for {
+      staticInfo         <- resource.get(Keys.assetStaticInfo(asset))
+      (info, volumeInfo) <- fromHistory(resource, Keys.assetDetailsHistory(asset), Keys.assetDetails(asset))
+      sponsorship = fromHistory(resource, Keys.sponsorshipHistory(asset), Keys.sponsorship(asset)).fold(0L)(_.minFee)
+      script      = fromHistory(resource, Keys.assetScriptHistory(asset), Keys.assetScript(asset)).flatten
+    } yield AssetDescription(
+      staticInfo.source,
+      staticInfo.issuer,
+      info.name,
+      info.description,
+      staticInfo.decimals,
+      volumeInfo.isReissuable,
+      volumeInfo.volume,
+      info.lastUpdatedAt,
+      script,
+      sponsorship,
+      staticInfo.nft
+    )
 }

@@ -100,10 +100,10 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
 
   private val simpleScenario = for {
     (lessor, alias, genesisBlock) <- genesis
-    b2                            <- blockWithAliases(genesisBlock.uniqueId, lessor, alias)
-    b3 = mkEmptyBlock(b2.uniqueId)
-    b4 = mkEmptyBlock(b3.uniqueId)
-    b5 = mkEmptyBlock(b4.uniqueId)
+    b2                            <- blockWithAliases(genesisBlock.id(), lessor, alias)
+    b3 = mkEmptyBlock(b2.id())
+    b4 = mkEmptyBlock(b3.id())
+    b5 = mkEmptyBlock(b4.id())
   } yield (lessor, alias, genesisBlock, b2, Seq(b3, b4, b5))
 
   "Upon feature activation" - {
@@ -122,7 +122,7 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
           leasesToBeCancelled.map(_.id()).toSet shouldEqual activeLeases
           // balance snapshots, however, already reflect cancelled leases
           for (a <- leasesToBeCancelled.map(lt => d.blockchainUpdater.resolveAlias(lt.recipient).explicitGet())) {
-            d.blockchainUpdater.balanceSnapshots(a, 1, d.blockchainUpdater.lastBlockId.get).last.leaseIn shouldBe 0L
+            d.blockchainUpdater.balanceSnapshots(a, 1, d.blockchainUpdater.lastBlockId).last.leaseIn shouldBe 0L
           }
           // once new block is appended, leases become cancelled
           d.blockchainUpdater.processBlock(emptyBlocks.last)
@@ -137,10 +137,10 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.getTimestamp())
       recipient                     <- accountGen
       (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.getTimestamp())
-      b2 = TestBlock.create(ntpNow, genesisBlock.uniqueId, Seq(l1, l2))
-      b3 = mkEmptyBlock(b2.uniqueId)
-      b4 = TestBlock.create(ntpNow, b3.uniqueId, Seq(c1, c2))
-      b5 = mkEmptyBlock(b4.uniqueId)
+      b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2))
+      b3 = mkEmptyBlock(b2.id())
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(c1, c2))
+      b5 = mkEmptyBlock(b4.id())
     } yield Seq(genesisBlock, b2, b3, b4, b5)
 
     "is accepted in a block where lease is cancelled" in forAll(validCancel) { blocks =>
@@ -157,10 +157,10 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       (l1, c1)                      <- leaseAndCancelGeneratorP(lessor, alias, ntpTime.getTimestamp())
       recipient                     <- accountGen
       (l2, c2)                      <- leaseAndCancelGeneratorP(lessor, recipient.toAddress, ntpTime.getTimestamp())
-      b2 = TestBlock.create(ntpNow, genesisBlock.uniqueId, Seq(l1, l2))
-      b3 = mkEmptyBlock(b2.uniqueId)
-      b4 = mkEmptyBlock(b3.uniqueId)
-      b5 = TestBlock.create(ntpNow, b4.uniqueId, Seq(c1, c2))
+      b2 = TestBlock.create(ntpNow, genesisBlock.id(), Seq(l1, l2))
+      b3 = mkEmptyBlock(b2.id())
+      b4 = mkEmptyBlock(b3.id())
+      b5 = TestBlock.create(ntpNow, b4.id(), Seq(c1, c2))
     } yield Seq(genesisBlock, b2, b3, b4, b5)
 
     "is rejected after lease is cancelled" in forAll(invalidCancel) { blocks =>
@@ -180,18 +180,18 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       alias                     <- accountGen
       l1                        <- lease(lessor, alias, amount)
       l2                        <- lease(lessor, alias, amount / 2)
-      b2 = mkEmptyBlock(genesisBlock.uniqueId)
-      b3 = mkEmptyBlock(b2.uniqueId)
-      b4 = TestBlock.create(ntpNow, b3.uniqueId, Seq(l1))
-      b5 = TestBlock.create(ntpNow, b4.uniqueId, Seq(l2))
-      b6 = mkEmptyBlock(b5.uniqueId)
-      b7 = mkEmptyBlock(b6.uniqueId)
+      b2 = mkEmptyBlock(genesisBlock.id())
+      b3 = mkEmptyBlock(b2.id())
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1))
+      b5 = TestBlock.create(ntpNow, b4.id(), Seq(l2))
+      b6 = mkEmptyBlock(b5.id())
+      b7 = mkEmptyBlock(b6.id())
     } yield (alias, Seq(genesisBlock, b2, b3, b4, b5, b6, b7))
 
     "should be applied only for expired leases" ignore forAll(manyLeases) {
       case (alias, blocks) =>
         withDomain(leasingSettings) {
-          case Domain(blockchainUpdater, _) =>
+          case Domain(_, blockchainUpdater, _) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, alias, 0L)
@@ -223,18 +223,18 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       miner                     <- accountGen
       l1                        <- lease(lessor, miner, amount)
       l2                        <- lease(lessor, miner, amount)
-      b2 = mkEmptyBlock(genesisBlock.uniqueId)
-      b3 = mkEmptyBlock(b2.uniqueId)
-      b4 = TestBlock.create(ntpNow, b3.uniqueId, Seq(l1))
-      b5 = mkEmptyBlock(b4.uniqueId)
-      b6 = TestBlock.create(ntpNow, b5.uniqueId, Seq(l2))
-      b7 = mkEmptyBlock(b6.uniqueId)
+      b2 = mkEmptyBlock(genesisBlock.id())
+      b3 = mkEmptyBlock(b2.id())
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(l1))
+      b5 = mkEmptyBlock(b4.id())
+      b6 = TestBlock.create(ntpNow, b5.id(), Seq(l2))
+      b7 = mkEmptyBlock(b6.id())
     } yield (miner, lessor, Seq(genesisBlock, b2, b3, b4, b5, b6, b7))
 
     "has correct balance when lease transaction is accepted in a block where previous leases are cancelled" ignore forAll(leaseInTheCancelBlock) {
       case (miner, lessor, blocks) =>
         withDomain(leasingSettings) {
-          case Domain(blockchainUpdater, _) =>
+          case Domain(_, blockchainUpdater, _) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)
@@ -261,17 +261,17 @@ class LeasingExpirySpec extends FreeSpec with ScalaCheckPropertyChecks with With
       (lessor, _, genesisBlock) <- genesis
       miner                     <- accountGen
       lease                     <- lease(lessor, miner, amount)
-      b2 = mkEmptyBlock(genesisBlock.uniqueId)
-      b3 = mkEmptyBlock(b2.uniqueId)
-      b4 = TestBlock.create(ntpNow, b3.uniqueId, Seq(lease))
-      b5 = mkEmptyBlock(b4.uniqueId)
-      b6 = mkEmptyBlock(b5.uniqueId)
+      b2 = mkEmptyBlock(genesisBlock.id())
+      b3 = mkEmptyBlock(b2.id())
+      b4 = TestBlock.create(ntpNow, b3.id(), Seq(lease))
+      b5 = mkEmptyBlock(b4.id())
+      b6 = mkEmptyBlock(b5.id())
     } yield (miner, Seq(genesisBlock, b2, b3, b4, b5, b6))
 
     "can generate block where lease is cancelled" ignore forAll(blockWhereLeaseCancelled) {
       case (miner, blocks) =>
         withDomain(leasingSettings) {
-          case Domain(blockchainUpdater, _) =>
+          case Domain(_, blockchainUpdater, _) =>
             // blocks before activation
             blocks.slice(0, 3).foreach(b => blockchainUpdater.processBlock(b).explicitGet())
             ensureEffectiveBalance(blockchainUpdater, miner, 0L)

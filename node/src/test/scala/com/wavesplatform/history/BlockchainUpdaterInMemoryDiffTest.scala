@@ -34,10 +34,10 @@ class BlockchainUpdaterInMemoryDiffTest
           Seq(genesis) +:
             Seq.fill(MaxTransactionsPerBlockDiff * 2 - 1)(Seq.empty[Transaction]) :+
             Seq(payment1))
-        val blockTriggersCompaction = buildBlockOfTxs(blocksWithoutCompaction.last.uniqueId, Seq(payment2))
+        val blockTriggersCompaction = buildBlockOfTxs(blocksWithoutCompaction.last.id(), Seq(payment2))
 
         blocksWithoutCompaction.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
-        val mastersBalanceAfterPayment1 = domain.portfolio(genesis.recipient).balance
+        val mastersBalanceAfterPayment1 = domain.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
@@ -55,9 +55,9 @@ class BlockchainUpdaterInMemoryDiffTest
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment1, payment2)) =>
         val firstBlocks             = chainBlocks(Seq(Seq(genesis)) ++ Seq.fill(MaxTransactionsPerBlockDiff * 2 - 2)(Seq.empty[Transaction]))
-        val payment1Block           = buildBlockOfTxs(firstBlocks.last.uniqueId, Seq(payment1))
-        val emptyBlock              = buildBlockOfTxs(payment1Block.uniqueId, Seq.empty)
-        val blockTriggersCompaction = buildBlockOfTxs(payment1Block.uniqueId, Seq(payment2))
+        val payment1Block           = buildBlockOfTxs(firstBlocks.last.id(), Seq(payment1))
+        val emptyBlock              = buildBlockOfTxs(payment1Block.id(), Seq.empty)
+        val blockTriggersCompaction = buildBlockOfTxs(payment1Block.id(), Seq(payment2))
 
         firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
         domain.blockchainUpdater.processBlock(payment1Block).explicitGet()
@@ -66,7 +66,7 @@ class BlockchainUpdaterInMemoryDiffTest
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         // discard liquid block
-        domain.blockchainUpdater.removeAfter(payment1Block.uniqueId)
+        domain.blockchainUpdater.removeAfter(payment1Block.id())
         domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
 
         domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
