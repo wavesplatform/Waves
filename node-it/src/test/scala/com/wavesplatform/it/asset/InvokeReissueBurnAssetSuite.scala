@@ -11,8 +11,8 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.TxVersion
-import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 
 case class Asset(t: String, n: String, ds: String, q: Long, r: Boolean, d: Byte, nc: Long)
 
@@ -69,11 +69,37 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
        |  ]
        |}
        |
+       |@Callable (i) func process11actions(a: ByteVector) = {
+       |  [
+       |    Issue($issueParams, 0),
+       |    Reissue(a, true, 1000),
+       |    Issue($issueParams, 2),
+       |    Issue($issueParams, 3),
+       |    Reissue(a, true, 2000),
+       |    Reissue(a, true, 2000),
+       |    Reissue(a, true, 3000),
+       |    Burn(a, 6212),
+       |    Reissue(a, true, 2000),
+       |    Issue($issueParams, 1),
+       |    Burn(a, 12311)
+       |  ]
+       |}
+       |
        |@Callable (i) func issueAsset() = [Issue($issueParams, ${asset.nc})]
        |
        |@Callable (i) func burnAsset(a: ByteVector, q: Int) = [Burn(a, q)]
        |
        |@Callable (i) func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, r, q)]
+       |
+       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, false, rq), Reissue(a, false, rq)]
+       |
+       |@Callable(i)
+       |func transferAndBurn(a: ByteVector, q: Int) = {
+       |  [
+       |    ScriptTransfer(Address(fromBase58String("${miner.address}")), q, a),
+       |    Burn(a, q)
+       | ]
+       |}
        |
        |$function
        |
@@ -151,7 +177,8 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
   "Restrictions in @Callable" - {
     val method = "@Callable"
 
-    "Issue two identical assets with the same nonce (one invocation) should produce an error" ignore { /* SC-576  */
+    "Issue two identical assets with the same nonce (one invocation) should produce an error" ignore {
+      /* SC-576  */
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
         invokeScript(acc, "issue2Assets"),
@@ -185,7 +212,7 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
       assertBadRequestAndMessage(
-        burn(acc, method, assetId, simpleReissuableAsset.q + 1),
+        invokeScript(acc,"transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.q / 2 + 1).toInt),
         "State check failed. Reason: Accounts balance errors"
       )
     }
@@ -201,7 +228,15 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
       )
     }
 
-    "Burn to 1, set reissuee false, reissue" in {}
+    "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" ignore /* SC-580 */ {
+      val acc     = createDapp(script(simpleReissuableAsset))
+      val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
+      val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
+
+      invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000)
+
+      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.q + 1000)
+    }
 
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
@@ -218,7 +253,18 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
       )
     }
 
-    "More than 10 action in one invocation should produce an error" in {
+    "More than 10 actions Issue/Reissue/Burn should produce an error" in {
+      val acc     = createDapp(script(simpleReissuableAsset))
+      val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
+      val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
+
+      assertBadRequestAndMessage(
+        invokeScript(acc, "process11actions", assetId = assetId),
+        "State check failed. Reason: Too many script actions: max: 10, actual: 11"
+      )
+    }
+
+    "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
         invokeScript(acc, "issue11Assets"),
@@ -240,7 +286,7 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
 
     miner.transfer(sender.address, address, initialWavesBalance, minFee, waitForTx = true)
 
-    nodes.waitForHeightAriseAndTxPresent(
+    nodes.waitForTransaction(
       miner
         .signedBroadcast(
           SetScriptTransaction
@@ -262,15 +308,19 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
       assetId: String = "",
       count: Int = 1,
       isReissuable: Boolean = true,
-      fee: Long = invokeFee
+      fee: Long = invokeFee,
+      payments: Seq[InvokeScriptTransaction.Payment] = Seq.empty
   ): Transaction = {
     val args = function match {
-      case "issueAsset"    => List.empty
-      case "issue2Assets"  => List.empty
-      case "issue10Assets" => List.empty
-      case "issue11Assets" => List.empty
-      case "burnAsset"     => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueAsset"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
+      case "issueAsset"        => List.empty
+      case "issue2Assets"      => List.empty
+      case "issue10Assets"     => List.empty
+      case "issue11Assets"     => List.empty
+      case "transferAndBurn"     => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "process11actions"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
+      case "burnAsset"         => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
+      case "reissueAndReissue" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
     }
 
     val tx = miner
@@ -280,10 +330,11 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
         fee = fee,
         waitForTx = wait,
         func = Some(function),
-        args = args
+        args = args,
+        payment = payments
       )
 
-    if (wait) nodes.waitForHeightAriseAndTxPresent(tx._1.id)
+    if (wait) nodes.waitForTransaction(tx._1.id)
     tx._1
   }
 
