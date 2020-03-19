@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.lease
 
-import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -11,7 +11,6 @@ import com.wavesplatform.transaction.validation.impl.LeaseCancelTxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
-import scala.reflect.ClassTag
 import scala.util.Try
 
 final case class LeaseCancelTransaction(
@@ -20,7 +19,8 @@ final case class LeaseCancelTransaction(
     leaseId: ByteStr,
     fee: TxAmount,
     timestamp: TxTimestamp,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends SigProofsSwitch
     with VersionedTransaction
     with TxWithFee.InWaves
@@ -34,9 +34,9 @@ final case class LeaseCancelTransaction(
 
 object LeaseCancelTransaction extends TransactionParser {
   type TransactionT = LeaseCancelTransaction
-  val classTag: ClassTag[LeaseCancelTransaction] = ClassTag(classOf[LeaseCancelTransaction])
-  val supportedVersions: Set[TxVersion]          = Set(1, 2, 3)
-  val typeId: TxType                             = 9
+
+  val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
+  val typeId: TxType                    = 9: Byte
 
   implicit val validator: TxValidator[LeaseCancelTransaction] = LeaseCancelTxValidator
 
@@ -52,9 +52,10 @@ object LeaseCancelTransaction extends TransactionParser {
       leaseId: ByteStr,
       fee: TxAmount,
       timestamp: TxTimestamp,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, TransactionT] =
-    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs).validatedEither
+    LeaseCancelTransaction(version, sender, leaseId, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

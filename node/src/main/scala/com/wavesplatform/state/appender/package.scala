@@ -74,7 +74,7 @@ package object appender extends ScorexLogging {
   )(block: Block): Either[ValidationError, Option[Int]] =
     for {
       _ <- Either.cond(
-        !blockchainUpdater.hasScript(block.sender),
+        !blockchainUpdater.hasAccountScript(block.sender),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
@@ -132,7 +132,7 @@ package object appender extends ScorexLogging {
   private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
     Either
       .cond(
-        exceptions.contains((height, block.uniqueId)),
+        exceptions.contains((height, block.id())),
         (),
         GenericError(s"Block time ${block.header.timestamp} less than expected")
       )

@@ -1,7 +1,7 @@
 package com.wavesplatform.transaction.assets
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
@@ -26,7 +26,8 @@ case class IssueTransaction(
     script: Option[Script],
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends VersionedTransaction
     with ProvenTransaction
     with FastHashId
@@ -43,12 +44,14 @@ case class IssueTransaction(
 }
 
 object IssueTransaction extends TransactionParser {
+  type TransactionT = IssueTransaction
+
   val MinAssetNameLength        = 4
   val MaxAssetNameLength        = 16
   val MaxAssetDescriptionLength = 1000
   val MaxAssetDecimals          = 8
 
-  override val typeId: TxType                    = 3
+  override val typeId: TxType                    = 3: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   val serializer = IssueTxSerializer
@@ -68,7 +71,8 @@ object IssueTransaction extends TransactionParser {
       script: Option[Script],
       fee: Long,
       timestamp: Long,
-      proofs: Proofs = Proofs.empty
+      proofs: Proofs = Proofs.empty,
+      chainId: Byte = AddressScheme.current.chainId
   ): IssueTransaction = {
     require(version <= 2, "bytes in name and description are only supported in versions <= 3")
     IssueTransaction(
@@ -82,7 +86,8 @@ object IssueTransaction extends TransactionParser {
       script,
       fee,
       timestamp,
-      proofs
+      proofs,
+      chainId
     )
   }
 
@@ -97,7 +102,8 @@ object IssueTransaction extends TransactionParser {
       script: Option[Script],
       fee: Long,
       timestamp: Long,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, IssueTransaction] =
     IssueTransaction(
       version,
@@ -110,7 +116,8 @@ object IssueTransaction extends TransactionParser {
       script,
       fee,
       timestamp,
-      proofs
+      proofs,
+      chainId
     ).validatedEither
 
   def signed(

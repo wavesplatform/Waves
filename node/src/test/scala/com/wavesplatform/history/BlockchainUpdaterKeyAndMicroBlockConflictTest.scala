@@ -15,6 +15,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     extends PropSpec
     with PropertyChecks
     with DomainScenarioDrivenPropertyCheck
+    with OptionValues
     with Matchers
     with TransactionGen
     with BlocksTransactionsHelpers {
@@ -51,7 +52,7 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
           assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0) > 0)
 
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, Some(leaseBlock.uniqueId)) > 0)
+          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, Some(leaseBlock.id())) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
         }
@@ -63,10 +64,9 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
       case (genesisBlock, Seq(block1, block2), microBlocks, address) =>
         withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
           Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          d.blockchainUpdater.accountDataKeys(address) shouldBe Set("test")
-
+          d.blockchainUpdater.accountData(address, "test") shouldBe 'defined
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          d.blockchainUpdater.accountDataKeys(address) shouldBe Set("test")
+          d.blockchainUpdater.accountData(address, "test") shouldBe 'defined
         }
     }
   }

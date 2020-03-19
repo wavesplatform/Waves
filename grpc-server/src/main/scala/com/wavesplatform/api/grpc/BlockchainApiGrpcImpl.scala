@@ -1,4 +1,5 @@
 package com.wavesplatform.api.grpc
+
 import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.features.FeatureProvider._
@@ -46,7 +47,7 @@ class BlockchainApiGrpcImpl(blockchain: Blockchain, featuresSettings: FeaturesSe
   }
 
   override def getBaseTarget(request: Empty): Future[BaseTargetResponse] = Future {
-    BaseTargetResponse(blockchain.lastBlock.get.header.baseTarget)
+    BaseTargetResponse(blockchain.lastBlockHeader.get.header.baseTarget)
   }
 
   override def getCumulativeScore(request: Empty): Future[ScoreResponse] = Future {

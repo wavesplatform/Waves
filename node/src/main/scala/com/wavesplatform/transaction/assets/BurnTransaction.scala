@@ -1,6 +1,6 @@
 package com.wavesplatform.transaction.assets
 
-import com.wavesplatform.account.{KeyPair, PrivateKey, PublicKey}
+import com.wavesplatform.account.{AddressScheme, KeyPair, PrivateKey, PublicKey}
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -20,7 +20,8 @@ final case class BurnTransaction(
     quantity: Long,
     fee: Long,
     timestamp: Long,
-    proofs: Proofs
+    proofs: Proofs,
+    chainId: Byte
 ) extends ProvenTransaction
     with VersionedTransaction
     with SigProofsSwitch
@@ -38,7 +39,9 @@ final case class BurnTransaction(
 }
 
 object BurnTransaction extends TransactionParser {
-  override val typeId: TxType                    = 6
+  type TransactionT = BurnTransaction
+
+  override val typeId: TxType                    = 6: Byte
   override val supportedVersions: Set[TxVersion] = Set(1, 2, 3)
 
   implicit val validator: TxValidator[BurnTransaction] = BurnTxValidator
@@ -58,9 +61,10 @@ object BurnTransaction extends TransactionParser {
       quantity: Long,
       fee: Long,
       timestamp: Long,
-      proofs: Proofs
+      proofs: Proofs,
+      chainId: Byte = AddressScheme.current.chainId
   ): Either[ValidationError, BurnTransaction] =
-    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs).validatedEither
+    BurnTransaction(version, sender, asset, quantity, fee, timestamp, proofs, chainId).validatedEither
 
   def signed(
       version: TxVersion,

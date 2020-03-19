@@ -83,7 +83,7 @@ object Vals {
       override def apply[F[_] : Monad](env: Environment[F]): Eval[F[Either[ExecutionError, EVALUATED]]] =
         Eval.later {
           env.lastBlockOpt()
-            .map(v => Bindings.buildLastBlockInfo(v.get, version): EVALUATED)
+            .map(v => Bindings.buildBlockInfo(v.get, version): EVALUATED)
             .map(_.asRight[ExecutionError])
         }
     }

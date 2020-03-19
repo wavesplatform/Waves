@@ -57,7 +57,7 @@ class UtxPoolImpl(
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).nonEmpty)
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined)
   private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
@@ -227,10 +227,10 @@ class UtxPoolImpl(
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress).filter(blockchain.hasScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.sender.toAddress).filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
-      Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasScript)
-    case a: Authorized if blockchain.hasScript(a.sender.toAddress) => Set(a.sender.toAddress)
+      Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
+    case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
     case _                                                         => Set.empty
   }
 
@@ -367,7 +367,7 @@ class UtxPoolImpl(
       transaction match {
         case _: InvokeScriptTransaction => true
         case _: ExchangeTransaction     => false
-        case a: AuthorizedTransaction   => blockchain.hasScript(a.sender.toAddress)
+        case a: AuthorizedTransaction   => blockchain.hasAccountScript(a.sender.toAddress)
         case _                          => false
       }
 

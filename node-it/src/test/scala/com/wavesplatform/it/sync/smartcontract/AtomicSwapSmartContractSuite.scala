@@ -1,7 +1,7 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.AddressOrAlias
+import com.wavesplatform.account.{AddressOrAlias, AddressScheme}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.crypto
@@ -151,7 +151,8 @@ class AtomicSwapSmartContractSuite extends BaseTransactionSuite with CancelAfter
         fee = setScriptFee + smartFee,
         attachment = None,
         timestamp = System.currentTimeMillis(),
-        proofs = Proofs.empty
+        proofs = Proofs.empty,
+        AddressScheme.current.chainId
       )
 
     val proof    = ByteStr(secretText.getBytes("UTF-8"))

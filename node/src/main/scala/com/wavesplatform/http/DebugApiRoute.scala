@@ -3,36 +3,36 @@ package com.wavesplatform.http
 import java.net.{InetAddress, InetSocketAddress, URI}
 import java.util.concurrent.ConcurrentMap
 
+import akka.http.scaladsl.common.{EntityStreamingSupport, JsonEntityStreamingSupport}
 import akka.http.scaladsl.model.StatusCodes
 import akka.http.scaladsl.model.headers.Accept
 import akka.http.scaladsl.server.Route
+import akka.stream.scaladsl.Source
 import cats.implicits._
 import cats.kernel.Monoid
 import com.typesafe.config.{ConfigObject, ConfigRenderOptions}
 import com.wavesplatform.account.Address
-import com.wavesplatform.api.http.ApiError.InvalidAddress
+import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi, CommonTransactionsApi}
 import com.wavesplatform.api.http._
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.Base58
-import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.extensions.Distributions
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, TransactionId}
+import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.smart.Verifier
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, Verifier}
 import com.wavesplatform.utils.{ScorexLogging, Time}
 import com.wavesplatform.utx.UtxPool
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.Channel
 import monix.eval.{Coeval, Task}
 import monix.execution.Scheduler
+import play.api.libs.json.Json.JsValueWrapper
 import play.api.libs.json._
 
 import scala.concurrent.duration._
@@ -43,9 +43,11 @@ import scala.util.{Failure, Success}
 case class DebugApiRoute(
     ws: WavesSettings,
     time: Time,
-    blockchain: Blockchain,
+    blockchain: Blockchain with NG,
     wallet: Wallet,
-    ng: NG,
+    accountsApi: CommonAccountsApi,
+    transactionsApi: CommonTransactionsApi,
+    assetsApi: CommonAssetsApi,
     peerDatabase: PeerDatabase,
     establishedConnections: ConcurrentMap[Channel, PeerInfo],
     rollbackTask: (ByteStr, Boolean) => Task[Either[ValidationError, Unit]],
@@ -63,7 +65,6 @@ case class DebugApiRoute(
 
   import DebugApiRoute._
 
-  private[this] val dst                  = Distributions(ng)
   private lazy val configStr             = configRoot.render(ConfigRenderOptions.concise().setJson(true).setFormatted(true))
   private lazy val fullConfig: JsValue   = Json.parse(configStr)
   private lazy val wavesConfig: JsObject = Json.obj("waves" -> (fullConfig \ "waves").get)
@@ -71,16 +72,7 @@ case class DebugApiRoute(
   override val settings: RestAPISettings = ws.restAPISettings
   override lazy val route: Route = pathPrefix("debug") {
     stateChanges ~ balanceHistory ~ withAuth {
-      blocks ~ state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
-    }
-  }
-
-  def blocks: Route = {
-    (path("blocks" / IntNumber) & get) { howMany =>
-      complete(JsArray(ng.lastBlocks(howMany).map { block =>
-        val bytes = block.bytes()
-        Json.obj(bytes.length.toString -> Base58.encode(crypto.fastHash(bytes)))
-      }))
+      state ~ info ~ stateWaves ~ rollback ~ rollbackTo ~ blacklist ~ portfolios ~ minerInfo ~ historyInfo ~ configInfo ~ print ~ validate
     }
   }
 
@@ -90,14 +82,14 @@ case class DebugApiRoute(
       ""
     })
 
-  def portfolios: Route = path("portfolios" / Segment) { rawAddress =>
+  def portfolios: Route = path("portfolios" / AddrSegment) { address =>
     (get & parameter('considerUnspent.as[Boolean].?)) { considerUnspent =>
-      Address.fromString(rawAddress) match {
-        case Left(_) => complete(InvalidAddress)
-        case Right(address) =>
-          val base      = dst.portfolio(address)
-          val portfolio = if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
-          complete(Json.toJson(portfolio))
+      extractScheduler { implicit s =>
+        complete(accountsApi.portfolio(address).toListL.runToFuture.map { assetList =>
+          val bd   = accountsApi.balanceDetails(address)
+          val base = Portfolio(bd.regular, LeaseBalance(bd.leaseIn, bd.leaseOut), assetList.toMap)
+          if (considerUnspent.getOrElse(true)) Monoid.combine(base, utxStorage.pessimisticPortfolio(address)) else base
+        })
       }
     }
   }
@@ -108,20 +100,29 @@ case class DebugApiRoute(
     }))
   }
 
-  private def wavesDistribution(height: Int): Route =
-    optionalHeaderValueByType[Accept](()) {
-      case Some(accept) if accept.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings) =>
-        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b.toString }))
-      case _ =>
-        complete(dst.wavesDistribution(height).map(_.map { case (a, b) => a.stringRepr -> b }))
+  private def distribution(height: Int): Route = optionalHeaderValueByType[Accept](()) { accept =>
+    extractScheduler { implicit s =>
+      complete(
+        assetsApi
+          .wavesDistribution(height, None)
+          .toListL
+          .runToFuture
+          .map {
+            case l if accept.exists(_.mediaRanges.exists(CustomJson.acceptsNumbersAsStrings)) =>
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance.toString: JsValueWrapper) }: _*)
+            case l =>
+              Json.obj(l.map { case (address, balance) => address.toString -> (balance: JsValueWrapper) }: _*)
+          }
+      )
     }
+  }
 
   def state: Route = (path("state") & get) {
-    wavesDistribution(ng.height)
+    distribution(blockchain.height)
   }
 
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
-    wavesDistribution(height)
+    distribution(height)
   }
 
   private def rollbackToBlock(blockId: ByteStr, returnTransactionsToUtx: Boolean)(
@@ -134,9 +135,9 @@ case class DebugApiRoute(
 
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
     jsonPost[RollbackParams] { params =>
-      ng.blockAt(params.rollbackTo) match {
-        case Some(block) =>
-          rollbackToBlock(block.uniqueId, params.returnTransactionsToUtx)
+      blockchain.blockHeader(params.rollbackTo) match {
+        case Some(sh) =>
+          rollbackToBlock(sh.id(), params.returnTransactionsToUtx)
         case None =>
           (StatusCodes.BadRequest, "Block at height not found")
       }
@@ -146,7 +147,7 @@ case class DebugApiRoute(
   def info: Route = (path("info") & get) {
     complete(
       Json.obj(
-        "stateHeight"                      -> ng.height,
+        "stateHeight"                      -> blockchain.height,
         "extensionLoaderState"             -> extLoaderStateReporter().toString,
         "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
         "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -159,7 +160,7 @@ case class DebugApiRoute(
   def minerInfo: Route = (path("minerInfo") & get) {
     complete(
       wallet.privateKeyAccounts
-        .filterNot(account => ng.hasScript(account.toAddress))
+        .filterNot(account => blockchain.hasAccountScript(account.toAddress))
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
         }
@@ -167,10 +168,10 @@ case class DebugApiRoute(
           case (address, Right(offset)) =>
             AccountMiningInfo(
               address.stringRepr,
-              ng.effectiveBalance(
+              blockchain.effectiveBalance(
                 address,
-                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(ng.height),
-                ng.microblockIds.lastOption
+                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
+                blockchain.microblockIds.lastOption
               ),
               System.currentTimeMillis() + offset.toMillis
             )
@@ -179,10 +180,7 @@ case class DebugApiRoute(
   }
 
   def historyInfo: Route = (path("historyInfo") & get) {
-    val a = ng.lastPersistedBlockIds(10)
-    val b = ng.microblockIds
-    complete(HistoryInfo(a, b))
-
+    complete(???)
   }
 
   def configInfo: Route = (path("configInfo") & get & parameter('full.as[Boolean])) { full =>
@@ -226,10 +224,10 @@ case class DebugApiRoute(
 
   def validate: Route =
     path("validate")(jsonPost[JsObject] { jsv =>
-        val t0 = System.nanoTime
-        val tracedDiff = for {
-          tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-          _  <- Verifier(blockchain)(tx)
+      val t0 = System.nanoTime
+      val tracedDiff = for {
+        tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
+        _  <- Verifier(blockchain)(tx)
         ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield ei
       val timeSpent = (System.nanoTime - t0) * 1e-6
@@ -246,45 +244,32 @@ case class DebugApiRoute(
 
   def stateChanges: Route = stateChangesById ~ stateChangesByAddress
 
-  def stateChangesById: Route = (get & path("stateChanges" / "info" / B58Segment)) { id =>
-    blockchain.transactionInfo(id) match {
-      case Some((h, tx: InvokeScriptTransaction)) =>
-        val resultE = blockchain
-          .invokeScriptResult(TransactionId(tx.id()))
-          .map(isr => tx.json.map(_ ++ Json.obj("height" -> h, "stateChanges" -> isr))())
-        complete(resultE)
-
-      case Some((_, tx)) =>
-        complete(ApiError.UnsupportedTransactionType)
-
-      case None =>
-        complete(ApiError.TransactionDoesNotExist)
-
+  def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
+    transactionsApi.transactionById(id) match {
+      case Some((height, Right((ist, isr)))) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
+      case Some(_)                           => complete(ApiError.UnsupportedTransactionType)
+      case None                              => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
   def stateChangesByAddress: Route =
-    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.?)) { (address, limit, afterOpt) =>
-      (validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") & extractScheduler) {
-        implicit sc =>
-          import cats.implicits._
+    (get & path("stateChanges" / "address" / AddrSegment / "limit" / IntNumber) & parameter('after.as[ByteStr].?)) { (address, limit, afterOpt) =>
+      validate(limit <= settings.transactionsByAddressLimit, s"Max limit is ${settings.transactionsByAddressLimit}") {
+        extractScheduler { implicit s =>
+          complete {
+            implicit val ss: JsonEntityStreamingSupport = EntityStreamingSupport.json()
 
-          val result = blockchain
-            .addressTransactionsObservable(address, Set.empty, afterOpt.flatMap(str => Base58.tryDecodeWithLimit(str).map(ByteStr(_)).toOption))
-            .map {
-              case (height, tx: InvokeScriptTransaction) =>
-                blockchain
-                  .invokeScriptResult(TransactionId(tx.id()))
-                  .map(isr => tx.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr))
-
-              case (height, tx) =>
-                Right(tx.json() ++ Json.obj("height" -> JsNumber(height)))
-            }
-            .take(limit)
-            .toListL
-            .map(_.sequence)
-
-          complete(result.runAsyncLogErr)
+            Source.fromPublisher(
+              transactionsApi
+                .invokeScriptResults(address, None, Set.empty, afterOpt)
+                .map {
+                  case (height, Right((ist, isr))) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
+                  case (height, Left(tx))          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
+                }
+                .toReactivePublisher
+            )
+          }
+        }
       }
     }
 }

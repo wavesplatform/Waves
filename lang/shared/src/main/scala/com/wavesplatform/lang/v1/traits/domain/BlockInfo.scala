@@ -7,4 +7,5 @@ case class BlockInfo(timestamp: Long,
                      generationSignature: ByteStr,
                      generator: ByteStr,
                      generatorPublicKey: ByteStr,
-                     vrf: Option[ByteStr])
+                     vrf: Option[ByteStr],
+                     transactionsRoot: ByteStr)

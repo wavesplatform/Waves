@@ -1,4 +1,5 @@
 package com.wavesplatform.generator
+
 import cats.Show
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.common.state.ByteStr
@@ -46,7 +47,8 @@ class MultisigTransactionGenerator(settings: MultisigTransactionGenerator.Settin
         enoughFee,
         None,
         now + i,
-        Proofs.empty
+        Proofs.empty,
+        owners(1).toAddress.chainId
       )
       val signatures = owners.map(crypto.sign(_, tx.bodyBytes())).map(ByteStr(_))
       tx.copy(proofs = Proofs(signatures))

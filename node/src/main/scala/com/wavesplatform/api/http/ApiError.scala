@@ -472,4 +472,26 @@ object ApiError {
         "transaction" -> tx.json()
       )
   }
+
+  case object InvalidBase58 extends ApiError {
+    override val id = 406
+    override val message = "Invalid Base58 string"
+    override val code = StatusCodes.BadRequest
+  }
+
+  case class InvalidTransactionId(message: String) extends ApiError {
+    override val id = 4001
+    override val code = StatusCodes.BadRequest
+  }
+
+  case class InvalidBlockId(message: String) extends ApiError {
+    override val id = 4002
+    override val code = StatusCodes.BadRequest
+  }
+
+  case object InvalidAssetId extends ApiError {
+    override val id = 4007
+    override val message = "Invalid asset id"
+    override val code = StatusCodes.BadRequest
+  }
 }

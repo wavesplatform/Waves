@@ -1,5 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract.smartasset
 
+import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -26,7 +27,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         0,
         reissuable = true,
         issueFee,
-        2,
+        2: Byte,
         script = Some(
           ScriptCompiler(
             s"""
@@ -58,7 +59,7 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         0,
         reissuable = true,
         issueFee,
-        2,
+        2: Byte,
         script = Some(
           ScriptCompiler(
             s"""
@@ -85,7 +86,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
       smartMinFee,
       None,
       System.currentTimeMillis + 10.minutes.toMillis,
-      Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
+      Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
+      AddressScheme.current.chainId
     )
 
     assertBadRequestAndMessage(
@@ -101,7 +103,8 @@ class NoOrderProofsSuite extends BaseTransactionSuite {
         1,
         smartMinFee,
         System.currentTimeMillis + 10.minutes.toMillis,
-        Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8"))))
+        Proofs(Seq(ByteStr("assetWProofs".getBytes("UTF-8")))),
+        AddressScheme.current.chainId
       )
       .right
       .get

@@ -1,6 +1,7 @@
 package com.wavesplatform.state.diffs.smart.scenarios
 
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.db.WithState
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
@@ -9,10 +10,10 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.state.diffs._
 import com.wavesplatform.state.diffs.smart._
 import com.wavesplatform.{NoShrink, TransactionGen}
-import org.scalatest.{Matchers, PropSpec}
+import org.scalatest.PropSpec
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
-class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+class OnlyTransferIsAllowedTest extends PropSpec with PropertyChecks with WithState with TransactionGen with NoShrink {
 
   property("transfer is allowed but lease is not due to predicate") {
 

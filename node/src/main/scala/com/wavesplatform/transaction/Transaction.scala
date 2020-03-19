@@ -1,6 +1,5 @@
 package com.wavesplatform.transaction
 
-import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -14,7 +13,7 @@ trait Transaction {
   def builder: TransactionParser
   def assetFee: (Asset, Long)
   def timestamp: Long
-  def chainByte: Byte = AddressScheme.current.chainId
+  def chainId: Byte
 
   def bytesSize: Int = bytes().length
   val bytes: Coeval[Array[Byte]]
@@ -27,7 +26,7 @@ trait Transaction {
     case _               => false
   }
 
-  override def hashCode(): Int = id().hashCode()
+  override def hashCode(): Int = id().hashCode
 
   val bodyBytes: Coeval[Array[Byte]]
   def checkedAssets: Seq[IssuedAsset] = Nil

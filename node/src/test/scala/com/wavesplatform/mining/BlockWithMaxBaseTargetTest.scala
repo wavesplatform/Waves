@@ -150,7 +150,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
             val genesisBlock = TestBlock.create(ts + 2, List(tx))
             val secondBlock = TestBlock.create(
               ts + 3,
-              genesisBlock.uniqueId,
+              genesisBlock.id(),
               Seq.empty,
               account
             )
@@ -176,7 +176,7 @@ object BlockWithMaxBaseTargetTest {
   final case class Env(
       settings: WavesSettings,
       pos: PoSSelector,
-      bcu: BlockchainUpdater with NG,
+      bcu: Blockchain with BlockchainUpdater with NG,
       utxPool: UtxPoolImpl,
       schedulerService: SchedulerService,
       miner: KeyPair,

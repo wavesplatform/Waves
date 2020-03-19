@@ -35,7 +35,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
-        val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
+        val (block1, microblocks1) = chainBaseAndMicro(block0.id(), payment, Seq(payment2).map(Seq(_)))
         val badSigMicro            = microblocks1.head.copy(totalResBlockSig = randomSig)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -48,7 +48,7 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
     scenario(preconditionsAndPayments) {
       case (domain, (genesis, payment, payment2)) =>
         val block0                 = buildBlockOfTxs(randomSig, Seq(genesis))
-        val (block1, microblocks1) = chainBaseAndMicro(block0.uniqueId, payment, Seq(payment2).map(Seq(_)))
+        val (block1, microblocks1) = chainBaseAndMicro(block0.id(), payment, Seq(payment2).map(Seq(_)))
         val badSigMicro            = microblocks1.head.copy(signature = randomSig)
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
@@ -62,8 +62,8 @@ class BlockchainUpdaterMicroblockBadSignaturesTest
       case (domain, (genesis, payment, payment2)) =>
         val otherSigner = KeyPair(TestBlock.randomOfLength(KeyLength).arr)
         val block0      = buildBlockOfTxs(randomSig, Seq(genesis))
-        val block1      = buildBlockOfTxs(block0.uniqueId, Seq(payment))
-        val badSigMicro = buildMicroBlockOfTxs(block0.uniqueId, block1, Seq(payment2), otherSigner)._2
+        val block1      = buildBlockOfTxs(block0.id(), Seq(payment))
+        val badSigMicro = buildMicroBlockOfTxs(block0.id(), block1, Seq(payment2), otherSigner)._2
         domain.blockchainUpdater.processBlock(block0).explicitGet()
         domain.blockchainUpdater.processBlock(block1).explicitGet()
         domain.blockchainUpdater.processMicroBlock(badSigMicro) should produce("another account")

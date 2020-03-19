@@ -73,7 +73,7 @@ case class AssetDescription(
     reissuable: Boolean,
     totalVolume: BigInt,
     lastUpdatedAt: Height,
-    script: Option[Script],
+    script: Option[(Script, Long)],
     sponsorship: Long,
     nft: Boolean
 )
@@ -122,17 +122,19 @@ object Sponsorship {
       .map(h => h + blockchain.settings.functionalitySettings.activationWindowSize(h))
       .getOrElse(Int.MaxValue)
 
-  def toWaves(assetFee: Long, sponsorship: Long): Long = {
-    if (sponsorship == 0) return Long.MaxValue
-    val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
-    waves.bigInteger.longValueExact()
-  }
+  def toWaves(assetFee: Long, sponsorship: Long): Long =
+    if (sponsorship == 0) Long.MaxValue
+    else {
+      val waves = BigInt(assetFee) * FeeValidation.FeeUnit / sponsorship
+      waves.bigInteger.longValueExact()
+    }
 
-  def fromWaves(wavesFee: Long, sponsorship: Long): Long = {
-    if (wavesFee == 0 || sponsorship == 0) return 0
-    val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
-    assetFee.bigInteger.longValueExact()
-  }
+  def fromWaves(wavesFee: Long, sponsorship: Long): Long =
+    if (wavesFee == 0 || sponsorship == 0) 0
+    else {
+      val assetFee = BigInt(wavesFee) * sponsorship / FeeValidation.FeeUnit
+      assetFee.bigInteger.longValueExact()
+    }
 }
 
 case class Diff(
@@ -144,7 +146,7 @@ case class Diff(
     orderFills: Map[ByteStr, VolumeAndFee],
     leaseState: Map[ByteStr, Boolean],
     scripts: Map[Address, Option[AccountScriptInfo]],
-    assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]],
+    assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
     accountData: Map[Address, AccountDataInfo],
     sponsorship: Map[IssuedAsset, Sponsorship],
     scriptsRun: Int,
@@ -161,7 +163,7 @@ object Diff {
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptResults: Map[ByteStr, InvokeScriptResult] = Map.empty
@@ -192,7 +194,7 @@ object Diff {
       orderFills: Map[ByteStr, VolumeAndFee] = Map.empty,
       leaseState: Map[ByteStr, Boolean] = Map.empty,
       scripts: Map[Address, Option[AccountScriptInfo]] = Map.empty,
-      assetScripts: Map[IssuedAsset, Option[(PublicKey, Script, Long)]] = Map.empty,
+      assetScripts: Map[IssuedAsset, Option[(Script, Long)]] = Map.empty,
       accountData: Map[Address, AccountDataInfo] = Map.empty,
       sponsorship: Map[IssuedAsset, Sponsorship] = Map.empty,
       scriptsRun: Int = 0,

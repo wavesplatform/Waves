@@ -1,130 +1,20 @@
 package com.wavesplatform
 
 import cats.kernel.Monoid
-import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block
-import com.wavesplatform.block.Block.{BlockId, BlockInfo}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.consensus.GeneratingBalanceProvider
-import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.protobuf.block.{PBBlock, PBBlocks}
-import com.wavesplatform.state.extensions.{AddressTransactions, Distributions}
-import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, GenericError}
+import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.utils.Paged
-import monix.reactive.Observable
 import play.api.libs.json._
 import supertagged.TaggedType
 
-import scala.concurrent.duration.Duration
 import scala.reflect.ClassTag
 import scala.util.Try
 
 package object state {
   def safeSum(x: Long, y: Long): Long = Try(Math.addExact(x, y)).getOrElse(Long.MinValue)
-
-  private[state] def nftListFromDiff(blockchain: Blockchain, distr: Distributions, maybeDiff: Option[Diff])(
-      address: Address,
-      maybeAfter: Option[IssuedAsset]
-  ): Observable[(ByteStr, AssetDescription)] = {
-
-    def notWithdrawn(asset: IssuedAsset): Boolean = {
-      val changeFromDiff = for {
-        diff          <- maybeDiff
-        portfolio     <- diff.portfolios.get(address)
-        balanceChange <- portfolio.assets.get(asset)
-      } yield balanceChange
-
-      changeFromDiff.forall(_ >= 0)
-    }
-
-    def assetsFromDiff(diff: Diff, id: IssuedAsset): Option[AssetDescription] =
-      diff.issuedAssets.get(id).map {
-        case (staticInfo, info, volumeInfo) =>
-          AssetDescription(
-            staticInfo.source,
-            staticInfo.issuer,
-            info.name,
-            info.description,
-            staticInfo.decimals,
-            volumeInfo.isReissuable,
-            volumeInfo.volume,
-            info.lastUpdatedAt,
-            diff.assetScripts(id).map(_._2),
-            0,
-            blockchain.isNFT(volumeInfo.volume.intValue(), staticInfo.decimals, volumeInfo.isReissuable)
-          )
-      }
-
-    def assetStreamFromDiff(diff: Diff): Iterable[IssuedAsset] =
-      for {
-        portfolio <- diff.portfolios
-          .get(address)
-          .toIterable
-        (asset, balance) <- portfolio.assets if balance > 0
-      } yield asset
-
-    def nftFromDiff(diff: Diff, maybeAfter: Option[IssuedAsset]): Observable[(ByteStr, AssetDescription)] = Observable.fromIterable {
-      maybeAfter
-        .fold(assetStreamFromDiff(diff)) { after =>
-          assetStreamFromDiff(diff)
-            .dropWhile(_ != after)
-            .drop(1)
-        }
-        .filter(notWithdrawn)
-        .map { asset =>
-          assetsFromDiff(diff, asset)
-            .map((asset.id, _))
-            .orElse(blockchain.assetDescription(asset).map((asset.id, _)))
-        }
-        .collect {
-          case Some((assetId, assetDescr)) if assetDescr.nft => (assetId, assetDescr)
-        }
-    }
-
-    def nftFromBlockchain: Observable[(ByteStr, AssetDescription)] =
-      distr
-        .nftObservable(address, maybeAfter)
-        .filter {
-          case (assetId, _) =>
-            val asset = IssuedAsset(assetId)
-            notWithdrawn(asset)
-        }
-
-    maybeDiff.fold(nftFromBlockchain) { diff =>
-      maybeAfter match {
-        case None                                            => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case Some(asset) if diff.issuedAssets contains asset => Observable(nftFromDiff(diff, maybeAfter), nftFromBlockchain).concat
-        case _                                               => nftFromBlockchain
-      }
-    }
-  }
-
-  // common logic for addressTransactions method of BlockchainUpdaterImpl and CompositeBlockchain
-  def addressTransactionsCompose(
-      at: AddressTransactions,
-      fromDiffIter: Observable[(Height, Transaction, Set[Address])]
-  )(address: Address, types: Set[TransactionParser], fromId: Option[ByteStr]): Observable[(Height, Transaction)] = {
-
-    def withPagination(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction, Set[Address])] =
-      fromId match {
-        case None     => txs
-        case Some(id) => txs.dropWhile(_._2.id() != id).drop(1)
-      }
-
-    def withFilterAndLimit(txs: Observable[(Height, Transaction, Set[Address])]): Observable[(Height, Transaction)] =
-      txs
-        .collect { case (h, tx, addresses) if addresses(address) && (types.isEmpty || types.contains(tx.builder)) => (h, tx) }
-
-    Observable(
-      withFilterAndLimit(withPagination(fromDiffIter)).map(tup => (tup._1, tup._2)),
-      at.addressTransactionsObservable(address, types, fromId)
-    ).concat
-  }
 
   implicit class EitherExt[L <: ValidationError, R](ei: Either[L, R]) {
     def liftValidationError[T <: Transaction](t: T): Either[ValidationError, R] = {
@@ -139,89 +29,6 @@ package object state {
         case _    => None
       }
     }
-  }
-
-  implicit class BlockchainExt(private val blockchain: Blockchain) extends AnyVal {
-    def isEmpty: Boolean = blockchain.height == 0
-
-    def contains(block: Block): Boolean       = blockchain.contains(block.uniqueId)
-    def contains(signature: ByteStr): Boolean = blockchain.heightOf(signature).isDefined
-
-    def blockById(blockId: ByteStr): Option[Block] = blockchain.heightOf(blockId).flatMap(blockAt)
-
-    def blockAt(height: Int): Option[Block] = blockchain.blockBytes(height).flatMap { bb =>
-      if (height > 1 && blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height)) PBBlocks.vanilla(PBBlock.parseFrom(bb)).toOption
-      else Block.parseBytes(bb).toOption
-    }
-
-    def lastBlockId: Option[ByteStr]     = blockchain.lastBlock.map(_.uniqueId)
-    def lastBlockTimestamp: Option[Long] = blockchain.lastBlock.map(_.header.timestamp)
-
-    def lastBlocks(howMany: Int): Seq[Block] = {
-      (Math.max(1, blockchain.height - howMany + 1) to blockchain.height).flatMap(blockchain.blockAt).reverse
-    }
-
-    def genesis: Block = blockchain.blockAt(1).get
-    def resolveAlias(aoa: AddressOrAlias): Either[ValidationError, Address] =
-      aoa match {
-        case a: Address => Right(a)
-        case a: Alias   => blockchain.resolveAlias(a)
-      }
-
-    def canCreateAlias(alias: Alias): Boolean = blockchain.resolveAlias(alias) match {
-      case Left(AliasDoesNotExist(_)) => true
-      case _                          => false
-    }
-
-    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long =
-      (for {
-        blockId     <- block.orElse(blockchain.lastBlockId)
-        blockHeight <- blockchain.heightOf(blockId)
-        bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
-        balances    = blockchain.balanceSnapshots(address, bottomLimit, blockId)
-      } yield balances.view.map(_.effectiveBalance).min).getOrElse(0L)
-
-    def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
-      val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val BlockInfo(_, _, _, signature) =
-        blockchain.blockInfo(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight"))
-      val balances = blockchain.balanceSnapshots(address, bottomLimit, signature)
-      if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
-    }
-
-    def aliasesOfAddress(address: Address): Seq[Alias] = {
-      import monix.execution.Scheduler.Implicits.global
-
-      blockchain
-        .addressTransactionsObservable(address, Set(CreateAliasTransaction), None)
-        .collect {
-          case (_, a: CreateAliasTransaction) => a.alias
-        }
-        .toListL
-        .runSyncUnsafe(Duration.Inf)
-    }
-
-    def unsafeHeightOf(id: ByteStr): Int =
-      blockchain
-        .heightOf(id)
-        .getOrElse(throw new IllegalStateException(s"Can't find a block: $id"))
-
-    def wavesPortfolio(address: Address): Portfolio = Portfolio(
-      blockchain.balance(address),
-      blockchain.leaseBalance(address),
-      Map.empty
-    )
-
-    def isMiningAllowed(height: Int, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isMiningAllowed(blockchain, height, effectiveBalance)
-
-    def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
-      GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
-
-    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
-      GeneratingBalanceProvider.balance(blockchain, account, blockId)
-
-    def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(1, blockchain.height)(_ => true)
   }
 
   object AssetDistribution extends TaggedType[Map[Address, Long]]

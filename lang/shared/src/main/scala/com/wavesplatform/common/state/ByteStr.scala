@@ -24,6 +24,9 @@ case class ByteStr(arr: Array[Byte]) {
 
   def size: Int = arr.length
 
+  // java replaces invalid chars
+  def toUTF8String = new String(arr, "UTF-8")
+
   def ++(other: ByteStr): ByteStr =
     if (this.isEmpty) other else ByteStr(this.arr ++ other.arr)
 
@@ -52,7 +55,7 @@ case class ByteStr(arr: Array[Byte]) {
     case _              => false
   }
 
-  override def hashCode(): Int = java.util.Arrays.hashCode(arr)
+  override lazy val hashCode: Int = java.util.Arrays.hashCode(arr)
 }
 
 object ByteStr {

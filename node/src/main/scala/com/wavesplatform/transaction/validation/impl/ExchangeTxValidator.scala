@@ -20,6 +20,7 @@ object ExchangeTxValidator extends TxValidator[ExchangeTransaction] {
       V.cond(sellMatcherFee <= Order.MaxAmount, GenericError("sellMatcherFee too large")),
       V.cond(buyMatcherFee <= Order.MaxAmount, GenericError("buyMatcherFee too large")),
       V.cond(fee <= Order.MaxAmount, GenericError("fee too large")),
+      V.cond(isProtobufVersion || order1.orderType == OrderType.BUY, GenericError("order1 should have OrderType.BUY")),
       V.cond(buyOrder.orderType == OrderType.BUY, GenericError("buyOrder should has OrderType.BUY")),
       V.cond(sellOrder.orderType == OrderType.SELL, GenericError("sellOrder should has OrderType.SELL")),
       V.cond(buyOrder.matcherPublicKey == sellOrder.matcherPublicKey, GenericError("buyOrder.matcher should be the same as sellOrder.matcher")),

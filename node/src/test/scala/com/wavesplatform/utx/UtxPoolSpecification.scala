@@ -6,7 +6,7 @@ import cats.data.NonEmptyList
 import com.wavesplatform
 import com.wavesplatform._
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
@@ -28,7 +28,6 @@ import com.wavesplatform.settings._
 import com.wavesplatform.state._
 import com.wavesplatform.state.appender.{ExtensionAppender, MicroblockAppender}
 import com.wavesplatform.state.diffs._
-import com.wavesplatform.state.extensions.Distributions
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.TxValidationError.SenderIsBlacklisted
@@ -38,10 +37,9 @@ import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.transaction.{Asset, Transaction, _}
-import com.wavesplatform.utils.Implicits.SubjectOps
 import com.wavesplatform.utils.Time
 import monix.execution.Scheduler
-import monix.reactive.subjects.Subject
+import monix.reactive.subjects.PublishSubject
 import org.iq80.leveldb.DB
 import org.scalacheck.Gen
 import org.scalacheck.Gen._
@@ -54,7 +52,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import scala.concurrent.duration._
 
 private object UtxPoolSpecification {
-  private val ignoreSpendableBalanceChanged = Subject.empty[(Address, Asset)]
+  private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]
 
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("leveldb-test")
@@ -274,7 +272,7 @@ class UtxPoolSpecification
   private def massTransferWithBlacklisted(allowRecipients: Boolean) =
     (for {
       (sender, senderBalance, bcu) <- stateGen
-      addressesSize <- Gen.choose(1, MassTransferTransaction.MaxTransferCount)
+      addressesSize                <- Gen.choose(1, MassTransferTransaction.MaxTransferCount)
       addressGen = Gen.listOfN(addressesSize, accountGen).filter(list => if (allowRecipients) list.nonEmpty else true)
       recipients <- addressGen.map(_.map(_.publicKey))
       time = new TestTime()
@@ -358,7 +356,7 @@ class UtxPoolSpecification
         enablePriorityPool = true
       )
 
-      (sender, senderBalance, utx, bcu.lastBlock.fold(0L)(_.header.timestamp))
+      (sender, senderBalance, utx, bcu.lastBlockTimestamp.getOrElse(0L))
     }
 
   private def transactionV1Gen(sender: KeyPair, ts: Long, feeAmount: Long): Gen[TransferTransaction] = accountGen.map { recipient =>
@@ -464,7 +462,14 @@ class UtxPoolSpecification
                 GenesisTransaction.create(richAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 GenesisTransaction.create(randomAccount, ENOUGH_AMT, ntpNow).explicitGet(),
                 SetScriptTransaction
-                  .signed(1.toByte, richAccount, Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()), QuickTX.FeeAmount * 4, ntpNow, richAccount)
+                  .signed(
+                    1.toByte,
+                    richAccount,
+                    Some(Script.fromBase64String("AQkAAGcAAAACAHho/EXujJiPAJUhuPXZYac+rt2jYg==").explicitGet()),
+                    QuickTX.FeeAmount * 4,
+                    ntpNow,
+                    richAccount
+                  )
                   .explicitGet()
               ),
               signer = TestBlock.defaultSigner,
@@ -552,30 +557,7 @@ class UtxPoolSpecification
           utxPool.pessimisticPortfolio(sender) should not be emptyPf
       }
 
-      "takes into account unconfirmed transactions" in forAll(withValidPayments) {
-        case (sender, state, utxPool, _, _) =>
-          val basePortfolio = Distributions(state).portfolio(sender)
-          val baseAssetIds  = basePortfolio.assetIds
-
-          val pessimisticAssetIds = {
-            val p = utxPool.pessimisticPortfolio(sender)
-            p.assetIds.filter(x => p.balanceOf(x) != 0)
-          }
-
-          val unchangedAssetIds = baseAssetIds -- pessimisticAssetIds
-          withClue("unchanged") {
-            unchangedAssetIds.foreach { assetId =>
-              basePortfolio.balanceOf(assetId) shouldBe basePortfolio.balanceOf(assetId)
-            }
-          }
-
-          val changedAssetIds = pessimisticAssetIds -- baseAssetIds
-          withClue("changed") {
-            changedAssetIds.foreach { assetId =>
-              basePortfolio.balanceOf(assetId) should not be basePortfolio.balanceOf(assetId)
-            }
-          }
-      }
+      "takes into account unconfirmed transactions" in pending
     }
 
     "blacklisting" - {
@@ -693,8 +675,9 @@ class UtxPoolSpecification
             (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
 
             (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
-            (blockchain.accountScriptWithComplexity _).when(*).returning(None)
-            (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+            (blockchain.accountScript _).when(*).returns(None)
+            val tb = TestBlock.create(Nil)
+            (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
 
             utx.putIfNew(tx1).resultE shouldBe 'right
             all(rest.map(utx.putIfNew(_).resultE)) shouldBe 'right
@@ -748,10 +731,10 @@ class UtxPoolSpecification
         if (setBalance) (blockchain.balance _).when(*, *).returning(ENOUGH_AMT)
         (blockchain.leaseBalance _).when(*).returning(LeaseBalance(0, 0))
 
-        (blockchain.accountScriptWithComplexity _).when(scripted).returning(Some(AccountScriptInfo(null, testScript, testScriptComplexity, Map.empty)))
-        (blockchain.hasScript _).when(scripted).returning(true)
-        (blockchain.accountScriptWithComplexity _).when(*).returning(None)
-        (blockchain.lastBlock _).when().returning(Some(TestBlock.create(Nil)))
+        (blockchain.accountScript _).when(scripted).returns(Some(AccountScriptInfo(null, testScript, testScriptComplexity, Map.empty)))
+        (blockchain.accountScript _).when(*).returns(None)
+        val tb = TestBlock.create(Nil)
+        (blockchain.blockHeader _).when(*).returning(Some(SignedBlockHeader(tb.header, tb.signature)))
         (blockchain.transactionHeight _).when(*).returning(None)
         blockchain
       }
@@ -882,7 +865,7 @@ class UtxPoolSpecification
         genBlock = TestBlock.create(Seq(genesis))
         txs1 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
         (block1, mbs1) = UnsafeBlocks.unsafeChainBaseAndMicro(
-          genBlock.uniqueId,
+          genBlock.id(),
           Nil,
           Seq(Nil, txs1),
           acc,
@@ -901,7 +884,7 @@ class UtxPoolSpecification
         )
         txs3 <- Gen.nonEmptyListOf(transferV2(acc, 10000000L, ntpTime))
         block3 = UnsafeBlocks.unsafeBlock(mbs2.last.totalResBlockSig, txs3, acc, Block.NgBlockVersion, ntpTime.correctedTime())
-        block4 = UnsafeBlocks.unsafeBlock(genBlock.uniqueId, txs4, acc, Block.NgBlockVersion, ntpTime.correctedTime())
+        block4 = UnsafeBlocks.unsafeBlock(genBlock.id(), txs4, acc, Block.NgBlockVersion, ntpTime.correctedTime())
       } yield (genBlock, (block1, mbs1), (block2, mbs2), block3, block4)
 
       val settingsWithNG = wavesplatform.history.settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.SmartAccounts)
