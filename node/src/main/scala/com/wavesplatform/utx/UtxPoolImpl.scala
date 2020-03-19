@@ -9,6 +9,7 @@ import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
@@ -44,8 +45,9 @@ class UtxPoolImpl(
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    nanoTimeSource: () => Long = () => System.nanoTime(),
-    enablePriorityPool: Boolean
+    enablePriorityPool: Boolean,
+    onEvent: UtxEvent => Unit = _ => (),
+    nanoTimeSource: () => Long = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
     with UtxPool {
@@ -57,7 +59,7 @@ class UtxPoolImpl(
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined)
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
   private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
@@ -180,12 +182,19 @@ class UtxPoolImpl(
   }
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityTransactions.synchronized {
-    removed.foreach(removeFromBothPools)
+    removed.foreach { id =>
+      val tx = priorityTransactions.get(id).orElse(Option(transactions.get(id)))
+      tx.foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
+      removeFromBothPools(id)
+    }
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val diffEi               = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
-    def addPortfolio(): Unit = diffEi.map(pessimisticPortfolios.add(tx.id(), _))
+    val diffEi = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+    def addPortfolio(): Unit = diffEi.map { diff =>
+      pessimisticPortfolios.add(tx.id(), diff)
+      onEvent(UtxEvent.TxAdded(tx, diff))
+    }
 
     if (!verify || diffEi.resultE.isRight) {
       if (priority) priorityTransactions.synchronized {
@@ -227,11 +236,12 @@ class UtxPoolImpl(
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress).filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.sender.toAddress)
+        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
-    case _                                                         => Set.empty
+    case _                                                                => Set.empty
   }
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
@@ -264,6 +274,7 @@ class UtxPoolImpl(
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
                 this.removeFromBothPools(tx.id())
+                onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
@@ -306,6 +317,7 @@ class UtxPoolImpl(
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       traceLogger.trace(error.toString)
                       this.removeFromBothPools(tx.id())
+                      onEvent(UtxEvent.TxRemoved(tx, Some(error)))
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),

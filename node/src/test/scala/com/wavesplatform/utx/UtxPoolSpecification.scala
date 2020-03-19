@@ -12,6 +12,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
 import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
+import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{StorageFactory, randomSig}
@@ -304,7 +305,7 @@ class UtxPoolSpecification
         }
     }
 
-  private val dualTxGen: Gen[(UtxPool, TestTime, Seq[Transaction], Seq[Transaction])] =
+  private val dualTxGen: Gen[(UtxPool, TestTime, Seq[Transaction], Seq[Transaction], collection.mutable.ListBuffer[UtxEvent])] =
     for {
       (sender, senderBalance, bcu) <- stateGen
       ts = System.currentTimeMillis()
@@ -313,14 +314,16 @@ class UtxPoolSpecification
       tx2    <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + maxAge.toMillis + 1000)))
     } yield {
       val time = new TestTime()
+      val events = collection.mutable.ListBuffer[UtxEvent]()
       val utx = new UtxPoolImpl(
         time,
         bcu,
         ignoreSpendableBalanceChanged,
         UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false),
-        enablePriorityPool = true
+        enablePriorityPool = true,
+        e => events += e
       )
-      (utx, time, tx1, tx2)
+      (utx, time, tx1, tx2, events)
     }
 
   private val expr: EXPR = {
@@ -413,7 +416,7 @@ class UtxPoolSpecification
     }
 
     "packUnconfirmed result is limited by constraint" in forAll(dualTxGen) {
-      case (utx, _, txs, _) =>
+      case (utx, _, txs, _, _) =>
         all(txs.map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
         utx.all.size shouldEqual txs.size
 
@@ -426,15 +429,18 @@ class UtxPoolSpecification
     }
 
     "evicts expired transactions when packUnconfirmed is called" in forAll(dualTxGen) {
-      case (utx, time, txs, _) =>
+      case (utx, time, txs, _, events) =>
         all(txs.map(tx => utx.putIfNew(tx).resultE)) shouldBe 'right
         utx.all.size shouldEqual txs.size
+        events.collect { case UtxEvent.TxAdded(tx, _) => tx }.toSet shouldBe txs.toSet
+        events.clear()
 
         time.advance(maxAge + 1000.millis)
 
         val (packed, _) = utx.packUnconfirmed(limitByNumber(100), 5.seconds)
         packed shouldBe 'empty
         utx.all shouldBe 'empty
+        events.collect { case UtxEvent.TxRemoved(tx, _) => tx }.toSet shouldBe txs.toSet
     }
 
     "evicts one of mutually invalid transactions when packUnconfirmed is called" in forAll(twoOutOfManyValidPayments) {
@@ -636,7 +642,7 @@ class UtxPoolSpecification
               }
             val settings =
               UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
-            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, () => nanoTimeSource(), true)
+            val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, true, nanoTimeSource = () => nanoTimeSource())
 
             utxPool.putIfNew(transfer).resultE.explicitGet()
             val (tx, _) = utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, 100.nanos)

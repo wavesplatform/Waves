@@ -10,7 +10,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.database.openDB
-import com.wavesplatform.events.{BlockchainUpdateTriggers, BlockchainUpdateTriggersImpl, BlockchainUpdated}
+import com.wavesplatform.events.{BlockchainUpdateTriggers, BlockchainUpdateTriggersImpl, BlockchainUpdated, UtxEvent}
 import com.wavesplatform.extensions.{Context, Extension}
 import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.lang.ValidationError
@@ -140,11 +140,11 @@ object Importer extends ScorexLogging {
         override def spendableBalanceChanged: Observable[(Address, Asset)] = ???
         override def actorSystem: ActorSystem                              = ???
         override def blockchainUpdated: Observable[BlockchainUpdated]      = blockchainUpdatedObservable
-
-        override def transactionsApi = ???
-        override def blocksApi       = ???
-        override def accountsApi     = ???
-        override def assetsApi       = ???
+        override def utxEvents: Observable[UtxEvent]                       = Observable.empty
+        override def transactionsApi                                       = ???
+        override def blocksApi                                             = ???
+        override def accountsApi                                           = ???
+        override def assetsApi                                             = ???
       }
     }
 
