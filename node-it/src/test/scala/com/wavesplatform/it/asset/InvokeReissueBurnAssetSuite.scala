@@ -178,7 +178,7 @@ class InvokeReissueBurnAssetSuite extends BaseSuite {
     val method = "@Callable"
 
     "Issue two identical assets with the same nonce (one invocation) should produce an error" ignore {
-      /* SC-576  */
+      /* SC-575  */
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
         invokeScript(acc, "issue2Assets"),
