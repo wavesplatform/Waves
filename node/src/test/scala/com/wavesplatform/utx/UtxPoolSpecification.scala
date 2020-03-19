@@ -13,6 +13,7 @@ import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
 import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
+import com.wavesplatform.events.UtxEvent.{TxAdded, TxRemoved}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{StorageFactory, randomSig}
@@ -213,9 +214,10 @@ class UtxPoolSpecification
   } yield {
     val settings =
       UtxSettings(10, PoolDefaultMaxBytes, 1000, Set.empty, Set.empty, allowTransactionsFromSmartAccounts = true, allowSkipChecks = false)
-    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true)
+    val events  = collection.mutable.ListBuffer[UtxEvent]()
+    val utxPool = new UtxPoolImpl(time, bcu, ignoreSpendableBalanceChanged, settings, enablePriorityPool = true, events += _)
     txs.foreach(utxPool.putIfNew(_))
-    (sender, bcu, utxPool, time, settings)
+    (sender, bcu, utxPool, time, settings, events)
   }).label("withValidPayments")
 
   private val withValidPaymentsNotAdded = (for {
@@ -313,7 +315,7 @@ class UtxPoolSpecification
       tx1    <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts)))
       tx2    <- listOfN(count1, transfer(sender, senderBalance / 2, new TestTime(ts + maxAge.toMillis + 1000)))
     } yield {
-      val time = new TestTime()
+      val time   = new TestTime()
       val events = collection.mutable.ListBuffer[UtxEvent]()
       val utx = new UtxPoolImpl(
         time,
@@ -513,7 +515,7 @@ class UtxPoolSpecification
 
     "pessimisticPortfolio" - {
       "is not empty if there are transactions" in forAll(withValidPayments) {
-        case (sender, _, utxPool, _, _) =>
+        case (sender, _, utxPool, _, _, _) =>
           utxPool.size should be > 0
           utxPool.pessimisticPortfolio(sender) should not be empty
       }
@@ -525,13 +527,16 @@ class UtxPoolSpecification
       }
 
       "is empty if utx pool was cleaned" in forAll(withValidPayments) {
-        case (sender, _, utxPool, _, _) =>
+        case (sender, _, utxPool, _, _, events) =>
+          val txs = utxPool.all.toSet
+          events.collect { case TxAdded(tx, _) => tx }.toSet shouldBe txs
           utxPool.removeAll(utxPool.all)
+          events.collect { case TxRemoved(tx, None) => tx }.toSet shouldBe txs
           utxPool.pessimisticPortfolio(sender) shouldBe empty
       }
 
       "is changed after transactions with these assets are removed" in forAll(withValidPayments) {
-        case (sender, _, utxPool, time, _) =>
+        case (sender, _, utxPool, time, _, _) =>
           val portfolioBefore = utxPool.pessimisticPortfolio(sender)
           val poolSizeBefore  = utxPool.size
 
