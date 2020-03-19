@@ -3,6 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
+import com.wavesplatform.state.Diff.TransactionMeta
 import com.wavesplatform.state.{AddressId, Diff, Height, InvokeScriptResult, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
@@ -105,8 +106,8 @@ object AddressTransactions {
       fromId: Option[ByteStr]
   ): Iterable[(Height, Transaction)] =
     (for {
-      (h, diff)       <- maybeDiff.toSeq
-      (tx, addresses) <- diff.transactions.values.toSeq.reverse
+      (h, diff)                         <- maybeDiff.toSeq
+      TransactionMeta(tx, addresses, _) <- diff.transactions.values.toSeq.reverse
       if addresses(subject)
     } yield h -> tx)
       .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }

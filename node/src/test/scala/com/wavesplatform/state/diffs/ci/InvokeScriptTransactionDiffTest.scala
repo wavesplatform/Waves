@@ -586,7 +586,7 @@ class InvokeScriptTransactionDiffTest
             newState.accountData(genesis(0).recipient, "sender") shouldBe Some(BinaryDataEntry("sender", ci.sender.toAddress.bytes))
             newState.accountData(genesis(0).recipient, "argument") shouldBe Some(BinaryDataEntry("argument", ci.funcCallOpt.get.args.head.asInstanceOf[CONST_BYTESTR].bs))
 
-            blockDiff.transactions(ci.id())._2.contains(setScript.sender) shouldBe true
+            blockDiff.transactions(ci.id()).addresses.contains(setScript.sender) shouldBe true
           }
 
     }

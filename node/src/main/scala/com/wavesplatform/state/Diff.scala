@@ -8,7 +8,9 @@ import com.wavesplatform.account.{Address, Alias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.state.Diff.TransactionMeta
 import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
@@ -138,7 +140,7 @@ object Sponsorship {
 }
 
 case class Diff(
-    transactions: collection.Map[ByteStr, (Transaction, Set[Address])],
+    transactions: collection.Map[ByteStr, TransactionMeta],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
@@ -155,6 +157,18 @@ case class Diff(
 )
 
 object Diff {
+  case class TransactionMeta(transaction: Transaction, addresses: Set[Address], error: Option[ValidationError]) {
+    val succeed: Boolean = error.isEmpty
+  }
+
+  object TransactionMeta {
+    def apply(transaction: Transaction, addresses: Set[Address]): TransactionMeta =
+      new TransactionMeta(transaction, addresses, None)
+
+    def failed(transaction: Transaction, addresses: Set[Address], error: ValidationError): TransactionMeta =
+      new TransactionMeta(transaction, addresses, Some(error))
+  }
+
   def stateOps(
       portfolios: Map[Address, Portfolio] = Map.empty,
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)] = Map.empty,
@@ -203,7 +217,7 @@ object Diff {
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
+      transactions = LinkedHashMap((tx.id(), TransactionMeta(tx, (portfolios.keys ++ accountData.keys).toSet))),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,
@@ -219,8 +233,29 @@ object Diff {
       scriptsComplexity = scriptsComplexity
     )
 
+  def failed(
+      tx: Transaction,
+      error: ValidationError,
+      portfolios: Map[Address, Portfolio]
+    ): Diff = ???
+
   val empty =
-    new Diff(LinkedHashMap(), Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, Map.empty, 0, 0, Map.empty)
+    new Diff(
+      LinkedHashMap(),
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      Map.empty,
+      0,
+      0,
+      Map.empty
+    )
 
   implicit val diffMonoid: Monoid[Diff] = new Monoid[Diff] {
     override def empty: Diff = Diff.empty

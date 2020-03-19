@@ -10,6 +10,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
+import com.wavesplatform.state.Diff.TransactionMeta
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.{AliasDoesNotExist, AliasIsDisabled}
@@ -47,7 +48,7 @@ final case class CompositeBlockchain(
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (lt: LeaseTransaction, _) =>
+        case TransactionMeta(lt: LeaseTransaction, _, None) =>
           LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
@@ -56,7 +57,7 @@ final case class CompositeBlockchain(
     diff.transactions
       .get(id)
       .collect {
-        case (tx: TransferTransaction, _) => (height, tx)
+        case TransactionMeta(tx: TransferTransaction, _, None) => (height, tx)
       }
       .orElse(inner.transferById(id))
   }
@@ -64,7 +65,7 @@ final case class CompositeBlockchain(
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
     diff.transactions
       .get(id)
-      .map(t => (this.height, t._1))
+      .map(t => (this.height, t.transaction))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
@@ -237,7 +238,7 @@ object CompositeBlockchain {
     assetDescription map { z =>
       diff.transactions.values
         .foldLeft(z.copy(script = script)) {
-          case (acc, (ut: UpdateAssetInfoTransaction, _)) if ut.assetId == asset =>
+          case (acc, TransactionMeta(ut: UpdateAssetInfoTransaction, _, None)) if ut.assetId == asset =>
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _) => acc
         }
@@ -257,7 +258,7 @@ object CompositeBlockchain {
           case (id, false) => id
         }.toSet
         val addedInLiquidBlock = ng.transactions.values.collect {
-          case (lt: LeaseTransaction, _) if !cancelledInLiquidBlock(lt.id()) => lt
+          case TransactionMeta(lt: LeaseTransaction, _, None) if !cancelledInLiquidBlock(lt.id()) => lt
         }
         innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
       case _ => innerActiveLeases

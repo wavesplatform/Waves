@@ -10,6 +10,7 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
 import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.state.Diff.TransactionMeta
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
@@ -271,7 +272,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
           // merge issue/reissue diffs as if they were produced by a single invoke
           val invokeTxDiff = assetsDummyBlockDiff.transactionDiffs
             .foldLeft(Diff.empty)(Diff.diffMonoid.combine)
-            .copy(transactions = Map((invoke.id(), (invoke, Set(master)))))
+            .copy(transactions = Map((invoke.id(), TransactionMeta(invoke, Set(master)))))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
           produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, None, blockchain)) match {

@@ -13,6 +13,7 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
+import com.wavesplatform.state.Diff.TransactionMeta
 import com.wavesplatform.state.diffs.TransactionDiffer
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.reader.CompositeBlockchain
@@ -184,10 +185,13 @@ class UtxPoolImpl(
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val diffEi               = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+    val diffEi = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+    val txMetaEi =
+      diffEi.resultE.flatMap(_.transactions.headOption.map { case (_, meta) => meta }.toRight(GenericError("Transaction validation failed")))
+
     def addPortfolio(): Unit = diffEi.map(pessimisticPortfolios.add(tx.id(), _))
 
-    if (!verify || diffEi.resultE.isRight) {
+    if (!verify || txMetaEi.map(_.succeed).getOrElse(false)) {
       if (priority) priorityTransactions.synchronized {
         priorityTransactions += tx.id() -> tx
         PoolMetrics.addTransactionPriority(tx)
@@ -200,7 +204,10 @@ class UtxPoolImpl(
         })
     }
 
-    diffEi.map(_ => true)
+    txMetaEi match {
+      case Right(TransactionMeta(_, _, Some(error))) => TracedResult(Left(error), diffEi.trace)
+      case _                                         => diffEi.map(_ => true)
+    }
   }
 
   override def spendableBalance(addr: Address, assetId: Asset): Long =
@@ -227,11 +234,12 @@ class UtxPoolImpl(
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress).filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.sender.toAddress)
+        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
-    case _                                                         => Set.empty
+    case _                                                                => Set.empty
   }
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
