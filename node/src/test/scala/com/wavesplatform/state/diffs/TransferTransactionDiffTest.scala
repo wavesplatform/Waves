@@ -80,18 +80,19 @@ class TransferTransactionDiffTest extends PropSpec with PropertyChecks with Matc
 
     val rdEnabled = TestFunctionalitySettings.Stub
 
-    val rdDisabled = rdEnabled.copy(
-      preActivatedFeatures = Map(
-        BlockchainFeatures.SmartAccounts.id -> 0,
-        BlockchainFeatures.SmartAssets.id   -> 0,
-        BlockchainFeatures.FairPoS.id       -> 0
-      ))
-
     forAll(precs) {
       case (genesis, issue, transfer) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(transfer)), rdEnabled) { diffEi =>
           diffEi shouldBe an[Right[_, _]]
         }
+
+        val rdDisabled = rdEnabled.copy(
+          preActivatedFeatures = Map(
+            BlockchainFeatures.SmartAccounts.id -> 0,
+            BlockchainFeatures.SmartAssets.id   -> 0,
+            BlockchainFeatures.FairPoS.id       -> 0,
+            BlockchainFeatures.Ride4DApps.id    -> 100000
+          ))
 
         assertDiffEi(Seq(TestBlock.create(Seq(genesis, issue))), TestBlock.create(Seq(transfer)), rdDisabled) { diffEi =>
           diffEi shouldBe Left(TransactionDiffer.TransactionValidationError(TxValidationError.OverflowError, transfer))
