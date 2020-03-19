@@ -16,7 +16,7 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 
 case class Asset(t: String, n: String, ds: String, q: Long, r: Boolean, d: Byte, nc: Long)
 
-class InvokeReissueBurnAssetSuite extends BaseSuite {
+class IssueReissueBurnAssetSuite extends BaseSuite {
   val initialWavesBalance = 100.waves
   val setScriptPrice      = 0.01.waves
 
