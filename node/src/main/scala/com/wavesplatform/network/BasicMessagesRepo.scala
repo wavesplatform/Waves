@@ -136,28 +136,28 @@ trait BlockIdSeqSpec[A <: AnyRef] extends MessageSpec[A] {
 }
 
 object GetSignaturesSpec extends SignaturesSeqSpec[GetSignatures] {
-  def isSupported(signatures: Seq[ByteStr]): Boolean = signatures.forall(_.length == SignatureLength)
+  def isSupported(signatures: Seq[ByteStr]): Boolean             = signatures.forall(_.length == SignatureLength)
   override def wrap(signatures: Seq[Array[Byte]]): GetSignatures = GetSignatures(signatures.map(ByteStr(_)))
   override def unwrap(v: GetSignatures): Seq[Array[MessageCode]] = v.signatures.map(_.arr)
-  override val messageCode: MessageCode = 20: Byte
+  override val messageCode: MessageCode                          = 20: Byte
 }
 
 object SignaturesSpec extends SignaturesSeqSpec[Signatures] {
   override def wrap(signatures: Seq[Array[Byte]]): Signatures = Signatures(signatures.map(ByteStr(_)))
-  override def unwrap(v: Signatures): Seq[Array[Byte]] = v.signatures.map(_.arr)
-  override val messageCode: MessageCode = 21: Byte
+  override def unwrap(v: Signatures): Seq[Array[Byte]]        = v.signatures.map(_.arr)
+  override val messageCode: MessageCode                       = 21: Byte
 }
 
 object GetBlockIdsSpec extends BlockIdSeqSpec[GetSignatures] {
-  override def wrap(blockIds: Seq[Array[Byte]]): GetSignatures = GetSignatures(blockIds.map(ByteStr(_)))
+  override def wrap(blockIds: Seq[Array[Byte]]): GetSignatures   = GetSignatures(blockIds.map(ByteStr(_)))
   override def unwrap(v: GetSignatures): Seq[Array[MessageCode]] = v.signatures.map(_.arr)
   override val messageCode: MessageCode                          = 32: Byte
 }
 
 object BlockIdsSpec extends BlockIdSeqSpec[Signatures] {
   override def wrap(blockIds: Seq[Array[Byte]]): Signatures = Signatures(blockIds.map(ByteStr(_)))
-  override def unwrap(v: Signatures): Seq[Array[Byte]]        = v.signatures.map(_.arr)
-  override val messageCode: MessageCode                       = 33: Byte
+  override def unwrap(v: Signatures): Seq[Array[Byte]]      = v.signatures.map(_.arr)
+  override val messageCode: MessageCode                     = 33: Byte
 }
 
 object GetBlockSpec extends MessageSpec[GetBlock] {
@@ -281,13 +281,13 @@ object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
   override val messageCode: MessageCode = 30: Byte
 
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
-    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes.dropRight(crypto.DigestLength))).map { mb =>
-      val blockId = bytes.takeRight(crypto.DigestLength)
-      MicroBlockResponse(mb, blockId)
+    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes)).map {
+      case (mb, totalBlockId) =>
+        MicroBlockResponse(mb, totalBlockId)
     }
 
   override def serializeData(resp: MicroBlockResponse): Array[Byte] =
-    PBMicroBlocks.protobuf(resp.microblock).toByteArray ++ resp.totalBlockId.arr
+    PBMicroBlocks.protobuf(resp.microblock, resp.totalBlockId).toByteArray
 
   override val maxLength: Int = PBBlockSpec.maxLength + crypto.DigestLength
 }
