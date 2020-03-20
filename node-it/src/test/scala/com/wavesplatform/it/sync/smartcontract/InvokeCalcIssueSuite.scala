@@ -24,51 +24,66 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
       .overrideBase(_.preactivatedFeatures((BlockchainFeatures.MultiPaymentInvokeScript.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
       .buildNonConflicting()
 
-  private val smartAcc  = pkByAddress(firstAddress)
-  private val callerAcc = pkByAddress(secondAddress)
+  private val smartAcc  = firstAddress
+  private val callerAcc = secondAddress
 
 
   test("calculateAssetId should return right unique id for each invoke") {
 
     sender.setScript(
-      smartAcc.stringRepr,
+      smartAcc,
       Some(ScriptCompiler.compile(dAppV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64),
       fee = setScriptFee + smartFee,
       waitForTx = true
     )
     sender
       .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+        callerAcc,
+        smartAcc,
         Some("i"),
         args = List.empty,
         waitForTx = true
       )
-    val assetId = Base58.encode(sender.getDataByKey(smartAcc.stringRepr, "id").as[BinaryDataEntry].value)
+    val assetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
 
     sender
       .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+        callerAcc,
+        smartAcc,
         Some("i"),
         args = List.empty,
         waitForTx = true
       )
-    val secondAssetId = Base58.encode(sender.getDataByKey(smartAcc.stringRepr, "id").as[BinaryDataEntry].value)
+    val secondAssetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
 
-    sender.assetBalance(smartAcc.stringRepr, assetId).balance shouldBe 100
-    sender.assetBalance(smartAcc.stringRepr, secondAssetId).balance shouldBe 100
+    sender.assetBalance(smartAcc, assetId).balance shouldBe 100
+    sender.assetBalance(smartAcc, secondAssetId).balance shouldBe 100
+
+    val assetDetails = sender.assetsDetails(assetId)
+    assetDetails.decimals shouldBe decimals
+    assetDetails.name shouldBe assetName
+    assetDetails.reissuable shouldBe reissuable
+    assetDetails.description shouldBe assetDescr
+    assetDetails.minSponsoredAssetFee shouldBe None
+
   }
 }
 
 object InvokeCalcIssueSuite {
+
+  val assetName = "InvokeAsset"
+  val assetDescr = "Invoke asset descr"
+  val amount = 100
+  val decimals = 0
+  val reissuable = true
+
   private val dAppV4: String =
-    """{-# STDLIB_VERSION 4 #-}
+    s"""{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
       |
       |@Callable(i)
       |func i() = {
-      |let issue = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+      |let issue = Issue("$assetName", "$assetDescr", $amount, $decimals, $reissuable, unit, 0)
       |let id = calculateAssetId(issue)
       |[issue,
       | BinaryEntry("id", id)]

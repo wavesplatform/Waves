@@ -16,9 +16,9 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeSelfPaymentSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val caller = pkByAddress(firstAddress).stringRepr
-  private val dAppV4 = pkByAddress(secondAddress).stringRepr
-  private val dAppV3 = pkByAddress(thirdAddress).stringRepr
+  private val caller = firstAddress
+  private val dAppV4 = secondAddress
+  private val dAppV3 = thirdAddress
 
   private var asset1: IssuedAsset = _
   private def asset1Id = asset1.id.toString
