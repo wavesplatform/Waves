@@ -671,11 +671,12 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       seller: KeyPair,
       amountAssetId: Asset,
       priceAssetId: Asset,
-      fixedMatcherFee: Option[Long] = None
+      fixedMatcherFee: Option[Long] = None,
+      fixedMatcher: Option[KeyPair] = None
   ): Gen[ExchangeTransaction] = {
     Gen.oneOf(
-      exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId),
-      exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId)
+      exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher),
+      exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher)
     )
   }
 
@@ -685,23 +686,23 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       amountAssetId: Asset,
       priceAssetId: Asset,
       fixedMatcherFee: Option[Long] = None,
-      chainId: Byte = AddressScheme.current.chainId
+      chainId: Byte = AddressScheme.current.chainId,
+      fixedMatcher: Option[KeyPair] = None
   ): Gen[ExchangeTransaction] =
     for {
-      (_, matcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
-      amount2: Long                                                            <- matcherAmountGen
-      matchedAmount: Long                                                      <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
+      (_, genMatcher, _, _, amount1, price, timestamp, expiration, genMatcherFee) <- orderParamGen
+      amount2: Long                                                               <- matcherAmountGen
+      matchedAmount: Long                                                         <- Gen.choose(Math.min(amount1, amount2) / 2000, Math.min(amount1, amount2) / 1000)
       assetPair = AssetPair(amountAssetId, priceAssetId)
-      o1first <- Arbitrary.arbBool.arbitrary
     } yield {
       val matcherFee = fixedMatcherFee.getOrElse(genMatcherFee)
+      val matcher    = fixedMatcher.getOrElse(genMatcher)
       val o1         = Order.buy(1: Byte, buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2         = Order.sell(1: Byte, seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
       val buyFee     = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
-      val (order1, order2) = if (o1first) (o1, o2) else (o2, o1)
       val trans =
-        ExchangeTransaction(1.toByte, order1, order2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
+        ExchangeTransaction(1.toByte, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
             .signWith(matcher)
 
       trans
@@ -741,7 +742,6 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       assetPair = AssetPair(amountAssetId, priceAssetId)
       mkO1 <- Gen.oneOf(orderVersions.map(mkBuyOrder).toSeq)
       mkO2 <- Gen.oneOf(orderVersions.map(mkSellOrder).toSeq)
-      o1first <- Arbitrary.arbBool.arbitrary
     } yield {
 
       val buyFee  = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount1)).longValue()
@@ -750,10 +750,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val o1 = mkO1(buyer, matcher, assetPair, amount1, price, timestamp, expiration, matcherFee)
       val o2 = mkO2(seller, matcher, assetPair, amount2, price, timestamp, expiration, matcherFee)
 
-      val (order1, order2) = if (o1first) (o1, o2) else (o2, o1)
-
       ExchangeTransaction
-        .signed(2.toByte, matcher, order1, order2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
+        .signed(2.toByte, matcher, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100)
         .explicitGet()
     }
   }
@@ -960,7 +958,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
     } yield IssueTransaction(2.toByte, sender, assetName, description, quantity, decimals, reissuable, script, fee, timestamp)
       .signWith(sender)
 
-  val invalidChainIdGen = Arbitrary.arbitrary[Byte].filterNot(_ == AddressScheme.current.chainId)
+  val invalidChainIdGen: Gen[Byte] = Arbitrary.arbitrary[Byte].filterNot(_ == AddressScheme.current.chainId)
 }
 
 trait TransactionGen extends TransactionGenBase { _: Suite =>
