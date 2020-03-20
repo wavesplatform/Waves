@@ -55,9 +55,9 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       } ~ path("seq" / IntNumber / IntNumber) { (start, end) =>
         seq(start, end, includeTransactions = false)
       } ~ path("last") {
-        at(commonApi.currentHeight, false)
+        at(commonApi.currentHeight, includeTransactions = false)
       } ~ path(BlockId) { id =>
-        complete(commonApi.meta(id).map(toJson(_, Nil)))
+        complete(commonApi.meta(id).map(meta => toJson(meta -> Nil)))
       }
     } ~ path(BlockId) { id =>
       complete(commonApi.block(id).map(toJson))
