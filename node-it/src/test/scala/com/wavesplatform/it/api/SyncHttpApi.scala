@@ -143,6 +143,7 @@ object SyncHttpApi extends Assertions {
       case NonFatal(cause)                     => throw new Exception(cause)
     }
 
+  //noinspection ScalaStyle
   implicit class NodeExtSync(n: Node) extends Assertions with Matchers {
     import com.wavesplatform.it.api.AsyncHttpApi.{NodeAsyncHttpApi => async}
 
@@ -179,11 +180,13 @@ object SyncHttpApi extends Assertions {
 
     def lastBlock(amountsAsStrings: Boolean = false): Block = sync(async(n).lastBlock(amountsAsStrings))
 
-    def blockBySignature(signature: String, amountsAsStrings: Boolean = false): Block = sync(async(n).blockBySignature(signature, amountsAsStrings))
+    def blockById(id: String, amountsAsStrings: Boolean = false): Block = sync(async(n).blockById(id, amountsAsStrings))
 
     def lastBlockHeader(amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).lastBlockHeader(amountsAsStrings))
 
     def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeadersAt(height, amountsAsStrings))
+
+    def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): BlockHeader = sync(async(n).blockHeaderForId(id, amountsAsStrings))
 
     def postForm(path: String, params: (String, String)*): Response =
       sync(async(n).postForm(path, params: _*))
@@ -417,9 +420,9 @@ object SyncHttpApi extends Assertions {
         version: Byte = 2,
         matcherFeeAssetId: Option[String] = None,
         waitForTx: Boolean = false,
-        amountsAsStrings: Boolean = false,
-        validate: Boolean = true
-    ): Transaction = {
+        amountsAsStrings: Boolean = false
+    ,
+        validate: Boolean = true): Transaction = {
       maybeWaitForTransaction(
         sync(
           async(n).broadcastExchange(
@@ -433,7 +436,8 @@ object SyncHttpApi extends Assertions {
             fee,
             version,
             matcherFeeAssetId,
-            amountsAsStrings,
+            amountsAsStrings
+          ,
             validate
           )
         ),
@@ -782,10 +786,10 @@ object SyncHttpApi extends Assertions {
       )
     }
 
-    def rollbackToBlockWithSignature(signature: String): Unit = {
+    def rollbackToBlockId(id: String): Unit = {
       sync(
         Future.traverse(nodes) { node =>
-          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollbackToBlockWithSignature(signature)
+          com.wavesplatform.it.api.AsyncHttpApi.NodeAsyncHttpApi(node).rollbackToBlockId(id)
         },
         ConditionAwaitTime
       )

@@ -103,6 +103,9 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
     blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+
+    val blockHeaderById = sender.blockHeaderForId(blockHeadersAtActivationHeight.id)
+    blockHeaderById shouldBe blockHeadersAtActivationHeight
   }
 
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {
@@ -189,7 +192,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     nodes.waitForHeightArise()
 
     //rollback to height after activation height using rollback to block with signature method
-    nodes.rollbackToBlockWithSignature(sender.blockAt(activationHeight + 1).id)
+    nodes.rollbackToBlockId(sender.blockAt(activationHeight + 1).id)
 
     val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
     blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion
