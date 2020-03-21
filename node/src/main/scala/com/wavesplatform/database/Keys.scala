@@ -107,19 +107,19 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[Transaction]] =
-    Key.opt[Transaction](
+  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, Boolean)]] =
+    Key.opt[(Transaction, Boolean)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
       readTransaction,
       writeTransaction
     )
 
-  def transferTransactionAt(height: Height, n: TxNum): Key[Option[TransferTransaction]] =
+  def transferTransactionAt(height: Height, n: TxNum): Key[Option[(TransferTransaction, Boolean)]] =
     Key(
       NthTransactionInfoAtHeight,
       hNum(height, n),
-      TransferTxSerializer.tryParseTransfer,
+      bytes => TransferTxSerializer.tryParseTransfer(bytes.tail).map(tx => (tx, bytes.head == 0)),
       unsupported("Can not explicitly write transfer transaction")
     )
 

@@ -57,6 +57,13 @@ object TxValidationError {
     }
   }
 
+  case class DAppExecutionError(error: String, log: Log[Id]) extends ValidationError with HasScriptType {
+    override def toString: String = s"DAppExecutionError(error = $error, type = Account, log =${logToString(log)})"
+    override val isAssetScript: Boolean = false
+  }
+
+  case class InsufficientInvokeActionFee(error: String) extends ValidationError
+
   case class TransactionNotAllowedByScript(log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
       val target = if (isAssetScript) "Asset" else "Account"

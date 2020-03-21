@@ -25,7 +25,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         case None =>
           if (request.sender.isEmpty) {
             Observable.fromIterable(transactionIds.flatMap(commonApi.transactionById)).map {
-              case (h, e) => h -> e.fold(identity, _._1)
+              case (h, e, s) => (h, e.fold(identity, _._1), s)
             }
           } else {
             val senderAddress = request.sender.toAddress
@@ -42,8 +42,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
       responseObserver.completeWith(
         stream
-          .filter { case (_, t) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
-          .map { case (h, tx) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB)) }
+          .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
+          .map { case (h, tx, _) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB)) }
       )
     }
 
@@ -69,7 +69,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
 
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
-        .collect { case (_, Right((_, Some(isr)))) => VISR.toPB(isr) }
+        .collect { case (_, Right((_, Some(isr))), true) => VISR.toPB(isr) }
 
       responseObserver.completeWith(result)
     }
@@ -80,8 +80,8 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         commonApi
           .unconfirmedTransactionById(txId)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
-          .orElse {
-            commonApi.transactionById(txId).map { case (h, _) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h) }
+          .orElse { // TODO (NODE-2066): Status FAILED?
+            commonApi.transactionById(txId).map { case (h, _, _) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h) }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
       }

@@ -490,20 +490,28 @@ package object database extends ScorexLogging {
     )
   }
 
-  def readTransaction(b: Array[Byte]): Transaction = b.head match {
-    case 0 => TransactionParsers.parseBytes(b.tail).get
-    case 1 => PBTransactions.vanilla(PBSignedTransaction.parseFrom(b.tail)).explicitGet()
+  def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
+    val confirmed = b.head == 0
+    val txBytes = b.tail
+    txBytes.head match {
+      case 0 => (TransactionParsers.parseBytes(txBytes.tail).get, confirmed)
+      case 1 => (PBTransactions.vanilla(PBSignedTransaction.parseFrom(txBytes.tail)).explicitGet(), confirmed)
+    }
   }
 
-  def writeTransaction(t: Transaction): Array[Byte] = Bytes.concat(
-    t match {
-      case _: GenesisTransaction                         => Array(0.toByte)
-      case _: PaymentTransaction                         => Array(0.toByte)
-      case lps: LegacyPBSwitch if !lps.isProtobufVersion => Array(0.toByte)
-      case _                                             => Array(1.toByte)
-    },
-    t.bytes()
-  )
+  def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
+    val (t, s) = v
+    Bytes.concat(
+      Array[Byte](if (s) 0 else 1),
+      t match {
+        case _: GenesisTransaction                         => Array(0.toByte)
+        case _: PaymentTransaction                         => Array(0.toByte)
+        case lps: LegacyPBSwitch if !lps.isProtobufVersion => Array(0.toByte)
+        case _                                             => Array(1.toByte)
+      },
+      t.bytes()
+    )
+  }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {
@@ -511,7 +519,7 @@ package object database extends ScorexLogging {
       txs = (0 until meta.transactionCount).toList.flatMap { n =>
         db.get(Keys.transactionAt(height, TxNum(n.toShort)))
       }
-      block <- createBlock(meta.header, meta.signature, txs).toOption
+      block <- createBlock(meta.header, meta.signature, txs.map(_._1)).toOption
     } yield block
 
   def fromHistory[A](resource: DBResource, historyKey: Key[Seq[Int]], valueKey: Int => Key[A]): Option[A] =

@@ -15,6 +15,8 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.block.Block.TransactionProof
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api.TransactionsByIdRequest
@@ -66,8 +68,9 @@ case class TransactionsApiRoute(
       complete(InvalidTransactionId("Transaction ID was not specified"))
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
-        case Some((h, either)) => complete(txToExtendedJson(either.fold(identity, _._1)) + ("height" -> JsNumber(h)))
-        case None              => complete(ApiError.TransactionDoesNotExist)
+        case Some((h, either, status)) =>
+          complete(txToExtendedJson(either.fold(identity, _._1)) ++ statusInfo(h, status) + ("height" -> JsNumber(h)))
+        case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
   }
@@ -81,14 +84,19 @@ case class TransactionsApiRoute(
           case (Nil, Nil) => complete(CustomValidationError("Empty request"))
           case (Nil, ids) =>
             val results = ids.toSet.map { id: ByteStr =>
+              import Status._
               val statusJson = blockchain.transactionInfo(id) match {
-                case Some((height, _)) =>
-                  Json.obj("status" -> "confirmed", "height" -> height, "confirmations" -> (blockchain.height - height).max(0))
+                case Some((height, _, confirmed)) =>
+                  Json.obj(
+                    "status"        -> (if (confirmed) Confirmed else Failed),
+                    "height"        -> height,
+                    "confirmations" -> (blockchain.height - height).max(0)
+                  )
 
                 case None =>
                   commonApi.unconfirmedTransactionById(id) match {
-                    case Some(_) => Json.obj("status" -> "unconfirmed")
-                    case None    => Json.obj("status" -> "not_found")
+                    case Some(_) => Json.obj("status" -> Unconfirmed)
+                    case None    => Json.obj("status" -> NotFound)
                   }
               }
               id -> (statusJson ++ Json.obj("id" -> id.toString))
@@ -187,37 +195,52 @@ case class TransactionsApiRoute(
     }
   }
 
+  private def statusInfo(height: Int, confirmed: Boolean): JsObject = {
+    import Status._
+    if (blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction, height))
+      JsObject(Map("status" -> JsString(if (confirmed) Confirmed else Failed)))
+    else
+      JsObject.empty
+  }
+
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
-      Observable
-        .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
-        .flatMap { aliases =>
-          val addressesCached = (aliases :+ address).toSet
+    Observable
+      .fromTask(commonApi.aliasesOfAddress(address).collect { case (_, cat) => cat.alias }.toListL)
+      .flatMap { aliases =>
+        val addressesCached = (aliases :+ address).toSet
 
-          /**
-            * Produces compact representation for large transactions by stripping unnecessary data.
-            * Currently implemented for MassTransfer transaction only.
-            */
-          def txToCompactJson(address: Address, tx: Transaction): JsObject = {
-            import com.wavesplatform.transaction.transfer._
-            tx match {
-              case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
-              case _                                                               => txToExtendedJson(tx)
-            }
+        /**
+          * Produces compact representation for large transactions by stripping unnecessary data.
+          * Currently implemented for MassTransfer transaction only.
+          */
+        def txToCompactJson(address: Address, tx: Transaction): JsObject = {
+          import com.wavesplatform.transaction.transfer._
+          tx match {
+            case mtt: MassTransferTransaction if mtt.sender.toAddress != address => mtt.compactJson(addressesCached)
+            case _                                                               => txToExtendedJson(tx)
           }
-
-          commonApi
-            .transactionsByAddress(address, None, Set.empty, maybeAfter)
-            .take(limitParam)
-            .map { case (height, tx) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }
         }
-    .toListL
-    .runToFuture
+
+        commonApi
+          .transactionsByAddress(address, None, Set.empty, maybeAfter)
+          .take(limitParam)
+          .map { case (height, tx, _) => txToCompactJson(address, tx) + ("height" -> JsNumber(height)) }
+      }
+      .toListL
+      .runToFuture
 }
 
 object TransactionsApiRoute {
   object LeaseStatus {
     val Active   = "active"
     val Canceled = "canceled"
+  }
+
+  object Status {
+    val Confirmed   = "confirmed"
+    val Failed      = "failed"
+    val Unconfirmed = "unconfirmed"
+    val NotFound    = "not_found"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

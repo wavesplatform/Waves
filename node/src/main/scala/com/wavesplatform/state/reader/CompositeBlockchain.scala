@@ -47,24 +47,24 @@ final case class CompositeBlockchain(
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = {
     inner.leaseDetails(leaseId).map(ld => ld.copy(isActive = diff.leaseState.getOrElse(leaseId, ld.isActive))) orElse
       diff.transactions.get(leaseId).collect {
-        case (lt: LeaseTransaction, _) =>
+        case (lt: LeaseTransaction, _, true) =>
           LeaseDetails(lt.sender, lt.recipient, this.height, lt.amount, diff.leaseState(lt.id()))
       }
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = {
+  override def transferById(id: ByteStr): Option[(Int, TransferTransaction, Boolean)] = {
     diff.transactions
       .get(id)
       .collect {
-        case (tx: TransferTransaction, _) => (height, tx)
+        case (tx: TransferTransaction, _, status) => (height, tx, status)
       }
       .orElse(inner.transferById(id))
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] =
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] =
     diff.transactions
       .get(id)
-      .map(t => (this.height, t._1))
+      .map(t => (this.height, t._1, t._3))
       .orElse(inner.transactionInfo(id))
 
   override def transactionHeight(id: ByteStr): Option[Int] =
@@ -237,7 +237,7 @@ object CompositeBlockchain {
     assetDescription map { z =>
       diff.transactions.values
         .foldLeft(z.copy(script = script)) {
-          case (acc, (ut: UpdateAssetInfoTransaction, _)) if ut.assetId == asset =>
+          case (acc, (ut: UpdateAssetInfoTransaction, _, true)) if ut.assetId == asset =>
             acc.copy(name = ByteString.copyFromUtf8(ut.name), description = ByteString.copyFromUtf8(ut.description), lastUpdatedAt = Height(height))
           case (acc, _) => acc
         }
@@ -257,7 +257,7 @@ object CompositeBlockchain {
           case (id, false) => id
         }.toSet
         val addedInLiquidBlock = ng.transactions.values.collect {
-          case (lt: LeaseTransaction, _) if !cancelledInLiquidBlock(lt.id()) => lt
+          case (lt: LeaseTransaction, _, true) if !cancelledInLiquidBlock(lt.id()) => lt
         }
         innerActiveLeases.filterNot(lt => cancelledInLiquidBlock(lt.id())) ++ addedInLiquidBlock
       case _ => innerActiveLeases

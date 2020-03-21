@@ -223,7 +223,8 @@ class LevelDBWriter(
       totalFee: Long,
       reward: Option[Long],
       hitSource: ByteStr,
-      scriptResults: Map[ByteStr, InvokeScriptResult]
+      scriptResults: Map[ByteStr, InvokeScriptResult],
+      failedTransactionIds: Set[ByteStr]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -395,7 +396,7 @@ class LevelDBWriter(
       }
 
       for ((id, (tx, num)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+        rw.put(Keys.transactionAt(Height(height), num), Some((tx, !failedTransactionIds.contains(id))))
         rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
       }
 
@@ -648,21 +649,21 @@ class LevelDBWriter(
     asset
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
+  override def transferById(id: ByteStr): Option[(Int, TransferTransaction, Boolean)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      tx            <- db.get(Keys.transferTransactionAt(height, num))
-    } yield height -> tx
+      (tx, status)  <- db.get(Keys.transferTransactionAt(height, num))
+    } yield (height, tx, status)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readOnly(transactionInfo(id, _))
 
-  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
-      tx            <- db.get(Keys.transactionAt(height, num))
-    } yield (height, tx)
+      (tx, status)  <- db.get(Keys.transactionAt(height, num))
+    } yield (height, tx, status)
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
@@ -679,7 +680,7 @@ class LevelDBWriter(
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     transactionInfo(leaseId, db) match {
-      case Some((h, lt: LeaseTransaction)) =>
+      case Some((h, lt: LeaseTransaction, true)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None
     }
@@ -776,7 +777,7 @@ class LevelDBWriter(
     val activeLeaseTransactions = for {
       leaseId <- activeLeaseIds
       (h, n)  <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx      <- db.get(Keys.transactionAt(h, n)).collect { case lt: LeaseTransaction if filter(lt) => lt }
+      tx      <- db.get(Keys.transactionAt(h, n)).collect { case (lt: LeaseTransaction, true) if filter(lt) => lt }
     } yield tx
 
     activeLeaseTransactions.toSeq
@@ -849,7 +850,7 @@ class LevelDBWriter(
 
     db.iterateOver(prefix) { entry =>
       val k = entry.getKey
-      val v = entry.getValue
+      val v = entry.getValue.tail
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
