@@ -146,7 +146,7 @@ object InvokeScriptTransactionDiff {
                 )
               } yield (evaluator, invocationComplexity)
 
-              result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
+              result.leftMap { case (error, log) => DAppExecutionError(error, log) }
             })
             TracedResult(
               scriptResultE,
@@ -211,13 +211,14 @@ object InvokeScriptTransactionDiff {
             val totalScriptsInvoked =
               smartAssetInvocations.count(blockchain.hasAssetScript) +
                 (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
-            val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+            val assetsIssued = issues.count(i => !blockchain.isNFT(i))
+            val minWaves     = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + assetsIssued * FeeUnit
+            val txName       = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val assetName    = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
-              GenericError(
+              InsufficientInvokeActionFee(
                 s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
                   s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES."
               )
@@ -486,6 +487,7 @@ object InvokeScriptTransactionDiff {
       diffAcc |+| diff
     }
 
+  // TODO (NODE-2066): Feature 17: asset script validation should occur after balance checking
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       totalDiff: Diff,
       pseudoTx: PseudoTx,

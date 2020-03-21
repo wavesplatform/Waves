@@ -267,7 +267,9 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height) =>
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some(Height(height) -> Left(tx))).once()
+          val h: Height = Height(height)
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, Left(tx), true))).once()
+          (blockchain.activatedFeatures _).expects().returning(Map()).anyNumberOfTimes()
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK
@@ -296,8 +298,9 @@ class TransactionsRouteSpec
 
       forAll(txAvailability) {
         case (tx, height) =>
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx))).anyNumberOfTimes()
+          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, true))).anyNumberOfTimes()
           (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
+          (blockchain.activatedFeatures _).expects().returning(Map()).anyNumberOfTimes()
 
           Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> route ~> check {
             status shouldEqual StatusCodes.OK

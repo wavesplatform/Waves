@@ -271,7 +271,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
           // merge issue/reissue diffs as if they were produced by a single invoke
           val invokeTxDiff = assetsDummyBlockDiff.transactionDiffs
             .foldLeft(Diff.empty)(Diff.diffMonoid.combine)
-            .copy(transactions = Map((invoke.id(), (invoke, Set(master)))))
+            .copy(transactions = Map((invoke.id(), (invoke, Set(master), true))))
           val invokeBlockDetailedDiff = assetsDummyBlockDiff.copy(transactionDiffs = Seq(invokeTxDiff))
 
           produceEvent(_.onProcessBlock(invokeBlock, invokeBlockDetailedDiff, None, blockchain)) match {

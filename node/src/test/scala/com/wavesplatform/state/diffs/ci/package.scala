@@ -16,10 +16,10 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.scalacheck.Gen
 
 package object ci {
-  def ciFee(sc: Int = 0): Gen[Long] =
+  def ciFee(sc: Int = 0, nonNftIssue: Int = 0): Gen[Long] =
     Gen.choose(
-      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + sc * ScriptExtraFee,
-      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * ScriptExtraFee - 1
+      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + sc * ScriptExtraFee + nonNftIssue * FeeUnit,
+      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeUnit
     )
 
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
