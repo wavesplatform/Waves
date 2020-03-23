@@ -14,6 +14,7 @@ import com.wavesplatform.database.{LevelDBWriter, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.history.{StorageFactory, randomSig}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
