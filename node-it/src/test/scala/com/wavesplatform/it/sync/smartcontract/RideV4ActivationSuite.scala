@@ -27,9 +27,9 @@ class RideV4ActivationSuite extends BaseTransactionSuite with CancelAfterFailure
       .overrideBase(_.preactivatedFeatures((16, activationHeight - 1)))
       .buildNonConflicting()
 
-  private val smartAccV4  = pkByAddress(firstAddress).stringRepr
-  private val callerAcc = pkByAddress(secondAddress).stringRepr
-  private val smartAccV3  = pkByAddress(thirdAddress).stringRepr
+  private val smartAccV4  = firstAddress
+  private val callerAcc = secondAddress
+  private val smartAccV3  = thirdAddress
 
   private var asset: Asset = _
 

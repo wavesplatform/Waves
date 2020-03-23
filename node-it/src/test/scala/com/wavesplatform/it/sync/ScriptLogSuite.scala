@@ -66,13 +66,7 @@ class ScriptLogSuite extends BaseTransactionSuite with CancelAfterFailure {
         BinaryDataEntry(s"k$i", ByteStr(bytes))
       }).toList
 
-    val initialData = DataTransaction
-      .selfSigned(1.toByte, smart, data, ENOUGH_FEE, System.currentTimeMillis())
-      .explicitGet()
-
-    val dtx1_id = sender.signedBroadcast(initialData.json()).id
-
-    nodes.waitForHeightAriseAndTxPresent(dtx1_id)
+    sender.putData(smart.stringRepr, data, ENOUGH_FEE, waitForTx = true).id
 
     val script = ScriptCompiler(scriptSrc, isAssetScript = false, ScriptEstimatorV2).explicitGet()._1
     val setScriptTransaction = SetScriptTransaction

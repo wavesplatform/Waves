@@ -13,6 +13,7 @@ import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.block.Block.Header
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.Waves
@@ -285,6 +286,10 @@ object SyncGrpcApi extends Assertions {
     def blockAt(height: Int): VanillaBlock = {
       val block = blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height))).getBlock
       PBBlocks.vanilla(block).toEither.explicitGet()
+    }
+
+    def blockHeaderAt(height: Int): Header = {
+      blocks.getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height.apply(height))).getBlock.getHeader
     }
 
     def blockById(blockId: ByteString): VanillaBlock = {

@@ -1,9 +1,8 @@
 package com.wavesplatform.block
 
-import cats.Monoid
 import com.wavesplatform.account.{Address, KeyPair, PublicKey}
-import com.wavesplatform.common.merkle.Merkle.{hash, mkProofs, verify}
 import com.wavesplatform.block.serialization.BlockSerializer
+import com.wavesplatform.common.merkle.Merkle.{hash, mkProofs, verify}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.crypto._
@@ -12,7 +11,6 @@ import com.wavesplatform.protobuf.block.{PBBlockHeaders, PBBlocks}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.GenesisSettings
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.ScorexLogging
@@ -48,23 +46,6 @@ case class Block(
   val json: Coeval[JsObject]     = Coeval.evalOnce(BlockSerializer.toJson(this))
 
   val blockScore: Coeval[BigInt] = Coeval.evalOnce((BigInt("18446744073709551616") / header.baseTarget).ensuring(_ > 0))
-
-  val feesPortfolio: Coeval[Portfolio] = Coeval.evalOnce(Monoid[Portfolio].combineAll({
-    val assetFees: Seq[(Asset, Long)] = transactionData.map(_.assetFee)
-    assetFees
-      .map { case (maybeAssetId, vol) => maybeAssetId -> vol }
-      .groupBy(a => a._1)
-      .mapValues((records: Seq[(Asset, Long)]) => records.map(_._2).sum)
-  }.toList.map {
-    case (assetId, feeVolume) =>
-      assetId match {
-        case Waves                  => Portfolio(feeVolume, LeaseBalance.empty, Map.empty)
-        case asset @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(asset -> feeVolume))
-      }
-  }))
-
-  val prevBlockFeePart: Coeval[Portfolio] =
-    Coeval.evalOnce(Monoid[Portfolio].combineAll(transactionData.map(tx => tx.feeDiff().minus(tx.feeDiff().multiply(CurrentBlockFeePart)))))
 
   private[block] val bytesWithoutSignature: Coeval[Array[Byte]] = Coeval.evalOnce {
     if (header.version < Block.ProtoBlockVersion) copy(signature = ByteStr.empty).bytes()
@@ -181,12 +162,6 @@ object Block extends ScorexLogging {
       validBlock <- signedBlock.validateGenesis(genesisSettings)
     } yield validBlock
   }
-
-  case class Fraction(dividend: Int, divider: Int) {
-    def apply(l: Long): Long = l / divider * dividend
-  }
-
-  val CurrentBlockFeePart: Fraction = Fraction(2, 5)
 
   type BlockId                = ByteStr
   type TransactionsMerkleTree = Seq[Seq[Array[Byte]]]

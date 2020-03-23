@@ -23,8 +23,8 @@ class RideUpdateAssetInfoTxSuite extends BaseTransactionSuite with CancelAfterFa
       .overrideBase(_.minAssetInfoUpdateInterval(1))
       .buildNonConflicting()
 
-  private val dApp = pkByAddress(firstAddress).stringRepr
-  private val smartAcc = pkByAddress(secondAddress).stringRepr
+  private val dApp = firstAddress
+  private val smartAcc = secondAddress
 
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _

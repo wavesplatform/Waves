@@ -14,6 +14,7 @@ import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -363,7 +364,7 @@ object InvokeScriptTransactionDiff {
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
 
-      def applyTransfer(transfer: AssetTransfer): TracedResult[ValidationError, Diff] = {
+      def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
         val AssetTransfer(addressRepr, amount, asset) = transfer
         val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
         Asset.fromCompatId(asset) match {
@@ -395,6 +396,7 @@ object InvokeScriptTransactionDiff {
                 val pseudoTx = ScriptTransfer(
                   asset,
                   actionSender,
+                  pk,
                   Recipient.Address(addressRepr.bytes),
                   amount,
                   tx.timestamp,
@@ -447,15 +449,15 @@ object InvokeScriptTransactionDiff {
         }
       }
 
-      def applyReissue(reissue: Reissue): TracedResult[ValidationError, Diff] = {
+      def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, Diff] = {
         val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
-        val pseudoTx    = ReissuePseudoTx(reissue, actionSender, tx.id(), tx.timestamp)
+        val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
         validateActionAsPseudoTx(diffAcc, reissueDiff, reissue.assetId, pseudoTx)
       }
 
-      def applyBurn(burn: Burn): TracedResult[ValidationError, Diff] = {
+      def applyBurn(burn: Burn, pk: PublicKey): TracedResult[ValidationError, Diff] = {
         val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
-        val pseudoTx = BurnPseudoTx(burn, actionSender, tx.id(), tx.timestamp)
+        val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
         validateActionAsPseudoTx(diffAcc, burnDiff, burn.assetId, pseudoTx)
       }
 
@@ -482,11 +484,11 @@ object InvokeScriptTransactionDiff {
         }
 
       val diff = action match {
-        case t: AssetTransfer => applyTransfer(t)
+        case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(MultiPaymentInvokeScript)) { pk } else { PublicKey(ByteStr.empty) }))
         case d: DataItem[_]   => applyDataItem(d)
         case i: Issue         => applyIssue(tx, pk, i)
-        case r: Reissue       => applyReissue(r)
-        case b: Burn          => applyBurn(b)
+        case r: Reissue       => applyReissue(r, pk)
+        case b: Burn          => applyBurn(b, pk)
       }
       diffAcc |+| diff
     }
