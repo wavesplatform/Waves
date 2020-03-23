@@ -1,8 +1,7 @@
 resolvers ++= Seq(
-  "Typesafe repository" at "http://repo.typesafe.com/typesafe/releases/",
-  "Artima Maven Repository" at "http://repo.artima.com/releases",
-  "JBoss" at "https://repository.jboss.org",
-  Resolver.sbtPluginRepo("releases"),
+  Resolver.typesafeRepo("releases"),
+//  "JBoss" at "https://repository.jboss.org",
+  Resolver.sbtPluginRepo("releases")
 )
 
 // Should go before Scala.js

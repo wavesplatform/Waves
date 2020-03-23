@@ -34,7 +34,9 @@ lazy val lang =
           sourceGenerators += Tasks.docSource,
           PB.targets += scalapb.gen(flatPackage = true) -> (sourceManaged in Compile).value,
           PB.protoSources := Seq(baseDirectory.value.getParentFile / "shared" / "src" / "main" / "protobuf"),
-          PB.deleteTargetDirectory := false
+          PB.deleteTargetDirectory := false,
+          sources in (Compile, doc) := Seq.empty,
+          publishArtifact in (Compile, packageDoc) := false
         )
       )
     )

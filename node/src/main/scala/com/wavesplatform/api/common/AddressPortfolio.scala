@@ -3,6 +3,7 @@ package com.wavesplatform.api.common
 import cats.syntax.option._
 import cats.syntax.semigroup._
 import com.google.common.collect.AbstractIterator
+import com.google.common.primitives.Longs
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
@@ -15,10 +16,10 @@ import com.wavesplatform.utils.ScorexLogging
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 
-class NFTIterator(addressId: BigInt, maybeAfter: Option[IssuedAsset], resource: DBResource)
+class NFTIterator(addressId: Long, maybeAfter: Option[IssuedAsset], resource: DBResource)
     extends AbstractIterator[(IssuedAsset, Long)]
     with ScorexLogging {
-  private val prefixBytes = KeyTags.NftPossession.prefixBytes ++ addressId.toByteArray
+  private val prefixBytes = KeyTags.NftPossession.prefixBytes ++ Longs.toByteArray(addressId)
 
   resource.iterator.seek(prefixBytes)
 
@@ -39,8 +40,8 @@ class NFTIterator(addressId: BigInt, maybeAfter: Option[IssuedAsset], resource: 
     } else endOfData()
 }
 
-class AssetBalanceIterator(addressId: BigInt, resource: DBResource) extends AbstractIterator[(IssuedAsset, Long)] {
-  private val prefixBytes = KeyTags.AssetBalanceHistory.prefixBytes ++ addressId.toByteArray
+class AssetBalanceIterator(addressId: Long, resource: DBResource) extends AbstractIterator[(IssuedAsset, Long)] {
+  private val prefixBytes = KeyTags.AssetBalanceHistory.prefixBytes ++ Longs.toByteArray(addressId)
 
   resource.iterator.seek(prefixBytes)
 

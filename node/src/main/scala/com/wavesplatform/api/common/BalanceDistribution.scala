@@ -21,13 +21,13 @@ trait BalanceDistribution {
       after: Option[Address],
       overrides: Map[Address, Portfolio],
       globalPrefix: Array[Byte],
-      addressId: Array[Byte] => BigInt,
+      addressId: Array[Byte] => Long,
       balanceOf: Portfolio => Long
   ): Observable[(Address, Long)] =
     db.resourceObservable
       .flatMap { resource =>
         resource.iterator.seek(
-          globalPrefix ++ after.flatMap(address => resource.get(Keys.addressId(address))).fold(Array.emptyByteArray)(id => (id + 1).toByteArray)
+          globalPrefix ++ after.flatMap(address => resource.get(Keys.addressId(address))).fold(Array.emptyByteArray)(id => Longs.toByteArray(id + 1))
         )
         Observable.fromIterator(Task(new BalanceIterator(resource, globalPrefix, addressId, balanceOf, height, overrides).asScala.filter(_._2 > 0)))
       }
@@ -38,13 +38,13 @@ object BalanceDistribution {
   class BalanceIterator(
       resource: DBResource,
       globalPrefix: Array[Byte],
-      addressId: Array[Byte] => BigInt,
+      addressId: Array[Byte] => Long,
       balanceOf: Portfolio => Long,
       height: Int,
       private var pendingPortfolios: Map[Address, Portfolio]
   ) extends AbstractIterator[(Address, Long)] {
     @inline
-    private def stillSameAddress(expected: BigInt): Boolean = resource.iterator.hasNext && {
+    private def stillSameAddress(expected: Long): Boolean = resource.iterator.hasNext && {
       val maybeNext = resource.iterator.peekNext().getKey
       maybeNext.startsWith(globalPrefix) && addressId(maybeNext) == expected
     }

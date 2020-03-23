@@ -154,11 +154,6 @@ object Importer extends ScorexLogging {
 
     log.info(s"Skipping $blocksToSkip block(s)")
 
-//    sys.addShutdownHook {
-//      val millis = System.currentTimeMillis() - start
-//      log.info(s"Imported $counter block(s) from $startHeight to ${startHeight + counter} in ${humanReadableDuration(millis)}")
-//    }
-
     while (!quit && counter < blocksToApply) lock.synchronized {
       val s1 = bis.read(lenBytes)
       if (s1 == Ints.BYTES) {
@@ -204,7 +199,7 @@ object Importer extends ScorexLogging {
       override val chainId: Byte = settings.blockchainSettings.addressSchemeCharacter.toByte
     }
 
-    val bis = new BufferedInputStream(new FileInputStream(importOptions.blockchainFile))
+    val bis = new BufferedInputStream(new FileInputStream(importOptions.blockchainFile), 2 * 1024 * 1024)
 
     val scheduler = Schedulers.singleThread("appender")
     val time      = new NTP(settings.ntpServer)

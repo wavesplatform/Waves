@@ -2,8 +2,7 @@ package com.wavesplatform
 
 import java.io.File
 import java.nio.ByteBuffer
-import java.util
-import java.util.{Comparator, Map => JMap}
+import java.util.{Map => JMap}
 
 import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
@@ -30,8 +29,6 @@ import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
 
-import scala.collection.mutable
-
 package object database extends ScorexLogging {
   def openDB(path: String, recreate: Boolean = false): DB = {
     log.debug(s"Open DB at $path")
@@ -55,13 +52,6 @@ package object database extends ScorexLogging {
       output.write(s.arr)
     }
 
-    def writeBigInt(v: BigInt): Unit = {
-      val b = v.toByteArray
-      require(b.length <= Byte.MaxValue)
-      output.writeByte(b.length)
-      output.write(b)
-    }
-
     def writeScriptOption(v: Option[Script]): Unit = {
       output.writeBoolean(v.isDefined)
       v.foreach { s =>
@@ -73,13 +63,6 @@ package object database extends ScorexLogging {
   }
 
   implicit class ByteArrayDataInputExt(val input: ByteArrayDataInput) extends AnyVal {
-    def readBigInt(): BigInt = {
-      val len = input.readByte()
-      val b   = new Array[Byte](len)
-      input.readFully(b)
-      BigInt(b)
-    }
-
     def readScriptOption(): Option[Script] = {
       if (input.readBoolean()) {
         val len = input.readShort()
@@ -111,6 +94,15 @@ package object database extends ScorexLogging {
     val in = ByteBuffer.wrap(data)
     Seq.fill(d.length / 4)(in.getInt)
   }
+
+  def readLongSeq(data: Array[Byte]): Seq[Long] = Option(data).fold(Seq.empty[Long]) { d =>
+    require(d.length % java.lang.Long.BYTES == 0, s"Invalid data length: ${d.length}")
+    val buffer = ByteBuffer.wrap(data)
+    Seq.fill(d.length / java.lang.Long.BYTES)(buffer.getLong)
+  }
+
+  def writeLongSeq(values: Seq[Long]): Array[Byte] =
+    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES))(_.putLong(_)).array()
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
@@ -160,22 +152,6 @@ package object database extends ScorexLogging {
           b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
-
-  def writeBigIntSeq(values: Seq[BigInt]): Array[Byte] = {
-    require(values.length <= Short.MaxValue, s"BigInt sequence is too long")
-    val ndo = newDataOutput()
-    ndo.writeShort(values.size)
-    for (v <- values) {
-      ndo.writeBigInt(v)
-    }
-    ndo.toByteArray
-  }
-
-  def readBigIntSeq(data: Array[Byte]): Seq[BigInt] = Option(data).fold(Seq.empty[BigInt]) { d =>
-    val ndi    = newDataInput(d)
-    val length = ndi.readShort()
-    for (_ <- 0 until length) yield ndi.readBigInt()
-  }
 
   def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
     val ndo = newDataOutput()
@@ -411,27 +387,6 @@ package object database extends ScorexLogging {
     }
   }
 
-  class SB extends WriteBatch {
-    val addedEntries = mutable.TreeMap[ByteStr, Array[Byte]]()
-    val deletedEntries = mutable.TreeSet[ByteStr]()
-
-    override def put(bytes: Array[Byte], bytes1: Array[Byte]): WriteBatch = {
-      val k = ByteStr(bytes)
-      addedEntries.put(k, bytes1)
-      deletedEntries.remove(k)
-      this
-    }
-
-    override def delete(bytes: Array[Byte]): WriteBatch = {
-      val k = ByteStr(bytes)
-      addedEntries.remove(k)
-      deletedEntries.add(k)
-      this
-    }
-
-    override def close(): Unit = {}
-  }
-
   implicit class DBExt(val db: DB) extends AnyVal {
     def readOnly[A](f: ReadOnlyDB => A): A = {
       val snapshot = db.getSnapshot
@@ -445,7 +400,7 @@ package object database extends ScorexLogging {
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
-      val batch       = new SB
+      val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
