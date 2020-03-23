@@ -69,8 +69,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
           .signed(
             TxVersion.V2,
             matcher = matcher,
-            order1 = buy,
-            order2 = sell,
+            order1 = sell,
+            order2 = buy,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
