@@ -3,6 +3,8 @@ package com.wavesplatform.it.sync.grpc
 import com.google.protobuf.ByteString
 import com.typesafe.config.Config
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.it.{GrpcIntegrationSuiteWithThreeAddress, NodeConfigs, ReportingTestName}
 import com.wavesplatform.it.sync.activation.ActivationStatusRequest
 import com.wavesplatform.it.api.SyncGrpcApi._
@@ -37,6 +39,8 @@ class BlockV5GrpcSuite
       val blockV5ById = sender.blockById(ByteString.copyFrom(blockV5.id()))
 
       blockV5.header.version shouldBe Block.ProtoBlockVersion
+      blockV5.id().length shouldBe crypto.DigestLength
+      blockV5.signature.length shouldBe crypto.SignatureLength
       blockV5.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
       assert(blockV5.transactionsRootValid(), "transactionsRoot is not valid")
       blockV5ById.header.version shouldBe Block.ProtoBlockVersion
@@ -50,6 +54,7 @@ class BlockV5GrpcSuite
 
       blockAfterVRFUsing.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsing.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
+      ByteStr(sender.blockHeaderAt(currentHeight + 1).reference.toByteArray) shouldBe blockV5.id()
       blockAfterVRFUsingById.header.version shouldBe Block.ProtoBlockVersion
       blockAfterVRFUsingById.header.generationSignature.length shouldBe Block.GenerationVRFSignatureLength
       assert(blockAfterVRFUsingById.transactionsRootValid(), "transactionsRoot is not valid")
