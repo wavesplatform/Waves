@@ -133,7 +133,6 @@ class NgState(
     val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
     microDiffs.put(blockId, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
     microBlocks.prepend(MicroBlockInfo(blockId, microBlock))
-    internalCaches.invalidate(microBlock.totalResBlockSig)
     internalCaches.invalidate(blockId)
     blockId
   }
