@@ -1,13 +1,13 @@
 package com.wavesplatform.events
 
 import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.mining.MiningConstraint
 import com.wavesplatform.state.diffs.BlockDiffer
 import com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff
 import monix.execution.Scheduler.Implicits.global
 import monix.reactive.subjects.ReplaySubject
 import org.scalatest.Suite
-import com.wavesplatform.common.utils.EitherExt2
 
 import scala.concurrent.duration._
 
@@ -31,7 +31,7 @@ private[events] trait EventsHelpers extends WithBlockchain { _: Suite =>
 
   protected def appendMicroBlock(mb: MicroBlock): MicroBlockAppended = {
     val dd = BlockDiffer.fromMicroBlock(blockchain, Some(0), mb, 1, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
-    produceEvent(_.onProcessMicroBlock(mb, dd, blockchain)) match {
+    produceEvent(_.onProcessMicroBlock(mb, dd, blockchain, mb.totalResBlockSig)) match {
       case mba: MicroBlockAppended => mba
       case _                       => fail()
     }

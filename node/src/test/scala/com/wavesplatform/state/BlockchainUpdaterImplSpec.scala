@@ -214,8 +214,13 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .once()
 
             // microblock 1
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where {
+            (
+                (
+                    microBlock: _root_.com.wavesplatform.block.MicroBlock,
+                    diff: _root_.com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff,
+                    blockchainBefore: _root_.com.wavesplatform.state.Blockchain
+                ) => triggersMock.onProcessMicroBlock(microBlock, diff, blockchainBefore, microBlock.totalResBlockSig)
+            ).expects(where {
                 case (microBlock, diff, bc) =>
                   bc.height == 1 &&
                     microBlock.transactionData.length == 2 &&
@@ -226,8 +231,13 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
               .once()
 
             // microblock 2
-            (triggersMock.onProcessMicroBlock _)
-              .expects(where {
+            (
+                (
+                    microBlock: _root_.com.wavesplatform.block.MicroBlock,
+                    diff: _root_.com.wavesplatform.state.diffs.BlockDiffer.DetailedDiff,
+                    blockchainBefore: _root_.com.wavesplatform.state.Blockchain
+                ) => triggersMock.onProcessMicroBlock(microBlock, diff, blockchainBefore, microBlock.totalResBlockSig)
+            ).expects(where {
                 case (microBlock, diff, bc) =>
                   bc.height == 1 &&
                     microBlock.transactionData.length == 1 &&
@@ -256,7 +266,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
             // microblock 3
             (triggersMock.onProcessMicroBlock _)
               .expects(where {
-                case (microBlock, diff, bc) =>
+                case (microBlock, _, bc, _) =>
                   bc.height == 2 && microBlock.reference == block2.signature
               })
               .once()
