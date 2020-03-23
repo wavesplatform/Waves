@@ -4703,6 +4703,7 @@
           "type": "string",
           "enum": [
             "confirmed",
+            "failed",
             "unconfirmed",
             "not_found"
           ]

@@ -21,9 +21,11 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api.TransactionsByIdRequest
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.Blockchain
+import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease._
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
@@ -69,7 +71,7 @@ case class TransactionsApiRoute(
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
         case Some((h, either, status)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ statusInfo(h, status) + ("height" -> JsNumber(h)))
+          complete(txToExtendedJson(either.fold(identity, _._1)) ++ scriptExecutionStatus(h, status, either) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
@@ -195,12 +197,18 @@ case class TransactionsApiRoute(
     }
   }
 
-  private def statusInfo(height: Int, confirmed: Boolean): JsObject = {
+  private def scriptExecutionStatus(
+      height: Int,
+      confirmed: Boolean,
+      either: Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])]
+  ): JsObject = {
     import Status._
-    if (blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction, height))
-      JsObject(Map("status" -> JsString(if (confirmed) Confirmed else Failed)))
-    else
-      JsObject.empty
+    val activated = blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction, height)
+    either match {
+      case Left(_: ExchangeTransaction) | Right(_) if activated =>
+        JsObject(Map("scriptExecutionStatus" -> JsString(if (confirmed) Confirmed else Failed)))
+      case _ => JsObject.empty
+    }
   }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
