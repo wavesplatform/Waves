@@ -48,7 +48,7 @@ class TransactionsRouteSpec
   private val addressTransactions = mock[CommonTransactionsApi]
   private val utxPoolSize         = mockFunction[Int]
 
-  private def mkRoute(blockchain: Blockchain = blockchain, addressTransactions: CommonTransactionsApi = addressTransactions) =
+  private def mkRoute(blockchain: Blockchain, addressTransactions: CommonTransactionsApi) =
     seal(
       new TransactionsApiRoute(
         restAPISettings,
@@ -366,7 +366,7 @@ class TransactionsRouteSpec
             .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> activationHeight))
             .anyNumberOfTimes()
 
-          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> mkRoute(blockchain) ~> check {
+          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {
             status shouldEqual StatusCodes.OK
             val obj =
               Json.obj(

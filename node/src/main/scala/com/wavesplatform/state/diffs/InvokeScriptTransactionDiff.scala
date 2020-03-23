@@ -224,8 +224,8 @@ object InvokeScriptTransactionDiff {
               )
             )
           }
-
-          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff)
+          beforeActions <- beforeActionsDiff(blockchain, paymentsDiff)
+          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, beforeActions)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -350,6 +350,14 @@ object InvokeScriptTransactionDiff {
         s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
       )
     } yield ()
+
+  private def beforeActionsDiff(blockchain: Blockchain, diff: Diff): TracedResult[ValidationError, Diff] =
+    if (blockchain.isFeatureActivated(AcceptFailedScriptTransaction))
+      stats.balanceValidation
+        .measureForType(InvokeScriptTransaction.typeId) {
+          TracedResult(BalanceDiffValidation(blockchain)(diff))
+        }
+    else TracedResult.wrapValue(diff)
 
   private def foldActions(blockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],
@@ -487,7 +495,6 @@ object InvokeScriptTransactionDiff {
       diffAcc |+| diff
     }
 
-  // TODO (NODE-2066): Feature 17: asset script validation should occur after balance checking
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
       totalDiff: Diff,
       pseudoTx: PseudoTx,

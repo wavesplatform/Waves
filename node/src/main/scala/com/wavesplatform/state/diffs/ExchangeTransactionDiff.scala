@@ -6,6 +6,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.metrics.TxProcessingStats
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -15,6 +16,9 @@ import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order
 import scala.util.{Right, Try}
 
 object ExchangeTransactionDiff {
+  import TxProcessingStats.TxTimerExt
+
+  private val stats = TxProcessingStats
 
   def apply(blockchain: Blockchain)(tx: ExchangeTransaction): Either[ValidationError, Diff] = {
     val matcher = tx.buyOrder.matcherPublicKey.toAddress
@@ -48,6 +52,20 @@ object ExchangeTransactionDiff {
         _              <- Either.cond(tx.price >= sellOrderPrice, (), GenericError("price should be >= sellOrder.price"))
       } yield ()
     }
+
+    def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
+      Monoid.combine(
+        Map(buyer  → Portfolio.build(asset, buyAssetChange)),
+        Map(seller → Portfolio.build(asset, sellAssetChange))
+      )
+    }
+
+    def getFeeDiff(portfolios: Map[Address, Portfolio]): Either[ValidationError, Map[Address, Portfolio]] =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction))
+        stats.balanceValidation
+          .measureForType(ExchangeTransaction.typeId) {
+            BalanceDiffValidation(blockchain)(Diff(tx, portfolios)).map(_ => portfolios)
+          } else Right(portfolios)
 
     for {
       _ <- Either.cond(assets.values.forall(_.isDefined), (), GenericError("Assets should be issued before they can be traded"))
@@ -101,32 +119,25 @@ object ExchangeTransactionDiff {
         .map(_.maxComplexity)
 
       scriptsComplexity = assetsComplexity.sum + accountsComplexity.sum
-    } yield {
 
-      def getAssetDiff(asset: Asset, buyAssetChange: Long, sellAssetChange: Long): Map[Address, Portfolio] = {
-        Monoid.combine(
-          Map(buyer  → Portfolio.build(asset, buyAssetChange)),
-          Map(seller → Portfolio.build(asset, sellAssetChange))
-        )
-      }
-
-      val matcherPortfolio =
-        Monoid.combineAll(
-          Seq(
-            getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
-            getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
-            Portfolio.waves(-tx.fee)
-          )
-        )
-
-      val feeDiff = Monoid.combineAll(
+      matcherPortfolio = Monoid.combineAll(
         Seq(
-          Map(matcher -> matcherPortfolio),
-          Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
-          Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+          getOrderFeePortfolio(tx.buyOrder, tx.buyMatcherFee),
+          getOrderFeePortfolio(tx.sellOrder, tx.sellMatcherFee),
+          Portfolio.waves(-tx.fee)
         )
       )
 
+      feeDiff <- getFeeDiff(
+        Monoid.combineAll(
+          Seq(
+            Map(matcher -> matcherPortfolio),
+            Map(buyer   -> getOrderFeePortfolio(tx.buyOrder, -tx.buyMatcherFee)),
+            Map(seller  -> getOrderFeePortfolio(tx.sellOrder, -tx.sellMatcherFee))
+          )
+        )
+      )
+    } yield {
       val priceDiff  = getAssetDiff(tx.buyOrder.assetPair.priceAsset, buyPriceAssetChange, sellPriceAssetChange)
       val amountDiff = getAssetDiff(tx.buyOrder.assetPair.amountAsset, buyAmountAssetChange, sellAmountAssetChange)
       val portfolios = Monoid.combineAll(Seq(feeDiff, priceDiff, amountDiff))
