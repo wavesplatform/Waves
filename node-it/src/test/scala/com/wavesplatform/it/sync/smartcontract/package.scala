@@ -6,8 +6,6 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransac
 import com.wavesplatform.utils.Time
 import play.api.libs.json.JsObject
 
-import scala.util.Random
-
 package object smartcontract {
   val invokeScrTxSupportedVersions: List[Byte] = List(1, 2)
   val setScrTxSupportedVersions: List[Byte] = List(1, 2)
@@ -124,14 +122,12 @@ package object smartcontract {
     val buyMatcherFee  = (BigInt(orderFee) * amount / buy.amount).toLong
     val sellMatcherFee = (BigInt(orderFee) * amount / sell.amount).toLong
 
-    val (order1, order2) = if (Random.nextBoolean()) (buy, sell) else (sell, buy)
-
     val tx = ExchangeTransaction
       .signed(
         2.toByte,
         matcher = matcher,
-        order1 = order1,
-        order2 = order2,
+        order1 = buy,
+        order2 = sell,
         amount = amount,
         price = sellPrice,
         buyMatcherFee = buyMatcherFee,
