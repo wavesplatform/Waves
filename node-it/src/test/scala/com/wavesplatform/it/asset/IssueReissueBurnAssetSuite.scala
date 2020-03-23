@@ -10,6 +10,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.state.diffs.FeeValidation
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
@@ -240,7 +241,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets")
+      val tx  = invokeScript(acc, "issue10Assets", fee = invokeFee + 10 * FeeValidation.FeeUnit)
 
       for (nth <- 0 to 9) validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, "@Callable")
     }
