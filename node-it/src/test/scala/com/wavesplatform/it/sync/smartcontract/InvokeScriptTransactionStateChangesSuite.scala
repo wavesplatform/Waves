@@ -15,9 +15,9 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val contract  = pkByAddress(firstAddress).stringRepr
-  private val caller    = pkByAddress(secondAddress).stringRepr
-  private val recipient = pkByAddress(thirdAddress).stringRepr
+  private val contract  = firstAddress
+  private val caller    = secondAddress
+  private val recipient = thirdAddress
 
   var simpleAsset: String               = ""
   var assetSponsoredByDApp: String      = ""

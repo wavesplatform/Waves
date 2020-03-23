@@ -32,8 +32,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
                               |}""".stripMargin))
       .buildNonConflicting()
 
-  private val smartAcc  = pkByAddress(firstAddress)
-  private val callerAcc = pkByAddress(secondAddress)
+  private val smartAcc  = firstAddress
+  private val callerAcc = secondAddress
 
   private val accScript = ScriptCompiler
     .compile(
@@ -112,7 +112,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("send waves to accounts") {
 
-    Seq(smartAcc.stringRepr, callerAcc.stringRepr).foreach(
+    Seq(smartAcc, callerAcc).foreach(
       r =>
         sender
           .transfer(
@@ -144,13 +144,13 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
         )
       )
     )
-    sender.putData(smartAcc.stringRepr, data, 0.3.waves, waitForTx = true)
+    sender.putData(smartAcc, data, 0.3.waves, waitForTx = true)
   }
 
   test("can issue scripted asset and set script fro asset before precheck activation") {
     issuedAssetId = sender
       .issue(
-        smartAcc.stringRepr,
+        smartAcc,
         "Test",
         "Test asset",
         1000,
@@ -164,7 +164,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     sender
       .setAssetScript(
         issuedAssetId,
-        smartAcc.stringRepr,
+        smartAcc,
         issueFee,
         Some(assetScript),
         waitForTx = true
@@ -174,12 +174,12 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   }
 
   test("can set contract and invoke script before precheck activation") {
-    sender.setScript(smartAcc.stringRepr, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
 
     sender
       .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+        callerAcc,
+        smartAcc,
         Some("default"),
         List.empty,
         Seq.empty,
@@ -190,7 +190,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.setScript(smartAcc.stringRepr, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
+    sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee, waitForTx = true).id
   }
 
   test(s"wait height from to $featureHeight for precheck activation") {
@@ -201,7 +201,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
     assertBadRequestAndMessage(
       sender.issue(
-        smartAcc.stringRepr,
+        smartAcc,
         "Test",
         "Test asset",
         1000,
@@ -217,7 +217,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
     assertBadRequestAndMessage(
       sender.setAssetScript(
         issuedAssetId,
-        smartAcc.stringRepr,
+        smartAcc,
         issueFee + smartFee,
         Some(assetScript)
       ),
@@ -227,7 +227,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
 
   test("can't set contract to account after estimator v1 precheck activation") {
     assertBadRequestAndMessage(
-      sender.setScript(smartAcc.stringRepr, Some(accScript), setScriptFee + smartFee),
+      sender.setScript(smartAcc, Some(accScript), setScriptFee + smartFee),
       "Contract function (default) is too complex"
     )
   }
@@ -235,8 +235,8 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
   test("can still invoke account and asset scripts after estimator v1 precheck activation") {
     sender
       .invokeScript(
-        callerAcc.stringRepr,
-        smartAcc.stringRepr,
+        callerAcc,
+        smartAcc,
         Some("default"),
         List.empty,
         Seq.empty,
@@ -247,7 +247,7 @@ class EstimatorTestSuite extends BaseTransactionSuite with CancelAfterFailure {
       ._1
       .id
 
-    sender.transfer(smartAcc.stringRepr, callerAcc.stringRepr, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
+    sender.transfer(smartAcc, callerAcc, 1, minFee + 2 * smartFee, Some(issuedAssetId), None, waitForTx = true)
   }
 
 }

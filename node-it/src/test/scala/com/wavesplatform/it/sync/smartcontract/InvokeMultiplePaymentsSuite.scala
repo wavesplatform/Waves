@@ -16,8 +16,8 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterFailure {
-  private val dApp   = pkByAddress(firstAddress).stringRepr
-  private val caller = pkByAddress(secondAddress).stringRepr
+  private val dApp   = firstAddress
+  private val caller = secondAddress
 
   private var asset1: IssuedAsset = _
   private var asset2: IssuedAsset = _
