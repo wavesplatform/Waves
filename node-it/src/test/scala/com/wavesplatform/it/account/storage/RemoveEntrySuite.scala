@@ -68,6 +68,8 @@ class RemoveEntrySuite extends BaseSuite {
 
       invokeScript(address, s"write${data.ct}", data.k, data.v.toString)
 
+      nodes.waitForHeightArise() //TODO: delete this line after NODE-2099 will be done
+
       miner.getData(address) should have size 1
       miner.getDataByKey(address, data.k).key shouldBe data.k
       miner.getDataByKey(address, data.k).value shouldBe v

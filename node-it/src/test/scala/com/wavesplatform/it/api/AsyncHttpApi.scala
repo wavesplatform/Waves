@@ -706,8 +706,8 @@ object AsyncHttpApi extends Assertions {
       )
 
     def broadcastExchange(matcher: KeyPair,
-                          buyOrder: Order,
-                          sellOrder: Order,
+                          order1: Order,
+                          order2: Order,
                           amount: Long,
                           price: Long,
                           buyMatcherFee: Long,
@@ -715,25 +715,24 @@ object AsyncHttpApi extends Assertions {
                           fee: Long,
                           version: Byte,
                           matcherFeeAssetId: Option[String],
-                          amountsAsStrings: Boolean = false): Future[Transaction] = {
-      val tx = ExchangeTx
-        .signed(
-          matcher = matcher,
-          order1 = buyOrder,
-          order2 = sellOrder,
-          amount = amount,
-          price = price,
-          buyMatcherFee = buyMatcherFee,
-          sellMatcherFee = sellMatcherFee,
-          fee = fee,
-          timestamp = System.currentTimeMillis(),
-          version = version
-        )
-        .right
-        .get
-        .json()
+                          amountsAsStrings: Boolean = false,
+                          validate: Boolean = true): Future[Transaction] = {
+      val tx = ExchangeTx(
+        version = version,
+        order1 = order1,
+        order2 = order2,
+        amount = amount,
+        price = price,
+        buyMatcherFee = buyMatcherFee,
+        sellMatcherFee = sellMatcherFee,
+        fee = fee,
+        proofs = Proofs.empty,
+        timestamp = System.currentTimeMillis(),
+        chainId = AddressScheme.current.chainId
+      ).signWith(matcher)
 
-      signedBroadcast(tx, amountsAsStrings)
+      val json = if (validate) tx.validatedEither.right.get.json() else tx.json()
+      signedBroadcast(json, amountsAsStrings)
     }
 
     def aliasByAddress(targetAddress: String): Future[Seq[String]] =
