@@ -30,12 +30,10 @@ object TransactionDiffer {
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTimestamp, currentBlockTimestamp, verify)(blockchain, tx) match {
-      case isFailedScript() if acceptFailedScript(blockchain) => failedScriptTransactionDiff(blockchain, tx)
-      case result                                             => result
+      case isFailedScript() if acceptFailedScript(blockchain, tx) => failedScriptTransactionDiff(blockchain, tx)
+      case result                                                 => result
     }
 
-  // TODO (NODE-2066): Always check the balance
-  // TODO (NODE-2066): common -> Verifier[account scripts, signatures, orders] -> transaction diff -> balance -> Verifier[asset scripts]
   def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
@@ -43,7 +41,7 @@ object TransactionDiffer {
     for {
       _            <- if (verify) common(prevBlockTimestamp, currentBlockTimestamp)(blockchain, tx) else TracedResult(Right(()))
       diff         <- transactionDiff(currentBlockTimestamp)(blockchain, tx)
-      positiveDiff <- if (verify) balance(blockchain, tx, diff) else TracedResult(Right(diff))
+      positiveDiff <- balance(blockchain, tx, diff)
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
@@ -116,28 +114,31 @@ object TransactionDiffer {
   private def failedScriptTransactionDiff(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
     for {
       portfolios <- (tx, tx.assetFee) match {
-        case (tx: ProvenTransaction, (Waves, fee)) => Right(Map(tx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)))
+        case (tx: ProvenTransaction, (Waves, fee)) => TracedResult(Right(Map(tx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty))))
         case (tx: ProvenTransaction, (asset @ IssuedAsset(_), fee)) =>
-          for {
-            assetInfo <- blockchain
-              .assetDescription(asset)
-              .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
-            wavesFee <- Either.cond(
-              assetInfo.sponsorship > 0,
-              Sponsorship.toWaves(fee, assetInfo.sponsorship),
-              GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
-            )
-          } yield {
-            Map(tx.sender.toAddress        -> Portfolio(0, LeaseBalance.empty, Map(asset -> -fee))) |+|
-            Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+          TracedResult {
+            for {
+              assetInfo <- blockchain
+                .assetDescription(asset)
+                .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
+              wavesFee <- Either.cond(
+                assetInfo.sponsorship > 0,
+                Sponsorship.toWaves(fee, assetInfo.sponsorship),
+                GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
+              )
+            } yield {
+              Map(tx.sender.toAddress          -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))) |+|
+                Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
+            }
           }
-        case _ => Left(TransactionValidationError(GenericError(s"Can't accept failed script on $tx"), tx))
+        case _ => TracedResult(Left(TransactionValidationError(GenericError(s"Can't accept failed script on $tx"), tx)))
       }
-      diff <- BalanceDiffValidation(blockchain)(Diff.failed(tx, portfolios))
+      diff <- balance(blockchain, tx, Diff.failed(tx, portfolios))
     } yield diff
 
-  private def acceptFailedScript(blockchain: Blockchain): Boolean =
-    blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction)
+  private def acceptFailedScript(blockchain: Blockchain, tx: Transaction): Boolean =
+    (tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId) &&
+      blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction)
 
   private object isFailedScript {
     def unapply(result: TracedResult[ValidationError, Diff]): Boolean =

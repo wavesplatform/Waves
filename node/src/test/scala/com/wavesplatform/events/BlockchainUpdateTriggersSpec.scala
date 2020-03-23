@@ -15,7 +15,7 @@ import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{BlockchainUpdater, DataTransaction, GenesisTransaction, Transaction}
 import com.wavesplatform.{BlockGen, TestHelpers, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
@@ -26,8 +26,14 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
   override protected def settings: WavesSettings = TestHelpers.enableNG(super.settings)
 
   // add a genesis block to the blockchain
-  private val master: KeyPair = accountGen.sample.get
-  private val genesis         = TestBlock.create(0, Seq(GenesisTransaction.create(master, WAVES_AMOUNT, 0).explicitGet()), master)
+  private val master: KeyPair     = accountGen.sample.get
+  private val rich: KeyPair       = accountGen.sample.get
+  private val initialAmount: Long = WAVES_AMOUNT / 2
+  private val genesis = TestBlock.create(
+    0,
+    Seq(GenesisTransaction.create(master, initialAmount, 0).explicitGet(), GenesisTransaction.create(rich, initialAmount, 0).explicitGet()),
+    master
+  )
   override protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(genesis).explicitGet()
     super.initBlockchain(blockchainUpdater)
@@ -104,7 +110,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
 
     "microblock with one transaction" in forAll {
       for {
-        tx <- dataTransactionGen(0)
+        tx <- dataTransactionGen(0, sender = Some(rich))
         mb <- microBlockGen(Seq(tx), master)
         mba = appendMicroBlock(mb)
       } yield (mb, mba)
@@ -121,7 +127,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
       "block" in forAll {
         for {
           miner <- accountGen
-          tx    <- dataTransactionGen(0)
+          tx    <- dataTransactionGen(0, sender = Some(rich))
           mb    <- blockGen(Seq(tx), miner)
           ba = appendBlock(mb)
         } yield (tx, miner, ba.blockStateUpdate)
@@ -129,13 +135,13 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
 
       "microblock, giving reward to a key block miner" in forAll {
         for {
-          tx <- dataTransactionGen(0)
+          tx <- dataTransactionGen(0, sender = Some(rich))
           mb <- microBlockGen(Seq(tx), master)
           mba = appendMicroBlock(mb)
         } yield (tx, mba.microBlockStateUpdate)
       } {
         case (tx, su) =>
-          su.balances.find(_._1 == master.publicKey.toAddress).get._3 shouldBe (0.4 * tx.fee + WAVES_AMOUNT)
+          su.balances.find(_._1 == master.publicKey.toAddress).get._3 shouldBe (0.4 * tx.fee + initialAmount)
       }
     }
 
@@ -143,7 +149,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
       for {
         sender        <- accountGen
         recipient     <- accountGen
-        amount        <- Gen.choose(1L, WAVES_AMOUNT - Constants.UnitsInWave)
+        amount        <- Gen.choose(1L, initialAmount - Constants.UnitsInWave)
         master2sender <- transferGeneratorPV2(1, master, sender, amount)
         fee           <- Gen.choose(1, master2sender.amount - 1)
         sender2recipient = TransferTransaction
@@ -160,7 +166,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
         }
     }
 
-    "block/microblock with a data transaction" in forAll(dataTransactionGen) { tx =>
+    "block/microblock with a data transaction" in forAll(dataTransactionGen(DataTransaction.MaxEntryCount, sender = Some(rich))) { tx =>
       testTxsStateUpdates(Seq(tx)) {
         _.head.dataEntries.map(_._2).sortBy(_.key) shouldBe tx.data.sortBy(_.key)
       }
@@ -230,7 +236,8 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
             val scriptUpd = upds.last.assets.head
 
             scriptUpd shouldBe issueUpd.copy(
-              script = setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator).explicitGet()),
+              script =
+                setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator).explicitGet()),
               assetExistedBefore = !issueUpd.assetExistedBefore
             )
           }

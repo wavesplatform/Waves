@@ -703,7 +703,7 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       val sellFee    = (BigInt(matcherFee) * BigInt(matchedAmount) / BigInt(amount2)).longValue()
       val trans =
         ExchangeTransaction(1.toByte, o1, o2, matchedAmount, price, buyFee, sellFee, (buyFee + sellFee) / 2, expiration - 100, Proofs.empty, chainId)
-            .signWith(matcher)
+          .signWith(matcher)
 
       trans
     }
@@ -896,10 +896,15 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
 
   val dataTransactionGen: Gen[DataTransaction] = dataTransactionGen(DataTransaction.MaxEntryCount)
 
-  def dataTransactionGen(maxEntryCount: Int, useForScript: Boolean = false, withDeleteEntry: Boolean = false): Gen[DataTransaction] =
+  def dataTransactionGen(
+      maxEntryCount: Int,
+      useForScript: Boolean = false,
+      withDeleteEntry: Boolean = false,
+      sender: Option[KeyPair] = None
+  ): Gen[DataTransaction] =
     (for {
-      sender    <- accountGen
       timestamp <- timestampGen
+      sender    <- sender.fold(accountGen)(Gen.const)
       size      <- Gen.choose(0, maxEntryCount)
       maxEntrySize = if (useForScript) 200 else (DataTransaction.MaxBytes - 122) / (size max 1) min DataEntry.MaxValueSize
       data <- if (useForScript) Gen.listOfN(size, dataEntryGen(maxEntrySize, dataScriptsKeyGen, withDeleteEntry))

@@ -830,13 +830,14 @@ class UtxPoolSpecification
         acc  <- accountGen
         acc1 <- accountGen
         tx1  <- transferV2WithRecipient(acc, acc1, ENOUGH_AMT / 3, ntpTime).suchThat(_.amount > 20000000L)
-        tx2  <- transferV2(acc1, 10000000L, ntpTime)
+        tx2  <- transferV2(acc1, tx1.amount / 2 , ntpTime)
       } yield (tx1, tx2)
 
       "takes into account priority txs when pack" in forAll(genDependent) {
         case (tx1, tx2) =>
           val blockchain = createState(tx1.sender, setBalance = false)
           (blockchain.balance _).when(tx1.sender.toAddress, *).returning(ENOUGH_AMT)
+          (blockchain.balance _).when(tx2.sender.toAddress, *).returning(ENOUGH_AMT).noMoreThanOnce() // initial validation
           (blockchain.balance _).when(tx2.sender.toAddress, *).returning(0) // Should be overriden in composite blockchain
 
           val utx =
