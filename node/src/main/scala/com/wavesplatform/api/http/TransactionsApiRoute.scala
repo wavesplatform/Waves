@@ -21,11 +21,9 @@ import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api.TransactionsByIdRequest
 import com.wavesplatform.settings.RestAPISettings
-import com.wavesplatform.state.{Blockchain, InvokeScriptResult}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction._
-import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease._
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.wallet.Wallet
 import monix.execution.Scheduler
@@ -70,8 +68,8 @@ case class TransactionsApiRoute(
       complete(InvalidTransactionId("Transaction ID was not specified"))
     } ~ path(TransactionId) { id =>
       commonApi.transactionById(id) match {
-        case Some((h, either, status)) =>
-          complete(txToExtendedJson(either.fold(identity, _._1)) ++ scriptExecutionStatus(h, status, either) + ("height" -> JsNumber(h)))
+        case Some((h, either, succeed)) =>
+          complete(txToExtendedJson(either.fold(identity, _._1)) ++ applicationStatus(h, succeed) + ("height" -> JsNumber(h)))
         case None => complete(ApiError.TransactionDoesNotExist)
       }
     }
@@ -88,13 +86,12 @@ case class TransactionsApiRoute(
             val results = ids.toSet.map { id: ByteStr =>
               import Status._
               val statusJson = blockchain.transactionInfo(id) match {
-                case Some((height, _, confirmed)) =>
+                case Some((height, _, succeed)) =>
                   Json.obj(
-                    "status"        -> (if (confirmed) Confirmed else Failed),
+                    "status"        -> Confirmed,
                     "height"        -> height,
                     "confirmations" -> (blockchain.height - height).max(0)
-                  )
-
+                  ) ++ applicationStatus(height, succeed)
                 case None =>
                   commonApi.unconfirmedTransactionById(id) match {
                     case Some(_) => Json.obj("status" -> Unconfirmed)
@@ -197,18 +194,12 @@ case class TransactionsApiRoute(
     }
   }
 
-  private def scriptExecutionStatus(
-      height: Int,
-      confirmed: Boolean,
-      either: Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])]
-  ): JsObject = {
-    import Status._
-    val activated = blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction, height)
-    either match {
-      case Left(_: ExchangeTransaction) | Right(_) if activated =>
-        JsObject(Map("scriptExecutionStatus" -> JsString(if (confirmed) Confirmed else Failed)))
-      case _ => JsObject.empty
-    }
+  private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
+    import ApplicationStatus._
+    if (blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction, height))
+      JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeed else ScriptExecutionFailed)))
+    else
+      JsObject.empty
   }
 
   def transactionsByAddress(address: Address, limitParam: Int, maybeAfter: Option[ByteStr])(implicit sc: Scheduler): Future[List[JsObject]] =
@@ -246,9 +237,13 @@ object TransactionsApiRoute {
 
   object Status {
     val Confirmed   = "confirmed"
-    val Failed      = "failed"
     val Unconfirmed = "unconfirmed"
     val NotFound    = "not_found"
+  }
+
+  object ApplicationStatus {
+    val Succeed             = "succeed"
+    val ScriptExecutionFailed = "scriptExecutionFailed"
   }
 
   implicit val transactionProofWrites: Writes[TransactionProof] = Writes { mi =>

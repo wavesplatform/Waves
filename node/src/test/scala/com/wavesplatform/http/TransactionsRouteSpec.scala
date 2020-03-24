@@ -264,55 +264,35 @@ class TransactionsRouteSpec
 
     "working properly otherwise" in {
       val txAvailability = for {
-        tx     <- randomTransactionGen
-        height <- posNum[Int]
-      } yield (tx, height)
+        tx                           <- randomTransactionGen
+        height                       <- posNum[Int]
+        acceptFailedActivationHeight <- posNum[Int]
+        succeed                      <- if (height >= acceptFailedActivationHeight) Arbitrary.arbBool.arbitrary else Gen.const(true)
+      } yield (tx, succeed, height, acceptFailedActivationHeight)
 
       forAll(txAvailability) {
-        case (tx, height) =>
-          val h: Height = Height(height)
-          val info      = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, true))).once()
-          (blockchain.activatedFeatures _).expects().returning(Map()).anyNumberOfTimes()
-
-          Get(routePath(s"/info/${tx.id().toString}")) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            responseAs[JsValue] shouldEqual tx.json() + ("height" -> JsNumber(height))
-          }
-      }
-    }
-
-    "returns script execution status for InvokeScriptTransaction and ExchangeTransaction" in {
-      val txAvailability = for {
-        tx               <- Gen.oneOf(invokeScriptGen(Gen.const(Seq())), exchangeTransactionGen)
-        confirmed        <- Arbitrary.arbBool.arbitrary
-        height           <- posNum[Int]
-        activationHeight <- posNum[Int]
-      } yield (tx, confirmed, height, activationHeight)
-
-      forAll(txAvailability) {
-        case (tx, confirmed, height, activationHeight) =>
+        case (tx, succeed, height, acceptFailedActivationHeight) =>
           val blockchain          = mock[Blockchain]
           val addressTransactions = mock[CommonTransactionsApi]
           val h: Height           = Height(height)
           val info                = if (tx.typeId == InvokeScriptTransaction.typeId) Right((tx.asInstanceOf[InvokeScriptTransaction], None)) else Left(tx)
-          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, confirmed))).once()
+          (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
           (blockchain.activatedFeatures _)
             .expects()
-            .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> activationHeight))
+            .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {
             status shouldEqual StatusCodes.OK
 
             val statusInfo =
-              if (height >= activationHeight) JsObject(Map("scriptExecutionStatus" -> JsString(if (confirmed) "confirmed" else "failed")))
+              if (height >= acceptFailedActivationHeight)
+                JsObject(Map("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed")))
               else JsObject.empty
 
             responseAs[JsValue] shouldEqual tx.json() ++ statusInfo + ("height" -> JsNumber(height))
           }
       }
-
     }
   }
 
@@ -329,52 +309,37 @@ class TransactionsRouteSpec
 
     "working properly otherwise" in {
       val txAvailability = for {
-        tx     <- randomTransactionGen
-        height <- Gen.chooseNum(1, 1000)
-      } yield (tx, height)
+        tx                           <- randomTransactionGen
+        height                       <- Gen.chooseNum(1, 1000)
+        acceptFailedActivationHeight <- Gen.chooseNum(1, 1000)
+        succeed                      <- if (height >= acceptFailedActivationHeight) Arbitrary.arbBool.arbitrary else Gen.const(true)
+      } yield (tx, height, acceptFailedActivationHeight, succeed)
 
       forAll(txAvailability) {
-        case (tx, height) =>
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, true))).anyNumberOfTimes()
-          (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
-          (blockchain.activatedFeatures _).expects().returning(Map()).anyNumberOfTimes()
-
-          Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> route ~> check {
-            status shouldEqual StatusCodes.OK
-            val obj =
-              Json.obj("id" -> tx.id().toString, "status" -> "confirmed", "height" -> JsNumber(height), "confirmations" -> JsNumber(1000 - height))
-            responseAs[JsValue] shouldEqual Json.arr(obj, obj)
-          }
-      }
-    }
-
-    "returns script execution status for InvokeScriptTransaction and ExchangeTransaction" in {
-      val txAvailability = for {
-        tx               <- Gen.oneOf(invokeScriptGen(Gen.const(Seq())), exchangeTransactionGen)
-        height           <- Gen.chooseNum(1, 1000)
-        activationHeight <- Gen.chooseNum(0, 1000)
-        confirmed        <- if (height >= activationHeight) Arbitrary.arbBool.arbitrary else Gen.const(true)
-      } yield (tx, confirmed, height, activationHeight)
-
-      forAll(txAvailability) {
-        case (tx, confirmed, height, activationHeight) =>
+        case (tx, height, acceptFailedActivationHeight, succeed) =>
           val blockchain = mock[Blockchain]
-          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, confirmed))).anyNumberOfTimes()
+          (blockchain.transactionInfo _).expects(tx.id()).returning(Some((height, tx, succeed))).anyNumberOfTimes()
           (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
           (blockchain.activatedFeatures _)
             .expects()
-            .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> activationHeight))
+            .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
 
           Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {
             status shouldEqual StatusCodes.OK
-            val obj =
-              Json.obj(
+            val obj = {
+              val common = Json.obj(
                 "id"            -> tx.id().toString,
-                "status"        -> (if (confirmed || height < activationHeight) "confirmed" else "failed"),
+                "status"        -> "confirmed",
                 "height"        -> JsNumber(height),
                 "confirmations" -> JsNumber(1000 - height)
               )
+              val applicationStatus =
+                if (height >= acceptFailedActivationHeight)
+                  Json.obj("applicationStatus" -> JsString(if (succeed) "succeed" else "scriptExecutionFailed"))
+                else Json.obj()
+              common ++ applicationStatus
+            }
             responseAs[JsValue] shouldEqual Json.arr(obj, obj)
           }
       }

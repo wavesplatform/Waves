@@ -4703,7 +4703,6 @@
           "type": "string",
           "enum": [
             "confirmed",
-            "failed",
             "unconfirmed",
             "not_found"
           ]
@@ -4715,6 +4714,9 @@
         "confirmations": {
           "type": "integer",
           "format": "int32"
+        },
+        "applicationStatus": {
+          "type": "string"
         }
       }
     }
