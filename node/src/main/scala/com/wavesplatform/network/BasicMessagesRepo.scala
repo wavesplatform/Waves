@@ -281,10 +281,7 @@ object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
   override val messageCode: MessageCode = 30: Byte
 
   override def deserializeData(bytes: Array[Byte]): Try[MicroBlockResponse] =
-    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes)).map {
-      case (mb, totalBlockId) =>
-        MicroBlockResponse(mb, totalBlockId)
-    }
+    PBMicroBlocks.vanilla(SignedMicroBlock.parseFrom(bytes))
 
   override def serializeData(resp: MicroBlockResponse): Array[Byte] =
     PBMicroBlocks.protobuf(resp.microblock, resp.totalBlockId).toByteArray
