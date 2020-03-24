@@ -1,4 +1,5 @@
 package com.wavesplatform.api.grpc
+
 import com.wavesplatform.api.common.CommonTransactionsApi
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Authorized
@@ -43,7 +44,10 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       responseObserver.completeWith(
         stream
           .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
-          .map { case (h, tx, _) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB)) }
+          .map {
+            case (h, tx, false) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+            case (h, tx, _)     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEED)
+          }
       )
     }
 
@@ -80,8 +84,11 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
         commonApi
           .unconfirmedTransactionById(txId)
           .map(_ => TransactionStatus(txId, TransactionStatus.Status.UNCONFIRMED))
-          .orElse { // TODO (NODE-2066): Status FAILED?
-            commonApi.transactionById(txId).map { case (h, _, _) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h) }
+          .orElse {
+            commonApi.transactionById(txId).map {
+              case (h, _, false) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
+              case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEED)
+            }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))
       }
