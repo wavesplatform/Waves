@@ -52,6 +52,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
   val fsOrderMassTransfer: FunctionalitySettings =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
+  val fsWithAcceptingFailedScript: FunctionalitySettings =
+    fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0))
+
   private val estimator = ScriptEstimatorV2
 
   property("Validation fails when Order feature is not activation yet") {
@@ -475,6 +478,14 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
               totalPortfolioDiff.assets.values.toSet shouldBe Set(0L)
 
               blockDiff.portfolios(exchange.sender).balance shouldBe exchange.buyMatcherFee + exchange.sellMatcherFee - exchange.fee
+          }
+
+          assertDiffEi(
+            Seq(TestBlock.create(Seq(gen1, gen2, issue1))),
+            TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
+            fsWithAcceptingFailedScript
+          ) { ei =>
+            ei should produce("AccountBalanceError")
           }
         }
     }
