@@ -29,15 +29,15 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
     events.onNext(BlockAppended(block.signature, blockchainBefore.height + 1, block, updatedWavesAmount, blockStateUpdate, txsStateUpdates))
   }
 
-  override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain): Unit = {
+  override def onProcessMicroBlock(microBlock: MicroBlock, diff: DetailedDiff, blockchainBefore: Blockchain, totalBlockId: ByteStr): Unit = {
     val (microBlockStateUpdate, txsStateUpdates) = containerStateUpdate(blockchainBefore, diff, microBlock.transactionData)
-    events.onNext(MicroBlockAppended(microBlock.totalResBlockSig, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates))
+    events.onNext(MicroBlockAppended(totalBlockId, blockchainBefore.height, microBlock, microBlockStateUpdate, txsStateUpdates))
   }
 
   override def onRollback(toBlockId: ByteStr, toHeight: Int): Unit = events.onNext(RollbackCompleted(toBlockId, toHeight))
 
-  override def onMicroBlockRollback(toTotalResBlockSig: ByteStr, height: Int): Unit =
-    events.onNext(MicroBlockRollbackCompleted(toTotalResBlockSig, height))
+  override def onMicroBlockRollback(toBlockId: ByteStr, height: Int): Unit =
+    events.onNext(MicroBlockRollbackCompleted(toBlockId, height))
 
   private def atomicStateUpdate(blockchainBefore: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
     val blockchainAfter = CompositeBlockchain(blockchainBefore, Some(diff))
