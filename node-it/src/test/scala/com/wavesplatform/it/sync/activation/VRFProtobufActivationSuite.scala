@@ -116,7 +116,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     blockHeaderById shouldBe blockHeadersAtActivationHeight
   }
 
-  test("only able to get block by id (that is not equal to signature) before activation") {
+  test("only able to get block by id (that is not equal to signature) after activation") {
     sender.blockById(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
     sender.blockAt(sender.height).signature should not be sender.blockAt(sender.height).id
     ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
