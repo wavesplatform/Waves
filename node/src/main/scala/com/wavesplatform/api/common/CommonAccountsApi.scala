@@ -95,12 +95,13 @@ object CommonAccountsApi extends ScorexLogging {
       val entries         = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
       db.readOnly { ro =>
-        val addressId = db.get(Keys.addressId(address)).get
-        db.iterateOver(KeyTags.DataHistory.prefixBytes ++ addressId.toByteArray) { e =>
-          val key = new String(e.getKey.drop(2 + addressId.toByteArray.length), Charsets.UTF_8)
-          if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
-            for (h <- ro.get(Keys.dataHistory(addressId, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
-              entries += e
+        db.get(Keys.addressId(address)).foreach { addressId =>
+          db.iterateOver(KeyTags.DataHistory.prefixBytes ++ addressId.toByteArray) { e =>
+            val key = new String(e.getKey.drop(2 + addressId.toByteArray.length), Charsets.UTF_8)
+            if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
+              for (h <- ro.get(Keys.dataHistory(addressId, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
+                entries += e
+              }
             }
           }
         }
