@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.TransactionInfo
 import com.wavesplatform.it.sync._
@@ -21,10 +21,10 @@ import play.api.libs.json.JsNumber
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val firstContract = pkByAddress(firstAddress)
-  private val secondContract = pkByAddress(secondAddress)
-  private val thirdContract = pkByAddress(sender.createAddress())
-  private val caller   = pkByAddress(thirdAddress)
+  private val firstContract = firstAddress
+  private val secondContract = secondAddress
+  private val thirdContract = sender.createAddress()
+  private val caller   = thirdAddress
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -71,13 +71,13 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         """.stripMargin
     val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
-    sender.transfer(firstAddress, thirdContract.stringRepr, 10.waves, minFee, waitForTx = true)
-    val setScriptId = sender.setScript(firstContract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
-    val setScriptId2 = sender.setScript(secondContract.stringRepr, Some(script), setScriptFee, waitForTx = true).id
-    sender.setScript(thirdContract.stringRepr, Some(script2), setScriptFee, waitForTx = true).id
+    sender.transfer(firstAddress, thirdContract, 10.waves, minFee, waitForTx = true)
+    val setScriptId = sender.setScript(firstContract, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId2 = sender.setScript(secondContract, Some(script), setScriptFee, waitForTx = true).id
+    sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(firstContract.stringRepr)
-    val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract.stringRepr)
+    val acc0ScriptInfo = sender.addressScriptInfo(firstContract)
+    val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
     acc0ScriptInfo.scriptText.isEmpty shouldBe false
@@ -95,8 +95,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     for (v <- invokeScrTxSupportedVersions) {
       val contract = if (v < 2) firstContract else secondContract
       val invokeScriptTx = sender.invokeScript(
-        caller.stringRepr,
-        contract.stringRepr,
+        caller,
+        contract,
         func = Some("foo"),
         args = List(CONST_BYTESTR(arg).explicitGet()),
         payment = Seq(Payment(1.waves, Waves)),
@@ -107,8 +107,8 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
 
       nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
-      sender.getDataByKey(contract.stringRepr, "a") shouldBe BinaryDataEntry("a", arg)
-      sender.getDataByKey(contract.stringRepr, "sender") shouldBe BinaryDataEntry("sender", caller.toAddress.bytes)
+      sender.getDataByKey(contract, "a") shouldBe BinaryDataEntry("a", arg)
+      sender.getDataByKey(contract, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
     }
   }
 
@@ -116,42 +116,35 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     for (v <- invokeScrTxSupportedVersions) {
       val contract = if (v < 2) firstContract else secondContract
       val _ = sender.invokeScript(
-        caller.stringRepr,
-        contract.stringRepr,
+        caller,
+        contract,
         func = None,
         payment = Seq(),
         fee = 1.waves,
         version = v,
         waitForTx = true
       )
-      sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "b")
-      sender.getDataByKey(contract.stringRepr, "sender") shouldBe StringDataEntry("sender", "senderId")
+      sender.getDataByKey(contract, "a") shouldBe StringDataEntry("a", "b")
+      sender.getDataByKey(contract, "sender") shouldBe StringDataEntry("sender", "senderId")
     }
   }
 
   test("verifier works") {
     for (v <- invokeScrTxSupportedVersions) {
       val contract = if (v < 2) firstContract else secondContract
-      val tx =
-        DataTransaction
-          .create(1.toByte, sender = contract, data = List(StringDataEntry("a", "OOO")), fee = 1.waves, timestamp = System.currentTimeMillis(), proofs = Proofs.empty)
-          .explicitGet()
-
-      val dataTxId = sender
-        .signedBroadcast(tx.json() + ("type" -> JsNumber(DataTransaction.typeId.toInt)))
-        .id
+      val dataTxId = sender.putData(contract, data = List(StringDataEntry("a", "OOO")), fee = 1.waves, waitForTx = true).id
 
       nodes.waitForHeightAriseAndTxPresent(dataTxId)
 
-      sender.getDataByKey(contract.stringRepr, "a") shouldBe StringDataEntry("a", "OOO")
+      sender.getDataByKey(contract, "a") shouldBe StringDataEntry("a", "OOO")
     }
   }
 
   test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
     assertApiError(
       sender.invokeScript(
-        caller.stringRepr,
-        secondContract.stringRepr,
+        caller,
+        secondContract,
         func = Some("emptyKey"),
         payment = Seq(),
         fee = 1.waves,
@@ -160,12 +153,12 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     )
 
     nodes.waitForHeightArise()
-    sender.getData(secondContract.stringRepr).filter(_.key.isEmpty) shouldBe List.empty
+    sender.getData(secondContract).filter(_.key.isEmpty) shouldBe List.empty
 
     assertApiError(
       sender.invokeScript(
-        caller.stringRepr,
-        thirdContract.stringRepr,
+        caller,
+        thirdContract,
         func = Some("bar"),
         payment = Seq(),
         fee = 1.waves,
@@ -174,15 +167,15 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
     )
 
     nodes.waitForHeightArise()
-    sender.getData(thirdContract.stringRepr).filter(_.key.isEmpty) shouldBe List.empty
+    sender.getData(thirdContract).filter(_.key.isEmpty) shouldBe List.empty
   }
 
   test("invoke script via dApp alias") {
-    sender.createAlias(thirdContract.stringRepr, "dappalias", smartMinFee, waitForTx = true)
-    val dAppAlias = sender.aliasByAddress(thirdContract.stringRepr).find(_.endsWith("dappalias")).get
+    sender.createAlias(thirdContract, "dappalias", smartMinFee, waitForTx = true)
+    val dAppAlias = sender.aliasByAddress(thirdContract).find(_.endsWith("dappalias")).get
     for (v <- invokeScrTxSupportedVersions) {
-      sender.invokeScript(caller.stringRepr, dAppAlias, fee = smartMinFee + smartFee, func = Some("biz"), version = v, waitForTx = true)
-      sender.getDataByKey(thirdContract.stringRepr, "numb") shouldBe IntegerDataEntry("numb", 1)
+      sender.invokeScript(caller, dAppAlias, fee = smartMinFee + smartFee, func = Some("biz"), version = v, waitForTx = true)
+      sender.getDataByKey(thirdContract, "numb") shouldBe IntegerDataEntry("numb", 1)
     }
   }
 }

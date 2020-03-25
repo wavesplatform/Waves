@@ -73,12 +73,13 @@ class BlockchainUpdaterImpl(
 
   def liquidBlock(id: ByteStr): Option[Block] = readLock(ngState.flatMap(_.totalDiffOf(id).map(_._1)))
 
-  def liquidBlockMeta: Option[BlockMeta] = readLock(ngState.map { ng =>
-    val (_, _, totalFee) = ng.bestLiquidDiffAndFees
-    val b = ng.bestLiquidBlock
-    val vrf = if (b.header.version >= Block.ProtoBlockVersion) hitSource(height) else None
-    BlockMeta.fromBlock(b, height, totalFee, ng.reward, vrf)
-  })
+  def liquidBlockMeta: Option[BlockMeta] =
+    readLock(ngState.map { ng =>
+      val (_, _, totalFee) = ng.bestLiquidDiffAndFees
+      val b                = ng.bestLiquidBlock
+      val vrf              = if (b.header.version >= Block.ProtoBlockVersion) hitSource(height) else None
+      BlockMeta.fromBlock(b, height, totalFee, ng.reward, vrf)
+    })
 
   @noinline
   def bestLiquidDiff: Option[Diff] = readLock(ngState.map(_.bestLiquidDiff))
@@ -436,9 +437,10 @@ class BlockchainUpdaterImpl(
               }
             } yield {
               val BlockDiffer.Result(diff, carry, totalFee, updatedMdConstraint, detailedDiff) = blockDifferResult
-              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this)
               restTotalConstraint = updatedMdConstraint
-              val blockId = ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis)
+              val blockId = ng.createBlockId(microBlock)
+              blockchainUpdateTriggers.onProcessMicroBlock(microBlock, detailedDiff, this, blockId)
+              ng.append(microBlock, diff, carry, totalFee, System.currentTimeMillis, Some(blockId))
               log.info(s"$microBlock appended with id $blockId")
               internalLastBlockInfo.onNext(LastBlockInfo(blockId, height, score, ready = true))
 
@@ -553,8 +555,7 @@ class BlockchainUpdaterImpl(
   override def blockHeader(height: Int): Option[SignedBlockHeader] = readLock {
     if (height == leveldb.height + 1) ngState.map { x =>
       SignedBlockHeader(x.bestLiquidBlock.header, x.bestLiquidBlock.signature)
-      }
-    else leveldb.blockHeader(height)
+    } else leveldb.blockHeader(height)
   }
 
   override def transferById(id: BlockId): Option[(Int, TransferTransaction, Boolean)] = readLock {

@@ -4,6 +4,7 @@ import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.{CustomValidationError, StateCheckFailed}
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.crypto
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.Default
@@ -69,6 +70,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     }
   }
 
+  test("only able to get block by signature (that is equal to id) before activation") {
+    sender.blockById(sender.blockAt(sender.height).signature) shouldBe sender.blockAt(sender.height)
+    sender.blockAt(sender.height).signature shouldBe sender.blockAt(sender.height).id
+    ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
+    ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.SignatureLength
+  }
+
   test("not able to broadcast ExchangeTransaction with reversed buy/sell orders") {
     val (buyOrder, sellOrder) = mkOrders
 
@@ -103,6 +111,16 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
     blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+
+    val blockHeaderById = sender.blockHeaderForId(blockHeadersAtActivationHeight.id)
+    blockHeaderById shouldBe blockHeadersAtActivationHeight
+  }
+
+  test("only able to get block by id (that is not equal to signature) after activation") {
+    sender.blockById(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
+    sender.blockAt(sender.height).signature should not be sender.blockAt(sender.height).id
+    ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
+    ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.DigestLength
   }
 
   test("able to broadcast UpdateAssetInfoTransaction if interval's reached before activation") {
@@ -189,7 +207,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     nodes.waitForHeightArise()
 
     //rollback to height after activation height using rollback to block with signature method
-    nodes.rollbackToBlockWithSignature(sender.blockAt(activationHeight + 1).id)
+    nodes.rollbackToBlockId(sender.blockAt(activationHeight + 1).id)
 
     val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
     blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion

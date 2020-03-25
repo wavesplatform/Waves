@@ -625,6 +625,7 @@ object ExchangeTransaction {
 case class Block(
     id: String,
     signature: String,
+    reference: String,
     height: Int,
     timestamp: Long,
     generator: String,
@@ -648,6 +649,7 @@ object Block {
       for {
         id <- (jsv \ "id").validate[String]
         signature <- (jsv \ "signature").validate[String]
+        reference <- (jsv \ "reference").validate[String]
         height <- (jsv \ "height").validate[Int]
         timestamp <- (jsv \ "timestamp").validate[Long]
         generator <- (jsv \ "generator").validate[String]
@@ -667,6 +669,7 @@ object Block {
       } yield Block(
         id,
         signature,
+        reference,
         height,
         timestamp,
         generator,
