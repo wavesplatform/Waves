@@ -42,12 +42,12 @@ object PBEvents {
             )
           )
         )
-      case events.MicroBlockAppended(sig, height, microBlock, microBlockStateUpdate, transactionStateUpdates) =>
+      case events.MicroBlockAppended(totalBlockId, height, microBlock, microBlockStateUpdate, transactionStateUpdates) =>
         val microBlockUpdate = Some(microBlockStateUpdate).filterNot(_.isEmpty).map(protobufStateUpdate)
         val txsUpdates       = transactionStateUpdates.map(protobufStateUpdate)
 
         BlockchainUpdated(
-          id = sig,
+          id = totalBlockId,
           height = height,
           update = BlockchainUpdated.Update.Append(
             PBAppend(
@@ -56,7 +56,7 @@ object PBEvents {
               transactionStateUpdates = txsUpdates,
               body = PBAppend.Body.MicroBlock(
                 PBAppend.MicroBlockAppend(
-                  microBlock = Some(PBMicroBlocks.protobuf(microBlock))
+                  microBlock = Some(PBMicroBlocks.protobuf(microBlock, totalBlockId))
                 )
               )
             )
@@ -114,5 +114,5 @@ object PBEvents {
     )
   }
 
-  private def getIds(txs: Seq[Transaction]): Seq[ByteString] = txs.map(t => ByteString.copyFrom(t.id().arr)),
+  private def getIds(txs: Seq[Transaction]): Seq[ByteString] = txs.map(t => ByteString.copyFrom(t.id().arr))
 }

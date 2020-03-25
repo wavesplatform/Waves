@@ -41,7 +41,7 @@ class BlockV5TestSuite
       val lastBlockHeadersCurrentHeight = nodes.head.lastBlockHeader()
       val blockAtCurrentHeight = nodes.head.blockAt(currentHeight)
       val blockHeadersCurrentHeight = nodes.head.blockHeadersAt(currentHeight)
-      val blockBySignatureCurrentHeight = nodes.head.blockBySignature(blockAtCurrentHeight.id)
+      val blockBySignatureCurrentHeight = nodes.head.blockById(blockAtCurrentHeight.id)
       val generationSignatureInConsensusApi = ByteStr.decodeBase58(nodes.head.blockGenerationSignature(blockAtCurrentHeight.id).generationSignature).get
       val generationSignatureInBlockJson = ByteStr.decodeBase58(blockAtCurrentHeight.generationSignature.get).get
 

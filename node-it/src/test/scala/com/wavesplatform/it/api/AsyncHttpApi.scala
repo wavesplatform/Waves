@@ -185,7 +185,7 @@ object AsyncHttpApi extends Assertions {
 
     def blockAt(height: Int, amountsAsStrings: Boolean = false): Future[Block] = get(s"/blocks/at/$height", amountsAsStrings).as[Block](amountsAsStrings)
 
-    def blockBySignature(signature: String, amountsAsStrings: Boolean = false): Future[Block] = get(s"/blocks/signature/$signature", amountsAsStrings).as[Block](amountsAsStrings)
+    def blockById(id: String, amountsAsStrings: Boolean = false): Future[Block] = get(s"/blocks/$id", amountsAsStrings).as[Block](amountsAsStrings)
 
     def utx(amountsAsStrings: Boolean = false): Future[Seq[Transaction]] = {
       get(s"/transactions/unconfirmed", amountsAsStrings).as[Seq[Transaction]](amountsAsStrings)
@@ -206,6 +206,9 @@ object AsyncHttpApi extends Assertions {
       .as[Seq[Block]](amountsAsStrings)
 
     def blockHeadersAt(height: Int, amountsAsStrings: Boolean = false): Future[BlockHeader] = get(s"/blocks/headers/at/$height", amountsAsStrings)
+      .as[BlockHeader](amountsAsStrings)
+
+    def blockHeaderForId(id: String, amountsAsStrings: Boolean = false): Future[BlockHeader] = get(s"/blocks/headers/$id", amountsAsStrings)
       .as[BlockHeader](amountsAsStrings)
 
     def blockHeadersSeq(from: Int, to: Int, amountsAsStrings: Boolean = false): Future[Seq[BlockHeader]] = get(s"/blocks/headers/seq/$from/$to", amountsAsStrings)
@@ -744,7 +747,7 @@ object AsyncHttpApi extends Assertions {
     def rollback(to: Int, returnToUTX: Boolean = true): Future[Unit] =
       postJson("/debug/rollback", RollbackParams(to, returnToUTX)).map(_ => ())
 
-    def rollbackToBlockWithSignature(signature: String): Future[Unit] = delete(s"/debug/rollback-to/$signature").map(_ => ())
+    def rollbackToBlockId(id: String): Future[Unit] = delete(s"/debug/rollback-to/$id").map(_ => ())
 
     def ensureTxDoesntExist(txId: String): Future[Unit] =
       utx()
