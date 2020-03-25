@@ -893,9 +893,9 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE.right.get.scriptsRun shouldBe 3
           inside(blockDiffEi.trace) {
             case List(
-                AssetVerifierTrace(attachedAssetId, None),
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
-                AssetVerifierTrace(transferringAssetId, None)
+                AssetVerifierTrace(transferringAssetId, None),
+                AssetVerifierTrace(attachedAssetId, None)
                 ) =>
               attachedAssetId shouldBe attachedAsset.id.value
               transferringAssetId shouldBe transferringAsset.id.value
@@ -935,7 +935,7 @@ class InvokeScriptTransactionDiffTest
         assertDiffEiTraced(Seq(TestBlock.create(genesis ++ Seq(asset, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
           blockDiffEi.resultE should produce("TransactionNotAllowedByScript")
           inside(blockDiffEi.trace) {
-            case List(AssetVerifierTrace(assetId, Some(TransactionNotAllowedByScript(_, isAssetScript)))) =>
+            case List(_, AssetVerifierTrace(assetId, Some(TransactionNotAllowedByScript(_, isAssetScript)))) =>
               assetId shouldBe asset.id.value
               isAssetScript shouldBe true
           }
@@ -1059,7 +1059,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property("trace contains attached asset script invocation result when transferring asset script produce error") {
+  property("trace not contains attached asset script invocation result when transferring asset script produce error") {
     forAll(for {
       a       <- accountGen
       am      <- smallFeeGen
@@ -1108,11 +1108,9 @@ class InvokeScriptTransactionDiffTest
           blockDiffEi.resultE should produce("TransactionValidationError")
           inside(blockDiffEi.trace) {
             case List(
-                AssetVerifierTrace(attachedAssetId, None),
                 InvokeScriptTrace(_, _, Right(ScriptResultV3(_, transfers)), _),
                 AssetVerifierTrace(transferringAssetId, Some(_))
-                ) =>
-              attachedAssetId shouldBe attachedAsset.id.value
+            ) =>
               transferringAssetId shouldBe transferringAsset.id.value
               transfers.head.assetId.get shouldBe transferringAsset.id.value
           }

@@ -795,7 +795,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
 
         val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
-        assertLeft(preconBlocks, blockWithExchange, fs)("Proof doesn't validate as signature")
+        assertLeft(preconBlocks, blockWithExchange, fsWithOrderFeature)("Proof doesn't validate as signature")
     }
   }
 
@@ -827,7 +827,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
 
         val blockWithExchange = TestBlock.create(Seq(exchangeWithResignedOrder))
 
-        assertLeft(preconBlocks, blockWithExchange, fs)("Proof doesn't validate as signature")
+        assertLeft(preconBlocks, blockWithExchange, fsWithOrderFeature)("Proof doesn't validate as signature")
     }
   }
 
@@ -1032,12 +1032,6 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
           .signWith(MATCHER)
         reversed = fixed
           .copy(
-            version = TxVersion.V3,
-            amount = amount,
-            price = np(Order.V4, price),
-            buyMatcherFee = fee,
-            sellMatcherFee = fee,
-            fee = fee,
             order1 = fixed.order2,
             order2 = fixed.order1
           )

@@ -20,6 +20,7 @@ import com.wavesplatform.{BlockGen, TestHelpers, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckPropertyChecks
+
 class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen with ScalaCheckPropertyChecks with EventsHelpers {
   private val WAVES_AMOUNT = Constants.UnitsInWave * Constants.TotalWaves
 

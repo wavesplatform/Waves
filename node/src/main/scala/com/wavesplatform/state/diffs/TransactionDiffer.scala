@@ -42,6 +42,7 @@ object TransactionDiffer {
       _            <- if (verify) common(prevBlockTimestamp, currentBlockTimestamp)(blockchain, tx) else TracedResult(Right(()))
       diff         <- transactionDiff(currentBlockTimestamp)(blockchain, tx)
       positiveDiff <- balance(blockchain, tx, diff)
+      _            <- if (verify) Verifier.assets(blockchain)(tx) else TracedResult(Right(()))
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
@@ -52,7 +53,6 @@ object TransactionDiffer {
     stats.commonValidation
       .measureForType(tx.typeId) {
         for {
-          _ <- Verifier(blockchain)(tx)
           _ <- TracedResult(
             stats.commonValidation
               .measureForType(tx.typeId) {
@@ -67,6 +67,7 @@ object TransactionDiffer {
                 } yield ()
               }
           )
+          _ <- Verifier(blockchain)(tx)
         } yield ()
       }
 
