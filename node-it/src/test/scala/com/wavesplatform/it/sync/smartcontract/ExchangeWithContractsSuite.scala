@@ -42,7 +42,7 @@ class ExchangeWithContractsSuite extends BaseTransactionSuite with CancelAfterFa
         "ExchangeCoin",
         "ExchangeCoin for tests with exchange transaction",
         someAssetAmount,
-        0,
+        8,
         reissuable = false,
         issueFee,
         TxVersion.V2,
