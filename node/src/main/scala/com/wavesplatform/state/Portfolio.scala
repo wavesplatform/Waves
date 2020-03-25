@@ -2,9 +2,9 @@ package com.wavesplatform.state
 
 import cats._
 import cats.kernel.instances.map._
-import com.wavesplatform.block.Block.Fraction
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.Base58
+import com.wavesplatform.state.diffs.BlockDiffer.Fraction
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset._
 import play.api.libs.functional.syntax._
@@ -13,7 +13,7 @@ import play.api.libs.json._
 import scala.collection.Seq
 import scala.collection.immutable.Map
 
-case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset, Long]) {
+case class Portfolio(balance: Long = 0L, lease: LeaseBalance = LeaseBalance.empty, assets: Map[IssuedAsset, Long] = Map.empty) {
   lazy val effectiveBalance: Long = safeSum(balance, lease.in) - lease.out
   lazy val spendableBalance: Long = balance - lease.out
 
@@ -26,15 +26,16 @@ case class Portfolio(balance: Long, lease: LeaseBalance, assets: Map[IssuedAsset
 }
 
 object Portfolio {
-  def waves(amount: Long): Portfolio =
-    build(Waves, amount)
+  def waves(amount: Long): Portfolio = build(Waves, amount)
+
+  def build(af: (Asset, Long)): Portfolio = build(af._1, af._2)
 
   def build(a: Asset, amount: Long): Portfolio = a match {
-    case Waves              => Portfolio(amount, LeaseBalance.empty, Map.empty)
-    case t @ IssuedAsset(_) => Portfolio(0L, LeaseBalance.empty, Map(t -> amount))
+    case Waves              => Portfolio(amount)
+    case t @ IssuedAsset(_) => Portfolio(assets = Map(t -> amount))
   }
 
-  val empty = Portfolio(0L, Monoid[LeaseBalance].empty, Map.empty)
+  val empty: Portfolio = Portfolio()
 
   implicit val longSemigroup: Semigroup[Long] = (x: Long, y: Long) => safeSum(x, y)
 
@@ -69,9 +70,7 @@ object Portfolio {
 
     def negate: Portfolio = Portfolio.empty minus self
 
-    def assetIds: Set[Asset] = {
-      self.assets.keySet ++ Set(Waves)
-    }
+    def assetIds: Set[Asset] = self.assets.keySet ++ Set(Waves)
 
     def changedAssetIds(that: Portfolio): Set[Asset] = {
       val a1 = assetIds

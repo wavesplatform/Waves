@@ -54,9 +54,9 @@ class NgState(
         internalCaches.blockDiffCache.get(
           totalResBlockRef, { () =>
             microBlocks.find(_.idEquals(totalResBlockRef)) match {
-              case Some(MicroBlockInfo(_, current)) =>
+              case Some(MicroBlockInfo(blockId, current)) =>
                 val (prevDiff, prevCarry, prevTotalFee)                   = this.diffFor(current.reference)
-                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(current.totalResBlockSig)
+                val CachedMicroDiff(currDiff, currCarry, currTotalFee, _) = this.microDiffs(blockId)
                 (Monoid.combine(prevDiff, currDiff), prevCarry + currCarry, prevTotalFee + currTotalFee)
 
               case None =>
@@ -115,18 +115,24 @@ class NgState(
 
   def bestLastBlockInfo(maxTimeStamp: Long): BlockMinerInfo = {
     val blockId = microBlocks
-      .find(mi => microDiffs(mi.microBlock.totalResBlockSig).timestamp <= maxTimeStamp)
+      .find(mi => microDiffs(mi.totalBlockId).timestamp <= maxTimeStamp)
       .map(_.totalBlockId)
       .getOrElse(base.id())
 
     BlockMinerInfo(base.header.baseTarget, base.header.generationSignature, base.header.timestamp, blockId)
   }
 
-  def append(microBlock: MicroBlock, diff: Diff, microblockCarry: Long, microblockTotalFee: Long, timestamp: Long): BlockId = {
-    val blockId = this.createBlockId(microBlock.transactionData, microBlock.totalResBlockSig)
-    microDiffs.put(microBlock.totalResBlockSig, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
+  def append(
+      microBlock: MicroBlock,
+      diff: Diff,
+      microblockCarry: Long,
+      microblockTotalFee: Long,
+      timestamp: Long,
+      totalBlockId: Option[BlockId] = None
+  ): BlockId = {
+    val blockId = totalBlockId.getOrElse(this.createBlockId(microBlock))
+    microDiffs.put(blockId, CachedMicroDiff(diff, microblockCarry, microblockTotalFee, timestamp))
     microBlocks.prepend(MicroBlockInfo(blockId, microBlock))
-    internalCaches.invalidate(microBlock.totalResBlockSig)
     internalCaches.invalidate(blockId)
     blockId
   }
@@ -134,10 +140,15 @@ class NgState(
   def carryFee: Long =
     baseBlockCarry + microDiffs.values.map(_.carryFee).sum
 
-  private[this] def createBlockId(transactions: Seq[Transaction], signature: ByteStr): ByteStr = {
-    val newTransactions = this.transactions ++ transactions
+  def createBlockId(microBlock: MicroBlock): BlockId = {
+    val newTransactions  = this.transactions ++ microBlock.transactionData
     val transactionsRoot = block.mkTransactionsRoot(base.header.version, newTransactions)
-    val fullBlock = base.copy(transactionData = newTransactions, signature = signature, header = base.header.copy(transactionsRoot = transactionsRoot))
+    val fullBlock =
+      base.copy(
+        transactionData = newTransactions,
+        signature = microBlock.totalResBlockSig,
+        header = base.header.copy(transactionsRoot = transactionsRoot)
+      )
     fullBlock.id()
   }
 

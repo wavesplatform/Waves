@@ -1,6 +1,6 @@
 package com.wavesplatform.settings
 
-import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 
 object TestFunctionalitySettings {
   val Enabled = FunctionalitySettings(
@@ -14,6 +14,9 @@ object TestFunctionalitySettings {
     ),
     doubleFeaturesPeriodsAfterHeight = Int.MaxValue
   )
+
+  def withFeatures(features: BlockchainFeature*): FunctionalitySettings =
+    Enabled.copy(preActivatedFeatures = Enabled.preActivatedFeatures ++ features.map(_.id -> 0))
 
   val Stub: FunctionalitySettings = Enabled.copy(featureCheckBlocksPeriod = 100, blocksForFeatureActivation = 90)
 
