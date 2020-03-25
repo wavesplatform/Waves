@@ -384,12 +384,13 @@ class UtxPoolImpl(
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit = if (!transactions.isEmpty && scheduled.compareAndSet(false, true)) {
-      cleanupScheduler.execute { () =>
-        try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
-        finally scheduled.set(false)
+    def runCleanupAsync(): Unit =
+      if ((!transactions.isEmpty || priorityTransactions.nonEmpty) && scheduled.compareAndSet(false, true)) {
+        cleanupScheduler.execute { () =>
+          try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+          finally scheduled.set(false)
+        }
       }
-    }
   }
 
   /** DOES NOT verify transactions */

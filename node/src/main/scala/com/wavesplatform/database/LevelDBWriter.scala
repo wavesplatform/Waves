@@ -83,7 +83,8 @@ class LevelDBWriter(
     private[database] val writableDB: DB,
     spendableBalanceChanged: Observer[(Address, Asset)],
     val settings: BlockchainSettings,
-    val dbSettings: DBSettings
+    val dbSettings: DBSettings,
+    bloomFilterSize: Long
 ) extends Caches(spendableBalanceChanged)
     with ScorexLogging
     with AutoCloseable {
@@ -95,14 +96,13 @@ class LevelDBWriter(
 
   private[database] def readOnly[A](f: ReadOnlyDB => A): A = writableDB.readOnly(f)
 
-  private[this] val orderFilter: BloomFilter[Array[Byte]] =
-    BloomFilters.loadBloomFilter(writableDB, dbSettings.directory, "orders", height, KeyTags.FilledVolumeAndFeeHistory)
-  private[this] val dataKeyFilter: BloomFilter[Array[Byte]] =
-    BloomFilters.loadBloomFilter(writableDB, dbSettings.directory, "account-data", height, KeyTags.DataHistory)
-  private[this] val wavesBalanceFilter: BloomFilter[Array[Byte]] =
-    BloomFilters.loadBloomFilter(writableDB, dbSettings.directory, "waves-balances", height, KeyTags.WavesBalanceHistory)
-  private[this] val assetBalanceFilter: BloomFilter[Array[Byte]] =
-    BloomFilters.loadBloomFilter(writableDB, dbSettings.directory, "asset-balances", height, KeyTags.AssetBalanceHistory)
+  private def loadFilter(name: String, keyTag: KeyTags.KeyTag): BloomFilter[Array[Byte]] =
+    BloomFilters.loadBloomFilter(writableDB, dbSettings.directory, name, height, keyTag, bloomFilterSize)
+
+  private[this] val orderFilter: BloomFilter[Array[Byte]] = loadFilter("orders", KeyTags.FilledVolumeAndFeeHistory)
+  private[this] val dataKeyFilter: BloomFilter[Array[Byte]] = loadFilter("account-data", KeyTags.DataHistory)
+  private[this] val wavesBalanceFilter: BloomFilter[Array[Byte]] = loadFilter("waves-balances", KeyTags.WavesBalanceHistory)
+  private[this] val assetBalanceFilter: BloomFilter[Array[Byte]] = loadFilter("asset-balances", KeyTags.AssetBalanceHistory)
 
   override def close(): Unit = {
     BloomFilters.saveBloomFilter(orderFilter, writableDB, dbSettings.directory, "orders", height)

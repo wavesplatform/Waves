@@ -17,7 +17,8 @@ object BloomFilters extends ScorexLogging {
       directory: String,
       filterName: String,
       expectedHeight: Int,
-      keyTag: KeyTags.KeyTag
+      keyTag: KeyTags.KeyTag,
+      expectedInsertions: Long
   ): BloomFilter[Array[Byte]] = {
     val fileName       = filterName + Suffix
     val storedChecksum = db.get(Keys.bloomFilterChecksum(filterName))
@@ -41,7 +42,7 @@ object BloomFilters extends ScorexLogging {
     } catch {
       case e: Exception =>
         log.info(s"Error loading bloom filter from $fileName", e)
-        val bf = BloomFilter.create(Funnels.byteArrayFunnel(), 100000000L)
+        val bf = BloomFilter.create(Funnels.byteArrayFunnel(), expectedInsertions)
         db.iterateOver(keyTag)(e => bf.put(e.getKey.drop(2)))
         bf
     }
