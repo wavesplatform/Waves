@@ -80,7 +80,7 @@ class InvokeWithTransferSmartassetSuite extends BaseTransactionSuite with Cancel
       ._1
       .id
 
-    sender.assetBalance(callerAcc, issuedAssetId) shouldBe callerBalance + 1
-    sender.assetBalance(dApp, issuedAssetId) shouldBe dAppBalance - 1
+    sender.assetBalance(callerAcc, issuedAssetId).balance shouldBe callerBalance + 1
+    sender.assetBalance(dApp, issuedAssetId).balance shouldBe dAppBalance - 1
   }
 }
