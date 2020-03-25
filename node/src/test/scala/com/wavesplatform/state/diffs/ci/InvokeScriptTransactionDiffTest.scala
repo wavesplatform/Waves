@@ -1693,7 +1693,7 @@ class InvokeScriptTransactionDiffTest
             diff.scriptsRun shouldBe 0
             diff.portfolios(invoke.sender.toAddress).balanceOf(invoke.feeAssetId)
             state.balance(invoke.sender.toAddress, invoke.feeAssetId) shouldBe invoke.feeAssetId.fold(wavesBalance)(_ => sponsoredBalance) - invoke.fee
-            state.transactionInfo(invoke.id()) shouldBe(2, invoke, false)
+            state.transactionInfo(invoke.id()) shouldBe ((2, invoke, false))
         }
     }
   }
