@@ -11,9 +11,7 @@ object KeyHelpers {
   def hBytes(bytes: Array[Byte], height: Int): Array[Byte] =
     ByteBuffer.allocate(4 + bytes.length).put(bytes).putInt(height).array()
 
-  def addr(addressId: Long): Array[Byte] = Longs.toByteArray(addressId)
-
-  def hAddr(height: Int, addressId: Long): Array[Byte] = hBytes(Longs.toByteArray(addressId), height)
+  def hAddr(height: Int, addressId: AddressId): Array[Byte] = hBytes(addressId.toByteArray, height)
 
   def hNum(height: Int, num: TxNum): Array[Byte] = Bytes.concat(Ints.toByteArray(height), Shorts.toByteArray(num))
 

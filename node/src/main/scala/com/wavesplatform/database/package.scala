@@ -25,6 +25,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
+import io.estatico.newtype.macros.newtype
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
@@ -95,14 +96,14 @@ package object database extends ScorexLogging {
     Seq.fill(d.length / 4)(in.getInt)
   }
 
-  def readLongSeq(data: Array[Byte]): Seq[Long] = Option(data).fold(Seq.empty[Long]) { d =>
+  def readAddressIds(data: Array[Byte]): Seq[AddressId] = Option(data).fold(Seq.empty[AddressId]) { d =>
     require(d.length % java.lang.Long.BYTES == 0, s"Invalid data length: ${d.length}")
     val buffer = ByteBuffer.wrap(data)
-    Seq.fill(d.length / java.lang.Long.BYTES)(buffer.getLong)
+    Seq.fill(d.length / java.lang.Long.BYTES)(AddressId(buffer.getLong))
   }
 
-  def writeLongSeq(values: Seq[Long]): Array[Byte] =
-    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES))(_.putLong(_)).array()
+  def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
+    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)){ case (buf, aid) => buf.putLong(aid.toLong) }.array()
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
@@ -520,4 +521,16 @@ package object database extends ScorexLogging {
       sponsorship,
       staticInfo.nft
     )
+
+  @newtype case class AddressId(toLong: Long) {
+    def toByteArray: Array[Byte] = toLong.toByteArray
+  }
+
+  object AddressId {
+    def fromByteArray(bs: Array[Byte]): AddressId = AddressId(Longs.fromByteArray(bs))
+  }
+
+  implicit class LongExt(val l: Long) extends AnyVal {
+    def toByteArray: Array[Byte] = Longs.toByteArray(l)
+  }
 }

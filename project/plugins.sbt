@@ -1,6 +1,5 @@
 resolvers ++= Seq(
   Resolver.typesafeRepo("releases"),
-//  "JBoss" at "https://repository.jboss.org",
   Resolver.sbtPluginRepo("releases")
 )
 
