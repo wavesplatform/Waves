@@ -42,6 +42,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         smartAcc,
         Some("i"),
         args = List.empty,
+        fee = smartMinFee + minFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
     val assetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
@@ -52,6 +53,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         smartAcc,
         Some("i"),
         args = List.empty,
+        fee = smartMinFee + minFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
     val secondAssetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
