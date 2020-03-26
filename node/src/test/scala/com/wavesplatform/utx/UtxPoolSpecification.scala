@@ -977,10 +977,16 @@ class UtxPoolSpecification
                 utxPool invokePrivate addTransaction(tx, false, false)
               }
 
+              val differ = TransactionDiffer(d.blockchainUpdater.lastBlockTimestamp, System.currentTimeMillis(), verify = false)(
+                d.blockchainUpdater,
+                _: Transaction
+              ).resultE.explicitGet()
+              val validTransferDiff   = differ(validTransfer)
+              val invalidTransferDiff = differ(invalidTransfer)
               addUnverified(validTransfer)
               addUnverified(invalidTransfer)
               assertEvents {
-                case UtxEvent.TxAdded(`validTransfer`, _) +: UtxEvent.TxAdded(`invalidTransfer`, _) +: Nil => // Pass
+                case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: UtxEvent.TxAdded(`invalidTransfer`, `invalidTransferDiff`) +: Nil => // Pass
               }
 
               utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)
