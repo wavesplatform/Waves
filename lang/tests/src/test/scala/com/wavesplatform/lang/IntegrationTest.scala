@@ -59,6 +59,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         case _ :: Nil => throw new Exception("test exception")
         case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
+ 
+    val f2: BaseFunction[C] =
+      NativeFunction(
+        "fn2",
+        1,
+        92:Short,
+        pointType,
+        ("value", pointType),
+      ) {
+        case _ :: Nil => throw new SecurityException("test exception")
+        case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+      }
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
@@ -68,7 +80,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
-          CTX[C](sampleTypes, stringToTuple, Array(f)),
+          CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
           ctxt
         )
       )
@@ -105,7 +117,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointB => 1
         |  case pa: PointC => 2
         |}""".stripMargin
-    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe 'Left
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce("An error during run <fn1(value: PointA|PointB|PointC): PointA|PointB|PointC>: class java.lang.Exception test exception")
+  }
+
+  property("Security Exception handling") {
+    val sampleScript =
+      """match fn2(p) {
+        |  case pa: PointA => 0
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce("An access to <fn2(value: PointA|PointB|PointC): PointA|PointB|PointC> is denied")
   }
 
   property("patternMatching") {
