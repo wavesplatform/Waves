@@ -45,7 +45,7 @@ trait WithState extends DBCacheSettings with Matchers {
   }
 
   protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: LevelDBWriter => A): A = tempDb { db =>
-    test(new LevelDBWriter(db, Observer.stopped, bs, dbSettings))
+    test(new LevelDBWriter(db, Observer.stopped, bs, dbSettings, 100))
   }
 
   def withLevelDBWriter[A](fs: FunctionalitySettings)(test: LevelDBWriter => A): A =

@@ -13,10 +13,12 @@ import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.utils._
 import io.grpc.Status.Code
 
+import scala.collection.immutable
+
 class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime {
 
-  val transactionV1versions = (1: Byte, 1: Byte, 1: Byte)
-  val transactionV2versions = for {
+  val transactionV1versions: (TxVersion, TxVersion, TxVersion) = (1: Byte, 1: Byte, 1: Byte)
+  val transactionV2versions: immutable.Seq[(TxVersion, TxVersion, TxVersion)] = for {
     o1ver <- 1 to 3
     o2ver <- 1 to 3
     txVer <- 2 to 3
@@ -26,10 +28,10 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   val (seller, sellerAddress)   = (secondAcc, secondAddress)
   val (matcher, matcherAddress) = (thirdAcc, thirdAddress)
 
-  val versions = transactionV1versions +: transactionV2versions
+  val versions: immutable.Seq[(TxVersion, TxVersion, TxVersion)] = transactionV1versions +: transactionV2versions
 
   test("exchange tx with orders v1,v2") {
-    val exchAsset          = sender.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, true, 1.waves, waitForTx = true)
+    val exchAsset          = sender.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
     val exchAssetId        = PBTransactions.vanilla(exchAsset).explicitGet().id().toString
     val price              = 500000L
     val amount             = 40000000L
@@ -55,7 +57,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   }
 
   test("exchange tx with orders v3") {
-    val feeAsset           = sender.broadcastIssue(buyer, "feeAsset", someAssetAmount, 8, true, 1.waves, waitForTx = true)
+    val feeAsset           = sender.broadcastIssue(buyer, "feeAsset", someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
     val feeAssetId         = PBTransactions.vanilla(feeAsset).explicitGet().id()
     val price              = 500000L
     val amount             = 40000000L
@@ -91,7 +93,7 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
       val buy                 = Order.buy(o1ver, buyer, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder1)
       val sell                = Order.sell(o2ver, seller, matcher, assetPair, amount, price, ts, expirationTimestamp, matcherFee, matcherFeeOrder2)
 
-      sender.exchange(matcher, buy, sell, amount, price, matcherFee, matcherFee, matcherFee, ts, 2, waitForTx = true)
+      sender.exchange(matcher, sell, buy, amount, price, matcherFee, matcherFee, matcherFee, ts, 3, waitForTx = true)
 
       sender.wavesBalance(buyerAddress).available shouldBe (buyerWavesBalanceBefore + buyerWavesDelta)
       sender.wavesBalance(sellerAddress).available shouldBe (sellerWavesBalanceBefore + sellerWavesDelta)

@@ -52,7 +52,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "updatedName",
       "updatedDescription"
     )
-    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock().id).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.blockById(sender.lastBlock().id).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
       "updatedName",
@@ -98,7 +98,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "secondUpdate",
       "secondUpdatedDescription"
     )
-    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock().id).transactions.head, "secondUpdate", "secondUpdatedDescription")
+    checkUpdateAssetInfoTx(sender.blockById(sender.lastBlock().id).transactions.head, "secondUpdate", "secondUpdatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeqByAddress(miner.address, secondUpdateInfoHeight, secondUpdateInfoHeight).head.transactions.head,
       "secondUpdate",
@@ -222,7 +222,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
       "updatedName",
       "updatedDescription"
     )
-    checkUpdateAssetInfoTx(sender.blockBySignature(sender.lastBlock().id).transactions.head, "updatedName", "updatedDescription")
+    checkUpdateAssetInfoTx(sender.blockById(sender.lastBlock().id).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(
       sender.blockSeqByAddress(miner.address, updateAssetInfoTxHeight, updateAssetInfoTxHeight).head.transactions.head,
       "updatedName",

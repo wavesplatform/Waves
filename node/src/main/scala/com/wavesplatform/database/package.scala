@@ -25,6 +25,7 @@ import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
+import io.estatico.newtype.macros.newtype
 import monix.eval.Task
 import monix.reactive.Observable
 import org.iq80.leveldb._
@@ -52,13 +53,6 @@ package object database extends ScorexLogging {
       output.write(s.arr)
     }
 
-    def writeBigInt(v: BigInt): Unit = {
-      val b = v.toByteArray
-      require(b.length <= Byte.MaxValue)
-      output.writeByte(b.length)
-      output.write(b)
-    }
-
     def writeScriptOption(v: Option[Script]): Unit = {
       output.writeBoolean(v.isDefined)
       v.foreach { s =>
@@ -70,13 +64,6 @@ package object database extends ScorexLogging {
   }
 
   implicit class ByteArrayDataInputExt(val input: ByteArrayDataInput) extends AnyVal {
-    def readBigInt(): BigInt = {
-      val len = input.readByte()
-      val b   = new Array[Byte](len)
-      input.readFully(b)
-      BigInt(b)
-    }
-
     def readScriptOption(): Option[Script] = {
       if (input.readBoolean()) {
         val len = input.readShort()
@@ -108,6 +95,15 @@ package object database extends ScorexLogging {
     val in = ByteBuffer.wrap(data)
     Seq.fill(d.length / 4)(in.getInt)
   }
+
+  def readAddressIds(data: Array[Byte]): Seq[AddressId] = Option(data).fold(Seq.empty[AddressId]) { d =>
+    require(d.length % java.lang.Long.BYTES == 0, s"Invalid data length: ${d.length}")
+    val buffer = ByteBuffer.wrap(data)
+    Seq.fill(d.length / java.lang.Long.BYTES)(AddressId(buffer.getLong))
+  }
+
+  def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
+    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)){ case (buf, aid) => buf.putLong(aid.toLong) }.array()
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
@@ -157,22 +153,6 @@ package object database extends ScorexLogging {
           b.putShort(bytes.length.toShort).put(bytes)
       }
       .array()
-
-  def writeBigIntSeq(values: Seq[BigInt]): Array[Byte] = {
-    require(values.length <= Short.MaxValue, s"BigInt sequence is too long")
-    val ndo = newDataOutput()
-    ndo.writeShort(values.size)
-    for (v <- values) {
-      ndo.writeBigInt(v)
-    }
-    ndo.toByteArray
-  }
-
-  def readBigIntSeq(data: Array[Byte]): Seq[BigInt] = Option(data).fold(Seq.empty[BigInt]) { d =>
-    val ndi    = newDataInput(d)
-    val length = ndi.readShort()
-    for (_ <- 0 until length) yield ndi.readBigInt()
-  }
 
   def writeLeaseBalance(lb: LeaseBalance): Array[Byte] = {
     val ndo = newDataOutput()
@@ -421,11 +401,14 @@ package object database extends ScorexLogging {
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
-      val batch       = db.createWriteBatch()
+      val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
       try {
         val r = f(rw)
-        db.write(batch)
+        val nativeBatch = db.createWriteBatch()
+        batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
+        batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
+        db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
         r
       } finally {
         batch.close()
@@ -538,4 +521,16 @@ package object database extends ScorexLogging {
       sponsorship,
       staticInfo.nft
     )
+
+  @newtype case class AddressId(toLong: Long) {
+    def toByteArray: Array[Byte] = toLong.toByteArray
+  }
+
+  object AddressId {
+    def fromByteArray(bs: Array[Byte]): AddressId = AddressId(Longs.fromByteArray(bs))
+  }
+
+  implicit class LongExt(val l: Long) extends AnyVal {
+    def toByteArray: Array[Byte] = Longs.toByteArray(l)
+  }
 }
