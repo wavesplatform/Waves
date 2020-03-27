@@ -67,10 +67,10 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       if (exchangeVersion != 1) {
         val tx = ExchangeTransaction
           .signed(
-            TxVersion.V2,
+            TxVersion.V3,
             matcher = matcher,
-            order1 = buy,
-            order2 = sell,
+            order1 = sell,
+            order2 = buy,
             amount = amount,
             price = sellPrice,
             buyMatcherFee = (BigInt(matcherFee) * amount / buy.amount).toLong,
@@ -182,7 +182,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       val tx =
         ExchangeTransaction
           .signed(
-            2.toByte,
+            3.toByte,
             matcher = matcher,
             order1 = buy,
             order2 = sell,

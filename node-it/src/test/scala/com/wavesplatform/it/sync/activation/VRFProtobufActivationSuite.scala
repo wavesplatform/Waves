@@ -71,7 +71,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("only able to get block by signature (that is equal to id) before activation") {
-    sender.blockBySignature(sender.blockAt(sender.height).signature) shouldBe sender.blockAt(sender.height)
+    sender.blockById(sender.blockAt(sender.height).signature) shouldBe sender.blockAt(sender.height)
     sender.blockAt(sender.height).signature shouldBe sender.blockAt(sender.height).id
     ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
     ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.SignatureLength
@@ -111,10 +111,13 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     val blockHeadersAtActivationHeight = sender.blockHeadersAt(sender.height)
     blockAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
     blockHeadersAtActivationHeight.version.get shouldBe Block.ProtoBlockVersion
+
+    val blockHeaderById = sender.blockHeaderForId(blockHeadersAtActivationHeight.id)
+    blockHeaderById shouldBe blockHeadersAtActivationHeight
   }
 
-  test("only able to get block by id (that is not equal to signature) before activation") {
-    sender.blockBySignature(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
+  test("only able to get block by id (that is not equal to signature) after activation") {
+    sender.blockById(sender.blockAt(sender.height).id) shouldBe sender.blockAt(sender.height)
     sender.blockAt(sender.height).signature should not be sender.blockAt(sender.height).id
     ByteStr.decodeBase58(sender.blockAt(sender.height).signature).get.length shouldBe crypto.SignatureLength
     ByteStr.decodeBase58(sender.blockAt(sender.height).id).get.length shouldBe crypto.DigestLength
@@ -204,7 +207,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     nodes.waitForHeightArise()
 
     //rollback to height after activation height using rollback to block with signature method
-    nodes.rollbackToBlockWithSignature(sender.blockAt(activationHeight + 1).id)
+    nodes.rollbackToBlockId(sender.blockAt(activationHeight + 1).id)
 
     val blockAtActivationHeight3 = sender.blockAt(activationHeight + 1)
     blockAtActivationHeight3.version.get shouldBe Block.ProtoBlockVersion

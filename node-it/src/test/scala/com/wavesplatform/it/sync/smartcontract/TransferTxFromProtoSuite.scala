@@ -1,21 +1,19 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.google.protobuf.ByteString
-import com.wavesplatform.account.{AddressOrAlias, PublicKey}
+import com.wavesplatform.account.AddressOrAlias
 import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.crypto
-import com.wavesplatform.it.transactions.BaseTransactionSuite
+import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.Attachment.{Bin, Bool, Num, Str}
-import com.wavesplatform.transaction.{Proofs, TxByteArray, TxVersion}
 import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
 
 class TransferTxFromProtoSuite extends BaseTransactionSuite {

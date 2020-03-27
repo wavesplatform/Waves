@@ -15,7 +15,7 @@ import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain.BlockchainUpdaterExt
-import com.wavesplatform.history.{StorageFactory, randomSig}
+import com.wavesplatform.history.randomSig
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
@@ -105,7 +105,8 @@ class UtxPoolSpecification
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val bcu       = StorageFactory(settings, dbContext.db, new TestTime(), ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+    val levelDBWriter = new LevelDBWriter(dbContext.db, ignoreSpendableBalanceChanged, settings.blockchainSettings, settings.dbSettings, 100000000L)
+    val bcu = new BlockchainUpdaterImpl(levelDBWriter, ignoreSpendableBalanceChanged, settings, new TestTime(), ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }

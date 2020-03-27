@@ -106,7 +106,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val utxEvents                  = ConcurrentSubject.publish[UtxEvent](scheduler)
   private val blockchainUpdateTriggers   = new BlockchainUpdateTriggersImpl(blockchainUpdated)
 
-  private val blockchainUpdater = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
+  private val (blockchainUpdater, levelDB) = StorageFactory(settings, db, time, spendableBalanceChanged, blockchainUpdateTriggers)
 
   private var rxExtensionLoaderShutdown: Option[RxExtensionLoaderShutdownHook] = None
   private var maybeUtx: Option[UtxPool]                                        = None
@@ -458,6 +458,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       shutdownAndWait(appenderScheduler, "Appender", 5.minutes.some, tryForce = false)
 
       log.info("Closing storage")
+      levelDB.close()
       db.close()
 
       time.close()
