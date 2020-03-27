@@ -3,7 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.database.{DBExt, DBResource, Keys}
-import com.wavesplatform.state.{AddressId, Diff, Height, InvokeScriptResult, TransactionId, TxNum}
+import com.wavesplatform.state.{Diff, Height, InvokeScriptResult, TransactionId, TxNum}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Authorized, GenesisTransaction, Transaction}
 import monix.reactive.Observable
@@ -81,8 +81,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction)] = resource.get(Keys.addressId(subject)).fold(Iterable.empty[(Height, Transaction)]) { intId =>
-    val addressId = AddressId(intId)
+  ): Iterable[(Height, Transaction)] = resource.get(Keys.addressId(subject)).fold(Iterable.empty[(Height, Transaction)]) { addressId =>
     val (maxHeight, maxTxNum) =
       fromId.flatMap(id => resource.get(Keys.transactionHNById(TransactionId(id)))).getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
 
