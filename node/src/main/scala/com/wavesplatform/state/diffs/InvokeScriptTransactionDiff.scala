@@ -399,9 +399,7 @@ object InvokeScriptTransactionDiff {
                        tx.timestamp,
                        tx.id()
                      )
-                     val assetValidationDiff = diffAcc.resultE.flatMap(
-                       d => validatePseudoTxWithSmartAssetScript(blockchain, tx)(d, pseudoTx, a.id, assetVerifierDiff, script)
-                     )
+                     val assetValidationDiff = validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, a.id, assetVerifierDiff, script)
                      val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                      TracedResult(
                             assetValidationDiff.map(_ => nextDiff),
@@ -449,17 +447,16 @@ object InvokeScriptTransactionDiff {
            def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, Diff] = {
              val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
              val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
-             validateActionAsPseudoTx(diffAcc, reissueDiff, reissue.assetId, pseudoTx)
+             validateActionAsPseudoTx(reissueDiff, reissue.assetId, pseudoTx)
            }
 
            def applyBurn(burn: Burn, pk: PublicKey): TracedResult[ValidationError, Diff] = {
              val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
              val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
-             validateActionAsPseudoTx(diffAcc, burnDiff, burn.assetId, pseudoTx)
+             validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
            }
 
            def validateActionAsPseudoTx(
-               diffAcc: TracedResult[ValidationError, Diff],
                actionDiff: Either[ValidationError, Diff],
                assetId: ByteStr,
                pseudoTx: PseudoTx
@@ -469,9 +466,8 @@ object InvokeScriptTransactionDiff {
                case Some((script, _)) =>
                  val assetValidationDiff =
                    for {
-                     acc             <- diffAcc.resultE
                      result          <- actionDiff
-                     validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(acc, pseudoTx, assetId, result, script)
+                     validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, assetId, result, script)
                    } yield validatedResult
                  val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
                  TracedResult(
@@ -493,7 +489,6 @@ object InvokeScriptTransactionDiff {
     }
 
   private def validatePseudoTxWithSmartAssetScript(blockchain: Blockchain, tx: InvokeScriptTransaction)(
-      totalDiff: Diff,
       pseudoTx: PseudoTx,
       assetId: ByteStr,
       nextDiff: Diff,
@@ -502,7 +497,7 @@ object InvokeScriptTransactionDiff {
     Try {
       ScriptRunner(
         Coproduct[TxOrd](pseudoTx),
-        CompositeBlockchain(blockchain, Some(totalDiff)),
+        blockchain,
         script,
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
