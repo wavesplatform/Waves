@@ -420,7 +420,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   property("issue action results state") {
     forAll(issuePreconditions(feeMultiplier = 7)) {
       case (genesis, invoke, master, invoker, amount) =>
-        withDomain() { d =>
+        withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.MultiPaymentInvokeScript))) { d =>
           val tb1 = TestBlock.create(genesis)
           d.blockchainUpdater.processBlock(tb1, new Array[Byte](32), false).explicitGet()
           val tb2 = TestBlock.create(System.currentTimeMillis(), tb1.signature, Seq(invoke))
