@@ -1621,7 +1621,7 @@ object InvokeScriptTransactionDiffTest {
       val spendableBalanceChanged: Observer[(Address, Asset)],
       override val settings: BlockchainSettings,
       override val dbSettings: DBSettings
-  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
+  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings, 10) {
     import asset._
     override def assetDescription(ia: IssuedAsset): Option[AssetDescription] =
       Some(AssetDescription(id(), sender, name, description, decimals, reissuable, quantity, Height(2), script.map(_ -> 1L), 0, false))

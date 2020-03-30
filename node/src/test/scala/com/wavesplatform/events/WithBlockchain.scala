@@ -16,7 +16,7 @@ trait WithBlockchain extends BeforeAndAfterEach with BeforeAndAfterAll with NTPT
   private val path = Files.createTempDirectory("leveldb-test")
   private val db   = database.openDB(path.toAbsolutePath.toString)
   private val bcu: Blockchain with BlockchainUpdater = new BlockchainUpdaterImpl(
-    new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings),
+    new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings, 100),
     Observer.stopped,
     settings,
     ntpTime,
