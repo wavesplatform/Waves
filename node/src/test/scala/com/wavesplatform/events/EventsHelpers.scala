@@ -21,7 +21,7 @@ private[events] trait EventsHelpers extends WithBlockchain { _: Suite =>
   }
 
   protected def detailedDiffFromBlock(b: Block): DetailedDiff =
-    BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, verifySigs = false).explicitGet().detailedDiff
+    BlockDiffer.fromBlock(blockchain, None, b, MiningConstraint.Unlimited, verify = false).explicitGet().detailedDiff
 
   protected def appendBlock(b: Block, minerReward: Option[Long] = None): BlockAppended =
     produceEvent(_.onProcessBlock(b, detailedDiffFromBlock(b), minerReward, blockchain)) match {

@@ -56,14 +56,14 @@ package object appender extends ScorexLogging {
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
       time: Time,
-      verify: Boolean
+      verifySigs: Boolean
   )(block: Block): Either[ValidationError, Option[Int]] = {
-    if (verify)
+    if (verifySigs)
       validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(block)
     else
       pos
         .validateGenerationSignature(block)
-        .flatMap(hitSource => appendBlock(blockchainUpdater, utxStorage, verify = false)(block, hitSource))
+        .flatMap(hitSource => appendBlock(blockchainUpdater, utxStorage, verifySigs = false)(block, hitSource))
   }
 
   private[appender] def validateAndAppendBlock(
@@ -86,14 +86,14 @@ package object appender extends ScorexLogging {
           s"generator's effective balance $balance is less that required for generation"
         )
       }
-      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
+      baseHeight <- appendBlock(blockchainUpdater, utxStorage, verifySigs = true)(block, hitSource)
     } yield baseHeight
 
-  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
+  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verifySigs: Boolean)(
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] =
-    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verify)).map { maybeDiscardedTxs =>
+    metrics.appendBlock.measureSuccessful(blockchainUpdater.processBlock(block, hitSource, verifySigs)).map { maybeDiscardedTxs =>
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
         metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))

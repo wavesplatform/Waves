@@ -32,15 +32,17 @@ object BlockDiffer extends ScorexLogging {
       maybePrevBlock: Option[Block],
       block: Block,
       constraint: MiningConstraint,
+      verify: Boolean = true,
       verifySigs: Boolean = true
   ): Either[ValidationError, Result] =
-    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, verifySigs).resultE
+    fromBlockTraced(blockchain, maybePrevBlock, block, constraint, verify, verifySigs).resultE
 
   def fromBlockTraced(
       blockchain: Blockchain,
       maybePrevBlock: Option[Block],
       block: Block,
       constraint: MiningConstraint,
+      verify: Boolean = true,
       verifySigs: Boolean = true
   ): TracedResult[ValidationError, Result] = {
     val stateHeight = blockchain.height
@@ -80,6 +82,7 @@ object BlockDiffer extends ScorexLogging {
         Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))),
         stateHeight >= ngHeight,
         block.transactionData,
+        verify,
         verifySigs
       )
     } yield r
@@ -120,6 +123,7 @@ object BlockDiffer extends ScorexLogging {
         Diff.empty,
         true,
         micro.transactionData,
+        verify,
         verify
       )
     } yield r
@@ -139,6 +143,7 @@ object BlockDiffer extends ScorexLogging {
       initDiff: Diff,
       hasNg: Boolean,
       txs: Seq[Transaction],
+      verify: Boolean,
       verifySigs: Boolean
   ): TracedResult[ValidationError, Result] = {
     def updateConstraint(constraint: MiningConstraint, blockchain: Blockchain, tx: Transaction, diff: Diff): MiningConstraint =
@@ -148,7 +153,7 @@ object BlockDiffer extends ScorexLogging {
     val timestamp          = blockchain.lastBlockTimestamp.get
     val blockGenerator     = blockchain.lastBlockHeader.get.header.generator.toAddress
 
-    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verifySigs = verifySigs) _
+    val txDiffer       = TransactionDiffer(prevBlockTimestamp, timestamp, verify, verifySigs) _
     val hasSponsorship = currentBlockHeight >= Sponsorship.sponsoredFeesSwitchHeight(blockchain)
 
     txs

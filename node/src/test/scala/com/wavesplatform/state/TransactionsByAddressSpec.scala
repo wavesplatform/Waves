@@ -69,7 +69,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
           .copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = TestFunctionalitySettings.Enabled))
         withDomain(settings) { d =>
           for (b <- blocks) {
-            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false) shouldBe 'right
+            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verifySigs = false) shouldBe 'right
           }
 
           Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))
@@ -77,7 +77,7 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
           d.blockchainUpdater.processBlock(
             TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty),
             new Array[Byte](32),
-            verify = false
+            verifySigs = false
           )
 
           Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))

@@ -429,7 +429,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           d.portfolio(master).map(_._2) shouldEqual Seq(amount)
           d.portfolio(invoker) shouldEqual Seq()
 
-          d.blockchainUpdater.processBlock(TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty), new Array[Byte](32), verify = false)
+          d.blockchainUpdater.processBlock(TestBlock.create(System.currentTimeMillis(), tb2.signature, Seq.empty), new Array[Byte](32), verifySigs = false)
 
           d.portfolio(master).map(_._2) shouldEqual Seq(amount)
           d.portfolio(invoker) shouldEqual Seq()

@@ -170,7 +170,7 @@ class BlockchainUpdaterImpl(
       .orElse(lastBlockReward)
   }
 
-  override def processBlock(block: Block, hitSource: ByteStr, verify: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] =
+  override def processBlock(block: Block, hitSource: ByteStr, verifySigs: Boolean = true): Either[ValidationError, Option[DiscardedTransactions]] =
     writeLock {
       val height                             = leveldb.height
       val notImplementedFeatures: Set[Short] = leveldb.activatedFeaturesAt(height).diff(BlockchainFeatures.implemented)
@@ -200,7 +200,7 @@ class BlockchainUpdaterImpl(
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
-                        verify
+                        verifySigs = verifySigs
                       )
                       .map(r => Option((r, Seq.empty[Transaction], reward, hitSource)))
                 }
@@ -218,7 +218,7 @@ class BlockchainUpdaterImpl(
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
-                        verify
+                        verifySigs = verifySigs
                       )
                       .map { r =>
                         log.trace(
@@ -243,7 +243,7 @@ class BlockchainUpdaterImpl(
                           leveldb.lastBlock,
                           block,
                           miningConstraints.total,
-                          verify
+                          verifySigs = verifySigs
                         )
                         .map(r => Some((r, Seq.empty[Transaction], ng.reward, hitSource)))
                     }
@@ -259,7 +259,7 @@ class BlockchainUpdaterImpl(
                   metrics.forgeBlockTimeStats.measureSuccessful(ng.totalDiffOf(block.header.reference)) match {
                     case None => Left(BlockAppendError(s"References incorrect or non-existing block", block))
                     case Some((referencedForgedBlock, referencedLiquidDiff, carry, totalFee, discarded)) =>
-                      if (!verify || referencedForgedBlock.signatureValid()) {
+                      if (!verifySigs || referencedForgedBlock.signatureValid()) {
                         val height = leveldb.heightOf(referencedForgedBlock.header.reference).getOrElse(0)
 
                         if (discarded.nonEmpty) {
@@ -286,7 +286,7 @@ class BlockchainUpdaterImpl(
                             Some(referencedForgedBlock),
                             block,
                             constraint,
-                            verify
+                            verifySigs = verifySigs
                           )
 
                         diff.map { hardenedDiff =>
