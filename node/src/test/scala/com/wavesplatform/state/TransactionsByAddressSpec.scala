@@ -7,7 +7,7 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.settings.{Constants, GenesisSettings, GenesisTransactionSettings}
+import com.wavesplatform.settings.{GenesisSettings, GenesisTransactionSettings, TestFunctionalitySettings, WavesSettings}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.{BlockGen, NoShrink}
@@ -41,9 +41,9 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
         GenesisSettings(
           genesisTimestamp,
           genesisTimestamp,
-          Constants.TotalWaves,
+          diffs.ENOUGH_AMT,
           None,
-          Seq(GenesisTransactionSettings(sender.toAddress.stringRepr, Constants.TotalWaves)),
+          Seq(GenesisTransactionSettings(sender.toAddress.stringRepr, diffs.ENOUGH_AMT)),
           1000,
           1.minute
         )
@@ -64,9 +64,12 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
   private def test(f: (Address, Seq[Block], Domain) => Unit)(implicit pos: Position): Unit = {
     forAll(gen) {
       case (sender, r1, r2, blocks) =>
-        withDomain() { d =>
+        val settings = WavesSettings
+          .default()
+          .copy(blockchainSettings = WavesSettings.default().blockchainSettings.copy(functionalitySettings = TestFunctionalitySettings.Enabled))
+        withDomain(settings) { d =>
           for (b <- blocks) {
-            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
+            d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false) shouldBe 'right
           }
 
           Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))
