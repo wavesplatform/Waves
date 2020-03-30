@@ -335,6 +335,7 @@ class InvokeScriptTransactionDiffTest
         )
     }
 
+    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).left.map(println)
     compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
   }
 
@@ -1591,6 +1592,59 @@ class InvokeScriptTransactionDiffTest
         }
     }
   }
+
+  private def reissueContract(funcName: String, asset: ByteStr): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = [Reissue(base58'$asset', false, 1), Reissue(base58'$asset', true, 4)]
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val reissueAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      assetTx     <- issueV2TransactionGen(master, None, reissuableParam = Some(true))
+      fee         <- ciFee()
+      funcBinding <- funcNameGen
+      contract    = reissueContract(funcBinding, assetTx.id.value)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
+
+  property("Reissuind unissued asset should produce error") {
+    forAll(reissueAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei should produce("Asset is not reissuable")
+          }
+        }
+    }
+  }
+
+
 
   private def transferIssueContract(funcName: String): DApp = {
     val expr = {
