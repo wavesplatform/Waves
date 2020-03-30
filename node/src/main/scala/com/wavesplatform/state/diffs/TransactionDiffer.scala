@@ -25,22 +25,23 @@ object TransactionDiffer {
     override def toString: String = s"TransactionValidationError(cause = $cause,\ntx = ${Json.prettyPrint(tx.json())})"
   }
 
-  def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
+  def apply(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true, verifySigs: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
   ): TracedResult[ValidationError, Diff] = {
     val func =
-      if (verify) verified(prevBlockTimestamp, currentBlockTimestamp) _
+      if (verify) verified(prevBlockTimestamp, currentBlockTimestamp, verifySigs) _
       else unverified(currentBlockTimestamp) _
     func(blockchain, tx)
   }
 
   def verified(
       prevBlockTimestamp: Option[Long],
-      currentBlockTimestamp: Long
+      currentBlockTimestamp: Long,
+      verifySigs: Boolean
   )(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] = {
     for {
-      _ <- Verifier(blockchain)(tx)
+      _ <- Verifier(blockchain, verifySigs)(tx)
       _ <- TracedResult(
         stats.commonValidation
           .measureForType(tx.typeId) {

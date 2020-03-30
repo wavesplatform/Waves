@@ -33,7 +33,7 @@ object Verifier extends ScorexLogging {
 
   type ValidationResult[T] = Either[ValidationError, T]
 
-  def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
+  def apply(blockchain: Blockchain, verifySigs: Boolean = true)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
     val validatedTx: TracedResult[ValidationError, Transaction] = tx match {
       case _: GenesisTransaction => Right(tx)
       case pt: ProvenTransaction =>
@@ -42,7 +42,7 @@ object Verifier extends ScorexLogging {
             stats.signatureVerification
               .measureForType(stx.typeId)(stx.signaturesValid())
           case (et: ExchangeTransaction, scriptOpt) =>
-            verifyExchange(et, blockchain, scriptOpt)
+            verifyExchange(et, blockchain, scriptOpt, verifySigs)
           case (tx: SigProofsSwitch, Some(_)) if tx.usesLegacySignature =>
             Left(GenericError("Can't process transaction with signature from scripted account"))
           case (_: SignedTransaction, Some(_)) =>
@@ -51,8 +51,10 @@ object Verifier extends ScorexLogging {
             stats.accountScriptExecution
               .measureForType(pt.typeId)(verifyTx(blockchain, script, pt, None))
           case _ =>
-            stats.signatureVerification
-              .measureForType(tx.typeId)(verifyAsEllipticCurveSignature(pt))
+            if (verifySigs)
+              stats.signatureVerification
+                .measureForType(tx.typeId)(verifyAsEllipticCurveSignature(pt))
+            else Right(pt)
         }
     }
     validatedTx.flatMap { tx =>
@@ -147,7 +149,8 @@ object Verifier extends ScorexLogging {
   def verifyExchange(
       et: ExchangeTransaction,
       blockchain: Blockchain,
-      matcherScriptOpt: Option[Script]
+      matcherScriptOpt: Option[Script],
+      verifySigs: Boolean
   ): TracedResult[ValidationError, Transaction] = {
 
     val typeId    = et.typeId
@@ -164,7 +167,7 @@ object Verifier extends ScorexLogging {
             TracedResult(Left(GenericError("Can't process transaction with signature from scripted account")))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)))
+        .getOrElse(if (verifySigs) stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(et)) else Right(et))
 
     def orderVerification(order: Order): TracedResult[ValidationError, Order] = {
       val verificationResult = blockchain
@@ -176,7 +179,7 @@ object Verifier extends ScorexLogging {
             Left(GenericError("Can't process order with signature from scripted account"))
           }
         }
-        .getOrElse(stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)))
+        .getOrElse(if (verifySigs) stats.signatureVerification.measureForType(typeId)(verifyAsEllipticCurveSignature(order)) else Right(order))
 
       TracedResult(verificationResult)
     }
