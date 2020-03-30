@@ -40,7 +40,7 @@ class CommonAccountsApiSpec
       forAll(preconditions) {
         case (acc, block1, mb1, block2, mb2) =>
           withDomain(domainSettingsWithFS(TestFunctionalitySettings.withFeatures(BlockchainFeatures.NG, BlockchainFeatures.DataTransaction))) { d =>
-            val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchainUpdater)
+            val commonAccountsApi             = CommonAccountsApi(d.blockchainUpdater.bestLiquidDiff.getOrElse(Diff.empty), d.db, d.blockchain)
             def dataList(): Set[DataEntry[_]] = commonAccountsApi.dataStream(acc, None).toListL.runSyncUnsafe().toSet
 
             d.appendBlock(block1)

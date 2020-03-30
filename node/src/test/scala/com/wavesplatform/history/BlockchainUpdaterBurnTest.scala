@@ -61,12 +61,12 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         domain.appendBlock(block1)
 
         domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId)).get
+        val assetDescription1 = domain.blockchain.assetDescription(IssuedAsset(issue.assetId)).get
         assetDescription1.reissuable should be(false)
         assetDescription1.totalVolume should be(issue.quantity)
 
         domain.appendBlock(block3)
-        val assetDescription2 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId)).get
+        val assetDescription2 = domain.blockchain.assetDescription(IssuedAsset(issue.assetId)).get
         assetDescription2.reissuable should be(false)
         assetDescription2.totalVolume should be(issue.quantity - burn.quantity)
 
@@ -86,7 +86,7 @@ class BlockchainUpdaterBurnTest extends PropSpec with PropertyChecks with Domain
         domain.appendBlock(block1)
 
         domain.appendBlock(block2)
-        val assetDescription1 = domain.blockchainUpdater.assetDescription(IssuedAsset(issue.assetId)).get
+        val assetDescription1 = domain.blockchain.assetDescription(IssuedAsset(issue.assetId)).get
         assetDescription1.reissuable should be(false)
         assetDescription1.totalVolume should be(issue.quantity)
 

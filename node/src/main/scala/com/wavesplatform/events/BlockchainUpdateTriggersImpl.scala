@@ -40,7 +40,7 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
     events.onNext(MicroBlockRollbackCompleted(toBlockId, height))
 
   private def atomicStateUpdate(blockchainBefore: Blockchain, diff: Diff, byTransaction: Option[Transaction]): StateUpdate = {
-    val blockchainAfter = CompositeBlockchain(blockchainBefore, Some(diff))
+    val blockchainAfter = CompositeBlockchain(blockchainBefore, diff)
 
     val PortfolioUpdates(updatedBalances, updatedLeases) = DiffToStateApplier.portfolios(blockchainBefore, diff)
 
@@ -97,7 +97,7 @@ class BlockchainUpdateTriggersImpl(private val events: Observer[BlockchainUpdate
       .foldLeft((ArrayBuffer.empty[StateUpdate], parentDiff)) {
         case ((updates, accDiff), (txDiff, tx)) =>
           (
-            updates += atomicStateUpdate(CompositeBlockchain(blockchainBefore, Some(accDiff)), txDiff, Some(tx)),
+            updates += atomicStateUpdate(CompositeBlockchain(blockchainBefore, accDiff), txDiff, Some(tx)),
             accDiff.combine(txDiff)
           )
       }

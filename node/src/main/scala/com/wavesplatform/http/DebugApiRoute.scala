@@ -21,7 +21,7 @@ import com.wavesplatform.mining.{Miner, MinerDebugInfo}
 import com.wavesplatform.network.{PeerDatabase, PeerInfo, _}
 import com.wavesplatform.settings.{RestAPISettings, WavesSettings}
 import com.wavesplatform.state.diffs.TransactionDiffer
-import com.wavesplatform.state.{Blockchain, LeaseBalance, NG, Portfolio}
+import com.wavesplatform.state.{LeaseBalance, NG, Portfolio}
 import com.wavesplatform.transaction.TxValidationError.InvalidRequestSignature
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
@@ -42,7 +42,7 @@ import scala.util.{Failure, Success}
 case class DebugApiRoute(
     ws: WavesSettings,
     time: Time,
-    blockchain: Blockchain with NG,
+    updaterImpl: BlockchainUpdater with NG,
     wallet: Wallet,
     accountsApi: CommonAccountsApi,
     transactionsApi: CommonTransactionsApi,
@@ -117,7 +117,7 @@ case class DebugApiRoute(
   }
 
   def state: Route = (path("state") & get) {
-    distribution(blockchain.height)
+    distribution(updaterImpl.blockchain.height)
   }
 
   def stateWaves: Route = (path("stateWaves" / IntNumber) & get) { height =>
@@ -134,7 +134,7 @@ case class DebugApiRoute(
 
   def rollback: Route = (path("rollback") & withRequestTimeout(15.minutes) & extractScheduler) { implicit sc =>
     jsonPost[RollbackParams] { params =>
-      blockchain.blockHeader(params.rollbackTo) match {
+      updaterImpl.blockchain.blockHeader(params.rollbackTo) match {
         case Some(sh) =>
           rollbackToBlock(sh.id(), params.returnTransactionsToUtx)
         case None =>
@@ -146,7 +146,7 @@ case class DebugApiRoute(
   def info: Route = (path("info") & get) {
     complete(
       Json.obj(
-        "stateHeight"                      -> blockchain.height,
+        "stateHeight"                      -> updaterImpl.blockchain.height,
         "extensionLoaderState"             -> extLoaderStateReporter().toString,
         "historyReplierCacheSizes"         -> Json.toJson(historyReplier.cacheSizes),
         "microBlockSynchronizerCacheSizes" -> Json.toJson(mbsCacheSizesReporter()),
@@ -159,7 +159,7 @@ case class DebugApiRoute(
   def minerInfo: Route = (path("minerInfo") & get) {
     complete(
       wallet.privateKeyAccounts
-        .filterNot(account => blockchain.hasAccountScript(account.toAddress))
+        .filterNot(account => updaterImpl.blockchain.hasAccountScript(account.toAddress))
         .map { account =>
           (account.toAddress, miner.getNextBlockGenerationOffset(account))
         }
@@ -167,10 +167,10 @@ case class DebugApiRoute(
           case (address, Right(offset)) =>
             AccountMiningInfo(
               address.stringRepr,
-              blockchain.effectiveBalance(
+              updaterImpl.blockchain.effectiveBalance(
                 address,
-                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(blockchain.height),
-                blockchain.microblockIds.lastOption
+                ws.blockchainSettings.functionalitySettings.generatingBalanceDepth(updaterImpl.blockchain.height),
+                updaterImpl.blockchain.height
               ),
               System.currentTimeMillis() + offset.toMillis
             )
@@ -226,7 +226,7 @@ case class DebugApiRoute(
       val t0 = System.nanoTime
       val tracedDiff = for {
         tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-        ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
+        ei <- TransactionDiffer(updaterImpl.blockchain.lastBlockTimestamp, time.correctedTime())(updaterImpl.blockchain, tx)
       } yield ei
       val timeSpent = (System.nanoTime - t0) * 1e-6
       val response = Json.obj(

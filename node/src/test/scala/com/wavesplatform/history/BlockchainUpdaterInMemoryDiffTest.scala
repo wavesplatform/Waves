@@ -40,13 +40,13 @@ class BlockchainUpdaterInMemoryDiffTest
         val mastersBalanceAfterPayment1 = domain.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
-        domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
+        domain.blockchain.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
         domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
 
-        domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
+        domain.blockchain.height shouldBe MaxTransactionsPerBlockDiff * 2 + 2
 
-        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.balance(genesis.recipient)
+        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchain.balance(genesis.recipient)
         mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }
@@ -62,16 +62,16 @@ class BlockchainUpdaterInMemoryDiffTest
         firstBlocks.foreach(b => domain.blockchainUpdater.processBlock(b).explicitGet())
         domain.blockchainUpdater.processBlock(payment1Block).explicitGet()
         domain.blockchainUpdater.processBlock(emptyBlock).explicitGet()
-        val mastersBalanceAfterPayment1 = domain.blockchainUpdater.balance(genesis.recipient)
+        val mastersBalanceAfterPayment1 = domain.blockchain.balance(genesis.recipient)
         mastersBalanceAfterPayment1 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee)
 
         // discard liquid block
         domain.blockchainUpdater.removeAfter(payment1Block.id())
         domain.blockchainUpdater.processBlock(blockTriggersCompaction).explicitGet()
 
-        domain.blockchainUpdater.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
+        domain.blockchain.height shouldBe MaxTransactionsPerBlockDiff * 2 + 1
 
-        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchainUpdater.balance(genesis.recipient)
+        val mastersBalanceAfterPayment1AndPayment2 = domain.blockchain.balance(genesis.recipient)
         mastersBalanceAfterPayment1AndPayment2 shouldBe (ENOUGH_AMT - payment1.amount - payment1.fee - payment2.amount - payment2.fee)
     }
   }

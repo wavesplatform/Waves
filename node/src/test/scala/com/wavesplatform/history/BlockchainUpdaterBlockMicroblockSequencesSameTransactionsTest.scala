@@ -31,13 +31,13 @@ class BlockchainUpdaterBlockMicroblockSequencesSameTransactionsTest
         val finalMinerBalances = rest.map {
           case (bmb: BlockAndMicroblockSequence, last: Block) =>
             withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-              d.blockchainUpdater.processBlock(gen).explicitGet()
+              d.appendBlock(gen)
               bmb.foreach {
                 case (b, mbs) =>
-                  d.blockchainUpdater.processBlock(b).explicitGet()
+                  d.appendBlock(b)
                   mbs.foreach(mb => d.blockchainUpdater.processMicroBlock(mb).explicitGet())
               }
-              d.blockchainUpdater.processBlock(last)
+              d.appendBlock(last)
               d.balance(last.header.generator.toAddress)
             }
         }

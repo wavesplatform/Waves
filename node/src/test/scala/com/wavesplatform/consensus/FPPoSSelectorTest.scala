@@ -16,7 +16,7 @@ import com.wavesplatform.settings.{WavesSettings, _}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils.TestLevelDB
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction}
+import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{TestHelpers, TransactionGen, WithDB, crypto}
 import org.iq80.leveldb.Options
@@ -40,7 +40,8 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     "same on the same height in different forks" in forAll(generationSignatureMethods) {
       case (_, blockVersion: Byte, vrfActivated: Boolean) =>
         withEnv(chainGen(List(ENOUGH_AMT / 2, ENOUGH_AMT / 3), 110, blockVersion), vrfActivated) {
-          case Env(_, blockchain, miners, blocks) =>
+          case e@Env(_, updater, miners, blocks) =>
+            val blockchain = e.blockchain
             val miner1 = miners.head
             val miner2 = miners.tail.head
 
@@ -270,7 +271,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
-    val pos       = new PoSSelector(bcu, settings.blockchainSettings, settings.synchronizationSettings)
+    val pos       = new PoSSelector(bcu.blockchain, settings.blockchainSettings, settings.synchronizationSettings)
     try {
       val (accounts, blocks) = gen(ntpTime).sample.get
 
@@ -278,7 +279,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
         bcu.processBlock(block, block.header.generationSignature.take(Block.HitSourceLength)).explicitGet()
       }
 
-      f(Env(pos, bcu, accounts, blocks))
+      f(Env(pos, bcu.blockchain, accounts, blocks))
       bcu.shutdown()
     } finally {
       bcu.shutdown()
@@ -298,7 +299,7 @@ object FPPoSSelectorTest {
     }
   }
 
-  final case class Env(pos: PoSSelector, blockchain: Blockchain with BlockchainUpdater, miners: Seq[KeyPair], blocks: Seq[Block])
+  final case class Env(pos: PoSSelector, blockchain: Blockchain, miners: Seq[KeyPair], blocks: Seq[Block])
 
   def produce(errorMessage: String): ProduceError = new ProduceError(errorMessage)
 

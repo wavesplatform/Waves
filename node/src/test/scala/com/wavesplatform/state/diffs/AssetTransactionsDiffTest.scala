@@ -405,7 +405,7 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueUpdateWithSecondAsset) {
       case (gen, Seq(issue, issue1), signer, update1) =>
         withDomain(domainSettingsWithFS(assetInfoUpdateEnabled.copy(minAssetInfoUpdateInterval = 0))) { d =>
-          val blockchain   = d.blockchainUpdater
+          val blockchain   = d.blockchain
           val genesisBlock = TestBlock.create(gen :+ issue :+ issue1)
           d.appendBlock(genesisBlock)
 

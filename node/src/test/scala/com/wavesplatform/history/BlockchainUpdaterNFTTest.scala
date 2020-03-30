@@ -5,7 +5,6 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
@@ -33,9 +32,9 @@ class BlockchainUpdaterNFTTest
     forAll(Preconditions.nftTransfer()) {
       case (issue, Seq(firstAccount, secondAccount), Seq(genesisBlock, issueBlock, keyBlock, postBlock), Seq(microBlock)) =>
         withDomain(settingsWithFeatures(BlockchainFeatures.NG, BlockchainFeatures.ReduceNFTFee)) { d =>
-          d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.appendBlock(genesisBlock)
+          d.appendBlock(issueBlock)
+          d.appendBlock(keyBlock)
 
           d.nftList(firstAccount).map(_._1.id) shouldBe Seq(issue.id())
           d.nftList(secondAccount) shouldBe Nil
@@ -44,7 +43,7 @@ class BlockchainUpdaterNFTTest
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
 
-          d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
+          d.appendBlock(postBlock)
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
         }
@@ -62,18 +61,18 @@ class BlockchainUpdaterNFTTest
             BlockchainFeatures.Ride4DApps
           )
         ) { d =>
-          d.blockchainUpdater.processBlock(genesisBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(issueBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.appendBlock(genesisBlock)
+          d.appendBlock(issueBlock)
+          d.appendBlock(keyBlock)
 
           d.nftList(firstAccount).map(_._1.id) shouldBe Seq(issue.id())
           d.nftList(secondAccount) shouldBe Nil
 
-          d.blockchainUpdater.processMicroBlock(microBlock) shouldBe 'right
+          d.appendMicroBlock(microBlock)
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
 
-          d.blockchainUpdater.processBlock(postBlock) shouldBe 'right
+          d.appendBlock(postBlock)
           d.nftList(firstAccount) shouldBe Nil
           d.nftList(secondAccount).map(_._1.id) shouldBe Seq(issue.id())
         }

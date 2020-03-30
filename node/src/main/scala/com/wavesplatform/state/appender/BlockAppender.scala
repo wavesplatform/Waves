@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network._
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.{BlockAppendError, GenericError, InvalidSignature}
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -23,7 +22,7 @@ import scala.util.control.NonFatal
 
 object BlockAppender extends ScorexLogging {
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      updater: BlockchainUpdater,
       time: Time,
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
@@ -32,9 +31,9 @@ object BlockAppender extends ScorexLogging {
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
       metrics.blockProcessingTimeStats.measureSuccessful {
-        if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-          appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-        else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
+        if (updater.isLastBlockId(newBlock.header.reference))
+          appendBlock(updater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(updater.blockchain.score))
+        else if (updater.isLastBlockId(newBlock.id()) || updater.blockchain.contains(newBlock.id()))
           Right(None)
         else
           Left(BlockAppendError("Block is not a child of the last block", newBlock))
@@ -42,7 +41,7 @@ object BlockAppender extends ScorexLogging {
     }.executeOn(scheduler)
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater,
       time: Time,
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
@@ -57,15 +56,15 @@ object BlockAppender extends ScorexLogging {
     val append =
       (for {
         _ <- EitherT(Task(metrics.blockSignaturesValidation.measureSuccessful {
-        Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))
-      }))
+          Either.cond(newBlock.signatureValid(), (), GenericError("Invalid block signature"))
+        }))
         validApplication <- EitherT(apply(blockchainUpdater, time, utxStorage, pos, scheduler)(newBlock))
       } yield validApplication).value
 
     val handle = append.asyncBoundary.map {
       case Right(None) => // block already appended
       case Right(Some(_)) =>
-        BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.height)
+        BlockStats.applied(newBlock, BlockStats.Source.Broadcast, blockchainUpdater.blockchain.height)
         log.debug(s"${id(ch)} Appended $newBlock")
         if (newBlock.transactionData.isEmpty)
           allChannels.broadcast(BlockForged(newBlock), Some(ch))

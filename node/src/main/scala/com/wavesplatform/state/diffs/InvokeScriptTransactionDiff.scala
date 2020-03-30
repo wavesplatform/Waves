@@ -367,7 +367,7 @@ object InvokeScriptTransactionDiff {
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
         case TracedResult(Right(curDiff), _) =>
-          val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
+          val blockchain   = CompositeBlockchain(sblockchain, curDiff)
           val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
@@ -445,7 +445,7 @@ object InvokeScriptTransactionDiff {
                   script =>
                     Diff(
                       tx = itx,
-                      portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                      portfolios = Map(pk.toAddress -> Portfolio(assets = Map(asset -> issue.quantity))),
                       issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
                       assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
                     )

@@ -72,6 +72,17 @@ case class Block(
 }
 
 object Block extends ScorexLogging {
+  implicit class BlockExt(val b: Block) extends AnyVal {
+    def appendTransactions(transactions: Seq[Transaction], newSignature: ByteStr): Block = {
+      val newTransactionData = b.transactionData ++ transactions
+      b.copy(
+        signature = newSignature,
+        transactionData = newTransactionData,
+        header = b.header.copy(transactionsRoot = mkTransactionsRoot(b.header.version, newTransactionData))
+      )
+    }
+  }
+
   def idFromHeader(h: BlockHeader, signature: ByteStr): ByteStr =
     if (h.version >= ProtoBlockVersion) protoHeaderHash(h)
     else signature

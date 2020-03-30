@@ -94,7 +94,7 @@ class CustomJsonMarshallerSpec
     (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
     (blockchain.blockReward _).expects(*).returning(Some(1000)).twice()
     (blockchain.wavesAmount _).expects(*).returning(BigInt(10000000)).twice()
-    (blockchain.blockRewardVotes _).expects(1000).returning(Seq(100L)).twice()
+    (blockchain.blockRewardVotes _).expects().returning(Seq(100L)).twice()
 
     checkRoute(Get("/blockchain/rewards/1000"), rewardRoute, "totalWavesAmount", "currentReward", "minIncrement")
   }

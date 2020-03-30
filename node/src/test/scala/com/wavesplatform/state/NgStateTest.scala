@@ -1,5 +1,6 @@
 package com.wavesplatform.state
 
+import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.history._
 import com.wavesplatform.state.diffs._
@@ -11,6 +12,8 @@ import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class NgStateTest extends PropSpec with PropertyChecks with Matchers with TransactionGen with NoShrink {
+
+  private def mkNg(block: Block) = NgState.KeyBlock(Diff.empty, block, 0, 0, Set.empty, None, block.header.generationSignature, Map.empty)
 
   def preconditionsAndPayments(amt: Int): Gen[(GenesisTransaction, Seq[TransferTransaction])] =
     for {
@@ -25,16 +28,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
     forAll(preconditionsAndPayments(10)) {
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
-
-        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
+        val ng = mkNg(block)
         microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L, 0L))
-
-        ng.totalDiffOf(microBlocks.last.totalResBlockSig)
         microBlocks.foreach { m =>
-          val (forged, _, _, _, _) = ng.totalDiffOf(m.totalResBlockSig).get
-          forged.signatureValid() shouldBe true
+          ng.forId(m.totalResBlockSig).get.totalBlock.signatureValid() shouldBe true
         }
-        Seq(microBlocks(4)).map(x => ng.totalDiffOf(x.totalResBlockSig))
+        Seq(microBlocks(4)).map(x => ng.contains(x.totalBlockId) shouldBe true)
     }
   }
 
@@ -43,12 +42,12 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
+        val ng = mkNg(block)
         microBlocks.foreach(m => ng.append(m, Diff.empty, 0L, 0L, 0L))
 
-        ng.bestLiquidBlock.id() shouldBe microBlocks.last.totalResBlockSig
+        ng.totalBlock.id() shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, 0L, 0L, Set.empty, Some(0), block.header.generationSignature, Map.empty).bestLiquidBlock.id() shouldBe block.id()
+        mkNg(block).block.id() shouldBe block.id()
     }
   }
 
@@ -57,7 +56,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
+        val ng = mkNg(block)
 
         microBlocks.foldLeft(1000) {
           case (thisTime, m) =>
@@ -70,7 +69,7 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
         ng.bestLastBlockInfo(1051).blockId shouldBe microBlocks.tail.head.totalResBlockSig
         ng.bestLastBlockInfo(2000).blockId shouldBe microBlocks.last.totalResBlockSig
 
-        new NgState(block, Diff.empty, 0L, 0L, Set.empty, Some(0), block.header.generationSignature, Map.empty).bestLiquidBlock.id() shouldBe block.id()
+        mkNg(block).block.id() shouldBe block.id()
     }
   }
 
@@ -79,16 +78,16 @@ class NgStateTest extends PropSpec with PropertyChecks with Matchers with Transa
       case (genesis, payments) =>
         val (block, microBlocks) = chainBaseAndMicro(randomSig, genesis, payments.map(t => Seq(t)))
 
-        val ng = new NgState(block, Diff.empty, 0L, 0L, Set.empty, None, block.header.generationSignature, Map.empty)
+        val ng = mkNg(block)
         microBlocks.foreach(m => ng.append(m, Diff.empty, 1L, 0L, 0L))
 
-        ng.totalDiffOf(block.id()).map(_._3) shouldBe Some(0L)
+        ng.forId(block.id()).map(_.carry) shouldBe Some(0L)
         microBlocks.zipWithIndex.foreach {
           case (m, i) =>
-            val u = ng.totalDiffOf(m.totalResBlockSig).map(_._3)
+            val u = ng.forId(m.totalResBlockSig).map(_.carry)
             u shouldBe Some(i + 1)
         }
-        ng.carryFee shouldBe microBlocks.size
+        ng.carry shouldBe microBlocks.size
     }
   }
 }

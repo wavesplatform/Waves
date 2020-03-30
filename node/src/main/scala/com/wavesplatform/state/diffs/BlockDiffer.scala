@@ -74,7 +74,7 @@ object BlockDiffer extends ScorexLogging {
     for {
       _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       r <- apply(
-        CompositeBlockchain(blockchain, newBlock = Some(block)),
+        CompositeBlockchain(blockchain, Diff.empty, Some(block)),
         constraint,
         maybePrevBlock.map(_.header.timestamp),
         Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))),
@@ -155,7 +155,7 @@ object BlockDiffer extends ScorexLogging {
       .foldLeft(TracedResult(Result(initDiff, 0L, 0L, initConstraint, DetailedDiff(initDiff, Seq.empty)).asRight[ValidationError])) {
         case (acc @ TracedResult(Left(_), _), _) => acc
         case (TracedResult(Right(Result(currDiff, carryFee, currTotalFee, currConstraint, DetailedDiff(parentDiff, txDiffs))), _), tx) =>
-          val currBlockchain = CompositeBlockchain(blockchain, Some(currDiff))
+          val currBlockchain = CompositeBlockchain(blockchain, currDiff)
           txDiffer(currBlockchain, tx).flatMap { thisTxDiff =>
             val updatedConstraint = updateConstraint(currConstraint, currBlockchain, tx, thisTxDiff)
             if (updatedConstraint.isOverfilled)
@@ -193,7 +193,7 @@ object BlockDiffer extends ScorexLogging {
         final case class Patch(predicate: Blockchain => Boolean, patch: Blockchain => Diff)
         def applyAll(patches: Patch*) = patches.foldLeft((result.diff, result.detailedDiff.parentDiff)) {
           case (r @ (previousDiff, previousPatchDiff), p) =>
-            val currentBlockchain = CompositeBlockchain(blockchain, Some(previousDiff))
+            val currentBlockchain = CompositeBlockchain(blockchain, previousDiff)
             if (p.predicate(currentBlockchain)) {
               val patchDiff = p.patch(currentBlockchain)
               (Monoid.combine(previousDiff, patchDiff), Monoid.combine(previousPatchDiff, patchDiff))

@@ -52,7 +52,7 @@ package object appender extends ScorexLogging {
   }
 
   private[appender] def appendBlock(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater,
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
       time: Time,
@@ -67,29 +67,31 @@ package object appender extends ScorexLogging {
   }
 
   private[appender] def validateAndAppendBlock(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater,
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
       time: Time
-  )(block: Block): Either[ValidationError, Option[Int]] =
+  )(block: Block): Either[ValidationError, Option[Int]] = {
+    val currentBlockchain = blockchainUpdater.blockchain(block.header.reference)
     for {
       _ <- Either.cond(
-        !blockchainUpdater.hasAccountScript(block.sender),
+        !currentBlockchain.hasAccountScript(block.sender),
         (),
         BlockAppendError(s"Account(${block.sender.toAddress}) is scripted are therefore not allowed to forge blocks", block)
       )
-      hitSource <- blockConsensusValidation(blockchainUpdater, pos, time.correctedTime(), block) { (height, parent) =>
-        val balance = blockchainUpdater.generatingBalance(block.sender, Some(parent))
+      hitSource <- blockConsensusValidation(currentBlockchain, pos, time.correctedTime(), block) { (height, _) =>
+        val balance = currentBlockchain.generatingBalance(block.sender)
         Either.cond(
-          blockchainUpdater.isEffectiveBalanceValid(height, block, balance),
+          currentBlockchain.isEffectiveBalanceValid(height, block, balance),
           balance,
           s"generator's effective balance $balance is less that required for generation"
         )
       }
       baseHeight <- appendBlock(blockchainUpdater, utxStorage, verify = true)(block, hitSource)
     } yield baseHeight
+  }
 
-  private def appendBlock(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPoolImpl, verify: Boolean)(
+  private def appendBlock(blockchainUpdater: BlockchainUpdater, utxStorage: UtxPoolImpl, verify: Boolean)(
       block: Block,
       hitSource: ByteStr
   ): Either[ValidationError, Option[Int]] =
@@ -97,7 +99,7 @@ package object appender extends ScorexLogging {
       metrics.utxRemoveAll.measure(utxStorage.removeAll(block.transactionData))
       maybeDiscardedTxs.map { discarded =>
         metrics.utxDiscardedPut.measure(utxStorage.addAndCleanup(discarded))
-        blockchainUpdater.height
+        blockchainUpdater.blockchain.height
       }
     }
 
@@ -110,17 +112,17 @@ package object appender extends ScorexLogging {
         val blockTime = block.header.timestamp
 
         for {
-          height <- blockchain
+          parentBlockHeight <- blockchain
             .heightOf(block.header.reference)
             .toRight(GenericError(s"height: history does not contain parent ${block.header.reference}"))
           parent <- blockchain.parentHeader(block.header).toRight(GenericError(s"parent: history does not contain parent ${block.header.reference}"))
           grandParent = blockchain.parentHeader(parent, 2)
-          effectiveBalance <- genBalance(height, block.header.reference).left.map(GenericError(_))
-          _                <- validateBlockVersion(height, block, blockchain)
+          effectiveBalance <- genBalance(parentBlockHeight, block.header.reference).left.map(GenericError(_))
+          _                <- validateBlockVersion(parentBlockHeight, block, blockchain)
           _                <- Either.cond(blockTime - currentTs < MaxTimeDrift, (), BlockFromFuture(blockTime))
-          _                <- pos.validateBaseTarget(height, block, parent, grandParent)
+          _                <- pos.validateBaseTarget(parentBlockHeight, block, parent, grandParent)
           hitSource        <- pos.validateGenerationSignature(block)
-          _                <- pos.validateBlockDelay(height, block.header, parent, effectiveBalance).orElse(checkExceptions(height, block))
+          _                <- pos.validateBlockDelay(parentBlockHeight, block.header, parent, effectiveBalance).orElse(checkExceptions(parentBlockHeight, block))
         } yield hitSource
       }
       .left
@@ -129,22 +131,19 @@ package object appender extends ScorexLogging {
         case x               => x
       }
 
-  private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] = {
-    Either
-      .cond(
-        exceptions.contains((height, block.id())),
-        (),
-        GenericError(s"Block time ${block.header.timestamp} less than expected")
-      )
-  }
+  private def checkExceptions(height: Int, block: Block): Either[ValidationError, Unit] =
+    Either.cond(
+      exceptions.contains((height, block.id())),
+      (),
+      GenericError(s"Block time ${block.header.timestamp} less than expected")
+    )
 
-  private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] = {
+  private def validateBlockVersion(parentHeight: Int, block: Block, blockchain: Blockchain): Either[ValidationError, Unit] =
     Either.cond(
       blockchain.blockVersionAt(parentHeight + 1) == block.header.version,
       (),
       GenericError(s"Block version should be equal to ${blockchain.blockVersionAt(parentHeight + 1)}")
     )
-  }
 
   private[this] object metrics {
     val blockConsensusValidation = Kamon.timer("block-appender.block-consensus-validation")

@@ -250,7 +250,7 @@ class LevelDBWriterSpec
 
       def blockAt(height: Int): Option[Block] =
         bcu.liquidBlockMeta
-          .filter(_ => bcu.height == height)
+          .filter(_ => bcu.blockchain.height == height)
           .flatMap(m => bcu.liquidBlock(m.id))
           .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
 

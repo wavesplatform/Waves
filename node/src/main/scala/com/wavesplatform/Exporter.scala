@@ -45,8 +45,8 @@ object Exporter extends ScorexLogging {
 
         val time             = new NTP(settings.ntpServer)
         val db               = openDB(settings.dbSettings.directory)
-        val (blockchain, _)  = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
-        val blockchainHeight = blockchain.height
+        val (updater, _)  = StorageFactory(settings, db, time, Observer.empty, BlockchainUpdateTriggers.noop)
+        val blockchainHeight = updater.blockchain.height
         val height           = Math.min(blockchainHeight, exportHeight.getOrElse(blockchainHeight))
         log.info(s"Blockchain height is $blockchainHeight exporting to $height")
         val outputFilename = s"$outputFileNamePrefix-$height"

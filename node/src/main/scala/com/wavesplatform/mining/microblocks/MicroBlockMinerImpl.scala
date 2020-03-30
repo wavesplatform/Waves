@@ -5,33 +5,30 @@ import cats.implicits._
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
-import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.microblocks.MicroBlockMinerImpl._
 import com.wavesplatform.mining.{MinerDebugInfo, MiningConstraint, MiningConstraints, MultiDimensionalMiningConstraint}
 import com.wavesplatform.network.{MicroBlockInv, _}
 import com.wavesplatform.settings.MinerSettings
-import com.wavesplatform.state.Blockchain
-import com.wavesplatform.state.appender.MicroblockAppender
-import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import kamon.metric.TimerMetric
 import monix.eval.Task
-import monix.execution.schedulers.SchedulerService
+import monix.execution.Scheduler
 
 import scala.concurrent.duration._
 
 class MicroBlockMinerImpl(
     debugState: Ref[Task, MinerDebugInfo.State],
     allChannels: ChannelGroup,
-    blockchainUpdater: BlockchainUpdater with Blockchain,
+    appendMicroBlockTask: MicroBlock => Task[Either[ValidationError, BlockId]],
     utx: UtxPool,
     settings: MinerSettings,
-    minerScheduler: SchedulerService,
-    appenderScheduler: SchedulerService
+    minerScheduler: Scheduler
 ) extends MicroBlockMiner
     with ScorexLogging {
 
@@ -110,7 +107,7 @@ class MicroBlockMinerImpl(
     Task(allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
-    MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock)
+    appendMicroBlockTask(microBlock)
       .flatMap {
         case Left(err) => Task.raiseError(MicroBlockAppendError(microBlock, err))
         case Right(v)  => Task.now(v)
@@ -125,7 +122,7 @@ class MicroBlockMinerImpl(
       for {
         signedBlock <- Block
           .buildAndSign(
-            version = blockchainUpdater.currentBlockVersion,
+            version = accumulatedBlock.header.version,
             timestamp = accumulatedBlock.header.timestamp,
             reference = accumulatedBlock.header.reference,
             baseTarget = accumulatedBlock.header.baseTarget,

@@ -142,7 +142,8 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
         {
           domain.blockchainUpdater.processBlock(block0) shouldBe 'right
-          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee)
+
+          domain.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) should contain(block0TotalFee)
         }
 
         {
@@ -151,10 +152,10 @@ class BlockchainUpdaterSponsoredFeeBlockTest
 
           val microBlocksWavesFee = microBlocks
             .flatMap(_.transactionData)
-            .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchainUpdater.assetDescription(ai).map(_.sponsorship)))
+            .map(tx => Sponsorship.calcWavesFeeAmount(tx, ai => domain.blockchain.assetDescription(ai).map(_.sponsorship)))
             .sum
 
-          domain.blockchainUpdater.bestLiquidDiffAndFees.map(_._3) should contain(block0TotalFee + microBlocksWavesFee)
+          domain.blockchainUpdater.liquidBlockMeta.map(_.totalFeeInWaves) should contain(block0TotalFee + microBlocksWavesFee)
         }
     }
   }

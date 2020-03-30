@@ -23,14 +23,14 @@ trait WithBlockchain extends BeforeAndAfterEach with BeforeAndAfterAll with NTPT
     BlockchainUpdateTriggers.noop
   )
 
-  protected def blockchain: Blockchain = bcu
+  protected def blockchain: Blockchain = bcu.blockchain
 
   /**
     * Override this method to do some initialization actions with
     * the blockchain before it becomes read-only
     * @param blockchainUpdater a blockchain to add something to (genesis, some blocks, etc.)
     */
-  protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = ()
+  protected def initBlockchain(blockchainUpdater: BlockchainUpdater): Unit = ()
 
   override protected def beforeAll(): Unit = {
     initBlockchain(bcu)

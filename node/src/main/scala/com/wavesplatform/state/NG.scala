@@ -9,5 +9,5 @@ trait NG {
 
   def bestLastBlockInfo(maxTimestamp: Long): Option[BlockMinerInfo]
 
-  def microblockIds: Seq[BlockId]
+  def microBlockIds: Seq[BlockId]
 }

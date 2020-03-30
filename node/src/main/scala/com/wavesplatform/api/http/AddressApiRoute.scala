@@ -237,7 +237,7 @@ case class AddressApiRoute(
       val balances = for {
         addressStr <- addresses.toSet[String]
         address    <- Address.fromString(addressStr).toOption
-      } yield blockchain.balanceOnlySnapshots(address, height, assetId).map(addressStr -> _._2).getOrElse(addressStr -> 0L)
+      } yield blockchain.balanceAtHeight(address, height, assetId).map(addressStr -> _._2).getOrElse(addressStr -> 0L)
 
       ToResponseMarshallable(balances)
     }

@@ -35,12 +35,12 @@ case object EmptyBlockchain extends Blockchain {
 
   override def activatedFeatures: Map[Short, Int] = Map.empty
 
-  override def featureVotes(height: Int): Map[Short, Int] = Map.empty
+  override def featureVotes: Map[Short, Int] = Map.empty
 
   /** Block reward related */
   override def blockReward(height: Int): Option[Long] = None
 
-  override def blockRewardVotes(height: Int): Seq[Long] = Seq.empty
+  override def blockRewardVotes: Seq[Long] = Seq.empty
 
   override def wavesAmount(height: Int): BigInt = 0
 
@@ -61,8 +61,8 @@ case object EmptyBlockchain extends Blockchain {
   override def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee = VolumeAndFee(0, 0)
 
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  override def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
-  override def balanceSnapshots(address: Address, from: Int, to: Option[ByteStr]): Seq[BalanceSnapshot]         = Seq.empty
+  override def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)] = Option.empty
+  override def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot]                = Seq.empty
 
   override def accountScript(address: Address): Option[AccountScriptInfo] = None
 

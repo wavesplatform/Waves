@@ -112,7 +112,7 @@ trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
     }
 
     val BlockDiffer.Result(diff, fees, totalFee, _, _) = differ(state, preconditions.lastOption, block).explicitGet()
-    val cb                                             = CompositeBlockchain(state, Some(diff))
+    val cb                                             = CompositeBlockchain(state, diff)
     assertion(diff, cb)
 
     state.append(diff, fees, totalFee, None, block.header.generationSignature, block)

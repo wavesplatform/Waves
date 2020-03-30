@@ -12,33 +12,28 @@ case class RewardApiRoute(blockchain: Blockchain) extends ApiRoute {
   import RewardApiRoute._
 
   override lazy val route: Route = pathPrefix("blockchain" / "rewards") {
-    rewards ~ rewardsAtHeight()
+    rewards()
   }
 
   def rewards(): Route = (get & pathEndOrSingleSlash) {
-    complete(getRewards(blockchain.height))
+    complete(loadRewards())
   }
 
-  def rewardsAtHeight(): Route = (get & path(IntNumber)) { height =>
-    complete(getRewards(height))
-  }
-
-  def getRewards(height: Int): Either[ValidationError, RewardStatus] =
+  def loadRewards(): Either[ValidationError, RewardStatus] =
     for {
-      _ <- Either.cond(height <= blockchain.height, (), GenericError(s"Invalid height: $height"))
       activatedAt <- blockchain
         .featureActivationHeight(BlockchainFeatures.BlockReward.id)
-        .filter(_ <= height)
+        .filter(_ <= blockchain.height)
         .toRight(GenericError("Block reward feature is not activated yet"))
-      reward <- blockchain.blockReward(height).toRight(GenericError(s"No information about rewards at height = $height"))
-      amount              = blockchain.wavesAmount(height)
+      reward <- blockchain.blockReward(blockchain.height).toRight(GenericError(s"No information about rewards at height = ${blockchain.height}"))
+      amount              = blockchain.wavesAmount(blockchain.height)
       settings            = blockchain.settings.rewardsSettings
-      nextCheck           = settings.nearestTermEnd(activatedAt, height)
+      nextCheck           = settings.nearestTermEnd(activatedAt, blockchain.height)
       votingIntervalStart = nextCheck - settings.votingInterval + 1
       votingThreshold     = settings.votingInterval / 2 + 1
-      votes               = blockchain.blockRewardVotes(height).filter(_ >= 0)
+      votes               = blockchain.blockRewardVotes.filter(_ >= 0)
     } yield RewardStatus(
-      height,
+      blockchain.height,
       amount,
       reward,
       settings.minIncrement,

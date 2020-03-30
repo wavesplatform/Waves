@@ -16,7 +16,9 @@ import org.iq80.leveldb.DB
 
 case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWriter: LevelDBWriter) {
   import Domain._
-  def effBalance(a: Address): Long = blockchainUpdater.effectiveBalance(a, 1000)
+  val blockchain: Blockchain = blockchainUpdater.blockchain
+
+  def effBalance(a: Address): Long = blockchain.effectiveBalance(a, 1000)
 
   def appendBlock(b: Block): Option[DiscardedTransactions] = blockchainUpdater.processBlock(b).explicitGet()
 
@@ -24,16 +26,16 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
 
   def appendMicroBlock(b: MicroBlock): BlockId = blockchainUpdater.processMicroBlock(b).explicitGet()
 
-  def lastBlockId: ByteStr = blockchainUpdater.lastBlockId.get
+  def lastBlockId: ByteStr = blockchain.lastBlockId.get
 
-  def carryFee: Long = blockchainUpdater.carryFee
+  def carryFee: Long = blockchain.carryFee
 
-  def balance(address: Address): Long               = blockchainUpdater.balance(address)
-  def balance(address: Address, asset: Asset): Long = blockchainUpdater.balance(address, asset)
+  def balance(address: Address): Long               = blockchain.balance(address)
+  def balance(address: Address, asset: Asset): Long = blockchain.balance(address, asset)
 
   def nftList(address: Address): Seq[(IssuedAsset, AssetDescription)] = db.withResource { resource =>
     AddressPortfolio
-      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, None, blockchainUpdater.assetDescription)
+      .nftIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, None, blockchain.assetDescription)
       .toSeq
   }
 
@@ -41,7 +43,7 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
     AddressTransactions
       .allAddressTransactions(
         resource,
-        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchainUpdater.height) -> diff),
+        blockchainUpdater.bestLiquidDiff.map(diff => Height(blockchain.height) -> diff),
         address,
         None,
         Set.empty,
@@ -62,7 +64,12 @@ object Domain {
 
   def portfolio(address: Address, db: DB, blockchainUpdater: BlockchainUpdaterImpl): Seq[(IssuedAsset, Long)] = db.withResource { resource =>
     AddressPortfolio
-      .assetBalanceIterator(resource, address, blockchainUpdater.bestLiquidDiff.orEmpty, id => blockchainUpdater.assetDescription(id).exists(!_.nft))
+      .assetBalanceIterator(
+        resource,
+        address,
+        blockchainUpdater.bestLiquidDiff.orEmpty,
+        id => blockchainUpdater.blockchain.assetDescription(id).exists(!_.nft)
+      )
       .toSeq
   }
 }

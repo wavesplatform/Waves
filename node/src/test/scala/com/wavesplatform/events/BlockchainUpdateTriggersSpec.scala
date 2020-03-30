@@ -10,8 +10,8 @@ import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.protobuf.utils.PBImplicitConversions.PBByteStringOps
 import com.wavesplatform.settings.{Constants, WavesSettings}
+import com.wavesplatform.state.Diff
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, Diff}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
@@ -35,7 +35,8 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
     Seq(GenesisTransaction.create(master, initialAmount, 0).explicitGet(), GenesisTransaction.create(rich, initialAmount, 0).explicitGet()),
     master
   )
-  override protected def initBlockchain(blockchainUpdater: Blockchain with BlockchainUpdater): Unit = {
+
+  override protected def initBlockchain(blockchainUpdater: BlockchainUpdater): Unit = {
     blockchainUpdater.processBlock(genesis).explicitGet()
     super.initBlockchain(blockchainUpdater)
   }
@@ -237,8 +238,12 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
             val scriptUpd = upds.last.assets.head
 
             scriptUpd shouldBe issueUpd.copy(
-              script =
-                setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator, useContractVerifierLimit = false).explicitGet()),
+              script = setAssetScript.script.map(
+                s =>
+                  s -> Script
+                    .estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator, useContractVerifierLimit = false)
+                    .explicitGet()
+              ),
               assetExistedBefore = !issueUpd.assetExistedBefore
             )
           }

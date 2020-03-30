@@ -10,17 +10,16 @@ import com.wavesplatform.state.Blockchain
 case class MiningConstraints(total: MiningConstraint, keyBlock: MiningConstraint, micro: MiningConstraint)
 
 object MiningConstraints {
-  val MaxScriptRunsInBlock = 100
+  val MaxScriptRunsInBlock        = 100
   val MaxScriptsComplexityInBlock = 1000000
-  val ClassicAmountOfTxsInBlock = 100
-  val MaxTxsSizeInBytes = 1 * 1024 * 1024 // 1 megabyte
+  val ClassicAmountOfTxsInBlock   = 100
+  val MaxTxsSizeInBytes           = 1 * 1024 * 1024 // 1 megabyte
 
-  def apply(blockchain: Blockchain, height: Int, minerSettings: Option[MinerSettings] = None): MiningConstraints = {
-    val activatedFeatures     = blockchain.activatedFeaturesAt(height)
-    val isNgEnabled           = activatedFeatures.contains(BlockchainFeatures.NG.id)
-    val isMassTransferEnabled = activatedFeatures.contains(BlockchainFeatures.MassTransfer.id)
-    val isScriptEnabled       = activatedFeatures.contains(BlockchainFeatures.SmartAccounts.id)
-    val isDAppsEnabled        = activatedFeatures.contains(BlockchainFeatures.Ride4DApps.id)
+  def apply(blockchain: Blockchain, minerSettings: Option[MinerSettings] = None): MiningConstraints = {
+    val isNgEnabled           = blockchain.isFeatureActivated(BlockchainFeatures.NG)
+    val isMassTransferEnabled = blockchain.isFeatureActivated(BlockchainFeatures.MassTransfer)
+    val isScriptEnabled       = blockchain.isFeatureActivated(BlockchainFeatures.SmartAccounts)
+    val isDAppsEnabled        = blockchain.isFeatureActivated(BlockchainFeatures.Ride4DApps)
 
     val total: MiningConstraint =
       if (isMassTransferEnabled) OneDimensionalMiningConstraint(MaxTxsSizeInBytes, TxEstimators.sizeInBytes, "MaxTxsSizeInBytes")
@@ -34,10 +33,12 @@ object MiningConstraints {
         if (isDAppsEnabled)
           MultiDimensionalMiningConstraint(
             NonEmptyList
-              .of(OneDimensionalMiningConstraint(MaxScriptsComplexityInBlock, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total))
+              .of(OneDimensionalMiningConstraint(MaxScriptsComplexityInBlock, TxEstimators.scriptsComplexity, "MaxScriptsComplexityInBlock"), total)
+          )
         else if (isScriptEnabled)
           MultiDimensionalMiningConstraint(
-            NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total))
+            NonEmptyList.of(OneDimensionalMiningConstraint(MaxScriptRunsInBlock, TxEstimators.scriptRunNumber, "MaxScriptRunsInBlock"), total)
+          )
         else total,
       keyBlock =
         if (isNgEnabled) OneDimensionalMiningConstraint(0, TxEstimators.one, "MaxTxsInKeyBlock")

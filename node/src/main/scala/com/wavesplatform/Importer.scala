@@ -91,7 +91,7 @@ object Importer extends ScorexLogging {
 
   def initExtensions(
       wavesSettings: WavesSettings,
-      blockchainUpdater: Blockchain with BlockchainUpdater,
+      blockchainUpdater: BlockchainUpdater,
       appenderScheduler: Scheduler,
       time: Time,
       utxPool: UtxPool,
@@ -103,7 +103,7 @@ object Importer extends ScorexLogging {
         val t = time
         new Context {
           override def settings: WavesSettings = wavesSettings
-          override def blockchain: Blockchain  = blockchainUpdater
+          override def blockchain: Blockchain  = blockchainUpdater.blockchain
           override def rollbackTo(blockId: ByteStr): Task[Either[ValidationError, DiscardedBlocks]] =
             Task(blockchainUpdater.removeAfter(blockId)).executeOn(appenderScheduler)
           override def time: Time     = t
@@ -137,18 +137,18 @@ object Importer extends ScorexLogging {
   private val lock = new Object
 
   def startImport(
-      scheduler: Scheduler,
-      bis: BufferedInputStream,
-      blockchainUpdater: Blockchain,
-      appendBlock: AppendBlock,
-      importOptions: ImportOptions
+                   scheduler: Scheduler,
+                   bis: BufferedInputStream,
+                   blockchain: Blockchain,
+                   appendBlock: AppendBlock,
+                   importOptions: ImportOptions
   ): Unit = {
 
     val lenBytes = new Array[Byte](Ints.BYTES)
     val start    = System.currentTimeMillis()
     var counter  = 0
 
-    val startHeight   = blockchainUpdater.height
+    val startHeight   = blockchain.height
     var blocksToSkip  = startHeight - 1
     val blocksToApply = importOptions.importHeight - startHeight + 1
 
@@ -168,7 +168,7 @@ object Importer extends ScorexLogging {
               if (importOptions.format == Formats.Binary) Block.parseBytes(buffer)
               else PBBlocks.vanilla(PBBlocks.addChainId(protobuf.block.PBBlock.parseFrom(buffer)), unsafe = true)
 
-            if (blockchainUpdater.lastBlockId.contains(block.header.reference)) {
+            if (blockchain.lastBlockId.contains(block.header.reference)) {
               Await.result(appendBlock(block).runAsyncLogErr, Duration.Inf) match {
                 case Left(ve) =>
                   log.error(s"Error appending block: $ve")
@@ -207,26 +207,26 @@ object Importer extends ScorexLogging {
     val blockchainUpdated        = PublishSubject[BlockchainUpdated]()
     val blockchainUpdateTriggers = new BlockchainUpdateTriggersImpl(blockchainUpdated)
     val db                       = openDB(settings.dbSettings.directory)
-    val (blockchainUpdater, levelDb) =
+    val (updater, levelDb) =
       StorageFactory(settings, db, time, Observer.empty, blockchainUpdateTriggers)
-    val utxPool     = new UtxPoolImpl(time, blockchainUpdater, PublishSubject(), settings.utxSettings, enablePriorityPool = false)
-    val pos         = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
-    val extAppender = BlockAppender(blockchainUpdater, time, utxPool, pos, scheduler, importOptions.verify) _
+    val utxPool     = new UtxPoolImpl(time, updater.blockchain, PublishSubject(), settings.utxSettings, enablePriorityPool = false)
+    val pos         = new PoSSelector(updater.blockchain, settings.blockchainSettings, settings.synchronizationSettings)
+    val extAppender = BlockAppender(updater, time, utxPool, pos, scheduler, importOptions.verify) _
 
-    checkGenesis(settings, blockchainUpdater)
-    val extensions = initExtensions(settings, blockchainUpdater, scheduler, time, utxPool, blockchainUpdated)
+    checkGenesis(settings, updater)
+    val extensions = initExtensions(settings, updater, scheduler, time, utxPool, blockchainUpdated)
 
     sys.addShutdownHook {
       quit = true
       Await.ready(Future.sequence(extensions.map(_.shutdown())), settings.extensionsShutdownTimeout)
       Await.result(Kamon.stopAllReporters(), 10.seconds)
       lock.synchronized {
-        blockchainUpdater.shutdown()
+        updater.shutdown()
         levelDb.close()
         db.close()
       }
     }
 
-    startImport(scheduler, bis, blockchainUpdater, extAppender, importOptions)
+    startImport(scheduler, bis, updater.blockchain, extAppender, importOptions)
   }
 }

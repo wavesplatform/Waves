@@ -10,14 +10,10 @@ import play.api.libs.json.Json
 
 case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: FeaturesSettings, blockchain: Blockchain) extends ApiRoute {
 
-  override lazy val route: Route = pathPrefix("activation") {
-    status
-  }
-
-  def status: Route = (get & path("status")) {
+  override lazy val route: Route = (get & path("activation" / "status")) {
     val height = blockchain.height
 
-    val featureIds = (blockchain.featureVotes(height).keySet ++
+    val featureIds = (blockchain.featureVotes.keySet ++
       blockchain.approvedFeatures.keySet ++
       BlockchainFeatures.implemented).toSeq.sorted
 
@@ -44,7 +40,7 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
                 case _          => NodeFeatureStatus.Implemented
               },
               blockchain.featureActivationHeight(id),
-              if (status == BlockchainFeatureStatus.Undefined) blockchain.featureVotes(height).get(id).orElse(Some(0)) else None
+              if (status == BlockchainFeatureStatus.Undefined) blockchain.featureVotes.get(id).orElse(Some(0)) else None
             )
           }
         )

@@ -12,11 +12,11 @@ import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.{BlockchainFeature, BlockchainFeatures}
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
+import com.wavesplatform.state.BlockchainUpdaterImpl
 import com.wavesplatform.state.diffs.ENOUGH_AMT
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG}
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Transaction}
+import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import com.wavesplatform.{TransactionGen, WithDB}
@@ -41,16 +41,16 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     withEnv(Seq.empty) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
-        val oldBalance    = blockchain.balance(account)
+        val oldBalance    = blockchain.blockchain.balance(account)
         val newBalance    = oldBalance + 2 * settings.blockchainSettings.rewardsSettings.initial
         for {
           _ <- generateBlock
           _ <- generateBlock
         } yield {
-          blockchain.balance(account) should be(newBalance)
-          blockchain.height should be(3)
-          blockchain.blockHeader(2).get.header.version should be(Block.RewardBlockVersion)
-          blockchain.blockHeader(3).get.header.version should be(Block.RewardBlockVersion)
+          blockchain.blockchain.balance(account) should be(newBalance)
+          blockchain.blockchain.height should be(3)
+          blockchain.blockchain.blockHeader(2).get.header.version should be(Block.RewardBlockVersion)
+          blockchain.blockchain.blockHeader(3).get.header.version should be(Block.RewardBlockVersion)
         }
     }
   }
@@ -59,12 +59,12 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     withEnv(Seq((ts, reference, _) => TestBlock.create(time = ts, ref = reference, txs = Seq.empty, version = Block.NgBlockVersion))) {
       case Env(_, account, miner, blockchain) =>
         val generateBlock = generateBlockTask(miner)(account)
-        val oldBalance    = blockchain.balance(account)
+        val oldBalance    = blockchain.blockchain.balance(account)
         val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial
 
         generateBlock.map { _ =>
-          blockchain.balance(account) should be(newBalance)
-          blockchain.height should be(3)
+          blockchain.blockchain.balance(account) should be(newBalance)
+          blockchain.blockchain.height should be(3)
         }
     }
   }
@@ -94,14 +94,14 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
     )
 
     withEnv(bps, txs) {
-      case Env(_, account, miner, blockchain) =>
+      case Env(_, account, miner, blockchainUpdater) =>
         val generateBlock = generateBlockTask(miner)(account)
-        val oldBalance    = blockchain.balance(account)
+        val oldBalance    = blockchainUpdater.blockchain.balance(account)
         val newBalance    = oldBalance + settings.blockchainSettings.rewardsSettings.initial - 10 * Constants.UnitsInWave
 
         generateBlock.map { _ =>
-          blockchain.balance(account) should be(newBalance)
-          blockchain.height should be(3)
+          blockchainUpdater.blockchain.balance(account) should be(newBalance)
+          blockchainUpdater.blockchain.height should be(3)
         }
     }
 
@@ -120,12 +120,29 @@ class MiningWithRewardSuite extends AsyncFlatSpec with Matchers with WithDB with
       case (blockchainUpdater, _) =>
         for {
           _ <- Task.unit
-          pos          = new PoSSelector(blockchainUpdater, settings.blockchainSettings, settings.synchronizationSettings)
-          utxPool      = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, settings.utxSettings, enablePriorityPool = true)
-          scheduler    = Scheduler.singleThread("appender")
-          allChannels  = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
-          wallet       = Wallet(WalletSettings(None, Some("123"), None))
-          miner        = new MinerImpl(allChannels, blockchainUpdater, settings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+          pos = new PoSSelector(blockchainUpdater.blockchain, settings.blockchainSettings, settings.synchronizationSettings)
+          utxPool = new UtxPoolImpl(
+            ntpTime,
+            blockchainUpdater.blockchain,
+            ignoreSpendableBalanceChanged,
+            settings.utxSettings,
+            enablePriorityPool = true
+          )
+          scheduler   = Scheduler.singleThread("appender")
+          allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
+          wallet      = Wallet(WalletSettings(None, Some("123"), None))
+          miner = new MinerImpl(
+            allChannels,
+            blockchainUpdater.blockchain,
+            _ => None,
+            settings,
+            ntpTime,
+            utxPool,
+            wallet,
+            pos,
+            _ => Task(Right(None)),
+            _ => Task(Right(ByteStr.empty))
+          )(Scheduler.global)
           account      = createAccount
           ts           = ntpTime.correctedTime() - 60000
           genesisBlock = TestBlock.create(ts + 2, List(GenesisTransaction.create(account, ENOUGH_AMT, ts + 1).explicitGet()))
@@ -172,7 +189,7 @@ object MiningWithRewardSuite {
   type BlockProducer       = (Long, ByteStr, KeyPair) => Block
   type TransactionProducer = (Long, KeyPair) => Transaction
 
-  case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: Blockchain with BlockchainUpdater with NG)
+  case class Env(blocks: Seq[Block], account: KeyPair, miner: MinerImpl, blockchain: BlockchainUpdaterImpl)
 
   val settings: WavesSettings = {
     val commonSettings: WavesSettings = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))

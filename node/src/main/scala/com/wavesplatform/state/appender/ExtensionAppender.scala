@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, Metrics}
 import com.wavesplatform.mining.Miner
 import com.wavesplatform.network.{InvalidBlockStorage, PeerDatabase, formatBlocks, id}
-import com.wavesplatform.state._
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
@@ -22,7 +21,7 @@ import scala.util.{Left, Right}
 object ExtensionAppender extends ScorexLogging {
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      updater: BlockchainUpdater,
       utxStorage: UtxPoolImpl,
       pos: PoSSelector,
       time: Time,
@@ -32,82 +31,86 @@ object ExtensionAppender extends ScorexLogging {
       scheduler: Scheduler
   )(ch: Channel, extensionBlocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] = {
     def p(blocks: Seq[Block]): Task[Either[ValidationError, Option[BigInt]]] =
-      Task(blocks
+      Task(
+        blocks
           .collectFirst { case b if !b.signatureValid() => GenericError(s"Block $b has invalid signature") }
-          .toLeft(blocks).flatMap { newBlocks =>
+          .toLeft(blocks)
+          .flatMap { newBlocks =>
+            val extension = newBlocks.dropWhile(updater.blockchain.contains)
 
-        val extension = newBlocks.dropWhile(blockchainUpdater.contains)
+            extension.headOption.map(_.header.reference) match {
+              case Some(lastCommonBlockId) =>
+                val forkApplicationResultEi = Coeval {
+                  extension.view
+                    .map { b =>
+                      b -> validateAndAppendBlock(updater, utxStorage, pos, time)(b).right
+                        .map {
+                          _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+                        }
+                    }
+                    .zipWithIndex
+                    .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
+                    .fold[Either[ValidationError, Unit]](Right(())) {
+                      case (i, declinedBlock, e) =>
+                        e match {
+                          case _: TxValidationError.BlockFromFuture =>
+                          case _                                    => invalidBlocks.add(declinedBlock.id(), e)
+                        }
 
-        extension.headOption.map(_.header.reference) match {
-          case Some(lastCommonBlockId) =>
-            val forkApplicationResultEi = Coeval {
-              extension.view
-                .map { b =>
-                  b -> validateAndAppendBlock(blockchainUpdater, utxStorage, pos, time)(b).right
-                    .map {
-                      _.foreach(bh => BlockStats.applied(b, BlockStats.Source.Ext, bh))
+                        extension.view
+                          .dropWhile(_ != declinedBlock)
+                          .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
+
+                        if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
+                        else
+                          log.warn(
+                            s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e"
+                          )
+
+                        Left(e)
                     }
                 }
-                .zipWithIndex
-                .collectFirst { case ((b, Left(e)), i) => (i, b, e) }
-                .fold[Either[ValidationError, Unit]](Right(())) {
-                  case (i, declinedBlock, e) =>
-                    e match {
-                      case _: TxValidationError.BlockFromFuture =>
-                      case _                                    => invalidBlocks.add(declinedBlock.id(), e)
+
+                val initialHeight = updater.blockchain.height
+
+                val droppedBlocksEi = for {
+                  commonBlockHeight <- updater.blockchain.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
+                  droppedBlocks <- {
+                    if (commonBlockHeight < initialHeight)
+                      updater.removeAfter(lastCommonBlockId)
+                    else Right(Seq.empty)
+                  }
+                } yield (commonBlockHeight, droppedBlocks)
+
+                droppedBlocksEi.flatMap {
+                  case (commonBlockHeight, droppedBlocks) =>
+                    forkApplicationResultEi() match {
+                      case Left(e) =>
+                        updater.removeAfter(lastCommonBlockId).explicitGet()
+                        droppedBlocks.foreach { case (b, gp) => updater.processBlock(b, gp).explicitGet() }
+                        Left(e)
+
+                      case Right(_) =>
+                        val depth = initialHeight - commonBlockHeight
+                        if (depth > 0) {
+                          Metrics.write(
+                            Point
+                              .measurement("rollback")
+                              .addField("depth", initialHeight - commonBlockHeight)
+                              .addField("txs", droppedBlocks.size)
+                          )
+                        }
+                        utxStorage.addAndCleanup(droppedBlocks.flatMap { case (b, _) => b.transactionData })
+                        Right(Some(updater.blockchain.score))
                     }
-
-                    extension.view
-                      .dropWhile(_ != declinedBlock)
-                      .foreach(BlockStats.declined(_, BlockStats.Source.Ext))
-
-                    if (i == 0) log.warn(s"Can't process fork starting with $lastCommonBlockId, error appending block $declinedBlock: $e")
-                    else
-                      log.warn(s"Processed only ${i + 1} of ${newBlocks.size} blocks from extension, error appending next block $declinedBlock: $e")
-
-                    Left(e)
                 }
+
+              case None =>
+                log.debug("No new blocks found in extension")
+                Right(None)
             }
-
-            val initialHeight = blockchainUpdater.height
-
-            val droppedBlocksEi = for {
-              commonBlockHeight <- blockchainUpdater.heightOf(lastCommonBlockId).toRight(GenericError("Fork contains no common parent"))
-              droppedBlocks <- {
-                if (commonBlockHeight < initialHeight)
-                  blockchainUpdater.removeAfter(lastCommonBlockId)
-                else Right(Seq.empty)
-              }
-            } yield (commonBlockHeight, droppedBlocks)
-
-            droppedBlocksEi.flatMap {
-              case (commonBlockHeight, droppedBlocks) =>
-                forkApplicationResultEi() match {
-                  case Left(e) =>
-                    blockchainUpdater.removeAfter(lastCommonBlockId).explicitGet()
-                    droppedBlocks.foreach { case (b, gp) => blockchainUpdater.processBlock(b, gp).explicitGet() }
-                    Left(e)
-
-                  case Right(_) =>
-                    val depth = initialHeight - commonBlockHeight
-                    if (depth > 0) {
-                      Metrics.write(
-                        Point
-                          .measurement("rollback")
-                          .addField("depth", initialHeight - commonBlockHeight)
-                          .addField("txs", droppedBlocks.size)
-                      )
-                    }
-                    utxStorage.addAndCleanup(droppedBlocks.flatMap { case (b, _) => b.transactionData })
-                    Right(Some(blockchainUpdater.score))
-                }
-            }
-
-          case None =>
-            log.debug("No new blocks found in extension")
-            Right(None)
-        }
-      }).executeOn(scheduler)
+          }
+      ).executeOn(scheduler)
 
     extensionBlocks.foreach(BlockStats.received(_, BlockStats.Source.Ext, ch))
     processAndBlacklistOnFailure(

@@ -7,7 +7,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.{BlockStats, _}
 import com.wavesplatform.network.MicroBlockSynchronizer.MicroblockData
 import com.wavesplatform.network._
-import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.transaction.TxValidationError.InvalidSignature
 import com.wavesplatform.utils.ScorexLogging
@@ -21,7 +20,7 @@ import monix.execution.Scheduler
 import scala.util.{Left, Right}
 
 object MicroblockAppender extends ScorexLogging {
-  def apply(blockchainUpdater: BlockchainUpdater with Blockchain, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
+  def apply(blockchainUpdater: BlockchainUpdater, utxStorage: UtxPool, scheduler: Scheduler, verify: Boolean = true)(
       microBlock: MicroBlock
   ): Task[Either[ValidationError, BlockId]] = {
 
@@ -36,7 +35,7 @@ object MicroblockAppender extends ScorexLogging {
   }
 
   def apply(
-      blockchainUpdater: BlockchainUpdater with Blockchain,
+      blockchainUpdater: BlockchainUpdater,
       utxStorage: UtxPool,
       allChannels: ChannelGroup,
       peerDatabase: PeerDatabase,

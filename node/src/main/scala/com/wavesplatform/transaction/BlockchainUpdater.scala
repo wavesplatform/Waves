@@ -3,6 +3,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.state.Blockchain
 import monix.reactive.Observable
 
 trait BlockchainUpdater {
@@ -12,6 +13,8 @@ trait BlockchainUpdater {
   def lastBlockInfo: Observable[LastBlockInfo]
   def isLastBlockId(id: ByteStr): Boolean
   def shutdown(): Unit
+  def blockchain: Blockchain
+  def blockchain(lastBlockId: ByteStr): Blockchain
 }
 
 case class LastBlockInfo(id: BlockId, height: Int, score: BigInt, ready: Boolean)

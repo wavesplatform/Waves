@@ -1,10 +1,10 @@
 package com.wavesplatform.state
 
 import com.wavesplatform.account.{Address, AddressOrAlias, Alias}
-import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.GeneratingBalanceProvider
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.settings.BlockchainSettings
@@ -14,6 +14,7 @@ import com.wavesplatform.transaction.TxValidationError.AliasDoesNotExist
 import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 
 trait Blockchain {
   def settings: BlockchainSettings
@@ -31,11 +32,11 @@ trait Blockchain {
   /** Features related */
   def approvedFeatures: Map[Short, Int]
   def activatedFeatures: Map[Short, Int]
-  def featureVotes(height: Int): Map[Short, Int]
+  def featureVotes: Map[Short, Int]
 
   /** Block reward related */
   def blockReward(height: Int): Option[Long]
-  def blockRewardVotes(height: Int): Seq[Long]
+  def blockRewardVotes: Seq[Long]
 
   def wavesAmount(height: Int): BigInt
 
@@ -53,9 +54,10 @@ trait Blockchain {
 
   def filledVolumeAndFee(orderId: ByteStr): VolumeAndFee
 
+  def balanceAtHeight(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
+
   /** Retrieves Waves balance snapshot in the [from, to] range (inclusive) */
-  def balanceOnlySnapshots(address: Address, height: Int, assetId: Asset = Waves): Option[(Int, Long)]
-  def balanceSnapshots(address: Address, from: Int, to: Option[BlockId]): Seq[BalanceSnapshot]
+  def balanceSnapshots(address: Address, from: Int, to: Int): Seq[BalanceSnapshot]
 
   def accountScript(address: Address): Option[AccountScriptInfo]
   def hasAccountScript(address: Address): Boolean
@@ -86,7 +88,7 @@ object Blockchain {
         .map(_ - (back - 1).max(0))
         .flatMap(h => blockchain.blockHeader(h).map(_.header))
 
-    def contains(block: Block): Boolean       = blockchain.contains(block.id())
+    def contains(block: Block): Boolean     = blockchain.contains(block.id())
     def contains(blockId: ByteStr): Boolean = blockchain.heightOf(blockId).isDefined
 
     def blockId(atHeight: Int): Option[ByteStr] = blockchain.blockHeader(atHeight).map(_.id())
@@ -107,17 +109,15 @@ object Blockchain {
       case _                          => false
     }
 
-    def effectiveBalance(address: Address, confirmations: Int, block: Option[BlockId] = blockchain.lastBlockId): Long = {
-      val blockHeight = block.flatMap(b => blockchain.heightOf(b)).getOrElse(blockchain.height)
+    def effectiveBalance(address: Address, confirmations: Int, blockHeight: Int = blockchain.height): Long = {
       val bottomLimit = (blockHeight - confirmations + 1).max(1).min(blockHeight)
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, block)
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, blockHeight)
       if (balances.isEmpty) 0L else balances.view.map(_.effectiveBalance).min
     }
 
     def balance(address: Address, atHeight: Int, confirmations: Int): Long = {
       val bottomLimit = (atHeight - confirmations + 1).max(1).min(atHeight)
-      val blockId   = blockchain.blockHeader(atHeight).getOrElse(throw new IllegalArgumentException(s"Invalid block height: $atHeight")).id()
-      val balances    = blockchain.balanceSnapshots(address, bottomLimit, Some(blockId))
+      val balances    = blockchain.balanceSnapshots(address, bottomLimit, atHeight)
       if (balances.isEmpty) 0L else balances.view.map(_.regularBalance).min
     }
 
@@ -138,8 +138,8 @@ object Blockchain {
     def isEffectiveBalanceValid(height: Int, block: Block, effectiveBalance: Long): Boolean =
       GeneratingBalanceProvider.isEffectiveBalanceValid(blockchain, height, block, effectiveBalance)
 
-    def generatingBalance(account: Address, blockId: Option[BlockId] = None): Long =
-      GeneratingBalanceProvider.balance(blockchain, account, blockId)
+    def generatingBalance(account: Address, height: Option[Int] = None): Long =
+      GeneratingBalanceProvider.balance(blockchain, account, height)
 
     def allActiveLeases: Seq[LeaseTransaction] = blockchain.collectActiveLeases(_ => true)
 
@@ -151,5 +151,43 @@ object Blockchain {
       blockchain
         .blockHeader(atHeight)
         .flatMap(header => if (header.header.version >= Block.ProtoBlockVersion) blockchain.hitSource(atHeight) else None)
+
+    def nextBlockReward: Option[Long] =
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockReward, blockchain.height + 1)) None
+      else {
+        val settings   = blockchain.settings.rewardsSettings
+        val nextHeight = blockchain.height + 1
+
+        blockchain
+          .featureActivationHeight(BlockchainFeatures.BlockReward.id)
+          .filter(_ <= nextHeight)
+          .flatMap { activatedAt =>
+            val mayBeReward     = lastBlockReward
+            val mayBeTimeToVote = nextHeight - activatedAt
+
+            mayBeReward match {
+              case Some(reward) if mayBeTimeToVote > 0 && mayBeTimeToVote % settings.term == 0 =>
+                Some((blockchain.blockRewardVotes.filter(_ >= 0), reward))
+              case None if mayBeTimeToVote >= 0 =>
+                Some((Seq(), settings.initial))
+              case _ => None
+            }
+          }
+          .flatMap {
+            case (votes, currentReward) =>
+              val lt        = votes.count(_ < currentReward)
+              val gt        = votes.count(_ > currentReward)
+              val threshold = settings.votingInterval / 2 + 1
+
+              if (lt >= threshold)
+                Some(math.max(currentReward - settings.minIncrement, 0))
+              else if (gt >= threshold)
+                Some(currentReward + settings.minIncrement)
+              else
+                Some(currentReward)
+          }
+          .orElse(lastBlockReward)
+      }
+
   }
 }

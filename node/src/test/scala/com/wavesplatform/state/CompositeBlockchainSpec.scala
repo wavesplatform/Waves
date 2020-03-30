@@ -8,7 +8,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class CompositeBlockchainSpec extends FreeSpec with Matchers with PropertyChecks with BlockGen with NoShrink {
   "blockHeaderAndSize at current height is last block" in forAll(randomSignerBlockGen) { block =>
-    val comp = CompositeBlockchain(EmptyBlockchain, newBlock = Some(block))
+    val comp = CompositeBlockchain(EmptyBlockchain, Diff.empty, Some(block))
 
     comp.blockHeader(comp.height).map(_.id()) should contain(block.id())
   }

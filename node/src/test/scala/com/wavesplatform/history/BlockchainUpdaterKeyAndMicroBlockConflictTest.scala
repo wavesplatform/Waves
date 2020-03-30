@@ -24,35 +24,35 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     forAll(Preconditions.conflictingTransfers()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          d.blockchainUpdater.processBlock(prevBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.appendBlock(prevBlock)
+          d.appendBlock(keyBlock)
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
+          microBlocks.foreach(d.appendMicroBlock)
 
-          d.blockchainUpdater.processBlock(keyBlock1) shouldBe 'right
+          d.appendBlock(keyBlock1)
         }
     }
 
     forAll(Preconditions.conflictingTransfersInMicro()) {
       case (prevBlock, keyBlock, microBlocks, keyBlock1) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          d.blockchainUpdater.processBlock(prevBlock) shouldBe 'right
-          d.blockchainUpdater.processBlock(keyBlock) shouldBe 'right
+          d.appendBlock(prevBlock)
+          d.appendBlock(keyBlock)
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
+          microBlocks.foreach(d.appendMicroBlock)
 
-          d.blockchainUpdater.processBlock(keyBlock1) shouldBe 'right
+          d.appendBlock(keyBlock1)
         }
     }
 
     forAll(Preconditions.leaseAndLeaseCancel()) {
       case (genesisBlock, leaseBlock, keyBlock, microBlocks, transferBlock, secondAccount) =>
         withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0) > 0)
+          Seq(genesisBlock, leaseBlock, keyBlock).foreach(d.appendBlock)
+          assert(d.blockchain.effectiveBalance(secondAccount, 0) > 0)
 
-          microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          assert(d.blockchainUpdater.effectiveBalance(secondAccount, 0, Some(leaseBlock.id())) > 0)
+          microBlocks.foreach(d.appendMicroBlock)
+          assert(d.blockchain.effectiveBalance(secondAccount, 0, 2) > 0)
 
           assert(d.blockchainUpdater.processBlock(transferBlock).toString.contains("negative effective balance"))
         }
@@ -63,10 +63,10 @@ class BlockchainUpdaterKeyAndMicroBlockConflictTest
     forAll(Preconditions.duplicateDataKeys()) {
       case (genesisBlock, Seq(block1, block2), microBlocks, address) =>
         withDomain(DataAndMicroblocksActivatedAt0WavesSettings) { d =>
-          Seq(genesisBlock, block1, block2).foreach(d.blockchainUpdater.processBlock(_) shouldBe 'right)
-          d.blockchainUpdater.accountData(address, "test") shouldBe 'defined
+          Seq(genesisBlock, block1, block2).foreach(d.appendBlock)
+          d.blockchain.accountData(address, "test") shouldBe 'defined
           microBlocks.foreach(d.blockchainUpdater.processMicroBlock(_) shouldBe 'right)
-          d.blockchainUpdater.accountData(address, "test") shouldBe 'defined
+          d.blockchain.accountData(address, "test") shouldBe 'defined
         }
     }
   }

@@ -3,6 +3,7 @@ package com.wavesplatform.mining
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
@@ -49,22 +50,22 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     }
 
     val miner = {
-      val scheduler   = Scheduler.singleThread("appender")
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
       val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings, enablePriorityPool = true)
       val pos         = new PoSSelector(blockchainUpdater, blockchainSettings, wavesSettings.synchronizationSettings)
       new MinerImpl(
         allChannels,
-        blockchainUpdater,
+        blockchainUpdater.blockchain,
+        _ => None,
         wavesSettings.copy(blockchainSettings = blockchainSettings),
         ntpTime,
         utxPool,
         wallet,
         pos,
-        scheduler,
-        scheduler
-      )
+        _ => Task(Right(None)),
+        _ => Task(Right(ByteStr.empty))
+      )(Scheduler.global)
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil)

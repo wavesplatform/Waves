@@ -78,19 +78,20 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
       val scripts = mkScripts(CACHE_SIZE * 10)
 
       withBlockchain(blockGen(scripts, _)) {
-        case (accounts, bc) =>
+        case (accounts, updater) =>
           val allScriptCorrect = (accounts zip scripts)
             .map {
               case (account, (script, _)) =>
                 val address = account.toAddress
 
                 val scriptFromCache =
-                  bc.accountScript(address)
+                  updater.blockchain
+                    .accountScript(address)
                     .map(_.script)
                     .toRight(s"No script for acc: $account")
                     .explicitGet()
 
-                scriptFromCache == script && bc.hasAccountScript(address)
+                scriptFromCache == script && updater.blockchain.hasAccountScript(address)
             }
             .forall(identity)
 
@@ -103,9 +104,9 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
 
       withBlockchain(blockGen(scripts, _)) {
         case (List(account), bcu) =>
-          bcu.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account, script, complexity))
+          bcu.blockchain.accountScript(account.toAddress) shouldEqual Some(AccountScriptInfo(account, script, complexity))
 
-          val lastBlockHeader = bcu.lastBlockHeader.get
+          val lastBlockHeader = bcu.blockchain.lastBlockHeader.get
 
           val newScriptTx = SetScriptTransaction
             .selfSigned(1.toByte, account, None, FEE, lastBlockHeader.header.timestamp + 1)
@@ -122,15 +123,15 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
             .processBlock(blockWithEmptyScriptTx, blockWithEmptyScriptTx.header.generationSignature)
             .explicitGet()
 
-          bcu.accountScript(account.toAddress) shouldEqual None
+          bcu.blockchain.accountScript(account.toAddress) shouldEqual None
           bcu.removeAfter(lastBlockHeader.id())
-          bcu.accountScript(account.toAddress).map(_.script) shouldEqual Some(script)
+          bcu.blockchain.accountScript(account.toAddress).map(_.script) shouldEqual Some(script)
       }
     }
 
   }
 
-  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], Blockchain with BlockchainUpdater) => Unit): Unit = {
+  def withBlockchain(gen: Time => Gen[(Seq[KeyPair], Seq[Block])])(f: (Seq[KeyPair], BlockchainUpdater) => Unit): Unit = {
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val defaultWriter = TestLevelDB.withFunctionalitySettings(

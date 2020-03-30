@@ -6,8 +6,6 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.transaction.GenesisTransaction
-import com.wavesplatform.transaction.TxValidationError.GenericError
-import com.wavesplatform.history.Domain.BlockchainUpdaterExt
 import org.scalacheck.Gen
 import org.scalatest._
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -53,37 +51,6 @@ class BlockchainUpdaterLiquidBlockTest
       (prevBlock, keyBlock, microBlocks)
     }
 
-  property("liquid block can't be overfilled") {
-    import Block.{MaxTransactionsPerBlockVer3 => Max}
-    forAll(preconditionsAndPayments(Max + 1, Max + 100)) {
-      case (prevBlock, keyBlock, microBlocks) =>
-        withDomain(MicroblocksActivatedAt0WavesSettings) { d =>
-          val blocksApplied = for {
-            _ <- d.blockchainUpdater.processBlock(prevBlock)
-            _ <- d.blockchainUpdater.processBlock(keyBlock)
-          } yield ()
-
-          val r = microBlocks.foldLeft(blocksApplied) {
-            case (Right(_), curr) => d.blockchainUpdater.processMicroBlock(curr).map(_ => ())
-            case (x, _)           => x
-          }
-
-          withClue("All microblocks should not be processed") {
-            r match {
-              case Left(e: GenericError) => e.err should include("Limit of txs was reached")
-              case x =>
-                val txNumberByMicroBlock = microBlocks.map(_.transactionData.size)
-                fail(
-                  s"Unexpected result: $x. keyblock txs: ${keyBlock.transactionData.length}, " +
-                    s"microblock txs: ${txNumberByMicroBlock.mkString(", ")} (total: ${txNumberByMicroBlock.sum}), " +
-                    s"total txs: ${keyBlock.transactionData.length + txNumberByMicroBlock.sum}"
-                )
-            }
-          }
-        }
-    }
-  }
-
   property("miner settings don't interfere with micro block processing") {
     val oneTxPerMicroSettings = MicroblocksActivatedAt0WavesSettings
       .copy(
@@ -94,8 +61,8 @@ class BlockchainUpdaterLiquidBlockTest
     forAll(preconditionsAndPayments(10, Block.MaxTransactionsPerBlockVer3)) {
       case (genBlock, keyBlock, microBlocks) =>
         withDomain(oneTxPerMicroSettings) { d =>
-          d.blockchainUpdater.processBlock(genBlock)
-          d.blockchainUpdater.processBlock(keyBlock)
+          d.appendBlock(genBlock)
+          d.appendBlock(keyBlock)
           microBlocks.foreach { mb =>
             d.blockchainUpdater.processMicroBlock(mb) shouldBe 'right
           }
