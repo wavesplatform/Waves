@@ -448,7 +448,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
             "value" -> CONST_STRING("2").explicitGet()
           )
         )
-      )))
+      )).explicitGet())
   }
 
   property("allow 'throw' in '==' arguments") {
@@ -762,7 +762,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval[EVALUATED](src) shouldBe Right(ARR(IndexedSeq(
       CONST_STRING("q:we").explicitGet(),
       CONST_STRING("q;we:x;q.we").explicitGet()
-    )))
+    )).explicitGet())
   }
 
   property("split separate correctly") {
@@ -773,7 +773,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       CONST_STRING("str2").explicitGet(),
       CONST_STRING("str3").explicitGet(),
       CONST_STRING("str4").explicitGet()
-    )))
+    )).explicitGet())
   }
 
   property("split separator at the end") {
@@ -783,7 +783,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       CONST_STRING("str1").explicitGet(),
       CONST_STRING("str2").explicitGet(),
       CONST_STRING("").explicitGet()
-    )))
+    )).explicitGet())
   }
 
   property("split double separator") {
@@ -794,7 +794,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
       CONST_STRING("").explicitGet(),
       CONST_STRING("str2").explicitGet(),
       CONST_STRING("str3").explicitGet()
-    )))
+    )).explicitGet())
   }
 
   property("parseInt") {

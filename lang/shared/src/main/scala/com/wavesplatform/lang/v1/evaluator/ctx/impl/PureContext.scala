@@ -20,6 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx._
 import com.wavesplatform.lang.v1.parser.BinaryOperation
 import com.wavesplatform.lang.v1.parser.BinaryOperation._
 import com.wavesplatform.lang.v1.{BaseGlobal, CTX}
+import com.wavesplatform.lang.v1.ContractLimits._
 
 import scala.annotation.tailrec
 import scala.util.{Success, Try}
@@ -60,7 +61,7 @@ object PureContext {
 
   lazy val eq: BaseFunction[NoContext] =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, ("a", TYPEPARAM('T')), ("b", TYPEPARAM('T'))) {
-      case a :: b :: Nil => Right(CONST_BOOLEAN(a == b))
+      case a :: b :: Nil => Either.cond(b.weight <= MaxCmpWeight || a.weight <= MaxCmpWeight, CONST_BOOLEAN(a == b), "Comparable value too heavy.")
       case xs            => notImplemented[Id](s"${EQ_OP.func}(a: T, b: T)", xs)
     }
 
@@ -271,7 +272,7 @@ object PureContext {
       ("head", TYPEPARAM('A')),
       ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
-      case h :: ARR(t) :: Nil => Right(ARR(h +: t))
+      case h :: (a @ ARR(t)) :: Nil => ARR(h +: t, h.weight + a.weight + ELEM_WEIGHT)
       case xs                 => notImplemented[Id]("cons(head: T, tail: LIST[T]", xs)
     }
 
@@ -433,7 +434,7 @@ object PureContext {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
         split(str, sep)
           .traverse(CONST_STRING(_))
-          .map(s => ARR(s.toIndexedSeq))
+          .flatMap(s => ARR(s.toIndexedSeq))
       case xs => notImplemented[Id]("split(str: String, separator: String)", xs)
     }
 
@@ -699,7 +700,7 @@ object PureContext {
           ctx,
           CTX[NoContext](
             Seq.empty,
-            Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]))))),
+            Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]).explicitGet())))),
             Array(
               value,
               valueOrErrorMessage,

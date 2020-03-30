@@ -7,6 +7,7 @@ import monix.eval.Coeval
 import cats.implicits._
 import com.wavesplatform.common.utils._
 import com.wavesplatform.lang.ExecutionError
+import com.wavesplatform.lang.v1.ContractLimits._
 
 object Terms {
   private val DATA_TX_BYTES_MAX = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
@@ -68,8 +69,13 @@ object Terms {
   sealed trait EVALUATED extends EXPR {
     def prettyString(level: Int) : String = toString
     def toStr: Coeval[String] = Coeval.now(toString)
+    def weight: Long
   }
-  case class CONST_LONG(t: Long)        extends EVALUATED { override def toString: String = t.toString  }
+
+  case class CONST_LONG(t: Long) extends EVALUATED {
+    override def toString: String = t.toString
+    override val weight: Long = 8l
+  }
 
   case class CONST_BYTESTR private (bs: ByteStr) extends EVALUATED {
     override def toString: String = bs.toString
@@ -80,7 +86,7 @@ object Terms {
         "base58'" ++ Base58.encode(bs) ++ "'"
       }
     }
-
+    override val weight: Long = bs.size
   }
   object CONST_BYTESTR {
     def apply(bs: ByteStr): Either[ExecutionError, CONST_BYTESTR] =
@@ -111,6 +117,7 @@ object Terms {
   case class CONST_STRING private (s: String)    extends EVALUATED {
     override def toString: String = s
     override def prettyString(level: Int) : String = "\"" ++ escape(s) ++ "\""
+    override val weight: Long = s.getBytes.size
   }
   object CONST_STRING {
     def apply(s: String): Either[ExecutionError, CONST_STRING] =
@@ -121,18 +128,48 @@ object Terms {
       )
   }
 
-  case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED { override def toString: String = b.toString }
+  case class CONST_BOOLEAN(b: Boolean)  extends EVALUATED {
+    override def toString: String = b.toString
+    override val weight: Long = 1l
+  }
 
   lazy val TRUE  = CONST_BOOLEAN(true)
   lazy val FALSE = CONST_BOOLEAN(false)
 
-  case class CaseObj(caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
+  case class CaseObj private (caseType: CASETYPEREF, fields: Map[String, EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
 
     override def prettyString(depth: Int): String = TermPrinter.indentObjString(this, depth)
+
+    override val weight: Long = OBJ_WEIGHT + FIELD_WEIGHT * fields.size + fields.map(_._2.weight).sum
   }
 
-  case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED {
+  object CaseObj {
+    def apply(caseType: CASETYPEREF, fields: Map[String, EVALUATED]): CaseObj = {
+      val obj = new CaseObj(caseType, fields)
+      if (obj.weight > MaxWeight) {
+        throw new Exception(s"the object ${caseType.name} is too heavy. Actual weight: ${obj.weight}, limit: ${MaxWeight}")
+      } else {
+        obj
+      }
+    }
+  }
+
+  abstract case class ARR(xs: IndexedSeq[EVALUATED]) extends EVALUATED {
     override def toString: String = TermPrinter.string(this)
+  }
+
+  object ARR {
+    def apply(xs: IndexedSeq[EVALUATED], mweight: Long): Either[ExecutionError, ARR] =
+      if (mweight > MaxWeight) {
+        Left(s"the list is too heavy. Actual weight: ${mweight}, limit: ${MaxWeight}")
+      } else {
+        Right(new ARR(xs) { override val weight: Long = mweight })
+      }
+ 
+    def apply(xs: IndexedSeq[EVALUATED]): Either[ExecutionError, ARR] = {
+      val weight =  EMPTYARR_WEIGHT + ELEM_WEIGHT * xs.size + xs.map(_.weight).sum
+      ARR(xs, weight)
+    }
   }
 }

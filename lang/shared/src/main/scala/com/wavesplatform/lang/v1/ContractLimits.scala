@@ -20,8 +20,22 @@ object ContractLimits {
   val MaxInvokeScriptSizeInBytes = 5 * 1024
   val MaxWriteSetSizeInBytes     = 5 * 1024
   val MaxWriteSetSize            = 100
-  val MaxKeySizeInBytes                 = 100
+  val MaxKeySizeInBytes          = 100
 
   // Mass Transfer	0.001 + 0.0005*N, rounded up to 0.001, fee for CI is 0.005
   val MaxPaymentAmount = 10
+
+  // Data weight related constants
+  val OBJ_WEIGHT = 40l
+  val FIELD_WEIGHT = 30l
+  val EMPTYARR_WEIGHT = 20l
+  val ELEM_WEIGHT = 20l
+  val MaxWeight =
+    150l * 1024l * 2l // MaxBytes dublicate in bodyBytes and data
+  + 32l + 8l + 8l + 8l // header
+  + OBJ_WEIGHT + FIELD_WEIGHT + 32l // address object
+  + EMPTYARR_WEIGHT + (ELEM_WEIGHT + 64l) * 8l // proofs
+  + EMPTYARR_WEIGHT + (ELEM_WEIGHT + OBJ_WEIGHT + FIELD_WEIGHT * 2l) * 100l // Data entries
+
+  val MaxCmpWeight = 13000l
 }

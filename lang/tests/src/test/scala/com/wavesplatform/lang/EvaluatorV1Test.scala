@@ -713,6 +713,94 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
+  private def recCmp(cnt: Int)(f: ((String => String) => String) = (gen =>  gen("x") ++ gen("y") ++ s"x${cnt+1} == y${cnt+1}")): (Log[Id], Either[ExecutionError, Boolean]) = {
+    val context: CTX[NoContext] = Monoid.combineAll(
+      Seq(
+        pureContext,
+        defaultCryptoContext,
+        CTX[NoContext](Seq(), Map(), Array.empty[BaseFunction[NoContext]])
+      ))
+
+    def gen(a: String) = (0 to cnt).foldLeft(s"""let ${a}0="qqqq";""") { (c, n) => c ++ s"""let $a${n+1}=[$a$n,$a$n,$a$n];""" }
+    val script = f(gen)
+
+    val r = noContextEvaluator.applyWithLogging[EVALUATED](
+      context.evaluationContext[Id],
+      ExpressionCompiler
+        .compile(script, context.compilerContext)
+        .explicitGet()
+    )
+    (r._1, r._2.map {
+      case CONST_BOOLEAN(b) => b
+      case _                => ???
+    })
+  }
+
+  property("recCmp") {
+    val (log, result) = recCmp(4)()
+
+    result shouldBe Right(true)
+
+    //it false, because script fails on Alice's signature check, and bobSigned is not evaluated
+    log.find(_._1 == "bobSigned") shouldBe None
+    log.find(_._1 == "x0") shouldBe Some(("x0", evaluated("qqqq")))
+  }
+
+  property("recCmp fail by cmp") {
+    val (log, result) = recCmp(5)()
+
+    result shouldBe 'Left
+  }
+
+  property("recData fail by ARR") {
+    val cnt = 8
+    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}.size() == 3")
+
+    result shouldBe 'Left
+  }
+
+  property("recData use uncomparable data") {
+    val cnt = 7
+    val (log, result) = recCmp(cnt)(gen => gen("x") ++ s"x${cnt+1}[1].size() == 3")
+
+    result shouldBe Right(true)
+  }
+
+  private def genRCO(cnt: Int) = {
+    (0 to cnt).foldLeft[EXPR](CONST_STRING("qqqq").explicitGet()) { (acc, i) =>
+      val n = s"x$i"
+      val r = REF(n)
+      LET_BLOCK(LET(n, acc), FUNCTION_CALL(FunctionHeader.User("ScriptTransfer"), List(r, r, r)))
+    }
+  }
+
+  property("recursive caseobject") {
+    val environment = emptyBlockchainEnvironment()
+    val term = genRCO(3)
+
+    //println(term)
+
+    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe evaluated(true)
+  }
+
+  property("recursive caseobject fail by compare") {
+    val environment = emptyBlockchainEnvironment()
+    val term = genRCO(4)
+
+    //println(term)
+
+    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, term))) shouldBe 'Left
+  }
+
+  property("recursive caseobject compare with unit") {
+    val environment = emptyBlockchainEnvironment()
+    val term = genRCO(4)
+
+    //println(term)
+
+    defaultEvaluator.apply[CONST_BOOLEAN](defaultFullContext.evaluationContext(environment), FUNCTION_CALL(FunctionHeader.Native(EQ), List(term, REF("unit")))) shouldBe evaluated(false)
+  }
+
   private def multiSig(bodyBytes: Array[Byte],
                        senderPK: PublicKey,
                        alicePK: PublicKey,
