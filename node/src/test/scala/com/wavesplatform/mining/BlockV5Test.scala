@@ -59,29 +59,29 @@ class BlockV5Test
   }
 
   "Proto block" should "be serialized" in {
-    val block             = TestBlock.create(Nil, version = Block.ProtoBlockVersion)
-    val blockWithBadVotes = block.copy(header = block.header.copy(featureVotes = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)))
-    val blockWithSortedVotes =
-      blockWithBadVotes.copy(header = blockWithBadVotes.header.copy(featureVotes = blockWithBadVotes.header.featureVotes.sorted))
+    val features = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
+    val block =
+      TestBlock.create(System.currentTimeMillis(), TestBlock.randomSignature(), Nil, version = Block.ProtoBlockVersion, features = features.sorted)
+    val blockWithBadVotes = block.copy(header = block.header.copy(featureVotes = features))
 
     Validators.validateBlock(blockWithBadVotes) shouldBe 'left
-    Validators.validateBlock(blockWithSortedVotes) shouldBe 'right
+    Validators.validateBlock(block) shouldBe 'right
     Validators.validateBlock(
       blockWithBadVotes.copy(header = blockWithBadVotes.header.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
     ) shouldBe 'right
 
-    val serialized1   = BlockSerializer.toBytes(blockWithBadVotes)
-    val deserialized1 = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized1)).get
-    val serialized2   = PBBlocks.protobuf(blockWithBadVotes).toByteArray
-    val deserialized2 = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized2)).get
-    val serializedHeader = BlockHeaderSerializer.toBytes(blockWithBadVotes.header)
+    val serialized1        = BlockSerializer.toBytes(blockWithBadVotes)
+    val deserialized1      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized1)).get
+    val serialized2        = PBBlocks.protobuf(blockWithBadVotes).toByteArray
+    val deserialized2      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized2)).get
+    val serializedHeader   = BlockHeaderSerializer.toBytes(blockWithBadVotes.header)
     val deserializedHeader = PBBlocks.vanilla(protobuf.block.PBBlockHeader.parseFrom(serializedHeader))
     serialized1 shouldBe serialized2
     all(Seq(deserialized1, deserialized2)) should matchPattern {
-      case b: Block if b.transactionsRootValid() => // Pass
+      case b: Block if b.transactionsRootValid() && b.signatureValid() => // Pass
     }
-    all(Seq(deserialized1, deserialized2)) shouldBe blockWithSortedVotes
-    deserializedHeader shouldBe blockWithSortedVotes.header
+    all(Seq(deserialized1, deserialized2)) shouldBe block
+    deserializedHeader shouldBe block.header
   }
 
   "Miner" should "generate valid blocks" in forAll(genesis) {
