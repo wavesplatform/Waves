@@ -1,6 +1,5 @@
 package com.wavesplatform.http
 
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.common.CommonAccountsApi
 import com.wavesplatform.common.utils._
 import com.wavesplatform.db.WithDomain

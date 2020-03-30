@@ -3,7 +3,7 @@ package com.wavesplatform.api.common
 import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.CommonAssetsApi.AssetInfo
 import com.wavesplatform.crypto
-import com.wavesplatform.database.KeyTags
+import com.wavesplatform.database.{AddressId, KeyTags}
 import com.wavesplatform.state.{AssetDescription, Blockchain, Diff, Portfolio}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
@@ -41,7 +41,7 @@ object CommonAssetsApi {
         after,
         if (height == blockchain.height) diff.portfolios else Map.empty[Address, Portfolio],
         KeyTags.WavesBalance.prefixBytes,
-        bs => BigInt(bs.slice(2, bs.length - 4)),
+        bs => AddressId.fromByteArray(bs.slice(2, bs.length - 4)),
         _.balance
       )
 
@@ -52,7 +52,7 @@ object CommonAssetsApi {
         after,
         if (height == blockchain.height) diff.portfolios else Map.empty[Address, Portfolio],
         KeyTags.AssetBalance.prefixBytes ++ asset.id.arr,
-        bs => BigInt(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
+        bs => AddressId.fromByteArray(bs.slice(2 + crypto.DigestLength, bs.length - 4)),
         _.assets.getOrElse(asset, 0L)
       )
   }

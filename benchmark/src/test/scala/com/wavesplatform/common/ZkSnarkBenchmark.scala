@@ -3,7 +3,7 @@ package com.wavesplatform.common
 import java.util.Base64
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.common.ZkSnarkBenchmark.{CurveSt, Groth16St, MerkleSt}
+import com.wavesplatform.common.ZkSnarkBenchmark.{CurveSt, Groth16St}
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.zwaves.bls12.Groth16
 import org.openjdk.jmh.annotations._
