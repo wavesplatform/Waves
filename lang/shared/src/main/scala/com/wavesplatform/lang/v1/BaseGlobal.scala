@@ -22,6 +22,7 @@ import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
+import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.util.Try
 
@@ -56,15 +57,20 @@ trait BaseGlobal {
     if (checkLength && input.length > MaxBase16String)
       Left(s"Base16 decode input length=${input.length} should not exceed $MaxBase16String")
     else
-      toEither(BaseEncoding.base16().decode(input))
+      toEither(BaseEncoding.base16().decode(input.toUpperCase))
 
-  def toEither[A](f: => A): Either[String, A] =
+  private def toEither[A](f: => A): Either[String, A] =
     Try(f).toEither
-      .leftMap(
-        exception =>
-          if (exception.getMessage != null) exception.getMessage
-          else exception.toString
-      )
+      .leftMap { exception =>
+        @tailrec
+        def findThrowableCause(th: Throwable): Throwable =
+          if (th.getCause == null) th
+          else findThrowableCause(th.getCause)
+
+        val cause = findThrowableCause(exception)
+        if (cause.getMessage != null) cause.getMessage
+        else cause.toString
+      }
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
