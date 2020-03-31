@@ -3,6 +3,7 @@ package com.wavesplatform.lang.v1
 import java.math.RoundingMode
 
 import cats.implicits._
+import com.google.common.io.BaseEncoding
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
@@ -22,12 +23,15 @@ import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
 import scala.concurrent.Future
+import scala.util.Try
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.
   * And IDEA can't find the Global class in the "shared" module, but it must!
   */
 trait BaseGlobal {
+  val MaxBase16Bytes               = 8 * 1024
+  val MaxBase16String              = 32 * 1024
   val MaxBase58Bytes               = 64
   val MaxBase58String              = 100
   val MaxBase64Bytes               = 32 * 1024
@@ -42,44 +46,25 @@ trait BaseGlobal {
   def base64Encode(input: Array[Byte]): Either[String, String]
   def base64Decode(input: String, limit: Int = MaxLiteralLength): Either[String, Array[Byte]]
 
-  val hex: Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
-  def base16Encode(input: Array[Byte]): Either[String, String] = {
-    val output = new StringBuilder(input.size * 2)
-    for (b <- input) {
-      output.append(hex((b >> 4) & 0xf))
-      output.append(hex(b & 0xf))
-    }
-    Right(output.result)
-  }
+  def base16Encode(input: Array[Byte], checkLength: Boolean): Either[String, String] =
+    if (checkLength && input.length > MaxBase16Bytes)
+      Left(s"Base16 encode input length=${input.length} should not exceed $MaxBase16Bytes")
+    else
+      toEither(BaseEncoding.base16().encode(input))
 
-  def base16Dig(c: Char): Either[String, Byte] = {
-    if ('0' <= c && c <= '9') {
-      Right((c - '0').toByte)
-    } else if ('a' <= c && c <= 'f') {
-      Right((10 + (c - 'a')).toByte)
-    } else if ('A' <= c && c <= 'F') {
-      Right((10 + (c - 'A')).toByte)
-    } else {
-      Left(s"$c isn't base16/hex digit")
-    }
-  }
+  def base16Decode(input: String, checkLength: Boolean): Either[String, Array[Byte]] =
+    if (checkLength && input.length > MaxBase16String)
+      Left(s"Base16 decode input length=${input.length} should not exceed $MaxBase16String")
+    else
+      toEither(BaseEncoding.base16().decode(input))
 
-  def base16Decode(input: String): Either[String, Array[Byte]] = {
-    val size = input.size
-    if (size % 2 == 1) {
-      Left("Need internal bytes number")
-    } else {
-      val bytes = new Array[Byte](size / 2)
-      for (i <- 0 to size / 2 - 1) {
-        (base16Dig(input(i * 2)), base16Dig(input(i * 2 + 1))) match {
-          case (Right(h), Right(l)) => bytes(i) = ((16: Byte) * h + l).toByte
-          case (Left(e), _)         => return Left(e)
-          case (_, Left(e))         => return Left(e)
-        }
-      }
-      Right(bytes)
-    }
-  }
+  def toEither[A](f: => A): Either[String, A] =
+    Try(f).toEither
+      .leftMap(
+        exception =>
+          if (exception.getMessage != null) exception.getMessage
+          else exception.toString
+      )
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 

@@ -250,14 +250,14 @@ object CryptoContext {
         case xs => notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
     }
 
-    def toBase16StringF: BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
-      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr).flatMap(CONST_STRING(_))
+    def toBase16StringF(checkLength: Boolean): BaseFunction[NoContext] = NativeFunction("toBase16String", 10, TOBASE16, STRING, ("bytes", BYTESTR)) {
+      case CONST_BYTESTR(bytes: ByteStr) :: Nil => global.base16Encode(bytes.arr, checkLength).flatMap(CONST_STRING(_))
       case xs                                   => notImplemented[Id, EVALUATED]("toBase16String(bytes: ByteVector)", xs)
     }
 
-    def fromBase16StringF: BaseFunction[NoContext] =
+    def fromBase16StringF(checkLength: Boolean): BaseFunction[NoContext] =
       NativeFunction("fromBase16String", 10, FROMBASE16, BYTESTR, ("str", STRING)) {
-        case CONST_STRING(str: String) :: Nil => global.base16Decode(str).flatMap(x => CONST_BYTESTR(ByteStr(x)))
+        case CONST_STRING(str: String) :: Nil => global.base16Decode(str, checkLength).flatMap(x => CONST_BYTESTR(ByteStr(x)))
         case xs                               => notImplemented[Id, EVALUATED]("fromBase16String(str: String)", xs)
       }
 
@@ -361,14 +361,14 @@ object CryptoContext {
       Array(
         rsaVerifyF,
         checkMerkleProofF,
-        toBase16StringF,
-        fromBase16StringF
+        toBase16StringF(checkLength = false),
+        fromBase16StringF(checkLength = false)
       )
 
     val v4Functions =
       Array(
         bls12Groth16VerifyF, createMerkleRootF,  // new in V4
-        rsaVerifyF, toBase16StringF, fromBase16StringF // from V3
+        rsaVerifyF, toBase16StringF(checkLength = true), fromBase16StringF(checkLength = true) // from V3
         ) ++ sigVerifyL ++ rsaVerifyL ++ keccak256F_lim ++ blake2b256F_lim ++ sha256F_lim ++ bls12Groth16VerifyL
 
     val fromV1Ctx = CTX[NoContext](Seq(), Map(), v1Functions)
