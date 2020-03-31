@@ -37,7 +37,8 @@ package object utils {
         writableDB,
         spendableBalanceChanged,
         createTestBlockchainSettings(fs),
-        dbSettings
+        dbSettings,
+        10
       )
 
     def createTestBlockchainSettings(fs: FunctionalitySettings): BlockchainSettings =

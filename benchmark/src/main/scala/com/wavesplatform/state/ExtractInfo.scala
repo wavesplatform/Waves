@@ -49,7 +49,7 @@ object ExtractInfo extends App with ScorexLogging {
   }
 
   try {
-    val state = new LevelDBWriter(db, PublishSubject(), wavesSettings.blockchainSettings, wavesSettings.dbSettings)
+    val state = new LevelDBWriter(db, PublishSubject(), wavesSettings.blockchainSettings, wavesSettings.dbSettings, 10)
 
     def nonEmptyBlockHeights(from: Int): Iterator[Integer] =
       for {

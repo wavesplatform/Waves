@@ -211,7 +211,7 @@ object MiningWithRewardSuite {
       val spendableBalanceChanged: Observer[(Address, Asset)],
       override val settings: BlockchainSettings,
       override val dbSettings: DBSettings
-  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings) {
+  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings, 10) {
     def saveReward(newReward: Long): Unit = {
       db.put(Keys.blockReward(0).keyBytes, Keys.blockReward(0).encode(Some(newReward)))
     }

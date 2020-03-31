@@ -122,18 +122,23 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def assetScript(asset: IssuedAsset): Option[(Script, Long)] = assetScriptCache.get(asset)
 
   private var lastAddressId = loadMaxAddressId()
-  protected def loadMaxAddressId(): BigInt
+  protected def loadMaxAddressId(): Long
 
-  private val addressIdCache: LoadingCache[Address, Option[BigInt]] = cache(dbSettings.maxCacheSize, loadAddressId)
-  protected def loadAddressId(address: Address): Option[BigInt]
+  private val addressIdCache: LoadingCache[Address, Option[AddressId]] = cache(dbSettings.maxCacheSize, loadAddressId)
+  protected def loadAddressId(address: Address): Option[AddressId]
 
-  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, loadAccountData)
+  protected def addressIdWithFallback(address: Address, newAddresses: Map[Address, AddressId]): AddressId =
+    newAddresses.getOrElse(address, addressIdCache.get(address).get)
+
+  private val accountDataCache: LoadingCache[(Address, String), Option[DataEntry[_]]] = cache(dbSettings.maxCacheSize, {
+    case (k, v) => loadAccountData(k, v)
+  })
 
   override def accountData(acc: Address, key: String): Option[DataEntry[_]] = accountDataCache.get((acc, key))
   protected def discardAccountData(addressWithKey: (Address, String)): Unit = accountDataCache.invalidate(addressWithKey)
-  protected def loadAccountData(addressWithKey: (Address, String)): Option[DataEntry[_]]
+  protected def loadAccountData(acc: Address, key: String): Option[DataEntry[_]]
 
-  private[database] def addressId(address: Address): Option[BigInt] = addressIdCache.get(address)
+  private[database] def addressId(address: Address): Option[AddressId] = addressIdCache.get(address)
 
   @volatile
   protected var approvedFeaturesCache: Map[Short, Int] = loadApprovedFeatures()
@@ -149,18 +154,18 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   protected def doAppend(
       block: Block,
       carry: Long,
-      newAddresses: Map[Address, BigInt],
-      balances: Map[BigInt, Map[Asset, Long]],
-      leaseBalances: Map[BigInt, LeaseBalance],
+      newAddresses: Map[Address, AddressId],
+      balances: Map[AddressId, Map[Asset, Long]],
+      leaseBalances: Map[AddressId, LeaseBalance],
       addressTransactions: Map[AddressId, Seq[TransactionId]],
       leaseStates: Map[ByteStr, Boolean],
       issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
       reissuedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
       filledQuantity: Map[ByteStr, VolumeAndFee],
-      scripts: Map[BigInt, Option[AccountScriptInfo]],
+      scripts: Map[AddressId, Option[AccountScriptInfo]],
       assetScripts: Map[IssuedAsset, Option[(Script, Long)]],
-      data: Map[BigInt, AccountDataInfo],
-      aliases: Map[Alias, BigInt],
+      data: Map[Address, AccountDataInfo],
+      aliases: Map[Alias, AddressId],
       sponsorship: Map[IssuedAsset, Sponsorship],
       totalFee: Long,
       reward: Option[Long],
@@ -182,15 +187,13 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex
-    } yield address -> (lastAddressId + offset + 1)).toMap
-
-    def addressId(address: Address): BigInt = (newAddressIds.get(address) orElse addressIdCache.get(address)).get
+    } yield address -> AddressId(lastAddressId + offset + 1)).toMap
 
     lastAddressId += newAddressIds.size
 
     val PortfolioUpdates(updatedBalances, updatedLeaseBalances) = DiffToStateApplier.portfolios(this, diff)
 
-    val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressId(address) -> lb }
+    val leaseBalances = updatedLeaseBalances.map { case (address, lb) => addressIdWithFallback(address, newAddressIds) -> lb }
 
     val newFills = for {
       (orderId, fillInfo) <- diff.orderFills
@@ -210,8 +213,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>
-              val addrId = AddressId(addressId(addr))
-              addrId -> TransactionId(tx.id())
+              addressIdWithFallback(addr, newAddressIds) -> TransactionId(tx.id())
             }
         }
         .groupBy(_._1)
@@ -225,17 +227,17 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       block,
       carryFee,
       newAddressIds,
-      updatedBalances.map { case (a, v) => addressId(a) -> v },
+      updatedBalances.map { case (a, v) => addressIdWithFallback(a, newAddressIds) -> v },
       leaseBalances,
       addressTransactions,
       diff.leaseState,
       diff.issuedAssets,
       diff.updatedAssets,
       newFills,
-      diff.scripts.map { case (address, s) => addressId(address) -> s },
+      diff.scripts.map { case (address, s) => addressIdWithFallback(address, newAddressIds) -> s },
       diff.assetScripts,
-      diff.accountData.map { case (address, data) => addressId(address) -> data },
-      diff.aliases.map { case (a, address)        => a                  -> addressId(address) },
+      diff.accountData,
+      diff.aliases.map { case (a, address) => a -> addressIdWithFallback(address, newAddressIds) },
       diff.sponsorship,
       totalFee,
       reward,

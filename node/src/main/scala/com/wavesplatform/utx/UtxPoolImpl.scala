@@ -28,6 +28,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
@@ -53,7 +54,8 @@ class UtxPoolImpl(
   import com.wavesplatform.utx.UtxPoolImpl._
 
   // Context
-  private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
+  private[this] val cleanupScheduler: SchedulerService =
+    Schedulers.singleThread("utx-pool-cleanup", executionModel = ExecutionModel.AlwaysAsyncExecution)
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
@@ -382,12 +384,13 @@ class UtxPoolImpl(
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
-      cleanupScheduler.execute { () =>
-        try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
-        finally scheduled.set(false)
+    def runCleanupAsync(): Unit =
+      if ((!transactions.isEmpty || priorityTransactions.nonEmpty) && scheduled.compareAndSet(false, true)) {
+        cleanupScheduler.execute { () =>
+          try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+          finally scheduled.set(false)
+        }
       }
-    }
   }
 
   /** DOES NOT verify transactions */
