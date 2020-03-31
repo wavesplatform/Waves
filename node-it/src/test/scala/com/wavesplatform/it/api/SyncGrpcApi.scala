@@ -37,8 +37,8 @@ object SyncGrpcApi extends Assertions {
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
 
-  implicit class NodeExtGrpc(n: Node) {
-
+  implicit class NodeExtGrpc(private val n: Node) extends AnyVal {
+    def grpc = this
     import com.wavesplatform.account.{Address => Addr}
     import com.wavesplatform.it.api.AsyncGrpcApi.{NodeAsyncGrpcApi => async}
 
@@ -57,6 +57,10 @@ object SyncGrpcApi extends Assertions {
     def resolveAlias(alias: String): Addr = {
       val addr = accounts.resolveAlias(StringValue.of(alias))
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
+    }
+
+    def stateChanges(txId: String): StateChangesDetails = {
+      sync(async(n).stateChanges(txId))
     }
 
     def exchange(

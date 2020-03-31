@@ -309,8 +309,8 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee, version)), waitForTx)
 
-    def debugStateChanges(transactionId: String): DebugStateChanges = {
-      sync(async(n).debugStateChanges(transactionId))
+    def debugStateChanges(transactionId: String, amountsAsStrings: Boolean = false): DebugStateChanges = {
+      sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
     }
 
     def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
