@@ -150,8 +150,8 @@ object Keys {
       Longs.toByteArray
     )
 
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
-    Key(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
+  def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
+    Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 
   def blockReward(height: Int): Key[Option[Long]] =
     Key.opt(BlockReward, h(height), Longs.fromByteArray, Longs.toByteArray)

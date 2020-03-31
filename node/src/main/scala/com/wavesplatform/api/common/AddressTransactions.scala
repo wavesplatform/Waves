@@ -55,7 +55,8 @@ object AddressTransactions {
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
       (h, txNum) <- resource.get(Keys.transactionHNById(TransactionId(txId)))
-    } yield resource.get(Keys.invokeScriptResult(h, txNum))
+      r <- resource.get(Keys.invokeScriptResult(h, txNum))
+    } yield r
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
     db.withResource(r => loadInvokeScriptResult(r, txId))

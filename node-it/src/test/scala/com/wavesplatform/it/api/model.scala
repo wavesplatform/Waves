@@ -284,7 +284,8 @@ case class TransactionStatus(
     id: String,
     status: String,
     confirmations: Option[Int],
-    height: Option[Int]
+    height: Option[Int],
+    applicationStatus: Option[String]
 )
 object TransactionStatus {
   implicit val format: Format[TransactionStatus] = Json.format

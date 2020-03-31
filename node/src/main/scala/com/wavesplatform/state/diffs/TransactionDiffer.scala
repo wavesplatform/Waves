@@ -144,10 +144,11 @@ object TransactionDiffer {
   private object isFailedScript {
     def unapply(result: TracedResult[ValidationError, Diff]): Boolean =
       result match {
-        case TracedResult(Left(TransactionValidationError(ScriptExecutionError(_, _, true), _)), _) => true
-        case TracedResult(Left(TransactionValidationError(DAppExecutionError(_, _), _)), _)         => true
-        case TracedResult(Left(TransactionValidationError(InsufficientInvokeActionFee(_), _)), _)   => true
-        case _                                                                                      => false
+        case TracedResult(Left(TransactionValidationError(ScriptExecutionError(_, _, true), _)), _)       => true
+        case TracedResult(Left(TransactionValidationError(TransactionNotAllowedByScript(_, true), _)), _) => true
+        case TracedResult(Left(TransactionValidationError(DAppExecutionError(_, _), _)), _)               => true
+        case TracedResult(Left(TransactionValidationError(InsufficientInvokeActionFee(_), _)), _)         => true
+        case _                                                                                            => false
       }
   }
 

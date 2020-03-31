@@ -320,6 +320,22 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
   }
 
+  test("failed exchange tx when amount asset script fails") {
+
+  }
+
+  test("failed exchange tx when price asset script fails") {
+
+  }
+
+  test("failed exchange tx when buy matcher fee asset script fails") {
+
+  }
+
+  test("failed exchange tx when sell matcher fee asset script fails") {
+
+  }
+
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
       .overrideBase(_.quorum(0))

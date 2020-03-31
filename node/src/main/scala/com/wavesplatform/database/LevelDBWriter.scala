@@ -444,7 +444,7 @@ class LevelDBWriter(
             .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-          try rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+          try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
           catch {
             case NonFatal(e) =>
               throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
