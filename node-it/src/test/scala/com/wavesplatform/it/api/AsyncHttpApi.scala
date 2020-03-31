@@ -927,7 +927,13 @@ object AsyncHttpApi extends Assertions {
     }
 
     def assertAssetBalance(acc: String, assetIdString: String, balance: Long)(implicit pos: Position): Future[Unit] = {
-      n.assetBalance(acc, assetIdString).map(_.balance shouldBe balance)
+      for {
+      plainBalance <-   n.assetBalance(acc, assetIdString)
+      pf <- n.assetsBalance(acc)
+      } yield {
+        plainBalance shouldBe balance
+        pf.balances.find(_.assetId == assetIdString).map(_.balance) should contain(balance)
+      }
     }
 
     def calculateFee(json: JsValue, amountsAsStrings: Boolean = false): Future[FeeInfo] = {
