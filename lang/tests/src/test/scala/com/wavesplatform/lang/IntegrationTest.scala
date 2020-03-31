@@ -1368,7 +1368,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(script(base16String8Kb + "AA"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
   }
 
-  property("fromBase16String limit 32Kb from V4") {
+  property("fromBase16String limit 32768 digits from V4") {
     val string32Kb = "FEDCBA9876543210" * (32 * 1024 / 16)
     def script(base16String: String) = s"""fromBase16String("$base16String")"""
     def bytes(base16String: String) = BaseEncoding.base16().decode(base16String)
