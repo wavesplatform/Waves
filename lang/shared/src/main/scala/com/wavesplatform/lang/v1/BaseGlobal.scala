@@ -51,26 +51,17 @@ trait BaseGlobal {
     if (checkLength && input.length > MaxBase16Bytes)
       Left(s"Base16 encode input length=${input.length} should not exceed $MaxBase16Bytes")
     else
-      toEither(BaseEncoding.base16().encode(input))
+      base16EncodeImpl(input)
 
   def base16Decode(input: String, checkLength: Boolean): Either[String, Array[Byte]] =
     if (checkLength && input.length > MaxBase16String)
       Left(s"Base16 decode input length=${input.length} should not exceed $MaxBase16String")
     else
-      toEither(BaseEncoding.base16().decode(input.toUpperCase))
+      base16DecodeImpl(input)
 
-  private def toEither[A](f: => A): Either[String, A] =
-    Try(f).toEither
-      .leftMap { exception =>
-        @tailrec
-        def findThrowableCause(th: Throwable): Throwable =
-          if (th.getCause == null) th
-          else findThrowableCause(th.getCause)
+  protected def base16EncodeImpl(input: Array[Byte]): Either[String, String]
 
-        val cause = findThrowableCause(exception)
-        if (cause.getMessage != null) cause.getMessage
-        else cause.toString
-      }
+  protected def base16DecodeImpl(input: String): Either[String, Array[Byte]]
 
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean
 
