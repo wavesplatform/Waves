@@ -5,7 +5,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.Transaction
+import com.wavesplatform.it.api.{StateChangesDetails, Transaction}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
@@ -212,7 +212,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
       assertBadRequestAndMessage(
-        invokeScript(acc,"transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.q / 2 + 1).toInt),
+        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.q / 2 + 1).toInt),
         "State check failed. Reason: Accounts balance errors"
       )
     }
@@ -273,6 +273,29 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
   }
 
+  "State changes" - {
+    "No issue" in {
+      val script =
+        """
+          |{-# STDLIB_VERSION 4 #-}
+          |{-# SCRIPT_TYPE ACCOUNT #-}
+          |{-# CONTENT_TYPE DAPP #-}
+          |
+          |@Callable (i)
+          |func nooperation() = {
+          |  [
+          |  ]
+          |}""".stripMargin
+
+      val acc = createDapp(script)
+      assetStateChanges(invokeScript(acc, "nooperation")) { sc =>
+        sc.issues shouldBe empty
+        sc.burns shouldBe empty
+        sc.reissues shouldBe empty
+      }
+    }
+  }
+
   def createDapp(scriptParts: String*): String = {
     val script  = scriptParts.mkString(" ")
     val address = miner.createAddress()
@@ -316,7 +339,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       case "issue2Assets"      => List.empty
       case "issue10Assets"     => List.empty
       case "issue11Assets"     => List.empty
-      case "transferAndBurn"     => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "transferAndBurn"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
       case "process11actions"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "burnAsset"         => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
       case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
@@ -338,11 +361,18 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     tx._1
   }
 
+  def assetStateChanges(tx: Transaction)(f: StateChangesDetails => Unit): Unit = {
+    f(stateChanges(tx))
+  }
+
+  def stateChanges(tx: Transaction): StateChangesDetails =
+    sender.debugStateChanges(tx.id).stateChanges.get
+
   def validateIssuedAssets(account: String, tx: Transaction, data: Asset, nth: Int = -1, method: String): String = {
     val assetId = method match {
       case "@Callable" =>
-        (if (nth == -1) sender.debugStateChanges(tx.id.toString).stateChanges.get.issues.head
-         else sender.debugStateChanges(tx.id.toString).stateChanges.get.issues(nth)).assetId
+        (if (nth == -1) stateChanges(tx).issues.head
+         else stateChanges(tx).issues(nth)).assetId
       case _ => tx.id
     }
 
