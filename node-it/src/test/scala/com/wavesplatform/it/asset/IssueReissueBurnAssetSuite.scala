@@ -264,6 +264,19 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         acc           -> (simpleReissuableAsset.quantity)
       )
     }
+
+    "rollback works" in {
+      val height = sender.height
+      val acc   = createDapp(script(simpleReissuableAsset))
+      val asset = issueValidated(acc, simpleReissuableAsset)
+      burn(acc, CallableMethod, asset, 400)
+      reissue(acc, CallableMethod, asset, 400, reissuable = false)
+      sender.setScript(acc, Some(script(nftAsset)), waitForTx = true)
+      issue(acc, CallableMethod, nftAsset)
+      nodes.waitForHeightArise()
+      nodes.rollback(height, returnToUTX = false)
+
+    }
   }
 
   def createDapp(scriptParts: String*): String = {
@@ -310,6 +323,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       case "issue10Assets"     => List.empty
       case "issue11Assets"     => List.empty
       case "transferAndBurn"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "reissueIssueAndNft"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "process11actions"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
       case "burnAsset"         => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
       case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
@@ -487,7 +501,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   }
 
   def script(asset: Asset, function: String = ""): String = {
-    val issueParams = s""""${asset.name}","${asset.description}",${asset.quantity}, ${asset.decimals},${asset.reissuable},unit"""
+    def createIssueParams(asset: Asset) = s""""${asset.name}","${asset.description}",${asset.quantity}, ${asset.decimals},${asset.reissuable},unit"""
+    val issueParams = createIssueParams(asset)
 
     s"""
        |{-# STDLIB_VERSION 4 #-}
@@ -565,6 +580,16 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
        |    ScriptTransfer(Address(fromBase58String("${miner.address}")), q, a),
        |    Burn(a, q)
        | ]
+       |}
+       |
+       |@Callable(i)
+       |func reissueIssueAndNft(a: ByteVector) = {
+       |  [
+       |    Issue($issueParams, ${asset.nonce + 1})
+       |    Reissue(a, 100),
+       |    Burn(a, 100),
+       |    Issue(${createIssueParams(nftAsset)}, 1)
+       |  ]
        |}
        |
        |$function
