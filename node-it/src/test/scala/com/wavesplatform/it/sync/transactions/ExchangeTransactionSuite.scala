@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.Config
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.exchangeTx
@@ -17,11 +16,14 @@ import com.wavesplatform.transaction.assets.exchange._
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils._
-import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
+import play.api.libs.json.{JsNumber, JsString, Json}
 
 import scala.concurrent.duration._
 
-class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
+class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime with PriorityTransaction {
+  import ExchangeTransactionSuite.mkExchange
+  import restApi._
+
   var exchAsset: IssueTransaction = IssueTransaction(
     TxVersion.V1,
     sender = sender.privateKey,
@@ -297,7 +299,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - nftWavesPrice - matcherFee
 
     val sellerBalanceAfterFirstExchange = sender.balanceDetails(sellerAddress).regular
-    val buyerBalanceAfgerFirstExchange  = sender.balanceDetails(buyerAddress).regular
+    val buyerBalanceAfterFirstExchange  = sender.balanceDetails(buyerAddress).regular
 
     val tx2 =
       ExchangeTransaction
@@ -323,7 +325,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     sender.assetBalance(sellerAddress, dec6AssetId).balance shouldBe 0
     sender.assetBalance(buyerAddress, dec6AssetId).balance shouldBe 1000000
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalanceAfterFirstExchange - matcherFee
-    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfgerFirstExchange - matcherFee
+    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfterFirstExchange - matcherFee
 
   }
 
@@ -334,8 +336,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val sellerAddress  = firstAddress
     val buyerAddress   = secondAddress
     val matcherAddress = thirdAddress
-
-    val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
 
     val transfers = Seq(
       sender.transfer(sender.address, sellerAddress, 100.waves).id,
@@ -369,25 +369,20 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val buyMatcherFee  = fee / 100000L
     val priorityFee    = setAssetScriptFee + smartFee + fee * 10
 
-    for ((invalidScriptAsset, owner) <- Seq(
-           (amountAsset, sellerAddress),
-           (priceAsset, buyerAddress),
-           (sellMatcherFeeAsset, matcherAddress),
-           (buyMatcherFeeAsset, matcherAddress)
-         )) {
-      val txs = (1 to maxTxsInMicroBlock * 2).map { _ =>
-        mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAsset, sellMatcherFeeAsset, buyMatcherFee, sellMatcherFee)
+    val allCases =
+      Seq((amountAsset, sellerAddress), (priceAsset, buyerAddress), (sellMatcherFeeAsset, matcherAddress), (buyMatcherFeeAsset, matcherAddress))
+
+    for ((invalidScriptAsset, owner) <- allCases) {
+      val txsSend = (_: Int) => {
+        val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAsset, sellMatcherFeeAsset, buyMatcherFee, sellMatcherFee)
+        sender.signedBroadcast(tx.json()).id
       }
-      val txIds        = txs.map(tx => sender.signedBroadcast(tx.json()).id)
-      val priorityTxId = updateAssetScript(false, invalidScriptAsset, owner, priorityFee)
-      waitForEmptyUtx()
-      sender.printDebugMessage(DebugMessage(s"Priority transaction id: $priorityTxId, invalid asset id: $invalidScriptAsset"))
 
-      assertFailedTxs(txIds) // liquid
-      nodes.waitForHeightArise()
-      assertFailedTxs(txIds) // hardened
-
-      nodes.waitForTransaction(updateAssetScript(true, invalidScriptAsset, owner, setAssetScriptFee + smartFee))
+      sendTxsAndThenPriorityTx(
+        txsSend,
+        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee)
+      )(assertFailedTxs)
+      updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
     }
   }
 
@@ -398,8 +393,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val sellerAddress  = firstAddress
     val buyerAddress   = secondAddress
     val matcherAddress = thirdAddress
-
-    val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
 
     val transfers = Seq(
       sender.transfer(sender.address, sellerAddress, 100.waves).id,
@@ -432,28 +425,42 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     val buyMatcherFee  = fee / 100000L
     val priorityFee    = setScriptFee + smartFee + fee * 10
 
-    for (invalidAccount <- Seq(
-           sellerAddress,
-           buyerAddress,
-           matcherAddress
-         )) {
-      val txs = (1 to maxTxsInMicroBlock * 2).map { _ =>
-        mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAsset, sellMatcherFeeAsset, buyMatcherFee, sellMatcherFee)
+    val allCases = Seq(sellerAddress, buyerAddress, matcherAddress)
+    allCases.foreach(address => updateAccountScript(None, address, setScriptFee + smartFee))
+
+    for (invalidAccount <- allCases) {
+      val txsSend = (_: Int) => {
+        val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAsset, sellMatcherFeeAsset, buyMatcherFee, sellMatcherFee)
+        sender.signedBroadcast(tx.json()).id
       }
-      val txIds        = txs.map(tx => sender.signedBroadcast(tx.json()).id)
-      val priorityTxId = updateAccountScript(Some(false), invalidAccount, priorityFee)
-      waitForEmptyUtx()
-      sender.printDebugMessage(DebugMessage(s"Priority transaction id: $priorityTxId, invalid account: $invalidAccount"))
 
-      assertInvalidTxs(txIds) // liquid
-      nodes.waitForHeightArise()
-      assertInvalidTxs(txIds) // hardened
-
-      nodes.waitForTransaction(updateAccountScript(None, invalidAccount, setScriptFee + smartFee))
+      sendTxsAndThenPriorityTx(
+        txsSend,
+        () => updateAccountScript(Some(false), invalidAccount, priorityFee)
+      )(assertInvalidTxs)
+      updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
     }
   }
 
-  private def mkExchange(
+  private def waitForTxs(txs: Seq[String]): Unit =
+    nodes.waitFor[Boolean]("preconditions")(100.millis)(
+      n => n.transactionStatus(txs).forall(_.status == "confirmed"),
+      statuses => statuses.forall(identity)
+    )
+
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id.toInt, 0)))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
+
+  override protected def waitForHeightArise(): Unit = nodes.waitForHeightArise()
+}
+
+object ExchangeTransactionSuite {
+  def mkExchange(
       buyer: KeyPair,
       seller: KeyPair,
       matcher: KeyPair,
@@ -464,7 +471,7 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       buyMatcherFee: Long,
       sellMatcherFee: Long
   ): ExchangeTransaction = {
-    val ts   = ntpTime.getTimestamp()
+    val ts   = System.currentTimeMillis()
     val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
     val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
     val buy  = Order.buy(Order.V4, buyer, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
@@ -485,108 +492,4 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
       .right
       .get
   }
-
-  private def updateAssetScript(result: Boolean, asset: String, owner: String, fee: Long): String = {
-    sender
-      .setAssetScript(
-        asset,
-        owner,
-        fee,
-        Some(
-          ScriptCompiler
-            .compile(
-              s"""
-               |match tx {
-               |  case tx: SetAssetScriptTransaction => true
-               |  case _ => $result
-               |}
-               |""".stripMargin,
-              ScriptEstimatorV3
-            )
-            .right
-            .get
-            ._1
-            .bytes()
-            .base64
-        )
-      )
-      .id
-  }
-
-  private def updateAccountScript(result: Option[Boolean], account: String, fee: Long): String = {
-    sender
-      .setScript(
-        account,
-        result.map { r =>
-          ScriptCompiler
-            .compile(
-              s"""
-               {-# STDLIB_VERSION 3 #-}
-                 |{-# CONTENT_TYPE EXPRESSION #-}
-                 |{-# SCRIPT_TYPE ACCOUNT #-}
-                 |
-                 |match (tx) {
-                 |  case t: ExchangeTransaction => false
-                 |  case _ => $r
-                 |}
-                 |""".stripMargin,
-              ScriptEstimatorV3
-            )
-            .right
-            .get
-            ._1
-            .bytes()
-            .base64
-
-        },
-        fee = fee
-      )
-      .id
-  }
-
-  def assertFailedTxs(txs: Seq[String]): Unit = {
-    val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
-    all(statuses.map(_.status)) shouldBe "confirmed"
-    all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
-
-    statuses.foreach { s =>
-      (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
-    }
-
-    val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
-    failed.size should be > 0
-
-    all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
-  }
-
-  def assertInvalidTxs(txs: Seq[String]): Unit = {
-    val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
-
-    statuses.foreach { s =>
-      (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
-    }
-
-    val invalid = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
-    invalid.size should be > 0
-
-    all(invalid.map(_.status)) shouldBe "not_found"
-    all(invalid.map(_.applicationStatus)) shouldBe None
-  }
-
-  private def waitForTxs(txs: Seq[String]): Unit =
-    nodes.waitFor[Boolean]("preconditions")(100.millis)(
-      n => n.transactionStatus(txs).forall(_.status == "confirmed"),
-      statuses => statuses.forall(identity)
-    )
-
-  private def waitForEmptyUtx(): Unit =
-    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
-
-  override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.newBuilder
-      .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id.toInt, 0)))
-      .withDefault(1)
-      .withSpecial(_.nonMiner)
-      .buildNonConflicting()
 }
