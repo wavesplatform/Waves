@@ -339,7 +339,7 @@ class ParserV2(val input: ParserInput) extends Parser {
 
   def parseByteVectorAtom(base: String, startPos: Int, byteStr: String, endPos: Int): EXPR = {
     val decoded = base match {
-      case "16" => Global.base16Decode(byteStr)
+      case "16" => Global.base16Decode(byteStr, checkLength = false)
       case "58" => Global.base58Decode(byteStr)
       case "64" => Global.base64Decode(byteStr)
       case _ => Left("Wrong input around 'base...' construction")
