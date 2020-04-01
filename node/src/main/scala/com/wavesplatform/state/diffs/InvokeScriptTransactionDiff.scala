@@ -188,15 +188,6 @@ object InvokeScriptTransactionDiff {
           _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transfers))
           _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _ <- TracedResult(validateOverflow(transfers.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
-//          _ <- TracedResult(
-//            Either.cond(
-//              transfers
-//                .flatMap(_.assetId)
-//                .forall(id => blockchain.assetDescription(IssuedAsset(id)).isDefined),
-//              (),
-//              GenericError(s"Unissued assets are not allowed")
-//            )
-//          )
 
           verifierComplexity = blockchain.accountScript(tx.sender).map(_.maxComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
