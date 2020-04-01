@@ -284,7 +284,7 @@ object Parser {
           val innerStart = start + 8
           val innerEnd   = end - 1
           val decoded = base match {
-            case "16" => Global.base16Decode(xs)
+            case "16" => Global.base16Decode(xs, checkLength = false)
             case "58" => Global.base58Decode(xs)
             case "64" => Global.base64Decode(xs)
           }
