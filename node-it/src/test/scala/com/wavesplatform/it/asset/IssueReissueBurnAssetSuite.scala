@@ -7,7 +7,15 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{AssetInfo, BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails, Transaction}
+import com.wavesplatform.it.api.{
+  AssetInfo,
+  BurnInfoResponse,
+  DebugStateChanges,
+  IssueInfoResponse,
+  ReissueInfoResponse,
+  StateChangesDetails,
+  Transaction
+}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
@@ -165,7 +173,11 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       val tx  = invokeScript(acc, "issue10Assets")
-      for (nth <- 0 to 9) validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
+      for (nth <- 0 to 9) {
+        val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
+        assertQuantity(assetId)(simpleReissuableAsset.quantity)
+        sender.assertAssetBalance(acc, assetId, simpleReissuableAsset.quantity)
+      }
     }
 
     "Issue more than 10 assets should produce an error" in {
@@ -266,16 +278,18 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
 
     "rollback works" in {
-      val height = sender.height
-      val acc   = createDapp(script(simpleReissuableAsset))
-      val asset = issueValidated(acc, simpleReissuableAsset)
-      burn(acc, CallableMethod, asset, 400)
-      reissue(acc, CallableMethod, asset, 400, reissuable = false)
-      sender.setScript(acc, Some(script(nftAsset)), waitForTx = true)
-      issue(acc, CallableMethod, nftAsset)
+      val acc    = createDapp(script(simpleReissuableAsset))
+      val asset  = issueValidated(acc, simpleReissuableAsset)
+      val height = nodes.waitForHeightArise()
+      invokeScript(acc, "reissueIssueAndNft", assetId = asset)
       nodes.waitForHeightArise()
       nodes.rollback(height, returnToUTX = false)
-
+      sender.debugStateChangesByAddress(acc, 100) should matchPattern {
+        case Seq(sc: DebugStateChanges) if sc.stateChanges.forall(sd => sd.issues.nonEmpty && sd.reissues.isEmpty && sd.burns.isEmpty) =>
+      }
+      assertQuantity(asset)(simpleReissuableAsset.quantity)
+      sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
+      sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
     }
   }
 
@@ -318,16 +332,16 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       payments: Seq[InvokeScriptTransaction.Payment] = Seq.empty
   ): Transaction = {
     val args = function match {
-      case "issueAsset"        => List.empty
-      case "issue2Assets"      => List.empty
-      case "issue10Assets"     => List.empty
-      case "issue11Assets"     => List.empty
-      case "transferAndBurn"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueIssueAndNft"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
-      case "process11actions"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
-      case "burnAsset"         => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
-      case "reissueAsset"      => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
-      case "reissueAndReissue" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "issueAsset"         => List.empty
+      case "issue2Assets"       => List.empty
+      case "issue10Assets"      => List.empty
+      case "issue11Assets"      => List.empty
+      case "transferAndBurn"    => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "reissueIssueAndNft" => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
+      case "process11actions"   => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet())
+      case "burnAsset"          => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
+      case "reissueAsset"       => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_BOOLEAN(isReissuable), CONST_LONG(count))
+      case "reissueAndReissue"  => List(CONST_BYTESTR(ByteStr.decodeBase58(assetId).get).explicitGet(), CONST_LONG(count))
     }
 
     val tx = miner
@@ -502,7 +516,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
   def script(asset: Asset, function: String = ""): String = {
     def createIssueParams(asset: Asset) = s""""${asset.name}","${asset.description}",${asset.quantity}, ${asset.decimals},${asset.reissuable},unit"""
-    val issueParams = createIssueParams(asset)
+    val issueParams                     = createIssueParams(asset)
 
     s"""
        |{-# STDLIB_VERSION 4 #-}
