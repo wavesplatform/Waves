@@ -31,7 +31,8 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
   val versions: immutable.Seq[(TxVersion, TxVersion, TxVersion)] = transactionV1versions +: transactionV2versions
 
   test("exchange tx with orders v1,v2") {
-    val exchAsset          = sender.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
+    val exchAsset =
+      sender.broadcastIssue(buyer, Base64.encode("exchAsset".utf8Bytes), someAssetAmount, 8, reissuable = true, 1.waves, waitForTx = true)
     val exchAssetId        = PBTransactions.vanilla(exchAsset).explicitGet().id().toString
     val price              = 500000L
     val amount             = 40000000L
@@ -63,6 +64,15 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     val amount             = 40000000L
     val priceAssetSpending = price * amount / 100000000L
 
+    sender.broadcastTransfer(
+      buyer,
+      Recipient().withPublicKeyHash(sellerAddress),
+      someAssetAmount / 2,
+      minFee,
+      assetId = feeAssetId.toString,
+      waitForTx = true
+    )
+
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2, buyerWavesDelta, sellerWavesDelta, buyerAssetDelta, sellerAssetDelta) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(feeAssetId), amount - matcherFee, -amount, -priceAssetSpending, priceAssetSpending - matcherFee),
            (1: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),
@@ -71,16 +81,6 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
            (2: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),
            (3: Byte, 2: Byte, IssuedAsset(feeAssetId), Waves, amount, -amount - matcherFee, -priceAssetSpending - matcherFee, priceAssetSpending)
          )) {
-      if (matcherFeeOrder1 == Waves && matcherFeeOrder2 != Waves) {
-        sender.broadcastTransfer(
-          buyer,
-          Recipient().withPublicKeyHash(sellerAddress),
-          100000,
-          minFee,
-          assetId = feeAssetId.toString,
-          waitForTx = true
-        )
-      }
 
       val buyerWavesBalanceBefore  = sender.wavesBalance(buyerAddress).available
       val sellerWavesBalanceBefore = sender.wavesBalance(sellerAddress).available
