@@ -460,7 +460,7 @@ object AsyncGrpcApi {
 
     def assetInfo(assetId: String): Future[AssetInfoResponse] = assets.getInfo(AssetRequest(ByteString.copyFrom(Base58.decode(assetId))))
 
-    def getStatuses(request: TransactionsByIdRequest): Future[List[PBTransactionStatus]] = {
+    def getStatuses(request: TransactionsByIdRequest): Future[Seq[PBTransactionStatus]] = {
       val (obs, result) = createCallObserver[PBTransactionStatus]
       transactions.getStatuses(request, obs)
       result.runToFuture

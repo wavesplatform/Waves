@@ -327,6 +327,6 @@ object SyncGrpcApi extends Assertions {
       blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
     }
 
-    def getStatuses(request: TransactionsByIdRequest): List[PBTransactionStatus] = sync(async(n).getStatuses(request))
+    def getStatuses(request: TransactionsByIdRequest): Seq[PBTransactionStatus] = sync(async(n).getStatuses(request))
   }
 }

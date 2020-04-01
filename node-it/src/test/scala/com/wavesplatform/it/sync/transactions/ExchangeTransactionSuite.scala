@@ -2,18 +2,23 @@ package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
+import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
+import com.wavesplatform.it.{NTPTime, NodeConfigs}
+import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
+import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils._
-import play.api.libs.json.{JsNumber, JsString, Json}
+import play.api.libs.json.{JsNumber, JsObject, JsString, Json}
+
+import scala.concurrent.duration._
 
 class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   var exchAsset: IssueTransaction = IssueTransaction(
@@ -150,6 +155,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     sender.postJson("/transactions/broadcast", IssueTx.json())
 
     nodes.waitForHeightAriseAndTxPresent(assetId.toString)
+
+    sender.transfer(firstAddress, secondAddress, IssueTx.quantity / 2, assetId = Some(assetId.toString), waitForTx = true)
 
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
@@ -288,7 +295,6 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + nftWavesPrice - matcherFee
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - nftWavesPrice - matcherFee
 
-
     val sellerBalanceAfterFirstExchange = sender.balanceDetails(sellerAddress).regular
     val buyerBalanceAfgerFirstExchange  = sender.balanceDetails(buyerAddress).regular
 
@@ -320,21 +326,139 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
   }
 
-  test("failed exchange tx when amount asset script fails") {
+  test("failed exchange tx when asset script fails") {
+    val seller         = acc0
+    val buyer          = acc1
+    val matcher        = acc2
+    val sellerAddress  = firstAddress
+    val buyerAddress   = secondAddress
+    val matcherAddress = thirdAddress
 
+    val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
+
+    val transfers = Seq(
+      sender.transfer(sender.address, sellerAddress, 100.waves).id,
+      sender.transfer(sender.address, buyerAddress, 100.waves).id,
+      sender.transfer(sender.address, matcherAddress, 100.waves).id
+    )
+
+    val initScript          = Some(ScriptCompiler.compile("true", ScriptEstimatorV3).right.get._1.bytes().base64)
+    val amountAsset         = sender.issue(sellerAddress, "Amount asset", script = initScript, decimals = 8).id
+    val priceAsset          = sender.issue(buyerAddress, "Price asset", script = initScript, decimals = 8).id
+    val sellMatcherFeeAsset = sender.issue(matcherAddress, "Seller fee asset", script = initScript, decimals = 8).id
+    val buyMatcherFeeAsset  = sender.issue(matcherAddress, "Buyer fee asset", script = initScript, decimals = 8).id
+
+    val preconditions = transfers ++ Seq(
+      amountAsset,
+      priceAsset,
+      sellMatcherFeeAsset,
+      buyMatcherFeeAsset
+    )
+
+    waitForTxs(preconditions)
+
+    val transferToSeller = sender.transfer(matcherAddress, sellerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(sellMatcherFeeAsset)).id
+    val transferToBuyer  = sender.transfer(matcherAddress, buyerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(buyMatcherFeeAsset)).id
+
+    waitForTxs(Seq(transferToSeller, transferToBuyer))
+
+    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
+    val fee            = 0.003.waves + 4 * smartFee
+    val sellMatcherFee = fee / 100000L
+    val buyMatcherFee  = fee / 100000L
+    val priorityFee    = setAssetScriptFee + smartFee + fee * 10
+
+    for ((invalidScriptAsset, owner) <- Seq(
+           (amountAsset, sellerAddress),
+           (priceAsset, buyerAddress),
+           (sellMatcherFeeAsset, matcherAddress),
+           (buyMatcherFeeAsset, matcherAddress)
+         )) {
+      val txs = (1 to maxTxsInMicroBlock * 2).map { _ =>
+        val ts   = ntpTime.getTimestamp()
+        val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
+        val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
+        val buy  = Order.buy(Order.V4, buyer, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
+        val sell = Order.sell(Order.V4, seller, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
+        val tx = ExchangeTransaction
+          .signed(
+            TxVersion.V3,
+            matcher,
+            buy,
+            sell,
+            buy.amount,
+            buy.price,
+            buy.matcherFee,
+            sell.matcherFee,
+            fee,
+            ts
+          )
+          .right
+          .get
+        sender.signedBroadcast(tx.json()).id
+      }
+      val priorityTxId = updateAssetScript(false, invalidScriptAsset, owner, priorityFee)
+      sender.utxSize should be > 0
+      waitForEmptyUtx()
+      nodes.waitForTransaction(priorityTxId)
+
+      assertFailedTxs(txs)
+      nodes.waitForHeightArise()
+      assertFailedTxs(txs)
+
+      nodes.waitForTransaction(updateAssetScript(true, invalidScriptAsset, owner, setAssetScriptFee + smartFee))
+    }
   }
 
-  test("failed exchange tx when price asset script fails") {
-
+  private def updateAssetScript(result: Boolean, asset: String, owner: String, fee: Long): String = {
+    sender
+      .setAssetScript(
+        asset,
+        owner,
+        fee,
+        Some(
+          ScriptCompiler
+            .compile(
+              s"""
+               |match tx {
+               |  case tx: SetAssetScriptTransaction => true
+               |  case _ => $result
+               |}
+               |""".stripMargin,
+              ScriptEstimatorV3
+            )
+            .right
+            .get
+            ._1
+            .bytes()
+            .base64
+        )
+      )
+      .id
   }
 
-  test("failed exchange tx when buy matcher fee asset script fails") {
+  def assertFailedTxs(txs: Seq[String]): Unit = {
+    val statuses = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.id) < txs.indexOf(s.id) }
+    all(statuses.map(_.status)) shouldBe "confirmed"
+    all(statuses.map(_.applicationStatus.isDefined)) shouldBe true
 
+    statuses.foreach { s =>
+      (sender.transactionInfo[JsObject](s.id) \ "applicationStatus").asOpt[String] shouldBe s.applicationStatus
+    }
+
+    val failed = statuses.dropWhile(s => s.applicationStatus.contains("succeed"))
+
+    all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
   }
 
-  test("failed exchange tx when sell matcher fee asset script fails") {
+  private def waitForTxs(txs: Seq[String]): Unit =
+    nodes.waitFor[Boolean]("preconditions")(100.millis)(
+      n => n.transactionStatus(txs).forall(_.status == "confirmed"),
+      statuses => statuses.forall(identity)
+    )
 
-  }
+  private def waitForEmptyUtx(): Unit =
+    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
