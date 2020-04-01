@@ -242,8 +242,27 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val acc     = createDapp(script(nftAsset))
       val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
+      sender.nftList(acc, 2).map(_.assetId) shouldBe Seq(assetId)
       burn(acc, CallableMethod, assetId, 1)
       sender.nftList(acc, 1) shouldBe empty
+    }
+
+    "distribution works" in {
+      val acc   = createDapp(script(simpleReissuableAsset))
+      val asset = issueValidated(acc, simpleReissuableAsset)
+      invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
+      nodes.waitForHeightArise()
+      sender.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
+        miner.address -> 100L,
+        acc           -> (simpleReissuableAsset.quantity - 200)
+      )
+      reissue(acc, CallableMethod, asset, 400, reissuable = false)
+      invokeScript(acc, "transferAndBurn", assetId = asset, count = 100)
+      nodes.waitForHeightArise()
+      sender.assetDistribution(asset).map { case (a, v) => a.stringRepr -> v } shouldBe Map(
+        miner.address -> 200L,
+        acc           -> (simpleReissuableAsset.quantity)
+      )
     }
   }
 
@@ -342,7 +361,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     issue.quantity shouldBe data.quantity
   }
 
-  def assertQuantity(assetId: String)(quantity: Long, reissuable: Boolean = true): Unit ={
+  def assertQuantity(assetId: String)(quantity: Long, reissuable: Boolean = true): Unit = {
     assertAssetDetails(assetId) { ai =>
       ai.quantity shouldBe quantity
       ai.reissuable shouldBe reissuable
@@ -368,7 +387,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   def validateIssuedAssets(account: String, tx: Transaction, data: Asset, nth: Int = -1, method: String = CallableMethod): String = {
     val assetId = method match {
       case CallableMethod => invokeAssetId(tx, nth)
-      case _ => tx.id
+      case _              => tx.id
     }
 
     val assetInfo = sender.assetsDetails(assetId)
@@ -396,7 +415,12 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
   def invokeAssetId(tx: Transaction, nth: Int = -1): String = {
     (if (nth == -1) stateChanges(tx).issues.head
-    else stateChanges(tx).issues(nth)).assetId
+     else stateChanges(tx).issues(nth)).assetId
+  }
+
+  def issueValidated(account: String, data: Asset): String = {
+    val tx = issue(account, CallableMethod, data)
+    validateIssuedAssets(account, tx, data)
   }
 
   def issue(account: String, method: String, data: Asset, fee: Long = invocationCost(1)): Transaction = {
@@ -461,7 +485,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   def invocationCost(aCount: Int, isSmartAcc: Boolean = true, sPCount: Int = 0, sAinActions: Int = 0): Long = {
     0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * sPCount + 0.004.waves * sAinActions + 1.waves * aCount
   }
-
 
   def script(asset: Asset, function: String = ""): String = {
     val issueParams = s""""${asset.name}","${asset.description}",${asset.quantity}, ${asset.decimals},${asset.reissuable},unit"""
