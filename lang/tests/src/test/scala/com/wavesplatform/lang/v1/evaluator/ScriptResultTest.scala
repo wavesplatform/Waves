@@ -1,7 +1,7 @@
 package com.wavesplatform.lang.v1.evaluator
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils._
 import com.wavesplatform.common.state.diffs.ProduceError._
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.v1.compiler.Terms._
@@ -28,7 +28,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
         "key"   -> CONST_STRING("xxx").explicitGet(),
         "value" -> CONST_LONG(42)
       )
-    ))))
+    ))).explicitGet())
   )
 
   val transferSetObj = CaseObj(
@@ -51,7 +51,7 @@ class ScriptResultTest extends PropSpec with PropertyChecks with Matchers with N
             "asset"     -> noAsset
           )
         )
-      )))
+      )).explicitGet())
   )
 
   val scriptResultObj = CaseObj(CASETYPEREF("ScriptResult", el), Map(FieldNames.ScriptWriteSet -> writeSetObj, FieldNames.ScriptTransferSet -> transferSetObj))
