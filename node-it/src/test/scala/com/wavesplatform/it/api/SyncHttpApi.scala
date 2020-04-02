@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
@@ -138,9 +137,9 @@ object SyncHttpApi extends Assertions {
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
     catch {
-      case usce: UnexpectedStatusCodeException => throw usce
-      case te: TimeoutException                => throw te
-      case NonFatal(cause)                     => throw new Exception(cause)
+//      case usce: UnexpectedStatusCodeException => throw usce
+//      case te: TimeoutException                => throw te
+      case NonFatal(cause) => throw new RuntimeException("Error in future", cause)
     }
 
   //noinspection ScalaStyle
@@ -420,9 +419,9 @@ object SyncHttpApi extends Assertions {
         version: Byte = 2,
         matcherFeeAssetId: Option[String] = None,
         waitForTx: Boolean = false,
-        amountsAsStrings: Boolean = false
-    ,
-        validate: Boolean = true): Transaction = {
+        amountsAsStrings: Boolean = false,
+        validate: Boolean = true
+    ): Transaction = {
       maybeWaitForTransaction(
         sync(
           async(n).broadcastExchange(
@@ -436,8 +435,7 @@ object SyncHttpApi extends Assertions {
             fee,
             version,
             matcherFeeAssetId,
-            amountsAsStrings
-          ,
+            amountsAsStrings,
             validate
           )
         ),
