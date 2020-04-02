@@ -983,11 +983,10 @@ class UtxPoolSpecification
                 _: Transaction
               ).resultE.explicitGet()
               val validTransferDiff   = differ(validTransfer)
-              val invalidTransferDiff = differ(invalidTransfer)
               addUnverified(validTransfer)
               addUnverified(invalidTransfer)
               assertEvents {
-                case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: UtxEvent.TxAdded(`invalidTransfer`, `invalidTransferDiff`) +: Nil => // Pass
+                case UtxEvent.TxAdded(`validTransfer`, `validTransferDiff`) +: Nil => // Pass
               }
 
               utxPool.packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, Duration.Inf)
