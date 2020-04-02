@@ -65,6 +65,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, data, fee)
       val assetId = validateIssuedAssets(acc, txIssue, data, method = method)
 
+      sender.assertAssetBalance(acc, assetId, data.quantity)
       val tx = burn(acc, method, assetId, data.quantity)
 
       sender.assetsDetails(assetId).quantity shouldBe 0
@@ -362,7 +363,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       function: String,
       wait: Boolean = true,
       assetId: String = "",
-      count: Int = 1,
+      count: Long = 1,
       isReissuable: Boolean = true,
       fee: Long = invokeFee,
       payments: Seq[InvokeScriptTransaction.Payment] = Seq.empty
@@ -513,7 +514,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   def reissue(account: String, method: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long = invokeFee): Transaction = {
     method match {
       case CallableMethod =>
-        val tx = invokeScript(account, "reissueAsset", assetId = assetId, count = quantity.toInt, isReissuable = reissuable)
+        val tx = invokeScript(account, "reissueAsset", assetId = assetId, count = quantity, isReissuable = reissuable)
         assertStateChanges(tx) { sd =>
           sd.reissues should matchPattern {
             case Seq(ReissueInfoResponse(`assetId`, `reissuable`, `quantity`)) =>
@@ -528,7 +529,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   def burn(account: String, method: String, assetId: String, quantity: Long, fee: Long = invokeFee): Transaction = {
     method match {
       case CallableMethod =>
-        val tx = invokeScript(account, "burnAsset", assetId = assetId, count = quantity.toInt)
+        val tx = invokeScript(account, "burnAsset", assetId = assetId, count = quantity)
         assertStateChanges(tx) { sd =>
           sd.burns should matchPattern {
             case Seq(BurnInfoResponse(`assetId`, `quantity`)) =>
