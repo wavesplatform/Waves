@@ -37,7 +37,8 @@ object NumberAsStringSerializer extends JsonSerializer[JsValue] {
     "totalAmount",
     "totalFee",
     "totalWavesAmount",
-    "value"
+    "value",
+    "nonce"
   )
 
   override def serialize(value: JsValue, json: JsonGenerator, provider: SerializerProvider): Unit = {

@@ -585,7 +585,7 @@ case class IssueInfoResponse(
     decimals: Int,
     isReissuable: Boolean,
     compiledScript: Option[String],
-    nonce: Int
+    nonce: Long
 )
 object IssueInfoResponse {
   implicit val IssueInfoFormat: Format[IssueInfoResponse] = Json.format
