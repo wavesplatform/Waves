@@ -59,7 +59,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       sender.assertAssetBalance(acc, assetId, remainQuantity)
     }
 
-    for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset)) s"${data.assetType} could be fully burned" in {
+    for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset)) s"${data.assetType} could be fully burned" in {
       val acc     = createDapp(script(data))
       val fee     = invocationCost(if (isNft(data)) 0 else 1)
       val txIssue = issue(acc, method, data, fee)
@@ -74,6 +74,12 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         sd.burns should matchPattern {
           case Seq(BurnInfoResponse(`assetId`, data.quantity)) =>
         }
+      }
+
+      if (data.reissuable) {
+        reissue(acc, method, assetId, data.quantity, reissuable = true)
+        sender.assetsDetails(assetId).quantity shouldBe data.quantity
+        sender.assertAssetBalance(acc, assetId, data.quantity)
       }
     }
 
