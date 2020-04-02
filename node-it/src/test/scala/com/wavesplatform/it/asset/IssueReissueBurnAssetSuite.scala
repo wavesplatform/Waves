@@ -290,6 +290,22 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       assertQuantity(asset)(simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
       sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
+      sender.nftList(acc, 10) shouldBe empty
+    }
+
+    "liquid block works" in {
+      val acc   = createDapp(script(simpleReissuableAsset))
+      val asset = issueValidated(acc, simpleReissuableAsset)
+      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset)
+      assertStateChanges(tx) { sd =>
+        sd.issues should have size 1
+        sd.burns should have size 1
+        sd.reissues should have size 1
+      }
+      assertQuantity(asset)(simpleReissuableAsset.quantity)
+      sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
+      sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
+      sender.nftList(acc, 10) should have size 1
     }
   }
 

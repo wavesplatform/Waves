@@ -51,7 +51,7 @@ object AsyncGrpcApi {
     def stateChanges(txId: String): Future[StateChangesDetails] = {
       val (obs, result) = createCallObserver[InvokeScriptResult]
       transactions.getStateChanges(TransactionsRequest().addTransactionIds(ByteString.copyFrom(Base58.decode(txId))), obs)
-      result.map { r =>
+      result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
         val result = VISR.fromPB(r.head)
         Json.toJson(result).as[StateChangesDetails]
