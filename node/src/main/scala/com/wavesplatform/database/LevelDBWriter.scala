@@ -516,8 +516,8 @@ class LevelDBWriter(
             val address = rw.get(Keys.idToAddress(addressId))
 
             rw.iterateOver(KeyTags.AssetBalanceHistory.prefixBytes ++ addressId.toByteArray) { e =>
-              val assetId = IssuedAsset(ByteStr(e.getKey.drop(java.lang.Long.BYTES).dropRight(4)))
-              val history = readIntSeq(e.getKey)
+              val assetId = IssuedAsset(e.getKey.takeRight(32))
+              val history = readIntSeq(e.getValue)
               if (history.nonEmpty && history.head == currentHeight) {
                 balancesToInvalidate += address -> assetId
                 rw.delete(Keys.assetBalance(addressId, assetId)(history.head))

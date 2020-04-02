@@ -31,6 +31,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   val setScriptPrice      = 0.01.waves
 
   val CallableMethod = "@Callable"
+  val TransactionMethod = "Transaction"
 
   val simpleNonreissuableAsset = Asset("Simple", "SimpleAsset", "description", 100500, false, 8, 0)
   val simpleReissuableAsset    = Asset("Reissuable", "ReissuableAsset", "description", 100000000, true, 3, 0)
@@ -38,7 +39,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   val longMinAsset             = Asset("Long min", "name" * 4, "A" * 1000, Long.MaxValue, true, 0, Long.MinValue)
   val nftAsset                 = Asset("NFT", "NFTAsset", "description", 1, false, 0, 0)
 
-  for (method <- Seq(CallableMethod, "Transaction")) s"Asset Issue/Reissue/Burn via $method" - {
+  for (method <- Seq(CallableMethod, TransactionMethod)) s"Asset Issue/Reissue/Burn via $method" - {
     val isCallable = method == CallableMethod
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset, longMinAsset))
@@ -60,7 +61,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val burnQuantity   = 1000
       val remainQuantity = data.quantity - burnQuantity
 
-      burn(acc, method, assetId, burnQuantity)
+      burn(acc, TransactionMethod, assetId, burnQuantity / 2)
+      burn(acc, CallableMethod, assetId, burnQuantity / 2)
       sender.assetsDetails(assetId).quantity shouldBe remainQuantity
       sender.assertAssetBalance(acc, assetId, remainQuantity)
     }
@@ -91,7 +93,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val addedQuantity     = 100500
       val initialReissuable = simpleReissuableAsset.reissuable
 
-      reissue(acc, method, assetId, addedQuantity, !initialReissuable)
+      reissue(acc, TransactionMethod, assetId, addedQuantity / 2, true)
+      reissue(acc, CallableMethod, assetId, addedQuantity / 2 , false)
 
       sender.assetsDetails(assetId).reissuable shouldBe !initialReissuable
       sender.assetsDetails(assetId).quantity shouldBe initialQuantity + addedQuantity
@@ -283,22 +286,27 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     "rollback works" in {
       val acc    = createDapp(script(simpleReissuableAsset))
       val asset  = issueValidated(acc, simpleReissuableAsset)
-      nodes.waitForHeightArise()
-      sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
+      val simpleAsset = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
 
-      val height = miner.height
+      sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil)) if issue.name == simpleReissuableAsset.name =>
+      }
+
+      val height = nodes.waitForHeightArise()
       nodes.waitForHeightArise()
       invokeScript(acc, "reissueIssueAndNft", assetId = asset)
+      burn(acc, CallableMethod, simpleAsset, 5000)
+      burn(acc, TransactionMethod, asset, 10000)
       nodes.waitForHeightArise()
 
       nodes.rollback(height, returnToUTX = false)
       assertQuantity(asset)(simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-      sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
+      sender.assertAssetBalance(acc, simpleAsset, simpleReissuableAsset.quantity)
+      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset, simpleAsset)
       sender.nftList(acc, 10) shouldBe empty
-      sender.debugStateChangesByAddress(acc, 100) should matchPattern {
-        case Seq(DebugStateChanges(_, _, _, _, _, _, _, _, _, Some(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil))))
-            if issue.name == simpleReissuableAsset.name =>
+      sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil)) if issue.name == simpleReissuableAsset.name =>
       }
     }
 
@@ -314,7 +322,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
         }
         assertQuantity(asset)(simpleReissuableAsset.quantity)
         sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-        sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
+        sender.assetsBalance(acc).balances should have size 2
         sender.nftList(acc, 10) should have size 1
       }
       checks()

@@ -137,9 +137,7 @@ object SyncHttpApi extends Assertions {
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
     catch {
-//      case usce: UnexpectedStatusCodeException => throw usce
-//      case te: TimeoutException                => throw te
-      case NonFatal(cause) => throw new RuntimeException("Error in future", cause)
+      case NonFatal(cause) => throw new RuntimeException("Error in API call", cause)
     }
 
   //noinspection ScalaStyle
