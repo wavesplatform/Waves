@@ -34,20 +34,23 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
   val simpleNonreissuableAsset = Asset("Simple", "SimpleAsset", "description", 100500, false, 8, 0)
   val simpleReissuableAsset    = Asset("Reissuable", "ReissuableAsset", "description", 100000000, true, 3, 0)
+  val longMaxAsset             = Asset("Long max", "name", "", Long.MaxValue, true, 8, Long.MaxValue)
+  val longMinAsset             = Asset("Long min", "name" * 4, "A" * 1000, Long.MaxValue, true, 0, Long.MinValue)
   val nftAsset                 = Asset("NFT", "NFTAsset", "description", 1, false, 0, 0)
 
   for (method <- Seq(CallableMethod, "Transaction")) s"Asset Issue/Reissue/Burn via $method" - {
     val isCallable = method == CallableMethod
 
-    for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset)) s"${data.assetType} asset could be issued in callable" in {
-      val acc = createDapp(script(data))
+    for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset, nftAsset, longMaxAsset, longMinAsset))
+      s"${data.assetType} asset could be issued in callable" in {
+        val acc = createDapp(script(data))
 
-      val fee = invocationCost(if (isNft(data)) 0 else 1)
-      val tx  = issue(acc, method, data, fee)
+        val fee = invocationCost(if (isNft(data)) 0 else 1)
+        val tx  = issue(acc, method, data, fee)
 
-      validateIssuedAssets(acc, tx, data, method = method)
-      sender.balanceDetails(acc).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
-    }
+        validateIssuedAssets(acc, tx, data, method = method)
+        sender.balanceDetails(acc).regular shouldBe (initialWavesBalance - setScriptPrice - fee)
+      }
 
     for (data <- Seq(simpleNonreissuableAsset, simpleReissuableAsset)) s"${data.assetType} asset could be partially burned" in {
       val acc            = createDapp(script(data))
@@ -297,15 +300,20 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val acc   = createDapp(script(simpleReissuableAsset))
       val asset = issueValidated(acc, simpleReissuableAsset)
       val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset)
-      assertStateChanges(tx) { sd =>
-        sd.issues should have size 1
-        sd.burns should have size 1
-        sd.reissues should have size 1
+      def checks(): Unit = {
+        assertStateChanges(tx) { sd =>
+          sd.issues should have size 1
+          sd.burns should have size 1
+          sd.reissues should have size 1
+        }
+        assertQuantity(asset)(simpleReissuableAsset.quantity)
+        sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
+        sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
+        sender.nftList(acc, 10) should have size 1
       }
-      assertQuantity(asset)(simpleReissuableAsset.quantity)
-      sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-      sender.assetsBalance(acc).balances.map(_.assetId) shouldBe Seq(asset)
-      sender.nftList(acc, 10) should have size 1
+      checks()
+      nodes.waitForHeightArise()
+      checks()
     }
   }
 
@@ -615,8 +623,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
        |@Callable(i)
        |func reissueIssueAndNft(a: ByteVector) = {
        |  [
-       |    Issue($issueParams, ${asset.nonce + 1})
-       |    Reissue(a, 100),
+       |    Issue($issueParams, ${asset.nonce + 1}),
+       |    Reissue(a, true, 100),
        |    Burn(a, 100),
        |    Issue(${createIssueParams(nftAsset)}, 1)
        |  ]
