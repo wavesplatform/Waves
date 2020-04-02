@@ -7,15 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.{
-  AssetInfo,
-  BurnInfoResponse,
-  DebugStateChanges,
-  IssueInfoResponse,
-  ReissueInfoResponse,
-  StateChangesDetails,
-  Transaction
-}
+import com.wavesplatform.it.api.{AssetInfo, BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails, Transaction}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms.{CONST_BOOLEAN, CONST_BYTESTR, CONST_LONG}
@@ -30,7 +22,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   val initialWavesBalance = 100.waves
   val setScriptPrice      = 0.01.waves
 
-  val CallableMethod = "@Callable"
+  val CallableMethod    = "@Callable"
   val TransactionMethod = "Transaction"
 
   val simpleNonreissuableAsset = Asset("Simple", "SimpleAsset", "description", 100500, false, 8, 0)
@@ -94,7 +86,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val initialReissuable = simpleReissuableAsset.reissuable
 
       reissue(acc, TransactionMethod, assetId, addedQuantity / 2, true)
-      reissue(acc, CallableMethod, assetId, addedQuantity / 2 , false)
+      reissue(acc, CallableMethod, assetId, addedQuantity / 2, false)
 
       sender.assetsDetails(assetId).reissuable shouldBe !initialReissuable
       sender.assetsDetails(assetId).quantity shouldBe initialQuantity + addedQuantity
@@ -284,8 +276,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
 
     "rollback works" in {
-      val acc    = createDapp(script(simpleReissuableAsset))
-      val asset  = issueValidated(acc, simpleReissuableAsset)
+      val acc         = createDapp(script(simpleReissuableAsset))
+      val asset       = issueValidated(acc, simpleReissuableAsset)
       val simpleAsset = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
