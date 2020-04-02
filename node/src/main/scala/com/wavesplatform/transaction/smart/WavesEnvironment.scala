@@ -138,8 +138,7 @@ class WavesEnvironment(
       generationSignature = blockH.generationSignature,
       generator = blockH.generator.toAddress.bytes,
       generatorPublicKey = ByteStr(blockH.generator),
-      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None,
-      blockH.transactionsRoot
+      if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) vrf else None
     )
   }
 
