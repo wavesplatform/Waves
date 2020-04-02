@@ -44,17 +44,25 @@ class AssetBalanceIterator(addressId: AddressId, resource: DBResource) extends A
 
   resource.iterator.seek(prefixBytes)
 
-  private def stillSameAddress(k: Array[Byte]): Boolean =
-    (k.length == (prefixBytes.length + crypto.DigestLength)) && k.startsWith(prefixBytes)
-
-  override def computeNext(): (IssuedAsset, Long) =
-    if (resource.iterator.hasNext && stillSameAddress(resource.iterator.peekNext().getKey)) {
-      val currentEntry = resource.iterator.next()
-      val assetId      = IssuedAsset(currentEntry.getKey.takeRight(crypto.DigestLength))
-      val history      = readIntSeq(currentEntry.getValue)
-      val balance      = resource.get(Keys.assetBalance(addressId, assetId)(history.headOption.getOrElse(0)))
-      assetId -> balance
-    } else endOfData()
+  override def computeNext(): (IssuedAsset, Long) = {
+    @tailrec
+    def loop(): (IssuedAsset, Long) = {
+      if (!resource.iterator.hasNext || !resource.iterator.peekNext().getKey.startsWith(prefixBytes))
+        endOfData()
+      else {
+        val currentEntry = resource.iterator.next()
+        if (currentEntry.getKey.length == (prefixBytes.length + crypto.DigestLength)) {
+          val assetId = IssuedAsset(currentEntry.getKey.takeRight(crypto.DigestLength))
+          val history = readIntSeq(currentEntry.getValue)
+          val balance = resource.get(Keys.assetBalance(addressId, assetId)(history.headOption.getOrElse(0)))
+          assetId -> balance
+        } else {
+          loop()
+        }
+      }
+    }
+    loop()
+  }
 }
 
 class BalanceIterator(
