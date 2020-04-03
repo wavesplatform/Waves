@@ -98,7 +98,11 @@ class MinerImpl(
       )
 
   private def checkScript(account: KeyPair): Either[String, Unit] = {
-    Either.cond(!blockchainUpdater.hasAccountScript(account.toAddress), (), s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks")
+    Either.cond(
+      !blockchainUpdater.hasAccountScript(account.toAddress),
+      (),
+      s"Account(${account.toAddress}) is scripted and therefore not allowed to forge blocks"
+    )
   }
 
   private def ngEnabled: Boolean = blockchainUpdater.featureActivationHeight(BlockchainFeatures.NG.id).exists(blockchainUpdater.height > _ + 1)
@@ -184,11 +188,13 @@ class MinerImpl(
 
   private def blockFeatures(version: Byte): Seq[Short] = {
     if (version <= PlainBlockVersion) Seq.empty[Short]
-    else
+    else {
+      val exclude = (blockchainUpdater.approvedFeatures ).keySet
       settings.featuresSettings.supported
-        .filterNot(blockchainUpdater.approvedFeatures.keySet)
+        .filterNot(exclude)
         .filter(BlockchainFeatures.implemented)
         .sorted
+    }
   }
 
   private def blockRewardVote(version: Byte): Long =
