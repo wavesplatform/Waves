@@ -977,10 +977,14 @@ object AsyncHttpApi extends Assertions {
         plainBalance <- n.assetBalance(acc, assetIdString)
         pf           <- n.assetsBalance(acc)
         asset <- n.assetsDetails(assetIdString)
+        nftList <- n.nftList(acc, 100)
       } yield {
         plainBalance.balance shouldBe balance
-        if (balance > 0 && !asset.isNFT)
+        if (asset.isNFT) {
+          nftList.count(_.assetId == assetIdString) shouldBe balance
+        } else if (balance != 0) {
           pf.balances.find(_.assetId == assetIdString).map(_.balance) should contain(balance)
+        }
       }
     }
 
