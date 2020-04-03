@@ -3,8 +3,10 @@ package com.wavesplatform.mining
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AddressOrAlias, KeyPair}
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PublicKey}
+import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
+import com.wavesplatform.block.validation.Validators
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
@@ -13,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.chainBaseAndMicro
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings, WalletSettings, WavesSettings}
 import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl, NG, diffs}
@@ -22,7 +25,7 @@ import com.wavesplatform.transaction.{BlockchainUpdater, GenesisTransaction, Tra
 import com.wavesplatform.utils.Time
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
-import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TestTime, TransactionGen, crypto}
+import com.wavesplatform.{BlocksTransactionsHelpers, NoShrink, TestTime, TransactionGen, crypto, protobuf}
 import io.netty.channel.group.DefaultChannelGroup
 import io.netty.util.concurrent.GlobalEventExecutor
 import monix.eval.Task
@@ -53,6 +56,47 @@ class BlockV5Test
   def shiftTime(miner: MinerImpl, minerAcc: KeyPair): Unit = {
     val offset = miner.getNextBlockGenerationOffset(minerAcc).explicitGet()
     testTime.advance(offset + 1.milli)
+  }
+
+  "Proto block" should "be serialized" in {
+    val features = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
+    val block =
+      TestBlock.create(System.currentTimeMillis(), TestBlock.randomSignature(), Nil, version = Block.ProtoBlockVersion, features = features.sorted)
+
+    def updateHeader(block: Block, f: BlockHeader => BlockHeader): Block =
+      block.copy(header = f(block.header))
+
+    val blockWithBadVotes = updateHeader(block, _.copy(featureVotes = features))
+    Validators.validateBlock(blockWithBadVotes) shouldBe 'left
+    Validators.validateBlock(block) shouldBe 'right
+    Validators.validateBlock(
+      updateHeader(block, _.copy(generator = PublicKey(Array.fill(64)(0.toByte))))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(block, _.copy(version = Block.NgBlockVersion))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(block, _.copy(generationSignature = Array.fill(32)(0.toByte)))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(block, _.copy(featureVotes = Seq[Short](1, 1, 1)))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
+    ) shouldBe 'right
+
+    val serialized1        = BlockSerializer.toBytes(blockWithBadVotes)
+    val deserialized1      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized1)).get
+    val serialized2        = PBBlocks.protobuf(blockWithBadVotes).toByteArray
+    val deserialized2      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized2)).get
+    val serializedHeader   = BlockHeaderSerializer.toBytes(blockWithBadVotes.header)
+    val deserializedHeader = PBBlocks.vanilla(protobuf.block.PBBlockHeader.parseFrom(serializedHeader))
+    serialized1 shouldBe serialized2
+    all(Seq(deserialized1, deserialized2)) should matchPattern {
+      case b: Block if b.transactionsRootValid() && b.signatureValid() => // Pass
+    }
+    all(Seq(deserialized1, deserialized2)) shouldBe block
+    deserializedHeader shouldBe block.header
   }
 
   "Miner" should "generate valid blocks" in forAll(genesis) {
@@ -324,7 +368,7 @@ class BlockV5Test
       case (acc, genesis) =>
         val fs = TestFunctionalitySettings.Stub.copy(
           preActivatedFeatures = Map(
-            BlockchainFeatures.NG.id -> 0,
+            BlockchainFeatures.NG.id      -> 0,
             BlockchainFeatures.BlockV5.id -> 2
           )
         )
