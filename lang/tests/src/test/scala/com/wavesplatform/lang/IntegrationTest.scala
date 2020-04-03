@@ -1,7 +1,10 @@
 package com.wavesplatform.lang
 
+import java.nio.charset.StandardCharsets
+
 import cats.Id
 import cats.kernel.Monoid
+import com.google.common.io.BaseEncoding
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.Common._
@@ -59,6 +62,18 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         case _ :: Nil => throw new Exception("test exception")
         case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
       }
+ 
+    val f2: BaseFunction[C] =
+      NativeFunction(
+        "fn2",
+        1,
+        92:Short,
+        pointType,
+        ("value", pointType),
+      ) {
+        case _ :: Nil => throw new SecurityException("test exception")
+        case xs => notImplemented[Id, EVALUATED]("fraction(value: Int, numerator: Int, denominator: Int)", xs)
+      }
 
     val lazyVal       = ContextfulVal.pure[C](pointInstance.orNull)
     val stringToTuple = Map(("p", (pointType, lazyVal)))
@@ -68,7 +83,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           PureContext.build(Global, version).withEnvironment[C],
           CryptoContext.build(Global, version).withEnvironment[C],
           addCtx.withEnvironment[C],
-          CTX[C](sampleTypes, stringToTuple, Array(f)),
+          CTX[C](sampleTypes, stringToTuple, Array(f, f2)),
           ctxt
         )
       )
@@ -105,7 +120,17 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         |  case pa: PointB => 1
         |  case pa: PointC => 2
         |}""".stripMargin
-    eval[EVALUATED](sampleScript, Some(pointAInstance)) shouldBe 'Left
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce("An error during run <fn1(value: PointA|PointB|PointC): PointA|PointB|PointC>: class java.lang.Exception test exception")
+  }
+
+  property("Security Exception handling") {
+    val sampleScript =
+      """match fn2(p) {
+        |  case pa: PointA => 0
+        |  case pa: PointB => 1
+        |  case pa: PointC => 2
+        |}""".stripMargin
+    eval[EVALUATED](sampleScript, Some(pointAInstance)) should produce("An access to <fn2(value: PointA|PointB|PointC): PointA|PointB|PointC> is denied")
   }
 
   property("patternMatching") {
@@ -1352,5 +1377,28 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
 
     genericEval[Environment, EVALUATED](script, ctxt = ctx, version = V4, env = utils.environment) shouldBe
       CONST_BYTESTR(issue.id)
+  }
+
+  property("toBase16String limit 8Kb from V4") {
+    val base16String8Kb = "FEDCBA9876543210" * 1024
+    def script(base16String: String) = s"toBase16String(base16'$base16String')"
+
+    eval(script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
+    eval(script(base16String8Kb), version = V4) shouldBe CONST_STRING(base16String8Kb)
+
+    eval(script(base16String8Kb + "AA"), version = V3) shouldBe CONST_STRING(base16String8Kb + "AA")
+    eval(script(base16String8Kb + "AA"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
+  }
+
+  property("fromBase16String limit 32768 digits from V4") {
+    val string32Kb = "FEDCBA9876543210" * (32 * 1024 / 16)
+    def script(base16String: String) = s"""fromBase16String("$base16String")"""
+    def bytes(base16String: String) = BaseEncoding.base16().decode(base16String)
+
+    eval(script(string32Kb), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb))
+    eval(script(string32Kb), version = V4) shouldBe CONST_BYTESTR(bytes(string32Kb))
+
+    eval(script(string32Kb + "AA"), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb + "AA"))
+    eval(script(string32Kb + "AA"), version = V4) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
   }
 }
