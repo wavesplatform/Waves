@@ -3,10 +3,10 @@ package com.wavesplatform.mining
 import java.util.concurrent.atomic.AtomicReference
 
 import com.typesafe.config.ConfigFactory
-import com.wavesplatform.account.{AddressOrAlias, KeyPair}
+import com.wavesplatform.account.{AddressOrAlias, KeyPair, PublicKey}
 import com.wavesplatform.block.serialization.{BlockHeaderSerializer, BlockSerializer}
 import com.wavesplatform.block.validation.Validators
-import com.wavesplatform.block.{Block, SignedBlockHeader}
+import com.wavesplatform.block.{Block, BlockHeader, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
@@ -62,12 +62,27 @@ class BlockV5Test
     val features = Seq(534, 3, 33, 5, 1, 0, 12343242).map(_.toShort)
     val block =
       TestBlock.create(System.currentTimeMillis(), TestBlock.randomSignature(), Nil, version = Block.ProtoBlockVersion, features = features.sorted)
-    val blockWithBadVotes = block.copy(header = block.header.copy(featureVotes = features))
 
+    def updateHeader(block: Block, f: BlockHeader => BlockHeader): Block =
+      block.copy(header = f(block.header))
+
+    val blockWithBadVotes = updateHeader(block, _.copy(featureVotes = features))
     Validators.validateBlock(blockWithBadVotes) shouldBe 'left
     Validators.validateBlock(block) shouldBe 'right
     Validators.validateBlock(
-      blockWithBadVotes.copy(header = blockWithBadVotes.header.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
+      updateHeader(block, _.copy(generator = PublicKey(Array.fill(64)(0.toByte))))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(block, _.copy(version = Block.NgBlockVersion))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(block, _.copy(generationSignature = Array.fill(32)(0.toByte)))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(block, _.copy(featureVotes = Seq[Short](1, 1, 1)))
+    ) shouldBe 'left
+    Validators.validateBlock(
+      updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
     ) shouldBe 'right
 
     val serialized1        = BlockSerializer.toBytes(blockWithBadVotes)
