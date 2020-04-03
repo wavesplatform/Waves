@@ -499,6 +499,8 @@ object AsyncHttpApi extends Assertions {
 
     def scriptDecompile(script: String): Future[DecompiledScript] = post("/utils/script/decompile", script).as[DecompiledScript]
 
+    def scriptEstimate(script: String): Future[EstimatedScript] = post("/utils/script/estimate", script).as[EstimatedScript]
+
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long, version: Byte = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
