@@ -369,6 +369,12 @@ object ApiError {
     override val code: StatusCode = StatusCodes.BadRequest
   }
 
+  case object TransactionFailed extends ApiError {
+    override val id: Int          = 314
+    override val message: String  = "transaction failed"
+    override val code: StatusCode = StatusCodes.BadRequest
+  }
+
   final case class NegativeAmount(msg: String) extends ApiError {
     override val id: Int          = NegativeAmount.Id
     override val message: String  = s"negative amount: $msg"

@@ -247,6 +247,7 @@ case class DebugApiRoute(
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
       case Some((height, Right((ist, isr)), true)) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
+      case Some((_, Right((_, _)), false))         => complete(ApiError.TransactionFailed)
       case Some(_)                                 => complete(ApiError.UnsupportedTransactionType)
       case None                                    => complete(ApiError.TransactionDoesNotExist)
     }
