@@ -3,6 +3,7 @@ package waves.api;
 option java_package = "com.wavesplatform.database.protobuf";
 
 import "waves/block.proto";
+import "waves/transaction.proto";
 
 message AssetDetails {
     bytes name = 1;
@@ -22,6 +23,14 @@ message BlockMeta {
     int64 total_fee_in_waves = 7;
     int64 reward = 8;
     bytes vrf = 9;
+}
+
+message TransactionData {
+    oneof transaction {
+        bytes legacy_bytes = 1;
+        SignedTransaction new_transaction = 2;
+    }
+    bool succeed = 3;
 }
 
 message AccountScriptInfo {

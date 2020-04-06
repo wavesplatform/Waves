@@ -558,7 +558,7 @@ class BlockchainUpdaterImpl(
     } else leveldb.blockHeader(height)
   }
 
-  override def transferById(id: BlockId): Option[(Int, TransferTransaction, Boolean)] = readLock {
+  override def transferById(id: BlockId): Option[(Int, TransferTransaction)] = readLock {
     compositeBlockchain.transferById(id)
   }
 

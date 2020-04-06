@@ -10,13 +10,12 @@ import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils._
 
 object Keys {
   import KeyHelpers._
-  import KeyTags.{InvokeScriptResult => InvokeScriptResultTag, AddressId => AddressIdTag, _}
+  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, _}
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -112,11 +111,11 @@ object Keys {
       writeTransaction
     )
 
-  def transferTransactionAt(height: Height, n: TxNum): Key[Option[(TransferTransaction, Boolean)]] =
+  def transferTransactionAt(height: Height, n: TxNum): Key[Option[TransferTransaction]] =
     Key(
       NthTransactionInfoAtHeight,
       hNum(height, n),
-      bytes => TransferTxSerializer.tryParseTransfer(bytes.tail).map(tx => (tx, bytes.head == 0)),
+      bytes => readTransferTransaction(bytes),
       unsupported("Can not explicitly write transfer transaction")
     )
 

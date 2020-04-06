@@ -3,7 +3,7 @@ package com.wavesplatform.database.patch
 import java.util
 
 import com.wavesplatform.account.Alias
-import com.wavesplatform.database.{KeyTags, Keys, RW}
+import com.wavesplatform.database.{KeyTags, Keys, RW, readTransactionBytes}
 import com.wavesplatform.transaction.{CreateAliasTransaction, TransactionParsers}
 import com.wavesplatform.utils.ScorexLogging
 
@@ -15,17 +15,18 @@ object DisableHijackedAliases extends ScorexLogging {
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
 
     rw.iterateOver(KeyTags.NthTransactionInfoAtHeight) { e =>
-      val transactionBytes = e.getValue
-      val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
-        transactionBytes(0) == 0 &&
-          transactionBytes(1) == CreateAliasTransaction.typeId
-      if (isCreateAlias) {
-        TransactionParsers
-          .parseBytes(transactionBytes)
-          .foreach {
-            case cat: CreateAliasTransaction => aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
-            case _                           =>
-          }
+      readTransactionBytes(e.getValue)._2.left.map { transactionBytes =>
+        val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
+          transactionBytes(0) == 0 &&
+            transactionBytes(1) == CreateAliasTransaction.typeId
+        if (isCreateAlias) {
+          TransactionParsers
+            .parseBytes(transactionBytes)
+            .foreach {
+              case cat: CreateAliasTransaction => aliases.compute(cat.alias, (_, prevTx) => Option(prevTx).fold(Seq(cat))(_ :+ cat))
+              case _                           =>
+            }
+        }
       }
     }
 

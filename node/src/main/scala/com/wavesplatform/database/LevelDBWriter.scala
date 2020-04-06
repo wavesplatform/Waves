@@ -674,11 +674,11 @@ class LevelDBWriter(
     asset
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction, Boolean)] = readOnly { db =>
+  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      (tx, status)  <- db.get(Keys.transferTransactionAt(height, num))
-    } yield (height, tx, status)
+      tx  <- db.get(Keys.transferTransactionAt(height, num))
+    } yield (height, tx)
   }
 
   override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readOnly(transactionInfo(id, _))
@@ -866,6 +866,8 @@ class LevelDBWriter(
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>
+    import com.wavesplatform.protobuf.transaction.PBSignedTransaction
+
     val txs = new ListBuffer[(TxNum, Transaction)]()
 
     val prefix = ByteBuffer
@@ -876,12 +878,13 @@ class LevelDBWriter(
 
     db.iterateOver(prefix) { entry =>
       val k = entry.getKey
-      val v = entry.getValue.tail
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = if (v(0) == 1) PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v.tail))
-        else TransactionParsers.parseBytes(v.tail).get
+        tx = readTransactionBytes(entry.getValue) match {
+          case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
+          case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
+        }
       } txs.append((TxNum(idx), tx))
     }
 

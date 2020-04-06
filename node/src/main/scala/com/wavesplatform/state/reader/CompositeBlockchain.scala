@@ -52,11 +52,11 @@ final case class CompositeBlockchain(
       }
   }
 
-  override def transferById(id: ByteStr): Option[(Int, TransferTransaction, Boolean)] = {
+  override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = {
     diff.transactions
       .get(id)
       .collect {
-        case (tx: TransferTransaction, _, status) => (height, tx, status)
+        case (tx: TransferTransaction, _, true) => (height, tx)
       }
       .orElse(inner.transferById(id))
   }

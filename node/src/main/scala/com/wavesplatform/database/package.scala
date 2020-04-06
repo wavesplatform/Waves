@@ -8,7 +8,7 @@ import com.google.common.base.Charsets.UTF_8
 import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
-import com.google.protobuf.ByteString
+import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
@@ -23,6 +23,7 @@ import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{GenesisTransaction, LegacyPBSwitch, PaymentTransaction, Transaction, TransactionParsers, TxValidationError}
 import com.wavesplatform.utils.{ScorexLogging, _}
 import io.estatico.newtype.macros.newtype
@@ -103,7 +104,7 @@ package object database extends ScorexLogging {
   }
 
   def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
-    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)){ case (buf, aid) => buf.putLong(aid.toLong) }.array()
+    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)) { case (buf, aid) => buf.putLong(aid.toLong) }.array()
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
@@ -404,7 +405,7 @@ package object database extends ScorexLogging {
       val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
       try {
-        val r = f(rw)
+        val r           = f(rw)
         val nativeBatch = db.createWriteBatch()
         batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
         batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
@@ -474,27 +475,64 @@ package object database extends ScorexLogging {
   }
 
   def readTransaction(b: Array[Byte]): (Transaction, Boolean) = {
-    val confirmed = b.head == 0
-    val txBytes = b.tail
-    txBytes.head match {
-      case 0 => (TransactionParsers.parseBytes(txBytes.tail).get, confirmed)
-      case 1 => (PBTransactions.vanilla(PBSignedTransaction.parseFrom(txBytes.tail)).explicitGet(), confirmed)
+    import pb.TransactionData.Transaction._
+
+    val data = pb.TransactionData.parseFrom(b)
+    data.transaction match {
+      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, data.succeed)
+      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), data.succeed)
+      case _                  => throw new IllegalArgumentException("Illegal transaction data")
     }
   }
 
   def writeTransaction(v: (Transaction, Boolean)): Array[Byte] = {
-    val (t, s) = v
-    Bytes.concat(
-      Array[Byte](if (s) 0 else 1),
-      t match {
-        case _: GenesisTransaction                         => Array(0.toByte)
-        case _: PaymentTransaction                         => Array(0.toByte)
-        case lps: LegacyPBSwitch if !lps.isProtobufVersion => Array(0.toByte)
-        case _                                             => Array(1.toByte)
-      },
-      t.bytes()
-    )
+    import pb.TransactionData.Transaction._
+    val (tx, succeed) = v
+    val ptx = tx match {
+      case lps: LegacyPBSwitch if !lps.isProtobufVersion => LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: GenesisTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
+      case _                                             => NewTransaction(PBTransactions.protobuf(tx))
+    }
+    pb.TransactionData(succeed, ptx).toByteArray
   }
+
+  /** Returns status and bytes (left - legacy format bytes, right - new format bytes) */
+  def readTransactionBytes(b: Array[Byte]): (Boolean, Either[Array[Byte], Array[Byte]]) = {
+    import pb.TransactionData._
+
+    val coded = CodedInputStream.newInstance(b)
+
+    @inline def validTransactionFieldNum(fieldNum: Int): Boolean = fieldNum == NEW_TRANSACTION_FIELD_NUMBER || fieldNum == LEGACY_BYTES_FIELD_NUMBER
+    @inline def readBytes(fieldNum: Int): Either[Array[Byte], Array[Byte]] = {
+      val size  = coded.readUInt32()
+      val bytes = coded.readRawBytes(size)
+      if (fieldNum == NEW_TRANSACTION_FIELD_NUMBER) Right(bytes) else Left(bytes)
+    }
+
+    val transactionFieldTag  = coded.readTag()
+    val transactionFieldNum  = WireFormat.getTagFieldNumber(transactionFieldTag)
+    val transactionFieldType = WireFormat.getTagWireType(transactionFieldTag)
+    require(validTransactionFieldNum(transactionFieldNum), "Unknown `transaction` field in transaction data")
+    require(transactionFieldType == WireFormat.WIRETYPE_LENGTH_DELIMITED, "Can't parse `transaction` field in transaction data")
+    val bytes = readBytes(WireFormat.getTagFieldNumber(transactionFieldTag))
+
+    val statusFieldTag  = coded.readTag()
+    val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
+    val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
+    require(statusFieldNum == SUCCEED_FIELD_NUMBER, "Unknown `succeed` field in transaction data")
+    require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `succeed` field in transaction data")
+    val succeed = coded.readBool()
+
+    (succeed, bytes)
+  }
+
+  def readTransferTransaction(b: Array[Byte]): Option[TransferTransaction] =
+    readTransactionBytes(b) match {
+      case (true, Left(oldBytes)) => TransferTransaction.parseBytes(oldBytes).toOption
+      case (true, Right(bytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).toOption.collect { case t: TransferTransaction => t }
+      case _                      => None
+    }
 
   def loadBlock(height: Height, db: ReadOnlyDB): Option[Block] =
     for {

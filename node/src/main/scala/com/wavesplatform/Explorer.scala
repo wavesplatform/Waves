@@ -9,7 +9,8 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.api.common.AddressPortfolio
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
-import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB}
+import com.wavesplatform.database.{DBExt, KeyTags, Keys, LevelDBWriter, openDB, readTransactionBytes}
+import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state.{Blockchain, Diff, Height, Portfolio, TxNum}
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -243,11 +244,13 @@ object Explorer extends ScorexLogging {
 
               val k = entry.getKey
               println(k.toList.map(_.toInt & 0xff))
-              val v = entry.getValue
 
               for {
                 idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-                tx  <- TransactionParsers.parseBytes(v)
+                tx  =  readTransactionBytes(entry.getValue) match {
+                  case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
+                  case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
+                }
               } txs.append((TxNum(idx), tx))
             }
           } finally iterator.close()
