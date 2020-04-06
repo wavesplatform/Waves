@@ -36,7 +36,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
           |  interval-after-last-block-then-generation-is-allowed = 0
           |}
           |
-          |waves.features.supported=[1]
+          |waves.features.supported=[2]
           |""".stripMargin).withFallback(ConfigFactory.load())
 
       WavesSettings.fromRootConfig(loadConfig(config))
@@ -45,7 +45,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     val blockchainSettings = {
       val bs = wavesSettings.blockchainSettings
       val fs = bs.functionalitySettings
-      bs.copy(functionalitySettings = fs.copy(preActivatedFeatures = Map(1.toShort -> 0)))
+      bs.copy(functionalitySettings = fs.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(2.toShort -> 0)))
     }
 
     val miner = {
@@ -54,7 +54,17 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
       val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings, enablePriorityPool = true)
       val pos         = new PoSSelector(blockchainUpdater, blockchainSettings, wavesSettings.synchronizationSettings)
-      new MinerImpl(allChannels, blockchainUpdater, wavesSettings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+      new MinerImpl(
+        allChannels,
+        blockchainUpdater,
+        wavesSettings.copy(blockchainSettings = blockchainSettings),
+        ntpTime,
+        utxPool,
+        wallet,
+        pos,
+        scheduler,
+        scheduler
+      )
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
@@ -65,6 +75,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     (blockchainUpdater.settings _).when().returning(blockchainSettings)
     (blockchainUpdater.blockHeader _).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
     (blockchainUpdater.activatedFeatures _).when().returning(Map.empty)
+    (blockchainUpdater.approvedFeatures _).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(new Array[Byte](32)))
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
