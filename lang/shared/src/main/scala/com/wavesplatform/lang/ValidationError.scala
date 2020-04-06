@@ -2,7 +2,7 @@ package com.wavesplatform.lang
 
 import scala.util.Either
 
-trait ValidationError extends Product with Serializable
+trait ValidationError
 
 object ValidationError {
   type Validation[T] = Either[ValidationError, T]

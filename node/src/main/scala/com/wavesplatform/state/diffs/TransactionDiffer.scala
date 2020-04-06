@@ -30,8 +30,8 @@ object TransactionDiffer {
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTimestamp, currentBlockTimestamp, verify)(blockchain, tx) match {
-      case isFailedScript() if acceptFailedScript(blockchain, tx) => failedScriptTransactionDiff(blockchain, tx)
-      case result                                                 => result
+      case isFailedTransaction() if acceptFailedTransaction(blockchain, tx) => failedTransactionDiff(blockchain, tx)
+      case result                                                          => result
     }
 
   def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
@@ -112,7 +112,7 @@ object TransactionDiffer {
         TracedResult(BalanceDiffValidation(blockchain)(diff))
       }
 
-  private def failedScriptTransactionDiff(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
+  private def failedTransactionDiff(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
     for {
       portfolios <- (tx, tx.assetFee) match {
         case (tx: ProvenTransaction, (Waves, fee)) => TracedResult(Right(Map(tx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty))))
@@ -137,18 +137,15 @@ object TransactionDiffer {
       diff <- balance(blockchain, tx, Diff.failed(tx, portfolios))
     } yield diff
 
-  private def acceptFailedScript(blockchain: Blockchain, tx: Transaction): Boolean =
+  private def acceptFailedTransaction(blockchain: Blockchain, tx: Transaction): Boolean =
     (tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId) &&
       blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction)
 
-  private object isFailedScript {
+  private object isFailedTransaction {
     def unapply(result: TracedResult[ValidationError, Diff]): Boolean =
       result match {
-        case TracedResult(Left(TransactionValidationError(ScriptExecutionError(_, _, true), _)), _)       => true
-        case TracedResult(Left(TransactionValidationError(TransactionNotAllowedByScript(_, true), _)), _) => true
-        case TracedResult(Left(TransactionValidationError(DAppExecutionError(_, _), _)), _)               => true
-        case TracedResult(Left(TransactionValidationError(InsufficientInvokeActionFee(_), _)), _)         => true
-        case _                                                                                            => false
+        case TracedResult(Left(TransactionValidationError(_: CanFailTransaction, _)), _) => true
+        case _                                                                           => false
       }
   }
 

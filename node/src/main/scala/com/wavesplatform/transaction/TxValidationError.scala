@@ -28,7 +28,7 @@ object TxValidationError {
   case class BlockFromFuture(ts: Long)                         extends ValidationError
   case class AlreadyInTheState(txId: ByteStr, txHeight: Int)   extends ValidationError
   case class AccountBalanceError(errs: Map[Address, String])   extends ValidationError
-  case class AliasDoesNotExist(a: Alias)                       extends ValidationError { override def toString = s"Alias '$a' does not exists." }
+  case class AliasDoesNotExist(a: Alias)                       extends ValidationError { override def toString: String = s"Alias '$a' does not exists." }
   case class AliasIsDisabled(a: Alias)                         extends ValidationError
   case class OrderValidationError(order: Order, err: String)   extends ValidationError
   case class SenderIsBlacklisted(addr: String)                 extends ValidationError
@@ -50,25 +50,45 @@ object TxValidationError {
     def isAssetScript: Boolean
   }
 
-  case class ScriptExecutionError(error: String, log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
+  trait CanFailTransaction
+
+  class ScriptExecutionError(val error: String, val log: Log[Id], override val isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
       val target = if (isAssetScript) "Asset" else "Account"
       s"ScriptExecutionError(error = $error, type = $target, log =${logToString(log)})"
     }
   }
 
-  case class DAppExecutionError(error: String, log: Log[Id]) extends ValidationError with HasScriptType {
-    override def toString: String = s"DAppExecutionError(error = $error, type = Account, log =${logToString(log)})"
+  object ScriptExecutionError {
+    def apply(error: String, log: Log[Id], isAssetScript: Boolean): ScriptExecutionError =
+      if (isAssetScript) new ScriptExecutionError(error, log, isAssetScript) with CanFailTransaction
+      else new ScriptExecutionError(error, log, isAssetScript)
+
+    def unapply(e: ScriptExecutionError): Option[(String, Log[Id], Boolean)] =
+      Some((e.error, e.log, e.isAssetScript))
+  }
+
+  case class DAppExecutionError(error: String, log: Log[Id]) extends ValidationError with HasScriptType with CanFailTransaction {
+    override def toString: String       = s"DAppExecutionError(error = $error, type = Account, log =${logToString(log)})"
     override val isAssetScript: Boolean = false
   }
 
-  case class InsufficientInvokeActionFee(error: String) extends ValidationError
+  case class InsufficientInvokeActionFee(error: String) extends ValidationError with CanFailTransaction
 
-  case class TransactionNotAllowedByScript(log: Log[Id], isAssetScript: Boolean) extends ValidationError with HasScriptType {
+  class TransactionNotAllowedByScript(val log: Log[Id], override val isAssetScript: Boolean) extends ValidationError with HasScriptType {
     override def toString: String = {
       val target = if (isAssetScript) "Asset" else "Account"
       s"TransactionNotAllowedByScript(type = $target, log =${logToString(log)})"
     }
+  }
+
+  object TransactionNotAllowedByScript {
+    def apply(log: Log[Id], isAssetScript: Boolean): TransactionNotAllowedByScript =
+      if (isAssetScript) new TransactionNotAllowedByScript(log, isAssetScript) with CanFailTransaction
+      else new TransactionNotAllowedByScript(log, isAssetScript)
+
+    def unapply(e: TransactionNotAllowedByScript): Option[(Log[Id], Boolean)] =
+      Some((e.log, e.isAssetScript))
   }
 
   def logToString(log: Log[Id]): String =
