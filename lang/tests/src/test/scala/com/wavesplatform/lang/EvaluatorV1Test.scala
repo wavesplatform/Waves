@@ -346,11 +346,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    val bodyBytes = ("m" * (32*1024 + 1)).getBytes("UTF-8")
-    val signature = Curve25519.sign(privateKey, bodyBytes)
+    for(i <- 0 to 3) {
+      val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
+      val signature = Curve25519.sign(privateKey, bodyBytes)
 
-    val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(2))
-    r.isRight shouldBe true
+      val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(i.toShort))
+      r.isRight shouldBe true
+    }
   }
 
 
