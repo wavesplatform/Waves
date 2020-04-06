@@ -57,7 +57,6 @@ object ApiError {
             else TransactionNotAllowedByAccountScript(tx)
           case TxValidationError.Mistiming(errorMessage)               => Mistiming(errorMessage)
           case TxValidationError.ScriptExecutionError(err, _, isToken) => ScriptExecutionError(tx, err, isToken)
-          case TxValidationError.DAppExecutionError(err, _)            => ScriptExecutionError(tx, err, false)
           case err                                                     => StateCheckFailed(tx, fromValidationError(err).message)
         }
       case error => CustomValidationError(error.toString)

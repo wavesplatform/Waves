@@ -146,7 +146,7 @@ object InvokeScriptTransactionDiff {
                 )
               } yield (evaluator, invocationComplexity)
 
-              result.leftMap { case (error, log) => DAppExecutionError(error, log) }
+              result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
             })
             TracedResult(
               scriptResultE,
