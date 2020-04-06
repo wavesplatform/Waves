@@ -187,14 +187,13 @@ class MinerImpl(
   }
 
   private def blockFeatures(version: Byte): Seq[Short] = {
-    if (version <= PlainBlockVersion) Seq.empty[Short]
-    else {
-      val exclude = (blockchainUpdater.approvedFeatures ).keySet
+    if (version <= PlainBlockVersion)
+      Nil
+    else
       settings.featuresSettings.supported
-        .filterNot(exclude)
+        .filterNot(blockchainUpdater.approvedFeatures.contains)
         .filter(BlockchainFeatures.implemented)
         .sorted
-    }
   }
 
   private def blockRewardVote(version: Byte): Long =
