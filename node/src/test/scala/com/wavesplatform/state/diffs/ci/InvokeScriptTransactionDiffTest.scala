@@ -1748,7 +1748,7 @@ class InvokeScriptTransactionDiffTest
           )
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
-            ei shouldBe 'Left
+            ei should produce("negative asset balance")
           }
         }
     }
