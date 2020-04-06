@@ -126,7 +126,7 @@ object Serde {
               (1 to argsCount)
                 .toStream
                 .traverse(_ => evaluatedOnly(desAux(bb)))
-                .map(elements => ARR(elements.toIndexedSeq))
+                .map(elements => ARR(elements.toIndexedSeq, false /* true? */).explicitGet)
             else
               tooBigArray(bb)
           )
