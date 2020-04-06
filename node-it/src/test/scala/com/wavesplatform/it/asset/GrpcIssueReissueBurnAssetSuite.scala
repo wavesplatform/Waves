@@ -297,7 +297,7 @@ class GrpcIssueReissueBurnAssetSuite extends BaseSuite {
 
     miner.waitForTransaction(
       miner
-        .broadcast(
+        .signedBroadcast(
           PBTransactions.protobuf(
             SetScriptTransaction
               .selfSigned(1.toByte, address, Some(compiledScript), setScriptFee, System.currentTimeMillis())

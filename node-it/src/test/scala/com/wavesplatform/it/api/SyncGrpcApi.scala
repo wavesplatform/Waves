@@ -270,7 +270,7 @@ object SyncGrpcApi extends Assertions {
       accounts.getScript(AccountRequest.of(address))
     }
 
-    def broadcast(tx: PBSignedTransaction, waitForTx: Boolean = false): PBSignedTransaction = {
+    def signedBroadcast(tx: PBSignedTransaction, waitForTx: Boolean = false): PBSignedTransaction = {
       maybeWaitForTransaction(sync(async(n).broadcast(tx.getTransaction, tx.proofs)), waitForTx)
     }
 
