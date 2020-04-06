@@ -1,7 +1,7 @@
 package com.wavesplatform.state
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.Address
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.common.utils._
 import com.wavesplatform.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
@@ -80,7 +80,8 @@ object InvokeScriptResult {
       ),
       isr.issues.map(toPbIssue),
       isr.reissues.map(toPbReissue),
-      isr.burns.map(toPbBurn)
+      isr.burns.map(toPbBurn),
+      AddressScheme.current.chainId
     )
   }
 
