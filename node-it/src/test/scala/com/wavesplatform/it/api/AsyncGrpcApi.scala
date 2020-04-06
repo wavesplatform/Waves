@@ -6,7 +6,19 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountsApiGrpc, AssetInfoResponse, AssetRequest, AssetsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{
+  AccountsApiGrpc,
+  AssetInfoResponse,
+  AssetRequest,
+  AssetsApiGrpc,
+  BalanceResponse,
+  BalancesRequest,
+  BlockRequest,
+  BlocksApiGrpc,
+  TransactionResponse,
+  TransactionsApiGrpc,
+  TransactionsRequest
+}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
@@ -19,8 +31,8 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
@@ -48,13 +60,13 @@ object AsyncGrpcApi {
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
-    def stateChanges(txId: String): Future[StateChangesDetails] = {
+    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
       val (obs, result) = createCallObserver[InvokeScriptResult]
-      transactions.getStateChanges(TransactionsRequest().addTransactionIds(ByteString.copyFrom(Base58.decode(txId))), obs)
+      val ids           = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
+      transactions.getStateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address), obs)
       result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
-        val result = VISR.fromPB(r.head)
-        Json.toJson(result).as[StateChangesDetails]
+        r.map(VISR.fromPB).map(r => Json.toJson(r).as[StateChangesDetails])
       }
     }
 
@@ -87,16 +99,16 @@ object AsyncGrpcApi {
     }
 
     def broadcastTransfer(
-                           source: KeyPair,
-                           recipient: Recipient,
-                           amount: Long,
-                           fee: Long,
-                           version: Int = 2,
-                           assetId: String = "WAVES",
-                           feeAssetId: String = "WAVES",
-                           attachment: Attachment.Attachment = Attachment.Attachment.Empty,
-                           timestamp: Long = System.currentTimeMillis
-                         ): Future[PBSignedTransaction] = {
+        source: KeyPair,
+        recipient: Recipient,
+        amount: Long,
+        fee: Long,
+        version: Int = 2,
+        assetId: String = "WAVES",
+        feeAssetId: String = "WAVES",
+        attachment: Attachment.Attachment = Attachment.Attachment.Empty,
+        timestamp: Long = System.currentTimeMillis
+    ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
@@ -114,8 +126,7 @@ object AsyncGrpcApi {
       try {
         val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
         transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
-      }
-      catch {
+      } catch {
         case _: IllegalArgumentException => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
       }
     }
@@ -459,14 +470,14 @@ object AsyncGrpcApi {
     }
 
     def updateAssetInfo(
-                         sender: KeyPair,
-                         assetId: String,
-                         updatedName: String,
-                         updatedDescription: String,
-                         fee: Long,
-                         feeAsset: Asset = Waves,
-                         version: TxVersion = TxVersion.V1
-                       ): Future[SignedTransaction] = {
+        sender: KeyPair,
+        assetId: String,
+        updatedName: String,
+        updatedDescription: String,
+        fee: Long,
+        feeAsset: Asset = Waves,
+        version: TxVersion = TxVersion.V1
+    ): Future[SignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(sender.publicKey),
