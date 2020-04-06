@@ -1,29 +1,21 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.typesafe.config.Config
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.sync.smartcontract.exchangeTx
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
-import com.wavesplatform.it.{NTPTime, NodeConfigs}
-import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange._
-import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils._
 import play.api.libs.json.{JsNumber, JsString, Json}
 
-import scala.concurrent.duration._
-
-class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime with PriorityTransaction {
-  import ExchangeTransactionSuite.mkExchange
-  import restApi._
-
+class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
   var exchAsset: IssueTransaction = IssueTransaction(
     TxVersion.V1,
     sender = sender.privateKey,
@@ -298,8 +290,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime with Pr
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalance + nftWavesPrice - matcherFee
     sender.balanceDetails(buyerAddress).regular shouldBe buyerBalance - nftWavesPrice - matcherFee
 
+
     val sellerBalanceAfterFirstExchange = sender.balanceDetails(sellerAddress).regular
-    val buyerBalanceAfterFirstExchange  = sender.balanceDetails(buyerAddress).regular
+    val buyerBalanceAfgerFirstExchange  = sender.balanceDetails(buyerAddress).regular
 
     val tx2 =
       ExchangeTransaction
@@ -325,128 +318,9 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime with Pr
     sender.assetBalance(sellerAddress, dec6AssetId).balance shouldBe 0
     sender.assetBalance(buyerAddress, dec6AssetId).balance shouldBe 1000000
     sender.balanceDetails(sellerAddress).regular shouldBe sellerBalanceAfterFirstExchange - matcherFee
-    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfterFirstExchange - matcherFee
+    sender.balanceDetails(buyerAddress).regular shouldBe buyerBalanceAfgerFirstExchange - matcherFee
 
   }
-
-  test("failed exchange tx when asset script fails") {
-    val seller         = acc0
-    val buyer          = acc1
-    val matcher        = acc2
-    val sellerAddress  = firstAddress
-    val buyerAddress   = secondAddress
-    val matcherAddress = thirdAddress
-
-    val transfers = Seq(
-      sender.transfer(sender.address, sellerAddress, 100.waves).id,
-      sender.transfer(sender.address, buyerAddress, 100.waves).id,
-      sender.transfer(sender.address, matcherAddress, 100.waves).id
-    )
-
-    val initScript          = Some(ScriptCompiler.compile("true", ScriptEstimatorV3).right.get._1.bytes().base64)
-    val amountAsset         = sender.issue(sellerAddress, "Amount asset", script = initScript, decimals = 8).id
-    val priceAsset          = sender.issue(buyerAddress, "Price asset", script = initScript, decimals = 8).id
-    val sellMatcherFeeAsset = sender.issue(matcherAddress, "Seller fee asset", script = initScript, decimals = 8).id
-    val buyMatcherFeeAsset  = sender.issue(matcherAddress, "Buyer fee asset", script = initScript, decimals = 8).id
-
-    val preconditions = transfers ++ Seq(
-      amountAsset,
-      priceAsset,
-      sellMatcherFeeAsset,
-      buyMatcherFeeAsset
-    )
-
-    waitForTxs(preconditions)
-
-    val transferToSeller = sender.transfer(matcherAddress, sellerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(sellMatcherFeeAsset)).id
-    val transferToBuyer  = sender.transfer(matcherAddress, buyerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(buyMatcherFeeAsset)).id
-
-    waitForTxs(Seq(transferToSeller, transferToBuyer))
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + 4 * smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setAssetScriptFee + smartFee + fee * 10
-
-    val allCases =
-      Seq((amountAsset, sellerAddress), (priceAsset, buyerAddress), (sellMatcherFeeAsset, matcherAddress), (buyMatcherFeeAsset, matcherAddress))
-
-    for ((invalidScriptAsset, owner) <- allCases) {
-      val txsSend = (_: Int) => {
-        val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAsset, sellMatcherFeeAsset, buyMatcherFee, sellMatcherFee)
-        sender.signedBroadcast(tx.json()).id
-      }
-
-      sendTxsAndThenPriorityTx(
-        txsSend,
-        () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee)
-      )(assertFailedTxs)
-      updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
-    }
-  }
-
-  test("invalid exchange tx when account script fails") {
-    val seller         = acc0
-    val buyer          = acc1
-    val matcher        = acc2
-    val sellerAddress  = firstAddress
-    val buyerAddress   = secondAddress
-    val matcherAddress = thirdAddress
-
-    val transfers = Seq(
-      sender.transfer(sender.address, sellerAddress, 100.waves).id,
-      sender.transfer(sender.address, buyerAddress, 100.waves).id,
-      sender.transfer(sender.address, matcherAddress, 100.waves).id
-    )
-
-    val amountAsset         = sender.issue(sellerAddress, "Amount asset", decimals = 8).id
-    val priceAsset          = sender.issue(buyerAddress, "Price asset", decimals = 8).id
-    val sellMatcherFeeAsset = sender.issue(matcherAddress, "Seller fee asset", decimals = 8).id
-    val buyMatcherFeeAsset  = sender.issue(matcherAddress, "Buyer fee asset", decimals = 8).id
-
-    val preconditions = transfers ++ Seq(
-      amountAsset,
-      priceAsset,
-      sellMatcherFeeAsset,
-      buyMatcherFeeAsset
-    )
-
-    waitForTxs(preconditions)
-
-    val transferToSeller = sender.transfer(matcherAddress, sellerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(sellMatcherFeeAsset)).id
-    val transferToBuyer  = sender.transfer(matcherAddress, buyerAddress, 1000000000, fee = minFee + smartFee, assetId = Some(buyMatcherFeeAsset)).id
-
-    waitForTxs(Seq(transferToSeller, transferToBuyer))
-
-    val assetPair      = AssetPair.createAssetPair(amountAsset, priceAsset).get
-    val fee            = 0.003.waves + smartFee
-    val sellMatcherFee = fee / 100000L
-    val buyMatcherFee  = fee / 100000L
-    val priorityFee    = setScriptFee + smartFee + fee * 10
-
-    val allCases = Seq(sellerAddress, buyerAddress, matcherAddress)
-    allCases.foreach(address => updateAccountScript(None, address, setScriptFee + smartFee))
-
-    for (invalidAccount <- allCases) {
-      val txsSend = (_: Int) => {
-        val tx = mkExchange(buyer, seller, matcher, assetPair, fee, buyMatcherFeeAsset, sellMatcherFeeAsset, buyMatcherFee, sellMatcherFee)
-        sender.signedBroadcast(tx.json()).id
-      }
-
-      sendTxsAndThenPriorityTx(
-        txsSend,
-        () => updateAccountScript(Some(false), invalidAccount, priorityFee)
-      )(assertInvalidTxs)
-      updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
-    }
-  }
-
-  private def waitForTxs(txs: Seq[String]): Unit =
-    nodes.waitFor[Boolean]("preconditions")(100.millis)(
-      n => n.transactionStatus(txs).forall(_.status == "confirmed"),
-      statuses => statuses.forall(identity)
-    )
 
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs.newBuilder
@@ -455,41 +329,4 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime with Pr
       .withDefault(1)
       .withSpecial(_.nonMiner)
       .buildNonConflicting()
-
-  override protected def waitForHeightArise(): Unit = nodes.waitForHeightArise()
-}
-
-object ExchangeTransactionSuite {
-  def mkExchange(
-      buyer: KeyPair,
-      seller: KeyPair,
-      matcher: KeyPair,
-      assetPair: AssetPair,
-      fee: Long,
-      buyMatcherFeeAsset: String,
-      sellMatcherFeeAsset: String,
-      buyMatcherFee: Long,
-      sellMatcherFee: Long
-  ): ExchangeTransaction = {
-    val ts   = System.currentTimeMillis()
-    val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
-    val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
-    val buy  = Order.buy(Order.V4, buyer, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
-    val sell = Order.sell(Order.V4, seller, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
-    ExchangeTransaction
-      .signed(
-        TxVersion.V3,
-        matcher,
-        buy,
-        sell,
-        buy.amount,
-        buy.price,
-        buy.matcherFee,
-        sell.matcherFee,
-        fee,
-        ts
-      )
-      .right
-      .get
-  }
 }
