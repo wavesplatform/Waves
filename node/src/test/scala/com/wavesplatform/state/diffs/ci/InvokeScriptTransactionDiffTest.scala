@@ -1629,7 +1629,7 @@ class InvokeScriptTransactionDiffTest
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
 
-  property("Reissuind unissued asset should produce error") {
+  property("Reissuing unreissued asset should produce error") {
     forAll(reissueAssetIdScenario) {
       case (invoke, genesisTxs) =>
         tempDb { db =>
