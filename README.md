@@ -140,7 +140,7 @@ sbt packageAll                   # Mainnet
 sbt -Dnetwork=testnet packageAll # Testnet
 ```
 
-For *Ubuntu*, `sbt packageAll` ‌produces only `deb` package but for other platforms, `zip` archive or a fat `jar` can be used as well. 
+`sbt packageAll` ‌produces only `deb` package along with a fat `jar`. 
 
 *6. Install DEB package*
 
