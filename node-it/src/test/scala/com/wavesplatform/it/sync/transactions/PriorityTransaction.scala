@@ -27,7 +27,7 @@ trait PriorityTransaction { _: Matchers =>
     */
   def sendTxsAndThenPriorityTx[T, S](t: Int => T, pt: () => T)(
       checker: Seq[T] => Seq[S]
-  ): Unit = {
+  ): Seq[S] = {
     import com.wavesplatform.it.api.SyncHttpApi._
 
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
@@ -81,6 +81,10 @@ trait PriorityTransaction { _: Matchers =>
       all(invalid.map(_.applicationStatus)) shouldBe None
 
       invalid
+    }
+
+    def assertFailedDebugStateChanges(): Unit = {
+
     }
 
     def updateAssetScript(result: Boolean, asset: String, owner: String, fee: Long): String = {
