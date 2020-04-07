@@ -696,37 +696,39 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     }
   }
 
-  private def hashTest(bodyBytes: Array[Byte], hash: Short, lim_n: Short)(implicit version: StdLibVersion): Either[ExecutionError, ByteStr] = {
-    val context = Monoid.combineAll(
+  private def hashTest(bodyBytes: Array[Byte], hash: String, lim: Int)(implicit version: StdLibVersion): Either[ExecutionError, ByteStr] = {
+   val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
+      ("b", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bodyBytes)))),
+    )
+
+    val context: CTX[NoContext] = Monoid.combineAll(
       Seq(
-        pureEvalContext,
-        defaultCryptoContext.evaluationContext[Id],
-        EvaluationContext.build(
-          typeDefs = Map.empty,
-          letDefs = Map.empty,
-          functions = Seq.empty
-        )
+        pureContext,
+        defaultCryptoContext,
+        CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
       ))
 
+    val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
+
+    val expr = ExpressionCompiler
+        .compileUntyped(script, context.compilerContext)
+        .explicitGet()
+
     ev[EVALUATED](
-      context = context,
-      expr = FUNCTION_CALL(
-        function = FunctionHeader.Native((hash + lim_n).toShort),
-        args = List(
-          CONST_BYTESTR(ByteStr(bodyBytes)).explicitGet()
-        )
-      )
+      context = context.evaluationContext[Id],
+      expr = expr
     ).map {
       case CONST_BYTESTR(b) => b
       case _                => ???
     }
   }
 
+  val hashes = Seq("keccak256", "blake2b256", "sha256")
   property("returns an success if hash functions (*_NKb) return a success") {
     implicit val version = V4
 
     for {
-      h <- Seq(KECCAK256_LIM, BLAKE256_LIM, SHA256_LIM)
+      h <- hashes
       i <- 0 to 3
     } {
       val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
@@ -740,7 +742,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     implicit val version = V4
 
     for{
-      h <- Seq(KECCAK256_LIM, BLAKE256_LIM, SHA256_LIM)
+      h <- hashes
       i <- 0 to 3
     } {
       val bodyBytes = ("m" * ((16 << i)*1024 + 1)).getBytes("UTF-8")
