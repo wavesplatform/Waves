@@ -2,19 +2,19 @@
 
 <p align="center">
 
-  <a href="https://travis-ci.org/wavesplatform/Waves">
+  <a href="https://travis-ci.org/wavesplatform/Waves" target="_blank">
     <img alt="Build status" src="https://travis-ci.org/wavesplatform/Waves.svg?branch=master" target="_blank" />
   </a>
-  <a href="https://github.com/wavesplatform/Waves/releases">
+  <a href="https://github.com/wavesplatform/Waves/releases" target="_blank">
     <img alt="Downloads" src="https://img.shields.io/github/downloads/wavesplatform/Waves/total" target="_blank" />
   </a>
-  <a href="https://github.com/wavesplatform/Waves/blob/master/LICENSE">
+  <a href="https://github.com/wavesplatform/Waves/blob/master/LICENSE" target="_blank">
     <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-yellow.svg" target="_blank" />
   </a>
-  <a href="https://github.com/wavesplatform/Waves/issues">
+  <a href="https://github.com/wavesplatform/Waves/issues" target="_blank">
     <img alt="Open Issues" src="https://img.shields.io/github/issues/wavesplatform/Waves" target="_blank" />
   </a>
-  <a href="https://twitter.com/wavesplatform">
+  <a href="https://twitter.com/wavesplatform" target="_blank">
     <img alt="Twitter: WavesPlatform" src="https://img.shields.io/twitter/follow/wavesplatform?label=Follow&style=social" target="_blank" />
   </a>
 </p>
