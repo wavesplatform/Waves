@@ -28,7 +28,7 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
             blockchain.approvedFeatures.keySet ++
             BlockchainFeatures.implemented).toSeq.sorted.map(id => {
             val status = blockchain.featureStatus(id, height)
-            val voted  = featuresSettings.supported.contains(id) && !blockchain.activatedFeatures.contains(id)
+            val voted  = featuresSettings.supported.contains(id) && !blockchain.activatedFeatures.get(id).exists(_ <= height)
             FeatureActivationStatus(
               id,
               BlockchainFeatures.feature(id).fold("Unknown feature")(_.description),
