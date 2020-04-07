@@ -55,7 +55,7 @@ class PreActivatedFeaturesTestSuite
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-    assertActivatedStatus(mainNodeStatus, PreActivatedFeaturesTestSuite.votingInterval * 2, NodeFeatureStatus.Voted)
+    assertUndefinedStatus(mainNodeStatus, NodeFeatureStatus.Voted)
 
     val otherNodes = nodes.tail.map(_.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum))
     otherNodes.foreach { s =>
