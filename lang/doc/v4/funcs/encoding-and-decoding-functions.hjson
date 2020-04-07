@@ -7,9 +7,57 @@
       paramsDoc: [ "The array of bytes to encode." ]
     }
     {
+      name: "keccak256_16Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-3-256](https://en.wikipedia.org/wiki/SHA-3) hash function. For array with size <= 16Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "keccak256_32Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-3-256](https://en.wikipedia.org/wiki/SHA-3) hash function. For array with size <= 32Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "keccak256_64Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-3-256](https://en.wikipedia.org/wiki/SHA-3) hash function. For array with size <= 64Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "keccak256_128Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-3-256](https://en.wikipedia.org/wiki/SHA-3) hash function. For array with size <= 128Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
       name: "blake2b256"
       params: [ "ByteVector" ]
       doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "blake2b256_16Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 16Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "blake2b256_32Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 32Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "blake2b256_64Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 64Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "blake2b256_128Kb"
+      params: [ "ByteVector" ]
+      doc: "[BLAKE-256](https://en.wikipedia.org/wiki/BLAKE_%28hash_function%29) hash function. For array with size <= 128Kb."
       paramsDoc: [ "The array of bytes to encode." ]
     }
     {
@@ -19,9 +67,123 @@
       paramsDoc: [ "The array of bytes to encode." ]
     }
     {
+      name: "sha256_16Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 16Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "sha256_32Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 32Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "sha256_64Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 64Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
+      name: "sha256_128Kb"
+      params: [ "ByteVector" ]
+      doc: "[SHA-256](https://en.wikipedia.org/wiki/SHA-2) hash function. For array with size <= 128Kb."
+      paramsDoc: [ "The array of bytes to encode." ]
+    }
+    {
       name: "groth16Verify"
       params: [ "ByteVector", "ByteVector", "ByteVector" ]
       doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_1inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 1 input."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_2inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 2 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_3inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 3 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_4inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 4 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_5inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 5 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_6inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 6 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_7inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 7 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_8inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 8 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_9inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 9 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_10inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 10 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_11inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 11 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_12inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 12 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_13inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 13 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_14inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 14 inputs."
+      paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
+    }
+    {
+      name: "groth16Verify_15inputs"
+      params: [ "ByteVector", "ByteVector", "ByteVector" ]
+      doc: "[Zero-knowledge proof](https://en.wikipedia.org/wiki/Zero-knowledge_proof) verifier function. With 15 inputs."
       paramsDoc: [ "Verifying key.", "Proofs.", "Inputs." ]
     }
     {
