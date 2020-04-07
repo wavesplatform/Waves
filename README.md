@@ -15,7 +15,7 @@
     <img alt="Open Issues" src="https://img.shields.io/github/issues/wavesplatform/Waves" target="_blank" />
   </a>
   <a href="https://twitter.com/wavesplatform">
-    <img alt="Twitter: WavesPlatform" src="https://img.shields.io/twitter/follow/wavesplatform?style=social" target="_blank" />
+    <img alt="Twitter: WavesPlatform" src="https://img.shields.io/twitter/follow/wavesplatform?label=Follow&style=social" target="_blank" />
   </a>
 </p>
 
