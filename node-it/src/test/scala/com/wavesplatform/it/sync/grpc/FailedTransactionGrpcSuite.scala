@@ -7,8 +7,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
-import com.wavesplatform.it.sync.transactions.FailedTransactionSuite.mkExchange
-import com.wavesplatform.it.sync.transactions.PriorityTransaction
+import com.wavesplatform.it.sync.transactions.FailedTransactionSuiteLike
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.FunctionHeader
@@ -21,13 +20,14 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityTransaction {
+class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTransactionSuiteLike {
+  import FailedTransactionSuiteLike._
   import grpcApi._
 
-  private val thirdContract     = KeyPair("thirdContract".getBytes("UTF-8"))
-  private val thirdContractAddr = PBRecipients.create(Address.fromPublicKey(thirdContract.publicKey)).getPublicKeyHash
-  private val caller            = thirdAcc
-  private val callerAddr        = PBRecipients.create(Address.fromPublicKey(thirdAcc.publicKey)).getPublicKeyHash
+  private val contract     = KeyPair("thirdContract".getBytes("UTF-8"))
+  private val contractAddr = PBRecipients.create(Address.fromPublicKey(contract.publicKey)).getPublicKeyHash
+  private val caller       = thirdAcc
+  private val callerAddr   = PBRecipients.create(Address.fromPublicKey(thirdAcc.publicKey)).getPublicKeyHash
 
   private val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
 
@@ -38,13 +38,13 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
   protected override def beforeAll(): Unit = {
     super.beforeAll()
 
-    sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(thirdContractAddr), 100.waves, minFee, waitForTx = true)
+    sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(contractAddr), 100.waves, minFee, waitForTx = true)
 
     smartAsset = PBTransactions
       .vanillaUnsafe(
         sender
           .broadcastIssue(
-            thirdContract,
+            contract,
             "Asset",
             assetAmount,
             8,
@@ -62,7 +62,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
       .vanillaUnsafe(
         sender
           .broadcastIssue(
-            thirdContract,
+            contract,
             "Sponsored Asset",
             assetAmount,
             8,
@@ -104,7 +104,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
          |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1
-    sender.setScript(thirdContract, Right(Some(script)), setScriptFee, waitForTx = true)
+    sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
   }
 
   test("InvokeScriptTransaction: insufficient action fees propagates failed transaction") {
@@ -112,7 +112,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
     val setAssetScriptMinFee = setAssetScriptFee + smartFee * 2
     val priorityFee          = setAssetScriptMinFee + invokeFee
 
-    updateAssetScript(result = true, smartAsset, thirdContract, setAssetScriptMinFee)
+    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     for (typeName <- Seq("transfer", "issue", "reissue", "burn")) {
       updateTikTok("unknown", setAssetScriptMinFee)
@@ -122,7 +122,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
           sender
             .broadcastInvokeScript(
               caller,
-              Recipient().withPublicKeyHash(thirdContractAddr),
+              Recipient().withPublicKeyHash(contractAddr),
               Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
               fee = invokeFee
             ),
@@ -138,18 +138,18 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
 
     for (funcName <- Seq("transfer", "reissue", "burn")) {
       updateTikTok(funcName, setAssetScriptMinFee)
-      updateAssetScript(result = true, smartAsset, thirdContract, setAssetScriptMinFee)
+      updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
       sendTxsAndThenPriorityTx(
         _ =>
           sender
             .broadcastInvokeScript(
               caller,
-              Recipient().withPublicKeyHash(thirdContractAddr),
+              Recipient().withPublicKeyHash(contractAddr),
               Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
               fee = invokeFee
             ),
-        () => updateAssetScript(result = false, smartAsset, thirdContract, priorityFee)
+        () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
       )(assertFailedTxs)
     }
   }
@@ -161,37 +161,37 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
     val priorityFee          = setAssetScriptMinFee + invokeFee
     val totalWavesSpend      = invokeFee * maxTxsInMicroBlock * 2
 
-    updateAssetScript(result = true, smartAsset, thirdContract, setAssetScriptMinFee)
+    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
     updateTikTok("reissue", setAssetScriptMinFee)
 
     sender.broadcastSponsorFee(
-      thirdContract,
+      contract,
       Some(Amount.of(ByteString.copyFrom(Base58.decode(sponsoredAsset)), 1)),
       sponsorFee + smartFee,
       waitForTx = true
     )
     sender.broadcastTransfer(
-      thirdContract,
+      contract,
       Recipient().withPublicKeyHash(callerAddr),
       assetAmount,
       smartMinFee,
       assetId = sponsoredAsset,
       waitForTx = true
     )
-    val prevBalance = sender.wavesBalance(thirdContractAddr).regular
+    val prevBalance = sender.wavesBalance(contractAddr).regular
 
     sendTxsAndThenPriorityTx(
       _ =>
         sender.broadcastInvokeScript(
           caller,
-          Recipient().withPublicKeyHash(thirdContractAddr),
+          Recipient().withPublicKeyHash(contractAddr),
           Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
           fee = invokeFeeInAsset,
           feeAssetId = ByteString.copyFrom(Base58.decode(sponsoredAsset))
         ),
-      () => updateAssetScript(result = false, smartAsset, thirdContract, priorityFee)
+      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { txs =>
-      sender.wavesBalance(thirdContractAddr).regular shouldBe prevBalance - totalWavesSpend - priorityFee
+      sender.wavesBalance(contractAddr).regular shouldBe prevBalance - totalWavesSpend - priorityFee
       assertFailedTxs(txs)
     }
   }
@@ -207,18 +207,18 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
       BinaryDataEntry("bn", ByteStr(Longs.toByteArray(-1))),
       StringDataEntry("s", "-1")
     ).map(PBTransactions.toPBDataEntry)
-    sender.putData(thirdContract, initialEntries, minFee + smartFee)
-    updateAssetScript(result = true, smartAsset, thirdContract, setAssetScriptMinFee)
+    sender.putData(contract, initialEntries, minFee + smartFee)
+    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     sendTxsAndThenPriorityTx(
       i =>
         sender.broadcastInvokeScript(
           caller,
-          Recipient().withPublicKeyHash(thirdContractAddr),
+          Recipient().withPublicKeyHash(contractAddr),
           Some(FUNCTION_CALL(FunctionHeader.User("transferAndWrite"), List(Terms.CONST_LONG(i)))),
           fee = invokeFee
         ),
-      () => updateAssetScript(result = false, smartAsset, thirdContract, priorityFee)
+      () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { txs =>
       val failed              = assertFailedTxs(txs)
       val lastSuccessEndArg   = txs.size - failed.size
@@ -237,7 +237,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
           .mapValues(PBTransactions.toPBDataEntry)
       initialEntries.map(entry => entry.key -> entry).toMap.foreach {
         case (key, initial) =>
-          sender.getDataByKey(thirdContractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
+          sender.getDataByKey(contractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
       }
       failed
     }
@@ -249,7 +249,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
     val priorityFee          = setAssetScriptMinFee + invokeFee
 
     updateTikTok("unknown", setAssetScriptMinFee)
-    updateAssetScript(result = true, smartAsset, thirdContract, setAssetScriptMinFee)
+    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     val prevBalance = sender.wavesBalance(callerAddr).regular
 
@@ -257,7 +257,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
       _ =>
         sender.broadcastInvokeScript(
           caller,
-          Recipient().withPublicKeyHash(thirdContractAddr),
+          Recipient().withPublicKeyHash(contractAddr),
           Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
           fee = invokeFee
         ),
@@ -301,18 +301,11 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
 
     waitForTxs(init)
 
-    val seller         = firstAcc
-    val buyer          = secondAcc
-    val matcher        = thirdAcc
-    val sellerAddress  = firstAddress
-    val buyerAddress   = secondAddress
-//    val matcherAddress = thirdAddress
-
-//    val transfers = Seq(
-//      sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(sellerAddress), 100.waves, minFee),
-//      sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(buyerAddress), 100.waves, minFee),
-//      sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(matcherAddress), 100.waves, minFee)
-//    )
+    val seller        = firstAcc
+    val buyer         = secondAcc
+    val matcher       = thirdAcc
+    val sellerAddress = firstAddress
+    val buyerAddress  = secondAddress
 
     val quantity                                        = 1000000000L
     val initScript: Either[Array[Byte], Option[Script]] = Right(ScriptCompiler.compile("true", ScriptEstimatorV3).toOption.map(_._1))
@@ -321,7 +314,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
     val sellMatcherFeeAsset                             = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
     val buyMatcherFeeAsset                              = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
 
-    val preconditions = /*transfers ++ */Seq(
+    val preconditions = /*transfers ++ */ Seq(
       amountAsset,
       priceAsset,
       sellMatcherFeeAsset,
@@ -377,34 +370,18 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
   }
 
   test("ExchangeTransaction: invalid exchange tx when account script fails") {
-//    val init = Seq(
-//      sender.setScript(firstAcc, Right(None), setScriptFee + smartFee),
-//      sender.setScript(secondAcc, Right(None), setScriptFee + smartFee),
-//      sender.setScript(thirdAcc, Right(None), setScriptFee + smartFee)
-//    )
-
-//    waitForTxs(init)
-
-    val seller         = firstAcc
-    val buyer          = secondAcc
-    val matcher        = thirdAcc
-    val sellerAddress  = firstAddress
-    val buyerAddress   = secondAddress
-//    val matcherAddress = thirdAddress
-
-   /* val transfers = Seq(
-      sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(sellerAddress), 100.waves, minFee),
-      sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(buyerAddress), 100.waves, minFee),
-      sender.broadcastTransfer(sender.privateKey, Recipient().withPublicKeyHash(matcherAddress), 100.waves, minFee)
-    )*/
-
+    val seller              = firstAcc
+    val buyer               = secondAcc
+    val matcher             = thirdAcc
+    val sellerAddress       = firstAddress
+    val buyerAddress        = secondAddress
     val quantity            = 1000000000L
     val amountAsset         = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee)
     val priceAsset          = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee)
     val sellMatcherFeeAsset = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee)
     val buyMatcherFeeAsset  = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee)
 
-    val preconditions = /*transfers ++ */Seq(
+    val preconditions = Seq(
       amountAsset,
       priceAsset,
       sellMatcherFeeAsset,
@@ -461,7 +438,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with PriorityT
   }
 
   private def updateTikTok(result: String, fee: Long): PBSignedTransaction =
-    sender.putData(thirdContract, List(StringDataEntry("tikTok", result)).map(PBTransactions.toPBDataEntry), fee = fee, waitForTx = true)
+    sender.putData(contract, List(StringDataEntry("tikTok", result)).map(PBTransactions.toPBDataEntry), fee = fee, waitForTx = true)
 
   private def waitForTxs(txs: Seq[PBSignedTransaction]): Unit = {
     txs.foreach(tx => sender.waitForTransaction(PBTransactions.vanillaUnsafe(tx).id().toString))

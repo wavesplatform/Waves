@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.http.ApiError.{TransactionFailed, TransactionNotAllowedByAccountScript}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -13,15 +12,15 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
-import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
 
-class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with PriorityTransaction {
+class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike {
   import FailedTransactionSuite._
+  import FailedTransactionSuiteLike._
   import restApi._
 
   private val acc0 = pkByAddress(firstAddress)
@@ -459,37 +458,4 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
 object FailedTransactionSuite {
   case class Precondition(amountAsset: String, priceAsset: String, buyFeeAsset: String, sellFeeAsset: String)
-
-  def mkExchange(
-      buyer: KeyPair,
-      seller: KeyPair,
-      matcher: KeyPair,
-      assetPair: AssetPair,
-      fee: Long,
-      buyMatcherFeeAsset: String,
-      sellMatcherFeeAsset: String,
-      buyMatcherFee: Long,
-      sellMatcherFee: Long
-  ): ExchangeTransaction = {
-    val ts   = System.currentTimeMillis()
-    val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
-    val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
-    val buy  = Order.buy(Order.V4, buyer, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
-    val sell = Order.sell(Order.V4, seller, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
-    ExchangeTransaction
-      .signed(
-        TxVersion.V3,
-        matcher,
-        buy,
-        sell,
-        buy.amount,
-        buy.price,
-        buy.matcherFee,
-        sell.matcherFee,
-        fee,
-        ts
-      )
-      .right
-      .get
-  }
 }

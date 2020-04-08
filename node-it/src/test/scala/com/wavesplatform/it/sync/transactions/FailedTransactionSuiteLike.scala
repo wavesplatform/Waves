@@ -4,18 +4,21 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
+import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.Matchers
 import play.api.libs.json.JsObject
 
 import scala.concurrent.duration._
 
-trait PriorityTransaction { _: Matchers =>
+trait FailedTransactionSuiteLike { _: Matchers =>
   protected def waitForHeightArise(): Unit
   protected def sender: Node
 
@@ -61,6 +64,13 @@ trait PriorityTransaction { _: Matchers =>
 
       all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
 
+      val failedIdsByHeight = failed.groupBy(_.height.get).mapValues(_.map(_.id))
+
+      failedIdsByHeight.foreach {
+        case (h, ids) =>
+          sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
+      }
+
       failed
     }
 
@@ -81,10 +91,6 @@ trait PriorityTransaction { _: Matchers =>
       all(invalid.map(_.applicationStatus)) shouldBe None
 
       invalid
-    }
-
-    def assertFailedDebugStateChanges(): Unit = {
-
     }
 
     def updateAssetScript(result: Boolean, asset: String, owner: String, fee: Long): String = {
@@ -167,6 +173,13 @@ trait PriorityTransaction { _: Matchers =>
       failed.size should be > 0
       all(failed.map(_.applicationStatus)) shouldBe ApplicationStatus.SCRIPT_EXECUTION_FAILED
 
+      val failedIdsByHeight = failed.groupBy(_.height.toInt).mapValues(_.map(_.id))
+
+      failedIdsByHeight.foreach {
+        case (h, ids) =>
+          sender.blockAt(h).transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
+      }
+
       failed
     }
 
@@ -243,5 +256,40 @@ trait PriorityTransaction { _: Matchers =>
     import com.wavesplatform.it.api.SyncHttpApi._
 
     sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+  }
+}
+
+object FailedTransactionSuiteLike {
+  def mkExchange(
+      buyer: KeyPair,
+      seller: KeyPair,
+      matcher: KeyPair,
+      assetPair: AssetPair,
+      fee: Long,
+      buyMatcherFeeAsset: String,
+      sellMatcherFeeAsset: String,
+      buyMatcherFee: Long,
+      sellMatcherFee: Long
+  ): ExchangeTransaction = {
+    val ts   = System.currentTimeMillis()
+    val bmfa = Asset.fromString(Some(buyMatcherFeeAsset))
+    val smfa = Asset.fromString(Some(sellMatcherFeeAsset))
+    val buy  = Order.buy(Order.V4, buyer, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, buyMatcherFee, bmfa)
+    val sell = Order.sell(Order.V4, seller, matcher, assetPair, 100, 100, ts, ts + Order.MaxLiveTime, sellMatcherFee, smfa)
+    ExchangeTransaction
+      .signed(
+        TxVersion.V3,
+        matcher,
+        buy,
+        sell,
+        buy.amount,
+        buy.price,
+        buy.matcherFee,
+        sell.matcherFee,
+        fee,
+        ts
+      )
+      .right
+      .get
   }
 }
