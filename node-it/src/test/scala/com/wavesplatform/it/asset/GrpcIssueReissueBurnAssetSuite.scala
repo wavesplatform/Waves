@@ -258,11 +258,15 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
       sender.assertAssetBalance(acc, asset2Id, 15)
     }
 
-    "NFT burning removes it from list" in pending
-
-    "distribution works" in pending
-
-    "rollback works" in pending
+    // TODO NODE-1968
+    "NFT burning removes it from list" ignore {
+      val acc     = createDapp(script(nftAsset))
+      val txIssue = issue(acc, CallableMethod, nftAsset, invocationCost(1))
+      val assetId = validateIssuedAssets(acc, txIssue, nftAsset, method = CallableMethod)
+      // sender.nftList(acc, 2).map(_.assetId) shouldBe Seq(assetId)
+      burn(acc, CallableMethod, assetId, 1)
+      // sender.nftList(acc, 1) shouldBe empty
+    }
 
     "liquid block works" in {
       val acc   = createDapp(script(simpleReissuableAsset))

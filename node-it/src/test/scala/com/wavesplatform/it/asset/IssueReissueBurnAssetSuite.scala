@@ -1,8 +1,6 @@
 package com.wavesplatform.it.asset
 
-import com.google.protobuf.ByteString
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
@@ -394,7 +392,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   def assertStateChanges(tx: Transaction)(f: StateChangesDetails => Unit): Unit = {
     f(stateChanges(tx))
     f(stateChangesStrings(tx))
-    f(grpcStateChanges(tx))
   }
 
   def stateChanges(tx: Transaction): StateChangesDetails =
@@ -402,16 +399,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
   def stateChangesStrings(tx: Transaction): StateChangesDetails =
     sender.debugStateChanges(tx.id, amountsAsStrings = true).stateChanges.get
-
-  def grpcStateChanges(tx: Transaction): StateChangesDetails = {
-    import com.wavesplatform.it.api.SyncGrpcApi._
-    sender.stateChanges(tx.id)
-  }
-
-  def grpcBalance(address: String, assetId: String): Long = {
-    import com.wavesplatform.it.api.SyncGrpcApi._
-    sender.grpc.assetsBalance(ByteString.copyFrom(Base58.decode(address)), Seq(assetId)).headOption.fold(0L)(_._2)
-  }
 
   def validateIssue(issue: IssueInfoResponse, data: Asset): Unit = {
     issue.name shouldBe data.name
@@ -426,21 +413,10 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       ai.quantity shouldBe quantity
       ai.reissuable shouldBe reissuable
     }
-
-    assertGrpcAssetDetails(assetId) { ai =>
-      ai.totalVolume shouldBe quantity
-      ai.reissuable shouldBe reissuable
-    }
   }
 
   def assertAssetDetails(assetId: String)(f: AssetInfo => Unit): Unit = {
     val assetInfo = sender.assetsDetails(assetId)
-    f(assetInfo)
-  }
-
-  def assertGrpcAssetDetails(assetId: String)(f: AssetInfoResponse => Unit): Unit = {
-    import com.wavesplatform.it.api.SyncGrpcApi._
-    val assetInfo = sender.grpc.assetInfo(assetId)
     f(assetInfo)
   }
 
@@ -463,7 +439,6 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     assetInfo.scriptDetails shouldBe None
 
     sender.assertAssetBalance(account, assetId, data.quantity)
-    grpcBalance(account, assetId) shouldBe data.quantity
 
     if (method == CallableMethod) assertStateChanges(tx) { sd =>
       val issue = if (nth == -1) sd.issues.head else sd.issues(nth)
