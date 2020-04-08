@@ -2,7 +2,7 @@ package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
+import com.wavesplatform.api.http.ApiError.{TransactionFailed, TransactionNotAllowedByAccountScript}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -208,6 +208,13 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         case (key, initial) =>
           sender.getDataByKey(contract, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
+
+      failed.foreach { s =>
+        assertApiError(sender.debugStateChanges(s.id), TransactionFailed)
+      }
+
+      sender.debugStateChangesByAddress(contract, 10).map(sc => sc.id) should not contain allElementsOf(failed.map(_.id))
+
       failed
     }
   }
