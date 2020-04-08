@@ -33,7 +33,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{InvalidAssetId, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -704,8 +704,8 @@ class InvokeScriptTransactionDiffTest
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
       case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
-          _ shouldBe 'Left
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) { err =>
+          err shouldBe 'Left
         }
     }
   }
@@ -1587,7 +1587,11 @@ class InvokeScriptTransactionDiffTest
             new LevelDBWriterPredefAsset(asset, db, ignoreSpendableBalanceChanged, TestLevelDB.createTestBlockchainSettings(features), dbSettings)
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
-            ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
+            inside(ei) {
+              case Left(TransactionValidationError(ScriptExecutionError(m, _, false), i)) =>
+                i shouldBe invoke
+                m should endWith ("is already issued")
+            }
           }
         }
     }
@@ -1801,7 +1805,11 @@ class InvokeScriptTransactionDiffTest
             preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
-            ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
+            inside(ei) {
+              case Left(TransactionValidationError(ScriptExecutionError(m, _, false), i)) =>
+                i shouldBe invoke
+                m should endWith ("is already issued")
+            }
           }
         }
     }
