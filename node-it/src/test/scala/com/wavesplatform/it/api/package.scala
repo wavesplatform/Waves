@@ -50,8 +50,7 @@ package object api {
           "totalAmount",
           "totalFee",
           "totalWavesAmount",
-          "value",
-          "nonce"
+          "value"
         )
         jsv match {
           case JsArray(arr) =>

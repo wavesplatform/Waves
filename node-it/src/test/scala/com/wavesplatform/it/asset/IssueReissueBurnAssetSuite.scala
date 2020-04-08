@@ -1,6 +1,6 @@
 package com.wavesplatform.it.asset
 
-import com.wavesplatform.account.KeyPair
+import com.wavesplatform.account.{KeyPair, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
@@ -13,6 +13,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import org.scalactic.source.Position
 
 class IssueReissueBurnAssetSuite extends BaseSuite {
   val initialWavesBalance = 100.waves
@@ -392,6 +393,11 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   def assertStateChanges(tx: Transaction)(f: StateChangesDetails => Unit): Unit = {
     f(stateChanges(tx))
     f(stateChangesStrings(tx))
+
+    val result = sender.debugStateChangesByAddress(tx.sender.get, 100)
+    val stateChange = result.find(_.id == tx.id)
+    stateChange should not be empty
+    f(stateChange.get.stateChanges.get)
   }
 
   def stateChanges(tx: Transaction): StateChangesDetails =
