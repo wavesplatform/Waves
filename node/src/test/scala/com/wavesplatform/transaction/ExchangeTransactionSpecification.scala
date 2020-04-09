@@ -285,7 +285,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(buyMatcherFee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
         create(fee = Order.MaxAmount + 1) shouldBe an[Left[_, _]]
 
-        create(buyOrder = buy.updateType(OrderType.SELL)) shouldBe an[Left[_, _]]
+        create(buyOrder = buy.updateType(OrderType.SELL)) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
         create(buyOrder = buy.updateAmount(0)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateAmount(-1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateAmount(Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
@@ -295,7 +295,7 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
         create(buyOrder = buy.updatePrice(-1)) shouldBe an[Left[_, _]]
         create(buyOrder = buy.updateMatcher(sender2)) shouldBe an[Left[_, _]]
 
-        create(sellOrder = sell.updateType(OrderType.BUY)) shouldBe an[Left[_, _]]
+        create(sellOrder = sell.updateType(OrderType.BUY)) shouldBe Left(GenericError("sellOrder should has OrderType.SELL"))
         create(sellOrder = sell.updateAmount(0)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updateAmount(-1)) shouldBe an[Left[_, _]]
         create(sellOrder = sell.updateAmount(Order.MaxAmount + 1)) shouldBe an[Left[_, _]]
@@ -307,6 +307,8 @@ class ExchangeTransactionSpecification extends PropSpec with PropertyChecks with
 
         create(sellOrder = buy, buyOrder = sell) shouldBe Left(GenericError("order1 should have OrderType.BUY"))
         create(version = TxVersion.V3, sellOrder = buy, buyOrder = sell) shouldBe an[Right[_, _]]
+        create(version = TxVersion.V3, sellOrder = sell, buyOrder = sell) shouldBe Left(GenericError("buyOrder should has OrderType.BUY"))
+        create(version = TxVersion.V3, sellOrder = buy, buyOrder = buy) shouldBe Left(GenericError("sellOrder should has OrderType.SELL"))
 
         create(
           buyOrder = buy.updatePair(buy.assetPair.copy(amountAsset = Waves)),
