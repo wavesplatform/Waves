@@ -328,5 +328,7 @@ object SyncGrpcApi extends Assertions {
     }
 
     def getStatuses(request: TransactionsByIdRequest): Seq[PBTransactionStatus] = sync(async(n).getStatuses(request))
+
+    def getStateChanges(request: TransactionsRequest): Seq[InvokeScriptResult] = sync(async(n).getStateChanges(request))
   }
 }

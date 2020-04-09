@@ -1,11 +1,12 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
+import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
@@ -30,8 +31,8 @@ object TransactionDiffer {
       tx: Transaction
   ): TracedResult[ValidationError, Diff] =
     validate(prevBlockTimestamp, currentBlockTimestamp, verify)(blockchain, tx) match {
-      case isFailedTransaction() if acceptFailedTransaction(blockchain, tx) => failedTransactionDiff(blockchain, tx)
-      case result                                                          => result
+      case isFailedTransaction(error) if acceptFailedTransaction(blockchain, tx) => failedTransactionDiff(blockchain, tx, error)
+      case result                                                                => result
     }
 
   def validate(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
@@ -112,7 +113,7 @@ object TransactionDiffer {
         TracedResult(BalanceDiffValidation(blockchain)(diff))
       }
 
-  private def failedTransactionDiff(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
+  private def failedTransactionDiff(blockchain: Blockchain, tx: Transaction, error: Option[ErrorMessage]): TracedResult[ValidationError, Diff] =
     for {
       portfolios <- (tx, tx.assetFee) match {
         case (tx: ProvenTransaction, (Waves, fee)) => TracedResult(Right(Map(tx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty))))
@@ -132,20 +133,32 @@ object TransactionDiffer {
                 Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
             }
           }
-        case _ => TracedResult(Left(TransactionValidationError(GenericError(s"Can't accept failed script on $tx"), tx)))
+        case _ => TracedResult(Left(TransactionValidationError(GenericError(s"Can't accept failed script result in $tx"), tx)))
       }
-      diff <- balance(blockchain, tx, Diff.failed(tx, portfolios))
-    } yield diff
+      mayBeDApp <- extractDAppAddress(blockchain, tx)
+    } yield Diff.failed(tx, portfolios, mayBeDApp, error)
+
+  private def extractDAppAddress(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Option[Address]] =
+    tx match {
+      case ist: InvokeScriptTransaction => TracedResult.wrapE(blockchain.resolveAlias(ist.dAppAddressOrAlias).map(Some(_)))
+      case _                            => TracedResult.wrapValue[Option[Address], ValidationError](None)
+    }
 
   private def acceptFailedTransaction(blockchain: Blockchain, tx: Transaction): Boolean =
     (tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId) &&
       blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction)
 
   private object isFailedTransaction {
-    def unapply(result: TracedResult[ValidationError, Diff]): Boolean =
+    def unapply(result: TracedResult[ValidationError, Diff]): Option[Option[ErrorMessage]] =
       result match {
-        case TracedResult(Left(TransactionValidationError(_: CanFailTransaction, _)), _) => true
-        case _                                                                           => false
+        case TracedResult(Left(TransactionValidationError(e: CanFail, tx)), _) => Some(errorMessage(e, tx))
+        case _                                                                 => None
+      }
+
+    def errorMessage(cf: CanFail, tx: Transaction): Option[ErrorMessage] =
+      tx match {
+        case _: InvokeScriptTransaction => Some(ErrorMessage(cf.reason.id, cf.error))
+        case _                          => None
       }
   }
 

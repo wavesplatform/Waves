@@ -1,11 +1,11 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
-import com.wavesplatform.api.http.ApiError.{TransactionFailed, TransactionNotAllowedByAccountScript}
+import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
-import com.wavesplatform.it.api.TransactionStatus
+import com.wavesplatform.it.api.{DebugStateChanges, TransactionStatus}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
@@ -182,7 +182,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       BinaryDataEntry("bn", ByteStr(Longs.toByteArray(-1))),
       StringDataEntry("s", "-1")
     )
-    sender.broadcastData(pkByAddress(contract), initialEntries, minFee + smartFee)
+    sender.broadcastData(pkByAddress(contract), initialEntries, minFee + smartFee, waitForTx = true)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
     sendTxsAndThenPriorityTx(
@@ -208,11 +208,22 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
           sender.getDataByKey(contract, key) shouldBe lastSuccessWrites.getOrElse(key, initial)
       }
 
-      failed.foreach { s =>
-        assertApiError(sender.debugStateChanges(s.id), TransactionFailed)
+      def checkStateChange(info: DebugStateChanges): Unit = {
+        info.stateChanges shouldBe 'defined
+        info.stateChanges.get.issues.size shouldBe 0
+        info.stateChanges.get.reissues.size shouldBe 0
+        info.stateChanges.get.burns.size shouldBe 0
+        info.stateChanges.get.errorMessage shouldBe 'defined
+        info.stateChanges.get.errorMessage.get.code shouldBe 1
+        info.stateChanges.get.errorMessage.get.text shouldBe "Transaction is not allowed by token-script"
       }
 
-      sender.debugStateChangesByAddress(contract, 10).map(sc => sc.id) should not contain allElementsOf(failed.map(_.id))
+      failed.foreach(s => checkStateChange(sender.debugStateChanges(s.id)))
+
+      val failedIds             = failed.map(_.id).toSet
+      val stateChangesByAddress = sender.debugStateChangesByAddress(contract, 10).takeWhile(sc => failedIds.contains(sc.id))
+      stateChangesByAddress.size should be > 0
+      stateChangesByAddress.foreach(info => checkStateChange(info))
 
       failed
     }

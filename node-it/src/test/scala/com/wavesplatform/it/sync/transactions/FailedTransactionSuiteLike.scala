@@ -69,8 +69,16 @@ trait FailedTransactionSuiteLike { _: Matchers =>
       failedIdsByHeight.foreach {
         case (h, ids) =>
           sender.blockAt(h).transactions.map(_.id) should contain allElementsOf ids
-      }
+          sender.blockSeq(h, h).head.transactions.map(_.id) should contain allElementsOf ids
+          sender.blockById(sender.blockAt(h).id).transactions.map(_.id) should contain allElementsOf ids
+          sender.blockSeqByAddress(sender.address, h, h).head.transactions.map(_.id) should contain allElementsOf ids
 
+          val liquidBlock = sender.lastBlock()
+          val maxHeightWithFailed = failedIdsByHeight.keys.max
+          if (liquidBlock.height == maxHeightWithFailed) {
+            liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)
+          }
+      }
       failed
     }
 
@@ -178,6 +186,7 @@ trait FailedTransactionSuiteLike { _: Matchers =>
       failedIdsByHeight.foreach {
         case (h, ids) =>
           sender.blockAt(h).transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
+          sender.blockSeq(h, h).head.transactionData.map(_.id()) should contain allElementsOf ids.map(bs => ByteStr(bs.toByteArray))
       }
 
       failed

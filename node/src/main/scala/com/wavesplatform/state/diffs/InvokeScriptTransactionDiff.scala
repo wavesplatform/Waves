@@ -9,12 +9,12 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
 import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
-import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
@@ -78,10 +78,9 @@ object InvokeScriptTransactionDiff {
                   Sponsorship.toWaves(tx.fee, assetInfo.sponsorship),
                   GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
                 )
-              } yield
-                wavesFee ->
-                  (Map(tx.sender.toAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee))) |+|
-                    Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))))
+              } yield wavesFee ->
+                (Map(tx.sender.toAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee))) |+|
+                  Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))))
           })
           wavesFee     = feeInfo._1
           paymentsDiff = paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2)
@@ -486,7 +485,7 @@ object InvokeScriptTransactionDiff {
         }
 
       val diff = action match {
-        case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(MultiPaymentInvokeScript)) { pk } else { PublicKey(ByteStr.empty) }))
+        case t: AssetTransfer => applyTransfer(t, if(blockchain.isFeatureActivated(MultiPaymentInvokeScript)) { pk } else { PublicKey(ByteStr.empty) })
         case d: DataItem[_]   => applyDataItem(d)
         case i: Issue         => applyIssue(tx, pk, i)
         case r: Reissue       => applyReissue(r, pk)
@@ -510,14 +509,14 @@ object InvokeScriptTransactionDiff {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError(error, log, isAssetScript = true))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript(log, isAssetScript = true))
+        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reasons.AssetInAction))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reasons.AssetInAction))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x))     => Left(ScriptExecutionError(s"Script returned not a boolean result, but $x", log, isAssetScript = true))
+        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reasons.AssetInAction))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAssetScript = true))
+        Left(ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reasons.AssetInAction))
       case Success(s) => s
     }
 }

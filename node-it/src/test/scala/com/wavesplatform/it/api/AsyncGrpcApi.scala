@@ -465,6 +465,12 @@ object AsyncGrpcApi {
       transactions.getStatuses(request, obs)
       result.runToFuture
     }
+
+    def getStateChanges(request: TransactionsRequest): Future[Seq[InvokeScriptResult]] = {
+      val (obs, result) = createCallObserver[InvokeScriptResult]
+      transactions.getStateChanges(request, obs)
+      result.runToFuture
+    }
   }
 
   private def createCallObserver[T](implicit s: Scheduler): (StreamObserver[T], Task[List[T]]) = {

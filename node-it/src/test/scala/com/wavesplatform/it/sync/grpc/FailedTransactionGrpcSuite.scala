@@ -3,6 +3,7 @@ package com.wavesplatform.it.sync.grpc
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{Address, KeyPair}
+import com.wavesplatform.api.grpc.TransactionsRequest
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncGrpcApi._
@@ -34,6 +35,12 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   private val assetAmount    = 1000000000L
   private var smartAsset     = ""
   private var sponsoredAsset = ""
+
+  private val seller        = firstAcc
+  private val buyer         = secondAcc
+  private val matcher       = thirdAcc
+  private val sellerAddress = firstAddress
+  private val buyerAddress  = secondAddress
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -239,6 +246,16 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         case (key, initial) =>
           sender.getDataByKey(contractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
       }
+
+      sender.getStateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach { sc =>
+        sc.issues.size shouldBe 0
+        sc.reissues.size shouldBe 0
+        sc.burns.size shouldBe 0
+        sc.errorMessage shouldBe 'defined
+        sc.errorMessage.get.code shouldBe 1
+        sc.errorMessage.get.text shouldBe "Transaction is not allowed by token-script"
+      }
+
       failed
     }
   }
@@ -301,12 +318,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
     waitForTxs(init)
 
-    val seller        = firstAcc
-    val buyer         = secondAcc
-    val matcher       = thirdAcc
-    val sellerAddress = firstAddress
-    val buyerAddress  = secondAddress
-
     val quantity                                        = 1000000000L
     val initScript: Either[Array[Byte], Option[Script]] = Right(ScriptCompiler.compile("true", ScriptEstimatorV3).toOption.map(_._1))
     val amountAsset                                     = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee, script = initScript)
@@ -314,7 +325,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val sellMatcherFeeAsset                             = sender.broadcastIssue(matcher, "Seller fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
     val buyMatcherFeeAsset                              = sender.broadcastIssue(matcher, "Buyer fee asset", quantity, 8, reissuable = true, issueFee, script = initScript)
 
-    val preconditions = /*transfers ++ */ Seq(
+    val preconditions = Seq(
       amountAsset,
       priceAsset,
       sellMatcherFeeAsset,
@@ -370,11 +381,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   }
 
   test("ExchangeTransaction: invalid exchange tx when account script fails") {
-    val seller              = firstAcc
-    val buyer               = secondAcc
-    val matcher             = thirdAcc
-    val sellerAddress       = firstAddress
-    val buyerAddress        = secondAddress
     val quantity            = 1000000000L
     val amountAsset         = sender.broadcastIssue(seller, "Amount asset", quantity, 8, reissuable = true, issueFee)
     val priceAsset          = sender.broadcastIssue(buyer, "Price asset", quantity, 8, reissuable = true, issueFee)

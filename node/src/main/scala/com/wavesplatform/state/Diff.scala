@@ -221,11 +221,14 @@ object Diff {
 
   def failed(
       tx: Transaction,
-      portfolios: Map[Address, Portfolio] = Map.empty
+      portfolios: Map[Address, Portfolio],
+      dAppAddress: Option[Address],
+      errorMessage: Option[InvokeScriptResult.ErrorMessage]
   ): Diff =
     empty.copy(
-      transactions = LinkedHashMap((tx.id(), (tx, portfolios.keySet, false))),
-      portfolios = portfolios
+      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ dAppAddress.toList).toSet, false))),
+      portfolios = portfolios,
+      scriptResults = Map(tx.id() -> InvokeScriptResult(errorMessage = errorMessage))
     )
 
   val empty =
