@@ -1,7 +1,6 @@
 package com.wavesplatform.common
 
 import java.security.{KeyPairGenerator, SecureRandom, Signature => JavaSignature}
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 
 import com.wavesplatform.common.RSAVerifyBenchmark.{CurveSt, RSASt}

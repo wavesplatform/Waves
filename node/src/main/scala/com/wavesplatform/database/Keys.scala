@@ -6,6 +6,7 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state._
@@ -17,7 +18,7 @@ import com.wavesplatform.utils._
 
 object Keys {
   import KeyHelpers._
-  import KeyTags.{InvokeScriptResult => InvokeScriptResultTag, _}
+  import KeyTags.{InvokeScriptResult => InvokeScriptResultTag, AddressId => AddressIdTag, _}
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -25,14 +26,14 @@ object Keys {
 
   def heightOf(blockId: ByteStr): Key[Option[Int]] = Key.opt[Int](HeightOf, blockId.arr, Ints.fromByteArray, Ints.toByteArray)
 
-  def wavesBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
+  def wavesBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(WavesBalanceHistory, addressId.toByteArray)
 
-  def wavesBalance(addressId: BigInt)(height: Int): Key[Long] =
+  def wavesBalance(addressId: AddressId)(height: Int): Key[Long] =
     Key(WavesBalance, hAddr(height, addressId), Option(_).fold(0L)(Longs.fromByteArray), Longs.toByteArray)
 
-  def assetBalanceHistory(addressId: BigInt, asset: IssuedAsset): Key[Seq[Int]] =
+  def assetBalanceHistory(addressId: AddressId, asset: IssuedAsset): Key[Seq[Int]] =
     historyKey(AssetBalanceHistory, addressId.toByteArray ++ asset.id.arr)
-  def assetBalance(addressId: BigInt, asset: IssuedAsset)(height: Int): Key[Long] =
+  def assetBalance(addressId: AddressId, asset: IssuedAsset)(height: Int): Key[Long] =
     Key(
       AssetBalance,
       hBytes(asset.id.arr ++ addressId.toByteArray, height),
@@ -44,8 +45,8 @@ object Keys {
   def assetDetails(asset: IssuedAsset)(height: Int): Key[(AssetInfo, AssetVolumeInfo)] =
     Key(AssetDetails, hBytes(asset.id.arr, height), readAssetDetails, writeAssetDetails)
 
-  def leaseBalanceHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
-  def leaseBalance(addressId: BigInt)(height: Int): Key[LeaseBalance] =
+  def leaseBalanceHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(LeaseBalanceHistory, addressId.toByteArray)
+  def leaseBalance(addressId: AddressId)(height: Int): Key[LeaseBalance] =
     Key(LeaseBalance, hAddr(height, addressId), readLeaseBalance, writeLeaseBalance)
   def leaseStatusHistory(leaseId: ByteStr): Key[Seq[Int]] = historyKey(LeaseStatusHistory, leaseId.arr)
   def leaseStatus(leaseId: ByteStr)(height: Int): Key[Boolean] =
@@ -55,30 +56,26 @@ object Keys {
   def filledVolumeAndFee(orderId: ByteStr)(height: Int): Key[VolumeAndFee] =
     Key(FilledVolumeAndFee, hBytes(orderId.arr, height), readVolumeAndFee, writeVolumeAndFee)
 
-  def changedAddresses(height: Int): Key[Seq[BigInt]] = Key(ChangedAddresses, h(height), readBigIntSeq, writeBigIntSeq)
+  def changedAddresses(height: Int): Key[Seq[AddressId]] = Key(ChangedAddresses, h(height), readAddressIds, writeAddressIds)
 
-  def addressIdOfAlias(alias: Alias): Key[Option[BigInt]] = Key.opt(AddressIdOfAlias, alias.bytes.arr, BigInt(_), _.toByteArray)
+  def addressIdOfAlias(alias: Alias): Key[Option[AddressId]] = Key.opt(AddressIdOfAlias, alias.bytes.arr, AddressId.fromByteArray, _.toByteArray)
 
-  val lastAddressId: Key[Option[BigInt]] = Key.opt(LastAddressId, Array.emptyByteArray, BigInt(_), _.toByteArray)
+  val lastAddressId: Key[Option[Long]] = Key.opt(LastAddressId, Array.emptyByteArray, Longs.fromByteArray, _.toByteArray)
 
-  def addressId(address: Address): Key[Option[BigInt]] = Key.opt(AddressId, address.bytes.arr, BigInt(_), _.toByteArray)
-  def idToAddress(id: BigInt): Key[Address]            = Key(IdToAddress, id.toByteArray, Address.fromBytes(_).explicitGet(), _.bytes.arr)
+  def addressId(address: Address): Key[Option[AddressId]] = Key.opt(AddressIdTag, address.bytes.arr, AddressId.fromByteArray, _.toByteArray)
+  def idToAddress(addressId: AddressId): Key[Address]            = Key(IdToAddress, addressId.toByteArray, Address.fromBytes(_).explicitGet(), _.bytes.arr)
 
-  def addressScriptHistory(addressId: BigInt): Key[Seq[Int]] = historyKey(AddressScriptHistory, addressId.toByteArray)
-  def addressScript(addressId: BigInt)(height: Int): Key[Option[AccountScriptInfo]] =
+  def addressScriptHistory(addressId: AddressId): Key[Seq[Int]] = historyKey(AddressScriptHistory, addressId.toByteArray)
+  def addressScript(addressId: AddressId)(height: Int): Key[Option[AccountScriptInfo]] =
     Key.opt(AddressScript, hAddr(height, addressId), readAccountScriptInfo, writeAccountScriptInfo)
 
   val approvedFeatures: Key[Map[Short, Int]]  = Key(ApprovedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
   val activatedFeatures: Key[Map[Short, Int]] = Key(ActivatedFeatures, Array.emptyByteArray, readFeatureMap, writeFeatureMap)
 
-  def dataKeyChunkCount(addressId: BigInt): Key[Int] =
-    Key(DataKeyChunkCount, addr(addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
-  def dataKeyChunk(addressId: BigInt, chunkNo: Int): Key[Seq[String]] =
-    Key(DataKeyChunk, addr(addressId) ++ Ints.toByteArray(chunkNo), readStrings, writeStrings)
-
-  def dataHistory(addressId: BigInt, key: String): Key[Seq[Int]] =
-    historyKey(DataHistory, addressId.toByteArray ++ key.utf8Bytes)
-  def data(addressId: BigInt, key: String)(height: Int): Key[Option[DataEntry[_]]] =
+  // public key hash is used here so it's possible to populate bloom filter by just scanning all the history keys
+  def dataHistory(address: Address, key: String): Key[Seq[Int]] =
+    historyKey(DataHistory, PBRecipients.publicKeyHash(address) ++ key.utf8Bytes)
+  def data(addressId: AddressId, key: String)(height: Int): Key[Option[DataEntry[_]]] =
     Key.opt(Data, hBytes(addressId.toByteArray ++ key.utf8Bytes, height), readDataEntry(key), writeDataEntry)
 
   def sponsorshipHistory(asset: IssuedAsset): Key[Seq[Int]] = historyKey(SponsorshipHistory, asset.id.arr)
@@ -95,8 +92,8 @@ object Keys {
 
   val safeRollbackHeight: Key[Int] = intKey(SafeRollbackHeight)
 
-  def changedDataKeys(height: Int, addressId: BigInt): Key[Seq[String]] =
-    Key(ChangedDataKeys, hAddr(height, addressId), readStrings, writeStrings)
+  def changedDataKeys(height: Int, addressId: AddressId): Key[Seq[String]] =
+    Key(ChangedDataKeys, hBytes(addressId.toByteArray, height), readStrings, writeStrings)
 
   def blockMetaAt(height: Height): Key[Option[BlockMeta]] =
     Key.opt(BlockInfoAtHeight, h(height), readBlockMeta(height), writeBlockMeta)
@@ -172,10 +169,10 @@ object Keys {
   def assetStaticInfo(asset: IssuedAsset): Key[Option[AssetStaticInfo]] =
     Key.opt(AssetStaticInfo, asset.id.arr, readAssetStaticInfo, writeAssetStaticInfo)
 
-  def nftCount(addressId: BigInt): Key[Int] =
-    Key(NftCount, addr(addressId), Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
+  def nftCount(addressId: AddressId): Key[Int] =
+    Key(NftCount, addressId.toByteArray, Option(_).fold(0)(Ints.fromByteArray), Ints.toByteArray)
 
-  def nftAt(addressId: BigInt, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
+  def nftAt(addressId: AddressId, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
 
   val continuationStates: Key[Map[ByteStr, EXPR]] =
@@ -185,4 +182,6 @@ object Keys {
       readContinuationStates,
       writeContinuationStates
     )
+
+  def bloomFilterChecksum(filterName: String): Key[Array[Byte]] = Key(KeyTags.BloomFilterChecksum, filterName.utf8Bytes, identity, identity)
 }

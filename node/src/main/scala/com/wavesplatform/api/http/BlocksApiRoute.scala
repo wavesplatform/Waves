@@ -35,7 +35,7 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       complete(for {
         meta <- commonApi.meta(signature).toRight(BlockDoesNotExist)
       } yield Json.obj("height" -> meta.height))
-    } ~ path("signature" / BlockId) { signature =>
+    } ~ path("signature" / BlockId) { signature => // TODO: Delete
       complete(commonApi.block(signature).map(toJson))
     } ~ path("address" / AddrSegment / IntNumber / IntNumber) { (address, start, end) =>
       if (end >= 0 && start >= 0 && end - start >= 0 && end - start < MaxBlocksPerRequest) extractScheduler { implicit ec =>
@@ -55,8 +55,12 @@ case class BlocksApiRoute(settings: RestAPISettings, commonApi: CommonBlocksApi)
       } ~ path("seq" / IntNumber / IntNumber) { (start, end) =>
         seq(start, end, includeTransactions = false)
       } ~ path("last") {
-        at(commonApi.currentHeight, false)
+        at(commonApi.currentHeight, includeTransactions = false)
+      } ~ path(BlockId) { id =>
+        complete(commonApi.meta(id).map(_.json()))
       }
+    } ~ path(BlockId) { id =>
+      complete(commonApi.block(id).map(toJson))
     }
   }
 

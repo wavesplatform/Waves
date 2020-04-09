@@ -91,7 +91,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
        |
        |@Callable (i) func reissueAsset(a: ByteVector, r: Boolean, q: Int) = [Reissue(a, r, q)]
        |
-       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, false, rq), Reissue(a, false, rq)]
+       |@Callable (i) func reissueAndReissue(a: ByteVector, rq: Int) = [Reissue(a, true, rq), Reissue(a, false, rq)]
        |
        |@Callable(i)
        |func transferAndBurn(a: ByteVector, q: Int) = {
@@ -177,12 +177,11 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   "Restrictions in @Callable" - {
     val method = "@Callable"
 
-    "Issue two identical assets with the same nonce (one invocation) should produce an error" ignore {
-      /* SC-575  */
+    "Issue two identical assets with the same nonce (one invocation) should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
         invokeScript(acc, "issue2Assets"),
-        "State check failed. Reason: Reason should be here"
+        " is already issued"
       )
     }
 
@@ -228,14 +227,14 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       )
     }
 
-    "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" ignore /* SC-580 */ {
+    "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" in {
       val acc     = createDapp(script(simpleReissuableAsset))
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
       invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000)
 
-      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.q + 1000)
+      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.q + 2000)
     }
 
     "Issue 10 assets should not produce an error" in {

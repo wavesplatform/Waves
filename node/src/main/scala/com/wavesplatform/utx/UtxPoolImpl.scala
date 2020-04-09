@@ -9,6 +9,7 @@ import cats.syntax.monoid._
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.metrics._
@@ -29,6 +30,7 @@ import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
+import monix.execution.ExecutionModel
 import monix.execution.atomic.AtomicBoolean
 import monix.execution.schedulers.SchedulerService
 import monix.reactive.Observer
@@ -45,8 +47,9 @@ class UtxPoolImpl(
     blockchain: Blockchain,
     spendableBalanceChanged: Observer[(Address, Asset)],
     utxSettings: UtxSettings,
-    nanoTimeSource: () => Long = () => System.nanoTime(),
-    enablePriorityPool: Boolean
+    enablePriorityPool: Boolean,
+    onEvent: UtxEvent => Unit = _ => (),
+    nanoTimeSource: () => Long = () => System.nanoTime()
 ) extends ScorexLogging
     with AutoCloseable
     with UtxPool {
@@ -54,11 +57,12 @@ class UtxPoolImpl(
   import com.wavesplatform.utx.UtxPoolImpl._
 
   // Context
-  private[this] val cleanupScheduler: SchedulerService = Schedulers.singleThread("utx-pool-cleanup")
+  private[this] val cleanupScheduler: SchedulerService =
+    Schedulers.singleThread("utx-pool-cleanup", executionModel = ExecutionModel.AlwaysAsyncExecution)
 
   // State
   private[this] val transactions          = new ConcurrentHashMap[ByteStr, Transaction]()
-  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined)
+  private[this] val pessimisticPortfolios = new PessimisticPortfolios(spendableBalanceChanged, blockchain.transactionHeight(_).isDefined) // TODO delete in the future
   private[this] val priorityTransactions  = mutable.LinkedHashMap.empty[ByteStr, Transaction]
 
   override def putIfNew(tx: Transaction): TracedResult[ValidationError, Boolean] = {
@@ -181,12 +185,19 @@ class UtxPoolImpl(
   }
 
   private[this] def removeIds(removed: Set[ByteStr]): Unit = priorityTransactions.synchronized {
-    removed.foreach(removeFromBothPools)
+    removed.foreach { id =>
+      val tx = priorityTransactions.get(id).orElse(Option(transactions.get(id)))
+      tx.foreach(tx => onEvent(UtxEvent.TxRemoved(tx, None)))
+      removeFromBothPools(id)
+    }
   }
 
   private[this] def addTransaction(tx: Transaction, verify: Boolean, priority: Boolean): TracedResult[ValidationError, Boolean] = {
-    val diffEi               = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
-    def addPortfolio(): Unit = diffEi.map(pessimisticPortfolios.add(tx.id(), _))
+    val diffEi = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime(), verify)(blockchain, tx)
+    def addPortfolio(): Unit = diffEi.map { diff =>
+      pessimisticPortfolios.add(tx.id(), diff)
+      onEvent(UtxEvent.TxAdded(tx, diff))
+    }
 
     if (!verify || diffEi.resultE.isRight) {
       if (priority) priorityTransactions.synchronized {
@@ -266,6 +277,7 @@ class UtxPoolImpl(
               else if (TxCheck.isExpired(tx)) {
                 log.debug(s"Transaction ${tx.id()} expired")
                 this.removeFromBothPools(tx.id())
+                onEvent(UtxEvent.TxRemoved(tx, Some(GenericError("Expired"))))
                 r.copy(iterations = r.iterations + 1)
               } else {
                 val newScriptedAddresses = scriptedAddresses(tx)
@@ -308,6 +320,7 @@ class UtxPoolImpl(
                       log.debug(s"Transaction ${tx.id()} removed due to ${extractErrorMessage(error)}")
                       traceLogger.trace(error.toString)
                       this.removeFromBothPools(tx.id())
+                      onEvent(UtxEvent.TxRemoved(tx, Some(error)))
                       r.copy(
                         iterations = r.iterations + 1,
                         validatedTransactions = r.validatedTransactions + tx.id(),
@@ -386,12 +399,13 @@ class UtxPoolImpl(
   private[this] object TxCleanup {
     private[this] val scheduled = AtomicBoolean(false)
 
-    def runCleanupAsync(): Unit = if (scheduled.compareAndSet(false, true)) {
-      cleanupScheduler.execute { () =>
-        try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
-        finally scheduled.set(false)
+    def runCleanupAsync(): Unit =
+      if ((!transactions.isEmpty || priorityTransactions.nonEmpty) && scheduled.compareAndSet(false, true)) {
+        cleanupScheduler.execute { () =>
+          try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+          finally scheduled.set(false)
+        }
       }
-    }
   }
 
   /** DOES NOT verify transactions */

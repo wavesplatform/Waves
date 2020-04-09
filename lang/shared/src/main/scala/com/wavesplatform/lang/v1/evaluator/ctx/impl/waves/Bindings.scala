@@ -397,7 +397,7 @@ object Bindings {
       )
 
     val vrfFieldOpt: Map[String, EVALUATED] =
-      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf, "transactionsRoot" -> blockInf.transactionsRoot)
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
       else Map()
 
     CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)

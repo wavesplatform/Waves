@@ -38,6 +38,44 @@ object Global extends BaseGlobal {
         .toRight("Cannot decode")
     } yield x
 
+  private val hex: Array[Char] = Array('0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f')
+  override def base16EncodeImpl(input: Array[Byte]): Either[String, String] = {
+    val output = new StringBuilder(input.size * 2)
+    for (b <- input) {
+      output.append(hex((b >> 4) & 0xf))
+      output.append(hex(b & 0xf))
+    }
+    Right(output.result)
+  }
+
+  private def base16Dig(c: Char): Either[String, Byte] =
+    if ('0' <= c && c <= '9') {
+      Right((c - '0').toByte)
+    } else if ('a' <= c && c <= 'f') {
+      Right((10 + (c - 'a')).toByte)
+    } else if ('A' <= c && c <= 'F') {
+      Right((10 + (c - 'A')).toByte)
+    } else {
+      Left(s"$c isn't base16/hex digit")
+    }
+
+  override def base16DecodeImpl(input: String): Either[String, Array[Byte]] = {
+    val size = input.size
+    if (size % 2 == 1) {
+      Left("Need internal bytes number")
+    } else {
+      val bytes = new Array[Byte](size / 2)
+      for (i <- 0 until size / 2) {
+        (base16Dig(input(i * 2)), base16Dig(input(i * 2 + 1))) match {
+          case (Right(h), Right(l)) => bytes(i) = ((16: Byte) * h + l).toByte
+          case (Left(e), _) => return Left(e)
+          case (_, Left(e)) => return Left(e)
+        }
+      }
+      Right(bytes)
+    }
+  }
+
   def curve25519verify(message: Array[Byte], sig: Array[Byte], pub: Array[Byte]): Boolean =
     impl.Global.curve25519verify(toBuffer(message), toBuffer(sig), toBuffer(pub))
 

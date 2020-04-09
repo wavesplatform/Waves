@@ -216,7 +216,7 @@ class AddressRouteSpec
       verifierFuncOpt = Some(VerifierFunction(VerifierAnnotation("t"), FUNC("verify", List(), TRUE)))
     )
 
-    val contractScript     = ContractScript(V3, contractWithMeta).explicitGet()
+    val contractScript = ContractScript(V3, contractWithMeta).explicitGet()
     (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L))).once()
     (blockchain.accountScript _).when(allAccounts(3).toAddress).returns(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L)))
 

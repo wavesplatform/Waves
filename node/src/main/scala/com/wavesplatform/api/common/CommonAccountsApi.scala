@@ -9,6 +9,7 @@ import com.wavesplatform.database.{DBExt, KeyTags, Keys}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.protobuf.transaction.PBRecipients
 import com.wavesplatform.state.{AccountScriptInfo, AssetDescription, Blockchain, DataEntry, Diff, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.lease.LeaseTransaction
@@ -95,12 +96,13 @@ object CommonAccountsApi extends ScorexLogging {
       val entries         = mutable.ArrayBuffer[DataEntry[_]](entriesFromDiff.values.toSeq: _*)
 
       db.readOnly { ro =>
-        val addressId = db.get(Keys.addressId(address)).get
-        db.iterateOver(KeyTags.DataHistory.prefixBytes ++ addressId.toByteArray) { e =>
-          val key = new String(e.getKey.drop(2 + addressId.toByteArray.length), Charsets.UTF_8)
-          if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
-            for (h <- ro.get(Keys.dataHistory(addressId, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
-              entries += e
+        db.get(Keys.addressId(address)).foreach { addressId =>
+          db.iterateOver(KeyTags.DataHistory.prefixBytes ++ PBRecipients.publicKeyHash(address)) { e =>
+            val key = new String(e.getKey.drop(2 + Address.HashLength), Charsets.UTF_8)
+            if (regex.forall(_.r.pattern.matcher(key).matches()) && !entriesFromDiff.contains(key)) {
+              for (h <- ro.get(Keys.dataHistory(address, key)).headOption; e <- ro.get(Keys.data(addressId, key)(h))) {
+                entries += e
+              }
             }
           }
         }

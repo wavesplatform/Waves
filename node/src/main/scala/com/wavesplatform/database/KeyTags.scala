@@ -29,8 +29,6 @@ object KeyTags extends Enumeration {
   AddressScript,
   ApprovedFeatures,
   ActivatedFeatures,
-  DataKeyChunkCount,
-  DataKeyChunk,
   DataHistory,
   Data,
   SponsorshipHistory,
@@ -54,6 +52,7 @@ object KeyTags extends Enumeration {
   AssetStaticInfo,
   NftCount,
   NftPossession,
+  BloomFilterChecksum,
   ContinuationStates = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {

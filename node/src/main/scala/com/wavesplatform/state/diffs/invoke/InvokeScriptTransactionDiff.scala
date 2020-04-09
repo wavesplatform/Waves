@@ -1,34 +1,54 @@
 package com.wavesplatform.state.diffs.invoke
 
-import cats.implicits._
-
+import cats.instances.map._
 import cats.kernel.Monoid
-import com.wavesplatform.account.AddressScheme
+import cats.syntax.either._
+import cats.syntax.semigroup._
+import com.google.common.base.Throwables
+import com.google.protobuf.ByteString
+import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
+import com.wavesplatform.features.FunctionCallPolicyProvider._
+import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
+import com.wavesplatform.features.ScriptTransferValidationProvider._
+import com.wavesplatform.features.BlockchainFeatures._
+import com.wavesplatform.lang._
 import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.Account
+import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
 import com.wavesplatform.lang.v1.compiler.ContractCompiler
-import com.wavesplatform.lang.v1.compiler.Terms.{ARR, CaseObj, EVALUATED, FUNCTION_CALL}
+import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult, ScriptResultV3, ScriptResultV4}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.lang.v1.traits.domain.Recipient
-import com.wavesplatform.lang.{ExecutionError, Global, ValidationError}
-import com.wavesplatform.metrics.TxProcessingStats
+import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
+import com.wavesplatform.lang.v1.traits.domain._
+import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
-import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff}
-import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
-import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.state._
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.state.diffs.CommonValidation._
+import com.wavesplatform.state.diffs.FeeValidation._
+import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.TxValidationError._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
+import com.wavesplatform.transaction.smart.script.ScriptRunner
+import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
+import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.utils._
 import monix.eval.Coeval
 import shapeless.Coproduct
 
-import scala.util.Right
+import scala.util.{Failure, Right, Success, Try}
 
 object InvokeScriptTransactionDiff {
 

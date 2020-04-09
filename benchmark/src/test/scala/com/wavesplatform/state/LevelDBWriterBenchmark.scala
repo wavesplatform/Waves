@@ -94,7 +94,7 @@ object LevelDBWriterBenchmark {
 
     private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
 
-    val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings)
+    val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings, 10)
 
     def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
       loadBlockMetaAt(height).map { meta =>

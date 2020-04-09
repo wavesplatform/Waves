@@ -6,7 +6,7 @@ You can use it to build your own decentralised applications. Waves provides full
 
 ### How does the blockchain network work?
 
-There is a huge collection of nodes deployed by miners that store all of the network information in the chain of blocks (blockchain), process requests and can add new transactions to the network after checking their compliance with the rules. The miners are rewarded with the network coins called MRT. 
+There is a huge collection of nodes deployed by miners that store all of the network information in the chain of blocks (blockchain), process requests and can add new transactions to the network after checking their compliance with the rules. The miners are rewarded with the network coins called Waves. 
 
 The main advantage of this technology is that each node is a synchronized copy of the main blockchain: it means that the information is stored decentralized and won't be overwritten globally if one of the users changes it at one of the node storages. This can guarantee that the user's information will stay fair and unchangeable. 
 
