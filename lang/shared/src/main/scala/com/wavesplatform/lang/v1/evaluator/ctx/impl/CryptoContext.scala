@@ -124,7 +124,8 @@ object CryptoContext {
     }
 
 
-    def sigVerifyF(contextVer: StdLibVersion): BaseFunction[NoContext] =
+    def sigVerifyF(contextVer: StdLibVersion): BaseFunction[NoContext] = {
+      val lim = if(version < V4) { global.MaxByteStrSizeForVerifyFuncs } else { global.MaxByteStrSizeForVerifyFuncs_V4 }
       NativeFunction("sigVerify",
                      (if(version < V4) { 100 } else { 200 }),
                      SIGVERIFY,
@@ -133,14 +134,16 @@ object CryptoContext {
                      ("sig", BYTESTR),
                      ("pub", BYTESTR)) {
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
-            if (contextVer != V1 && contextVer != V2 && msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
-          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
+            if (contextVer != V1 && contextVer != V2 && msg.size > lim) =>
+          Left(s"Invalid message size, must be not greater than ${lim / 1024} KB")
         case CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           Right(CONST_BOOLEAN(global.curve25519verify(msg.arr, sig.arr, pub.arr)))
         case xs => notImplemented[Id, EVALUATED](s"sigVerify(message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
+    }
 
-    val rsaVerifyF: BaseFunction[NoContext] =
+    val rsaVerifyF: BaseFunction[NoContext] = {
+      val lim = if(version < V4) { global.MaxByteStrSizeForVerifyFuncs } else { global.MaxByteStrSizeForVerifyFuncs_V4 }
       NativeFunction(
         "rsaVerify",
         (if(version < V4) { 300 } else { 1000 }),
@@ -152,8 +155,8 @@ object CryptoContext {
         ("pub", BYTESTR)
       ) {
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil
-            if (msg.size > global.MaxByteStrSizeForVerifyFuncs) =>
-          Left(s"Invalid message size, must be not greater than ${global.MaxByteStrSizeForVerifyFuncs / 1024} KB")
+            if (msg.size > lim) =>
+          Left(s"Invalid message size, must be not greater than ${lim / 1024} KB")
         case (digestAlg: CaseObj) :: CONST_BYTESTR(msg: ByteStr) :: CONST_BYTESTR(sig: ByteStr) :: CONST_BYTESTR(pub: ByteStr) :: Nil =>
           algFromCO(digestAlg) flatMap { alg =>
             Try(global.rsaVerify(alg, msg.arr, sig.arr, pub.arr))
@@ -162,6 +165,7 @@ object CryptoContext {
           }
         case xs => notImplemented[Id, EVALUATED](s"rsaVerify(digest: DigestAlgorithmType, message: ByteVector, sig: ByteVector, pub: ByteVector)", xs)
       }
+    }
 
     val rsaVerifyL: Array[BaseFunction[NoContext]] = lgen(Array(16,32,64,128),
                                                          (n => (s"rsaVerify_${n._1}Kb", (RSAVERIFY_LIM + n._2).toShort)),
