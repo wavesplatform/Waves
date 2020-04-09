@@ -146,6 +146,8 @@ class EvaluatorV2(
       case evaluated: EVALUATED =>
         update(evaluated)
         limit
+
+      case f: FAILED_EXPR => throw new Error(s"Unexpected $f")
     }
   }
 
