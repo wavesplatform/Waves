@@ -166,7 +166,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       assertDiffEi(
         Seq(TestBlock.create(genesis ++ issues ++ Seq(setDApp, setVerifier))),
         TestBlock.create(Seq(ci)),
-        features.copy(preActivatedFeatures = features.preActivatedFeatures - BlockchainFeatures.MultiPaymentInvokeScript.id)
+        features.copy(preActivatedFeatures = features.preActivatedFeatures - BlockchainFeatures.BlockV5.id)
       ) { _ should produce("Multiple payments isn't allowed now") }
     }
   }
@@ -321,7 +321,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.MultiPaymentInvokeScript,
+      BlockchainFeatures.BlockV5,
     ).map(_.id -> 0).toMap
   )
 

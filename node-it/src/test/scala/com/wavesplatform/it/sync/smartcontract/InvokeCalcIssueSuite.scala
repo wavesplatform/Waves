@@ -21,7 +21,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.MultiPaymentInvokeScript.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
       .buildNonConflicting()
 
   private val smartAcc  = firstAddress

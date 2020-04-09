@@ -196,7 +196,7 @@ case class TransactionsApiRoute(
 
   private def applicationStatus(height: Int, succeed: Boolean): JsObject = {
     import ApplicationStatus._
-    if (blockchain.isFeatureActivated(BlockchainFeatures.AcceptFailedScriptTransaction, height))
+    if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5, height))
       JsObject(Map("applicationStatus" -> JsString(if (succeed) Succeed else ScriptExecutionFailed)))
     else
       JsObject.empty

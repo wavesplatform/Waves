@@ -22,8 +22,8 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.{BlockGen, NoShrink, TestTime, TestWallet, TransactionGen}
 import monix.reactive.Observable
-import org.scalacheck.{Arbitrary, Gen}
 import org.scalacheck.Gen._
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Matchers, OptionValues}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -279,7 +279,7 @@ class TransactionsRouteSpec
           (addressTransactions.transactionById _).expects(tx.id()).returning(Some((h, info, succeed))).once()
           (blockchain.activatedFeatures _)
             .expects()
-            .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> acceptFailedActivationHeight))
+            .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
 
           Get(routePath(s"/info/${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {
@@ -322,7 +322,7 @@ class TransactionsRouteSpec
           (blockchain.height _).expects().returning(1000).anyNumberOfTimes()
           (blockchain.activatedFeatures _)
             .expects()
-            .returning(Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> acceptFailedActivationHeight))
+            .returning(Map(BlockchainFeatures.BlockV5.id -> acceptFailedActivationHeight))
             .anyNumberOfTimes()
 
           Get(routePath(s"/status?id=${tx.id().toString}&id=${tx.id().toString}")) ~> mkRoute(blockchain, addressTransactions) ~> check {

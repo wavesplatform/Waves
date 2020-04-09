@@ -135,7 +135,7 @@ object ReissueTransactionDiffTest {
       blocksForFeatureActivation = 1,
       preActivatedFeatures = TestFunctionalitySettings.Enabled.preActivatedFeatures ++ Seq(
         BlockchainFeatures.FeeSponsorship.id           -> 0,
-        BlockchainFeatures.MultiPaymentInvokeScript.id -> 3
+        BlockchainFeatures.BlockV5.id -> 3
       )
     )
 

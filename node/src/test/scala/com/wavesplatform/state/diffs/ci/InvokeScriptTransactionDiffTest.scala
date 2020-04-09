@@ -683,7 +683,7 @@ class InvokeScriptTransactionDiffTest
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
       case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffAndState(
           Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))),
           TestBlock.create(Seq(ci), Block.ProtoBlockVersion),
@@ -1456,7 +1456,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ shouldBe 'right
         }
@@ -1478,7 +1478,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ should produce("DApp self-payment is forbidden since V4")
         }
@@ -1500,7 +1500,7 @@ class InvokeScriptTransactionDiffTest
       )
     } yield (r._1, r._2, r._3)) {
       case (genesis, setScript, ci) =>
-        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+        val features = fs.copy(preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0))
         assertDiffEi(Seq(TestBlock.create(Seq(genesis.head, setScript))), TestBlock.create(Seq(ci)), features) {
           _ should produce("DApp self-transfer is forbidden since V4")
         }
@@ -1531,7 +1531,7 @@ class InvokeScriptTransactionDiffTest
     } yield (a, am, r._1, r._2, r._3, asset, master)) {
       case (acc, amount, genesis, setScript, ci, asset, master) =>
         val features = fs.copy(
-          preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
         )
         assertDiffAndState(Seq(TestBlock.create(genesis ++ Seq(setScript))), TestBlock.create(Seq(asset, ci), Block.ProtoBlockVersion), features) {
           case (blockDiff, newState) =>
@@ -1657,7 +1657,7 @@ class InvokeScriptTransactionDiffTest
       case (invoke, genesisTxs) =>
         tempDb { db =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
           )
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
@@ -1850,7 +1850,7 @@ class InvokeScriptTransactionDiffTest
     }
   }
 
-  property(s"accepts failed transactions after ${BlockchainFeatures.AcceptFailedScriptTransaction} activation") {
+  property(s"accepts failed transactions after ${BlockchainFeatures.BlockV5} activation") {
     def failInvariant(funcBinding: String, sponsorTx: SponsorFeeTransaction, issueTx: IssueTransaction): Gen[(TxAmount, Asset, DApp, List[EXPR])] = {
       val feeInWaves = FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit
       val feeInAsset = Sponsorship.fromWaves(FeeConstants(InvokeScriptTransaction.typeId) * FeeValidation.FeeUnit, sponsorTx.minSponsoredAssetFee.get)
@@ -1896,11 +1896,11 @@ class InvokeScriptTransactionDiffTest
       } yield (invokeTx, (ENOUGH_AMT - enoughFee, i1Tx.quantity), Seq(g1Tx, g2Tx, g3Tx, i1Tx, i2Tx, sTx, tTx, ssTx))
 
     val notActivated = fs.copy(
-      preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+      preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.BlockV5.id -> 0)
     )
 
     val activated = notActivated.copy(
-      preActivatedFeatures = notActivated.preActivatedFeatures ++ Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0)
+      preActivatedFeatures = notActivated.preActivatedFeatures ++ Map(BlockchainFeatures.BlockV5.id -> 0)
     )
 
     forAll(failedTxScenario) {
@@ -1920,7 +1920,7 @@ class InvokeScriptTransactionDiffTest
   }
 
   property(
-    s"rejects withdrawal of fee from the funds received as a result of the script call execution after ${BlockchainFeatures.AcceptFailedScriptTransaction} activation"
+    s"rejects withdrawal of fee from the funds received as a result of the script call execution after ${BlockchainFeatures.BlockV5} activation"
   ) {
     val scenario =
       for {
@@ -1948,11 +1948,11 @@ class InvokeScriptTransactionDiffTest
       } yield (invokeTx, Seq(g1Tx, g2Tx, iTx, sTx, tTx, ssTx))
 
     val notActivated = fs.copy(
-      preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+      preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.BlockV5.id -> 0)
     )
 
     val activated = notActivated.copy(
-      preActivatedFeatures = notActivated.preActivatedFeatures ++ Map(BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0)
+      preActivatedFeatures = notActivated.preActivatedFeatures ++ Map(BlockchainFeatures.BlockV5.id -> 0)
     )
 
     forAll(scenario) {

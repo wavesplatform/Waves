@@ -378,7 +378,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.MultiPaymentInvokeScript
+      BlockchainFeatures.BlockV5
     ).map(_.id -> 0).toMap
   )
 

@@ -58,7 +58,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
 
   val fsWithAcceptingFailedScript: FunctionalitySettings =
     fsWithOrderFeature.copy(
-      preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0)
+      preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
     )
 
   private val estimator = ScriptEstimatorV2
@@ -1055,7 +1055,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
     }
   }
 
-  property(s"Accepts failed transactions after ${BlockchainFeatures.AcceptFailedScriptTransaction} activation") {
+  property(s"Accepts failed transactions after ${BlockchainFeatures.BlockV5} activation") {
     val scenario =
       for {
         buyer  <- accountGen

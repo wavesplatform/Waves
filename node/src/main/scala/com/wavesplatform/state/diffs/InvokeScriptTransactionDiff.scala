@@ -465,7 +465,7 @@ object InvokeScriptTransactionDiff {
 
           val diff = action match {
             case t: AssetTransfer =>
-              applyTransfer(t, if (blockchain.isFeatureActivated(MultiPaymentInvokeScript)) {
+              applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
               } else {
                 PublicKey(ByteStr.empty)
