@@ -8,7 +8,6 @@ import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
@@ -43,7 +42,7 @@ object TransactionDiffer {
       _            <- if (verify) common(prevBlockTimestamp, currentBlockTimestamp)(blockchain, tx) else TracedResult(Right(()))
       diff         <- transactionDiff(currentBlockTimestamp)(blockchain, tx)
       positiveDiff <- balance(blockchain, tx, diff)
-      _            <- if (verify) Verifier.assets(blockchain)(tx) else TracedResult(Right(()))
+      _            <- Verifier.assets(blockchain)(tx)
     } yield positiveDiff
   }.leftMap(TransactionValidationError(_, tx))
 
@@ -65,6 +64,7 @@ object TransactionDiffer {
                   _ <- CommonValidation.disallowDuplicateIds(blockchain, tx)
                   _ <- CommonValidation.disallowSendingGreaterThanBalance(blockchain, currentBlockTimestamp, tx)
                   _ <- FeeValidation(blockchain, tx)
+                  _ <- FundsValidation(blockchain, tx)
                 } yield ()
               }
           )
@@ -115,27 +115,8 @@ object TransactionDiffer {
 
   private def failedTransactionDiff(blockchain: Blockchain, tx: Transaction, error: Option[ErrorMessage]): TracedResult[ValidationError, Diff] =
     for {
-      portfolios <- (tx, tx.assetFee) match {
-        case (tx: ProvenTransaction, (Waves, fee)) => TracedResult(Right(Map(tx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty))))
-        case (tx: ProvenTransaction, (asset @ IssuedAsset(_), fee)) =>
-          TracedResult {
-            for {
-              assetInfo <- blockchain
-                .assetDescription(asset)
-                .toRight(GenericError(s"Asset $asset does not exist, cannot be used to pay fees"))
-              wavesFee <- Either.cond(
-                assetInfo.sponsorship > 0,
-                Sponsorship.toWaves(fee, assetInfo.sponsorship),
-                GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
-              )
-            } yield {
-              Map(tx.sender.toAddress          -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -fee))) |+|
-                Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> fee)))
-            }
-          }
-        case _ => TracedResult(Left(TransactionValidationError(GenericError(s"Can't accept failed script result in $tx"), tx)))
-      }
-      mayBeDApp <- extractDAppAddress(blockchain, tx)
+      portfolios <- TracedResult.wrapE(FundsValidation.feePortfolios(blockchain, tx))
+      mayBeDApp  <- extractDAppAddress(blockchain, tx)
     } yield Diff.failed(tx, portfolios, mayBeDApp, error)
 
   private def extractDAppAddress(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Option[Address]] =

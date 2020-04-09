@@ -215,8 +215,7 @@ object InvokeScriptTransactionDiff {
               )
             )
           }
-          beforeActions <- beforeActionsDiff(blockchain, paymentsDiff)
-          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, beforeActions)
+          compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -341,14 +340,6 @@ object InvokeScriptTransactionDiff {
         s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
       )
     } yield ()
-
-  private def beforeActionsDiff(blockchain: Blockchain, diff: Diff): TracedResult[ValidationError, Diff] =
-    if (blockchain.isFeatureActivated(AcceptFailedScriptTransaction))
-      stats.balanceValidation
-        .measureForType(InvokeScriptTransaction.typeId) {
-          TracedResult(BalanceDiffValidation(blockchain)(diff))
-        }
-    else TracedResult.wrapValue(diff)
 
   private def foldActions(sblockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],
