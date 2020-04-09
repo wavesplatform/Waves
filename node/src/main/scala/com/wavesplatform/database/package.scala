@@ -9,7 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.PublicKey
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
@@ -19,6 +19,8 @@ import com.wavesplatform.crypto._
 import com.wavesplatform.database.protobuf.DataEntry.Value
 import com.wavesplatform.database.{protobuf => pb}
 import com.wavesplatform.lang.script.{Script, ScriptReader}
+import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.state._
@@ -247,6 +249,36 @@ package object database extends ScorexLogging {
       b.putShort(featureId).putInt(height)
 
     b.array()
+  }
+
+  def readContinuationStates(bytes: Array[Byte]): Map[ByteStr, EXPR] = {
+    val input = newDataInput(bytes)
+    val size = input.readInt()
+    (1 to size).map { _ =>
+      val invokeTxIdLength = input.readByte()
+      val invokeTxId = input.readByteStr(invokeTxIdLength)
+
+      val exprBytesLength = input.readInt()
+      val exprBytes = input.readBytes(exprBytesLength)
+      val expr = Serde.deserialize(exprBytes).explicitGet()._1
+
+      (invokeTxId, expr)
+    }.toMap
+  }
+
+  def writeContinuationStates(states: Map[ByteStr, EXPR]): Array[Byte] = {
+    val output = newDataOutput()
+    output.writeInt(states.size)
+    states.foreach {
+      case (invokeTxId, expr) =>
+        output.writeByte(invokeTxId.length)
+        output.writeByteStr(invokeTxId)
+
+        val exprBytes = Serde.serialize(expr)
+        output.writeInt(exprBytes.length)
+        output.write(exprBytes)
+    }
+    output.toByteArray
   }
 
   def readSponsorship(data: Array[Byte]): SponsorshipValue = {

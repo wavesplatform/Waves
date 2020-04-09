@@ -6,6 +6,8 @@ import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.Serde
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
@@ -175,4 +177,12 @@ object Keys {
 
   def nftAt(addressId: BigInt, index: Int, assetId: IssuedAsset): Key[Option[Unit]] =
     Key.opt(NftPossession, addressId.toByteArray ++ Longs.toByteArray(index) ++ assetId.id.arr, _ => (), _ => Array.emptyByteArray)
+
+  val continuationStates: Key[Map[ByteStr, EXPR]] =
+    Key(
+      ContinuationStates,
+      Array.emptyByteArray,
+      readContinuationStates,
+      writeContinuationStates
+    )
 }

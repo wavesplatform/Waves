@@ -15,6 +15,7 @@ import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.metrics.{TxsInBlockchainStats, _}
 import com.wavesplatform.mining.{MiningConstraint, MiningConstraints}
 import com.wavesplatform.settings.{BlockchainSettings, WavesSettings}
@@ -645,6 +646,10 @@ class BlockchainUpdaterImpl(
       case Some(ng) if this.height == height => ng.hitSource.some
       case _                                 => leveldb.hitSource(height)
     }
+  }
+
+  override def continuationStates: Map[ByteStr, Terms.EXPR] = readLock {
+    compositeBlockchain.continuationStates
   }
 
   private[this] def compositeBlockchain =

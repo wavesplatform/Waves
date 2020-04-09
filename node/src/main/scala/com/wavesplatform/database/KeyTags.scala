@@ -53,7 +53,8 @@ object KeyTags extends Enumeration {
   DisabledAliases,
   AssetStaticInfo,
   NftCount,
-  NftPossession = Value
+  NftPossession,
+  ContinuationStates = Value
 
   final implicit class KeyTagExt(val t: KeyTag) extends AnyVal {
     @inline def prefixBytes: Array[Byte] = Shorts.toByteArray(t.id.toShort)

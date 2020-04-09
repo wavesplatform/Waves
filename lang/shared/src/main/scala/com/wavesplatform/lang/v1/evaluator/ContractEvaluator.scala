@@ -19,14 +19,16 @@ object ContractEvaluator {
 
   val DEFAULT_FUNC_NAME = "default"
 
-  case class Invocation(funcCall: FUNCTION_CALL,
-                        caller: Recipient.Address,
-                        callerPk: ByteStr,
-                        payments: AttachedPayments,
-                        dappAddress: ByteStr,
-                        transactionId: ByteStr,
-                        fee: Long,
-                        feeAssetId: Option[ByteStr])
+  case class Invocation(
+      funcCall: FUNCTION_CALL,
+      caller: Recipient.Address,
+      callerPk: ByteStr,
+      payments: AttachedPayments,
+      dappAddress: ByteStr,
+      transactionId: ByteStr,
+      fee: Long,
+      feeAssetId: Option[ByteStr]
+  )
 
   private def buildExprFromInvocation(c: DApp, i: Invocation, version: StdLibVersion): Either[String, EXPR] = {
     val functionName = i.funcCall.function.funcName
@@ -54,8 +56,8 @@ object ContractEvaluator {
             )
           ).asRight[ExecutionError]
         } else {
-            s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
-              .asLeft[EXPR]
+          s"function '$functionName takes $takingArgsNumber args but $passedArgsNumber were(was) given"
+            .asLeft[EXPR]
         }
     }
   }
@@ -75,7 +77,12 @@ object ContractEvaluator {
   def verify(decls: List[DECLARATION], v: VerifierFunction, ord: Ord): EvalM[Id, Environment, EVALUATED] =
     withDecls(decls, verifierBlock(v, Bindings.orderObject(ord, proofsEnabled = true)))
 
-  def apply(ctx: EvaluationContext[Environment, Id], c: DApp, i: Invocation, version: StdLibVersion): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
+  def apply(
+      ctx: EvaluationContext[Environment, Id],
+      c: DApp,
+      i: Invocation,
+      version: StdLibVersion
+  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
     ???
     /*buildExprFromInvocation(c, i, version)
       .map(expr => EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr))
@@ -87,10 +94,19 @@ object ContractEvaluator {
 
   def applyV2(ctx: EvaluationContext[Environment, Id], dApp: DApp, i: Invocation, version: StdLibVersion): Either[String, ScriptResult] =
     buildExprFromInvocation(dApp, i, version)
-      .map {
-        expr =>
-          val evaluator = new EvaluatorV2(ctx, version)
-          evaluator(expr, ContractLimits.MaxComplexityByVersion(version))
-      }
-      .flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r._1.asInstanceOf[EVALUATED], version))
+      .flatMap(applyV2(ctx, _, version, i.transactionId))
+
+  def applyV2(
+      ctx: EvaluationContext[Environment, Id],
+      expr: EXPR,
+      version: StdLibVersion,
+      transactionId: ByteStr
+  ): Either[ExecutionError, ScriptResult] = {
+    val evaluator = new EvaluatorV2(ctx, version)
+    val result    = evaluator(expr, ContractLimits.MaxComplexityByVersion(version))
+    result match {
+      case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
+      case (expr: EXPR, unusedComplexity) => Right(IncompleteResult(expr, unusedComplexity))
+    }
+  }
 }

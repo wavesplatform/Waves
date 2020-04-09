@@ -5,13 +5,14 @@ import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
+import com.wavesplatform.state.diffs.invoke.{ContinuationTransactionDiff, InvokeScriptTransactionDiff}
 import com.wavesplatform.transaction.TxValidationError.UnsupportedTransactionType
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
-import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction, Verifier}
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, SetScriptTransaction, Verifier}
 import com.wavesplatform.transaction.transfer._
 import play.api.libs.json.Json
 
@@ -66,10 +67,11 @@ object TransactionDiffer {
   private def unverified(currentBlockTimestamp: Long)(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Diff] =
     stats.transactionDiffValidation.measureForType(tx.typeId) {
       tx match {
-        case gtx: GenesisTransaction     => GenesisTransactionDiff(blockchain.height)(gtx)
-        case ptx: PaymentTransaction     => PaymentTransactionDiff(blockchain)(ptx)
-        case ci: InvokeScriptTransaction => InvokeScriptTransactionDiff(blockchain, currentBlockTimestamp)(ci)
-        case etx: ExchangeTransaction    => ExchangeTransactionDiff(blockchain)(etx)
+        case gtx: GenesisTransaction       => GenesisTransactionDiff(blockchain.height)(gtx)
+        case ptx: PaymentTransaction       => PaymentTransactionDiff(blockchain)(ptx)
+        case ci: InvokeScriptTransaction   => InvokeScriptTransactionDiff(blockchain, currentBlockTimestamp)(ci)
+        case cont: ContinuationTransaction => ContinuationTransactionDiff(blockchain, currentBlockTimestamp)(cont)
+        case etx: ExchangeTransaction      => ExchangeTransactionDiff(blockchain)(etx)
         case otherTx: ProvenTransaction =>
           unverifiedWithEstimate(currentBlockTimestamp)(blockchain, otherTx)
             .map(complexityDiff(blockchain, otherTx) |+| _)

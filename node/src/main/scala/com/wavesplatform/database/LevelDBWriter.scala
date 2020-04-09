@@ -17,6 +17,8 @@ import com.wavesplatform.database.patch.DisableHijackedAliases
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
+import com.wavesplatform.protobuf.block.{Block => PBlock}
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.settings.{BlockchainSettings, Constants, DBSettings}
 import com.wavesplatform.state.reader.LeaseDetails
@@ -163,7 +165,7 @@ class LevelDBWriter(
   override protected def loadLeaseBalance(address: Address): LeaseBalance = readOnly { db =>
     addressId(address).fold(LeaseBalance.empty)(loadLeaseBalance(db, _))
   }
-
+;
   private[database] def loadLposPortfolio(db: ReadOnlyDB, addressId: BigInt) = Portfolio(
     db.fromHistory(Keys.wavesBalanceHistory(addressId), Keys.wavesBalance(addressId)).getOrElse(0L),
     loadLeaseBalance(db, addressId),
@@ -185,6 +187,9 @@ class LevelDBWriter(
     val stateFeatures = readOnly(_.get(Keys.activatedFeatures))
     stateFeatures ++ settings.functionalitySettings.preActivatedFeatures
   }
+
+  override protected def loadContinuationStates: Map[ByteStr, EXPR] =
+    readOnly(_.get(Keys.continuationStates))
 
   override def wavesAmount(height: Int): BigInt = readOnly { db =>
     if (db.has(Keys.wavesAmount(height))) db.get(Keys.wavesAmount(height))
@@ -223,7 +228,8 @@ class LevelDBWriter(
       totalFee: Long,
       reward: Option[Long],
       hitSource: ByteStr,
-      scriptResults: Map[ByteStr, InvokeScriptResult]
+      scriptResults: Map[ByteStr, InvokeScriptResult],
+      continuationStates: Map[Address, EXPR]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
@@ -449,6 +455,8 @@ class LevelDBWriter(
               throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
           }
       }
+
+      rw.put(Keys.continuationStates, continuationStates)
 
       expiredKeys.foreach(rw.delete(_, "expired-keys"))
 

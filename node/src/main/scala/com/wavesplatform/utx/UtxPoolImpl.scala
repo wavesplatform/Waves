@@ -10,6 +10,7 @@ import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
 import com.wavesplatform.lang.ValidationError
+import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
@@ -22,8 +23,8 @@ import com.wavesplatform.transaction.TxValidationError.{AlreadyInTheState, Gener
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.ReissueTransaction
 import com.wavesplatform.transaction.assets.exchange.ExchangeTransaction
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
+import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
 import kamon.Kamon
@@ -227,11 +228,12 @@ class UtxPoolImpl(
 
   private def scriptedAddresses(tx: Transaction): Set[Address] = tx match {
     case i: InvokeScriptTransaction =>
-      Set(i.sender.toAddress).filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
+      Set(i.sender.toAddress)
+        .filter(blockchain.hasAccountScript) ++ blockchain.resolveAlias(i.dAppAddressOrAlias).fold[Set[Address]](_ => Set.empty, Set(_))
     case e: ExchangeTransaction =>
       Set(e.sender.toAddress, e.buyOrder.sender.toAddress, e.sellOrder.sender.toAddress).filter(blockchain.hasAccountScript)
     case a: Authorized if blockchain.hasAccountScript(a.sender.toAddress) => Set(a.sender.toAddress)
-    case _                                                         => Set.empty
+    case _                                                                => Set.empty
   }
 
   private[this] case class TxEntry(tx: Transaction, priority: Boolean)
@@ -334,7 +336,10 @@ class UtxPoolImpl(
         }
       }
 
-      pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
+      val continuationTransactions: Map[ByteStr, (ContinuationTransaction, Set[Address])] =
+        blockchain.continuationStates.map { case (invokeTxId, expr) => invokeTxId -> (ContinuationTransaction(expr, invokeTxId), Set[Address]()) }
+
+      pack(PackResult(None, Monoid[Diff].empty.copy(transactions = continuationTransactions), initialConstraint, 0, Set.empty, Set.empty))
     }
 
     log.trace(

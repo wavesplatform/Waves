@@ -9,6 +9,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.settings.BlockchainSettings
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -167,6 +168,8 @@ final case class CompositeBlockchain(
   override def wavesAmount(height: Int): BigInt = inner.wavesAmount(height)
 
   override def hitSource(height: Int): Option[ByteStr] = inner.hitSource(height)
+
+  override def continuationStates: Map[ByteStr, Terms.EXPR] = inner.continuationStates
 }
 
 object CompositeBlockchain {
