@@ -320,8 +320,7 @@ case class StateChangesDetails(
     transfers: Seq[TransfersInfoResponse],
     issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
-    burns: Seq[BurnInfoResponse],
-    chainId: Byte
+    burns: Seq[BurnInfoResponse]
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]

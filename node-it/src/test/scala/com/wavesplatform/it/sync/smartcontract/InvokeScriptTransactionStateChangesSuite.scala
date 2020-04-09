@@ -34,14 +34,18 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     assetSponsoredByDApp = sender.issue(contract, "DApp asset", "", 9000, 0).id
     assetSponsoredByRecipient = sender.issue(recipient, "Recipient asset", "", 9000, 0, waitForTx = true).id
     sender.massTransfer(contract, List(Transfer(caller, 3000), Transfer(recipient, 3000)), 0.01.waves, assetId = Some(simpleAsset))
-    sender.massTransfer(contract, List(Transfer(caller, 3000), Transfer(recipient, 3000)), 0.01.waves, assetId = Some(assetSponsoredByDApp))
-    sender.massTransfer(recipient, List(Transfer(caller, 3000), Transfer(contract, 3000)), 0.01.waves, assetId = Some(assetSponsoredByRecipient))
+    sender.massTransfer(contract,
+                        List(Transfer(caller, 3000), Transfer(recipient, 3000)),
+                        0.01.waves,
+                        assetId = Some(assetSponsoredByDApp))
+    sender.massTransfer(recipient,
+                        List(Transfer(caller, 3000), Transfer(contract, 3000)),
+                        0.01.waves,
+                        assetId = Some(assetSponsoredByRecipient))
     sender.sponsorAsset(contract, assetSponsoredByDApp, 1)
     sender.sponsorAsset(recipient, assetSponsoredByRecipient, 5)
 
-    val script = ScriptCompiler
-      .compile(
-        """
+    val script = ScriptCompiler.compile("""
         |{-# STDLIB_VERSION 3 #-}
         |{-# CONTENT_TYPE DAPP #-}
         |{-# SCRIPT_TYPE ACCOUNT #-}
@@ -63,13 +67,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
         |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
         |    )
         |}
-      """.stripMargin,
-        ScriptEstimatorV2
-      )
-      .explicitGet()
-      ._1
-      .bytes()
-      .base64
+      """.stripMargin, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     sender.setScript(contract, Some(script), setScriptFee, waitForTx = true)
 
     initCallerTxs = sender.transactionsByAddress(caller, 100).length
@@ -102,7 +100,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     nodes.waitForHeightAriseAndTxPresent(id)
 
-    val txInfo = sender.transactionInfo[TransactionInfo](id)
+    val txInfo             = sender.transactionInfo[TransactionInfo](id)
 
     sender.waitForHeight(txInfo.height + 1)
 
@@ -119,7 +117,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
 
     txInfoShouldBeEqual(txInfo, txStateChanges)
 
-    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq(), 'I'.toByte)
+    val expected = StateChangesDetails(Seq(DataResponse("integer", 10, "result")), Seq(), Seq(), Seq(), Seq())
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -164,7 +162,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
     txInfoShouldBeEqual(txInfo, dAppStateChanges.head)
     txInfoShouldBeEqual(txInfo, recipientStateChanges.head)
 
-    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq(), 'I'.toByte)
+    val expected = StateChangesDetails(Seq(), Seq(TransfersInfoResponse(recipient, Some(simpleAsset), 10)), Seq(), Seq(), Seq())
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
     dAppStateChanges.head.stateChanges.get shouldBe expected
@@ -211,8 +209,7 @@ class InvokeScriptTransactionStateChangesSuite extends BaseTransactionSuite with
       Seq(TransfersInfoResponse(caller, None, 10)),
       Seq(),
       Seq(),
-      Seq(),
-      'I'.toByte
+      Seq()
     )
     txStateChanges.stateChanges.get shouldBe expected
     callerStateChanges.head.stateChanges.get shouldBe expected
