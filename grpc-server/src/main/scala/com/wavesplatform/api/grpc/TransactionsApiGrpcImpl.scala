@@ -63,13 +63,16 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       )
     }
 
-  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResult]): Unit =
+  override def getStateChanges(request: TransactionsRequest, responseObserver: StreamObserver[InvokeScriptResultResponse]): Unit =
     responseObserver.interceptErrors {
       import com.wavesplatform.state.{InvokeScriptResult => VISR}
 
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
-        .collect { case (_, Right((_, Some(isr)))) => VISR.toPB(isr) }
+        .collect {
+          case (_, Right((tx, Some(isr)))) =>
+            InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(tx)), Some(VISR.toPB(isr)))
+        }
 
       responseObserver.completeWith(result)
     }

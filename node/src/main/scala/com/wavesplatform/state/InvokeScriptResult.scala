@@ -80,8 +80,7 @@ object InvokeScriptResult {
       ),
       isr.issues.map(toPbIssue),
       isr.reissues.map(toPbReissue),
-      isr.burns.map(toPbBurn),
-      AddressScheme.current.chainId
+      isr.burns.map(toPbBurn)
     )
   }
 
