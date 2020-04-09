@@ -1,6 +1,7 @@
 package com.wavesplatform.it.asset
 
 import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
@@ -13,6 +14,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
+import play.api.libs.json.JsObject
 
 case class Asset(t: String, n: String, ds: String, q: Long, r: Boolean, d: Byte, nc: Long)
 
@@ -210,10 +212,13 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      assertBadRequestAndMessage(
-        invokeScript(acc,"transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.q / 2 + 1).toInt),
-        "State check failed. Reason: Accounts balance errors"
-      )
+      assertApiError(
+        invokeScript(acc,"transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.q / 2 + 1).toInt)
+      ) { error =>
+        error.message should include ("State check failed. Reason: Accounts balance errors")
+        error.id shouldBe StateCheckFailed.Id
+        (error.json \ "details").as[JsObject].value.map(_._2.as[String]).head should include ("negative asset balance")
+      }
     }
 
     "Reissuing NFT asset should produce an error" in {
