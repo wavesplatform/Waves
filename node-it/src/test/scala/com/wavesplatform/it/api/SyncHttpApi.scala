@@ -21,7 +21,9 @@ import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.lease.{LeaseCancelTransaction, LeaseTransaction}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
+import com.wavesplatform.transaction.transfer.Attachment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
+import com.wavesplatform.transaction.{Asset, SignedTx, TxVersion}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.utils._
@@ -395,8 +397,7 @@ object SyncHttpApi extends Assertions {
         version: Byte = TxVersion.V2,
         waitForTx: Boolean = false
     ): Transaction = {
-      val tx = TransferTransaction
-        .selfSigned(
+      val tx = SignedTx.transfer(
           version = version,
           sender = source,
           recipient = AddressOrAlias.fromString(recipient).explicitGet(),
@@ -407,7 +408,6 @@ object SyncHttpApi extends Assertions {
           attachment = attachment,
           timestamp = System.currentTimeMillis()
         )
-        .explicitGet()
 
       maybeWaitForTransaction(sync(async(n).broadcastRequest(tx.json())), wait = waitForTx)
     }

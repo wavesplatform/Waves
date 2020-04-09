@@ -11,8 +11,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{DataTransaction, Transaction}
+import com.wavesplatform.transaction.{DataTransaction, SignedTx, Transaction}
 
 class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair], estimator: ScriptEstimator) extends TransactionGenerator {
   override def next(): Iterator[Transaction] = generate(settings).iterator
@@ -37,9 +36,7 @@ class OracleTransactionGenerator(settings: Settings, val accounts: Seq[KeyPair],
 
     val now = System.currentTimeMillis()
     val transactions: List[Transaction] = (1 to settings.transactions).map { i =>
-      TransferTransaction
-        .selfSigned(2.toByte, scriptedAccount, oracle.toAddress, Waves, 1.waves, Waves, enoughFee, ByteStr.empty, now + i)
-        .explicitGet()
+      SignedTx.transfer(2.toByte, scriptedAccount, oracle.toAddress, Waves, 1.waves, Waves, enoughFee, ByteStr.empty, now + i)
     }.toList
 
     setScript +: setDataTx +: transactions

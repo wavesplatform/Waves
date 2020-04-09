@@ -24,6 +24,20 @@ import scala.util.Right
 import scala.util.control.NonFatal
 
 object BlockAppender extends ScorexLogging {
+  def doApply(
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      time: Time,
+      utxStorage: UtxPoolImpl,
+      pos: PoSSelector,
+      verify: Boolean
+  )(newBlock: Block): Either[ValidationError, Option[BigInt]] =
+    if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
+      appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
+    else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
+      Right(None)
+    else
+      Left(BlockAppendError("Block is not a child of the last block", newBlock))
+
   def apply(
       blockchainUpdater: BlockchainUpdater with Blockchain,
       time: Time,
@@ -33,12 +47,7 @@ object BlockAppender extends ScorexLogging {
       verify: Boolean = true
   )(newBlock: Block): Task[Either[ValidationError, Option[BigInt]]] =
     Task {
-      if (blockchainUpdater.isLastBlockId(newBlock.header.reference))
-        appendBlock(blockchainUpdater, utxStorage, pos, time, verify)(newBlock).map(_ => Some(blockchainUpdater.score))
-      else if (blockchainUpdater.contains(newBlock.id()) || blockchainUpdater.isLastBlockId(newBlock.id()))
-        Right(None)
-      else
-        Left(BlockAppendError("Block is not a child of the last block", newBlock))
+      doApply(blockchainUpdater, time, utxStorage, pos, verify)(newBlock)
     }.executeOn(scheduler)
 
   def apply(

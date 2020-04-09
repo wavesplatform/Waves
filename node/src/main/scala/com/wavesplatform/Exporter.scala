@@ -4,9 +4,8 @@ import java.io.{BufferedOutputStream, File, FileOutputStream, OutputStream}
 
 import com.google.common.primitives.Ints
 import com.wavesplatform.block.Block
-import com.wavesplatform.database.{DBExt, openDB}
+import com.wavesplatform.database.{DBExt, StorageFactory, openDB}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.metrics.Metrics
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.state.Height

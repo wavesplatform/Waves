@@ -8,9 +8,9 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.SignedTx
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import com.wavesplatform.transaction.transfer.TransferTransaction
 import org.scalatest.CancelAfterFailure
 
 class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
@@ -37,12 +37,13 @@ class BigLetChain extends BaseTransactionSuite with CancelAfterFailure {
 
     sender.transfer(acc0.toAddress.toString, newAddress, 10.waves, minFee, waitForTx = true)
 
-    val scriptSet = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
+    val scriptSet          = SetScriptTransaction.selfSigned(1.toByte, pkNewAddress, Some(compiledScript), setScriptFee, System.currentTimeMillis())
     val scriptSetBroadcast = sender.signedBroadcast(scriptSet.explicitGet().json.value)
     nodes.waitForHeightAriseAndTxPresent(scriptSetBroadcast.id)
 
-    val transfer = TransferTransaction.selfSigned(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
-    val transferBroadcast = sender.signedBroadcast(transfer.explicitGet().json.value)
+    val transfer =
+      SignedTx.transfer(2.toByte, pkNewAddress, pkNewAddress.toAddress, Waves, 1.waves, Waves, smartMinFee, ByteStr.empty,  System.currentTimeMillis())
+    val transferBroadcast = sender.signedBroadcast(transfer.json.value)
     nodes.waitForHeightAriseAndTxPresent(transferBroadcast.id)
   }
 }

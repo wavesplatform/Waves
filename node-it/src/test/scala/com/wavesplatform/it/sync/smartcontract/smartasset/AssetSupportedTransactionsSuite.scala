@@ -9,9 +9,9 @@ import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.state.IntegerDataEntry
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
+import com.wavesplatform.transaction.SignedTx
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.Transfer
-import com.wavesplatform.transaction.transfer.TransferTransaction
 
 import scala.concurrent.duration._
 
@@ -177,7 +177,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
     ).explicitGet()._1.bytes.value.base64
     sender.setAssetScript(blackAsset, firstAddress, setAssetScriptFee + smartFee, Some(scr), waitForTx = true)
 
-    val blackTx = TransferTransaction.selfSigned(
+    val blackTx = SignedTx.transfer(
         2.toByte,
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress).toAddress,
@@ -187,10 +187,8 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         smartMinFee, ByteStr.empty,
         System.currentTimeMillis + 1.minutes.toMillis
       )
-      .explicitGet()
 
-    val incorrectTx = TransferTransaction
-      .selfSigned(
+    val incorrectTx = SignedTx.transfer(
         2.toByte,
         pkByAddress(secondAddress),
         pkByAddress(thirdAddress).toAddress,
@@ -200,7 +198,6 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
         smartMinFee, ByteStr.empty,
         System.currentTimeMillis + 10.minutes.toMillis
       )
-      .explicitGet()
 
     val dataTx = sender.putData(firstAddress, List(IntegerDataEntry(s"${blackTx.id.value.toString}", 42)), minFee).id
     nodes.waitForHeightAriseAndTxPresent(dataTx)

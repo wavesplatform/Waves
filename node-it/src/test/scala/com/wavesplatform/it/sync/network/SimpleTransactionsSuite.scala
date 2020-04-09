@@ -13,7 +13,7 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.network.{RawBytes, TransactionSpec}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.SignedTx
 import org.scalatest._
 
 import scala.concurrent.duration._
@@ -28,8 +28,17 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
   private def node = nodes.head
 
   test("valid tx send by network to node should be in blockchain") {
-    val tx = TransferTransaction.selfSigned(1.toByte, node.keyPair, Address.fromString(node.address).explicitGet(), Waves, 1L, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
-      .explicitGet()
+    val tx = SignedTx.transfer(
+      1.toByte,
+      node.keyPair,
+      Address.fromString(node.address).explicitGet(),
+      Waves,
+      1L,
+      Waves,
+      minFee,
+      None,
+      System.currentTimeMillis()
+    )
 
     node.sendByNetwork(RawBytes.fromTransaction(tx))
     node.waitForTransaction(tx.id().toString)
@@ -37,19 +46,17 @@ class SimpleTransactionsSuite extends BaseTransactionSuite with Matchers {
   }
 
   test("invalid tx send by network to node should be not in UTX or blockchain") {
-    val tx = TransferTransaction
-      .selfSigned(
-        1.toByte,
-        node.keyPair,
-        Address.fromString(node.address).explicitGet(),
-        Waves,
-        1L,
-        Waves,
-        minFee,
-        ByteStr.empty,
-        System.currentTimeMillis() + (1 days).toMillis
-      )
-      .explicitGet()
+    val tx = SignedTx.transfer(
+      1.toByte,
+      node.keyPair,
+      Address.fromString(node.address).explicitGet(),
+      Waves,
+      1L,
+      Waves,
+      minFee,
+      None,
+      System.currentTimeMillis() + (1 days).toMillis
+    )
 
     node.sendByNetwork(RawBytes.fromTransaction(tx))
     val maxHeight = nodes.map(_.height).max

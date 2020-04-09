@@ -72,11 +72,18 @@ lazy val langDoc = project
     libraryDependencies ++= Seq("com.github.spullara.mustache.java" % "compiler" % "0.9.5") ++ Dependencies.test
   )
 
-lazy val node             = project.dependsOn(langJVM, `lang-testkit` % "test")
-lazy val `grpc-server`    = project.dependsOn(node % "compile;test->test;runtime->provided")
-lazy val `node-it`        = project.dependsOn(node, `grpc-server`)
-lazy val `node-generator` = project.dependsOn(node, `node` % "compile")
-lazy val benchmark        = project.dependsOn(node % "compile;test->test")
+lazy val node           = project.dependsOn(langJVM, `lang-testkit` % "test")
+lazy val `node-testkit` = project.in(file("node/testkit")).dependsOn(node)
+lazy val `node-tests` = project
+  .in(file("node/tests"))
+  .dependsOn(`node-testkit` % "test", `lang-testkit` % "test")
+  .settings(
+    libraryDependencies ++= Dependencies.nodeTests.value
+  )
+lazy val `grpc-server`    = project.dependsOn(node % "compile;runtime->provided", `node-testkit` % "test")
+lazy val `node-it`        = project.dependsOn(node, `node-testkit`, `grpc-server`)
+lazy val `node-generator` = project.dependsOn(node, `node-testkit`, `node`)
+lazy val benchmark        = project.dependsOn(node, `node-testkit` % "test", `lang-testkit` % "test")
 
 lazy val `blockchain-updates` = project.dependsOn(node % "compile;test->test;runtime->provided")
 
@@ -130,7 +137,6 @@ inScope(Global)(
     cancelable := true,
     logBuffered := false,
     coverageExcludedPackages := ".*",
-    parallelExecution := false,
     testListeners := Seq.empty, // Fix for doubled test reports
     /* http://www.scalatest.org/user_guide/using_the_runner
      * o - select the standard output reporter
@@ -141,7 +147,6 @@ inScope(Global)(
      * u - select the JUnit XML reporter with output directory
      */
     testOptions += Tests.Argument("-oIDOF", "-u", "target/test-reports"),
-    testOptions += Tests.Setup(_ => sys.props("sbt-testing") = "true"),
     concurrentRestrictions := {
       val threadNumber = Option(System.getenv("SBT_THREAD_NUMBER")).fold(1)(_.toInt)
       Seq(Tags.limit(Tags.ForkedTestGroup, threadNumber))
@@ -175,7 +180,7 @@ checkPRRaw := Def.sequential(
     (Test / compile).value
     (langTests / Test / test).value
     (langJS / Compile / fastOptJS).value
-    (node / Test / test).value
+    (`node-tests` / Test / test).value
   }
 ).value
 

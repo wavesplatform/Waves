@@ -10,10 +10,10 @@ import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, DataEntry, EmptyDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer._
+import com.wavesplatform.transaction.{SignedTx, Transaction}
 import com.wavesplatform.utils.LoggerFacade
 import org.slf4j.LoggerFactory
 import scorex.crypto.signatures.Curve25519._
@@ -53,7 +53,7 @@ object Gen {
         case BooleanDataEntry(key, _)     => s"""extract(getBoolean(oracle, "$key"))"""
         case BinaryDataEntry(key, value)  => s"""(extract(getBinary(oracle, "$key")) == $value)"""
         case StringDataEntry(key, value)  => s"""(extract(getString(oracle, "$key")) == "$value")"""
-        case EmptyDataEntry(_) => ???
+        case EmptyDataEntry(_)            => ???
       } reduce [String] { case (l, r) => s"$l && $r " }
 
     val src =
@@ -124,7 +124,7 @@ object Gen {
       .zipWithIndex
       .map {
         case (((src, dst), fee), i) =>
-          TransferTransaction.selfSigned(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i)
+          SignedTx.transfer(2.toByte, src, dst, Waves, fee, Waves, fee, ByteStr.empty, now + i).validatedEither
       }
       .collect { case Right(x) => x }
   }

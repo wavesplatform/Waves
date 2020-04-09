@@ -3,7 +3,6 @@ package com.wavesplatform.transaction.transfer
 import com.wavesplatform.account._
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
@@ -64,45 +63,4 @@ object TransferTransaction extends TransactionParser {
   val serializer = TransferTxSerializer
 
   override def parseBytes(bytes: TxByteArray): Try[TransferTransaction] = serializer.parseBytes(bytes)
-
-  def create(
-      version: TxVersion,
-      sender: PublicKey,
-      recipient: AddressOrAlias,
-      asset: Asset,
-      amount: TxAmount,
-      feeAsset: Asset,
-      fee: TxAmount,
-      attachment: ByteStr,
-      timestamp: TxTimestamp,
-      proofs: Proofs
-  ): Either[ValidationError, TransferTransaction] =
-    TransferTransaction(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, proofs, recipient.chainId).validatedEither
-
-  def signed(
-      version: TxVersion,
-      sender: PublicKey,
-      recipient: AddressOrAlias,
-      asset: Asset,
-      amount: TxAmount,
-      feeAsset: Asset,
-      fee: TxAmount,
-      attachment: ByteStr,
-      timestamp: TxTimestamp,
-      signer: PrivateKey
-  ): Either[ValidationError, TransferTransaction] =
-    create(version, sender, recipient, asset, amount, feeAsset, fee, attachment, timestamp, Proofs.empty).map(_.signWith(signer))
-
-  def selfSigned(
-      version: TxVersion,
-      sender: KeyPair,
-      recipient: AddressOrAlias,
-      asset: Asset,
-      amount: TxAmount,
-      feeAsset: Asset,
-      fee: TxAmount,
-      attachment: ByteStr,
-      timestamp: TxTimestamp
-  ): Either[ValidationError, TransferTransaction] =
-    signed(version, sender.publicKey, recipient, asset, amount, feeAsset, fee, attachment, timestamp, sender.privateKey)
 }

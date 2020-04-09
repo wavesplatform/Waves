@@ -157,11 +157,16 @@ object Dependencies {
       "org.bitlet" % "weupnp" % "0.1.4",
       kindProjector,
       monixModule("reactive").value,
-      nettyModule("handler"),
+      nettyModule("handler")
+    ) ++ protobuf.value ++ console ++ logDeps ++ levelDBJNA
+  )
+
+  lazy val nodeTests = Def.setting(
+    Seq(
       akkaModule("testkit")               % Test,
       akkaHttpModule("akka-http-testkit") % Test,
       ("org.iq80.leveldb" % "leveldb" % "0.12").exclude("com.google.guava", "guava") % Test
-    ) ++ protobuf.value ++ test ++ console ++ logDeps ++ levelDBJNA
+    ) ++ test ++ logDeps
   )
 
   private[this] val protoSchemasLib =

@@ -47,7 +47,7 @@ package object database extends ScorexLogging {
     }
 
     file.getAbsoluteFile.getParentFile.mkdirs()
-    LevelDBFactory.factory.open(file, options)
+    new InMemoryDB(LevelDBFactory.factory.open(file, options))
   }
 
   final type DBEntry = JMap.Entry[Array[Byte], Array[Byte]]
@@ -418,13 +418,13 @@ package object database extends ScorexLogging {
     def readWrite[A](f: RW => A): A = {
       val snapshot    = db.getSnapshot
       val readOptions = new ReadOptions().snapshot(snapshot)
-      val batch       = new SortedBatch
-      val rw          = new RW(db, readOptions, batch)
       val nativeBatch = db.createWriteBatch()
+      //      val batch       = new SortedBatch
+      val rw          = new RW(db, readOptions, nativeBatch)
       try {
         val r = f(rw)
-        batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
-        batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
+//        batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
+//        batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
         db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
         r
       } finally {

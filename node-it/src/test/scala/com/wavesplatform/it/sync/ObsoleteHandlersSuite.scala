@@ -44,7 +44,7 @@ class ObsoleteHandlersSuite extends BaseTransactionSuite {
   test("assets transfer") {
     val json = sender.postJson(
       "/assets/transfer",
-      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, None, None, None)
+      TransferRequest(Some(1.toByte), Some(firstAddress), None, secondAddress, None, transferAmount, None, minFee, None, None, None, None, None)
     )
     val tx = Json.parse(json.getResponseBody).as[Transaction].id
     nodes.waitForTransaction(tx)

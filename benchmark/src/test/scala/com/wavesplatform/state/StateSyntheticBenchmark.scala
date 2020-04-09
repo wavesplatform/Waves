@@ -13,9 +13,8 @@ import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.settings.FunctionalitySettings
 import com.wavesplatform.state.StateSyntheticBenchmark._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.Transaction
+import com.wavesplatform.transaction.{SignedTx, Transaction}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer._
 import org.openjdk.jmh.annotations._
 import org.scalacheck.Gen
 
@@ -43,7 +42,7 @@ object StateSyntheticBenchmark {
       for {
         amount    <- Gen.choose(1, waves(1))
         recipient <- accountGen
-      } yield TransferTransaction.selfSigned(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, 100000, ByteStr.empty, ts).explicitGet()
+      } yield SignedTx.transfer(1.toByte, sender, recipient.toAddress, Waves, amount, Waves, 100000, ByteStr.empty, ts)
   }
 
   @State(Scope.Benchmark)
@@ -57,9 +56,7 @@ object StateSyntheticBenchmark {
       for {
         recipient: KeyPair <- accountGen
         amount             <- Gen.choose(1, waves(1))
-      } yield TransferTransaction
-        .selfSigned(2.toByte, sender, recipient.toAddress, Waves, amount, Waves, 1000000, ByteStr.empty, ts)
-        .explicitGet()
+      } yield SignedTx.transfer(2.toByte, sender, recipient.toAddress, Waves, amount, Waves, 1000000, ByteStr.empty, ts)
 
     @Setup
     override def init(): Unit = {

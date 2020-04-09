@@ -73,7 +73,7 @@ case class PeersApiRoute(
       val add: InetSocketAddress = new InetSocketAddress(InetAddress.getByName(req.host), req.port)
       connectToPeer(add)
 
-      Json.obj("hostname" -> add.getHostName, "status" -> "Trying to connect")
+      Json.obj("hostname" -> add.toString, "status" -> "Trying to connect")
     }
   }
 

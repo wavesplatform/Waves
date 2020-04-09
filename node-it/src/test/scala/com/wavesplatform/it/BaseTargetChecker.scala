@@ -5,9 +5,8 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.PoSSelector
-import com.wavesplatform.database.openDB
+import com.wavesplatform.database.{StorageFactory, openDB}
 import com.wavesplatform.events.BlockchainUpdateTriggers
-import com.wavesplatform.history.StorageFactory
 import com.wavesplatform.settings._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.utils.NTP

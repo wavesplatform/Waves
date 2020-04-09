@@ -1,21 +1,19 @@
 package com.wavesplatform.state
 
-import java.io.File
-import java.nio.file.Files
-
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.Block
+import com.wavesplatform.block.{Block, TestBlock}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
-import com.wavesplatform.lagonaki.mocks.TestBlock
+import com.wavesplatform.database.{TestDB, TestStorageFactory}
+import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.FunctionalitySettings
+import com.wavesplatform.settings.TestSettings._
+import com.wavesplatform.settings.{FunctionalitySettings, TestSettings}
 import com.wavesplatform.state.diffs.BlockDiffer
-import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.{GenesisTransaction, Transaction}
+import com.wavesplatform.utils.SystemTime
 import monix.execution.UncaughtExceptionReporter
 import monix.reactive.Observer
-import org.iq80.leveldb.{DB, Options}
+import org.iq80.leveldb.DB
 import org.openjdk.jmh.annotations.{Setup, TearDown}
 import org.scalacheck.{Arbitrary, Gen}
 
@@ -23,16 +21,16 @@ trait BaseState {
   import BaseState._
 
   private val fsSettings: FunctionalitySettings = updateFunctionalitySettings(FunctionalitySettings.TESTNET)
-  private val db: DB = {
-    val dir     = Files.createTempDirectory("state-synthetic").toAbsolutePath.toString
-    val options = new Options()
-    options.createIfMissing(true)
-    LevelDBFactory.factory.open(new File(dir), options)
-  }
+  private val db: DB                            = new TestDB
 
   private val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-  val state: LevelDBWriter     = TestLevelDB.withFunctionalitySettings(db, portfolioChanges, fsSettings)
-
+  val state = TestStorageFactory(
+    TestSettings.Default.withFunctionalitySettings(fsSettings),
+    db,
+    SystemTime,
+    portfolioChanges,
+    BlockchainUpdateTriggers.noop
+  )._2
   private var _richAccount: KeyPair = _
   def richAccount: KeyPair          = _richAccount
 
@@ -52,12 +50,11 @@ trait BaseState {
       transferTxs <- Gen.sequence[Vector[Transaction], Transaction]((1 to TxsInBlock).map { i =>
         txGenP(sender, base.header.timestamp + i)
       })
-    } yield
-      TestBlock.create(
-        time = transferTxs.last.timestamp,
-        ref = base.id(),
-        txs = transferTxs
-      )
+    } yield TestBlock.create(
+      time = transferTxs.last.timestamp,
+      ref = base.id(),
+      txs = transferTxs
+    )
 
   private val initGen: Gen[(KeyPair, Block)] = for {
     rich <- accountGen

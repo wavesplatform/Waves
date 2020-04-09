@@ -9,6 +9,8 @@ import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.{SignedTx, TxVersion}
+import com.wavesplatform.transaction.transfer.Attachment.Bin
 import com.wavesplatform.transaction.transfer._
 import org.scalatest.CancelAfterFailure
 
@@ -58,9 +60,7 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
   test("invalid signed waves transfer should not be in UTX or blockchain") {
     def invalidTx(timestamp: Long = System.currentTimeMillis, fee: Long = 100000): TransferTransaction =
-      TransferTransaction
-        .selfSigned(1.toByte, sender.keyPair, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, ByteStr.empty, timestamp)
-        .explicitGet()
+      SignedTx.transfer(1.toByte, sender.keyPair, AddressOrAlias.fromString(sender.address).explicitGet(), Waves, 1, Waves, fee, None, timestamp)
 
     val (balance1, eff1) = miner.accountBalances(firstAddress)
 

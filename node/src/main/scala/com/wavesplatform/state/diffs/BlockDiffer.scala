@@ -73,7 +73,7 @@ object BlockDiffer extends ScorexLogging {
     for {
       _ <- TracedResult(Either.cond(!verify || block.signatureValid(), (), GenericError(s"Block $block has invalid signature")))
       r <- apply(
-        CompositeBlockchain(blockchain, newBlock = Some(block)),
+        CompositeBlockchain(blockchain, maybeNewBlock = Some(block)),
         constraint,
         maybePrevBlock.map(_.header.timestamp),
         Diff.empty.copy(portfolios = Map(block.sender.toAddress -> (minerReward |+| initialFeeFromThisBlock |+| feeFromPreviousBlock))),

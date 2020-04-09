@@ -17,15 +17,15 @@ import com.wavesplatform.transaction.lease.LeaseTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.transaction.{Asset, Transaction}
 
-final case class CompositeBlockchain(
-    inner: Blockchain,
-    maybeDiff: Option[Diff] = None,
-    newBlock: Option[Block] = None,
-    carry: Long = 0,
-    reward: Option[Long] = None,
-    hitSource: Option[ByteStr] = None
-) extends Blockchain {
-  override val settings: BlockchainSettings = inner.settings
+trait CompositeBlockchain extends Blockchain {
+  def inner: Blockchain
+  def maybeDiff: Option[Diff]
+  def newBlock: Option[Block]
+  def carry: Long
+  def reward: Option[Long]
+  def hitSource: Option[ByteStr]
+
+  override def settings: BlockchainSettings = inner.settings
 
   def diff: Diff = maybeDiff.getOrElse(Diff.empty)
 
@@ -158,9 +158,6 @@ final case class CompositeBlockchain(
 }
 
 object CompositeBlockchain {
-  def apply(blockchain: Blockchain, ngState: NgState): CompositeBlockchain =
-    CompositeBlockchain(blockchain, Some(ngState.bestLiquidDiff), Some(ngState.bestLiquidBlock), ngState.carryFee, ngState.reward)
-
   private def assetDescription(
       asset: IssuedAsset,
       diff: Diff,
@@ -233,5 +230,30 @@ object CompositeBlockchain {
           case (acc, _) => acc
         }
     }
+  }
+
+  def apply(blockchain: Blockchain, ngState: NgState): Blockchain = new CompositeBlockchain {
+    override val inner: Blockchain       = blockchain
+    override def maybeDiff: Option[Diff] = Some(ngState.bestLiquidDiff)
+    override def newBlock: Option[Block] = Some(ngState.bestLiquidBlock)
+    override def carry: Long             = ngState.carryFee
+    override def reward: Option[Long]    = ngState.reward
+    override def hitSource: Option[BlockId] = Some(ngState.hitSource)
+  }
+
+  def apply(
+      blockchain: Blockchain,
+      _maybeDiff: Option[Diff] = None,
+      maybeNewBlock: Option[Block] = None,
+      maybeCarry: Option[Long] = None,
+      maybeReward: Option[Long] = None,
+      maybeHitSource: Option[ByteStr] = None
+  ): Blockchain = new CompositeBlockchain {
+    override val inner: Blockchain          = blockchain
+    override val maybeDiff: Option[Diff]    = _maybeDiff
+    override val newBlock: Option[Block]    = maybeNewBlock
+    override def carry: Long                = maybeCarry.getOrElse(blockchain.carryFee)
+    override def reward: Option[Long]       = maybeReward
+    override def hitSource: Option[BlockId] = maybeHitSource
   }
 }

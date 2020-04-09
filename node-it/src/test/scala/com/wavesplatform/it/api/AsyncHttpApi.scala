@@ -625,7 +625,7 @@ object AsyncHttpApi extends Assertions {
     def transfer(sourceAddress: String, recipient: String, amount: Long, fee: Long): Future[Transaction] =
       postJson(
         "/assets/transfer",
-        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee)
+        TransferRequest(Some(1.toByte), Some(sourceAddress), None, recipient, None, amount, None, fee, None, None, None, None, None)
       ).as[Transaction]
 
     def massTransfer(

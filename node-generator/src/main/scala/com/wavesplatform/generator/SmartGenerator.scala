@@ -13,8 +13,7 @@ import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.SetScriptTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
-import com.wavesplatform.transaction.{Asset, Transaction, TxVersion}
+import com.wavesplatform.transaction.{Asset, SignedTx, Transaction, TxVersion}
 
 import scala.concurrent.duration._
 
@@ -40,9 +39,7 @@ class SmartGenerator(settings: SmartGenerator.Settings, val accounts: Seq[KeyPai
 
     val now = System.currentTimeMillis()
     val txs = Range(0, settings.transfers).map { i =>
-      TransferTransaction
-        .selfSigned(2.toByte, bank, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, ByteStr.empty, now + i)
-        .explicitGet()
+      SignedTx.transfer(2.toByte, bank, bank.toAddress, Waves, 1.waves - 2 * fee, Waves, fee, ByteStr.empty, now + i)
     }
 
     val extxs = Range(0, settings.exchange).map { i =>

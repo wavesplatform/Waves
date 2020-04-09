@@ -117,7 +117,7 @@ object PBTransactions {
       case Data.Transfer(TransferTransactionData(Some(recipient), Some(amount), attachment)) =>
         for {
           address <- recipient.toAddressOrAlias(chainId)
-          tx <- vt.transfer.TransferTransaction.create(
+          tx <- vt.transfer.TransferTransaction(
             version.toByte,
             sender,
             address,
@@ -127,8 +127,9 @@ object PBTransactions {
             feeAmount,
             attachment.toByteStr,
             timestamp,
-            proofs
-          )
+            proofs,
+            chainId
+          ).validatedEither
         } yield tx
 
       case Data.CreateAlias(CreateAliasTransactionData(alias)) =>

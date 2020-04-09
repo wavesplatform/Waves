@@ -11,7 +11,7 @@ import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.{BaseTransactionSuite, NodesFromDocker}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.SignedTx
 
 class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDocker {
 
@@ -24,9 +24,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
   private def nodeB: Node = nodes.last
 
   test("should rebroadcast a transaction if that's allowed in config") {
-    val tx = TransferTransaction.selfSigned(2.toByte, nodeA.keyPair, Address.fromString(nodeB.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
-      .explicitGet()
-      .json()
+    val tx = SignedTx.transfer(2.toByte, nodeA.keyPair, Address.fromString(nodeB.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty, System.currentTimeMillis()).json()
 
     val dockerNodeBId = docker.stopContainer(dockerNodes.apply().last)
     val txId          = nodeA.signedBroadcast(tx).id
@@ -41,10 +39,7 @@ class RebroadcastTransactionSuite extends BaseTransactionSuite with NodesFromDoc
 
   test("should not rebroadcast a transaction if that's not allowed in config") {
     dockerNodes().foreach(docker.restartNode(_, configWithRebroadcastNotAllowed))
-    val tx = TransferTransaction
-      .selfSigned(2.toByte, nodeA.keyPair, Address.fromString(nodeB.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis())
-      .explicitGet()
-      .json()
+    val tx = SignedTx.transfer(2.toByte, nodeA.keyPair, Address.fromString(nodeB.address).explicitGet(), Waves, transferAmount, Waves, minFee, ByteStr.empty,  System.currentTimeMillis()).json()
 
     val dockerNodeBId = docker.stopContainer(dockerNodes.apply().last)
     val txId          = nodeA.signedBroadcast(tx).id

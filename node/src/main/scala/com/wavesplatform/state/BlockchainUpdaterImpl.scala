@@ -197,14 +197,14 @@ class BlockchainUpdaterImpl(
                     val reward            = nextReward()
                     BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = reward),
+                        CompositeBlockchain(leveldb, maybeReward = reward),
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
                         verify
                       )
                       .map { r =>
-                        val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), r.carry, reward, Some(hitSource))
+                        val refBlockchain = CompositeBlockchain(leveldb, Some(r.diff), Some(block), Some(r.carry), reward, Some(hitSource))
                         miner.scheduleMining(Some(refBlockchain))
                         Option((r, Seq.empty[Transaction], reward, hitSource))
                       }
@@ -219,7 +219,7 @@ class BlockchainUpdaterImpl(
 
                     BlockDiffer
                       .fromBlock(
-                        CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward),
+                        CompositeBlockchain(leveldb, maybeReward = ng.reward),
                         leveldb.lastBlock,
                         block,
                         miningConstraints.total,
@@ -244,7 +244,7 @@ class BlockchainUpdaterImpl(
 
                       BlockDiffer
                         .fromBlock(
-                          CompositeBlockchain(leveldb, carry = leveldb.carryFee, reward = ng.reward),
+                          CompositeBlockchain(leveldb, maybeReward = ng.reward),
                           leveldb.lastBlock,
                           block,
                           miningConstraints.total,
@@ -285,10 +285,10 @@ class BlockchainUpdaterImpl(
 
                         val liquidDiffWithCancelledLeases = ng.cancelExpiredLeases(referencedLiquidDiff)
 
-                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), carry, reward)
+                        val referencedBlockchain = CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), Some(carry), reward)
                         val maybeDiff = BlockDiffer
                           .fromBlock(
-                            referencedBlockchain,
+                            CompositeBlockchain(leveldb, Some(liquidDiffWithCancelledLeases), Some(referencedForgedBlock), Some(carry), reward),
                             Some(referencedForgedBlock),
                             block,
                             constraint,
@@ -296,7 +296,7 @@ class BlockchainUpdaterImpl(
                           )
 
                         maybeDiff.map { differResult =>
-                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), differResult.carry, reward, Some(hitSource))
+                          val tempBlockchain = CompositeBlockchain(referencedBlockchain, Some(differResult.diff), Some(block), Some(differResult.carry), reward, Some(hitSource))
                           miner.scheduleMining(Some(tempBlockchain))
 
                           leveldb.append(liquidDiffWithCancelledLeases, carry, totalFee, prevReward, prevHitSource, referencedForgedBlock)

@@ -10,8 +10,7 @@ import com.wavesplatform.it.api.{TransactionInfo, TransactionStatus}
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.ProvenTransaction
-import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{ProvenTransaction, SignedTx}
 import play.api.libs.json._
 
 import scala.util.Random
@@ -54,7 +53,7 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
     check(checkData, getResult)
 
     val maxTxList = (1 to 1000).map(_ => txIds.head).toList
-    val result = notMiner.transactionStatus(maxTxList)
+    val result    = notMiner.transactionStatus(maxTxList)
     result.size shouldBe maxTxList.size
     result.forall(_ == result.head)
 
@@ -78,18 +77,17 @@ class TransactionsStatusSuite extends BaseTransactionSuite with NTPTime {
 
   private def mkTransactions: List[ProvenTransaction] =
     (1001 to 1020).map { amount =>
-      TransferTransaction.selfSigned(
-          2.toByte,
-          miner.keyPair,
-          AddressOrAlias.fromString(secondAddress).explicitGet(),
-          Waves,
-          amount,
-          Waves,
-          minFee,
-          ByteStr.empty,
-          ntpTime.correctedTime(),
-        )
-        .explicitGet()
+      SignedTx.transfer(
+        2.toByte,
+        miner.keyPair,
+        AddressOrAlias.fromString(secondAddress).explicitGet(),
+        Waves,
+        amount,
+        Waves,
+        minFee,
+        ByteStr.empty,
+        ntpTime.correctedTime()
+      )
     }.toList
 
   private def waitForTransactions(txs: List[ProvenTransaction]): List[TransactionInfo] =

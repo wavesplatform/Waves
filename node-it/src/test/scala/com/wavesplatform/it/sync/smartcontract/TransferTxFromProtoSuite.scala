@@ -10,15 +10,17 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.transfer.Attachment.{Bin, Bool, Num, Str}
+import com.wavesplatform.transaction.transfer.{Attachment, TransferTransaction}
+import com.wavesplatform.transaction.{SignedTx, TxVersion}
 import com.wavesplatform.transaction.transfer.TransferTransaction
 
 class TransferTxFromProtoSuite extends BaseTransactionSuite {
-  val source    = firstAddress
-  val recipient = secondAddress
-  val dApp      = thirdAddress
-  val scriptText =
+  private val source    = firstAddress
+  private val recipient = secondAddress
+  private val dApp      = thirdAddress
+  private val scriptText =
    s"""
       |{-# STDLIB_VERSION 4 #-}
       |{-# CONTENT_TYPE DAPP #-}
@@ -46,23 +48,21 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
       |}
       |
       |""".stripMargin
-  val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
+  private val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV3).explicitGet()._1.bytes().base64
 
   test("TransferTransaction with Waves from proto bytes") {
     sender.setScript(dApp, Some(script), waitForTx = true)
-    val transferTx = TransferTransaction
-      .selfSigned(
-        version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-        asset = Waves,
-        amount = transferAmount,
-        feeAsset = Waves,
-        fee = minFee,
-        attachment = ByteStr("WAVES transfer".getBytes),
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
+    val transferTx = SignedTx.transfer(
+      version = TxVersion.V3,
+      sender = pkByAddress(source),
+      recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+      asset = Waves,
+      amount = transferAmount,
+      feeAsset = Waves,
+      fee = minFee,
+      attachment = ByteStr("WAVES transfer".getBytes),
+      timestamp = System.currentTimeMillis()
+    )
 
     sender.signedBroadcast(transferTx.json(), waitForTx = true)
 
@@ -92,19 +92,17 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     val assetId = sender.issue(source, waitForTx = true).id
     sender.sponsorAsset(source, assetId, minFee, waitForTx = true)
 
-    val transferAssetTx = TransferTransaction
-      .selfSigned(
-        version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-        asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
-        amount = 10000,
-        feeAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
-        fee = minFee,
-        attachment = ByteStr("Some Attachment".getBytes),
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
+    val transferAssetTx = SignedTx.transfer(
+      version = TxVersion.V3,
+      sender = pkByAddress(source),
+      recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+      asset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
+      amount = 10000,
+      feeAsset = IssuedAsset(ByteStr.decodeBase58(assetId).get),
+      fee = minFee,
+      attachment = ByteStr("Some Attachment".getBytes),
+      timestamp = System.currentTimeMillis()
+    )
 
     sender.signedBroadcast(transferAssetTx.json(), waitForTx = true)
 
@@ -123,19 +121,17 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
   }
 
   test("check bodyBytes of transaction returned by transferTransactionFromProto") {
-    val transferTx = TransferTransaction
-      .selfSigned(
-        version = TxVersion.V3,
-        sender = pkByAddress(source),
-        recipient = AddressOrAlias.fromString(recipient).explicitGet(),
-        asset = Waves,
-        amount = 10000,
-        feeAsset = Waves,
-        fee = minFee,
-        attachment = ByteStr("Some Attachment".getBytes),
-        timestamp = System.currentTimeMillis()
-      )
-      .explicitGet()
+    val transferTx = SignedTx.transfer(
+      version = TxVersion.V3,
+      sender = pkByAddress(source),
+      recipient = AddressOrAlias.fromString(recipient).explicitGet(),
+      asset = Waves,
+      amount = 10000,
+      feeAsset = Waves,
+      fee = minFee,
+      attachment = ByteStr("Some Attachment".getBytes),
+      timestamp = System.currentTimeMillis()
+    )
 
     sender.signedBroadcast(transferTx.json(), waitForTx = true)
 

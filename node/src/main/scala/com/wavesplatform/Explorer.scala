@@ -276,6 +276,18 @@ object Explorer extends ScorexLogging {
             counter += 1
           }
           log.info(s"Found $counter orders")
+
+        case "KC" =>
+          log.info("Counting keys")
+          var counter = 0L
+          val i       = db.iterator()
+          i.seekToFirst()
+          while (i.hasNext) {
+            counter += 1
+            i.next()
+          }
+          log.info(s"Found $counter keys")
+
       }
     } finally db.close()
   }
