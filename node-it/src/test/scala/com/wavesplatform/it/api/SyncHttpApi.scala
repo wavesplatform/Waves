@@ -420,9 +420,9 @@ object SyncHttpApi extends Assertions {
         version: Byte = 2,
         matcherFeeAssetId: Option[String] = None,
         waitForTx: Boolean = false,
-        amountsAsStrings: Boolean = false
-    ,
-        validate: Boolean = true): Transaction = {
+        amountsAsStrings: Boolean = false,
+        validate: Boolean = true
+    ): Transaction = {
       maybeWaitForTransaction(
         sync(
           async(n).broadcastExchange(
@@ -436,8 +436,7 @@ object SyncHttpApi extends Assertions {
             fee,
             version,
             matcherFeeAssetId,
-            amountsAsStrings
-          ,
+            amountsAsStrings,
             validate
           )
         ),

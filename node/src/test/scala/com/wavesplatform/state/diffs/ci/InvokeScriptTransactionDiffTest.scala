@@ -34,7 +34,7 @@ import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationErro
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.state.utils.TestLevelDB
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{InvalidAssetId, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace}
@@ -336,6 +336,7 @@ class InvokeScriptTransactionDiffTest
         )
     }
 
+    compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).left.map(println)
     compiler.ContractCompiler(ctx.compilerContext, expr, stdLibVersion).right.get
   }
 
@@ -706,8 +707,8 @@ class InvokeScriptTransactionDiffTest
       r <- preconditionsAndSetContract(contractGen, accountGen, accountGen, None, ciFee(0), sponsored = false, isCIDefaultFunc = true)
     } yield (a, aliasTx, am, genesis2, r._1, r._2, r._3)) {
       case (acc, aliasTx, amount, genesis2, genesis, setScript, ci) =>
-        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) {
-          _ shouldBe 'Left
+        assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(genesis2, setScript, aliasTx))), TestBlock.create(Seq(ci), Block.ProtoBlockVersion), fs) { err =>
+          err shouldBe 'Left
         }
     }
   }
@@ -1605,7 +1606,229 @@ class InvokeScriptTransactionDiffTest
             new LevelDBWriterPredefAsset(asset, db, ignoreSpendableBalanceChanged, TestLevelDB.createTestBlockchainSettings(features), dbSettings)
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
-            ei shouldBe Left(TransactionValidationError(InvalidAssetId, invoke))
+            inside(ei) {
+              case Left(TransactionValidationError(ScriptExecutionError(m, _, false), i)) =>
+                i shouldBe invoke
+                m should endWith ("is already issued")
+            }
+          }
+        }
+    }
+  }
+
+  private def reissueContract(funcName: String, asset: ByteStr): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = [Reissue(base58'$asset', false, 1), Reissue(base58'$asset', true, 4)]
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val reissueAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      assetTx     <- issueV2TransactionGen(master, None, reissuableParam = Some(true))
+      fee         <- ciFee()
+      funcBinding <- funcNameGen
+      contract    = reissueContract(funcBinding, assetTx.id.value)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, assetTx, setScriptTx))
+
+  property("Reissuing unreissued asset should produce error") {
+    forAll(reissueAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei should produce("Asset is not reissuable")
+          }
+        }
+    }
+  }
+
+
+
+  private def transferIssueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = {
+           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+           | [v, ScriptTransfer(i.caller, 1, v.calculateAssetId())]
+           |}
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val transferAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- ciFee(nonNftIssue = 1)
+      funcBinding <- funcNameGen
+      contract    = transferIssueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+
+  property("issued asset can be transfered") {
+    forAll(transferAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei shouldBe 'Right
+          }
+        }
+    }
+  }
+
+  private def transferNonIssueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = {
+           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+           | [ScriptTransfer(i.caller, 1, v.calculateAssetId())]
+           |}
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val transferNonAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- ciFee()
+      funcBinding <- funcNameGen
+      contract    = transferNonIssueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+
+  property("nonissued asset cann't be transfered") {
+    forAll(transferNonAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          )
+
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            ei should produce("negative asset balance")
+          }
+        }
+    }
+  }
+
+
+  private def doubleIssueContract(funcName: String): DApp = {
+    val expr = {
+      val script =
+        s"""
+           |{-# STDLIB_VERSION 4 #-}
+           |{-# CONTENT_TYPE DAPP #-}
+           |{-#SCRIPT_TYPE ACCOUNT#-}
+           |
+           |@Callable(i)
+           |func $funcName() = {
+           | let v = Issue("InvokeAsset", "InvokeDesc", 100, 0, true, unit, 0)
+           | [v, v]
+           |}
+           |""".stripMargin
+      Parser.parseContract(script).get.value
+    }
+
+    compileContractFromExpr(expr, V4)
+  }
+
+  private val doubleAssetIdScenario =
+    for {
+      master  <- accountGen
+      invoker <- accountGen
+      ts      <- timestampGen
+      genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+      fee         <- ciFee(nonNftIssue = 2)
+      funcBinding <- funcNameGen
+      contract    = doubleIssueContract(funcBinding)
+      script      = ContractScript(V4, contract)
+      setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+      fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
+      invokeTx = InvokeScriptTransaction
+        .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
+        .explicitGet()
+    } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+
+  property("duplicate issuing asset should produce error") {
+    forAll(doubleAssetIdScenario) {
+      case (invoke, genesisTxs) =>
+        tempDb { db =>
+          val features = fs.copy(
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+          )
+          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
+            inside(ei) {
+              case Left(TransactionValidationError(ScriptExecutionError(m, _, false), i)) =>
+                i shouldBe invoke
+                m should endWith ("is already issued")
+            }
           }
         }
     }
