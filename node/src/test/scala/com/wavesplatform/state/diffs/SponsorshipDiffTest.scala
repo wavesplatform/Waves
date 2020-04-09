@@ -280,17 +280,17 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
       ts        <- timestampGen
       genesis: GenesisTransaction = GenesisTransaction.create(master, 300000000, ts).explicitGet()
       issue = IssueTransaction(
-          TxVersion.V1,
-          master.publicKey,
-          "Asset".utf8Bytes,
-          Array.emptyByteArray,
-          100,
-          2,
-          reissuable = false,
-          script = None,
-          100000000,
-          ts + 1
-        ).signWith(master.privateKey)
+        TxVersion.V1,
+        master.publicKey,
+        "Asset".utf8Bytes,
+        Array.emptyByteArray,
+        100,
+        2,
+        reissuable = false,
+        script = None,
+        100000000,
+        ts + 1
+      ).signWith(master.privateKey)
       assetId = IssuedAsset(issue.id())
       sponsor = SponsorFeeTransaction.selfSigned(1.toByte, master, assetId, Some(100), 100000000, ts + 2).explicitGet()
       assetTransfer = TransferTransaction
@@ -314,7 +314,12 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
             state.balance(genesis.recipient) shouldBe 0
             state.balance(genesis.recipient, IssuedAsset(issue.id())) shouldBe issue.quantity
         }
+
+        assertDiffEi(
+          Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))),
+          block(Seq(backWavesTransfer)),
+          s.copy(preActivatedFeatures = s.preActivatedFeatures + (BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0))
+        ) { ei => ei should produce("negative waves balance") }
     }
   }
-
 }
