@@ -180,7 +180,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets")
+      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(1))
       for (nth <- 0 to 9) {
         val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
         assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
@@ -210,7 +210,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertGrpcError(
-        invokeScript(acc, "issue11Assets"),
+        invokeScript(acc, "issue11Assets", fee = invocationCost(1)),
         "State check failed. Reason: Too many script actions: max: 10, actual: 11"
       )
     }
@@ -271,7 +271,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     "liquid block works" in {
       val acc   = createDapp(script(simpleReissuableAsset))
       val asset = issueValidated(acc, simpleReissuableAsset)
-      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset)
+      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
       def checks(): Unit = {
         assertStateChanges(tx) { sd =>
           sd.issues should have size 2
