@@ -1394,7 +1394,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     }
   }
 
-  property("groth16Verify_*inputs fail if too many imputs") {
+  property("groth16Verify_*inputs fail if too many inputs") {
     for((i, lets) <- groths if (i>1)) {
       val src = lets ++ s"groth16Verify_${i-1}inputs(vk, proof, inputs)"
       eval(src, version = V4) shouldBe Left(s"Invalid inputs count $i, must be not greater than ${i-1}")
