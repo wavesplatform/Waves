@@ -271,7 +271,7 @@ object CryptoContext {
                                                            Array(1900, 2000, 2150, 2300, 2450, 2550, 2700, 2900, 3000, 3150, 3250, 3400, 3500, 3650, 3750)(n-1)
                                                          }),
                                                          (n => {
-                                                            case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ => Either.cond(inputs.size <= n*32, (), s"Invalid inputs count, must be not greater than $n")
+                                                            case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ => Either.cond(inputs.size <= n*32, (), s"Invalid inputs count ${inputs.size/32}, must be not greater than $n")
                                                             case xs => notImplemented[Id, Unit](s"groth16Verify_${n}inputs(vk:ByteVector, proof:ByteVector, inputs:ByteVector)", xs)
                                                           }),
                                                         BOOLEAN,
