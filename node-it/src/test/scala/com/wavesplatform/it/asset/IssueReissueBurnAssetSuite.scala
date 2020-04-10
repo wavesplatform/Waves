@@ -1,6 +1,7 @@
 package com.wavesplatform.it.asset
 
-import com.wavesplatform.account.{KeyPair, PublicKey}
+import com.wavesplatform.account.KeyPair
+import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.BaseSuite
@@ -13,7 +14,7 @@ import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
-import org.scalactic.source.Position
+import play.api.libs.json.JsObject
 
 class IssueReissueBurnAssetSuite extends BaseSuite {
   val initialWavesBalance = 100.waves
@@ -111,12 +112,11 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
   "Restrictions in " + CallableMethod - {
     val method = CallableMethod
 
-    "Issue two identical assets with the same nonce (one invocation) should produce an error" ignore {
-      /* SC-575  */
+    "Issue two identical assets with the same nonce (one invocation) should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
         invokeScript(acc, "issue2Assets"),
-        "State check failed. Reason: Reason should be here"
+        " is already issued"
       )
     }
 
@@ -145,10 +145,13 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      assertBadRequestAndMessage(
-        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt),
-        "State check failed. Reason: Accounts balance errors"
-      )
+      assertApiError(
+        invokeScript(acc, "transferAndBurn", assetId = assetId, count = (simpleReissuableAsset.quantity / 2 + 1).toInt)
+      ) { error =>
+        error.message should include("State check failed. Reason: Accounts balance errors")
+        error.id shouldBe StateCheckFailed.Id
+        (error.json \ "details").as[JsObject].value.map(_._2.as[String]).head should include("negative asset balance")
+      }
     }
 
     "Reissuing NFT asset should produce an error" in {
@@ -162,14 +165,17 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       )
     }
 
-    "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" ignore /* SC-580 */ {
+    "Reissuing after setting isReissuiable to falser inside one invocation should produce an error" in {
       val acc     = createDapp(script(simpleReissuableAsset))
       val txIssue = issue(acc, method, simpleReissuableAsset, invocationCost(1))
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
-      invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000)
+      assertBadRequestAndMessage(
+        invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000),
+        "Asset is not reissuable"
+      )
 
-      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity + 1000)
+      sender.assetsDetails(assetId).quantity should be(simpleReissuableAsset.quantity)
     }
 
     "Issue 10 assets should not produce an error" in {
@@ -394,7 +400,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     f(stateChanges(tx))
     f(stateChangesStrings(tx))
 
-    val result = sender.debugStateChangesByAddress(tx.sender.get, 100)
+    val result      = sender.debugStateChangesByAddress(tx.sender.get, 100)
     val stateChange = result.find(_.id == tx.id)
     stateChange should not be empty
     f(stateChange.get.stateChanges.get)

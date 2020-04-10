@@ -27,7 +27,7 @@ object Bindings {
   )
 
   private def proofsPart(existingProofs: IndexedSeq[ByteStr]) =
-    "proofs" -> ARR((existingProofs ++ Seq.fill(8 - existingProofs.size)(ByteStr.empty)).map(b => CONST_BYTESTR(b).explicitGet()))
+    "proofs" -> ARR(existingProofs.map(b => CONST_BYTESTR(b).explicitGet) ++ Seq.fill(8 - existingProofs.size)(CONST_BYTESTR(ByteStr.empty).explicitGet), false).explicitGet
 
   private def provenTxPart(tx: Proven, proofsEnabled: Boolean): Map[String, EVALUATED] = {
     val commonPart = combine(Map(
@@ -64,7 +64,7 @@ object Bindings {
   private def buildPayments(payments: AttachedPayments): (String, EVALUATED) =
     payments match {
       case AttachedPayments.Single(p) => "payment"  -> fromOptionCO(p.map(mapPayment))
-      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector)
+      case AttachedPayments.Multi(p)  => "payments" -> ARR(p.map(mapPayment).toVector, false).explicitGet
     }
 
   private def mapPayment(payment: (Long, Option[ByteStr])): CaseObj = {
@@ -397,7 +397,7 @@ object Bindings {
       )
 
     val vrfFieldOpt: Map[String, EVALUATED] =
-      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf, "transactionsRoot" -> blockInf.transactionsRoot)
+      if (version >= V4) Map[String, EVALUATED]("vrf" -> blockInf.vrf)
       else Map()
 
     CaseObj(blockInfo(version), commonFields ++ vrfFieldOpt)

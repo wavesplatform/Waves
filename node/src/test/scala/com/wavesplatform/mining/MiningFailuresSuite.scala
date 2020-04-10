@@ -2,7 +2,7 @@ package com.wavesplatform.mining
 
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.block.SignedBlockHeader
+import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.consensus.PoSSelector
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.settings._
@@ -34,9 +34,18 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
           |waves.miner {
           |  quorum = 0
           |  interval-after-last-block-then-generation-is-allowed = 0
-          |}""".stripMargin).withFallback(ConfigFactory.load())
+          |}
+          |
+          |waves.features.supported=[2]
+          |""".stripMargin).withFallback(ConfigFactory.load())
 
       WavesSettings.fromRootConfig(loadConfig(config))
+    }
+
+    val blockchainSettings = {
+      val bs = wavesSettings.blockchainSettings
+      val fs = bs.functionalitySettings
+      bs.copy(functionalitySettings = fs.copy(blockVersion3AfterHeight = 0, preActivatedFeatures = Map(2.toShort -> 0)))
     }
 
     val miner = {
@@ -44,8 +53,18 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
       val allChannels = new DefaultChannelGroup(GlobalEventExecutor.INSTANCE)
       val wallet      = Wallet(WalletSettings(None, Some("123"), None))
       val utxPool     = new UtxPoolImpl(ntpTime, blockchainUpdater, ignoreSpendableBalanceChanged, wavesSettings.utxSettings, enablePriorityPool = true)
-      val pos         = new PoSSelector(blockchainUpdater, wavesSettings.blockchainSettings, wavesSettings.synchronizationSettings)
-      new MinerImpl(allChannels, blockchainUpdater, wavesSettings, ntpTime, utxPool, wallet, pos, scheduler, scheduler)
+      val pos         = new PoSSelector(blockchainUpdater, blockchainSettings, wavesSettings.synchronizationSettings)
+      new MinerImpl(
+        allChannels,
+        blockchainUpdater,
+        wavesSettings.copy(blockchainSettings = blockchainSettings),
+        ntpTime,
+        utxPool,
+        wallet,
+        pos,
+        scheduler,
+        scheduler
+      )
     }
 
     val genesis = TestBlock.create(System.currentTimeMillis(), Nil)
@@ -53,9 +72,10 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     (blockchainUpdater.heightOf _).when(genesis.id()).returning(Some(1)).anyNumberOfTimes()
     (blockchainUpdater.heightOf _).when(genesis.header.reference).returning(Some(1)).anyNumberOfTimes()
     (blockchainUpdater.height _).when().returning(1)
-    (blockchainUpdater.settings _).when().returning(wavesSettings.blockchainSettings)
+    (blockchainUpdater.settings _).when().returning(blockchainSettings)
     (blockchainUpdater.blockHeader _).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
     (blockchainUpdater.activatedFeatures _).when().returning(Map.empty)
+    (blockchainUpdater.approvedFeatures _).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(new Array[Byte](32)))
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
@@ -69,13 +89,22 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
           )
         )
       )
+
+    var minedBlock: Block = null
     (blockchainUpdater.processBlock _).when(*, *, *).returning(Left(BlockFromFuture(100))).repeated(10)
-    (blockchainUpdater.processBlock _).when(*, *, *).returning(Right(None)).once()
+    (blockchainUpdater.processBlock _)
+      .when(*, *, *)
+      .onCall { (block, _, _) =>
+        minedBlock = block
+        Right(None)
+      }
+      .once()
     (blockchainUpdater.balanceSnapshots _).when(*, *, *).returning(Seq(BalanceSnapshot(1, ENOUGH_AMT, 0, 0)))
 
     val account       = accountGen.sample.get
     val generateBlock = generateBlockTask(miner)(account)
     generateBlock.runSyncUnsafe() shouldBe ((): Unit)
+    minedBlock.header.featureVotes shouldBe empty
   }
 
   private[this] def generateBlockTask(miner: MinerImpl)(account: KeyPair): Task[Unit] =

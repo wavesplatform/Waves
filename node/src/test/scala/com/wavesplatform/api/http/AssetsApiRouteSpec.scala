@@ -3,6 +3,7 @@ package com.wavesplatform.api.http
 import com.wavesplatform.api.common.{CommonAccountsApi, CommonAssetsApi}
 import com.wavesplatform.api.http.assets.AssetsApiRoute
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.http.{RestAPISettingsHelper, RouteSpec}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.estimator.ScriptEstimatorV1
@@ -10,12 +11,12 @@ import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.state.{AssetDescription, Blockchain, Height}
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.assets.IssueTransaction
-import com.wavesplatform.{NoShrink, TestTime, TestWallet, TransactionGen}
+import com.wavesplatform.{NoShrink, TestTime, TestValues, TestWallet, TransactionGen}
+import monix.reactive.Observable
 import org.scalacheck.Gen
 import org.scalamock.scalatest.PathMockFactory
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 import play.api.libs.json._
-import com.wavesplatform.common.utils.EitherExt2
 
 class AssetsApiRouteSpec
     extends RouteSpec("/assets")
@@ -28,8 +29,9 @@ class AssetsApiRouteSpec
 
   private val blockchain = stub[Blockchain]
 
+  private val assetsApi = stub[CommonAssetsApi]
   private val route =
-    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime, mock[CommonAccountsApi], mock[CommonAssetsApi]).route
+    AssetsApiRoute(restAPISettings, testWallet, mock[UtxPoolSynchronizer], blockchain, new TestTime, mock[CommonAccountsApi], assetsApi).route
 
   private val smartIssueAndDetailsGen = for {
     script       <- scriptGen
@@ -68,6 +70,22 @@ class AssetsApiRouteSpec
         val responses = responseAs[List[JsObject]]
         responses.foreach(response => checkResponse(smartAssetTx, smartAssetDesc, response))
       }
+  }
+
+  routePath("/{assetId}/distribution/1/limit/10") in {
+    (blockchain.height _).when().returning(2)
+    (assetsApi.assetDistribution _).when(TestValues.asset, *, *).returning(Observable(TestValues.address -> 10L))
+
+    Get(routePath(s"/${TestValues.asset.id}/distribution/1/limit/10")) ~> route ~> check {
+      val response = responseAs[JsObject]
+      response shouldBe Json.obj(
+        "hasNext"  -> false,
+        "lastItem" -> TestValues.address.stringRepr,
+        "items" -> Json.obj(
+          TestValues.address.stringRepr -> 10L
+        )
+      )
+    }
   }
 
   private val sillyIssueAndDetailsGen = for {

@@ -2,9 +2,9 @@ package com.wavesplatform.it.sync.activation
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.features.api.NodeFeatureStatus
 import com.wavesplatform.features.{BlockchainFeatureStatus, BlockchainFeatures}
-import com.wavesplatform.it.{Docker, ReportingTestName}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.transactions.NodesFromDocker
+import com.wavesplatform.it.{Docker, ReportingTestName}
 import org.scalatest.{CancelAfterFailure, FreeSpec, Matchers}
 class PreActivatedFeaturesTestSuite
     extends FreeSpec
@@ -27,7 +27,7 @@ class PreActivatedFeaturesTestSuite
     val otherNodes = nodes.tail.map(_.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum))
     otherNodes.foreach { s =>
       s.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-      assertActivatedStatus(s, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(s, 0, NodeFeatureStatus.Implemented)
     }
   }
   "on activation height check" in {
@@ -35,18 +35,19 @@ class PreActivatedFeaturesTestSuite
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-    assertApprovedStatus(mainNodeStatus, PreActivatedFeaturesTestSuite.votingInterval * 2, NodeFeatureStatus.Voted)
+    mainNodeStatus.blockchainStatus shouldBe BlockchainFeatureStatus.Undefined
+    mainNodeStatus.activationHeight shouldBe None
+    mainNodeStatus.supportingBlocks shouldBe Some(0)
 
     val otherNodes = nodes.tail
     otherNodes.foreach { node =>
       val feature = node.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
       feature.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-      assertActivatedStatus(feature, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(feature, 0, NodeFeatureStatus.Implemented)
 
-      val node1 = docker.restartNode(node.asInstanceOf[Docker.DockerNode])
-
+      val node1    = docker.restartNode(node.asInstanceOf[Docker.DockerNode])
       val feature2 = node1.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
-      assertActivatedStatus(feature2, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(feature2, 0, NodeFeatureStatus.Implemented)
     }
   }
   "after activation height check" in {
@@ -54,12 +55,12 @@ class PreActivatedFeaturesTestSuite
 
     val mainNodeStatus = nodes.head.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum)
     mainNodeStatus.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-    assertActivatedStatus(mainNodeStatus, PreActivatedFeaturesTestSuite.votingInterval * 2, NodeFeatureStatus.Voted)
+    assertUndefinedStatus(mainNodeStatus, NodeFeatureStatus.Voted)
 
     val otherNodes = nodes.tail.map(_.featureActivationStatus(PreActivatedFeaturesTestSuite.featureNum))
     otherNodes.foreach { s =>
       s.description shouldBe PreActivatedFeaturesTestSuite.featureDescr
-      assertActivatedStatus(s, 0, NodeFeatureStatus.Voted)
+      assertActivatedStatus(s, 0, NodeFeatureStatus.Implemented)
     }
   }
 }
