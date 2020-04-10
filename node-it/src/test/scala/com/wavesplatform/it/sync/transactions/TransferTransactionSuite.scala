@@ -223,11 +223,10 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
 
     val t1 = sender.waitForTransaction(txWithStringAtt.id)
     val t2 = sender.waitForTransaction(txWithBoolAtt.id)
-    t1.height shouldBe t2.height
 
     def checkBlock(h: Int): Unit = {
       val block = sender.blockAt(h)
-      block.transactions.toSet shouldBe Set(txWithStringAtt, txWithBoolAtt)
+      block.transactions.map(_.id).toSet shouldBe Set(t1.id, t2.id)
     }
 
     val height = sender.height
