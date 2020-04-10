@@ -384,13 +384,14 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
 
   private def issuePreconditions(
       assetScript: Option[Script] = None,
-      feeMultiplier: Int
+      feeMultiplier: Int,
+      issueFeeMultiplier: Int = 0
   ): Gen[(List[Transaction], InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      fee     <- ciFee(feeMultiplier)
+      fee     <- ciFee(feeMultiplier, issueFeeMultiplier)
       amount  <- Gen.choose(1L, 100000000L)
     } yield {
       val dApp = Some(issueDApp(amount))
@@ -418,7 +419,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     )
 
   property("issue action results state") {
-    forAll(issuePreconditions(feeMultiplier = 7)) {
+    forAll(issuePreconditions(feeMultiplier = 7, issueFeeMultiplier = 1)) {
       case (genesis, invoke, master, invoker, amount) =>
         withDomain() { d =>
           val tb1 = TestBlock.create(genesis)

@@ -12,14 +12,15 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Expressions.{DAPP, EXPR}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.state.diffs.FeeValidation._
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import org.scalacheck.Gen
 
 package object ci {
   def ciFee(sc: Int = 0, nonNftIssue: Int = 0): Gen[Long] =
     Gen.choose(
-      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + sc * ScriptExtraFee + nonNftIssue * FeeUnit,
-      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeUnit
+      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + sc * ScriptExtraFee + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit,
+      FeeUnit * FeeConstants(InvokeScriptTransaction.typeId) + (sc + 1) * ScriptExtraFee - 1 + nonNftIssue * FeeConstants(IssueTransaction.typeId) * FeeUnit
     )
 
   def compileContractFromExpr(expr: DAPP, version: StdLibVersion = V3): DApp = {
