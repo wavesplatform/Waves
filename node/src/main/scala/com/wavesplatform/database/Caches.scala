@@ -16,14 +16,14 @@ import com.wavesplatform.state.DiffToStateApplier.PortfolioUpdates
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.{Asset, Transaction}
-import com.wavesplatform.utils.{ObservedLoadingCache, ScorexLogging}
+import com.wavesplatform.utils.ObservedLoadingCache
 import monix.reactive.Observer
 
 import scala.collection.JavaConverters._
 import scala.concurrent.duration._
 import scala.reflect.ClassTag
 
-abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with ScorexLogging {
+abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) extends Blockchain with Storage {
   import Caches._
 
   val dbSettings: DBSettings
@@ -40,7 +40,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
   override def score: BigInt = current._2
 
   protected def loadLastBlock(): Option[Block]
-  def lastBlock: Option[Block] = current._3
+  override def lastBlock: Option[Block] = current._3
 
   def loadScoreOf(blockId: ByteStr): Option[BigInt]
 
@@ -174,7 +174,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       failedTransactionIds: Set[ByteStr]
   ): Unit
 
-  def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], htiSource: ByteStr, block: Block): Unit = {
+  override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
     val newHeight = current._1 + 1
 
     val newAddresses = Set.newBuilder[Address]
@@ -241,7 +241,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       diff.sponsorship,
       totalFee,
       reward,
-      htiSource,
+      hitSource,
       diff.scriptResults,
       failedTransactionIds
     )
@@ -280,7 +280,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
   protected def doRollback(targetBlockId: ByteStr): Seq[(Block, ByteStr)]
 
-  def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
+  override def rollbackTo(targetBlockId: ByteStr): Either[String, Seq[(Block, ByteStr)]] = {
     for {
       height <- heightOf(targetBlockId)
         .toRight(s"No block with signature: $targetBlockId found in blockchain")

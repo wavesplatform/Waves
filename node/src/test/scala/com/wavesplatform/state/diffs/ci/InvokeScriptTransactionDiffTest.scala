@@ -1,12 +1,12 @@
 package com.wavesplatform.state.diffs.ci
 
 import cats.kernel.Monoid
+import com.google.protobuf.ByteString
 import com.wavesplatform.account._
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.db.WithState
-import com.wavesplatform.db.DBCacheSettings
+import com.wavesplatform.db.{DBCacheSettings, WithState}
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.contract.DApp
@@ -27,12 +27,11 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader, compiler}
 import com.wavesplatform.lang.{Global, utils}
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
 import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
-import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
-import com.wavesplatform.state.utils.TestLevelDB
+import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, InvokeScriptTransactionDiff, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets._
@@ -44,6 +43,7 @@ import com.wavesplatform.transaction.{Asset, _}
 import com.wavesplatform.utils._
 import com.wavesplatform.{NoShrink, TransactionGen}
 import org.scalacheck.Gen
+import org.scalamock.scalatest.MockFactory
 import org.scalatest.{Inside, Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
@@ -57,7 +57,8 @@ class InvokeScriptTransactionDiffTest
     with NoShrink
     with Inside
     with WithState
-    with DBCacheSettings {
+    with DBCacheSettings
+    with MockFactory {
 
   private val fs = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(
@@ -1575,48 +1576,48 @@ class InvokeScriptTransactionDiffTest
   }
 
   property("issuing asset with existed id should produce error") {
-    import InvokeScriptTransactionDiffTest.LevelDBWriterPredefAsset
-
     val uniqueAssetIdScenario =
       for {
         master  <- accountGen
         invoker <- accountGen
         ts      <- timestampGen
-        genesis1Tx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
-        genesis2Tx = GenesisTransaction.create(invoker, ENOUGH_AMT, ts).explicitGet()
+
         assetTx     <- issueGen
         fee         <- ciFee(nonNftIssue = 1)
         funcBinding <- funcNameGen
         contract    = issueContract(funcBinding)
         script      = ContractScript(V4, contract)
-        setScriptTx = SetScriptTransaction.selfSigned(1.toByte, master, script.toOption, fee, ts + 2).explicitGet()
+
         fc          = Terms.FUNCTION_CALL(FunctionHeader.User(funcBinding), List.empty)
         invokeTx = InvokeScriptTransaction
           .selfSigned(TxVersion.V2, invoker, master, Some(fc), Seq(), fee, Waves, ts + 3)
           .explicitGet()
-      } yield (assetTx, invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
+      } yield (assetTx, invokeTx, master, script, funcBinding)
 
+    val blockchain: Blockchain = mock[Blockchain]
     forAll(uniqueAssetIdScenario) {
-      case (asset, invoke, genesisTxs) =>
-        tempDb { db =>
-          val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
-          )
-          val state =
-            new LevelDBWriterPredefAsset(asset, db, ignoreSpendableBalanceChanged, TestLevelDB.createTestBlockchainSettings(features), dbSettings)
-
-          assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), state) { ei =>
-            inside(ei) {
-              case Left(TransactionValidationError(ScriptExecutionError(m, _, false), i)) =>
-                i shouldBe invoke
-                m should endWith ("is already issued")
-            }
-          }
-        }
+      case (asset, invoke, master, script, funcBinding) =>
+        (blockchain.settings _).expects().returning(TestSettings.Default.blockchainSettings)
+        (blockchain.assetScript _).expects(*).returning(None)
+        (blockchain.accountScript _)
+          .expects(master.toAddress)
+          .returning(Some(AccountScriptInfo(master, script.explicitGet(), 10L, Map(1 -> Map(funcBinding -> 10L)))))
+          .anyNumberOfTimes()
+        (blockchain.accountScript _).expects(invoke.sender.toAddress).returning(None).anyNumberOfTimes()
+        (blockchain.hasAccountScript _).expects(invoke.sender.toAddress).returning(false).anyNumberOfTimes()
+        (blockchain.activatedFeatures _)
+          .expects()
+          .returning(Map(BlockchainFeatures.Ride4DApps.id -> 0))
+          .anyNumberOfTimes()
+        (blockchain.height _).expects().returning(1).anyNumberOfTimes()
+        (blockchain.assetDescription _).expects(*).returning(Some(AssetDescription(asset.id(), master, ByteString.EMPTY, ByteString.EMPTY, 1, false, BigInt(1), Height(1), None, 0L, false)))
+        InvokeScriptTransactionDiff
+          .apply(blockchain, invoke.timestamp)(invoke)
+          .resultE should produce("is already issued")
     }
   }
 
-  private def reissueContract(funcName: String, asset: ByteStr): DApp = {
+   def reissueContract(funcName: String, asset: ByteStr): DApp = {
     val expr = {
       val script =
         s"""
@@ -1632,8 +1633,7 @@ class InvokeScriptTransactionDiffTest
 
     compileContractFromExpr(expr, V4)
   }
-
-  private val reissueAssetIdScenario =
+    val reissueAssetIdScenario =
     for {
       master  <- accountGen
       invoker <- accountGen
@@ -1965,24 +1965,5 @@ class InvokeScriptTransactionDiffTest
           ei should produce("AccountBalanceError")
         }
     }
-  }
-}
-
-object InvokeScriptTransactionDiffTest {
-  import com.wavesplatform.database.LevelDBWriter
-  import com.wavesplatform.settings.{BlockchainSettings, DBSettings}
-  import monix.reactive.Observer
-  import org.iq80.leveldb.DB
-
-  private class LevelDBWriterPredefAsset(
-      val asset: IssueTransaction,
-      val db: DB,
-      val spendableBalanceChanged: Observer[(Address, Asset)],
-      override val settings: BlockchainSettings,
-      override val dbSettings: DBSettings
-  ) extends LevelDBWriter(db, spendableBalanceChanged, settings, dbSettings, 10) {
-    import asset._
-    override def assetDescription(ia: IssuedAsset): Option[AssetDescription] =
-      Some(AssetDescription(id(), sender, name, description, decimals, reissuable, quantity, Height(2), script.map(_ -> 1L), 0, false))
   }
 }

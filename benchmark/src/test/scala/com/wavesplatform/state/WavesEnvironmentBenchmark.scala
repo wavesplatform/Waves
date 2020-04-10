@@ -17,8 +17,6 @@ import com.wavesplatform.state.WavesEnvironmentBenchmark._
 import com.wavesplatform.state.bench.DataTestData
 import com.wavesplatform.transaction.smart.WavesEnvironment
 import monix.eval.Coeval
-import monix.execution.UncaughtExceptionReporter
-import monix.reactive.Observer
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -116,8 +114,8 @@ object WavesEnvironmentBenchmark {
   class TransferFromProtoSt extends BaseSt {
     val transferTxBytesBase58: String =
       "3nec7yqpNKXGsmPw7eTRUi8WPEaRmHfnHHSc8NZJggjsMp7SKGyLNnFk5NmZLTHQXaXqUEiSWqfPaXznZ3Drh" +
-      "8siJpCzS9AtSTUKS7yYBFUrj4jeQZM5axqbJHeYgLoDNwCXUcfwNdQ2XfQceSoYx6cEDc4MrXsA4GGnXWvoPD" +
-      "TKrX8EQCtcwJ8QbErSZEhK5Gv3EVjrC16i5v92ok9WS"
+        "8siJpCzS9AtSTUKS7yYBFUrj4jeQZM5axqbJHeYgLoDNwCXUcfwNdQ2XfQceSoYx6cEDc4MrXsA4GGnXWvoPD" +
+        "TKrX8EQCtcwJ8QbErSZEhK5Gv3EVjrC16i5v92ok9WS"
 
     val transferTxBytes: Array[Byte] =
       Base58.decode(transferTxBytesBase58)
@@ -142,8 +140,7 @@ object WavesEnvironmentBenchmark {
     }
 
     val environment: Environment[Id] = {
-      val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-      val state            = new LevelDBWriter(db, portfolioChanges, wavesSettings.blockchainSettings, wavesSettings.dbSettings, 10)
+      val state = LevelDBWriter.readOnly(db, wavesSettings)
       new WavesEnvironment(
         AddressScheme.current.chainId,
         Coeval.raiseError(new NotImplementedError("`tx` is not implemented")),

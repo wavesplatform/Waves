@@ -404,15 +404,15 @@ package object database extends ScorexLogging {
       val readOptions = new ReadOptions().snapshot(snapshot)
       val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
+      val nativeBatch = db.createWriteBatch()
       try {
         val r           = f(rw)
-        val nativeBatch = db.createWriteBatch()
         batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
         batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
         db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
         r
       } finally {
-        batch.close()
+        nativeBatch.close()
         snapshot.close()
       }
     }

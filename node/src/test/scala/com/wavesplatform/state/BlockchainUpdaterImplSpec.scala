@@ -40,7 +40,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
     val (fs, settings) =
       if (enableNg) (enableNG(functionalitySettings), enableNG(wavesSettings)) else (functionalitySettings, wavesSettings)
 
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
     val bcu           = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, triggers)
     try {
       val (account, blocks) = gen(ntpTime).sample.get
@@ -193,7 +193,7 @@ class BlockchainUpdaterImplSpec extends FreeSpec with Matchers with WithDB with 
         val triggersMock = mock[BlockchainUpdateTriggers]
 
         val defaultWriter =
-          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings), dbSettings)
+          TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, enableNG(functionalitySettings))
         val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, enableNG(wavesSettings), ntpTime, triggersMock)
 
         try {

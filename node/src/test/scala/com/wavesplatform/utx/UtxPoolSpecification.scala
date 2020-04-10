@@ -10,7 +10,7 @@ import com.wavesplatform.block.{Block, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.consensus.{PoSSelector, TransactionsOrdering}
-import com.wavesplatform.database.{LevelDBWriter, openDB}
+import com.wavesplatform.database.{LevelDBWriter, TestStorageFactory, openDB}
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.features.BlockchainFeatures
@@ -59,7 +59,7 @@ private object UtxPoolSpecification {
   final case class TempDB(fs: FunctionalitySettings, dbSettings: DBSettings) {
     val path: Path            = Files.createTempDirectory("leveldb-test")
     val db: DB                = openDB(path.toAbsolutePath.toString)
-    val writer: LevelDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs, dbSettings)
+    val writer: LevelDBWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, fs)
 
     sys.addShutdownHook {
       db.close()
@@ -105,8 +105,7 @@ class UtxPoolSpecification
     )
 
     val dbContext = TempDB(settings.blockchainSettings.functionalitySettings, settings.dbSettings)
-    val levelDBWriter = new LevelDBWriter(dbContext.db, ignoreSpendableBalanceChanged, settings.blockchainSettings, settings.dbSettings, 100000000L)
-    val bcu = new BlockchainUpdaterImpl(levelDBWriter, ignoreSpendableBalanceChanged, settings, new TestTime(), ignoreBlockchainUpdateTriggers)
+    val (bcu, levelDBWriter) = TestStorageFactory(settings, dbContext.db, new TestTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
     bcu.processBlock(Block.genesis(genesisSettings).explicitGet()).explicitGet()
     bcu
   }
