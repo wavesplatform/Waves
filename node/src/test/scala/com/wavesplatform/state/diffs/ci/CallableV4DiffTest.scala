@@ -385,7 +385,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
   private def issuePreconditions(
       assetScript: Option[Script] = None,
       feeMultiplier: Int,
-      issueFeeMultiplier: Int = 0
+      issueFeeMultiplier: Int
   ): Gen[(List[Transaction], InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen

@@ -115,7 +115,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     "Issue two identical assets with the same nonce (one invocation) should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
-        invokeScript(acc, "issue2Assets", fee = invocationCost(1)),
+        invokeScript(acc, "issue2Assets", fee = invocationCost(2)),
         " is already issued"
       )
     }

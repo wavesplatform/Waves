@@ -1080,7 +1080,9 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
               .copy(
                 amount = amount,
                 order1 = tx.buyOrder.copy(amount = sellAmount).signWith(buyer),
-                order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller)
+                order2 = tx.sellOrder.copy(amount = buyAmount).signWith(seller),
+                buyMatcherFee = (BigInt(tx.fee) * amount / buyAmount).toLong,
+                sellMatcherFee = (BigInt(tx.fee) * amount / sellAmount).toLong,
               )
               .signWith(MATCHER)
           }

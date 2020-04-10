@@ -180,7 +180,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(1))
+      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(issuesCount = 10))
       for (nth <- 0 to 9) {
         val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
         assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
@@ -480,8 +480,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     asset.quantity == 1 && asset.decimals == 0
   }
 
-  def invocationCost(aCount: Int, isSmartAcc: Boolean = true, sPCount: Int = 0, sAinActions: Int = 0): Long = {
-    0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * sPCount + 0.004.waves * sAinActions + 1.waves * aCount
+  def invocationCost(issuesCount: Int, isSmartAcc: Boolean = true, smartPaymentCount: Int = 0, smartAssetsInActions: Int = 0): Long = {
+    0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * smartPaymentCount + 0.004.waves * smartAssetsInActions + 1.waves * issuesCount
   }
 
   def script(asset: Asset, function: String = ""): String = {

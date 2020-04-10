@@ -12,8 +12,8 @@ import com.wavesplatform.lang.v1.evaluator.Log
 import com.wavesplatform.lang.{ExecutionError, ValidationError}
 import com.wavesplatform.metrics._
 import com.wavesplatform.state._
-import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
-import com.wavesplatform.transaction.TxValidationError.{GenericError, HasScriptType, ScriptExecutionError, TransactionNotAllowedByScript}
+import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError, TransactionNotAllowedByScript}
 import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.assets.exchange.{ExchangeTransaction, Order}
 import com.wavesplatform.transaction.smart.script.ScriptRunner
@@ -55,8 +55,13 @@ object Verifier extends ScorexLogging {
       }
   }
 
-  def assets(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] =
-    tx.checkedAssets
+  def assets(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = {
+    val additionalAssets = tx match {
+      case etx: ExchangeTransaction => Seq(etx.buyOrder.matcherFeeAssetId, etx.sellOrder.matcherFeeAssetId)
+      case _                        => Seq.empty
+    }
+
+    (tx.checkedAssets ++ additionalAssets)
       .flatMap {
         case asset: IssuedAsset => blockchain.assetDescription(asset).flatMap(_.script).map(script => (script, asset))
         case _                  => None
@@ -68,6 +73,7 @@ object Verifier extends ScorexLogging {
               .measureForType(tx.typeId)(verifyTx(blockchain, script, tx, Some(id.id)))
           }
       }
+  }
 
   private def logIfNecessary(
       result: Either[ValidationError, _],
@@ -179,34 +185,10 @@ object Verifier extends ScorexLogging {
       TracedResult(verificationResult)
     }
 
-    def assetVerification(assetId: Asset): TracedResult[ValidationError, Transaction] = assetId match {
-      case Waves => Right(et)
-      case asset: IssuedAsset =>
-        blockchain.assetScript(asset).fold[TracedResult[ValidationError, Transaction]](Right(et)) { script =>
-          verifyTx(blockchain, script._1, et, assetId.compatId) leftMap {
-            case x: HasScriptType => x
-            case GenericError(x)  => ScriptExecutionError(x, List.empty, isAssetScript = true)
-            case x                => ScriptExecutionError(x.toString, List.empty, isAssetScript = true)
-          }
-        }
-    }
-
-    lazy val txAssetsVerification: TracedResult[ValidationError, Transaction] = {
-      Set(
-        buyOrder.assetPair.amountAsset,
-        buyOrder.assetPair.priceAsset,
-        buyOrder.matcherFeeAssetId,
-        sellOrder.matcherFeeAssetId
-      ).foldLeft[TracedResult[ValidationError, Transaction]](Right(et)) {
-        case (verificationResult, asset) => verificationResult flatMap (_ => assetVerification(asset))
-      }
-    }
-
     for {
       _ <- matcherTxVerification
       _ <- orderVerification(sellOrder)
       _ <- orderVerification(buyOrder)
-      _ <- txAssetsVerification
     } yield et
   }
 

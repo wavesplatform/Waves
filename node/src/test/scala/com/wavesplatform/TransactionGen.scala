@@ -675,8 +675,8 @@ trait TransactionGenBase extends ScriptGen with TypedScriptGen with NTPTime { _:
       fixedMatcher: Option[KeyPair] = None
   ): Gen[ExchangeTransaction] = {
     Gen.oneOf(
-      exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher),
-      exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher)
+      exchangeV1GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher, fixedMatcherFee = fixedMatcherFee),
+      exchangeV2GeneratorP(buyer, seller, amountAssetId, priceAssetId, fixedMatcher = fixedMatcher, fixedMatcherFee = fixedMatcherFee)
     )
   }
 
