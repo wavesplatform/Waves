@@ -89,16 +89,17 @@ case class UtilsApiRoute(
 
   def compileCode: Route = path("script" / "compileCode") {
     (post & entity(as[String])) { code =>
-      executeLimited(ScriptCompiler.compile(code, estimator)) { result =>
+      executeLimited(ScriptCompiler.compileAndEstimateCallables(code, estimator)) { result =>
         complete(
           result
             .fold(
               e => ScriptCompilerError(e), {
-                case (script, complexity) =>
+                case (script, (verifierComplexity, callableComplexities)) =>
                   Json.obj(
-                    "script"     -> script.bytes().base64,
-                    "complexity" -> complexity,
-                    "extraFee"   -> FeeValidation.ScriptExtraFee
+                    "script"               -> script.bytes().base64,
+                    "complexity"           -> verifierComplexity,
+                    "callableComplexities" -> callableComplexities,
+                    "extraFee"             -> FeeValidation.ScriptExtraFee
                   )
               }
             )
@@ -138,18 +139,19 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.estimate(script, estimator).map((script, _))
+            Script.complexityInfo(script, estimator).map((script, _))
           }
       ) { result =>
         complete(
           result.fold(
             e => ScriptCompilerError(e), {
-              case (script, complexity) =>
+              case (script, (verifierComplexity, callableComplexities)) =>
                 Json.obj(
-                  "script"     -> code,
-                  "scriptText" -> script.expr.toString, // [WAIT] Script.decompile(script),
-                  "complexity" -> complexity,
-                  "extraFee"   -> FeeValidation.ScriptExtraFee
+                  "script"               -> code,
+                  "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
+                  "complexity"           -> verifierComplexity,
+                  "callableComplexities" -> callableComplexities,
+                  "extraFee"             -> FeeValidation.ScriptExtraFee
                 )
             }
           )

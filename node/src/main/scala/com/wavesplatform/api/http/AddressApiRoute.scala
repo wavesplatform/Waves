@@ -8,6 +8,7 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.meta.Dic
 import com.wavesplatform.lang.{Global, ValidationError}
@@ -53,13 +54,17 @@ case class AddressApiRoute(
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
     completeLimited {
       val script = blockchain.accountScript(address)
+      val callableComplexities =
+        script.flatMap(_.complexitiesByEstimator.get(blockchain.estimator.version))
+          .getOrElse(Map[String, Long]())
+
       Json.obj(
-        "address"            -> address.stringRepr,
-        "script"             -> script.map(_.script.bytes().base64),
-        "scriptText"         -> script.map(_.script.expr.toString),
-        "complexity"         -> script.fold(0L)(_.maxComplexity),
-        "callableComplexity" -> script.fold[JsValue](JsNull)(m => Json.obj()),
-        "extraFee"           -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
+        "address"              -> address.stringRepr,
+        "script"               -> script.map(_.script.bytes().base64),
+        "scriptText"           -> script.map(_.script.expr.toString),
+        "complexity"           -> script.fold(0L)(_.maxComplexity),
+        "callableComplexities" -> callableComplexities,
+        "extraFee"             -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
       )
     }
   }
