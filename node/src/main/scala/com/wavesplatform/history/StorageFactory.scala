@@ -13,13 +13,15 @@ import org.iq80.leveldb.DB
 object StorageFactory extends ScorexLogging {
   private val StorageVersion = 5
 
-  def apply(settings: WavesSettings,
-            db: DB,
-            time: Time,
-            spendableBalanceChanged: Observer[(Address, Asset)],
-            blockchainUpdateTriggers: BlockchainUpdateTriggers): (BlockchainUpdaterImpl, AutoCloseable) = {
+  def apply(
+      settings: WavesSettings,
+      db: DB,
+      time: Time,
+      spendableBalanceChanged: Observer[(Address, Asset)],
+      blockchainUpdateTriggers: BlockchainUpdateTriggers
+  ): (BlockchainUpdaterImpl, AutoCloseable) = {
     checkVersion(db)
-    val levelDBWriter = new LevelDBWriter(db, spendableBalanceChanged, settings.blockchainSettings, settings.dbSettings, 100000000L)
+    val levelDBWriter = LevelDBWriter(db, spendableBalanceChanged, settings)
     (new BlockchainUpdaterImpl(levelDBWriter, spendableBalanceChanged, settings, time, blockchainUpdateTriggers), levelDBWriter)
   }
 
@@ -33,7 +35,8 @@ object StorageFactory extends ScorexLogging {
       } else {
         // Here we've detected that the storage is not empty and doesn't contain version
         log.error(
-          s"Storage version $version is not compatible with expected version $StorageVersion! Please, rebuild node's state, use import or sync from scratch.")
+          s"Storage version $version is not compatible with expected version $StorageVersion! Please, rebuild node's state, use import or sync from scratch."
+        )
         log.error("FOR THIS REASON THE NODE STOPPED AUTOMATICALLY")
         forceStopApplication(UnsupportedFeature)
       }

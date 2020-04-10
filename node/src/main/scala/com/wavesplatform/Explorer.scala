@@ -62,9 +62,8 @@ object Explorer extends ScorexLogging {
 
     log.info(s"Data directory: ${settings.dbSettings.directory}")
 
-    val portfolioChanges = Observer.empty(UncaughtExceptionReporter.default)
-    val db               = openDB(settings.dbSettings.directory)
-    val reader           = new LevelDBWriter(db, portfolioChanges, settings.blockchainSettings, settings.dbSettings, 10)
+    val db     = openDB(settings.dbSettings.directory)
+    val reader = LevelDBWriter.readOnly(db, settings)
 
     val blockchainHeight = reader.height
     log.info(s"Blockchain height is $blockchainHeight")
@@ -166,7 +165,7 @@ object Explorer extends ScorexLogging {
           log.info(s"Last address id: $lastAddressId")
 
         case "AD" =>
-          val result        = new util.HashMap[Address, java.lang.Integer]()
+          val result = new util.HashMap[Address, java.lang.Integer]()
 
           db.iterateOver(KeyTags.IdToAddress) { e =>
             result.compute(
