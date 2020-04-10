@@ -19,12 +19,13 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
+import play.api.libs.json.Json
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -46,6 +47,20 @@ object AsyncGrpcApi {
       blocks
         .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height(height)))
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
+    }
+
+    def stateChanges(request: TransactionsRequest): Future[Seq[StateChangesDetails]] = {
+      val (obs, result) = createCallObserver[InvokeScriptResult]
+      transactions.getStateChanges(request, obs)
+      result.runToFuture.map { r =>
+        import com.wavesplatform.state.{InvokeScriptResult => VISR}
+        r.map(VISR.fromPB).map(r => Json.toJson(r).as[StateChangesDetails])
+      }
+    }
+
+    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
+      val ids = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
+      stateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address))
     }
 
     def broadcastIssue(
@@ -247,7 +262,11 @@ object AsyncGrpcApi {
     def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] =
       getTransactionInfo(ByteString.copyFrom(Base58.decode(id)), sender, recipient).map(_.getTransaction)
 
-    def getTransactionInfo(id: ByteString, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[TransactionResponse] = {
+    def getTransactionInfo(
+        id: ByteString,
+        sender: ByteString = ByteString.EMPTY,
+        recipient: Option[Recipient] = None
+    ): Future[TransactionResponse] = {
       val (obs, result) = createCallObserver[TransactionResponse]
       val req           = TransactionsRequest(transactionIds = Seq(id), sender = sender, recipient = recipient)
       transactions.getTransactions(req, obs)
@@ -463,12 +482,6 @@ object AsyncGrpcApi {
     def getStatuses(request: TransactionsByIdRequest): Future[Seq[PBTransactionStatus]] = {
       val (obs, result) = createCallObserver[PBTransactionStatus]
       transactions.getStatuses(request, obs)
-      result.runToFuture
-    }
-
-    def getStateChanges(request: TransactionsRequest): Future[Seq[InvokeScriptResult]] = {
-      val (obs, result) = createCallObserver[InvokeScriptResult]
-      transactions.getStateChanges(request, obs)
       result.runToFuture
     }
   }

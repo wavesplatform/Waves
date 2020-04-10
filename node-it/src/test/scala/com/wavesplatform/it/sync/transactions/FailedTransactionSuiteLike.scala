@@ -5,20 +5,20 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.http.DebugMessage
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
+import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.utils.ScorexLogging
 import org.scalatest.Matchers
 import play.api.libs.json.JsObject
 
 import scala.concurrent.duration._
 
-trait FailedTransactionSuiteLike { _: Matchers =>
+trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
   protected def waitForHeightArise(): Unit
   protected def sender: Node
 
@@ -28,20 +28,17 @@ trait FailedTransactionSuiteLike { _: Matchers =>
     * @param pt priority transaction sender
     * @param checker transactions checker (will be executed twice - immediately after emptying the utx pool and then after height arising)
     */
-  def sendTxsAndThenPriorityTx[T, S](t: Int => T, pt: () => T)(
-      checker: Seq[T] => Seq[S]
+  def sendTxsAndThenPriorityTx[S](t: Int => T, pt: () => T)(
+      checker: (Seq[T], T) => Seq[S]
   ): Seq[S] = {
-    import com.wavesplatform.it.api.SyncHttpApi._
-
     val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
     val txs                = (1 to maxTxsInMicroBlock * 2).map(i => t(i))
     val priorityTx         = pt()
     waitForEmptyUtx()
-    sender.printDebugMessage(DebugMessage(s"Priority transaction: $priorityTx"))
 
-    checker(txs) // liquid
+    checker(txs, priorityTx) // liquid
     waitForHeightArise()
-    checker(txs) // hardened
+    checker(txs, priorityTx) // hardened
   }
 
   object restApi {
@@ -73,7 +70,7 @@ trait FailedTransactionSuiteLike { _: Matchers =>
           sender.blockById(sender.blockAt(h).id).transactions.map(_.id) should contain allElementsOf ids
           sender.blockSeqByAddress(sender.address, h, h).head.transactions.map(_.id) should contain allElementsOf ids
 
-          val liquidBlock = sender.lastBlock()
+          val liquidBlock         = sender.lastBlock()
           val maxHeightWithFailed = failedIdsByHeight.keys.max
           if (liquidBlock.height == maxHeightWithFailed) {
             liquidBlock.transactions.map(_.id) should contain allElementsOf failedIdsByHeight(maxHeightWithFailed)

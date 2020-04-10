@@ -17,6 +17,10 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
   def status: Route = (get & path("status")) {
     val height = blockchain.height
 
+    val featureIds = (blockchain.featureVotes(height).keySet ++
+      blockchain.approvedFeatures.keySet ++
+      BlockchainFeatures.implemented).toSeq.sorted
+
     complete(
       Json.toJson(
         ActivationStatus(
@@ -24,15 +28,17 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
           blockchain.settings.functionalitySettings.activationWindowSize(height),
           blockchain.settings.functionalitySettings.blocksForFeatureActivation(height),
           blockchain.settings.functionalitySettings.activationWindow(height).last,
-          (blockchain.featureVotes(height).keySet ++
-            blockchain.approvedFeatures.keySet ++
-            BlockchainFeatures.implemented).toSeq.sorted.map(id => {
+          featureIds.map { id =>
             val status = blockchain.featureStatus(id, height)
+            val voted = featuresSettings.supported.contains(id) && !blockchain.activatedFeatures
+              .get(id)
+              .exists(_ <= height) && !blockchain.settings.functionalitySettings.preActivatedFeatures.contains(id)
+
             FeatureActivationStatus(
               id,
               BlockchainFeatures.feature(id).fold("Unknown feature")(_.description),
               status,
-              (BlockchainFeatures.implemented.contains(id), featuresSettings.supported.contains(id)) match {
+              (BlockchainFeatures.implemented.contains(id), voted) match {
                 case (false, _) => NodeFeatureStatus.NotImplemented
                 case (_, true)  => NodeFeatureStatus.Voted
                 case _          => NodeFeatureStatus.Implemented
@@ -40,7 +46,7 @@ case class ActivationApiRoute(settings: RestAPISettings, featuresSettings: Featu
               blockchain.featureActivationHeight(id),
               if (status == BlockchainFeatureStatus.Undefined) blockchain.featureVotes(height).get(id).orElse(Some(0)) else None
             )
-          })
+          }
         )
       )
     )

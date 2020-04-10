@@ -286,7 +286,7 @@ class DataTransactionSuite extends BaseTransactionSuite with EitherValues {
 
   test("queries for nonexistent data") {
     def assertNotFound(url: String): Assertion = Try(sender.get(url)) match {
-      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
         statusCode shouldBe 404
         responseBody should include("no data for this key")
       case _ => Assertions.fail("Expected 404")

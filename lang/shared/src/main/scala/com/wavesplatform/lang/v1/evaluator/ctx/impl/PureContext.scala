@@ -10,6 +10,7 @@ import cats.kernel.Monoid
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.directives.values._
+import com.wavesplatform.lang.v1.ContractLimits._
 import com.wavesplatform.lang.v1.FunctionHeader.{Native, User}
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
@@ -70,7 +71,8 @@ object PureContext {
 
   lazy val eq: BaseFunction[NoContext] =
     NativeFunction(EQ_OP.func, 1, EQ, BOOLEAN, ("a", TYPEPARAM('T')), ("b", TYPEPARAM('T'))) {
-      case a :: b :: Nil => Right(CONST_BOOLEAN(a == b))
+      case a :: b :: Nil =>
+        Either.cond(b.weight <= MaxCmpWeight || a.weight <= MaxCmpWeight, CONST_BOOLEAN(a == b), "Comparable value too heavy.")
       case xs            => notImplemented[Id, EVALUATED](s"${EQ_OP.func}(a: T, b: T)", xs)
     }
 
@@ -292,7 +294,7 @@ object PureContext {
       ("head", TYPEPARAM('A')),
       ("tail", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
-      case h :: ARR(t) :: Nil => ARR(h +: t, limited = checkSize)
+      case h :: (a @ ARR(t)) :: Nil => ARR(h +: t, h.weight + a.weight + ELEM_WEIGHT, checkSize)
       case xs                 => notImplemented[Id, EVALUATED]("cons(head: T, tail: LIST[T]", xs)
     }
 
@@ -305,7 +307,7 @@ object PureContext {
       ("list", PARAMETERIZEDLIST(TYPEPARAM('A'))),
       ("element", TYPEPARAM('B'))
     ) {
-      case ARR(list) :: element :: Nil => ARR(list :+ element, limited = true)
+      case (a @ ARR(list)) :: element :: Nil => ARR(list :+ element, a.weight + element.weight + ELEM_WEIGHT, true)
       case xs                          => notImplemented[Id, EVALUATED](s"list: List[T] ${LIST_APPEND_OP.func} value: T", xs)
     }
 
@@ -318,7 +320,7 @@ object PureContext {
       ("list1", PARAMETERIZEDLIST(TYPEPARAM('A'))),
       ("list2", PARAMETERIZEDLIST(TYPEPARAM('B')))
     ) {
-      case ARR(l1) :: ARR(l2) :: Nil => ARR(l1 ++ l2, limited = true)
+      case (a1 @ ARR(l1)) :: (a2 @ ARR(l2)) :: Nil => ARR(l1 ++ l2, a1.weight + a2.weight - EMPTYARR_WEIGHT, true)
       case xs                        => notImplemented[Id, EVALUATED](s"list1: List[T] ${LIST_CONCAT_OP.func} list2: List[T]", xs)
     }
 
@@ -484,7 +486,7 @@ object PureContext {
       case CONST_STRING(str) :: CONST_STRING(sep) :: Nil =>
         split(str, sep)
           .traverse(CONST_STRING(_))
-          .map(s => ARR(s.toIndexedSeq))
+          .flatMap(s => ARR(s.toIndexedSeq, true))
       case xs => notImplemented[Id, EVALUATED]("split(str: String, separator: String)", xs)
     }
 
@@ -599,7 +601,7 @@ object PureContext {
 
   lazy val getListMedian: BaseFunction[NoContext] =
     NativeFunction("median", 10, MEDIAN_LIST, LONG, ("arr", PARAMETERIZEDLIST(LONG))) {
-      case ARR(arr) :: Nil => {
+      case xs @ (ARR(arr) :: Nil) => {
 
         def getMedian(seq: Seq[Long]): Long = {
           val targetArr = seq.toArray
@@ -622,7 +624,7 @@ object PureContext {
             Left(s"Invalid list size. Size should be between 1 and $MaxListSizeForMedianCalc")
           }
         } else {
-          notImplemented[Id, EVALUATED](s"median(arr: List[Int])", ARR(arr) :: Nil)
+          notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
         }
       }
       case xs => notImplemented[Id, EVALUATED](s"median(arr: List[Int])", xs)
@@ -799,7 +801,7 @@ object PureContext {
       ctx,
       CTX[NoContext](
         Seq.empty,
-        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED]))))),
+        Map(("nil", (LIST(NOTHING), ContextfulVal.pure[NoContext](ARR(IndexedSeq.empty[EVALUATED], EMPTYARR_WEIGHT, false).explicitGet)))),
         fromV3Funcs :+ listConstructor(checkSize = false)
       )
     )

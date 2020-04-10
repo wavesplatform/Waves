@@ -524,8 +524,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
               "value" -> CONST_STRING("2").explicitGet()
             )
           )
-        )
-      )
+        ), false
+      ).explicitGet
     )
   }
 
@@ -842,8 +842,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
         IndexedSeq(
           CONST_STRING("q:we").explicitGet(),
           CONST_STRING("q;we:x;q.we").explicitGet()
-        )
-      )
+        ), false
+      ).explicitGet
     )
   }
 
@@ -857,8 +857,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("str3").explicitGet(),
           CONST_STRING("str4").explicitGet()
-        )
-      )
+        ), false
+      ).explicitGet
     )
   }
 
@@ -871,8 +871,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("str1").explicitGet(),
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("").explicitGet()
-        )
-      )
+        ), false
+      ).explicitGet
     )
   }
 
@@ -886,8 +886,8 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           CONST_STRING("").explicitGet(),
           CONST_STRING("str2").explicitGet(),
           CONST_STRING("str3").explicitGet()
-        )
-      )
+        ), false
+      ).explicitGet
     )
   }
 

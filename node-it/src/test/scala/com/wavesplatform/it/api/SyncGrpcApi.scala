@@ -17,8 +17,8 @@ import com.wavesplatform.protobuf.block.Block.Header
 import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import org.scalatest.{Assertion, Assertions}
@@ -30,7 +30,7 @@ import scala.util.{Failure, Success, Try}
 
 object SyncGrpcApi extends Assertions {
 
-  def assertGrpcError[R](f: => R, errorRegex: String, expectedCode: Code): Assertion = Try(f) match {
+  def assertGrpcError[R](f: => R, errorRegex: String = "", expectedCode: Code = Code.INVALID_ARGUMENT): Assertion = Try(f) match {
     case Failure(GrpcStatusRuntimeException(status, _)) =>
       Assertions.assert(
         status.getCode == expectedCode
@@ -41,8 +41,20 @@ object SyncGrpcApi extends Assertions {
     case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
   }
 
-  implicit class NodeExtGrpc(n: Node) {
+  implicit def stringAsBytes(str: String): ByteString = {
+    ByteString.copyFrom(Base58.decode(str))
+  }
 
+  implicit def keyPairAsBytes(kp: KeyPair): ByteString = {
+    ByteString.copyFrom(kp.toAddress.bytes)
+  }
+
+  implicit class PBTransactionOps(tx: PBSignedTransaction) {
+    def id: String = PBTransactions.vanillaUnsafe(tx).id().toString
+  }
+
+  implicit class NodeExtGrpc(n: Node) {
+    def grpc: NodeExtGrpc = this
     import com.wavesplatform.account.{Address => Addr}
     import com.wavesplatform.it.api.AsyncGrpcApi.{NodeAsyncGrpcApi => async}
 
@@ -61,6 +73,18 @@ object SyncGrpcApi extends Assertions {
     def resolveAlias(alias: String): Addr = {
       val addr = accounts.resolveAlias(StringValue.of(alias))
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
+    }
+
+    def stateChanges(txId: String): StateChangesDetails = {
+      sync(async(n).stateChanges(Seq(txId))).head
+    }
+
+    def stateChanges(address: ByteString): Seq[StateChangesDetails] = {
+      sync(async(n).stateChanges(address = address))
+    }
+
+    def stateChanges(request: TransactionsRequest): Seq[StateChangesDetails] = {
+      sync(async(n).stateChanges(request))
     }
 
     def exchange(
@@ -148,10 +172,15 @@ object SyncGrpcApi extends Assertions {
       maybeWaitForTransaction(sync(async(n).putData(source, data, fee, version, timestamp)), waitForTx)
     }
 
-    def assetsBalance(address: ByteString, assetIds: Seq[String]): Map[String, Long] = {
+    def assetsBalance(address: ByteString, assetIds: Seq[String] = Nil): Map[String, Long] = {
       val pbAssetIds = assetIds.map(a => ByteString.copyFrom(Base58.decode(a)))
       val balances   = accounts.getBalances(BalancesRequest.of(address, pbAssetIds))
       balances.map(b => Base58.encode(b.getAsset.assetId.toByteArray) -> b.getAsset.amount).toMap
+    }
+
+    def assertAssetBalance(acc: ByteString, assetIdString: String, balance: Long): Unit = {
+      val actual = assetsBalance(acc, Seq(assetIdString)).getOrElse(assetIdString, 0L)
+      assert(actual == balance, s"Asset balance mismatch, required=$balance, actual=$actual")
     }
 
     def wavesBalance(address: ByteString): WavesBalances = {
@@ -182,6 +211,9 @@ object SyncGrpcApi extends Assertions {
 
     def waitForHeight(expectedHeight: Int, requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(expectedHeight), requestAwaitTime)
+
+    def waitForHeightArise(requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
+      sync(async(n).waitForHeight(this.height + 1), requestAwaitTime)
 
     def broadcastBurn(
         sender: KeyPair,
@@ -239,6 +271,10 @@ object SyncGrpcApi extends Assertions {
 
     def scriptInfo(address: ByteString): ScriptData = {
       accounts.getScript(AccountRequest.of(address))
+    }
+
+    def signedBroadcast(tx: PBSignedTransaction, waitForTx: Boolean = false): PBSignedTransaction = {
+      maybeWaitForTransaction(sync(async(n).broadcast(tx.getTransaction, tx.proofs)), waitForTx)
     }
 
     def broadcast(tx: PBTransaction, proofs: Seq[ByteString], waitForTx: Boolean = false): PBSignedTransaction = {
@@ -328,7 +364,5 @@ object SyncGrpcApi extends Assertions {
     }
 
     def getStatuses(request: TransactionsByIdRequest): Seq[PBTransactionStatus] = sync(async(n).getStatuses(request))
-
-    def getStateChanges(request: TransactionsRequest): Seq[InvokeScriptResult] = sync(async(n).getStateChanges(request))
   }
 }

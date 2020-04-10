@@ -21,7 +21,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEn
 import com.wavesplatform.transaction.assets.exchange.AssetPair
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 
-class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTransactionSuiteLike {
+class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTransactionSuiteLike[PBSignedTransaction] {
   import FailedTransactionSuiteLike._
   import grpcApi._
 
@@ -134,7 +134,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
               fee = invokeFee
             ),
         () => updateTikTok(typeName, priorityFee)
-      )(assertFailedTxs)
+      )((txs, _) => assertFailedTxs(txs))
     }
   }
 
@@ -157,7 +157,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
               fee = invokeFee
             ),
         () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-      )(assertFailedTxs)
+      )((txs, _) => assertFailedTxs(txs))
     }
   }
 
@@ -197,7 +197,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           feeAssetId = ByteString.copyFrom(Base58.decode(sponsoredAsset))
         ),
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { txs =>
+    ) { (txs, _) =>
       sender.wavesBalance(contractAddr).regular shouldBe prevBalance - totalWavesSpend - priorityFee
       assertFailedTxs(txs)
     }
@@ -226,7 +226,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           fee = invokeFee
         ),
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
-    ) { txs =>
+    ) { (txs, _) =>
       val failed              = assertFailedTxs(txs)
       val lastSuccessEndArg   = txs.size - failed.size
       val lastSuccessStartArg = (lastSuccessEndArg - 3).max(1)
@@ -247,7 +247,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           sender.getDataByKey(contractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
       }
 
-      sender.getStateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach { sc =>
+      sender.stateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach { sc =>
         sc.issues.size shouldBe 0
         sc.reissues.size shouldBe 0
         sc.burns.size shouldBe 0
@@ -302,7 +302,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           fee = priorityFee,
           waitForTx = true
         )
-    ) { txs =>
+    ) { (txs, _) =>
       val invalid = assertInvalidTxs(txs)
       sender.wavesBalance(callerAddr).regular shouldBe prevBalance - (txs.size - invalid.size) * invokeFee - priorityFee
       invalid
@@ -375,7 +375,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       sendTxsAndThenPriorityTx(
         txsSend,
         () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee)
-      )(assertFailedTxs)
+      )((txs, _) => assertFailedTxs(txs))
       updateAssetScript(result = true, invalidScriptAsset, owner, setAssetScriptFee + smartFee)
     }
   }
@@ -438,7 +438,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       sendTxsAndThenPriorityTx(
         txsSend,
         () => updateAccountScript(Some(false), invalidAccount, priorityFee)
-      )(assertInvalidTxs)
+      )((txs, _) => assertInvalidTxs(txs))
       updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
     }
   }
@@ -450,5 +450,5 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     txs.foreach(tx => sender.waitForTransaction(PBTransactions.vanillaUnsafe(tx).id().toString))
   }
 
-  override protected def waitForHeightArise(): Unit = sender.waitForHeight(sender.height + 1)
+  override protected def waitForHeightArise(): Unit = sender.waitForHeightArise()
 }
