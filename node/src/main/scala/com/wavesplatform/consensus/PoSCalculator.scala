@@ -98,7 +98,7 @@ class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = {
     val h = (BigDecimal(hit) / MaxHit).toDouble
-    val a = minBlockTime.toDouble + C1 * math.log(1 - C2 * math.log(h) / bt / balance)
+    val a = minBlockTime + C1 * math.log(1 - C2 * math.log(h) / bt / balance)
     a.toLong
   }
 
