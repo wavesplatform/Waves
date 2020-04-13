@@ -189,7 +189,7 @@ object InvokeScriptTransactionDiff {
           _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _ <- TracedResult(validateOverflow(transfers.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
 
-          verifierComplexity = blockchain.accountScript(tx.sender).map(_.maxComplexity)
+          verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
             .map(_._2)

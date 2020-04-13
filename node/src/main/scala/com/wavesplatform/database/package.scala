@@ -453,7 +453,7 @@ package object database extends ScorexLogging {
       pb.AccountScriptInfo(
         ByteString.copyFrom(scriptInfo.publicKey.arr),
         ByteString.copyFrom(scriptInfo.script.bytes()),
-        scriptInfo.maxComplexity,
+        scriptInfo.verifierComplexity,
         scriptInfo.complexitiesByEstimator.map {
           case (version, complexities) =>
             pb.AccountScriptInfo.ComplexityByVersion(version, complexities)

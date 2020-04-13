@@ -44,7 +44,7 @@ object DiffsCommon {
 
     val accountComplexity = blockchain
       .accountScript(tx.sender.toAddress)
-      .map(_.maxComplexity)
+      .map(_.verifierComplexity)
 
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }
