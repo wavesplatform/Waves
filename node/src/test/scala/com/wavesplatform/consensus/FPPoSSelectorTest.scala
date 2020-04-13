@@ -250,8 +250,7 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
       ignoreSpendableBalanceChanged,
       TestFunctionalitySettings.Stub.copy(
         preActivatedFeatures = Map(BlockchainFeatures.FairPoS.id -> 0) ++ (if (VRFActivated) Map(BlockchainFeatures.BlockV5.id -> 0) else Map())
-      ),
-      dbSettings
+      )
     )
     val settings0 = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))

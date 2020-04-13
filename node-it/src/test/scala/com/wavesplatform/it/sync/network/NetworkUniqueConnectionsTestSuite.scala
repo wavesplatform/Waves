@@ -8,6 +8,7 @@ import org.scalatest.{FreeSpec, Matchers}
 
 import scala.concurrent._
 import scala.concurrent.duration._
+import scala.util.{Failure, Success, Try}
 
 class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with DockerBased with ScorexLogging with Nodes {
   import NetworkUniqueConnectionsTestSuite._
@@ -37,7 +38,11 @@ class NetworkUniqueConnectionsTestSuite extends FreeSpec with Matchers with Dock
     firstNode.connect(secondNode.containerNetworkAddress)
 
     withClue("Should fail with TimeoutException, because the connectionAttempt should fail") {
-      intercept[TimeoutException] { firstNode.waitForPeers(2, 30.seconds) }
+      Try(firstNode.waitForPeers(2, 30.seconds)) match {
+        case Failure(ApiCallException(_: TimeoutException)) => // Pass
+        case Failure(exception) => fail(exception)
+        case Success(v) => fail(s"Expected TimeoutException, got $v")
+      }
     }
   }
 

@@ -13,8 +13,7 @@ import com.wavesplatform.database
 import com.wavesplatform.database.{DBExt, Keys, LevelDBFactory, LevelDBWriter}
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
 import com.wavesplatform.state.LevelDBWriterBenchmark._
-import com.wavesplatform.transaction.{Asset, Transaction}
-import monix.reactive.subjects.PublishSubject
+import com.wavesplatform.transaction.Transaction
 import org.iq80.leveldb.{DB, Options}
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
@@ -92,9 +91,7 @@ object LevelDBWriterBenchmark {
       LevelDBFactory.factory.open(dir, new Options)
     }
 
-    private val ignoreSpendableBalanceChanged = PublishSubject[(Address, Asset)]()
-
-    val db = new LevelDBWriter(rawDB, ignoreSpendableBalanceChanged, wavesSettings.blockchainSettings, wavesSettings.dbSettings, 10)
+    val db = LevelDBWriter.readOnly(rawDB, wavesSettings)
 
     def loadBlockAt(height: Int): Option[(BlockMeta, Seq[Transaction])] =
       loadBlockMetaAt(height).map { meta =>
