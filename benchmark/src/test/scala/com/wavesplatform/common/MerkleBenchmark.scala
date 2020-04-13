@@ -1,19 +1,16 @@
 package com.wavesplatform.common
 
-import java.util.Base64
 import java.util.concurrent.TimeUnit
 
-import scala.util.Random
-import scorex.crypto.authds.merkle.{Leaf, MerkleProof, MerkleTree}
-import scorex.crypto.authds.LeafData
-import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest32}
+import com.google.common.primitives.Ints
 import com.wavesplatform.common.merkle.Merkle._
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
-//import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
-//import scorex.crypto.signatures.{Curve25519, Signature}
-import com.google.common.primitives.Ints
+import scorex.crypto.authds.LeafData
+import scorex.crypto.authds.merkle.MerkleTree
+import scorex.crypto.hash.{Blake2b256, CryptographicHash32, Digest32}
+
+import scala.util.Random
 
 @OutputTimeUnit(TimeUnit.MICROSECONDS)
 @BenchmarkMode(Array(Mode.AverageTime))
@@ -58,7 +55,7 @@ object MerkleBenchmark {
   }
 
   def testData(deep: Int): (MerkleTree[Digest32], List[LeafData]) = {
-    val n = BigInt(2).pow(deep - 1).toInt
+    val n    = BigInt(2).pow(deep - 1).toInt
     val size = n + 1 + Random.nextInt(n)
     val data: List[LeafData] =
       List
@@ -72,13 +69,14 @@ object MerkleBenchmark {
   }
 
   class MerkleDeep(size: Int) {
-    val leafs = testData(size)._2
+    val leafs  = testData(size)._2
     val levels = mkLevels(leafs)
-    val root = levels.head.head
-    val proofs = List((mkProofs(0, levels), hash(leafs(0)), 0),
-                      (mkProofs(size-1, levels), hash(leafs(size-1)), size-1),
-                      (mkProofs(size/2, levels), hash(leafs(size/2)), size/2)
-      ) 
+    val root   = levels.head.head
+    val proofs = List(
+      (mkProofs(0, levels), hash(leafs(0)), 0),
+      (mkProofs(size - 1, levels), hash(leafs(size - 1)), size - 1),
+      (mkProofs(size / 2, levels), hash(leafs(size / 2)), size / 2)
+    )
   }
 
   @State(Scope.Benchmark)

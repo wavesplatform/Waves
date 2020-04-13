@@ -31,11 +31,12 @@ import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.PBBlocks
 import com.wavesplatform.serialization.Deser
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.{Asset, TxVersion}
 import com.wavesplatform.transaction.assets.exchange.Order
+import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
 import monix.reactive.subjects.ConcurrentSubject
+import play.api.libs.json.Json
 
 import scala.concurrent.Future
 import scala.concurrent.duration._
@@ -57,6 +58,16 @@ object AsyncGrpcApi {
       blocks
         .getBlock(BlockRequest.of(includeTransactions = true, BlockRequest.Request.Height(height)))
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
+    }
+
+    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
+      val (obs, result) = createCallObserver[InvokeScriptResult]
+      val ids           = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
+      transactions.getStateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address), obs)
+      result.runToFuture.map { r =>
+        import com.wavesplatform.state.{InvokeScriptResult => VISR}
+        r.map(VISR.fromPB).map(r => Json.toJson(r).as[StateChangesDetails])
+      }
     }
 
     def broadcastIssue(
@@ -88,16 +99,16 @@ object AsyncGrpcApi {
     }
 
     def broadcastTransfer(
-                           source: KeyPair,
-                           recipient: Recipient,
-                           amount: Long,
-                           fee: Long,
-                           version: Int = 2,
-                           assetId: String = "WAVES",
-                           feeAssetId: String = "WAVES",
-                           attachment: Attachment.Attachment = Attachment.Attachment.Empty,
-                           timestamp: Long = System.currentTimeMillis
-                         ): Future[PBSignedTransaction] = {
+        source: KeyPair,
+        recipient: Recipient,
+        amount: Long,
+        fee: Long,
+        version: Int = 2,
+        assetId: String = "WAVES",
+        feeAssetId: String = "WAVES",
+        attachment: Attachment.Attachment = Attachment.Attachment.Empty,
+        timestamp: Long = System.currentTimeMillis
+    ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(source.publicKey),
@@ -115,8 +126,7 @@ object AsyncGrpcApi {
       try {
         val proofs = crypto.sign(source, PBTransactions.vanilla(SignedTransaction(Some(unsigned))).explicitGet().bodyBytes())
         transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.copyFrom(proofs))))
-      }
-      catch {
+      } catch {
         case _: IllegalArgumentException => transactions.broadcast(SignedTransaction.of(Some(unsigned), Seq(ByteString.EMPTY)))
       }
     }
@@ -256,18 +266,19 @@ object AsyncGrpcApi {
       }
     }
 
-    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] = {
-      def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
-        val subj = ConcurrentSubject.publishToOne[T]
+    def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
+      val subj = ConcurrentSubject.publishToOne[T]
 
-        val observer = new StreamObserver[T] {
-          override def onNext(value: T): Unit      = subj.onNext(value)
-          override def onError(t: Throwable): Unit = subj.onError(t)
-          override def onCompleted(): Unit         = subj.onComplete()
-        }
-
-        (observer, subj.toListL)
+      val observer = new StreamObserver[T] {
+        override def onNext(value: T): Unit      = subj.onNext(value)
+        override def onError(t: Throwable): Unit = subj.onError(t)
+        override def onCompleted(): Unit         = subj.onComplete()
       }
+
+      (observer, subj.toListL)
+    }
+
+    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] = {
       val (obs, result) = createCallObserver[TransactionResponse]
       val req           = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))), sender = sender, recipient = recipient)
       transactions.getTransactions(req, obs)
@@ -459,14 +470,14 @@ object AsyncGrpcApi {
     }
 
     def updateAssetInfo(
-                         sender: KeyPair,
-                         assetId: String,
-                         updatedName: String,
-                         updatedDescription: String,
-                         fee: Long,
-                         feeAsset: Asset = Waves,
-                         version: TxVersion = TxVersion.V1
-                       ): Future[SignedTransaction] = {
+        sender: KeyPair,
+        assetId: String,
+        updatedName: String,
+        updatedDescription: String,
+        fee: Long,
+        feeAsset: Asset = Waves,
+        version: TxVersion = TxVersion.V1
+    ): Future[SignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(sender.publicKey),

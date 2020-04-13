@@ -136,8 +136,7 @@ class ScriptCacheTest extends FreeSpec with Matchers with WithDB with Transactio
     val defaultWriter = TestLevelDB.withFunctionalitySettings(
       db,
       ignoreSpendableBalanceChanged,
-      TestFunctionalitySettings.Stub,
-      settings0.dbSettings.copy(maxCacheSize = CACHE_SIZE)
+      TestFunctionalitySettings.Stub
     )
     val bcu = new BlockchainUpdaterImpl(defaultWriter, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
     try {
