@@ -38,7 +38,7 @@ object Global extends BaseGlobal {
     } yield result
 
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    toEither(BaseEncoding.base16().encode(input))
+    toEither(BaseEncoding.base16().encode(input)).map(_.toLowerCase)
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
     toEither(BaseEncoding.base16().decode(input.toUpperCase))
