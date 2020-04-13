@@ -6,19 +6,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{
-  AccountsApiGrpc,
-  AssetInfoResponse,
-  AssetRequest,
-  AssetsApiGrpc,
-  BalanceResponse,
-  BalancesRequest,
-  BlockRequest,
-  BlocksApiGrpc,
-  TransactionResponse,
-  TransactionsApiGrpc,
-  TransactionsRequest
-}
+import com.wavesplatform.api.grpc.{AccountsApiGrpc, AssetInfoResponse, AssetRequest, AssetsApiGrpc, BalanceResponse, BalancesRequest, BlockRequest, BlocksApiGrpc, InvokeScriptResultResponse, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
@@ -60,13 +48,20 @@ object AsyncGrpcApi {
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
-    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
-      val (obs, result) = createCallObserver[InvokeScriptResult]
+    def stateChanges(
+        txIds: Seq[String] = Nil,
+        address: ByteString = ByteString.EMPTY
+    ): Future[Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)]] = {
+      val (obs, result) = createCallObserver[InvokeScriptResultResponse]
       val ids           = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
       transactions.getStateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address), obs)
       result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
-        r.map(VISR.fromPB).map(r => Json.toJson(r).as[StateChangesDetails])
+        r.map { r =>
+          val tx     = PBTransactions.vanillaUnsafe(r.getTransaction)
+          val result = Json.toJson(VISR.fromPB(r.getResult)).as[StateChangesDetails]
+          (tx, result)
+        }
       }
     }
 

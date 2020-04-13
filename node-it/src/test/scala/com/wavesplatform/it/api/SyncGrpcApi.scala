@@ -10,9 +10,7 @@ import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, AssetInfoRes
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
-import com.wavesplatform.it.sync.smartMinFee
 import com.wavesplatform.lang.script.Script
-import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.block.Block.Header
@@ -20,12 +18,10 @@ import com.wavesplatform.protobuf.block.{PBBlocks, VanillaBlock}
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction.assets.exchange.Order
-import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.Status.Code
 import io.grpc.StatusRuntimeException
 import org.scalatest.{Assertion, Assertions}
-import play.api.libs.json.JsValue
 
 import scala.concurrent.duration._
 import scala.concurrent.{Await, Awaitable}
@@ -79,11 +75,11 @@ object SyncGrpcApi extends Assertions {
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
     }
 
-    def stateChanges(txId: String): StateChangesDetails = {
+    def stateChanges(txId: String): (VanillaTransaction, StateChangesDetails) = {
       sync(async(n).stateChanges(Seq(txId))).head
     }
 
-    def stateChanges(address: ByteString): Seq[StateChangesDetails] = {
+    def stateChanges(address: ByteString): Seq[(VanillaTransaction, StateChangesDetails)] = {
       sync(async(n).stateChanges(address = address))
     }
 
