@@ -1,24 +1,32 @@
-package com.wavesplatform.utils
+package com.wavesplatform.lang.doc
 
-import cats.Id
 import cats.implicits._
 import com.wavesplatform.DocSource
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion, _}
 import com.wavesplatform.lang.v1.CTX
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.traits.Environment
-import com.wavesplatform.utils.doc.RideFullContext
-import org.scalatest.{FreeSpec, Matchers, PropSpec}
+import org.scalatest.{Matchers, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DocExportTest extends PropSpec with PropertyChecks with Matchers {
+
+  def buildFullContext(ds: DirectiveSet): CTX[Environment] = {
+    val wavesCtx  = WavesContext.build(ds)
+    val cryptoCtx = CryptoContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
+    val pureCtx = PureContext.build(Global, ds.stdLibVersion).withEnvironment[Environment]
+    pureCtx |+| cryptoCtx |+| wavesCtx
+  }
 
   property("declared ride FUNCs have doc for all contexts") {
 
     val totalFuncDocs = for {
       ds <- directives
-      ctx = RideFullContext.build(ds)
+      ctx = buildFullContext(ds)
       doc <- funcDoc(ctx, ds.stdLibVersion)
     } yield doc
 
@@ -30,7 +38,7 @@ class DocExportTest extends PropSpec with PropertyChecks with Matchers {
 
     val totalVarDocs = for {
       ds <- directives
-      ctx = RideFullContext.build(ds)
+      ctx = buildFullContext(ds)
       doc <- varsDoc(ctx, ds.stdLibVersion)
     } yield doc
 
