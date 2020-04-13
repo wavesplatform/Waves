@@ -347,7 +347,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
         crypto.verifyVRF(genSig, lastBlockVRF.getOrElse(lastBlockCData.generationSignature), signerPK.publicKey).explicitGet()
 
     val validBlockDelay: Long = updateDelay(
-      FairPoSCalculator
+      FairPoSCalculator.V2
         .calculateDelay(
           hit(hitSource.arr),
           lastBlockCData.baseTarget,
@@ -356,7 +356,7 @@ class PoSSuite extends FunSuite with Matchers with NodesFromDocker with WaitForH
     )
 
     val baseTarget: Long = updateBaseTarget(
-      FairPoSCalculator
+      FairPoSCalculator.V2
         .calculateBaseTarget(
           10,
           height,

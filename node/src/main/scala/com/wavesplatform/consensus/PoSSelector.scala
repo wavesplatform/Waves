@@ -22,8 +22,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
 
   protected def posCalculator(height: Int): PoSCalculator =
     if (fairPosActivated(height))
-      if (vrfActivated(height)) FairPoSCalculator
-      else FairPoSCalculator.old
+      if (vrfActivated(height)) FairPoSCalculator.V2
+      else FairPoSCalculator.V1
     else NxtPoSCalculator
 
   def consensusData(
@@ -43,7 +43,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           getHitSource(height)
             .map(hs => NxtLikeConsensusBlockData(bt, crypto.signVRF(account.privateKey, hs)))
         else
-          blockchain.blockHeader(height)
+          blockchain
+            .blockHeader(height)
             .map(_.header.generationSignature.arr)
             .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generationSignature(gs, account.publicKey))))
             .toRight(GenericError("No blocks in blockchain"))

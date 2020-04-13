@@ -1,6 +1,7 @@
 package com.wavesplatform.consensus
 
 import com.wavesplatform.account.{PrivateKey, PublicKey}
+import com.wavesplatform.consensus.PoSCalculator.HitSize
 import com.wavesplatform.crypto
 
 trait PoSCalculator {
@@ -82,17 +83,22 @@ object NxtPoSCalculator extends PoSCalculator {
 
 }
 
-class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
-  import PoSCalculator._
+object FairPoSCalculator {
+  lazy val V1 = new FairPoSCalculator(5000)
+  lazy val V2 = new FairPoSCalculator(30000)
 
-  private[this] val MaxSignature: Array[Byte] = Array.fill[Byte](HitSize)(-1)
-  private[this] val MaxHit: BigDecimal        = BigDecimal(BigInt(1, MaxSignature))
-  private[this] val C1                        = 70000
-  private[this] val C2                        = 5e17
+  private val MaxHit = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
+  private val C1     = 70000
+  private val C2     = 5e17
+}
+
+class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
+  import FairPoSCalculator._
+  import PoSCalculator._
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = {
     val h = (BigDecimal(hit) / MaxHit).toDouble
-    val a = minBlockTime + C1 * math.log(1 - C2 * math.log(h) / bt / balance)
+    val a = minBlockTime.toDouble + C1 * math.log(1 - C2 * math.log(h) / bt / balance)
     a.toLong
   }
 
@@ -117,8 +123,4 @@ class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
         else prevBaseTarget
     }
   }
-}
-
-object FairPoSCalculator extends FairPoSCalculator(30000) {
-  lazy val old = new FairPoSCalculator(5000)
 }
