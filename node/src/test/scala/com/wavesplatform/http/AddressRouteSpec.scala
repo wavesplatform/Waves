@@ -217,7 +217,7 @@ class AddressRouteSpec
     )
 
     val contractScript = ContractScript(V3, contractWithMeta).explicitGet()
-    val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L)
+    val callableComplexities = Map("a" -> 1L, "b" -> 2L, "c" -> 3L, "verify" -> 10L)
     (commonAccountApi.script _).expects(allAccounts(3).toAddress).returning(Some(AccountScriptInfo(allAccounts(3), contractScript, 11L))).once()
     (blockchain.accountScript _)
       .when(allAccounts(3).toAddress)
@@ -233,7 +233,7 @@ class AddressRouteSpec
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
-      (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities
+      (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities - "verify"
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 

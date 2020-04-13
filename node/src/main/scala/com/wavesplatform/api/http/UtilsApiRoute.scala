@@ -139,7 +139,7 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.complexityInfo(script, estimator).map((script, _))
+            Script.verifierAndCallableComplexities(script, estimator).map((script, _))
           }
       ) { result =>
         complete(

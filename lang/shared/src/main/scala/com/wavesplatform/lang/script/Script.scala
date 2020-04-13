@@ -49,7 +49,7 @@ object Script {
   def decompile(s: Script): (String, DirectiveMeta) = {
     val cType: ContentType = s match {
       case _: ExprScript => Expression
-      case _ => DAppType
+      case _             => DAppType
     }
     val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = s match {
@@ -75,18 +75,32 @@ object Script {
         ContractScript.estimateComplexity(version, contract, estimator)
     }
 
+  def verifierAndCallableComplexities(s: Script, estimator: ScriptEstimator): Either[String, (Long, Map[String, Long])] =
+    s match {
+      case script: ExprScript =>
+        ExprScript.estimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
+      case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
+        for {
+          (_, callableComplexities) <- ContractScript.estimateComplexity(version, contract, estimator)
+          complexities = verifierFuncOpt.fold((0L, callableComplexities))(
+            f => (callableComplexities(f.u.name), callableComplexities - f.u.name)
+          )
+        } yield complexities
+    }
+
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
+    Script
+      .complexityInfo(script, estimator)
       .map(calcVerifierComplexity(script, _))
 
   private def calcVerifierComplexity(
-    script:     Script,
-    complexity: (Long, Map[String, Long])
+      script: Script,
+      complexity: (Long, Map[String, Long])
   ): Long = {
     val (totalComplexity, cm) = complexity
     script match {
       case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
-      case _ => totalComplexity
+      case _                                                                        => totalComplexity
     }
   }
 }

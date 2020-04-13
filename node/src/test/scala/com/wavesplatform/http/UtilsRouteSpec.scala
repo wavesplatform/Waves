@@ -207,6 +207,9 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
       |    )
       |}
+      |
+      |@Verifier(tx)
+      |func verify() = true
     """.stripMargin
 
   routePath("/script/decompile") in {
@@ -429,7 +432,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
     Post(routePath("/script/compileCode"), dApp) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "complexity").as[Long] shouldBe 11
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
@@ -521,7 +524,7 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       val json = responseAs[JsValue]
       println(json)
       (json \ "script").as[String] shouldBe dAppBase64
-      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "complexity").as[Long] shouldBe 11
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
