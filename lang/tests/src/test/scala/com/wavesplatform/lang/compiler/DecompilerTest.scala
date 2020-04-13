@@ -25,8 +25,9 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
+  val sp = "\\s+".r
   implicit class StringCmp(s1: String) {
-    def shouldEq(s2: String) = s1.replace("\r\n", "\n") shouldEqual s2.replace("\r\n", "\n")
+    def shouldEq(s2: String) = sp.replaceAllIn(s1, "") shouldEqual sp.replaceAllIn(s2, "")
   }
 
   def getCtx(v: StdLibVersion): CTX[Environment] = {
@@ -34,7 +35,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
       Seq(
         getTestContext(v).withEnvironment[Environment],
         CryptoContext.build(Global, v).withEnvironment[Environment],
-        WavesContext.build(DirectiveSet.contractDirectiveSet)
+        WavesContext.build(DirectiveSet(v, Account, DAppType).explicitGet())
       )
     )
   }
@@ -750,11 +751,13 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
   }
 
   property("V4 - new contract result format") {
-    val script =
+    val prefix =
       """
         | {-# STDLIB_VERSION 4    #-}
         | {-#CONTENT_TYPE    DAPP #-}
-        |
+        |""".stripMargin
+    val script =
+      """
         | @Callable(i)
         | func foo() =
         |   [
@@ -762,6 +765,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |     BooleanEntry("key", true),
         |     StringEntry("key", "str"),
         |     BinaryEntry("key", base58''),
+        |     BinaryEntry("key", calculateAssetId(Issue("name", "description", 1000, 4, true, unit, 0))),
         |     DeleteEntry("key"),
         |     ScriptTransfer(i.caller, 1, base58''),
         |     Issue("name", "description", 1000, 4, true, unit, 0),
@@ -770,7 +774,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   ]
         """.stripMargin
 
-    val parsedExpr = Parser.parseContract(script).get.value
+    val parsedExpr = Parser.parseContract(prefix ++ script).get.value
 
     val ctx =
       Monoid.combine(
@@ -780,11 +784,49 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
 
     val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
     val res         = Decompiler(dApp, decompilerContextV4)
-    res shouldEq """
+    res shouldEq script
+  }
 
-@Callable(i)
-func foo () = [IntegerEntry("key", 1), BooleanEntry("key", true), StringEntry("key", "str"), BinaryEntry("key", base58''), DeleteEntry("key"), ScriptTransfer(i.caller, 1, base58''), Issue("name", "description", 1000, 4, true, unit, 0), Reissue(base58'', false, 1), Burn(base58'', 1)]
+  property("V4 - new functions") {
+    val sizes = Seq(16, 32, 64, 128)
+    val hashes = Seq("blake2b", "keccak", "sha")
+    val prefix =
+      """
+        | {-# STDLIB_VERSION 4    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+    val script =
+      s"""
+        | @Callable(i)
+        | func foo() = {
+        |   let v1 = transferTransactionFromProto(base58'')
+        |   let v2 = groth16Verify(base58'', base58'', base58'')
+        |   let v3 = createMerkleRoot(nil, base58'', 0)
+        |   let v4 = [${(for {s <- sizes; h <- hashes} yield h ++ "256_" ++ s.toString ++ "Kb(base58'')").mkString(", ")}]
+        |   let v5 = [${(for {s <- sizes} yield "sigVerify_" ++ s.toString ++ "Kb(base58'', base58'', base58'')").mkString(", ")}]
+        |   let v6 = [${(for {s <- sizes} yield "rsaVerify_" ++ s.toString ++ "Kb(SHA256, base58'', base58'', base58'')").mkString(", ")}]
+        |   let v7 = [${(for {s <- 1 to 15} yield "groth16Verify_" ++ s.toString ++ "inputs( base58'', base58'', base58'')").mkString(", ")}]
+        |   let v8 = value(1)
+        |   let v9 = valueOrErrorMessage(1,"")
+        |   let v10 = toUtf8String(base58'')
+        |   let v11 = toInt(base58'', toInt(base58''))
+        |   nil
+        | }
+        """.stripMargin
 
-"""
+    val parsedExpr = Parser.parseContract(prefix ++ script).get.value
+
+    val ctx =
+      Monoid.combineAll( Seq(
+        PureContext.build(Global, V4).withEnvironment[Environment],
+        CryptoContext.build(Global, V4).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      ))
+
+    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
+    println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
+    println(decompilerContextV4.opCodes)
+    val res         = Decompiler(dApp, decompilerContextV4)
+    res shouldEq script
   }
 }
