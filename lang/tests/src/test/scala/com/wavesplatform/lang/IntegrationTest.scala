@@ -1401,4 +1401,11 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     eval(script(string32Kb + "aa"), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
     eval(script(string32Kb + "aa"), version = V4) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
   }
+
+  property("fromBase16String supports mixed case input") {
+    val value = "fedcba9876543210FEDCBA9876543210"
+    val script = s"""fromBase16String("$value")"""
+
+    eval(script) shouldBe CONST_BYTESTR(BaseEncoding.base16().decode(value.toUpperCase))
+  }
 }
