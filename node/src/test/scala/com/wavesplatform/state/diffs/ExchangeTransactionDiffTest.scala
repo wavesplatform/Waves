@@ -24,7 +24,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
 import com.wavesplatform.transaction.transfer.{MassTransferTransaction, TransferTransaction}
 import com.wavesplatform.utils._
-import com.wavesplatform.{NoShrink, TransactionGen, crypto}
+import com.wavesplatform.{NoShrink, TestValues, TransactionGen, crypto}
 import org.scalacheck.Gen
 import org.scalatest.{Inside, PropSpec}
 import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
@@ -35,7 +35,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
 
   private def wavesPortfolio(amt: Long) = Portfolio.waves(amt)
 
-  val MATCHER: KeyPair = KeyPair(Base58.decode("matcher"))
+  val MATCHER: KeyPair = TestValues.keyPair
 
   val fs: FunctionalitySettings = TestFunctionalitySettings.Enabled.copy(
     preActivatedFeatures = Map(

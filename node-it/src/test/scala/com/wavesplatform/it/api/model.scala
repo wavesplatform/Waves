@@ -98,7 +98,9 @@ case class AssetInfo(
     originTransactionId: String,
     minSponsoredAssetFee: Option[Long],
     scriptDetails: Option[ScriptAssetInfo]
-)
+) {
+  def isNFT: Boolean = decimals == 0 && quantity == 1 && !reissuable
+}
 object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
@@ -585,7 +587,7 @@ case class IssueInfoResponse(
     decimals: Int,
     isReissuable: Boolean,
     compiledScript: Option[String],
-    nonce: Int
+    nonce: Long
 )
 object IssueInfoResponse {
   implicit val IssueInfoFormat: Format[IssueInfoResponse] = Json.format

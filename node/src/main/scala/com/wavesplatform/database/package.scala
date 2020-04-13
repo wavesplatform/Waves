@@ -103,7 +103,7 @@ package object database extends ScorexLogging {
   }
 
   def writeAddressIds(values: Seq[AddressId]): Array[Byte] =
-    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)){ case (buf, aid) => buf.putLong(aid.toLong) }.array()
+    values.foldLeft(ByteBuffer.allocate(values.length * java.lang.Long.BYTES)) { case (buf, aid) => buf.putLong(aid.toLong) }.array()
 
   def readTxIds(data: Array[Byte]): List[ByteStr] = Option(data).fold(List.empty[ByteStr]) { d =>
     val b   = ByteBuffer.wrap(d)
@@ -403,15 +403,15 @@ package object database extends ScorexLogging {
       val readOptions = new ReadOptions().snapshot(snapshot)
       val batch       = new SortedBatch
       val rw          = new RW(db, readOptions, batch)
+      val nativeBatch = db.createWriteBatch()
       try {
         val r = f(rw)
-        val nativeBatch = db.createWriteBatch()
         batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
         batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
         db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
         r
       } finally {
-        batch.close()
+        nativeBatch.close()
         snapshot.close()
       }
     }

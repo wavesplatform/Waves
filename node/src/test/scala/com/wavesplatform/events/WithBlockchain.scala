@@ -2,9 +2,9 @@ package com.wavesplatform.events
 
 import java.nio.file.Files
 
-import com.wavesplatform.database.LevelDBWriter
+import com.wavesplatform.database.TestStorageFactory
 import com.wavesplatform.settings.{WavesSettings, loadConfig}
-import com.wavesplatform.state.{Blockchain, BlockchainUpdaterImpl}
+import com.wavesplatform.state.Blockchain
 import com.wavesplatform.transaction.BlockchainUpdater
 import com.wavesplatform.{NTPTime, TestHelpers, database}
 import monix.reactive.Observer
@@ -15,11 +15,11 @@ trait WithBlockchain extends BeforeAndAfterEach with BeforeAndAfterAll with NTPT
 
   private val path = Files.createTempDirectory("leveldb-test")
   private val db   = database.openDB(path.toAbsolutePath.toString)
-  private val bcu: Blockchain with BlockchainUpdater = new BlockchainUpdaterImpl(
-    new LevelDBWriter(db, Observer.stopped, settings.blockchainSettings, settings.dbSettings, 100),
-    Observer.stopped,
+  private val (bcu, _) = TestStorageFactory(
     settings,
+    db,
     ntpTime,
+    Observer.stopped,
     BlockchainUpdateTriggers.noop
   )
 

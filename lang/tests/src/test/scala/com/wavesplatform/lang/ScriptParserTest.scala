@@ -171,7 +171,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
   }
 
   property("invalid base16 definition") {
-    parse("base16'mid-size'") shouldBe CONST_BYTESTR(Pos(8, 15), PART.INVALID(AnyPos, "Unrecognized character: M"))
+    parse("base16'mid-size'") shouldBe CONST_BYTESTR(Pos(0, 16), PART.INVALID(Pos(8, 15), "Unrecognized character: m"), None)
     parse("base16'123'") shouldBe CONST_BYTESTR(Pos(0, 11), PART.INVALID(Pos(8, 10), "Invalid input length 3"))
   }
 
@@ -671,7 +671,7 @@ class ScriptParserTest extends PropSpec with PropertyChecks with Matchers with S
 
   property("pattern matching - allow shadowing") {
     val code =
-      """match p { 
+      """match p {
         |  case p: PointA | PointB => true
         |  case _ => false
         |}""".stripMargin

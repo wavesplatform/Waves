@@ -68,7 +68,7 @@ class FeatureActivationTestSuite
     val statusInfo = nodes.map(_.featureActivationStatus(featureNum))
     statusInfo.foreach { si =>
       si.description shouldBe featureDescr
-      assertActivatedStatus(si, checkHeight, NodeFeatureStatus.Voted)
+      assertActivatedStatus(si, checkHeight, NodeFeatureStatus.Implemented)
     }
   }
 }
