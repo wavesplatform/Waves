@@ -82,19 +82,17 @@ object NxtPoSCalculator extends PoSCalculator {
 
 }
 
-object FairPoSCalculator extends PoSCalculator {
-
+class FairPoSCalculator(minBlockTime: Int) extends PoSCalculator {
   import PoSCalculator._
 
-  private val MaxSignature: Array[Byte] = Array.fill[Byte](HitSize)(-1)
-  private val MaxHit: BigDecimal        = BigDecimal(BigInt(1, MaxSignature))
-  private val C1                        = 70000
-  private val C2                        = 5e17
-  private val TMin                      = 5000
+  private[this] val MaxSignature: Array[Byte] = Array.fill[Byte](HitSize)(-1)
+  private[this] val MaxHit: BigDecimal        = BigDecimal(BigInt(1, MaxSignature))
+  private[this] val C1                        = 70000
+  private[this] val C2                        = 5e17
 
   def calculateDelay(hit: BigInt, bt: Long, balance: Long): Long = {
     val h = (BigDecimal(hit) / MaxHit).toDouble
-    val a = TMin + C1 * math.log(1 - C2 * math.log(h) / bt / balance)
+    val a = minBlockTime + C1 * math.log(1 - C2 * math.log(h) / bt / balance)
     a.toLong
   }
 
@@ -119,4 +117,8 @@ object FairPoSCalculator extends PoSCalculator {
         else prevBaseTarget
     }
   }
+}
+
+object FairPoSCalculator extends FairPoSCalculator(30000) {
+  lazy val old = new FairPoSCalculator(5000)
 }
