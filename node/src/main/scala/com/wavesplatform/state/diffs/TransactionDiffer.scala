@@ -46,7 +46,7 @@ object TransactionDiffer {
       _    <- validateFunds(blockchain, tx).traced
       _    <- if (verify) validateProofs(blockchain, tx) else success
       diff <- transactionDiff(blockchain, tx, currentBlockTimestamp)
-      _    <- validateBalance(blockchain, tx, diff).traced
+      _    <- validateBalance(blockchain, tx.typeId, diff).traced
       _    <- if (verifyAssets) validateAssets(blockchain, tx) else success
     } yield diff
     result.leftMap(TransactionValidationError(_, tx))
@@ -92,8 +92,8 @@ object TransactionDiffer {
 
   private def validateAssets(blockchain: Blockchain, tx: Transaction): TracedResult[ValidationError, Unit] = Verifier.assets(blockchain)(tx).as(())
 
-  private def validateBalance(blockchain: Blockchain, tx: Transaction, diff: Diff): Either[ValidationError, Unit] =
-    stats.balanceValidation.measureForType(tx.typeId)(BalanceDiffValidation(blockchain)(diff).as(()))
+  private def validateBalance(blockchain: Blockchain, txType: TxType, diff: Diff): Either[ValidationError, Unit] =
+    stats.balanceValidation.measureForType(txType)(BalanceDiffValidation(blockchain)(diff).as(()))
 
   // diff making related
   private def transactionDiff(blockchain: Blockchain, tx: Transaction, currentBlockTs: Long): TracedResult[ValidationError, Diff] =
@@ -141,7 +141,7 @@ object TransactionDiffer {
   private def validateFee(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Unit] =
     for {
       fee <- feePortfolios(blockchain, tx)
-      _   <- BalanceDiffValidation(blockchain)(Diff(tx, portfolios = fee))
+      _   <- validateBalance(blockchain, tx.typeId, Diff(tx, portfolios = fee))
     } yield ()
 
   private def validateOrder(blockchain: Blockchain, order: Order, matcherFee: Long): Either[ValidationError, Unit] =
@@ -154,7 +154,7 @@ object TransactionDiffer {
             .toRight(GenericError(s"Asset $asset should be issued before it can be traded"))
       }
       orderDiff = Diff.empty.copy(portfolios = Map(order.sender.toAddress -> Portfolio.build(order.matcherFeeAssetId, -matcherFee)))
-      _ <- BalanceDiffValidation(blockchain)(orderDiff)
+      _ <- validateBalance(blockchain, ExchangeTransaction.typeId, orderDiff)
     } yield ()
 
   private def validatePayments(blockchain: Blockchain, tx: InvokeScriptTransaction): Either[ValidationError, Unit] =
@@ -220,7 +220,7 @@ object TransactionDiffer {
 
     def errorMessage(cf: CanFail, tx: Transaction): Option[ErrorMessage] =
       tx match {
-        case _: InvokeScriptTransaction => Some(ErrorMessage(cf.reason.id, cf.error))
+        case _: InvokeScriptTransaction => Some(ErrorMessage(cf.reason.code, cf.error))
         case _                          => None
       }
   }
@@ -228,15 +228,8 @@ object TransactionDiffer {
   // helpers
   private def feePortfolios(blockchain: Blockchain, tx: Transaction): Either[ValidationError, Map[Address, Portfolio]] =
     tx match {
-      case gtx: GenesisTransaction =>
-        Map(gtx.recipient -> Portfolio(balance = gtx.amount, LeaseBalance.empty, assets = Map.empty)).asRight
-      case ptx: PaymentTransaction =>
-        Monoid
-          .combine(
-            Map(ptx.recipient        -> Portfolio(balance = ptx.amount, LeaseBalance.empty, assets = Map.empty)),
-            Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.amount - ptx.fee, LeaseBalance.empty, assets = Map.empty))
-          )
-          .asRight
+      case _: GenesisTransaction   => Map.empty[Address, Portfolio].asRight
+      case ptx: PaymentTransaction => Map(ptx.sender.toAddress -> Portfolio(balance = -ptx.fee, LeaseBalance.empty, assets = Map.empty)).asRight
       case ptx: ProvenTransaction =>
         ptx.assetFee match {
           case (Waves, fee) => Map(ptx.sender.toAddress -> Portfolio(-fee, LeaseBalance.empty, Map.empty)).asRight

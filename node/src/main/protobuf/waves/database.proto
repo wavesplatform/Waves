@@ -30,7 +30,7 @@ message TransactionData {
         bytes legacy_bytes = 1;
         SignedTransaction new_transaction = 2;
     }
-    bool succeed = 3;
+    bool failed = 3;
 }
 
 message AccountScriptInfo {

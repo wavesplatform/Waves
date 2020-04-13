@@ -16,6 +16,7 @@ import com.wavesplatform.lang.v1.compiler.Terms
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.Amount
+import com.wavesplatform.protobuf.transaction.DataTransactionData.DataEntry
 import com.wavesplatform.protobuf.transaction.{PBRecipients, PBSignedTransaction, PBTransactions, Recipient}
 import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, IntegerDataEntry, StringDataEntry}
 import com.wavesplatform.transaction.assets.exchange.AssetPair
@@ -109,9 +110,35 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
          |  else []
          |}
          |
+         |@Callable(inv)
+         |func canThrow() = {
+         |  let action = valueOrElse(getString(this, "crash"), "no")
+         |  if (action == "yes") then throw("Crashed by dApp")
+         |  else []
+         |}
+         |
         """.stripMargin
     val script = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1
     sender.setScript(contract, Right(Some(script)), setScriptFee, waitForTx = true)
+  }
+
+  test("InvokeScriptTransaction: dApp error propagates failed transaction") {
+    val invokeFee    = 0.005.waves
+    val priorityData = List(DataEntry("crash", DataEntry.Value.StringValue("yes")))
+    val putDataFee   = calcDataFee(priorityData)
+    val priorityFee  = putDataFee + invokeFee
+
+    sendTxsAndThenPriorityTx(
+      _ =>
+        sender
+          .broadcastInvokeScript(
+            caller,
+            Recipient().withPublicKeyHash(contractAddr),
+            Some(FUNCTION_CALL(FunctionHeader.User("canThrow"), List.empty)),
+            fee = invokeFee
+          ),
+      () => sender.putData(contract, priorityData, priorityFee, waitForTx = true)
+    )((txs, _) => assertFailedTxs(txs))
   }
 
   test("InvokeScriptTransaction: insufficient action fees propagates failed transaction") {
@@ -138,7 +165,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     }
   }
 
-  test("InvokeScriptTransaction: invoke script error propagates failed transaction") {
+  test("InvokeScriptTransaction: invoking asset script error in action asset propagates failed transaction") {
     val invokeFee            = 0.005.waves + smartFee
     val setAssetScriptMinFee = setAssetScriptFee + smartFee * 2
     val priorityFee          = setAssetScriptMinFee + invokeFee
@@ -159,6 +186,44 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
       )((txs, _) => assertFailedTxs(txs))
     }
+  }
+
+  test("InvokeScriptTransaction: invoke script error in payment asset propagates failed transaction") {
+    val invokeFee            = 0.005.waves + smartFee
+    val setAssetScriptMinFee = setAssetScriptFee + smartFee
+    val priorityFee          = setAssetScriptMinFee + invokeFee
+
+    val paymentAsset = PBTransactions
+      .vanillaUnsafe(
+        sender
+          .broadcastIssue(
+            caller,
+            "paymentAsset",
+            assetAmount,
+            8,
+            reissuable = true,
+            script = Right(ScriptCompiler.compile("true", ScriptEstimatorV3).toOption.map(_._1)),
+            fee = issueFee + smartFee,
+            waitForTx = true
+          )
+      )
+      .id()
+
+    updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
+    updateTikTok("unknown", setAssetScriptMinFee)
+
+    sendTxsAndThenPriorityTx(
+      _ =>
+        sender
+          .broadcastInvokeScript(
+            caller,
+            Recipient().withPublicKeyHash(contractAddr),
+            Some(FUNCTION_CALL(FunctionHeader.User("tikTok"), List.empty)),
+            payments = Seq(Amount(ByteString.copyFrom(paymentAsset.arr), 15)),
+            fee = invokeFee
+          ),
+      () => updateAssetScript(result = false, paymentAsset.toString, caller, priorityFee)
+    )((txs, _) => assertFailedTxs(txs))
   }
 
   test("InvokeScriptTransaction: sponsored fee on failed transaction should be charged correctly") {
@@ -252,7 +317,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         sc.reissues.size shouldBe 0
         sc.burns.size shouldBe 0
         sc.errorMessage shouldBe 'defined
-        sc.errorMessage.get.code shouldBe 1
+        sc.errorMessage.get.code shouldBe 3
         sc.errorMessage.get.text shouldBe "Transaction is not allowed by token-script"
       }
 
@@ -441,6 +506,13 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       )((txs, _) => assertInvalidTxs(txs))
       updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
     }
+  }
+
+  private def calcDataFee(data: List[DataEntry]): Long = {
+    val dataSize = data.map(_.toByteArray.length).sum + 128
+    if (dataSize > 1024) {
+      minFee * (dataSize / 1024 + 1)
+    } else minFee
   }
 
   private def updateTikTok(result: String, fee: Long): PBSignedTransaction =

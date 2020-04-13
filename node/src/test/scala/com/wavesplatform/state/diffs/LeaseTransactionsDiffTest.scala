@@ -175,7 +175,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithSt
     }
   }
 
-  property("can pay for cancel lease from the returning funds") {
+  property(s"can pay for cancel lease from the returning funds (before and after ${BlockchainFeatures.AcceptFailedScriptTransaction})") {
     val scenario =
       for {
         master    <- accountGen

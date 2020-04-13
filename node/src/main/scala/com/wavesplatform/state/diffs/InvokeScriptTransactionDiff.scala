@@ -494,14 +494,16 @@ object InvokeScriptTransactionDiff {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reasons.AssetInAction))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reasons.AssetInAction))
+        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reason.AssetInAction))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reason.AssetInAction))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reasons.AssetInAction))
+        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reason.AssetInAction))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reasons.AssetInAction))
+        Left(
+          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reason.AssetInAction)
+        )
       case Success(s) => s
     }
 }

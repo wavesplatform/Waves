@@ -406,7 +406,7 @@ package object database extends ScorexLogging {
       val rw          = new RW(db, readOptions, batch)
       val nativeBatch = db.createWriteBatch()
       try {
-        val r           = f(rw)
+        val r = f(rw)
         batch.addedEntries.foreach { case (k, v) => nativeBatch.put(k.arr, v) }
         batch.deletedEntries.foreach(k => nativeBatch.delete(k.arr))
         db.write(nativeBatch, new WriteOptions().sync(false).snapshot(false))
@@ -479,8 +479,8 @@ package object database extends ScorexLogging {
 
     val data = pb.TransactionData.parseFrom(b)
     data.transaction match {
-      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, data.succeed)
-      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), data.succeed)
+      case tx: LegacyBytes    => (TransactionParsers.parseBytes(tx.value.toByteArray).get, !data.failed)
+      case tx: NewTransaction => (PBTransactions.vanilla(tx.value).explicitGet(), !data.failed)
       case _                  => throw new IllegalArgumentException("Illegal transaction data")
     }
   }
@@ -494,10 +494,10 @@ package object database extends ScorexLogging {
       case _: PaymentTransaction                         => LegacyBytes(ByteString.copyFrom(tx.bytes()))
       case _                                             => NewTransaction(PBTransactions.protobuf(tx))
     }
-    pb.TransactionData(succeed, ptx).toByteArray
+    pb.TransactionData(!succeed, ptx).toByteArray
   }
 
-  /** Returns status and bytes (left - legacy format bytes, right - new format bytes) */
+  /** Returns status (succeed - true, failed -false) and bytes (left - legacy format bytes, right - new format bytes) */
   def readTransactionBytes(b: Array[Byte]): (Boolean, Either[Array[Byte], Array[Byte]]) = {
     import pb.TransactionData._
 
@@ -517,12 +517,16 @@ package object database extends ScorexLogging {
     require(transactionFieldType == WireFormat.WIRETYPE_LENGTH_DELIMITED, "Can't parse `transaction` field in transaction data")
     val bytes = readBytes(WireFormat.getTagFieldNumber(transactionFieldTag))
 
-    val statusFieldTag  = coded.readTag()
-    val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
-    val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
-    require(statusFieldNum == SUCCEED_FIELD_NUMBER, "Unknown `succeed` field in transaction data")
-    require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `succeed` field in transaction data")
-    val succeed = coded.readBool()
+    val succeed =
+      if (coded.isAtEnd) true
+      else {
+        val statusFieldTag  = coded.readTag()
+        val statusFieldNum  = WireFormat.getTagFieldNumber(statusFieldTag)
+        val statusFieldType = WireFormat.getTagWireType(statusFieldTag)
+        require(statusFieldNum == FAILED_FIELD_NUMBER, "Unknown `failed` field in transaction data")
+        require(statusFieldType == WireFormat.WIRETYPE_VARINT, "Can't parse `failed` field in transaction data")
+        !coded.readBool()
+      }
 
     (succeed, bytes)
   }

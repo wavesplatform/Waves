@@ -15,7 +15,7 @@ object DisableHijackedAliases extends ScorexLogging {
     val aliases = new util.HashMap[Alias, Seq[CreateAliasTransaction]]()
 
     rw.iterateOver(KeyTags.NthTransactionInfoAtHeight) { e =>
-      readTransactionBytes(e.getValue)._2.left.map { transactionBytes =>
+      readTransactionBytes(e.getValue)._2.left.foreach { transactionBytes =>
         val isCreateAlias = transactionBytes(0) == CreateAliasTransaction.typeId ||
           transactionBytes(0) == 0 &&
             transactionBytes(1) == CreateAliasTransaction.typeId

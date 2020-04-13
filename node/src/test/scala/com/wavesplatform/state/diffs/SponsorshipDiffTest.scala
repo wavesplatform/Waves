@@ -4,6 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.features.BlockchainFeatures.AcceptFailedScriptTransaction
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
@@ -272,7 +273,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
     }
   }
 
-  property("sponsor has no WAVES but receives them just in time") {
+  property(s"sponsor has no WAVES but receives them just in time before $AcceptFailedScriptTransaction activation") {
     val s = settings(0)
     val setup = for {
       master    <- accountGen
@@ -318,7 +319,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         assertDiffEi(
           Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))),
           block(Seq(backWavesTransfer)),
-          s.copy(preActivatedFeatures = s.preActivatedFeatures + (BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0))
+          s.copy(preActivatedFeatures = s.preActivatedFeatures + (AcceptFailedScriptTransaction.id -> 0))
         ) { ei => ei should produce("negative waves balance") }
     }
   }

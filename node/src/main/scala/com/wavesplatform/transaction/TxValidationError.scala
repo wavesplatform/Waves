@@ -6,8 +6,7 @@ import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.v1.evaluator.Log
-import com.wavesplatform.transaction.TxValidationError.CanFail.Reasons
-import com.wavesplatform.transaction.TxValidationError.CanFail.Reasons.Reason
+import com.wavesplatform.transaction.TxValidationError.CanFail.Reason
 import com.wavesplatform.transaction.assets.exchange.Order
 
 import scala.util.Either
@@ -53,14 +52,27 @@ object TxValidationError {
 
   /** Marker trait for errors which can produce failed transaction */
   sealed trait CanFail extends Product with Serializable {
-    def reason: Reasons.Reason = Reasons.Asset
+    def reason: Reason = Reason.Asset
     def error: String
   }
 
   object CanFail {
-    object Reasons extends Enumeration {
-      type Reason = Value
-      val Asset, AssetInAction, AssetInPayment, DApp, InsufficientFee = Value
+    sealed trait Reason extends Product with Serializable {
+      def code: Int
+    }
+    object Reason {
+      final case object DApp extends Reason {
+        val code: Int = 1
+      }
+      final case object InsufficientFee extends Reason {
+        val code: Int = 2
+      }
+      final case object AssetInAction extends Reason {
+        val code: Int = 3
+      }
+      final case object Asset extends Reason {
+        val code: Int = 4
+      }
     }
   }
 
@@ -74,10 +86,10 @@ object TxValidationError {
 
   object ScriptExecutionError {
     def apply(error: String, log: Log[Id], isAssetScript: Boolean): ScriptExecutionError =
-      if (isAssetScript) ByAssetScript(error, log, Reasons.Asset) else ByAccountScript(error, log)
+      if (isAssetScript) ByAssetScript(error, log, Reason.Asset) else ByAccountScript(error, log)
 
-    def asset(error: String, log: Log[Id], reason: Reasons.Reason): ScriptExecutionError = ByAssetScript(error, log, reason)
-    def dApp(error: String, log: Log[Id]): ScriptExecutionError                          = ByDAppScript(error, log)
+    def asset(error: String, log: Log[Id], reason: Reason): ScriptExecutionError = ByAssetScript(error, log, reason)
+    def dApp(error: String, log: Log[Id]): ScriptExecutionError                  = ByDAppScript(error, log)
 
     def unapply(e: ScriptExecutionError): Option[(String, Log[Id], Boolean)] =
       e match {
@@ -92,19 +104,17 @@ object TxValidationError {
 
     private final case class ByDAppScript(error: String, log: Log[Id]) extends ScriptExecutionError with CanFail {
       override val target: String = "DApp"
-      override val reason: Reason = Reasons.DApp
+      override val reason: Reason = Reason.DApp
     }
 
-    private final case class ByAssetScript(error: String, log: Log[Id], override val reason: Reasons.Reason)
-        extends ScriptExecutionError
-        with CanFail {
+    private final case class ByAssetScript(error: String, log: Log[Id], override val reason: Reason) extends ScriptExecutionError with CanFail {
       override val target: String = "Asset"
     }
   }
 
   case class InsufficientInvokeActionFee(error: String) extends ValidationError with CanFail {
-    override def toString: String       = s"ScriptExecutionError(error = $error)"
-    override val reason: Reasons.Reason = Reasons.InsufficientFee
+    override def toString: String = s"ScriptExecutionError(error = $error)"
+    override val reason: Reason   = Reason.InsufficientFee
   }
 
   sealed trait TransactionNotAllowedByScript extends ValidationError with HasScriptType {
@@ -116,9 +126,9 @@ object TxValidationError {
 
   object TransactionNotAllowedByScript {
     def apply(log: Log[Id], isAssetScript: Boolean): TransactionNotAllowedByScript =
-      if (isAssetScript) ByAssetScript(log, Reasons.Asset) else ByAccountScript(log)
+      if (isAssetScript) ByAssetScript(log, Reason.Asset) else ByAccountScript(log)
 
-    def asset(log: Log[Id], reason: Reasons.Reason): TransactionNotAllowedByScript = ByAssetScript(log, reason)
+    def asset(log: Log[Id], reason: Reason): TransactionNotAllowedByScript = ByAssetScript(log, reason)
 
     def unapply(e: TransactionNotAllowedByScript): Option[(Log[Id], Boolean)] =
       e match {
@@ -130,7 +140,7 @@ object TxValidationError {
       override val target: String = "Account"
     }
 
-    private final case class ByAssetScript(log: Log[Id], override val reason: Reasons.Reason) extends TransactionNotAllowedByScript with CanFail {
+    private final case class ByAssetScript(log: Log[Id], override val reason: Reason) extends TransactionNotAllowedByScript with CanFail {
       override val target: String = "Asset"
       override def error: String  = "Transaction is not allowed by token-script"
     }
