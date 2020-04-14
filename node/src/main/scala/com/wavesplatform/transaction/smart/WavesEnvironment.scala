@@ -42,6 +42,7 @@ class WavesEnvironment(
   override def transactionById(id: Array[Byte]): Option[Tx] =
     blockchain
       .transactionInfo(ByteStr(id))
+      .filter(_._3)
       .map(_._2)
       .map(tx => RealTransactionWrapper(tx, blockchain, ds.stdLibVersion, paymentTarget(ds, Some(ByteStr.empty))).explicitGet())
 
@@ -100,7 +101,7 @@ class WavesEnvironment(
   }
 
   override def transactionHeightById(id: Array[Byte]): Option[Long] =
-    blockchain.transactionInfo(ByteStr(id)).map(_._1.toLong)
+    blockchain.transactionInfo(ByteStr(id)).filter(_._3).map(_._1.toLong)
 
   override def tthis: Address = Recipient.Address(address())
 

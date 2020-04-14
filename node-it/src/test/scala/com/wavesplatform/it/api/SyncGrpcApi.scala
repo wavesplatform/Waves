@@ -6,7 +6,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.StringValue
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{AccountRequest, AccountsApiGrpc, AssetInfoResponse, BalancesRequest, BlockRangeRequest, BlockRequest, BlocksApiGrpc, DataRequest, ScriptData, TransactionResponse, TransactionsApiGrpc, TransactionsRequest}
+import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.Node
 import com.wavesplatform.it.api.SyncHttpApi.RequestAwaitTime
@@ -24,7 +24,7 @@ import io.grpc.StatusRuntimeException
 import org.scalatest.{Assertion, Assertions}
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Awaitable}
+import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -54,7 +54,7 @@ object SyncGrpcApi extends Assertions {
   }
 
   implicit class NodeExtGrpc(n: Node) {
-    def grpc = this
+    def grpc: NodeExtGrpc = this
     import com.wavesplatform.account.{Address => Addr}
     import com.wavesplatform.it.api.AsyncGrpcApi.{NodeAsyncGrpcApi => async}
 
@@ -81,6 +81,10 @@ object SyncGrpcApi extends Assertions {
 
     def stateChanges(address: ByteString): Seq[(VanillaTransaction, StateChangesDetails)] = {
       sync(async(n).stateChanges(address = address))
+    }
+
+    def stateChanges(request: TransactionsRequest): Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)] = {
+      sync(async(n).stateChanges(request))
     }
 
     def exchange(
@@ -187,6 +191,10 @@ object SyncGrpcApi extends Assertions {
       sync(async(n).getTransaction(id, sender, recipient))
     }
 
+    def getTransactionInfo(id: ByteString, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): TransactionResponse = {
+      sync(async(n).getTransactionInfo(id, sender, recipient))
+    }
+
     def getTransactionSeq(ids: Seq[String], sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): List[TransactionResponse] = {
       transactions.getTransactions(TransactionsRequest(sender, recipient, ids.map(id => ByteString.copyFrom(Base58.decode(id))))).toList
     }
@@ -207,6 +215,8 @@ object SyncGrpcApi extends Assertions {
     def waitForHeightArise(requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(this.height + 1), requestAwaitTime)
 
+    def waitFor[A](desc: String)(f: Node => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
+      sync(async(n).waitFor(desc)(x => Future.successful(f(x.n)), cond, retryInterval))
 
     def broadcastBurn(
         sender: KeyPair,
@@ -285,9 +295,10 @@ object SyncGrpcApi extends Assertions {
         payments: Seq[Amount] = Seq.empty,
         fee: Long,
         version: Int = 2,
+        feeAssetId: ByteString = ByteString.EMPTY,
         waitForTx: Boolean = false
     ): PBSignedTransaction = {
-      maybeWaitForTransaction(sync(async(n).broadcastInvokeScript(caller, dApp, functionCall, payments, fee, version)), waitForTx)
+      maybeWaitForTransaction(sync(async(n).broadcastInvokeScript(caller, dApp, functionCall, payments, fee, version, feeAssetId)), waitForTx)
     }
 
     def broadcastLease(
@@ -354,5 +365,7 @@ object SyncGrpcApi extends Assertions {
       )
       blockIter.map(blockWithHeight => PBBlocks.vanilla(blockWithHeight.getBlock).toEither.explicitGet()).toSeq
     }
+
+    def getStatuses(request: TransactionsByIdRequest): Seq[PBTransactionStatus] = sync(async(n).getStatuses(request))
   }
 }

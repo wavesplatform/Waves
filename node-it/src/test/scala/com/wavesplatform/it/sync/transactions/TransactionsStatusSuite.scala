@@ -108,9 +108,9 @@ object TransactionsStatusSuite {
   object CheckData {
     def apply(height: Int, confirmed: List[TransactionInfo], unconfirmed: List[String], notFound: List[String]): CheckData =
       new CheckData(
-        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height))),
-        unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None)),
-        notFound.map(d => TransactionStatus(d, "not_found", None, None))
+        confirmed.map(info => TransactionStatus(info.id, "confirmed", Some(height - info.height), Some(info.height), Some("succeed"))),
+        unconfirmed.map(d => TransactionStatus(d, "unconfirmed", None, None, None)),
+        notFound.map(d => TransactionStatus(d, "not_found", None, None, None))
       )
   }
 }

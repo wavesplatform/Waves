@@ -21,6 +21,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
 
   var asset1: String = ""
   var asset2: String = ""
+  var asset3: String = ""
 
   test("_send waves to dApp and caller accounts") {
     val dAppTransferId        = sender.transfer(sender.address, dApp, 5.waves, minFee).id
@@ -89,16 +90,49 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
       )
       .id
 
+    asset3 = sender
+      .issue(
+        dApp,
+        "Asset3",
+        "test asset",
+        1500,
+        0,
+        reissuable = true,
+        issueFee,
+        script = Some(
+          ScriptCompiler
+            .compile(
+              s"""
+                 |{-# STDLIB_VERSION 3 #-}
+                 |match tx {
+                 |  case tx:TransferTransaction => tx.amount > 20
+                 |  case _ => false
+                 |}""".stripMargin,
+              estimator
+            )
+            .explicitGet()
+            ._1
+            .bytes
+            .value
+            .base64)
+      )
+      .id
+
+    nodes.waitForHeightAriseAndTxPresent(asset3)
     nodes.waitForHeightAriseAndTxPresent(asset2)
     sender.waitForTransaction(asset1)
 
     val asset1ToCallerId = sender.transfer(dApp, caller, 500, smartMinFee, Some(asset1)).id
     val asset2ToCallerId = sender.transfer(dApp, caller, 500, smartMinFee, Some(asset2)).id
+    val asset3ToCallerId = sender.transfer(dApp, caller, 500, smartMinFee, Some(asset3)).id
     val asset1ToSmartId  = sender.transfer(dApp, smartCaller, 500, smartMinFee, Some(asset1)).id
     val asset2ToSmartId  = sender.transfer(dApp, smartCaller, 500, smartMinFee, Some(asset2)).id
+    val asset3ToSmartId  = sender.transfer(dApp, smartCaller, 500, smartMinFee, Some(asset3)).id
     nodes.waitForHeightAriseAndTxPresent(asset2ToSmartId)
+    nodes.waitForHeightAriseAndTxPresent(asset3ToSmartId)
     sender.waitForTransaction(asset1ToCallerId)
     sender.waitForTransaction(asset2ToCallerId)
+    sender.waitForTransaction(asset3ToCallerId)
     sender.waitForTransaction(asset1ToSmartId)
   }
 
@@ -109,6 +143,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |
           |let asset1 = base58'$asset1'
           |let asset2 = base58'$asset2'
+          |let asset3 = base58'$asset3'
           |
           |@Callable(i)
           |func payAsset1GetAsset2() = {
@@ -123,6 +158,13 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           |  let pay = extract(i.payment)
           |  if (pay.assetId == asset2 && pay.amount > 15) then
           |    TransferSet([ScriptTransfer(i.caller, 15, asset1)])
+          |  else throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
+          |}
+          |@Callable(i)
+          |func payAsset2GetAsset3() = {
+          |  let pay = extract(i.payment)
+          |  if (pay.assetId == asset2 && pay.amount > 15) then
+          |    TransferSet([ScriptTransfer(i.caller, 15, asset3)])
           |  else throw("need payment in 15+ tokens of asset2 " + toBase58String(asset2))
           |}
           |
@@ -233,7 +275,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           dApp,
           Some("get10ofAsset1"),
           payment = Seq(Payment(amountLessThanVerifierLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
-          fee = smartMinFee + smartFee
+          fee = smartMinFee + smartFee + smartFee // scripted asset + dApp
         )
         ._1.id,
       "Transaction is not allowed by account-script"
@@ -291,7 +333,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
   }
 
   test("can't invoke with payment if asset script disallows InvokeScript") {
-    val amountLessThanDAppScriptLimit = 15
+    val amountGreaterThanDAppScriptLimit = 16
 
     assertBadRequestAndMessage(
       sender
@@ -299,7 +341,7 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
           caller,
           dApp,
           Some("payAsset1GetAsset2"),
-          payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset1).get))),
+          payment = Seq(Payment(amountGreaterThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset1).get))),
           fee = smartMinFee + smartFee + smartFee
         )
         ._1.id,
@@ -325,14 +367,14 @@ class InvokeScriptWithSmartAccountAndAssetSuite extends BaseTransactionSuite wit
   }
 
   test("can't invoke a function with payment less than asset script's limit") {
-    val amountLessThanDAppScriptLimit = 10
+    val amountGreaterThanDAppScriptLimit = 16
 
     assertBadRequestAndMessage(
       sender.invokeScript(
         caller,
         dApp,
-        Some("payAsset2GetAsset1"),
-        payment = Seq(Payment(amountLessThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
+        Some("payAsset2GetAsset3"),
+        payment = Seq(Payment(amountGreaterThanDAppScriptLimit, IssuedAsset(ByteStr.decodeBase58(asset2).get))),
         fee = smartMinFee + smartFee + smartFee
       ),
       "Transaction is not allowed by token-script"

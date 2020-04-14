@@ -184,7 +184,7 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
       master        <- accountGen
       invoker       <- accountGen
       ts            <- timestampGen
-      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount) else Gen.const(1L)
+      fee           <- if (withEnoughFee) ciFee(ContractLimits.MaxAttachedPaymentAmount + 1) else Gen.const(1L)
       accountScript <- verifier
       commonIssues  <-
         if (multiPayment)

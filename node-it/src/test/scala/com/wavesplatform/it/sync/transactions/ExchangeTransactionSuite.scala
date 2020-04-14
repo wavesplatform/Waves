@@ -134,6 +134,8 @@ class ExchangeTransactionSuite extends BaseTransactionSuite with NTPTime {
 
     nodes.waitForHeightAriseAndTxPresent(assetId.toString)
 
+    sender.transfer(firstAddress, secondAddress, IssueTx.quantity / 2, assetId = Some(assetId.toString), waitForTx = true)
+
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(assetId)),
            (1: Byte, 3: Byte, Waves, Waves),
