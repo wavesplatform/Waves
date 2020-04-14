@@ -273,7 +273,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
     }
   }
 
-  property(s"sponsor has no WAVES but receives them just in time before $AcceptFailedScriptTransaction activation") {
+  property(s"sponsor has no WAVES but receives them just in time before $BlockV5 activation") {
     val s = settings(0)
     val setup = for {
       master    <- accountGen
