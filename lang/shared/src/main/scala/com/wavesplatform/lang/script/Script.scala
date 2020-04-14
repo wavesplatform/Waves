@@ -36,6 +36,8 @@ trait Script {
 
 object Script {
 
+  case class ComplexityInfo(verifierComplexity: Long, callableComplexities: Map[String, Long], maxComplexity: Long)
+
   val checksumLength = 4
 
   def fromBase64String(str: String): Either[ScriptParseError, Script] =
@@ -49,7 +51,7 @@ object Script {
   def decompile(s: Script): (String, DirectiveMeta) = {
     val cType: ContentType = s match {
       case _: ExprScript => Expression
-      case _ => DAppType
+      case _             => DAppType
     }
     val ctx = getDecompilerContext(s.stdLibVersion, cType)
     val (scriptText, directives) = s match {
@@ -64,29 +66,28 @@ object Script {
     (directivesText + scriptText, meta)
   }
 
-  def estimate(s: Script, estimator: ScriptEstimator): Either[String, Long] =
-    complexityInfo(s, estimator).map(_._1)
-
-  def complexityInfo(s: Script, estimator: ScriptEstimator): Either[String, (Long, Map[String, Long])] =
-    s match {
+  def complexityInfo(script: Script, estimator: ScriptEstimator): Either[String, ComplexityInfo] =
+    script match {
       case script: ExprScript =>
-        ExprScript.estimate(script.expr, script.stdLibVersion, estimator).map((_, Map()))
-      case ContractScriptImpl(version, contract) =>
-        ContractScript.estimateComplexity(version, contract, estimator)
+        ExprScript
+          .estimate(script.expr, script.stdLibVersion, estimator)
+          .map(complexity => ComplexityInfo(complexity, Map(), complexity))
+      case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
+        for {
+          (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(version, contract, estimator)
+          complexityInfo = verifierFuncOpt.fold(
+            ComplexityInfo(0L, callableComplexities, maxComplexity)
+          )(
+            v => ComplexityInfo(callableComplexities(v.u.name), callableComplexities - v.u.name, maxComplexity)
+          )
+        } yield complexityInfo
     }
+
+  def estimate(script: Script, estimator: ScriptEstimator): Either[String, Long] =
+    complexityInfo(script, estimator)
+      .map(_.maxComplexity)
 
   def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    Script.complexityInfo(script, estimator)
-      .map(calcVerifierComplexity(script, _))
-
-  private def calcVerifierComplexity(
-    script:     Script,
-    complexity: (Long, Map[String, Long])
-  ): Long = {
-    val (totalComplexity, cm) = complexity
-    script match {
-      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
-      case _ => totalComplexity
-    }
-  }
+    complexityInfo(script, estimator)
+      .map(_.verifierComplexity)
 }
