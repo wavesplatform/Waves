@@ -66,7 +66,7 @@ object FunctionIds {
   val FROMBASE16: Short = 605
 
   val CHECK_MERKLE_PROOF: Short = 700
-  val CREATE_MERKLE_PROOF: Short = 701
+  val CREATE_MERKLE_ROOT: Short = 701
 
   val BLS12_GROTH16_VERIFY: Short = 800
 
