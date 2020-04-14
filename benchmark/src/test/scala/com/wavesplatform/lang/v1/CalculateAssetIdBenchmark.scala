@@ -2,7 +2,7 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.v1.CalculateAssetIdBenchmark.{CalculateAssetIdSt, CurveSt}
+import com.wavesplatform.lang.v1.CalculateAssetIdBenchmark._
 import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.{curve25519, randomBytes}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.traits.domain.Issue
@@ -19,20 +19,68 @@ import scorex.crypto.signatures.{Curve25519, Signature}
 @Measurement(iterations = 10)
 class CalculateAssetIdBenchmark {
   @Benchmark
-  def blake2b256_150Kb(st: CurveSt, bh: Blackhole): Unit =
-    bh.consume(Blake2b256.hash(st.message150Kb))
+  def blake2b256_150Kb(st: CurveSt150k, bh: Blackhole): Unit =
+    bh.consume(Blake2b256.hash(st.message))
 
   @Benchmark
-  def sha256_150Kb(st: CurveSt, bh: Blackhole): Unit =
-    bh.consume(Sha256.hash(st.message150Kb))
+  def sha256_150Kb(st: CurveSt150k, bh: Blackhole): Unit =
+    bh.consume(Sha256.hash(st.message))
 
   @Benchmark
-  def keccak256_150Kb(st: CurveSt, bh: Blackhole): Unit =
-    bh.consume(Keccak256.hash(st.message150Kb))
+  def keccak256_150Kb(st: CurveSt150k, bh: Blackhole): Unit =
+    bh.consume(Keccak256.hash(st.message))
 
   @Benchmark
-  def sigVerify_150Kb(st: CurveSt, bh: Blackhole): Unit =
-    bh.consume(Curve25519.verify(Signature @@ st.signature150Kb, st.message150Kb, st.publicKey))
+  def blake2b256_128Kb(st: CurveSt128k, bh: Blackhole): Unit =
+    bh.consume(Blake2b256.hash(st.message))
+
+  @Benchmark
+  def sha256_128Kb(st: CurveSt128k, bh: Blackhole): Unit =
+    bh.consume(Sha256.hash(st.message))
+
+  @Benchmark
+  def keccak256_128Kb(st: CurveSt128k, bh: Blackhole): Unit =
+    bh.consume(Keccak256.hash(st.message))
+
+  @Benchmark
+  def blake2b256_96Kb(st: CurveSt96k, bh: Blackhole): Unit =
+    bh.consume(Blake2b256.hash(st.message))
+
+  @Benchmark
+  def sha256_96Kb(st: CurveSt96k, bh: Blackhole): Unit =
+    bh.consume(Sha256.hash(st.message))
+
+  @Benchmark
+  def keccak256_96Kb(st: CurveSt96k, bh: Blackhole): Unit =
+    bh.consume(Keccak256.hash(st.message))
+
+  @Benchmark
+  def blake2b256_64Kb(st: CurveSt64k, bh: Blackhole): Unit =
+    bh.consume(Blake2b256.hash(st.message))
+
+  @Benchmark
+  def sha256_64Kb(st: CurveSt64k, bh: Blackhole): Unit =
+    bh.consume(Sha256.hash(st.message))
+
+  @Benchmark
+  def keccak256_64Kb(st: CurveSt64k, bh: Blackhole): Unit =
+    bh.consume(Keccak256.hash(st.message))
+
+  @Benchmark
+  def blake2b256_32Kb(st: CurveSt32k, bh: Blackhole): Unit =
+    bh.consume(Blake2b256.hash(st.message))
+
+  @Benchmark
+  def sha256_32Kb(st: CurveSt32k, bh: Blackhole): Unit =
+    bh.consume(Sha256.hash(st.message))
+
+  @Benchmark
+  def keccak256_32Kb(st: CurveSt32k, bh: Blackhole): Unit =
+    bh.consume(Keccak256.hash(st.message))
+
+  @Benchmark
+  def sigVerify_150Kb(st: CurveSt150k, bh: Blackhole): Unit =
+    bh.consume(Curve25519.verify(Signature @@ st.signature, st.message, st.publicKey))
 
   @Benchmark
   def calculateAssetId(st: CalculateAssetIdSt, bh: Blackhole): Unit =
@@ -41,12 +89,26 @@ class CalculateAssetIdBenchmark {
 
 object CalculateAssetIdBenchmark {
   @State(Scope.Benchmark)
-  class CurveSt {
-    val (privateKey, publicKey) = curve25519.generateKeypair
-    val message150Kb            = randomBytes(150 * 1024)
-    val message32Kb             = randomBytes(32 * 1024)
-    val signature150Kb          = curve25519.sign(privateKey, message150Kb)
-    val signature32Kb           = curve25519.sign(privateKey, message32Kb)
+  class CurveSt150k extends CurveSt(150)
+
+  @State(Scope.Benchmark)
+  class CurveSt128k extends CurveSt(128)
+
+  @State(Scope.Benchmark)
+  class CurveSt96k extends CurveSt(96)
+
+  @State(Scope.Benchmark)
+  class CurveSt64k extends CurveSt(64)
+
+  @State(Scope.Benchmark)
+  class CurveSt32k extends CurveSt(32)
+
+  val (privateKey, gpublicKey) = curve25519.generateKeypair
+
+  class CurveSt(size: Int) {
+    val message   = randomBytes(size * 1024)
+    val signature = curve25519.sign(privateKey, message)
+    val publicKey = gpublicKey
   }
 
   @State(Scope.Benchmark)
