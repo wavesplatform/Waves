@@ -1385,7 +1385,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
             """.stripMargin)
   )
 
-  property("groth16Verify_*inputs (faulse)") {
+  property("groth16Verify_*inputs (false)") {
     for((ii, lets) <- grothsFail) {
       val i = if(ii == 0) { 1 } else { ii }
       val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
