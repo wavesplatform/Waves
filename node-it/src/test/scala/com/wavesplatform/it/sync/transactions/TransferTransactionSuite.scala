@@ -199,4 +199,39 @@ class TransferTransactionSuite extends BaseTransactionSuite with CancelAfterFail
       }
     }
   }
+
+  test("able to pass multiple typed attachments to transfer transaction V3") {
+    val txWithStringAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Str("somestring"))
+      )
+
+    val txWithBoolAtt =
+      sender.transfer(
+        firstAddress,
+        secondAddress,
+        transferAmount,
+        minFee,
+        version = TxVersion.V3,
+        typedAttachment = Some(Attachment.Bool(false))
+      )
+
+    val t1 = sender.waitForTransaction(txWithStringAtt.id)
+    val t2 = sender.waitForTransaction(txWithBoolAtt.id)
+
+    def checkBlock(h: Int): Unit = {
+      val block = sender.blockAt(h)
+      assert(Set(t1.id, t2.id).subsetOf(block.transactions.map(_.id).toSet))
+    }
+
+    val height = sender.height
+    checkBlock(height)
+    nodes.waitForHeightArise()
+    checkBlock(height)
+  }
 }

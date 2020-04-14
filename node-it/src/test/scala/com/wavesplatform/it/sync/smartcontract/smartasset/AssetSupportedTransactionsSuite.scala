@@ -431,7 +431,7 @@ class AssetSupportedTransactionsSuite extends BaseTransactionSuite {
       )
       .id
 
-    assertApiError(sender.setAssetScript(assetWOSupport, firstAddress, smartMinFee, Some(scriptBase64)), errNotAllowedByTokenApiError)
+    assertApiError(sender.setAssetScript(assetWOSupport, firstAddress, setAssetScriptFee, Some(scriptBase64)), errNotAllowedByTokenApiError)
     assertApiError(sender.transfer(firstAddress, secondAddress, 100, smartMinFee, Some(assetWOSupport)), errNotAllowedByTokenApiError)
     assertApiError(sender.burn(firstAddress, assetWOSupport, 10, smartMinFee), errNotAllowedByTokenApiError)
     assertApiError(

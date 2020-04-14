@@ -563,7 +563,7 @@ class BlockchainUpdaterImpl(
     compositeBlockchain.transferById(id)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readLock {
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readLock {
     compositeBlockchain.transactionInfo(id)
   }
 

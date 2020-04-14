@@ -28,7 +28,7 @@ trait CommonTransactionsApi {
       sender: Option[Address],
       transactionTypes: Set[Byte],
       fromId: Option[ByteStr] = None
-  ): Observable[(Height, Transaction)]
+  ): Observable[(Height, Transaction, Boolean)]
 
   def transactionById(txId: ByteStr): Option[TransactionMeta]
 
@@ -51,7 +51,7 @@ trait CommonTransactionsApi {
 }
 
 object CommonTransactionsApi {
-  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])])
+  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
 
   def apply(
       maybeDiff: => Option[(Height, Diff)],
@@ -71,18 +71,21 @@ object CommonTransactionsApi {
         sender: Option[Address],
         transactionTypes: Set[Byte],
         fromId: Option[ByteStr] = None
-    ): Observable[(Height, Transaction)] = resolve(subject).fold(Observable.empty[(Height, Transaction)]) { subjectAddress =>
+    ): Observable[(Height, Transaction, Boolean)] = resolve(subject).fold(Observable.empty[(Height, Transaction, Boolean)]) { subjectAddress =>
       common.addressTransactions(db, maybeDiff, subjectAddress, sender, transactionTypes, fromId)
     }
 
     override def transactionById(transactionId: ByteStr): Option[TransactionMeta] =
       blockchain.transactionInfo(transactionId).map {
-        case (height, ist: InvokeScriptTransaction) =>
-          Height(height) ->
+        case (height, ist: InvokeScriptTransaction, status) =>
+          (
+            Height(height),
             Right(
               ist -> maybeDiff.flatMap(_._2.scriptResults.get(transactionId)).orElse(AddressTransactions.loadInvokeScriptResult(db, transactionId))
-            )
-        case (height, tx) => Height(height) -> Left(tx)
+            ),
+            status
+          )
+        case (height, tx, status) => (Height(height), Left(tx), status)
 
       }
 
@@ -113,10 +116,10 @@ object CommonTransactionsApi {
 
     override def transactionProofs(transactionIds: List[ByteStr]): List[TransactionProof] =
       for {
-        transactionId           <- transactionIds
-        (height, transaction)   <- blockchain.transactionInfo(transactionId)
-        (meta, allTransactions) <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
-        transactionProof        <- block.transactionProof(transaction, allTransactions)
+        transactionId            <- transactionIds
+        (height, transaction, _) <- blockchain.transactionInfo(transactionId)
+        (meta, allTransactions)  <- blockAt(height) if meta.header.version >= Block.ProtoBlockVersion
+        transactionProof         <- block.transactionProof(transaction, allTransactions)
       } yield transactionProof
   }
 }

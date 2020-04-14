@@ -17,12 +17,12 @@ import com.wavesplatform.state.diffs.ENOUGH_AMT
 import com.wavesplatform.state.utils._
 import com.wavesplatform.state.{BlockchainUpdaterImpl, Height, TransactionId, TxNum}
 import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.transfer.TransferTransaction
+import com.wavesplatform.transaction.{GenesisTransaction, TxVersion}
 import com.wavesplatform.utils.Time
 import com.wavesplatform.{RequestGen, TransactionGen, WithDB, database}
-import org.scalacheck.Gen
+import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest.{FreeSpec, Matchers}
 import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 
@@ -248,10 +248,11 @@ class LevelDBWriterSpec
       bcu.processBlock(block4, block4.header.generationSignature) shouldBe 'right
       bcu.processBlock(block5, block5.header.generationSignature) shouldBe 'right
 
-      def blockAt(height: Int): Option[Block] = bcu.liquidBlockMeta
-        .filter(_ => bcu.height == height)
-        .flatMap(m => bcu.liquidBlock(m.id))
-        .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
+      def blockAt(height: Int): Option[Block] =
+        bcu.liquidBlockMeta
+          .filter(_ => bcu.height == height)
+          .flatMap(m => bcu.liquidBlock(m.id))
+          .orElse(db.readOnly(ro => database.loadBlock(Height(height), ro)))
 
       blockAt(1).get shouldBe genesisBlock
       blockAt(2).get shouldBe block1
@@ -284,6 +285,33 @@ class LevelDBWriterSpec
 
         db.put(Keys.transferTransactionAt(Height @@ 1, TxNum @@ 0.toShort).keyBytes, Array[Byte](TransferTransaction.typeId, 2, 3, 4, 5, 6))
         intercept[BufferUnderflowException](writer.transferById(transactionId))
+      }
+    }
+  }
+
+  "readTransactionBytes" - {
+    "reads correct failed transactions" in {
+      val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
+
+      val scenario =
+        for {
+          oldBytesTx <- randomTransactionGen.map(tx => (tx, true))
+          newBytesTx <- Gen
+            .oneOf(
+              exchangeTransactionGen.map(tx => tx.copy(version = TxVersion.V3)),
+              invokeScriptGen(paymentListGen).map(tx => tx.copy(version = TxVersion.V3))
+            )
+            .flatMap(tx => Arbitrary.arbBool.arbitrary.map(s => (tx, s)))
+          (tx, status) <- Gen.oneOf(oldBytesTx, newBytesTx)
+        } yield (tx, status)
+
+      forAll(scenario) {
+        case (tx, s) =>
+          val transactionId = tx.id()
+          db.put(Keys.transactionHNById(TransactionId(transactionId)).keyBytes, database.writeTransactionHN((Height(1), TxNum(0.toShort))))
+          db.put(Keys.transactionAt(Height(1), TxNum(0.toShort)).keyBytes, database.writeTransaction((tx, s)))
+
+          writer.transactionInfo(transactionId) shouldBe Some((1, tx, s))
       }
     }
   }

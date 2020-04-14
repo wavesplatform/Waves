@@ -301,8 +301,8 @@ object AssetsApiRoute {
     // (timestamp, height)
     def additionalInfo(id: ByteStr): Either[String, (Long, Int)] =
       for {
-        tt <- blockchain.transactionInfo(id).toRight("Failed to find issue/invokeScript transaction by ID")
-        (h, mtx) = tt
+        tt <- blockchain.transactionInfo(id).filter { case (_, _, confirmed) => confirmed }.toRight("Failed to find issue/invokeScript transaction by ID")
+        (h, mtx, _) = tt
         ts <- (mtx match {
           case tx: IssueTransaction        => Some(tx.timestamp)
           case tx: InvokeScriptTransaction => Some(tx.timestamp)
