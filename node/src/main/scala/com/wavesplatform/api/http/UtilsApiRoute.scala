@@ -10,6 +10,7 @@ import com.wavesplatform.common.utils._
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.script.Script
+import com.wavesplatform.lang.script.Script.ComplexityInfo
 import com.wavesplatform.lang.v1.estimator.ScriptEstimator
 import com.wavesplatform.settings.RestAPISettings
 import com.wavesplatform.state.diffs.FeeValidation
@@ -94,10 +95,11 @@ case class UtilsApiRoute(
           result
             .fold(
               e => ScriptCompilerError(e), {
-                case (script, (verifierComplexity, callableComplexities)) =>
+                case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
                   Json.obj(
                     "script"               -> script.bytes().base64,
-                    "complexity"           -> verifierComplexity,
+                    "complexity"           -> maxComplexity,
+                    "verifierComplexity"   -> verifierComplexity,
                     "callableComplexities" -> callableComplexities,
                     "extraFee"             -> FeeValidation.ScriptExtraFee
                   )
@@ -139,17 +141,18 @@ case class UtilsApiRoute(
           .left
           .map(_.m)
           .flatMap { script =>
-            Script.verifierAndCallableComplexities(script, estimator).map((script, _))
+            Script.complexityInfo(script, estimator).map((script, _))
           }
       ) { result =>
         complete(
           result.fold(
             e => ScriptCompilerError(e), {
-              case (script, (verifierComplexity, callableComplexities)) =>
+              case (script, ComplexityInfo(verifierComplexity, callableComplexities, maxComplexity)) =>
                 Json.obj(
                   "script"               -> code,
                   "scriptText"           -> script.expr.toString, // [WAIT] Script.decompile(script),
-                  "complexity"           -> verifierComplexity,
+                  "complexity"           -> maxComplexity,
+                  "verifierComplexity"   -> verifierComplexity,
                   "callableComplexities" -> callableComplexities,
                   "extraFee"             -> FeeValidation.ScriptExtraFee
                 )
