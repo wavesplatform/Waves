@@ -850,4 +850,45 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val res         = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script
   }
+
+  property("V4 - new case types") {
+    val prefix =
+      """
+        | {-# STDLIB_VERSION 4    #-}
+        | {-#CONTENT_TYPE    DAPP #-}
+        |""".stripMargin
+
+    val types = ": UpdateAssetInfoTransaction | InvokeScriptTransaction | DataTransaction | IssueTransaction | TransferTransaction | MassTransferTransaction | Asset | BlockInfo"
+
+    def script(t: String) = s"""
+        | func m (v$t) =
+        |   match v {
+        |    case a: UpdateAssetInfoTransaction => nil
+        |    case a: InvokeScriptTransaction => nil
+        |    case a: DataTransaction => nil
+        |    case a: IssueTransaction => nil
+        |    case a: TransferTransaction => nil
+        |    case a: MassTransferTransaction => nil
+        |    case a: Asset => nil
+        |    case a: BlockInfo => nil
+        |    case _ => nil
+        |   }
+        |""".stripMargin
+
+    val parsedExpr = Parser.parseContract(prefix ++ script(types)).get.value
+
+    val ctx =
+      Monoid.combineAll( Seq(
+        PureContext.build(Global, V4).withEnvironment[Environment],
+        CryptoContext.build(Global, V4).withEnvironment[Environment],
+        WavesContext.build(DirectiveSet(V4, Account, DAppType).explicitGet())
+      ))
+
+    val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
+    println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
+    println(decompilerContextV4.opCodes)
+    val res         = Decompiler(dApp, ctx.decompilerContext)
+    res shouldEq script("")
+  }
+ 
 }
