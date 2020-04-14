@@ -314,8 +314,8 @@ object SyncHttpApi extends Assertions {
       sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
-      sync(async(n).debugStateChangesByAddress(address, limit))
+    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[DebugStateChanges] = {
+      sync(async(n).debugStateChangesByAddress(address, limit, after))
     }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =

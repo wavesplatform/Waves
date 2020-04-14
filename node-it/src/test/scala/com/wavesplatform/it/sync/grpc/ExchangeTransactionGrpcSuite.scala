@@ -63,6 +63,15 @@ class ExchangeTransactionGrpcSuite extends GrpcBaseTransactionSuite with NTPTime
     val amount             = 40000000L
     val priceAssetSpending = price * amount / 100000000L
 
+    sender.broadcastTransfer(
+      buyer,
+      Recipient().withPublicKeyHash(sellerAddress),
+      someAssetAmount / 2,
+      minFee,
+      assetId = feeAssetId.toString,
+      waitForTx = true
+    )
+
     for ((o1ver, o2ver, matcherFeeOrder1, matcherFeeOrder2, buyerWavesDelta, sellerWavesDelta, buyerAssetDelta, sellerAssetDelta) <- Seq(
            (1: Byte, 3: Byte, Waves, IssuedAsset(feeAssetId), amount - matcherFee, -amount, -priceAssetSpending, priceAssetSpending - matcherFee),
            (1: Byte, 3: Byte, Waves, Waves, amount - matcherFee, -amount - matcherFee, -priceAssetSpending, priceAssetSpending),

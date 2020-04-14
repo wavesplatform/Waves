@@ -19,12 +19,12 @@ import org.scalatestplus.scalacheck.ScalaCheckDrivenPropertyChecks
 import scala.concurrent.duration._
 
 class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyChecks with BlockGen with WithDomain with Matchers with NoShrink {
-  def transferGen(sender: KeyPair, rs: Gen[AddressOrAlias]): Gen[TransferTransaction] =
+  def transferGen(sender: KeyPair, rs: Gen[AddressOrAlias], maxAmount: Long): Gen[TransferTransaction] =
     for {
       recipient <- rs
       t <- Gen.oneOf(
-        transferGeneratorPV2(ntpTime.getTimestamp(), sender, recipient, 100000000000L),
-        transferGeneratorP(ntpTime.getTimestamp(), sender, recipient, 100000000000L)
+        transferGeneratorPV2(ntpTime.getTimestamp(), sender, recipient, maxAmount),
+        transferGeneratorP(ntpTime.getTimestamp(), sender, recipient, maxAmount)
       )
     } yield t
 
@@ -52,10 +52,10 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
     recipient1    <- accountGen
     recipient2    <- accountGen
     txCount1      <- Gen.choose(10, 50)
-    transactions1 <- Gen.listOfN(txCount1, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress)))
+    transactions1 <- Gen.listOfN(txCount1, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress), Constants.TotalWaves / 2 / txCount1))
     block1 = mkBlock(sender, genesisBlock.id(), transactions1)
     txCount2      <- Gen.choose(10, 50)
-    transactions2 <- Gen.listOfN(txCount2, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress)))
+    transactions2 <- Gen.listOfN(txCount2, transferGen(sender, Gen.oneOf(recipient1, recipient2).map(_.toAddress), Constants.TotalWaves / 2 / txCount2))
     block2 = mkBlock(sender, block1.id(), transactions2)
   } yield {
     (sender, recipient1, recipient2, Seq(genesisBlock, block1, block2))

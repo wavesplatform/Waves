@@ -239,7 +239,7 @@ class AssetTransactionsDiffTest
     ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction)] =
+  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction, ReissueTransaction)] =
     for {
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
@@ -266,8 +266,9 @@ class AssetTransactionsDiffTest
       transfer = TransferTransaction
         .selfSigned(TxVersion.V1, accountA, accountB, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
         .explicitGet()
-      reissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
-    } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue)
+      reissue = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+      illegalReissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+    } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue, illegalReissue)
 
   property("Can issue smart asset with script") {
     forAll(for {
@@ -302,7 +303,7 @@ class AssetTransactionsDiffTest
 
   property("Can transfer when script evaluates to TRUE") {
     forAll(genesisIssueTransferReissue("true")) {
-      case (gen, issue, transfer, _) =>
+      case (gen, issue, transfer, _, _) =>
         assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS) {
           case (blockDiff, newState) =>
             val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
@@ -314,7 +315,7 @@ class AssetTransactionsDiffTest
 
   property("Cannot transfer when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
-      case (gen, issue, transfer, _) =>
+      case (gen, issue, transfer, _, _) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, transfer)), smartEnabledFS)(
           ei => ei should produce("TransactionNotAllowedByScript")
         )
@@ -323,7 +324,8 @@ class AssetTransactionsDiffTest
 
   property("Cannot reissue when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
-      case (gen, issue, _, reissue) =>
+      case (gen, issue, _, reissue, _) =>
+
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS)(
           ei => ei should produce("TransactionNotAllowedByScript")
         )
@@ -332,8 +334,8 @@ class AssetTransactionsDiffTest
 
   property("Only issuer can reissue") {
     forAll(genesisIssueTransferReissue("true")) {
-      case (gen, issue, _, reissue) =>
-        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS) { ei =>
+      case (gen, issue, _, _, illegalReissue) =>
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, illegalReissue)), smartEnabledFS) { ei =>
           ei should produce("Asset was issued by other address")
         }
     }

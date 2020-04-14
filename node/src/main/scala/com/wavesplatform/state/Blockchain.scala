@@ -40,7 +40,7 @@ trait Blockchain {
   def wavesAmount(height: Int): BigInt
 
   def transferById(id: ByteStr): Option[(Int, TransferTransaction)]
-  def transactionInfo(id: ByteStr): Option[(Int, Transaction)]
+  def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)]
   def transactionHeight(id: ByteStr): Option[Int]
 
   def containsTransaction(tx: Transaction): Boolean

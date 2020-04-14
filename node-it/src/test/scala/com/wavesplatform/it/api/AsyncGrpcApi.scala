@@ -6,19 +6,7 @@ import com.google.protobuf.ByteString
 import com.google.protobuf.empty.Empty
 import com.wavesplatform.account.{AddressScheme, Alias, KeyPair}
 import com.wavesplatform.api.grpc.BalanceResponse.WavesBalances
-import com.wavesplatform.api.grpc.{
-  AccountsApiGrpc,
-  AssetInfoResponse,
-  AssetRequest,
-  AssetsApiGrpc,
-  BalanceResponse,
-  BalancesRequest,
-  BlockRequest,
-  BlocksApiGrpc,
-  TransactionResponse,
-  TransactionsApiGrpc,
-  TransactionsRequest
-}
+import com.wavesplatform.api.grpc.{TransactionStatus => PBTransactionStatus, _}
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.crypto
 import com.wavesplatform.it.Node
@@ -35,6 +23,7 @@ import com.wavesplatform.transaction.assets.exchange.Order
 import com.wavesplatform.transaction.{Asset, TxVersion}
 import io.grpc.stub.StreamObserver
 import monix.eval.Task
+import monix.execution.Scheduler
 import monix.reactive.subjects.ConcurrentSubject
 import play.api.libs.json.Json
 
@@ -60,14 +49,18 @@ object AsyncGrpcApi {
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
-    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
+    def stateChanges(request: TransactionsRequest): Future[Seq[StateChangesDetails]] = {
       val (obs, result) = createCallObserver[InvokeScriptResult]
-      val ids           = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
-      transactions.getStateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address), obs)
+      transactions.getStateChanges(request, obs)
       result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
         r.map(VISR.fromPB).map(r => Json.toJson(r).as[StateChangesDetails])
       }
+    }
+
+    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
+      val ids = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
+      stateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address))
     }
 
     def broadcastIssue(
@@ -266,23 +259,18 @@ object AsyncGrpcApi {
       }
     }
 
-    def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
-      val subj = ConcurrentSubject.publishToOne[T]
+    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] =
+      getTransactionInfo(ByteString.copyFrom(Base58.decode(id)), sender, recipient).map(_.getTransaction)
 
-      val observer = new StreamObserver[T] {
-        override def onNext(value: T): Unit      = subj.onNext(value)
-        override def onError(t: Throwable): Unit = subj.onError(t)
-        override def onCompleted(): Unit         = subj.onComplete()
-      }
-
-      (observer, subj.toListL)
-    }
-
-    def getTransaction(id: String, sender: ByteString = ByteString.EMPTY, recipient: Option[Recipient] = None): Future[PBSignedTransaction] = {
+    def getTransactionInfo(
+        id: ByteString,
+        sender: ByteString = ByteString.EMPTY,
+        recipient: Option[Recipient] = None
+    ): Future[TransactionResponse] = {
       val (obs, result) = createCallObserver[TransactionResponse]
-      val req           = TransactionsRequest(transactionIds = Seq(ByteString.copyFrom(Base58.decode(id))), sender = sender, recipient = recipient)
+      val req           = TransactionsRequest(transactionIds = Seq(id), sender = sender, recipient = recipient)
       transactions.getTransactions(req, obs)
-      result.map(_.headOption.getOrElse(throw new NoSuchElementException("Transaction not found")).getTransaction).runToFuture
+      result.map(_.headOption.getOrElse(throw new NoSuchElementException("Transaction not found"))).runToFuture
     }
 
     def waitFor[A](desc: String)(f: this.type => Future[A], cond: A => Boolean, retryInterval: FiniteDuration): Future[A] = {
@@ -314,17 +302,6 @@ object AsyncGrpcApi {
     }
 
     def wavesBalance(address: ByteString): Future[WavesBalances] = {
-      def createCallObserver[T]: (StreamObserver[T], Task[List[T]]) = {
-        val subj = ConcurrentSubject.publishToOne[T]
-
-        val observer = new StreamObserver[T] {
-          override def onNext(value: T): Unit      = subj.onNext(value)
-          override def onError(t: Throwable): Unit = subj.onError(t)
-          override def onCompleted(): Unit         = subj.onComplete()
-        }
-
-        (observer, subj.toListL)
-      }
       val (obs, result) = createCallObserver[BalanceResponse]
       val req           = BalancesRequest.of(address, Seq(ByteString.EMPTY))
       accounts.getBalances(req, obs)
@@ -398,12 +375,13 @@ object AsyncGrpcApi {
         functionCall: Option[FUNCTION_CALL],
         payments: Seq[Amount] = Seq.empty,
         fee: Long,
-        version: Int = 2
+        version: Int = 2,
+        feeAssetId: ByteString = ByteString.EMPTY
     ): Future[PBSignedTransaction] = {
       val unsigned = PBTransaction(
         chainId,
         ByteString.copyFrom(caller.publicKey),
-        Some(Amount.of(ByteString.EMPTY, fee)),
+        Some(Amount.of(feeAssetId, fee)),
         System.currentTimeMillis,
         version,
         PBTransaction.Data.InvokeScript(
@@ -500,5 +478,23 @@ object AsyncGrpcApi {
     }
 
     def assetInfo(assetId: String): Future[AssetInfoResponse] = assets.getInfo(AssetRequest(ByteString.copyFrom(Base58.decode(assetId))))
+
+    def getStatuses(request: TransactionsByIdRequest): Future[Seq[PBTransactionStatus]] = {
+      val (obs, result) = createCallObserver[PBTransactionStatus]
+      transactions.getStatuses(request, obs)
+      result.runToFuture
+    }
+  }
+
+  private def createCallObserver[T](implicit s: Scheduler): (StreamObserver[T], Task[List[T]]) = {
+    val subj = ConcurrentSubject.publishToOne[T]
+
+    val observer = new StreamObserver[T] {
+      override def onNext(value: T): Unit      = subj.onNext(value)
+      override def onError(t: Throwable): Unit = subj.onError(t)
+      override def onCompleted(): Unit         = subj.onComplete()
+    }
+
+    (observer, subj.toListL)
   }
 }
