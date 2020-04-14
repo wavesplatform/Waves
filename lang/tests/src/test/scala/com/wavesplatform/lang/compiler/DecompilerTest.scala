@@ -698,6 +698,14 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     Decompiler(expr, decompilerContextV3) shouldEq script
   }
 
+  property("V3 - checkMerkleProof") {
+    val script =
+      "checkMerkleProof(base58'',base58'',base58'')"
+    val Right((expr, _)) = compileExpr(script, v=V3)
+    Decompiler(expr, decompilerContextV3) shouldEq script
+  }
+
+
   property("list func params") {
     val script =
       """
@@ -810,6 +818,19 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
         |   let v9 = valueOrErrorMessage(1,"")
         |   let v10 = toUtf8String(base58'')
         |   let v11 = toInt(base58'', toInt(base58''))
+        |   let v12 = indexOf("", "")
+        |   let v13 = lastIndexOf("", "")
+        |   let v14 = split("", "")
+        |   let v15 = parseInt("")
+        |   let v16 = parseIntValue("")
+        |   let v17 = pow(0,0,0,0,0,UP)
+        |   let v18 = log(0,0,0,0,0,UP)
+        |   let v19 = assetInfo(base58'')
+        |   let v20 = blockInfoByHeight(0)
+        |   let v21 = transferTransactionById(base58'')
+        |   let v22 = toString(Address(base58''))
+        |   let v23 = toBase16String(base58'')
+        |   let v24 = fromBase16String("")
         |   nil
         | }
         """.stripMargin
@@ -826,7 +847,7 @@ class DecompilerTest extends PropSpec with PropertyChecks with Matchers {
     val Right(dApp) = compiler.ContractCompiler(ctx.compilerContext, parsedExpr, V4)
     println(ctx.compilerContext.functionDefs.mapValues(_.fSigList.map(_.header).filter(_.isInstanceOf[Native]).map(_.asInstanceOf[Native].name)).toList.flatMap { case (name, codes) => codes.map((_, name)) })
     println(decompilerContextV4.opCodes)
-    val res         = Decompiler(dApp, decompilerContextV4)
+    val res         = Decompiler(dApp, ctx.decompilerContext)
     res shouldEq script
   }
 }
