@@ -212,6 +212,38 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |func verify() = true
     """.stripMargin
 
+  val dAppWithoutVerifier =
+    """
+      |{-# STDLIB_VERSION 3 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |@Callable(i)
+      |func write(value: Int) = {
+      |    WriteSet([DataEntry("result", value)])
+      |}
+      |
+      |@Callable(i)
+      |func sendAsset(recipient: String, amount: Int, assetId: String) = {
+      |    TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, assetId.fromBase58String())])
+      |}
+      |
+      |@Callable(i)
+      |func writeAndSendWaves(value: Int, recipient: String, amount: Int) = {
+      |    ScriptResult(
+      |        WriteSet([DataEntry("result", value)]),
+      |        TransferSet([ScriptTransfer(Address(recipient.fromBase58String()), amount, unit)])
+      |    )
+      |}
+    """.stripMargin
+
+  val emptyDApp =
+    """
+      |{-# STDLIB_VERSION 3 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+    """.stripMargin
+
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64
     Post(routePath("/script/decompile"), base64) ~> route ~> check {
@@ -427,13 +459,31 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
 
       Script.fromBase64String((json \ "script").as[String]) shouldBe Right(expectedScript)
       (json \ "complexity").as[Long] shouldBe 3
+      (json \ "verifierComplexity").as[Long] shouldBe 3
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
     Post(routePath("/script/compileCode"), dApp) ~> route ~> check {
       val json = responseAs[JsValue]
-      (json \ "complexity").as[Long] shouldBe 11
+      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "verifierComplexity").as[Long] shouldBe 11
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithoutVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/compileCode"), emptyDApp) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 0
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
@@ -504,14 +554,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
-    val dAppBase64 = {
-      val ctx = {
-        val directives = DirectiveSet.contractDirectiveSet
-        PureContext.build(Global, V3).withEnvironment[Environment] |+|
+    val ctx = {
+      val directives = DirectiveSet.contractDirectiveSet
+      PureContext.build(Global, V3).withEnvironment[Environment] |+|
         CryptoContext.build(Global, V3).withEnvironment[Environment] |+|
         WavesContext.build(directives)
-      }
+    }
 
+    def dAppToBase64(dApp: String) = {
       val r = for {
         compiled   <- ContractCompiler.compile(dApp, ctx.compilerContext, V3)
         serialized <- Global.serializeContract(compiled, V3)
@@ -520,12 +570,37 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       r.explicitGet()
     }
 
+    val dAppBase64 = dAppToBase64(dApp)
+    val dAppWithoutVerifierBase64 = dAppToBase64(dAppWithoutVerifier)
+    val emptyDAppBase64 = dAppToBase64(emptyDApp)
+
     Post(routePath("/script/estimate"), dAppBase64) ~> route ~> check {
       val json = responseAs[JsValue]
       println(json)
       (json \ "script").as[String] shouldBe dAppBase64
-      (json \ "complexity").as[Long] shouldBe 11
+      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "verifierComplexity").as[Long] shouldBe 11
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/estimate"), dAppWithoutVerifierBase64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      println(json)
+      (json \ "script").as[String] shouldBe dAppWithoutVerifierBase64
+      (json \ "complexity").as[Long] shouldBe 68
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("write" -> 27, "sendAsset" -> 66, "writeAndSendWaves" -> 68)
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/estimate"), emptyDAppBase64) ~> route ~> check {
+      val json = responseAs[JsValue]
+      println(json)
+      (json \ "script").as[String] shouldBe emptyDAppBase64
+      (json \ "complexity").as[Long] shouldBe 0
+      (json \ "verifierComplexity").as[Long] shouldBe 0
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
