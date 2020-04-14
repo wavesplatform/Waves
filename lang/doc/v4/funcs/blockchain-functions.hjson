@@ -30,5 +30,11 @@
       doc: "Gets the data of a transfer transaction."
       paramsDoc: [ "ID of the transfer transaction." ]
     }
+    {
+      name: "transferTransactionFromProto"
+      params: [ "ByteVector" ]
+      doc: "Deserializes transfer transaction: converts protobuf-encoded binary format to a TransferTransaction structure."
+      paramsDoc: [ "Transfer transaction in protobuf-encoded binary format." ]
+    }
   ]
 }
