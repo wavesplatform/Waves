@@ -244,6 +244,21 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       |{-# SCRIPT_TYPE ACCOUNT #-}
     """.stripMargin
 
+  val dAppWithMaxComplexityVerifier =
+    """
+      |{-# STDLIB_VERSION 3 #-}
+      |{-# CONTENT_TYPE DAPP #-}
+      |{-# SCRIPT_TYPE ACCOUNT #-}
+      |
+      |@Callable(i)
+      |func callable(value: Int) = {
+      |    WriteSet([DataEntry("result", value)])
+      |}
+      |
+      |@Verifier(tx)
+      |func verify() = true && true && true && true && true && true && true && true && true && true
+    """.stripMargin
+
   routePath("/script/decompile") in {
     val base64 = ExprScript(script).explicitGet().bytes().base64
     Post(routePath("/script/decompile"), base64) ~> route ~> check {
@@ -484,6 +499,14 @@ class UtilsRouteSpec extends RouteSpec("/utils") with RestAPISettingsHelper with
       (json \ "complexity").as[Long] shouldBe 0
       (json \ "verifierComplexity").as[Long] shouldBe 0
       (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map()
+      (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
+    }
+
+    Post(routePath("/script/compileCode"), dAppWithMaxComplexityVerifier) ~> route ~> check {
+      val json = responseAs[JsValue]
+      (json \ "complexity").as[Long] shouldBe 29
+      (json \ "verifierComplexity").as[Long] shouldBe 29
+      (json \ "callableComplexities").as[Map[String, Int]] shouldBe Map("callable" -> 27)
       (json \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
 
