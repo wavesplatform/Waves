@@ -233,6 +233,7 @@ class AddressRouteSpec
       //      testContract,
       //      Monoid.combineAll(Seq(PureContext.build(com.wavesplatform.lang.directives.values.StdLibVersion.V3), CryptoContext.build(Global))).decompilerContext)
       (response \ "complexity").as[Long] shouldBe 11
+      (response \ "verifierComplexity").as[Long] shouldBe 11
       (response \ "callableComplexities").as[Map[String, Long]] shouldBe callableComplexities - "verify"
       (response \ "extraFee").as[Long] shouldBe FeeValidation.ScriptExtraFee
     }
