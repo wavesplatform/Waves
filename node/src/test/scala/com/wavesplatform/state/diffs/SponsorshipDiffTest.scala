@@ -4,7 +4,7 @@ import com.wavesplatform.TransactionGen
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithState
 import com.wavesplatform.features.BlockchainFeatures
-import com.wavesplatform.features.BlockchainFeatures.AcceptFailedScriptTransaction
+import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.lagonaki.mocks.TestBlock.{create => block}
 import com.wavesplatform.settings.{Constants, FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
@@ -319,7 +319,7 @@ class SponsorshipDiffTest extends PropSpec with PropertyChecks with WithState wi
         assertDiffEi(
           Seq(block(Seq(genesis, issue, sponsor, assetTransfer, wavesTransfer))),
           block(Seq(backWavesTransfer)),
-          s.copy(preActivatedFeatures = s.preActivatedFeatures + (AcceptFailedScriptTransaction.id -> 0))
+          s.copy(preActivatedFeatures = s.preActivatedFeatures + (BlockV5.id -> 0))
         ) { ei => ei should produce("negative waves balance") }
     }
   }

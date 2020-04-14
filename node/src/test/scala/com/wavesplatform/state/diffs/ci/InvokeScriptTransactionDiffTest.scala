@@ -1713,7 +1713,7 @@ class InvokeScriptTransactionDiffTest
       case (invoke, genesisTxs) =>
         tempDb { db =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
           )
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
@@ -1767,7 +1767,7 @@ class InvokeScriptTransactionDiffTest
       case (invoke, genesisTxs) =>
         tempDb { db =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
           )
 
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
@@ -1821,7 +1821,7 @@ class InvokeScriptTransactionDiffTest
       case (invoke, genesisTxs) =>
         tempDb { db =>
           val features = fs.copy(
-            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.MultiPaymentInvokeScript.id -> 0)
+            preActivatedFeatures = fs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {

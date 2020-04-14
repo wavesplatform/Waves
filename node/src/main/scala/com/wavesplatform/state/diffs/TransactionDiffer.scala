@@ -6,7 +6,7 @@ import cats.kernel.Monoid
 import cats.syntax.either._
 import cats.syntax.functor._
 import com.wavesplatform.account.{Address, AddressScheme}
-import com.wavesplatform.features.BlockchainFeatures.AcceptFailedScriptTransaction
+import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics.TxProcessingStats
@@ -191,7 +191,7 @@ object TransactionDiffer {
   // failed transactions related
   private def mayFail(tx: Transaction): Boolean = tx.typeId == InvokeScriptTransaction.typeId || tx.typeId == ExchangeTransaction.typeId
 
-  private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(AcceptFailedScriptTransaction)
+  private def acceptFailed(blockchain: Blockchain): Boolean = blockchain.isFeatureActivated(BlockV5)
 
   private def failedTransactionDiff(blockchain: Blockchain, tx: Transaction, error: Option[ErrorMessage]): Either[ValidationError, Diff] = {
     val extractDAppAddress = tx match {
