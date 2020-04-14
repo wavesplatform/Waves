@@ -268,7 +268,7 @@ object CryptoContext {
     val bls12Groth16VerifyL: Array[BaseFunction[NoContext]] = lgen((1 to 15).toArray,
                                                          (n => (s"groth16Verify_${n._1}inputs", (BLS12_GROTH16_VERIFY_LIM + n._2).toShort)),
                                                          ({ n =>
-                                                           Array(1900, 2000, 2150, 2300, 2450, 2550, 2700, 2900, 3000, 3150, 3250, 3400, 3500, 3650, 3750)(n-1)
+                                                           Array(1200, 1300, 1400, 1500, 1600, 1700, 1800, 1900, 2000, 2100, 2200, 2300, 2400, 2500, 2600)(n-1)
                                                          }),
                                                          (n => {
                                                             case _ :: _ :: CONST_BYTESTR(inputs: ByteStr) :: _ => Either.cond(inputs.size <= n*32, (), s"Invalid inputs count ${inputs.size/32}, must be not greater than $n")
@@ -296,7 +296,7 @@ object CryptoContext {
     val bls12Groth16VerifyF: BaseFunction[NoContext] =
       NativeFunction(
         "groth16Verify",
-        3900,
+        2700,
         BLS12_GROTH16_VERIFY,
         BOOLEAN,
         ("verifying key", BYTESTR),
