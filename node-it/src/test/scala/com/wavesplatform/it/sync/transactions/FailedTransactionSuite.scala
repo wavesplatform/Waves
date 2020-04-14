@@ -20,6 +20,7 @@ import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 
 import scala.concurrent.duration._
+import scala.util.Try
 
 class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike[String] {
   import FailedTransactionSuite._
@@ -106,8 +107,11 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
          |  else []
          |}
          |
-         |@Callable(i)
+         |@Callable(inv)
          |func defineTxHeight(id: ByteVector) = [BooleanEntry(toBase58String(id), transactionHeightById(id).isDefined())]
+         |
+         |@Callable(inv)
+         |func blockIsEven() = if height % 2 == 0 then [] else throw("block height is odd")
          |
         """.stripMargin
 
@@ -542,6 +546,23 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       e.message should include("Transaction is not allowed by account-script")
       e.id shouldBe TransactionNotAllowedByAccountScript.Id
     }
+  }
+
+  test("InvokeScriptTransaction: revalidate transactions returned to UTXPool because of `min-micro-block-age`") {
+    docker.restartNode(dockerNodes().head, configForMinMicroblockAge)
+
+    val caller = sender.createAddress()
+    sender.transfer(sender.address, caller, 100.waves, minFee, waitForTx = true)
+
+    val txs = collection.mutable.ListBuffer[String]()
+    sender.waitFor("wait for even height")(n => n.height, (h: Int) => h % 2 == 0, 100.millis)
+    sender.waitFor("send until odd height")({ n =>
+      Try(n.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee)._1.id).foreach(txs += _)
+      n.height
+    }, (h: Int) => h % 2 != 0, 10.millis)
+    waitForEmptyUtx()
+
+    assertFailedTxs(txs)
   }
 
   def updateTikTok(result: String, fee: Long): String =

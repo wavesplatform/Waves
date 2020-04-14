@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.google.protobuf.ByteString
+import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
@@ -173,7 +174,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
       all(statuses.map(_.status)) shouldBe PBTransactionStatus.Status.CONFIRMED
       all(statuses.map(_.applicationStatus)) should not be ApplicationStatus.UNKNOWN
 
-      val failed = statuses.dropWhile(s => s.applicationStatus == ApplicationStatus.SUCCEED)
+      val failed = statuses.dropWhile(s => s.applicationStatus == ApplicationStatus.SUCCEEDED)
 
       failed.size should be > 0
       all(failed.map(_.applicationStatus)) shouldBe ApplicationStatus.SCRIPT_EXECUTION_FAILED
@@ -298,4 +299,8 @@ object FailedTransactionSuiteLike {
       .right
       .get
   }
+
+  val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
+     |waves.miner.min-micro-block-age = 7
+     |""".stripMargin)
 }

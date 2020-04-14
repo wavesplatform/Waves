@@ -46,7 +46,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .filter { case (_, t, _) => transactionIdSet.isEmpty || transactionIdSet(t.id()) }
           .map {
             case (h, tx, false) => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-            case (h, tx, _)     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEED)
+            case (h, tx, _)     => TransactionResponse(tx.id().toPBByteString, h, Some(tx.toPB), ApplicationStatus.SUCCEEDED)
           }
       )
     }
@@ -87,7 +87,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
           .orElse {
             commonApi.transactionById(txId).map {
               case (h, _, false) => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SCRIPT_EXECUTION_FAILED)
-              case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEED)
+              case (h, _, _)     => TransactionStatus(txId, TransactionStatus.Status.CONFIRMED, h, ApplicationStatus.SUCCEEDED)
             }
           }
           .getOrElse(TransactionStatus(txId, TransactionStatus.Status.NOT_EXISTS))

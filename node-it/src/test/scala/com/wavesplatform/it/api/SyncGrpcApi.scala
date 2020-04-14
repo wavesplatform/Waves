@@ -24,7 +24,7 @@ import io.grpc.StatusRuntimeException
 import org.scalatest.{Assertion, Assertions}
 
 import scala.concurrent.duration._
-import scala.concurrent.{Await, Awaitable}
+import scala.concurrent.{Await, Awaitable, Future}
 import scala.util.control.NonFatal
 import scala.util.{Failure, Success, Try}
 
@@ -214,6 +214,9 @@ object SyncGrpcApi extends Assertions {
 
     def waitForHeightArise(requestAwaitTime: FiniteDuration = RequestAwaitTime): Int =
       sync(async(n).waitForHeight(this.height + 1), requestAwaitTime)
+
+    def waitFor[A](desc: String)(f: Node => A, cond: A => Boolean, retryInterval: FiniteDuration): A =
+      sync(async(n).waitFor(desc)(x => Future.successful(f(x.n)), cond, retryInterval))
 
     def broadcastBurn(
         sender: KeyPair,
