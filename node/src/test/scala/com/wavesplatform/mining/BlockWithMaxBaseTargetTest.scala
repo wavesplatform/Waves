@@ -115,7 +115,7 @@ class BlockWithMaxBaseTargetTest extends FreeSpec with Matchers with WithDB with
   }
 
   def withEnv(f: Env => Unit): Unit = {
-    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub, dbSettings)
+    val defaultWriter = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
 
     val settings0     = WavesSettings.fromRootConfig(loadConfig(ConfigFactory.load()))
     val minerSettings = settings0.minerSettings.copy(quorum = 0)

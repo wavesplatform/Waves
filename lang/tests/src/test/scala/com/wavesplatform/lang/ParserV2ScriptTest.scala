@@ -180,8 +180,8 @@ class ParserV2ScriptTest extends PropSpec with PropertyChecks with Matchers with
   }
 
   property("invalid base16 definition") {
-    parse("base16'mid-size'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "m isn't base16/hex digit"))
-    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(AnyPos, "Need internal bytes number"))
+    parse("base16'mid-size'") shouldBe CONST_BYTESTR(Pos(7, 15), PART.INVALID(Pos(7, 15), "Unrecognized character: m"), None)
+    parse("base16'123'") shouldBe CONST_BYTESTR(AnyPos, PART.INVALID(Pos(7,10), "Invalid input length 3"))
   }
 
   property("literal too long") {

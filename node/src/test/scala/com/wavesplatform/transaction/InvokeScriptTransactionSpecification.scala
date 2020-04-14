@@ -251,7 +251,7 @@ class InvokeScriptTransactionSpecification extends PropSpec with PropertyChecks 
       Some(
         Terms.FUNCTION_CALL(
           FunctionHeader.User("foo"),
-          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L))))
+          List(ARR(IndexedSeq(CONST_LONG(1L), CONST_LONG(2L)), false).explicitGet)
         )
       ),
       Seq(),

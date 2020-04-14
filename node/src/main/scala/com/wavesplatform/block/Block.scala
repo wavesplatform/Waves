@@ -149,14 +149,11 @@ object Block extends ScorexLogging {
           tx      <- GenesisTransaction.create(address, gts.amount, genesisSettings.timestamp)
         } yield tx
       }.sequence
-      generator  = KeyPair(ByteStr.empty)
       baseTarget = genesisSettings.initialBaseTarget
-      genSig     = ByteStr(Array.fill(crypto.DigestLength)(0: Byte))
-      reference  = Array.fill(SignatureLength)(-1: Byte)
       timestamp  = genesisSettings.blockTimestamp
-      block      = create(GenesisBlockVersion, timestamp, reference, baseTarget, genSig, generator, Seq(), -1L, txs)
+      block      = create(GenesisBlockVersion, timestamp, GenesisReference, baseTarget, GenesisGenerationSignature, GenesisGenerator, Seq(), -1L, txs)
       signedBlock = genesisSettings.signature match {
-        case None             => block.sign(generator)
+        case None             => block.sign(GenesisGenerator)
         case Some(predefined) => block.copy(signature = predefined)
       }
       validBlock <- signedBlock.validateGenesis(genesisSettings)
@@ -176,6 +173,10 @@ object Block extends ScorexLogging {
   val BlockIdLength: Int                   = SignatureLength
   val TransactionSizeLength                = 4
   val HitSourceLength                      = 32
+
+  val GenesisReference: Array[TxVersion] = Array.fill(SignatureLength)(-1: Byte)
+  val GenesisGenerator: KeyPair = KeyPair(ByteStr.empty)
+  val GenesisGenerationSignature: BlockId = ByteStr(new Array[Byte](crypto.DigestLength))
 
   val GenesisBlockVersion: Byte = 1
   val PlainBlockVersion: Byte   = 2
