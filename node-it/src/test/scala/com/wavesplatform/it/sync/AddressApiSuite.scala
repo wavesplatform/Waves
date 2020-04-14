@@ -42,15 +42,10 @@ class AddressApiSuite extends BaseTransactionSuite with NTPTime {
     }
 
     for (invalidRegexp <- invalidRegexps) {
-      try {
-        sender.getData(firstAddress, invalidRegexp)
-        fail("RegexCompiler didn't throw expected error")
-      } catch {
-        case err: Throwable =>
-          if (!err.getMessage.contains("Cannot compile regex")) {
-            throw err
-          }
-      }
+      assertBadRequestAndMessage(
+        sender.getData(firstAddress, invalidRegexp),
+        "Cannot compile regex"
+      )
     }
   }
 

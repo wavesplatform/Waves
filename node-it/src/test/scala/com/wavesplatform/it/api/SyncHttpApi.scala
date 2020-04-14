@@ -1,7 +1,6 @@
 package com.wavesplatform.it.api
 
 import java.net.InetSocketAddress
-import java.util.concurrent.TimeoutException
 
 import akka.http.scaladsl.model.StatusCodes.BadRequest
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
@@ -41,6 +40,7 @@ import scala.util._
 import scala.util.control.NonFatal
 
 object SyncHttpApi extends Assertions {
+  case class ApiCallException(cause: Throwable) extends Exception("Error in API call", cause)
   case class ErrorMessage(error: Int, message: String)
   implicit val errorMessageFormat: Format[ErrorMessage] = Json.format
 
@@ -68,7 +68,7 @@ object SyncHttpApi extends Assertions {
   }
 
   def assertBadRequestAndResponse[R](f: => R, errorRegex: String): Assertion = Try(f) match {
-    case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+    case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
       Assertions.assert(
         statusCode == BadRequest.intValue && responseBody.replace("\n", "").matches(s".*$errorRegex.*"),
         s"\nexpected '$errorRegex'\nactual '$responseBody'"
@@ -79,9 +79,12 @@ object SyncHttpApi extends Assertions {
 
   def assertBadRequestAndMessage[R](f: => R, errorMessage: String, expectedStatusCode: Int = BadRequest.intValue): Assertion =
     Try(f) match {
-      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
-        Assertions.assert(statusCode == expectedStatusCode && parse(responseBody).as[ErrorMessage].message.contains(errorMessage))
-      case Failure(e) => Assertions.fail(e)
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
+        Assertions.assert(statusCode == expectedStatusCode, s"Status code not match: $statusCode")
+        val message1 = parse(responseBody).as[ErrorMessage].message
+        Assertions.assert(message1.contains(errorMessage), s"Message not match: $message1")
+      case Failure(e) =>
+        Assertions.fail("Unexpected exception", new Exception(e.toString, e))
       case Success(s) => Assertions.fail(s"Expecting bad request but handle $s")
     }
 
@@ -111,7 +114,7 @@ object SyncHttpApi extends Assertions {
 
   def assertApiError[R](f: => R, expectedError: ApiError): Assertion =
     Try(f) match {
-      case Failure(UnexpectedStatusCodeException(_, _, statusCode, responseBody)) =>
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, statusCode, responseBody))) =>
         import play.api.libs.json._
         parse(responseBody).validate[JsObject] match {
           case JsSuccess(json, _) => (json - "trace") shouldBe expectedError.json
@@ -124,7 +127,7 @@ object SyncHttpApi extends Assertions {
 
   def assertApiError[R](f: => R)(check: GenericApiError => Assertion): Assertion =
     Try(f) match {
-      case Failure(UnexpectedStatusCodeException(_, _, code, responseBody)) =>
+      case Failure(ApiCallException(UnexpectedStatusCodeException(_, _, code, responseBody))) =>
         parse(responseBody).validate[GenericApiError] match {
           case JsSuccess(error, _) => check(error.copy(statusCode = code))
           case JsError(errors)     => Assertions.fail(errors.map { case (_, es) => es.mkString("(", ",", ")") }.mkString(","))
@@ -138,9 +141,7 @@ object SyncHttpApi extends Assertions {
   def sync[A](awaitable: Awaitable[A], atMost: Duration = RequestAwaitTime): A =
     try Await.result(awaitable, atMost)
     catch {
-      case usce: UnexpectedStatusCodeException => throw usce
-      case te: TimeoutException                => throw te
-      case NonFatal(cause)                     => throw new Exception(cause)
+      case NonFatal(cause) => throw ApiCallException(cause)
     }
 
   //noinspection ScalaStyle
@@ -309,8 +310,8 @@ object SyncHttpApi extends Assertions {
     ): Transaction =
       maybeWaitForTransaction(sync(async(n).reissue(sourceAddress, assetId, quantity, reissuable, fee, version)), waitForTx)
 
-    def debugStateChanges(transactionId: String): DebugStateChanges = {
-      sync(async(n).debugStateChanges(transactionId))
+    def debugStateChanges(transactionId: String, amountsAsStrings: Boolean = false): DebugStateChanges = {
+      sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
     }
 
     def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {

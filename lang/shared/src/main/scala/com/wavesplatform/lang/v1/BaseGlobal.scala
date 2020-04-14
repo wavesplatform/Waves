@@ -3,7 +3,6 @@ package com.wavesplatform.lang.v1
 import java.math.RoundingMode
 
 import cats.implicits._
-import com.google.common.io.BaseEncoding
 import com.wavesplatform.lang.ValidationError.ScriptParseError
 import com.wavesplatform.lang.contract.meta.{Chain, Dic, MetaMapper, MetaMapperStrategyV1}
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
@@ -22,9 +21,7 @@ import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.parser.Expressions.Pos.AnyPos
 import com.wavesplatform.lang.v1.repl.node.http.response.model.NodeResponse
 
-import scala.annotation.tailrec
 import scala.concurrent.Future
-import scala.util.Try
 
 /**
   * This is a hack class for IDEA. The Global class is in JS/JVM modules.

@@ -233,7 +233,7 @@ object CryptoContext {
     NativeFunction(
       "createMerkleRoot",
       30,
-      CREATE_MERKLE_PROOF,
+      CREATE_MERKLE_ROOT,
       BYTESTR,
       ("merkleProof", LIST(BYTESTR)),
       ("valueBytes", BYTESTR),

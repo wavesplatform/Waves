@@ -6,14 +6,14 @@ import cats.Monoid
 import com.wavesplatform.account.Address
 import com.wavesplatform.block.Block
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter}
+import com.wavesplatform.database.{LevelDBFactory, LevelDBWriter, TestStorageFactory}
 import com.wavesplatform.events.BlockchainUpdateTriggers
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.history.Domain
 import com.wavesplatform.lagonaki.mocks.TestBlock
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.mining.MiningConstraint
-import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
+import com.wavesplatform.settings.{BlockchainSettings, FunctionalitySettings, TestSettings, WavesSettings, loadConfig, TestFunctionalitySettings => TFS}
 import com.wavesplatform.state.diffs.{BlockDiffer, produce}
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.utils.TestLevelDB
@@ -26,7 +26,7 @@ import monix.reactive.subjects.{PublishSubject, Subject}
 import org.iq80.leveldb.{DB, Options}
 import org.scalatest.{Matchers, Suite}
 
-trait WithState extends DBCacheSettings with Matchers {
+trait WithState extends DBCacheSettings with Matchers with NTPTime { _: Suite =>
   protected val ignoreSpendableBalanceChanged: Subject[(Address, Asset), (Address, Asset)] = PublishSubject()
   protected val ignoreBlockchainUpdateTriggers: BlockchainUpdateTriggers     = BlockchainUpdateTriggers.noop
 
@@ -45,7 +45,8 @@ trait WithState extends DBCacheSettings with Matchers {
   }
 
   protected def withLevelDBWriter[A](bs: BlockchainSettings)(test: LevelDBWriter => A): A = tempDb { db =>
-    test(new LevelDBWriter(db, Observer.stopped, bs, dbSettings, 100))
+    val (_, ldb) = TestStorageFactory(TestSettings.Default.copy(blockchainSettings = bs), db, ntpTime, ignoreSpendableBalanceChanged, ignoreBlockchainUpdateTriggers)
+    test(ldb)
   }
 
   def withLevelDBWriter[A](fs: FunctionalitySettings)(test: LevelDBWriter => A): A =
@@ -136,7 +137,7 @@ trait WithState extends DBCacheSettings with Matchers {
     assertDiffEi(preconditions, block, fs)(_ should produce(errorMessage))
 }
 
-trait WithDomain extends WithState with NTPTime { _: Suite =>
+trait WithDomain extends WithState { _: Suite =>
   def defaultDomainSettings: WavesSettings =
     WavesSettings.fromRootConfig(loadConfig(None))
 
