@@ -122,7 +122,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("rsaVeryfy_*Kb work with max size") {
+  property("rsaVerify_*Kb work with max size") {
     for(lim <- Seq(16, 32, 64, 128)) {
       forAll(keyPairGenerator, sizedMessageGenerator(lim*1024)) { (keyPair, message) =>
         val xpub = keyPair.getPublic
@@ -148,7 +148,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("rsaVeryfy_*Kb fail with max+1 size") {
+  property("rsaVerify_*Kb fail with max+1 size") {
     for(lim <- Seq(16, 32, 64, 128)) {
       forAll(keyPairGenerator, sizedMessageGenerator(lim*1024 + 1)) { (keyPair, message) =>
         val xpub = keyPair.getPublic
@@ -174,8 +174,8 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("rsaVeryfy work with max size V4") {
-    forAll(keyPairGenerator, sizedMessageGenerator(150*1024)) { (keyPair, message) =>
+  property("rsaVerify works with max size V4") {
+    forAll(keyPairGenerator, sizedMessageGenerator(DATA_TX_BYTES_MAX)) { (keyPair, message) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
 
@@ -198,7 +198,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("rsaVeryfy work with max size V3") {
+  property("rsaVerify works with max size V3") {
     forAll(keyPairGenerator, sizedMessageGenerator(32*1024)) { (keyPair, message) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
@@ -222,7 +222,7 @@ class RSATest extends PropSpec with PropertyChecks with Matchers with BeforeAndA
     }
   }
 
-  property("rsaVeryfy fail with max+1 size V3") {
+  property("rsaVerify fails with max+1 size V3") {
     forAll(keyPairGenerator, sizedMessageGenerator(32*1024 + 1)) { (keyPair, message) =>
       val xpub = keyPair.getPublic
       val xprv = keyPair.getPrivate
