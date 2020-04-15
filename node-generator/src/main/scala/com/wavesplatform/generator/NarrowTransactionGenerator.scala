@@ -45,11 +45,14 @@ class NarrowTransactionGenerator(
   private[this] val log     = LoggerFacade(LoggerFactory.getLogger(getClass))
   private[this] val typeGen = DistributedRandomGenerator(settings.probabilities)
 
+  private[this] def correctVersion(v: TxVersion): TxVersion =
+    if (settings.protobuf) (v + 1).toByte
+    else v
+
   override def next(): Iterator[Transaction] =
     generate(settings.transactions).toIterator
 
   private[this] def generate(n: Int): Seq[Transaction] = {
-
     val now = System.currentTimeMillis()
 
     val generated = (0 until (n * 1.2).toInt).foldLeft(
@@ -69,12 +72,12 @@ class NarrowTransactionGenerator(
             val sender      = randomFrom(accounts).get
             val name        = random.nextString(5)
             val description = random.nextString(5)
-            val reissuable = random.nextBoolean()
-            val amount     = 100000000L + Random.nextInt(Int.MaxValue)
+            val reissuable  = random.nextBoolean()
+            val amount      = 100000000L + Random.nextInt(Int.MaxValue)
             logOption(
               IssueTransaction
                 .selfSigned(
-                  TxVersion.V2,
+                  correctVersion(TxVersion.V2),
                   sender,
                   name,
                   description,
@@ -96,14 +99,14 @@ class NarrowTransactionGenerator(
                 tx <- logOption(
                   TransferTransaction
                     .selfSigned(
-                      2.toByte,
+                      correctVersion(TxVersion.V2),
                       sender,
                       recipient,
                       Asset.fromCompatId(asset),
                       500,
                       Waves,
                       500000L,
-                      Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte))),
+                      createAttachment(),
                       timestamp
                     )
                 )
@@ -118,7 +121,7 @@ class NarrowTransactionGenerator(
                 tx <- logOption(
                   ReissueTransaction
                     .selfSigned(
-                      TxVersion.V2,
+                      correctVersion(TxVersion.V2),
                       sender,
                       IssuedAsset(assetTx.id()),
                       Random.nextInt(Int.MaxValue),
@@ -136,7 +139,14 @@ class NarrowTransactionGenerator(
                 assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx <- logOption(
-                  BurnTransaction.selfSigned(2.toByte, sender, IssuedAsset(assetTx.id()), Random.nextInt(1000), 500000L, timestamp)
+                  BurnTransaction.selfSigned(
+                    correctVersion(TxVersion.V2),
+                    sender,
+                    IssuedAsset(assetTx.id()),
+                    Random.nextInt(1000),
+                    500000L,
+                    timestamp
+                  )
                 )
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
@@ -162,7 +172,18 @@ class NarrowTransactionGenerator(
                   300000L
                 )
                 tx <- logOption(
-                  ExchangeTransaction.signed(2.toByte, matcher, buyOrder, sellOrder, 10000000L + delta, 10, 300000L, 300000L, 700000L, timestamp)
+                  ExchangeTransaction.signed(
+                    correctVersion(TxVersion.V2),
+                    matcher,
+                    buyOrder,
+                    sellOrder,
+                    10000000L + delta,
+                    10,
+                    300000L,
+                    300000L,
+                    700000L,
+                    timestamp
+                  )
                 )
               } yield tx
             ).logNone("Can't define seller/matcher/buyer of transaction, check your configuration")
@@ -174,7 +195,9 @@ class NarrowTransactionGenerator(
                 useAlias = random.nextBoolean()
                 recipient <- (if (useAlias && aliases.nonEmpty) randomFrom(aliases.filter(_.sender != sender)).map(_.alias)
                               else randomFrom(accounts.filter(_ != sender).map(_.toAddress))) orElse Some(preconditions.leaseRecipient.toAddress)
-                tx <- logOption(LeaseTransaction.selfSigned(2.toByte, sender, recipient, random.nextLong(1, 100), 500000L, timestamp))
+                tx <- logOption(
+                  LeaseTransaction.selfSigned(correctVersion(TxVersion.V2), sender, recipient, random.nextLong(1, 100), 500000L, timestamp)
+                )
               } yield tx
             ).logNone("Can't define recipient of transaction, check your configuration")
 
@@ -190,7 +213,9 @@ class NarrowTransactionGenerator(
           case CreateAliasTransaction =>
             val sender      = randomFrom(accounts).get
             val aliasString = NarrowTransactionGenerator.generateAlias()
-            logOption(CreateAliasTransaction.selfSigned(Transaction.V2, sender, Alias.create(aliasString).explicitGet(), 500000L, timestamp))
+            logOption(
+              CreateAliasTransaction.selfSigned(correctVersion(TxVersion.V2), sender, Alias.create(aliasString).explicitGet(), 500000L, timestamp)
+            )
 
           case MassTransferTransaction =>
             (
@@ -206,13 +231,13 @@ class NarrowTransactionGenerator(
                 tx <- logOption(
                   MassTransferTransaction
                     .selfSigned(
-                      TxVersion.V1,
+                      correctVersion(TxVersion.V1),
                       sender,
                       Asset.fromCompatId(asset),
                       transfers.toList,
                       100000L + 50000L * transferCount + 400000L,
                       timestamp,
-                      Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
+                      createAttachment()
                     )
                 )
               } yield tx
@@ -237,7 +262,7 @@ class NarrowTransactionGenerator(
             }
             val size = 128 + data.map(_.toBytes.length).sum
             val fee  = 500000L * (size / 1024 + 1)
-            logOption(DataTransaction.selfSigned(TxVersion.V1, sender, data.toList, fee, timestamp))
+            logOption(DataTransaction.selfSigned(correctVersion(TxVersion.V1), sender, data.toList, fee, timestamp))
 
           case SponsorFeeTransaction =>
             (
@@ -245,7 +270,14 @@ class NarrowTransactionGenerator(
                 assetTx <- randomFrom(validIssueTxs).orElse(randomFrom(Universe.IssuedAssets))
                 sender  <- accountByAddress(assetTx.sender.stringRepr)
                 tx <- logOption(
-                  SponsorFeeTransaction.selfSigned(TxVersion.V1, sender, IssuedAsset(assetTx.id()), Some(Random.nextInt(1000)), 100400000L, timestamp)
+                  SponsorFeeTransaction.selfSigned(
+                    correctVersion(TxVersion.V1),
+                    sender,
+                    IssuedAsset(assetTx.id()),
+                    Some(Random.nextInt(1000)),
+                    100400000L,
+                    timestamp
+                  )
                 )
               } yield tx
             ).logNone("There is no issued assets, may be you need to increase issue transaction's probability or pre-configure them")
@@ -272,7 +304,7 @@ class NarrowTransactionGenerator(
 
             logOption(
               InvokeScriptTransaction.selfSigned(
-                TxVersion.V1,
+                correctVersion(TxVersion.V1),
                 sender,
                 GeneratorSettings.toKeyPair(script.dappAccount).toAddress,
                 maybeFunctionCall,
@@ -289,7 +321,7 @@ class NarrowTransactionGenerator(
               script = Gen.script(complexity = false, estimator)
               tx <- logOption(
                 SetScriptTransaction.selfSigned(
-                  TxVersion.V1,
+                  correctVersion(TxVersion.V1),
                   sender,
                   Some(script),
                   1400000L + random.nextLong(100),
@@ -306,7 +338,7 @@ class NarrowTransactionGenerator(
                 script = Gen.script(complexity = false, estimator)
                 tx <- logOption(
                   SetAssetScriptTransaction.selfSigned(
-                    TxVersion.V1,
+                    correctVersion(TxVersion.V1),
                     sender,
                     IssuedAsset(assetTx.id()),
                     Some(script),
@@ -340,6 +372,18 @@ class NarrowTransactionGenerator(
     log.trace(s"Distribution:\n${generated._1.groupBy(_.getClass).mapValues(_.size).mkString("\t", "\n\t", "")}")
 
     generated._1
+  }
+
+  private def createAttachment(): Option[Attachment] = {
+    if (random.nextBoolean()) None
+    else if (!settings.protobuf) Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
+    else
+      random.nextInt(4) match {
+        case 0 => Some(Attachment.Bin(Array.fill(random.nextInt(100))(random.nextInt().toByte)))
+        case 1 => Some(Attachment.Num(random.nextLong()))
+        case 2 => Some(Attachment.Str(random.nextString(10)))
+        case 3 => Some(Attachment.Bool(random.nextBoolean()))
+      }
   }
 
   private[this] def logOption[T <: Transaction](txE: Either[ValidationError, T])(implicit m: Manifest[T]): Option[T] = {
@@ -400,7 +444,8 @@ object NarrowTransactionGenerator {
       transactions: Int,
       probabilities: Map[TransactionParser, Double],
       scripts: Seq[ScriptSettings],
-      setScript: Option[SetScriptSettings]
+      setScript: Option[SetScriptSettings],
+      protobuf: Boolean
   )
 
   object Settings {
