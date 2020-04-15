@@ -138,7 +138,7 @@ object Sponsorship {
 }
 
 case class Diff(
-    transactions: collection.Map[ByteStr, (Transaction, Set[Address])],
+    transactions: collection.Map[ByteStr, (Transaction, Set[Address], Boolean)],
     portfolios: Map[Address, Portfolio],
     issuedAssets: Map[IssuedAsset, (AssetStaticInfo, AssetInfo, AssetVolumeInfo)],
     updatedAssets: Map[IssuedAsset, Ior[AssetInfo, AssetVolumeInfo]],
@@ -203,7 +203,7 @@ object Diff {
   ): Diff =
     Diff(
       // should be changed to VectorMap after 2.13 https://github.com/scala/scala/pull/6854
-      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet))),
+      transactions = LinkedHashMap((tx.id(), (tx, (portfolios.keys ++ accountData.keys).toSet, true))),
       portfolios = portfolios,
       issuedAssets = issuedAssets,
       updatedAssets = updatedAssets,

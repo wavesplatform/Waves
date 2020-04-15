@@ -246,9 +246,9 @@ case class DebugApiRoute(
 
   def stateChangesById: Route = (get & path("stateChanges" / "info" / TransactionId)) { id =>
     transactionsApi.transactionById(id) match {
-      case Some((height, Right((ist, isr)))) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
-      case Some(_)                           => complete(ApiError.UnsupportedTransactionType)
-      case None                              => complete(ApiError.TransactionDoesNotExist)
+      case Some((height, Right((ist, isr)), _)) => complete(ist.json() ++ Json.obj("height" -> height.toInt, "stateChanges" -> isr))
+      case Some(_)                                 => complete(ApiError.UnsupportedTransactionType)
+      case None                                    => complete(ApiError.TransactionDoesNotExist)
     }
   }
 
@@ -263,11 +263,11 @@ case class DebugApiRoute(
               transactionsApi
                 .invokeScriptResults(address, None, Set.empty, afterOpt)
                 .map {
-                  case (height, Right((ist, isr))) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
-                  case (height, Left(tx))          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
+                  case (height, Right((ist, isr)), _) => ist.json() ++ Json.obj("height" -> JsNumber(height), "stateChanges" -> isr)
+                  case (height, Left(tx), _)          => tx.json() ++ Json.obj("height"  -> JsNumber(height))
                 }
                 .toReactivePublisher
-            )
+            ).take(limit)
           }
         }
       }

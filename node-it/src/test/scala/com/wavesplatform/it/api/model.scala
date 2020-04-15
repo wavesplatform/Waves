@@ -286,7 +286,8 @@ case class TransactionStatus(
     id: String,
     status: String,
     confirmations: Option[Int],
-    height: Option[Int]
+    height: Option[Int],
+    applicationStatus: Option[String]
 )
 object TransactionStatus {
   implicit val format: Format[TransactionStatus] = Json.format
@@ -322,7 +323,8 @@ case class StateChangesDetails(
     transfers: Seq[TransfersInfoResponse],
     issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
-    burns: Seq[BurnInfoResponse]
+    burns: Seq[BurnInfoResponse],
+    errorMessage: Option[ErrorMessageInfoResponse]
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
@@ -601,6 +603,11 @@ object ReissueInfoResponse {
 case class BurnInfoResponse(assetId: String, quantity: Long)
 object BurnInfoResponse {
   implicit val burnInfoFormat: Format[BurnInfoResponse] = Json.format
+}
+
+case class ErrorMessageInfoResponse(code: Int, text: String)
+object ErrorMessageInfoResponse {
+  implicit val errorMessageInfoFormat: Format[ErrorMessageInfoResponse] = Json.format
 }
 
 case class ExchangeTransaction(
