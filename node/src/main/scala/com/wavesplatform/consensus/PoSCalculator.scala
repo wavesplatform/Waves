@@ -85,7 +85,7 @@ object NxtPoSCalculator extends PoSCalculator {
 
 object FairPoSCalculator {
   lazy val V1 = new FairPoSCalculator(5000)
-  lazy val V2 = new FairPoSCalculator(30000)
+  lazy val V2 = new FairPoSCalculator(15000)
 
   private val MaxHit = BigDecimal(BigInt(1, Array.fill[Byte](HitSize)(-1)))
   private val C1     = 70000
