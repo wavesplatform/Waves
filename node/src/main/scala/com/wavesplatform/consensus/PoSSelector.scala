@@ -20,7 +20,11 @@ import scala.concurrent.duration.FiniteDuration
 class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings, syncSettings: SynchronizationSettings) extends ScorexLogging {
   import PoSCalculator._
 
-  protected def pos(height: Int): PoSCalculator = if (fairPosActivated(height)) FairPoSCalculator else NxtPoSCalculator
+  protected def posCalculator(height: Int): PoSCalculator =
+    if (fairPosActivated(height))
+      if (vrfActivated(height)) FairPoSCalculator.V2
+      else FairPoSCalculator.V1
+    else NxtPoSCalculator
 
   def consensusData(
       account: KeyPair,
@@ -31,7 +35,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       greatGrandParentTS: Option[Long],
       currentTime: Long
   ): Either[ValidationError, NxtLikeConsensusBlockData] = {
-    val bt = pos(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
+    val bt = posCalculator(height).calculateBaseTarget(targetBlockDelay.toSeconds, height, refBlockBT, refBlockTS, greatGrandParentTS, currentTime)
 
     checkBaseTargetLimit(bt, height).flatMap(
       _ =>
@@ -39,7 +43,8 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
           getHitSource(height)
             .map(hs => NxtLikeConsensusBlockData(bt, crypto.signVRF(account.privateKey, hs)))
         else
-          blockchain.blockHeader(height)
+          blockchain
+            .blockHeader(height)
             .map(_.header.generationSignature.arr)
             .map(gs => NxtLikeConsensusBlockData(bt, ByteStr(generationSignature(gs, account.publicKey))))
             .toRight(GenericError("No blocks in blockchain"))
@@ -47,7 +52,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
   }
 
   def getValidBlockDelay(height: Int, account: KeyPair, refBlockBT: Long, balance: Long): Either[ValidationError, Long] = {
-    val pc = pos(height)
+    val pc = posCalculator(height)
 
     getHit(height, account)
       .map(pc.calculateDelay(_, refBlockBT, balance))
@@ -61,7 +66,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
       } else {
         generationSignature(parentHitSource, header.generator).asRight[ValidationError]
       }
-      ts = pos(parentHeight).calculateDelay(hit(gs), parent.baseTarget, effectiveBalance) + parent.timestamp
+      ts = posCalculator(parentHeight).calculateDelay(hit(gs), parent.baseTarget, effectiveBalance) + parent.timestamp
       _ <- Either.cond(
         ts <= header.timestamp,
         (),
@@ -111,7 +116,7 @@ class PoSSelector(blockchain: Blockchain, blockchainSettings: BlockchainSettings
     val blockBT = block.header.baseTarget
     val blockTS = block.header.timestamp
 
-    val expectedBT = pos(height).calculateBaseTarget(
+    val expectedBT = posCalculator(height).calculateBaseTarget(
       blockchainSettings.genesisSettings.averageBlockDelay.toSeconds,
       height,
       parent.baseTarget,

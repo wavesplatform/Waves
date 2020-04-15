@@ -15,7 +15,7 @@ class FairPoSCalculatorTest extends PropSpec with Matchers {
   import FairPoSCalculatorTest._
   import PoSCalculator._
 
-  val pos: PoSCalculator = FairPoSCalculator
+  val pos: PoSCalculator = FairPoSCalculator.V1
 
   case class Block(height: Int, baseTarget: Long, miner: KeyPair, timestamp: Long, delay: Long)
 
