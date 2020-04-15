@@ -193,7 +193,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     blockAfterActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
     nodes.waitForHeightArise()
 
-    returnedTxIds.foreach(sender.waitForTransaction(_))
+    returnedTxIds.foreach(sender.waitForTransaction(_, timeout = 8 minutes))
 
     //rollback to activation height
     nodes.rollback(activationHeight, returnToUTX = false)
