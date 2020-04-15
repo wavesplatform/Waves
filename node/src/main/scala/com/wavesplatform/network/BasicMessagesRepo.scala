@@ -269,8 +269,8 @@ object LegacyMicroBlockResponseSpec extends MessageSpec[MicroBlockResponse] {
 object PBBlockSpec extends MessageSpec[Block] {
   override val messageCode: MessageCode = 29: Byte
 
-  // Signed PBBlockHeader + max total transactions size
-  override val maxLength: Int = 390 + MiningConstraints.MaxTxsSizeInBytes + 100
+  // BlockHeader + signature + max transactions size + max proto serialization meta + some gap
+  override val maxLength: Int = 461 + 64 + MiningConstraints.MaxTxsSizeInBytes + 24005 + 100
 
   override def deserializeData(bytes: Array[Byte]): Try[Block] = PBBlocks.vanilla(PBBlock.parseFrom(bytes))
 
@@ -292,8 +292,8 @@ object PBMicroBlockSpec extends MessageSpec[MicroBlockResponse] {
 object PBTransactionSpec extends MessageSpec[Transaction] {
   override val messageCode: MessageCode = 31: Byte
 
-  // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry
-  override val maxLength: Int = 588 + DataTransaction.MaxProtoBytes + 100
+  // Signed (8 proofs) PBTransaction + max DataTransaction.DataEntry + max proto serialization meta + gap
+  override val maxLength: Int = 624 + DataTransaction.MaxProtoBytes + 5 + 100
 
   override def deserializeData(bytes: Array[MessageCode]): Try[Transaction] =
     PBTransactions.vanilla(PBSignedTransaction.parseFrom(bytes)).left.map(ve => new IllegalArgumentException(ve.toString)).toTry
