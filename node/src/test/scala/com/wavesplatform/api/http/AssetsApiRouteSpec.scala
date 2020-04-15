@@ -47,7 +47,7 @@ class AssetsApiRouteSpec
       reissuable = smartAssetTx.reissuable,
       totalVolume = smartAssetTx.quantity,
       lastUpdatedAt = Height @@ 0,
-      script = Some((script, Script.estimate(script, ScriptEstimatorV1).explicitGet())),
+      script = Some((script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
       sponsorship = 0,
       nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
     )

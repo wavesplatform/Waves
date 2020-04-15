@@ -35,7 +35,8 @@ object DiffsCommon {
 
   def countVerifierComplexity(
       script: Option[Script],
-      blockchain: Blockchain
+      blockchain: Blockchain,
+      isAsset: Boolean
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse { script =>
@@ -45,10 +46,10 @@ object DiffsCommon {
 
         val cost =
           if (useV1PreCheck)
-            Script.verifierComplexity(script, ScriptEstimatorV1) *>
-            Script.verifierComplexity(script, ScriptEstimatorV2)
+            Script.verifierComplexity(script, ScriptEstimatorV1, isAsset) *>
+            Script.verifierComplexity(script, ScriptEstimatorV2, isAsset)
           else
-            Script.verifierComplexity(script, blockchain.estimator)
+            Script.verifierComplexity(script, blockchain.estimator, isAsset)
 
         cost.map((script, _))
       }

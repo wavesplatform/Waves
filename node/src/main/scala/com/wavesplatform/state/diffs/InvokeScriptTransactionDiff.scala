@@ -418,7 +418,7 @@ object InvokeScriptTransactionDiff {
               val asset = IssuedAsset(issue.id)
 
               DiffsCommon
-                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain)
+                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
                 .map(
                   script =>
                     Diff(
