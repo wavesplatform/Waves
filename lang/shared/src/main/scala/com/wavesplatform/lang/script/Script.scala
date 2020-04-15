@@ -66,11 +66,11 @@ object Script {
     (directivesText + scriptText, meta)
   }
 
-  def complexityInfo(script: Script, estimator: ScriptEstimator): Either[String, ComplexityInfo] =
+  def complexityInfo(script: Script, estimator: ScriptEstimator, useContractVerifierLimit: Boolean): Either[String, ComplexityInfo] =
     script match {
       case script: ExprScript =>
         ExprScript
-          .estimate(script.expr, script.stdLibVersion, estimator)
+          .estimate(script.expr, script.stdLibVersion, estimator, useContractVerifierLimit)
           .map(complexity => ComplexityInfo(complexity, Map(), complexity))
       case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
         for {
@@ -83,11 +83,13 @@ object Script {
         } yield complexityInfo
     }
 
-  def estimate(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    complexityInfo(script, estimator)
+  def estimate(script: Script, estimator: ScriptEstimator, useContractVerifierLimit: Boolean): Either[String, Long] =
+    complexityInfo(script, estimator, useContractVerifierLimit)
       .map(_.maxComplexity)
 
-  def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    complexityInfo(script, estimator)
-      .map(_.verifierComplexity)
+  def verifierComplexity(script: Script, estimator: ScriptEstimator, isAsset: Boolean): Either[String, Long] =
+    script match {
+      case ContractScriptImpl(version, dApp) => ContractScript.estimateVerifier(version, dApp, estimator).map(_.fold(0L)(_._2))
+      case script: ExprScript                => ExprScript.estimate(script.expr, script.stdLibVersion, estimator, !isAsset)
+    }
 }

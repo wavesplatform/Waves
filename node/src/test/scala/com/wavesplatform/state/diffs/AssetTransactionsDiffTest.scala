@@ -289,7 +289,7 @@ class AssetTransactionsDiffTest
                 issue.reissuable,
                 BigInt(issue.quantity),
                 Height @@ 2,
-                issue.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator).explicitGet()),
+                issue.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false).explicitGet()),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )
