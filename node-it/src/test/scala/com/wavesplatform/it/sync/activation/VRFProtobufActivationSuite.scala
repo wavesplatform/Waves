@@ -57,7 +57,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("not able to broadcast tx of new versions before activation") {
     assertApiError(sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)) { error =>
       error.statusCode shouldBe 400
-      error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
+      error.message shouldBe "State check failed. Reason: ActivationError(Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet)"
       error.id shouldBe 112
     }
   }
@@ -65,7 +65,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("not able to broadcast UpdateAssetInfoTransaction before activation") {
     assertApiError(sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.statusCode shouldBe 400
-      error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
+      error.message shouldBe "State check failed. Reason: ActivationError(Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet)"
       error.id shouldBe 112
     }
   }
