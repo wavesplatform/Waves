@@ -270,7 +270,7 @@ object PBBlockSpec extends MessageSpec[Block] {
   override val messageCode: MessageCode = 29: Byte
 
   // BlockHeader + signature + max transactions size + max proto serialization meta + some gap
-  override val maxLength: Int = 461 + 64 + MiningConstraints.MaxTxsSizeInBytes + 24005 + 100
+  override val maxLength: Int = 461 + 64 + MiningConstraints.MaxTxsSizeInBytes + 37117 + 100
 
   override def deserializeData(bytes: Array[Byte]): Try[Block] = PBBlocks.vanilla(PBBlock.parseFrom(bytes))
 

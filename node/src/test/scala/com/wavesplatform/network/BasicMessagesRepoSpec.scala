@@ -8,7 +8,8 @@ import com.wavesplatform.mining.MiningConstraints
 import com.wavesplatform.protobuf.block._
 import com.wavesplatform.protobuf.transaction._
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{DataTransaction, Proofs}
+import com.wavesplatform.transaction.smart.SetScriptTransaction
+import com.wavesplatform.transaction.{DataTransaction, Proofs, TxVersion}
 import org.scalatest._
 
 class BasicMessagesRepoSpec extends FreeSpec with Matchers with TransactionGen {
@@ -48,11 +49,26 @@ class BasicMessagesRepoSpec extends FreeSpec with Matchers with TransactionGen {
     codedTransactionMaxLengthPBPrefix.writeUInt32NoTag(MiningConstraints.MaxTxsSizeInBytes)
     codedTransactionMaxLengthPBPrefix.flush()
 
+    val minPossibleTransactionSize = PBTransactions
+      .protobuf(
+        SetScriptTransaction
+          .selfSigned(
+            TxVersion.V2,
+            accountGen.sample.get,
+            None,
+            1L,
+            0L
+          )
+          .right
+          .get
+      )
+      .serializedSize
+
     val maxSize =
       headerPBPrefix.toByteArray.length + headerSize +
         signaturePBPrefix.toByteArray.length + signatureSize +
         MiningConstraints.MaxTxsSizeInBytes +
-        transactionPBPrefix.toByteArray.length * VanillaBlock.MaxTransactionsPerBlockVer3
+        (transactionPBPrefix.toByteArray.length * MiningConstraints.MaxTxsSizeInBytes / minPossibleTransactionSize)
 
     maxSize should be <= PBBlockSpec.maxLength
   }
