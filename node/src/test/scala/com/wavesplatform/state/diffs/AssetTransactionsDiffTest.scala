@@ -351,7 +351,7 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueUpdate) {
       case (gen, issue, update) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, update))) { ei =>
-          ei should produce("VRF and Protobuf feature has not been activated yet")
+          ei should produce("Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet")
         }
     }
   }

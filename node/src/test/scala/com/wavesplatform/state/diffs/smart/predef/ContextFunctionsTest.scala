@@ -6,7 +6,7 @@ import com.wavesplatform.block.Block
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, Base64, EitherExt2}
 import com.wavesplatform.db.WithState
-import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship, MultiPaymentInvokeScript}
+import com.wavesplatform.features.BlockchainFeatures.{BlockV5, FeeSponsorship}
 import com.wavesplatform.lagonaki.mocks.TestBlock._
 import com.wavesplatform.lang.Testing._
 import com.wavesplatform.lang.directives.values._
@@ -288,7 +288,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
 
         val fs = {
           val features = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (FeeSponsorship.id -> 0))
-          if (v4Activation) features.copy(preActivatedFeatures = features.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+          if (v4Activation) features.copy(preActivatedFeatures = features.preActivatedFeatures + (BlockV5.id -> 0))
           else features
         }
 
@@ -421,14 +421,14 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
     forAll(for {
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      withVrf <- Gen.oneOf(false, true)
+      withVrf <- Gen.oneOf(version >= V4, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
         val generationSignature =
           if (withVrf) ByteStr(new Array[Byte](Block.GenerationVRFSignatureLength)) else ByteStr(new Array[Byte](Block.GenerationSignatureLength))
 
         val fs =
-          if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+          if (version >= V4) smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
           else smartEnabledFS
 
         val fsWithVrf =
@@ -683,7 +683,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
     forAll(preconditionsAndPayments) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) =>
 
-        val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (MultiPaymentInvokeScript.id -> 0))
+        val fs = smartEnabledFS.copy(preActivatedFeatures = smartEnabledFS.preActivatedFeatures + (BlockV5.id -> 0))
 
         assertDiffAndState(fs) { append =>
           append(genesis).explicitGet()

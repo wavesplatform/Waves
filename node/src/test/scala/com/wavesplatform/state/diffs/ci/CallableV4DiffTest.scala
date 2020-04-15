@@ -61,7 +61,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("TransactionNotAllowedByScript"))
+        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
     }
   }
 
@@ -82,7 +82,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("TransactionNotAllowedByScript"))
+        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
     }
   }
 
@@ -140,7 +140,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  property("trace") {
+  ignore("trace") {
     forAll(multiActionPreconditions(feeMultiplier = 6, withScriptError = true)) {
       case (genesis, setScript, invoke, issue, _, _, _, _, _) =>
         assertDiffEiTraced(
@@ -378,7 +378,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.MultiPaymentInvokeScript
+      BlockchainFeatures.BlockV5
     ).map(_.id -> 0).toMap
   )
 

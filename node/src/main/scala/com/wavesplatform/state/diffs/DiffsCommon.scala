@@ -41,7 +41,7 @@ object DiffsCommon {
       .traverse { script =>
         val useV1PreCheck =
           blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
-          !blockchain.isFeatureActivated(BlockchainFeatures.MultiPaymentInvokeScript)
+          !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
 
         val cost =
           if (useV1PreCheck)
