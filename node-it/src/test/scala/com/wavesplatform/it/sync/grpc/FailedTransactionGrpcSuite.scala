@@ -312,13 +312,14 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
           sender.getDataByKey(contractAddr, key) shouldBe List(lastSuccessWrites.getOrElse(key, initial))
       }
 
-      sender.stateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach { sc =>
-        sc.issues.size shouldBe 0
-        sc.reissues.size shouldBe 0
-        sc.burns.size shouldBe 0
-        sc.errorMessage shouldBe 'defined
-        sc.errorMessage.get.code shouldBe 3
-        sc.errorMessage.get.text shouldBe "Transaction is not allowed by token-script"
+      sender.stateChanges(TransactionsRequest(transactionIds = failed.map(_.id))).foreach {
+        case (_, sc) =>
+          sc.issues.size shouldBe 0
+          sc.reissues.size shouldBe 0
+          sc.burns.size shouldBe 0
+          sc.errorMessage shouldBe 'defined
+          sc.errorMessage.get.code shouldBe 3
+          sc.errorMessage.get.text shouldBe "Transaction is not allowed by token-script"
       }
 
       failed

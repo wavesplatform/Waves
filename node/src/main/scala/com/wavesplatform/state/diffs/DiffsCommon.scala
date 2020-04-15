@@ -18,22 +18,6 @@ import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object DiffsCommon {
-  def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    Script
-      .complexityInfo(script, estimator)
-      .map(calcVerifierComplexity(script, _))
-
-  private def calcVerifierComplexity(
-      script: Script,
-      complexity: (Long, Map[String, Long])
-  ): Long = {
-    val (totalComplexity, cm) = complexity
-    script match {
-      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
-      case _                                                                        => totalComplexity
-    }
-  }
-
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
@@ -44,7 +28,7 @@ object DiffsCommon {
 
     val accountComplexity = blockchain
       .accountScript(tx.sender.toAddress)
-      .map(_.maxComplexity)
+      .map(_.verifierComplexity)
 
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }

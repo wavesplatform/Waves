@@ -4,7 +4,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.api.{BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails}
 import com.wavesplatform.it.sync._
@@ -17,7 +16,7 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{FlatSpec, FreeSpec}
+import org.scalatest.FreeSpec
 
 import scala.util.Random
 
@@ -352,11 +351,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
   }
 
   def assertStateChanges(tx: String)(f: StateChangesDetails => Unit): Unit = {
-    f(grpcStateChanges(tx))
-  }
-
-  def grpcStateChanges(tx: String): StateChangesDetails = {
-    sender.stateChanges(tx)
+    val (transaction, details) = sender.stateChanges(tx)
+    transaction.chainId shouldBe 'I'.toByte
+    f(details)
   }
 
   def grpcBalance(address: KeyPair, assetId: String): Long = {
@@ -410,8 +407,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
   }
 
   def invokeAssetId(tx: String, nth: Int = -1): String = {
-    (if (nth == -1) grpcStateChanges(tx).issues.head
-     else grpcStateChanges(tx).issues(nth)).assetId
+    (if (nth == -1) sender.stateChanges(tx)._2.issues.head
+     else sender.stateChanges(tx)._2.issues(nth)).assetId
   }
 
   def issueValidated(account: KeyPair, data: Asset): String = {
