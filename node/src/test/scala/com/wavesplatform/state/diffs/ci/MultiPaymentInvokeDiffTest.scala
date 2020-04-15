@@ -138,9 +138,11 @@ class MultiPaymentInvokeDiffTest extends PropSpec with PropertyChecks with Match
           features
         ) {
           val expectedFee = (0.005 + 0.004 + 0.004 * (ContractLimits.MaxAttachedPaymentAmount - 1)) * Constants.UnitsInWave
-          _ should matchPattern {
-            case Right(diff: Diff) if diff.transactions.exists(!_._2._3) =>
-          }
+          _ should produce(
+            s"Fee in WAVES for InvokeScriptTransaction (1 in WAVES) " +
+              s"with ${ContractLimits.MaxAttachedPaymentAmount} total scripts invoked " +
+              s"does not exceed minimal value of ${expectedFee.toLong} WAVES"
+          )
         }
     }
   }
