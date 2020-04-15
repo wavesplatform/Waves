@@ -243,9 +243,9 @@ class FPPoSSelectorTest extends FreeSpec with Matchers with WithDB with Transact
 
   "new calculator" - {
     "delay" in {
-      FairPoSCalculator.V2.calculateDelay(BigInt(1), 100L, 10000000000000L) shouldBe 730491
-      FairPoSCalculator.V2.calculateDelay(BigInt(2), 200L, 20000000000000L) shouldBe 632358
-      FairPoSCalculator.V2.calculateDelay(BigInt(3), 300L, 30000000000000L) shouldBe 574956
+      FairPoSCalculator.V2.calculateDelay(BigInt(1), 100L, 10000000000000L) shouldBe 715491
+      FairPoSCalculator.V2.calculateDelay(BigInt(2), 200L, 20000000000000L) shouldBe 617358
+      FairPoSCalculator.V2.calculateDelay(BigInt(3), 300L, 30000000000000L) shouldBe 559956
     }
 
     "base target" in {
