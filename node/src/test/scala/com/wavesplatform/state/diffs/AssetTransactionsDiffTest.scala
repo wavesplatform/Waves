@@ -6,12 +6,17 @@ import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.WithDomain
 import com.wavesplatform.features.{BlockchainFeatures, EstimatorProvider}
 import com.wavesplatform.lagonaki.mocks.TestBlock
-import com.wavesplatform.lang.directives.values.{Expression, V1}
+import com.wavesplatform.lang.Global
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, Expression, StdLibVersion, V1, V4}
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.utils._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.parser.Parser
+import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.smart.smartEnabledFS
@@ -234,12 +239,15 @@ class AssetTransactionsDiffTest
     }
   }
 
-  private def createScript(code: String) = {
+  private def createScript(code: String, version: StdLibVersion) = {
     val Parsed.Success(expr, _) = Parser.parseExpr(code).get
-    ExprScript(ExpressionCompiler(compilerContext(V1, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
+    ExprScript(version, ExpressionCompiler(compilerContext(version, Expression, isAssetScript = false), expr).explicitGet()._1).explicitGet()
   }
 
-  def genesisIssueTransferReissue(code: String): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction, ReissueTransaction)] =
+  def genesisIssueTransferReissue(
+      code: String,
+      version: StdLibVersion = V1
+  ): Gen[(Seq[GenesisTransaction], IssueTransaction, TransferTransaction, ReissueTransaction, ReissueTransaction)] =
     for {
       timestamp          <- timestampGen
       initialWavesAmount <- Gen.choose(Long.MaxValue / 1000, Long.MaxValue / 100)
@@ -258,7 +266,7 @@ class AssetTransactionsDiffTest
         quantity,
         decimals,
         reissuable,
-        Some(createScript(code)),
+        Some(createScript(code, version)),
         smallFee,
         timestamp + 1
       ).signWith(accountA)
@@ -266,7 +274,7 @@ class AssetTransactionsDiffTest
       transfer = TransferTransaction
         .selfSigned(TxVersion.V1, accountA, accountB, assetId, issue.quantity, Waves, smallFee, None, timestamp + 2)
         .explicitGet()
-      reissue = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
+      reissue        = ReissueTransaction.selfSigned(TxVersion.V1, accountA, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
       illegalReissue = ReissueTransaction.selfSigned(TxVersion.V1, accountB, assetId, quantity, reissuable, smallFee, timestamp + 3).explicitGet()
     } yield (Seq(genesisTx1, genesisTx2), issue, transfer, reissue, illegalReissue)
 
@@ -289,7 +297,12 @@ class AssetTransactionsDiffTest
                 issue.reissuable,
                 BigInt(issue.quantity),
                 Height @@ 2,
-                issue.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false).explicitGet()),
+                issue.script.map(
+                  s =>
+                    s -> Script
+                      .estimate(s, EstimatorProvider.EstimatorBlockchainExt(newState).estimator, useContractVerifierLimit = false)
+                      .explicitGet()
+                ),
                 0L,
                 issue.decimals == 0 && issue.quantity == 1 && !issue.reissuable
               )
@@ -325,7 +338,6 @@ class AssetTransactionsDiffTest
   property("Cannot reissue when script evaluates to FALSE") {
     forAll(genesisIssueTransferReissue("false")) {
       case (gen, issue, _, reissue, _) =>
-
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue, reissue)), smartEnabledFS)(
           ei => ei should produce("TransactionNotAllowedByScript")
         )
@@ -364,8 +376,8 @@ class AssetTransactionsDiffTest
         assertDiffEi(TestBlock.create(gen :+ issue) +: blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei should produce(
             s"Can't update info of asset with id=${issue.id.value} " +
-            s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
-            s"current height=${blocks.size + 2}, minUpdateInfoInterval=${assetInfoUpdateEnabled.minAssetInfoUpdateInterval}"
+              s"before ${assetInfoUpdateEnabled.minAssetInfoUpdateInterval + 1} block, " +
+              s"current height=${blocks.size + 2}, minUpdateInfoInterval=${assetInfoUpdateEnabled.minAssetInfoUpdateInterval}"
           )
         }
     }
@@ -375,7 +387,9 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueUpdate) {
       case (gen, issue, update) =>
         val blocks =
-          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(TestBlock.create(Seq.empty, Block.ProtoBlockVersion))
+          TestBlock.create(gen :+ issue) +: Seq.fill(assetInfoUpdateEnabled.minAssetInfoUpdateInterval)(
+            TestBlock.create(Seq.empty, Block.ProtoBlockVersion)
+          )
 
         assertDiffEi(blocks, TestBlock.create(Seq(update), Block.ProtoBlockVersion), assetInfoUpdateEnabled) { ei =>
           ei shouldBe 'right
@@ -401,7 +415,14 @@ class AssetTransactionsDiffTest
           d.appendBlock(genesisBlock)
 
           val (keyBlock, Seq(microBlock)) =
-            UnsafeBlocks.unsafeChainBaseAndMicro(genesisBlock.id(), Nil, Seq(Seq(update1)), signer, Block.ProtoBlockVersion, genesisBlock.header.timestamp + 100)
+            UnsafeBlocks.unsafeChainBaseAndMicro(
+              genesisBlock.id(),
+              Nil,
+              Seq(Seq(update1)),
+              signer,
+              Block.ProtoBlockVersion,
+              genesisBlock.header.timestamp + 100
+            )
           d.appendBlock(keyBlock)
           val microBlockId = d.appendMicroBlock(microBlock)
 
@@ -434,6 +455,50 @@ class AssetTransactionsDiffTest
             desc.lastUpdatedAt shouldBe 1
             desc1.lastUpdatedAt shouldBe (blockchain.height - 1)
           }
+        }
+    }
+  }
+
+  property("Asset V4 complexity limit is 4000") {
+    val exprV4WithComplexityBetween3000And4000 =
+      """
+        | {-#STDLIB_VERSION 4 #-}
+        | {-#SCRIPT_TYPE ASSET #-}
+        | {-#CONTENT_TYPE EXPRESSION #-}
+        |
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+      """.stripMargin
+
+    val exprV4WithComplexityAbove4000 =
+      """
+        | {-#STDLIB_VERSION 4 #-}
+        | {-#SCRIPT_TYPE ASSET #-}
+        | {-#CONTENT_TYPE EXPRESSION #-}
+        |
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') &&
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+      """.stripMargin
+
+    val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
+      preActivatedFeatures = Map(
+        BlockchainFeatures.Ride4DApps.id               -> 0,
+        BlockchainFeatures.MultiPaymentInvokeScript.id -> 0
+      )
+    )
+
+    forAll(genesisIssueTransferReissue(exprV4WithComplexityBetween3000And4000, V4)) {
+      case (gen, issue, _, _, _) =>
+        assertDiffAndState(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
+          case (blockDiff, newState) =>
+            val totalPortfolioDiff = Monoid.combineAll(blockDiff.portfolios.values)
+            totalPortfolioDiff.assets(IssuedAsset(issue.id())) shouldEqual issue.quantity
+        }
+    }
+
+    forAll(genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)) {
+      case (gen, issue, _, _, _) =>
+        assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
+          _ should produce("Script is too complex: 7507 > 4000")
         }
     }
   }
