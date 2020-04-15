@@ -421,7 +421,7 @@ class ContextFunctionsTest extends PropSpec with PropertyChecks with WithState w
     forAll(for {
       (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2) <- preconditionsAndPayments
       version <- Gen.oneOf(DirectiveDictionary[StdLibVersion].all.filter(_ >= V3).toSeq)
-      withVrf <- Gen.oneOf(false, true)
+      withVrf <- Gen.oneOf(version >= V4, true)
     } yield (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf)) {
       case (masterAcc, genesis, setScriptTransaction, dataTransaction, transferTx, transfer2, version, withVrf) =>
         val generationSignature =

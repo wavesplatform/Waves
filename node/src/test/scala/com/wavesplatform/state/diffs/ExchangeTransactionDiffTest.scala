@@ -51,12 +51,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
   )
 
   val fsWithOrderFeature: FunctionalitySettings =
-    fs.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.OrderV3.id -> 0, BlockchainFeatures.BlockV5.id -> 0))
+    fs.copy(preActivatedFeatures = fs.preActivatedFeatures ++ Map(BlockchainFeatures.OrderV3.id -> 0))
 
   val fsOrderMassTransfer: FunctionalitySettings =
     fsWithOrderFeature.copy(preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.MassTransfer.id -> 0))
 
-  val fsWithAcceptingFailedScript: FunctionalitySettings =
+  val fsWithBlockV5: FunctionalitySettings =
     fsWithOrderFeature.copy(
       preActivatedFeatures = fsWithOrderFeature.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
     )
@@ -493,7 +493,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
           assertDiffEi(
             Seq(TestBlock.create(Seq(gen1, gen2, issue1))),
             TestBlock.create(Seq(exchange), Block.ProtoBlockVersion),
-            fsWithAcceptingFailedScript
+            fsWithBlockV5
           ) { ei =>
             ei should produce("AccountBalanceError")
           }
@@ -962,19 +962,19 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       case (txWithV3, txWithV4, txWithV3V4, txWithV4V3) =>
         val portfolios = collection.mutable.ListBuffer[Map[Address, Portfolio]]()
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4), Block.ProtoBlockVersion), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3V4), Block.ProtoBlockVersion), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3V4), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4V3), Block.ProtoBlockVersion), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV4V3), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3), Block.ProtoBlockVersion), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(txWithV3), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (blockDiff, _) => portfolios += blockDiff.portfolios
         }
 
@@ -1041,12 +1041,12 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
       case (preconditions, fixed, reversed) =>
         val portfolios = collection.mutable.ListBuffer[Map[Address, Portfolio]]()
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(fixed)), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(fixed)), fsWithBlockV5) {
           case (diff, _) =>
             portfolios += diff.portfolios
         }
 
-        assertDiffAndState(preconditions, TestBlock.create(Seq(reversed)), fsWithOrderFeature) {
+        assertDiffAndState(preconditions, TestBlock.create(Seq(reversed)), fsWithBlockV5) {
           case (diff, _) =>
             portfolios += diff.portfolios
         }
@@ -1096,7 +1096,7 @@ class ExchangeTransactionDiffTest extends PropSpec with PropertyChecks with With
         assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithOrderFeature) { ei =>
           ei shouldBe 'left
         }
-        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithAcceptingFailedScript) {
+        assertDiffAndState(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(exchange), Block.ProtoBlockVersion), fsWithBlockV5) {
           case (diff, state) =>
             diff.scriptsRun shouldBe 0
             diff.portfolios(exchange.sender.toAddress).balance shouldBe -exchange.fee
