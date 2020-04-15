@@ -45,7 +45,7 @@ object ExprScript {
       _ <- Either.cond(
         scriptComplexity <= limit,
         (),
-        s"Script is too complex: $scriptComplexity > ${MaxComplexityByVersion(version)}"
+        s"Script is too complex: $scriptComplexity > $limit"
       )
     } yield scriptComplexity
 
