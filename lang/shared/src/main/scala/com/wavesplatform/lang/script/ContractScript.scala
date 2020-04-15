@@ -83,7 +83,7 @@ object ContractScript {
       verifierComplexity   <- estimateVerifier(version, dApp, estimator)
     } yield callableComplexities ++ verifierComplexity
 
-  def estimateVerifier(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, Option[(String, Long)]] =
+  private def estimateVerifier(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, Option[(String, Long)]] =
     dApp.verifierFuncOpt
       .traverse(
         func => {

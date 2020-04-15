@@ -88,8 +88,6 @@ object Script {
       .map(_.maxComplexity)
 
   def verifierComplexity(script: Script, estimator: ScriptEstimator, isAsset: Boolean): Either[String, Long] =
-    script match {
-      case ContractScriptImpl(version, dApp) => ContractScript.estimateVerifier(version, dApp, estimator).map(_.fold(0L)(_._2))
-      case script: ExprScript                => ExprScript.estimate(script.expr, script.stdLibVersion, estimator, !isAsset)
-    }
+    complexityInfo(script, estimator, !isAsset)
+      .map(_.verifierComplexity)
 }
