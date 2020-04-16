@@ -58,7 +58,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
-    sender.waitForHeight(nextTerm, 3.minutes)
+    nodes.waitForHeight(nextTerm)
     val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
     val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
     checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
@@ -136,7 +136,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update asset info after rollback to update height") {
-    sender.rollback(secondUpdateInfoHeight - 1, returnToUTX = false)
+    nodes.rollback(secondUpdateInfoHeight - 1, returnToUTX = false)
     sender.assetsDetails(otherAssetId).name shouldBe "otherAsset"
     sender.assetsDetails(otherAssetId).description shouldBe "otherDescription"
 
@@ -151,7 +151,7 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
     sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
     sender.updateAssetInfo(issuer, assetId, firstUpdatedName, firstUpdatedDescription, waitForTx = true)._1.id
-    sender.rollback(issueHeight - 1, returnToUTX = true)
+    nodes.rollback(issueHeight - 1, returnToUTX = true)
 
     sender.waitForTransaction(assetId)
     val newIssueHeight = sender.transactionInfo[TransactionInfo](assetId).height
