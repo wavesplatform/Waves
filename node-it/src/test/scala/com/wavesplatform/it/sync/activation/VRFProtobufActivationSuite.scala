@@ -180,8 +180,8 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     //rollback to activation height
     nodes.rollback(activationHeight, returnToUTX = true)
 
-    val blockBeforeActivationHeight1 = sender.blockAt(activationHeight - 1)
-    blockBeforeActivationHeight1.version.get shouldBe Block.RewardBlockVersion
+    val blockAtActivationHeight1 = sender.blockAt(activationHeight)
+    blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
     val returnedTxIds = sender.utx().map(tx => tx.id)
 
     sender.waitForHeight(activationHeight + 1, 2.minutes)
@@ -194,12 +194,12 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
     //rollback to height one block before activation height
     nodes.rollback(activationHeight - 1, returnToUTX = false)
 
-    val blockAtActivationHeight2 = sender.blockAt(activationHeight)
-    blockAtActivationHeight2.version.get shouldBe Block.ProtoBlockVersion
+    val blockBeforeActivationHeight = sender.blockAt(activationHeight - 1)
+    blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
 
     sender.waitForHeight(activationHeight, 2.minutes)
-    val blockAtActivationHeight1 = sender.blockAt(activationHeight)
-    blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
+    val blockAtActivationHeight2 = sender.blockAt(activationHeight)
+    blockAtActivationHeight2.version.get shouldBe Block.ProtoBlockVersion
 
     sender.waitForHeight(activationHeight + 1, 2.minutes)
     val blockAfterActivationHeight2 = sender.blockAt(activationHeight + 1)
