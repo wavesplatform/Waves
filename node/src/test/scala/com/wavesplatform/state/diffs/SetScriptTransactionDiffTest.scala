@@ -198,7 +198,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         | {-#SCRIPT_TYPE ACCOUNT #-}
         | {-#CONTENT_TYPE EXPRESSION #-}
         |
-        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+        | groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') || groth16Verify_1inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
       """.stripMargin
 
       val expr = ExpressionCompiler.compile(script, ctx.compilerContext).explicitGet()
@@ -221,7 +221,7 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
         |
         | @Verifier(tx)
         | func verify() =
-        |   groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
+        |   groth16Verify_15inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK') || groth16Verify_1inputs(base64'ZGdnZHMK',base64'ZGdnZHMK',base64'ZGdnZHMK')
         |
       """.stripMargin
 
@@ -287,14 +287,14 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
     forAll(preconditionsAndSetCustomContract(exprV4WithComplexityBetween3000And4000)) {
       case (genesis, setScript) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV4Activated)(
-          _ should produce("Script is too complex: 3753 > 3000")
+          _ should produce("Script is too complex: 3807 > 3000")
         )
     }
 
     forAll(preconditionsAndSetCustomContract(contractV4WithComplexityBetween3000And4000)) {
       case (genesis, setScript) =>
         assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV4Activated)(
-          _ should produce("Contract verifier is too complex: 3753 > 3000")
+          _ should produce("Contract verifier is too complex: 3807 > 3000")
         )
     }
 
