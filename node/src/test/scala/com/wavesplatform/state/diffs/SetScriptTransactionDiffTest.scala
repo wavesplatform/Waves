@@ -20,7 +20,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.protobuf.dapp.DAppMeta
-import com.wavesplatform.settings.TestFunctionalitySettings
+import com.wavesplatform.settings.{FunctionalitySettings, TestFunctionalitySettings}
 import com.wavesplatform.transaction.GenesisTransaction
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
@@ -263,47 +263,38 @@ class SetScriptTransactionDiffTest extends PropSpec with PropertyChecks with Tra
 
     val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
       preActivatedFeatures = Map(
-        BlockchainFeatures.Ride4DApps.id               -> 0,
-        BlockchainFeatures.MultiPaymentInvokeScript.id -> 0
+        BlockchainFeatures.Ride4DApps.id -> 0,
+        BlockchainFeatures.BlockV5.id    -> 0
       )
     )
 
-    forAll(preconditionsAndSetCustomContract(exprV3WithComplexityBetween3000And4000)) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV3Activated) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
-        }
+    def assertSuccess(script: Script, settings: FunctionalitySettings): Unit = {
+      forAll(preconditionsAndSetCustomContract(script)) {
+        case (genesis, setScript) =>
+          assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings) {
+            case (blockDiff, newState) =>
+              newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
+          }
+      }
     }
 
-    forAll(preconditionsAndSetCustomContract(contractV3WithComplexityBetween3000And4000)) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV3Activated) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
-        }
+    def assertFailure(script: Script, settings: FunctionalitySettings, errorMessage: String): Unit = {
+      forAll(preconditionsAndSetCustomContract(script)) {
+        case (genesis, setScript) =>
+          assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), settings)(
+            _ should produce(errorMessage)
+          )
+      }
     }
 
-    forAll(preconditionsAndSetCustomContract(exprV4WithComplexityBetween3000And4000)) {
-      case (genesis, setScript) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV4Activated)(
-          _ should produce("Script is too complex: 3753 > 3000")
-        )
-    }
+    assertSuccess(exprV3WithComplexityBetween3000And4000, rideV3Activated)
+    assertSuccess(contractV3WithComplexityBetween3000And4000, rideV3Activated)
 
-    forAll(preconditionsAndSetCustomContract(contractV4WithComplexityBetween3000And4000)) {
-      case (genesis, setScript) =>
-        assertDiffEi(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV4Activated)(
-          _ should produce("Contract verifier is too complex: 3753 > 3000")
-        )
-    }
+    assertFailure(exprV4WithComplexityBetween3000And4000, rideV4Activated, "Script is too complex: 3753 > 3000")
+    assertFailure(exprV3WithComplexityBetween3000And4000, rideV4Activated, "Script is too complex: 3049 > 3000")
+    assertFailure(contractV3WithComplexityBetween3000And4000, rideV4Activated, "Contract verifier is too complex: 3049 > 3000")
+    assertFailure(contractV4WithComplexityBetween3000And4000, rideV4Activated, "Contract verifier is too complex: 3753 > 3000")
 
-    forAll(preconditionsAndSetCustomContract(contractV4WithCallableComplexityBetween3000And4000)) {
-      case (genesis, setScript) =>
-        assertDiffAndState(Seq(TestBlock.create(Seq(genesis))), TestBlock.create(Seq(setScript)), rideV4Activated) {
-          case (blockDiff, newState) =>
-            newState.accountScript(setScript.sender).map(_.script) shouldBe setScript.script
-        }
-    }
+    assertSuccess(contractV4WithCallableComplexityBetween3000And4000, rideV4Activated)
   }
 }
