@@ -58,10 +58,11 @@ object ContractScript {
       version: StdLibVersion,
       contract: DApp,
       estimator: ScriptEstimator,
+      useContractVerifierLimit: Boolean = true,
       checkLimit: Boolean = true
   ): Either[String, (Long, Map[String, Long])] =
     for {
-      cbf <- estimateComplexityByFunction(version, contract, estimator)
+      cbf <- estimateComplexityByFunction(version, contract, estimator, useContractVerifierLimit)
       max = cbf.maximumOption(_._2 compareTo _._2)
       _ <- max.fold(().asRight[String])(
         m =>
@@ -76,18 +77,26 @@ object ContractScript {
   private def estimateComplexityByFunction(
       version: StdLibVersion,
       dApp: DApp,
-      estimator: ScriptEstimator
+      estimator: ScriptEstimator,
+      useContractVerifierLimit: Boolean
   ): Either[String, List[(String, Long)]] =
     for {
       callableComplexities <- dApp.callableFuncs.traverse(estimateAnnotatedFunction(version, dApp, estimator, _))
-      verifierComplexity   <- estimateVerifier(version, dApp, estimator)
+      verifierComplexity   <- estimateVerifier(version, dApp, estimator, useContractVerifierLimit)
     } yield callableComplexities ++ verifierComplexity
 
-  private def estimateVerifier(version: StdLibVersion, dApp: DApp, estimator: ScriptEstimator): Either[String, Option[(String, Long)]] =
+  private def estimateVerifier(
+      version: StdLibVersion,
+      dApp: DApp,
+      estimator: ScriptEstimator,
+      useContractVerifierLimit: Boolean
+  ): Either[String, Option[(String, Long)]] =
     dApp.verifierFuncOpt
       .traverse(
         func => {
-          val limit = MaxAccountVerifierComplexityByVersion(version)
+          val limit =
+            if (useContractVerifierLimit) MaxAccountVerifierComplexityByVersion(version)
+            else MaxComplexityByVersion(version)
           estimateAnnotatedFunction(version, dApp, estimator, func)
             .ensureOr(
               complexity => s"Contract verifier is too complex: ${complexity._2} > $limit"
