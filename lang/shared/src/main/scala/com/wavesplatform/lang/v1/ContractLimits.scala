@@ -8,8 +8,10 @@ object ContractLimits {
     case V3 | V4 => 4000
   }
 
-  val MaxAccountVerifierComplexityByVersion: StdLibVersion => Int =
-    _ => 3000
+  val MaxAccountVerifierComplexityByVersion: StdLibVersion => Int = {
+    case V1 | V2 => 2000
+    case V3 | V4 => 3000
+  }
 
   val MaxExprSizeInBytes     = 8 * 1024
   val MaxContractSizeInBytes = 32 * 1024
