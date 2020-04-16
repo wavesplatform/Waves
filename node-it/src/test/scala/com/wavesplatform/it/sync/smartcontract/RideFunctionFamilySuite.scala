@@ -48,8 +48,13 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
      |""",
        "rsa" -> """
      |@Verifier(tx)
-     |func rsa() = rsaVerify(NOALG, a, a, a) && rsaVerify_16Kb(MD5, a, a, a) && rsaVerify_32Kb(SHA256, a, a, a) && rsaVerify_64Kb(SHA3256, a, a, a) && rsaVerify_128Kb(NOALG, a, a, a)
-     |""")(f).stripMargin
+     |func rsa() = rsaVerify(NOALG, a, a, a) && rsaVerify_32Kb(SHA256, a, a, a) && rsaVerify_64Kb(SHA3256, a, a, a) && rsaVerify_128Kb(NOALG, a, a, a)
+     |""",
+       "rsa16" -> """
+     |@Verifier(tx)
+     |func rsa() = rsaVerify_16Kb(MD5, a, a, a) && rsaVerify_32Kb(SHA256, a, a, a) && rsaVerify_64Kb(SHA3256, a, a, a) && rsaVerify_128Kb(NOALG, a, a, a)
+     |"""
+   )(f).stripMargin
 
 
   test("function family in asset sript") {
@@ -92,7 +97,8 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
   test("function family (verify)") {
     for(((f, names), c) <- List(
          "sig" -> List("sigVerify(a, a, a)", "sigVerify_16Kb(a, a, a)", "sigVerify_32Kb(a, a, a)", "sigVerify_64Kb(a, a, a)", "sigVerify_128Kb(a, a, a)") -> 712,
-         "rsa" -> List("rsaVerify(NOALG, a, a, a)", "rsaVerify_16Kb(MD5, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 3450
+         "rsa" -> List("rsaVerify(NOALG, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 2945,
+         "rsa16" -> List("rsaVerify_16Kb(MD5, a, a, a)", "rsaVerify_32Kb(SHA256, a, a, a)", "rsaVerify_64Kb(SHA3256, a, a, a)", "rsaVerify_128Kb(NOALG, a, a, a)") -> 2445
     )) {
       val CompiledScript(scr, complexity, _) = sender.scriptCompile(ffDApp(4)(f))
       val EstimatedScript(_, _, ecomplexity, _) = sender.scriptEstimate(scr)
@@ -105,7 +111,7 @@ class RideFunctionFamilySuite extends BaseTransactionSuite with CancelAfterFailu
   }
 
   test("function family (DAps in V3)") {
-    for(f <- List("blake", "keccak", "sha", "sig", "rsa")) {
+    for(f <- List("blake", "keccak", "sha", "sig", "rsa", "rsa16")) {
       assertApiError(sender.scriptCompile(ffDApp(3)(f))) { error =>
         error.statusCode shouldBe 400
         error.id shouldBe ScriptCompilerError.Id
