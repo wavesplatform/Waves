@@ -91,7 +91,7 @@ object FeeValidation {
 
             (baseFee * multiplier).toLong
           case _: ReissueTransaction =>
-            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.MultiPaymentInvokeScript)) DAppV4Multiplier else 1
+            val multiplier = if (blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)) DAppV4Multiplier else 1
             (baseFee * multiplier).toLong
           case _ => baseFee
         }

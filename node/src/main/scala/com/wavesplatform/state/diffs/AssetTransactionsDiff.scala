@@ -38,7 +38,7 @@ object AssetTransactionsDiff extends ScorexLogging {
     for {
       _ <- Either.cond(requireValidUtf(), (), GenericError("Valid UTF-8 strings required"))
       result <- DiffsCommon
-        .countVerifierComplexity(tx.script, blockchain)
+        .countVerifierComplexity(tx.script, blockchain, isAsset = true)
         .map(
           script =>
             Diff(
@@ -56,7 +56,7 @@ object AssetTransactionsDiff extends ScorexLogging {
     DiffsCommon.validateAsset(blockchain, tx.asset, tx.sender, issuerOnly = true).flatMap { _ =>
       if (blockchain.hasAssetScript(tx.asset)) {
         DiffsCommon
-          .countVerifierComplexity(tx.script, blockchain)
+          .countVerifierComplexity(tx.script, blockchain, isAsset = true)
           .map { script =>
             Diff(
               tx = tx,

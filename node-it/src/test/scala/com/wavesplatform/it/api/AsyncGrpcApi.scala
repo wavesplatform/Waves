@@ -49,16 +49,25 @@ object AsyncGrpcApi {
         .map(r => PBBlocks.vanilla(r.getBlock).get.json().as[Block])
     }
 
-    def stateChanges(request: TransactionsRequest): Future[Seq[StateChangesDetails]] = {
-      val (obs, result) = createCallObserver[InvokeScriptResult]
+    def stateChanges(
+        request: TransactionsRequest
+    ): Future[Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)]] = {
+      val (obs, result) = createCallObserver[InvokeScriptResultResponse]
       transactions.getStateChanges(request, obs)
       result.runToFuture.map { r =>
         import com.wavesplatform.state.{InvokeScriptResult => VISR}
-        r.map(VISR.fromPB).map(r => Json.toJson(r).as[StateChangesDetails])
+        r.map { r =>
+          val tx     = PBTransactions.vanillaUnsafe(r.getTransaction)
+          val result = Json.toJson(VISR.fromPB(r.getResult)).as[StateChangesDetails]
+          (tx, result)
+        }
       }
     }
 
-    def stateChanges(txIds: Seq[String] = Nil, address: ByteString = ByteString.EMPTY): Future[Seq[StateChangesDetails]] = {
+    def stateChanges(
+        txIds: Seq[String] = Nil,
+        address: ByteString = ByteString.EMPTY
+    ): Future[Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)]] = {
       val ids = txIds.map(id => ByteString.copyFrom(Base58.decode(id)))
       stateChanges(TransactionsRequest().addTransactionIds(ids: _*).withSender(address))
     }

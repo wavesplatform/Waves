@@ -127,16 +127,17 @@ trait BaseGlobal {
   }
 
   val compileExpression =
-    compile(_, _, _, _, _, ExpressionCompiler.compile)
+    compile(_, _, _, _, _, _, ExpressionCompiler.compile)
 
   val compileDecls =
-    compile(_, _, _, _, _, ExpressionCompiler.compileDecls)
+    compile(_, _, _, _, _, _, ExpressionCompiler.compileDecls)
 
   private def compile(
       input: String,
       context: CompilerContext,
       letBlockOnly: Boolean,
       stdLibVersion: StdLibVersion,
+      isAsset: Boolean,
       estimator: ScriptEstimator,
       compiler: (String, CompilerContext) => Either[String, EXPR]
   ): Either[String, (Array[Byte], Terms.EXPR, Long)] =
@@ -146,8 +147,8 @@ trait BaseGlobal {
       _ <- Either.cond(!illegalBlockVersionUsage, (), "UserFunctions are only enabled in STDLIB_VERSION >= 3")
       x = serializeExpression(ex, stdLibVersion)
 
-      _          <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV1)
-      complexity <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV2)
+      _          <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV1, !isAsset)
+      complexity <- ExprScript.estimate(ex, stdLibVersion, ScriptEstimatorV2, !isAsset)
     } yield (x, ex, complexity)
 
   type ContractInfo = (Array[Byte], DApp, Long, Map[String, Long])

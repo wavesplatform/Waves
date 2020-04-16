@@ -418,7 +418,7 @@ object InvokeScriptTransactionDiff {
               val asset = IssuedAsset(issue.id)
 
               DiffsCommon
-                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain)
+                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
                 .map(
                   script =>
                     Diff(
@@ -465,7 +465,7 @@ object InvokeScriptTransactionDiff {
 
           val diff = action match {
             case t: AssetTransfer =>
-              applyTransfer(t, if (blockchain.isFeatureActivated(MultiPaymentInvokeScript)) {
+              applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
                 pk
               } else {
                 PublicKey(ByteStr.empty)

@@ -75,15 +75,15 @@ object SyncGrpcApi extends Assertions {
       Addr.fromBytes(addr.value.toByteArray).explicitGet()
     }
 
-    def stateChanges(txId: String): StateChangesDetails = {
+    def stateChanges(txId: String): (VanillaTransaction, StateChangesDetails) = {
       sync(async(n).stateChanges(Seq(txId))).head
     }
 
-    def stateChanges(address: ByteString): Seq[StateChangesDetails] = {
+    def stateChanges(address: ByteString): Seq[(VanillaTransaction, StateChangesDetails)] = {
       sync(async(n).stateChanges(address = address))
     }
 
-    def stateChanges(request: TransactionsRequest): Seq[StateChangesDetails] = {
+    def stateChanges(request: TransactionsRequest): Seq[(com.wavesplatform.transaction.Transaction, StateChangesDetails)] = {
       sync(async(n).stateChanges(request))
     }
 

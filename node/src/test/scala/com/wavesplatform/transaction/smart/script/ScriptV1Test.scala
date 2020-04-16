@@ -33,7 +33,7 @@ class ScriptV1Test extends PropSpec with PropertyChecks with Matchers with Typed
       }
       .reduceLeft[EXPR](IF(_, _, FALSE))
 
-    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2) should produce("Script is too complex")
+    Script.estimate(ExprScript(expr).explicitGet(), ScriptEstimatorV2, useContractVerifierLimit = false) should produce("Script is too complex")
   }
 
   property("ScriptV1.apply should deny too big scripts") {

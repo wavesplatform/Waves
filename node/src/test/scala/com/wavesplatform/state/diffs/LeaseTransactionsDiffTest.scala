@@ -175,7 +175,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithSt
     }
   }
 
-  property(s"can pay for cancel lease from the returning funds (before and after ${BlockchainFeatures.AcceptFailedScriptTransaction})") {
+  property(s"can pay for cancel lease from the returning funds (before and after ${BlockchainFeatures.BlockV5})") {
     val scenario =
       for {
         master    <- accountGen
@@ -192,7 +192,7 @@ class LeaseTransactionsDiffTest extends PropSpec with PropertyChecks with WithSt
       case (genesis, lease, leaseCancel, ts) =>
         val beforeFailedTxs = TestFunctionalitySettings.Enabled
         val afterFailedTxs = beforeFailedTxs.copy(
-          preActivatedFeatures = beforeFailedTxs.preActivatedFeatures + (BlockchainFeatures.AcceptFailedScriptTransaction.id -> 0)
+          preActivatedFeatures = beforeFailedTxs.preActivatedFeatures + (BlockchainFeatures.BlockV5.id -> 0)
         )
 
         assertDiffEi(Seq(TestBlock.create(ts, Seq(genesis, lease))), TestBlock.create(ts + 1, Seq(leaseCancel)), beforeFailedTxs) { ei =>
