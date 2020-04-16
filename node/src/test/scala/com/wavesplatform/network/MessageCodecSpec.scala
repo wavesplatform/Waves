@@ -2,10 +2,9 @@ package com.wavesplatform.network
 
 import java.nio.charset.StandardCharsets
 
-import com.wavesplatform.transaction.Asset.Waves
-import com.wavesplatform.transaction.assets.{IssueTransaction, UpdateAssetInfoTransaction}
+import com.wavesplatform.TransactionGen
+import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.{ProvenTransaction, Transaction}
-import com.wavesplatform.{TestValues, TransactionGen}
 import io.netty.channel.ChannelHandlerContext
 import io.netty.channel.embedded.EmbeddedChannel
 import org.scalamock.scalatest.MockFactory
@@ -33,14 +32,6 @@ class MessageCodecSpec extends FreeSpec with Matchers with MockFactory with Prop
 
     decodedTx shouldBe origTx
     codec.blockCalls shouldBe 0
-  }
-
-  "should pack update asset info in PB message" in {
-    val tx = UpdateAssetInfoTransaction
-      .selfSigned(1, TestValues.keyPair, TestValues.asset.id, "bomz", "", System.currentTimeMillis(), TestValues.fee, Waves)
-      .right
-      .get
-    RawBytes.fromTransaction(tx) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
   }
 
   private class SpiedMessageCodec extends MessageCodec(PeerDatabase.NoOp) {
