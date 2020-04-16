@@ -115,7 +115,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     "Issue two identical assets with the same nonce (one invocation) should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertBadRequestAndMessage(
-        invokeScript(acc, "issue2Assets"),
+        invokeScript(acc, "issue2Assets", fee = invocationCost(2)),
         " is already issued"
       )
     }
@@ -171,7 +171,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val assetId = validateIssuedAssets(acc, txIssue, simpleReissuableAsset, method = method)
 
       assertBadRequestAndMessage(
-        invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000),
+        invokeScript(acc, "reissueAndReissue", assetId = assetId, count = 1000, fee = invocationCost(1)),
         "Asset is not reissuable"
       )
 
@@ -180,7 +180,7 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
 
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets")
+      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(10))
       for (nth <- 0 to 9) {
         val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
         assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
@@ -291,12 +291,12 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val simpleAsset = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
 
       val height = nodes.waitForHeightArise()
       nodes.waitForHeightArise()
-      invokeScript(acc, "reissueIssueAndNft", assetId = asset)
+      invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
       burn(acc, CallableMethod, simpleAsset, 5000)
       burn(acc, TransactionMethod, asset, 10000)
       nodes.waitForHeightArise()
@@ -308,14 +308,14 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset, simpleAsset)
       sender.nftList(acc, 10) shouldBe empty
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
-        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil)) if issue.name == simpleReissuableAsset.name =>
+        case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
       }
     }
 
     "liquid block works" in {
       val acc   = createDapp(script(simpleReissuableAsset))
       val asset = issueValidated(acc, simpleReissuableAsset)
-      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset)
+      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
       def checks(): Unit = {
         assertStateChanges(tx) { sd =>
           sd.issues should have size 2

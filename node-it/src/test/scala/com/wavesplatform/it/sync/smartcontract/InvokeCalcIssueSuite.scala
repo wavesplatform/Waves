@@ -21,7 +21,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
     NodeConfigs
       .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.MultiPaymentInvokeScript.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.BlockV5.id, 0), (BlockchainFeatures.BlockV5.id, 0)))
       .buildNonConflicting()
 
   private val smartAcc  = firstAddress
@@ -42,6 +42,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         smartAcc,
         Some("i"),
         args = List.empty,
+        fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
     val assetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)
@@ -52,6 +53,7 @@ class InvokeCalcIssueSuite extends BaseTransactionSuite with Matchers with Cance
         smartAcc,
         Some("i"),
         args = List.empty,
+        fee = invokeFee + issueFee, // dAppV4 contains 1 Issue action
         waitForTx = true
       )
     val secondAssetId = Base58.encode(sender.getDataByKey(smartAcc, "id").as[BinaryDataEntry].value)

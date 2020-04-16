@@ -78,10 +78,9 @@ object InvokeScriptTransactionDiff {
                   Sponsorship.toWaves(tx.fee, assetInfo.sponsorship),
                   GenericError(s"Asset $asset is not sponsored, cannot be used to pay fees")
                 )
-              } yield
-                wavesFee ->
-                  (Map(tx.sender.toAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee))) |+|
-                    Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))))
+              } yield wavesFee ->
+                (Map(tx.sender.toAddress         -> Portfolio(0, LeaseBalance.empty, Map(asset         -> -tx.fee))) |+|
+                  Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))))
           })
           wavesFee     = feeInfo._1
           paymentsDiff = paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2)
@@ -146,7 +145,7 @@ object InvokeScriptTransactionDiff {
                 )
               } yield (evaluator, invocationComplexity)
 
-              result.leftMap { case (error, log) => ScriptExecutionError(error, log, isAssetScript = false) }
+              result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
             })
             TracedResult(
               scriptResultE,
@@ -188,7 +187,7 @@ object InvokeScriptTransactionDiff {
           _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
           _ <- TracedResult(validateOverflow(transfers.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
 
-          verifierComplexity = blockchain.accountScript(tx.sender).map(_.maxComplexity)
+          verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity)
           assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
             .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
             .map(_._2)
@@ -199,22 +198,20 @@ object InvokeScriptTransactionDiff {
                 transfers.flatMap(_.assetId).map(IssuedAsset) ++
                 reissues.map(r => IssuedAsset(r.assetId)) ++
                 burns.map(b => IssuedAsset(b.assetId))
-            val totalScriptsInvoked =
-              smartAssetInvocations.count(blockchain.hasAssetScript) +
-                (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
-            val minWaves  = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-            val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+            val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
+            val minIssueFee         = issues.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+            val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
+            val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
             Either.cond(
               minWaves <= wavesFee,
               totalScriptsInvoked,
-              GenericError(
+              InsufficientInvokeActionFee(
                 s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
                   s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES."
               )
             )
           }
-
           compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff)
         } yield {
           val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
@@ -347,133 +344,138 @@ object InvokeScriptTransactionDiff {
   ): TracedResult[ValidationError, Diff] =
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
-        case TracedResult(Right(curDiff), _) => 
-           val blockchain = CompositeBlockchain(sblockchain, Some(curDiff))
-           val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
+        case TracedResult(Right(curDiff), _) =>
+          val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
+          val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
 
-           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
-             val AssetTransfer(addressRepr, amount, asset) = transfer
-             val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
-             Asset.fromCompatId(asset) match {
-               case Waves =>
-                 val r = Diff.stateOps(
-                   portfolios =
-                     Map(address       -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
-                       Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
-                 )
-                 TracedResult.wrapValue(r)
-               case a @ IssuedAsset(id) =>
-                 val nextDiff = Diff.stateOps(
-                   portfolios =
-                     Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
-                       Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
-                 )
-                 blockchain.assetScript(a) match {
-                   case None => nextDiff.asRight[ValidationError]
-                   case Some((script, _)) =>
-                     val assetVerifierDiff =
-                       if (blockchain.disallowSelfPayment) nextDiff
-                       else
-                         nextDiff.copy(
-                           portfolios = Map(
-                             address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
-                             dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
-                           )
-                         )
-                     val pseudoTx = ScriptTransfer(
-                       asset,
-                       actionSender,
-                       pk,
-                       Recipient.Address(addressRepr.bytes),
-                       amount,
-                       tx.timestamp,
-                       tx.id()
-                     )
-                     val assetValidationDiff = validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, a.id, assetVerifierDiff, script)
-                     val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
-                     TracedResult(
-                            assetValidationDiff.map(_ => nextDiff),
-                       List(AssetVerifierTrace(id, errorOpt))
-                     )
-                 }
-             }
-           }
+          def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
+            val AssetTransfer(addressRepr, amount, asset) = transfer
+            val address                                   = Address.fromBytes(addressRepr.bytes.arr).explicitGet()
+            Asset.fromCompatId(asset) match {
+              case Waves =>
+                val r = Diff.stateOps(
+                  portfolios =
+                    Map(address       -> Portfolio(amount, LeaseBalance.empty, Map.empty)) |+|
+                      Map(dAppAddress -> Portfolio(-amount, LeaseBalance.empty, Map.empty))
+                )
+                TracedResult.wrapValue(r)
+              case a @ IssuedAsset(id) =>
+                val nextDiff = Diff.stateOps(
+                  portfolios =
+                    Map(address       -> Portfolio(0, LeaseBalance.empty, Map(a -> amount))) |+|
+                      Map(dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount)))
+                )
+                blockchain.assetScript(a) match {
+                  case None => nextDiff.asRight[ValidationError]
+                  case Some((script, _)) =>
+                    val assetVerifierDiff =
+                      if (blockchain.disallowSelfPayment) nextDiff
+                      else
+                        nextDiff.copy(
+                          portfolios = Map(
+                            address     -> Portfolio(0, LeaseBalance.empty, Map(a -> amount)),
+                            dAppAddress -> Portfolio(0, LeaseBalance.empty, Map(a -> -amount))
+                          )
+                        )
+                    val pseudoTx = ScriptTransfer(
+                      asset,
+                      actionSender,
+                      pk,
+                      Recipient.Address(addressRepr.bytes),
+                      amount,
+                      tx.timestamp,
+                      tx.id()
+                    )
+                    val assetValidationDiff = validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, a.id, assetVerifierDiff, script)
+                    val errorOpt            = assetValidationDiff.fold(Some(_), _ => None)
+                    TracedResult(
+                      assetValidationDiff.map(_ => nextDiff),
+                      List(AssetVerifierTrace(id, errorOpt))
+                    )
+                }
+            }
+          }
 
-           def applyDataItem(item: DataItem[_]): TracedResult[ValidationError, Diff] =
-             TracedResult.wrapValue(
-               Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
-             )
+          def applyDataItem(item: DataItem[_]): TracedResult[ValidationError, Diff] =
+            TracedResult.wrapValue(
+              Diff.stateOps(accountData = Map(dAppAddress -> AccountDataInfo(Map(item.key -> dataItemToEntry(item)))))
+            )
 
-           def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
-             if (issue.name
-                   .getBytes("UTF-8")
-                   .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
-               TracedResult(Left(InvalidName), List())
-             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
-               TracedResult(Left(TooBigArray), List())
-             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-               TracedResult(Left(ScriptExecutionError(s"Asset ${issue.id} is already issued", List(), false)), List())
-             } else {
-               val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
-               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
-               val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
+          def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
+            if (issue.name
+                  .getBytes("UTF-8")
+                  .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
+              TracedResult(Left(InvalidName), List())
+            } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
+              TracedResult(Left(TooBigArray), List())
+            } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
+              TracedResult(Left(ScriptExecutionError(s"Asset ${issue.id} is already issued", List(), isAssetScript = false)), List())
+            } else {
+              val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
+              val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
+              val info       = AssetInfo(ByteString.copyFromUtf8(issue.name), ByteString.copyFromUtf8(issue.description), Height @@ blockchain.height)
 
-               val asset = IssuedAsset(issue.id)
+              val asset = IssuedAsset(issue.id)
 
-               DiffsCommon
-                 .countVerifierComplexity(None /*issue.compiledScript*/, blockchain)
-                 .map(
-                   script =>
-                     Diff(
-                       tx = itx,
-                       portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
-                       issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
-                       assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
-                     )
-                 )
-             }
-           }
+              DiffsCommon
+                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
+                .map(
+                  script =>
+                    Diff(
+                      tx = itx,
+                      portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                      issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
+                      assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
+                    )
+                )
+            }
+          }
 
-           def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, Diff] = {
-             val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
-             val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
-             validateActionAsPseudoTx(reissueDiff, reissue.assetId, pseudoTx)
-           }
+          def applyReissue(reissue: Reissue, pk: PublicKey): TracedResult[ValidationError, Diff] = {
+            val reissueDiff = DiffsCommon.processReissue(blockchain, dAppAddress, blockTime, fee = 0, reissue)
+            val pseudoTx    = ReissuePseudoTx(reissue, actionSender, pk, tx.id(), tx.timestamp)
+            validateActionAsPseudoTx(reissueDiff, reissue.assetId, pseudoTx)
+          }
 
-           def applyBurn(burn: Burn, pk: PublicKey): TracedResult[ValidationError, Diff] = {
-             val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
-             val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
-             validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
-           }
+          def applyBurn(burn: Burn, pk: PublicKey): TracedResult[ValidationError, Diff] = {
+            val burnDiff = DiffsCommon.processBurn(blockchain, dAppAddress, fee = 0, burn)
+            val pseudoTx = BurnPseudoTx(burn, actionSender, pk, tx.id(), tx.timestamp)
+            validateActionAsPseudoTx(burnDiff, burn.assetId, pseudoTx)
+          }
 
-           def validateActionAsPseudoTx(
-               actionDiff: Either[ValidationError, Diff],
-               assetId: ByteStr,
-               pseudoTx: PseudoTx
-           ): TracedResult[ValidationError, Diff] =
-             blockchain.assetScript(IssuedAsset(assetId)) match {
-               case None => actionDiff
-               case Some((script, _)) =>
-                 val assetValidationDiff =
-                   for {
-                     result          <- actionDiff
-                     validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, assetId, result, script)
-                   } yield validatedResult
-                 val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
-                 TracedResult(
-                   assetValidationDiff,
-                   List(AssetVerifierTrace(assetId, errorOpt))
-                 )
-             }
+          def validateActionAsPseudoTx(
+              actionDiff: Either[ValidationError, Diff],
+              assetId: ByteStr,
+              pseudoTx: PseudoTx
+          ): TracedResult[ValidationError, Diff] =
+            blockchain.assetScript(IssuedAsset(assetId)) match {
+              case None => actionDiff
+              case Some((script, _)) =>
+                val assetValidationDiff =
+                  for {
+                    result          <- actionDiff
+                    validatedResult <- validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, assetId, result, script)
+                  } yield validatedResult
+                val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+                TracedResult(
+                  assetValidationDiff,
+                  List(AssetVerifierTrace(assetId, errorOpt))
+                )
+            }
 
-           val diff = action match {
-             case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(MultiPaymentInvokeScript)) { pk } else { PublicKey(ByteStr.empty) }))
-             case d: DataItem[_]   => applyDataItem(d)
-             case i: Issue         => applyIssue(tx, pk, i)
-             case r: Reissue       => applyReissue(r, pk)
-             case b: Burn          => applyBurn(b, pk)
-           }
-           diffAcc |+| diff
+          val diff = action match {
+            case t: AssetTransfer =>
+              applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
+                pk
+              } else {
+                PublicKey(ByteStr.empty)
+              })
+            case d: DataItem[_] => applyDataItem(d)
+            case i: Issue       => applyIssue(tx, pk, i)
+            case r: Reissue     => applyReissue(r, pk)
+            case b: Burn        => applyBurn(b, pk)
+          }
+          diffAcc |+| diff
         case _ => diffAcc
       }
     }
@@ -492,14 +494,16 @@ object InvokeScriptTransactionDiff {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError(error, log, isAssetScript = true))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript(log, isAssetScript = true))
+        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reason.AssetInAction))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reason.AssetInAction))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x))     => Left(ScriptExecutionError(s"Script returned not a boolean result, but $x", log, isAssetScript = true))
+        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reason.AssetInAction))
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, isAssetScript = true))
+        Left(
+          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reason.AssetInAction)
+        )
       case Success(s) => s
     }
 }

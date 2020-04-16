@@ -19,7 +19,7 @@ trait AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(Height, Transaction)] =
+  ): Observable[(Height, Transaction, Boolean)] =
     db.resourceObservable.flatMap { resource =>
       Observable.fromIterable(allAddressTransactions(resource, maybeDiff, subject, sender, types, fromId))
     }
@@ -31,29 +31,32 @@ trait AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Observable[(Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])])] =
+  ): Observable[TransactionMeta] =
     db.resourceObservable.flatMap { resource =>
       Observable
         .fromIterable(allAddressTransactions(resource, maybeDiff, subject, sender, types, fromId).map {
-          case (h, ist: InvokeScriptTransaction) =>
-            h -> Right(ist -> maybeDiff.flatMap(_._2.scriptResults.get(ist.id())).orElse(loadInvokeScriptResult(resource, ist.id())))
-          case (h, tx) => h -> Left(tx)
+          case (h, ist: InvokeScriptTransaction, status) =>
+            (h, Right(ist -> maybeDiff.flatMap(_._2.scriptResults.get(ist.id())).orElse(loadInvokeScriptResult(resource, ist.id()))), status)
+          case (h, tx, status) => (h, Left(tx), status)
         })
     }
 }
 
 object AddressTransactions {
-  private def loadTransaction(resource: DBResource, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction)] =
+  type TransactionMeta = (Height, Either[Transaction, (InvokeScriptTransaction, Option[InvokeScriptResult])], Boolean)
+
+  private def loadTransaction(resource: DBResource, height: Height, txNum: TxNum, sender: Option[Address]): Option[(Height, Transaction, Boolean)] =
     resource.get(Keys.transactionAt(height, txNum)) match {
-      case Some(tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => Some(height -> tx)
-      case Some(gt: GenesisTransaction) if sender.isEmpty                  => Some(height -> gt)
-      case _                                                               => None
+      case Some((tx: Authorized, status)) if sender.forall(_ == tx.sender.toAddress) => Some((height, tx, status))
+      case Some((gt: GenesisTransaction, status)) if sender.isEmpty                  => Some((height, gt, status))
+      case _                                                                         => None
     }
 
   private def loadInvokeScriptResult(resource: DBResource, txId: ByteStr): Option[InvokeScriptResult] =
     for {
       (h, txNum) <- resource.get(Keys.transactionHNById(TransactionId(txId)))
-    } yield resource.get(Keys.invokeScriptResult(h, txNum))
+      r <- resource.get(Keys.invokeScriptResult(h, txNum))
+    } yield r
 
   def loadInvokeScriptResult(db: DB, txId: ByteStr): Option[InvokeScriptResult] =
     db.withResource(r => loadInvokeScriptResult(r, txId))
@@ -65,7 +68,7 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction)] =
+  ): Iterable[(Height, Transaction, Boolean)] =
     transactionsFromDiff(maybeDiff, subject, sender, types, fromId) ++
       transactionsFromDB(
         resource,
@@ -81,15 +84,14 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction)] = resource.get(Keys.addressId(subject)).fold(Iterable.empty[(Height, Transaction)]) { addressId =>
+  ): Iterable[(Height, Transaction, Boolean)] = resource.get(Keys.addressId(subject)).fold(Iterable.empty[(Height, Transaction, Boolean)]) { addressId =>
     val (maxHeight, maxTxNum) =
       fromId.flatMap(id => resource.get(Keys.transactionHNById(TransactionId(id)))).getOrElse(Height(Int.MaxValue) -> TxNum(Short.MaxValue))
 
     (for {
       seqNr                    <- (resource.get(Keys.addressTransactionSeqNr(addressId)) to 0 by -1).view
-      (height, transactionIds) <- resource.get(Keys.addressTransactionHN(addressId, seqNr)).view
-      if height <= maxHeight
-      (txType, txNum) <- transactionIds.view
+      (height, transactionIds) <- resource.get(Keys.addressTransactionHN(addressId, seqNr)).view if height <= maxHeight
+      (txType, txNum)          <- transactionIds.view
     } yield (height, txNum, txType))
       .dropWhile { case (h, txNum, _) => h > maxHeight || h == maxHeight && txNum >= maxTxNum }
       .collect { case (h, txNum, txType) if types.isEmpty || types(txType) => h -> txNum }
@@ -102,14 +104,14 @@ object AddressTransactions {
       sender: Option[Address],
       types: Set[Transaction.Type],
       fromId: Option[ByteStr]
-  ): Iterable[(Height, Transaction)] =
+  ): Iterable[(Height, Transaction, Boolean)] =
     (for {
-      (h, diff)       <- maybeDiff.toSeq
-      (tx, addresses) <- diff.transactions.values.toSeq.reverse
+      (h, diff)               <- maybeDiff.toSeq
+      (tx, addresses, status) <- diff.transactions.values.toSeq.reverse
       if addresses(subject)
-    } yield h -> tx)
-      .dropWhile { case (_, tx) => fromId.isDefined && !fromId.contains(tx.id()) }
-      .dropWhile { case (_, tx) => fromId.contains(tx.id()) }
-      .filter { case (_, tx) => types.isEmpty || types.contains(tx.typeId) }
-      .collect { case v @ (_, tx: Authorized) if sender.forall(_ == tx.sender.toAddress) => v }
+    } yield (h, tx, status))
+      .dropWhile { case (_, tx, _) => fromId.isDefined && !fromId.contains(tx.id()) }
+      .dropWhile { case (_, tx, _) => fromId.contains(tx.id()) }
+      .filter { case (_, tx, _) => types.isEmpty || types.contains(tx.typeId) }
+      .collect { case v @ (_, tx: Authorized, _) if sender.forall(_ == tx.sender.toAddress) => v }
 }

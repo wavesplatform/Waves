@@ -22,7 +22,7 @@ package object utils {
       fromId: Option[ByteStr]
   ): Seq[(Height, Transaction)] = {
     val resource = DBResource(db)
-    try AddressTransactions.allAddressTransactions(resource, diff, address, None, types, fromId).toSeq
+    try AddressTransactions.allAddressTransactions(resource, diff, address, None, types, fromId).map { case (h, tx, _) => h -> tx }.toSeq
     finally resource.close()
   }
 
