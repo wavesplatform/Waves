@@ -1441,8 +1441,12 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("groth16Verify_*inputs with invalid vk size") {
-    val lets = """
-          |let vk = base16'AA'
+    for {
+      ii <- 0 to 16
+      n <- Seq(0, (8+ii)*48+1, (8+ii)*48-1)
+      }{
+      val lets = s"""
+          |let vk = base16'${"AA"*n}'
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
           |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"*ii}'
           |""".stripMargin
@@ -1458,7 +1462,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d' + base16'00'
           |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
           |""".stripMargin
-    for((ii, _) <- grothsOk if (ii <= 16)) {
+    for(ii <- 0 to 16) {
       val i = if(ii == 0) { 1 } else { ii }
       val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
       eval(src, version = V4) shouldBe Left("Invalid proof size 193 bytes, must be equal to 192 bytes")
