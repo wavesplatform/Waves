@@ -238,7 +238,7 @@ class BlockchainUpdateTriggersSpec extends FreeSpec with Matchers with BlockGen 
 
             scriptUpd shouldBe issueUpd.copy(
               script =
-                setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator).explicitGet()),
+                setAssetScript.script.map(s => s -> Script.estimate(s, EstimatorProvider.EstimatorBlockchainExt(blockchain).estimator, useContractVerifierLimit = false).explicitGet()),
               assetExistedBefore = !issueUpd.assetExistedBefore
             )
           }

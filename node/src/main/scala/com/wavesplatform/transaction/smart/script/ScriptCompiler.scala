@@ -39,7 +39,7 @@ object ScriptCompiler extends ScorexLogging {
       scriptText: String,
       estimator: ScriptEstimator,
       libraries: Map[String, String] = Map(),
-      estimate: (Script, ScriptEstimator) => Either[String, C]
+      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C]
   ): Either[String, (Script, C)] =
     for {
       directives  <- DirectiveParser(scriptText)
@@ -52,7 +52,7 @@ object ScriptCompiler extends ScorexLogging {
       scriptText: String,
       isAssetScript: Boolean,
       estimator: ScriptEstimator,
-      estimate: (Script, ScriptEstimator) => Either[String, C]
+      estimate: (Script, ScriptEstimator, Boolean) => Either[String, C]
   ): Either[String, (Script, C)] =
     for {
       directives <- DirectiveParser(scriptText)
@@ -61,7 +61,7 @@ object ScriptCompiler extends ScorexLogging {
       scriptType  = if (isAssetScript) Asset else Account
       _          <- DirectiveSet(version, scriptType, contentType)
       script     <- tryCompile(scriptText, contentType, version, isAssetScript)
-      complexity <- estimate(script, estimator)
+      complexity <- estimate(script, estimator, !isAssetScript)
     } yield (script, complexity)
 
   private def tryCompile(src: String, cType: ContentType, version: StdLibVersion, isAssetScript: Boolean): Either[String, Script] = {
@@ -80,7 +80,4 @@ object ScriptCompiler extends ScorexLogging {
         Left(msg)
     }
   }
-
-  def estimate(script: Script, version: StdLibVersion): Either[String, Long] =
-    Script.estimate(script, ScriptEstimatorV1)
 }
