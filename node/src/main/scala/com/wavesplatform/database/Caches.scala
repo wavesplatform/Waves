@@ -178,7 +178,7 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
-      continuationStates: Map[Address, EXPR]
+      continuationStates: Map[ByteStr, EXPR]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {

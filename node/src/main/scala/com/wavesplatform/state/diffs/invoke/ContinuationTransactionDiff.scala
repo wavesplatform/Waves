@@ -18,7 +18,7 @@ import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: ContinuationTransaction): Either[ValidationError, Diff] = {
-    val (invokeHeight, foundTx) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
+    val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
     val invokeScriptTransaction = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
       dAppAddress <- blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias)

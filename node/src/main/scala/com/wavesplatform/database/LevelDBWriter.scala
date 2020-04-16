@@ -365,7 +365,7 @@ abstract class LevelDBWriter private[database] (
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
       failedTransactionIds: Set[ByteStr],
-      continuationStates: Map[Address, EXPR]
+      continuationStates: Map[ByteStr, EXPR]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
     readWrite { rw =>
