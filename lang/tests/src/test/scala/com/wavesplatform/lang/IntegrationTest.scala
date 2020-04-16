@@ -1436,24 +1436,23 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   property("groth16Verify_*inputs fail if too many inputs") {
     for((i, lets) <- grothsFail ++ grothsOk if (i>1)) {
       val src = lets ++ (if(i <= 16) { s"groth16Verify_${i-1}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
-      if(i <= 16) {
-        eval(src, version = V4) shouldBe Left(s"Invalid inputs count $i, must be not greater than ${i-1}")
-      } else {
-        eval(src, version = V4) should produce("Groth16Verify key size should not exceed 1 Kbyte")
-      }
+      eval(src, version = V4) shouldBe Left(s"Invalid inputs size ${i*32} bytes, must be not greater than ${i*32-32} bytes")
     }
   }
 
   property("groth16Verify_*inputs with invalid vc size") {
-    val lets = """
-          |let vk = base16'AA'
+    for {
+      (ii, _) <- grothsOk if (ii <= 16)
+      n <- Seq(0, (8+ii)*48+1, (8+ii)*48-1)
+      } {
+      val lets = s"""
+          |let vk = base16'${"AA"*n}'
           |let proof = base64'g53N8ecorvG2sDgNv8D7quVhKMIIpdP9Bqk/8gmV5cJ5Rhk9gKvb4F0ll8J/ZZJVqa27OyciJwx6lym6QpVK9q1ASrqio7rD5POMDGm64Iay/ixXXn+//F+uKgDXADj9AySri2J1j3qEkqqe3kxKthw94DzAfUBPncHfTPazVtE48AfzB1KWZA7Vf/x/3phYs4ckcP7ZrdVViJVLbUgFy543dpKfEH2MD30ZLLYRhw8SatRCyIJuTZcMlluEKG+d'
-          |let inputs = base64'aZ8tqrOeEJKt4AMqiRF/WJhIKTDC0HeDTgiJVLZ8OEs='
+          |let inputs = base16'${"BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB"*ii}'
           |""".stripMargin
-    for((ii, _) <- grothsOk if (ii <= 16)) {
       val i = if(ii == 0) { 1 } else { ii }
       val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
-      eval(src, version = V4) shouldBe Left("Groth16Verify key size should be multiple of 48, but 1 found")
+      eval(src, version = V4) shouldBe Left(s"Invalid vk size ${n} bytes, must be equal to ${(8 + ii)*48} bytes for ${ii} inputs")
     }
   }
 
@@ -1466,7 +1465,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for((ii, _) <- grothsOk if (ii <= 16)) {
       val i = if(ii == 0) { 1 } else { ii }
       val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
-      eval(src, version = V4) shouldBe Left("Groth16Verify proof size should be exactly 192 bytes, but 193 found")
+      eval(src, version = V4) shouldBe Left("Invalid proof size 193 bytes, must be equal to 192 bytes")
     }
   }
 
@@ -1479,7 +1478,7 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
     for(ii <- 2 to 16) {
       val i = if(ii == 0) { 1 } else { ii }
       val src = lets ++ (if(i != 16) { s"groth16Verify_${i}inputs(vk, proof, inputs)" } else { "groth16Verify(vk, proof, inputs)" })
-      eval(src, version = V4) shouldBe Left("Groth16Verify inputs size should be multiple of 32, but 33 found")
+      eval(src, version = V4) shouldBe Left("Invalid inputs size 33 bytes, must be a multiple of 32 bytes")
     }
   }
 
