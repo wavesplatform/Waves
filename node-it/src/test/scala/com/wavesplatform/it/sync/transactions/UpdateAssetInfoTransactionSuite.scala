@@ -1,26 +1,31 @@
 package com.wavesplatform.it.sync.transactions
 
-import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
-import com.wavesplatform.it.NodeConfigs.Miners
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}
 import com.wavesplatform.it.sync._
+import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.lang.v1.estimator.v2.ScriptEstimatorV2
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import org.scalatest.CancelAfterFailure
 import org.scalatest.prop.TableDrivenPropertyChecks
-import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.transaction.TxVersion
 
 import scala.concurrent.duration._
 import scala.util.Random
 
 class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with TableDrivenPropertyChecks {
   import UpdateAssetInfoTransactionSuite._
-  val updateInterval                              = 2
-  override protected def nodeConfigs: Seq[Config] = Seq(configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head))
+  val updateInterval = 2
+  override protected def nodeConfigs: Seq[Config] =
+    Seq(
+      configWithUpdateIntervalSetting(updateInterval).withFallback(Miners.head),
+      configWithUpdateIntervalSetting(updateInterval).withFallback(NotMiner)
+    )
 
   val issuer       = pkByAddress(firstAddress)
   val nonIssuer    = pkByAddress(secondAddress)
@@ -31,19 +36,33 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    assetId = sender.broadcastIssue(issuer, "asset", "description", someAssetAmount, decimals = 8, reissuable = true, script = None, waitForTx = true).id
-    otherAssetId = sender.broadcastIssue(issuer, "otherAsset", "otherDescription", someAssetAmount, decimals = 8, reissuable = true, script = None, waitForTx = true).id
-    smartAssetId = sender.broadcastIssue(issuer, "smartAsset", "smartDescription", someAssetAmount, decimals = 8, reissuable = true, script = Some(scriptBase64), waitForTx = true).id
-    nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0,reissuable =  false, script = None, waitForTx = true).id
+    assetId =
+      sender.broadcastIssue(issuer, "asset", "description", someAssetAmount, decimals = 8, reissuable = true, script = None, waitForTx = true).id
+    otherAssetId = sender
+      .broadcastIssue(issuer, "otherAsset", "otherDescription", someAssetAmount, decimals = 8, reissuable = true, script = None, waitForTx = true)
+      .id
+    smartAssetId = sender
+      .broadcastIssue(
+        issuer,
+        "smartAsset",
+        "smartDescription",
+        someAssetAmount,
+        decimals = 8,
+        reissuable = true,
+        script = Some(scriptBase64),
+        waitForTx = true
+      )
+      .id
+    nftId = sender.broadcastIssue(issuer, "asset", "description", quantity = 1, decimals = 0, reissuable = false, script = None, waitForTx = true).id
   }
 
   test("able to update name/description of issued asset") {
     val nextTerm = sender.transactionInfo[TransactionInfo](assetId).height + updateInterval + 1
     sender.waitForHeight(nextTerm, 3.minutes)
     val issuerBalance       = sender.balanceDetails(issuer.publicKey.stringRepr)
-    val updateAssetInfoTxId = sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
-    checkUpdateAssetInfoTx(sender.utx().head, "updatedName", "updatedDescription")
-    sender.waitForTransaction(updateAssetInfoTxId)
+    val updateAssetInfoTxId = notMiner.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)._1.id
+    checkUpdateAssetInfoTx(notMiner.utx().head, "updatedName", "updatedDescription")
+    miner.waitForTransaction(updateAssetInfoTxId)
     val updateAssetInfoTxHeight = sender.transactionInfo[TransactionInfo](updateAssetInfoTxId).height
     checkUpdateAssetInfoTx(sender.blockAt(updateAssetInfoTxHeight).transactions.head, "updatedName", "updatedDescription")
     checkUpdateAssetInfoTx(sender.lastBlock().transactions.head, "updatedName", "updatedDescription")
@@ -73,13 +92,17 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     val nextTermEnd = sender.transactionInfo[TransactionInfo](assetId).height + 2 * updateInterval
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include(s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval")
+      error.message should include(
+        s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
+      )
     }
     sender.waitForHeight(nextTermEnd)
 
     assertApiError(sender.updateAssetInfo(issuer, assetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.id shouldBe StateCheckFailed.Id
-      error.message should include(s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval")
+      error.message should include(
+        s"Can't update info of asset with id=$assetId before ${nextTermEnd + 1} block, current height=${sender.height}, minUpdateInfoInterval=$updateInterval"
+      )
     }
   }
 
@@ -121,9 +144,9 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
   }
 
   test("able to update asset info after rollback to issue height") {
-    val assetId = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
-    val issueHeight = sender.transactionInfo[TransactionInfo](assetId).height
-    val (firstUpdatedName, firstUpdatedDescription) = ("updatedName", "updatedDescription")
+    val assetId                                       = sender.broadcastIssue(issuer, "asset", "description", 1, 0, false, script = None, waitForTx = true).id
+    val issueHeight                                   = sender.transactionInfo[TransactionInfo](assetId).height
+    val (firstUpdatedName, firstUpdatedDescription)   = ("updatedName", "updatedDescription")
     val (secondUpdatedName, secondUpdatedDescription) = ("updatedName2", "updatedDescription2")
 
     sender.waitForHeight(sender.height + updateInterval + 1, 3.minutes)
@@ -249,7 +272,14 @@ class UpdateAssetInfoTransactionSuite extends BaseTransactionSuite with CancelAf
     sender.assetsDetails(assetId).description shouldBe "asset after burn"
 
     sender.waitForHeight(sender.height + updateInterval + 1, 2.minutes)
-    sender.setAssetScript(smartAssetId, issuer.stringRepr, script = Some(scriptBase64), version = TxVersion.V2, fee = setAssetScriptFee + 2 * smartFee, waitForTx = true)
+    sender.setAssetScript(
+      smartAssetId,
+      issuer.stringRepr,
+      script = Some(scriptBase64),
+      version = TxVersion.V2,
+      fee = setAssetScriptFee + 2 * smartFee,
+      waitForTx = true
+    )
     sender.updateAssetInfo(issuer, smartAssetId, "afterSAScript", "asset after set asset script", waitForTx = true)
     sender.assetsDetails(smartAssetId).name shouldBe "afterSAScript"
     sender.assetsDetails(smartAssetId).description shouldBe "asset after set asset script"
