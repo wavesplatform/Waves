@@ -346,11 +346,13 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
     val seed                    = "seed".getBytes("UTF-8")
     val (privateKey, publicKey) = Curve25519.createKeyPair(seed)
 
-    val bodyBytes = ("m" * (32*1024 + 1)).getBytes("UTF-8")
-    val signature = Curve25519.sign(privateKey, bodyBytes)
+    for(i <- 0 to 3) {
+      val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
+      val signature = Curve25519.sign(privateKey, bodyBytes)
 
-    val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(2))
-    r.isRight shouldBe true
+      val r = sigVerifyTest(bodyBytes, publicKey, signature, Some(i.toShort))
+      r.isRight shouldBe true
+    }
   }
 
 
@@ -693,6 +695,64 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       actual shouldBe evaluated(unit)
     }
   }
+
+  private def hashTest(bodyBytes: Array[Byte], hash: String, lim: Int)(implicit version: StdLibVersion): Either[ExecutionError, ByteStr] = {
+   val vars: Map[String, (FINAL, ContextfulVal[NoContext])] = Map(
+      ("b", (BYTESTR, ContextfulVal.pure[NoContext](ByteStr(bodyBytes)))),
+    )
+
+    val context: CTX[NoContext] = Monoid.combineAll(
+      Seq(
+        pureContext,
+        defaultCryptoContext,
+        CTX[NoContext](Seq(), vars, Array.empty[BaseFunction[NoContext]])
+      ))
+
+    val script = s"""{-# STDLIB_VERSION 4 #-} ${hash}_${16 << lim}Kb(b)"""
+
+    val expr = ExpressionCompiler
+        .compileUntyped(script, context.compilerContext)
+        .explicitGet()
+
+    ev[EVALUATED](
+      context = context.evaluationContext[Id],
+      expr = expr
+    ).map {
+      case CONST_BYTESTR(b) => b
+      case _                => ???
+    }
+  }
+
+  val hashes = Seq("keccak256", "blake2b256", "sha256")
+  property("returns an success if hash functions (*_NKb) return a success") {
+    implicit val version = V4
+
+    for {
+      h <- hashes
+      i <- 0 to 3
+    } {
+      val bodyBytes = ("m" * ((16 << i)*1024)).getBytes("UTF-8")
+
+      val r = hashTest(bodyBytes, h, i.toShort)
+      r shouldBe 'Right
+    }
+  }
+
+  property("fail if hash functions (*_NKb) limits exhausted") {
+    implicit val version = V4
+
+    for{
+      h <- hashes
+      i <- 0 to 3
+    } {
+      val bodyBytes = ("m" * ((16 << i)*1024 + 1)).getBytes("UTF-8")
+
+      val r = hashTest(bodyBytes, h, i.toShort)
+      r shouldBe 'Left
+    }
+  }
+
+
 
   private def sigVerifyTest(bodyBytes: Array[Byte], publicKey: PublicKey, signature: Signature, lim_n: Option[Short] = None)(implicit version: StdLibVersion): Either[ExecutionError, Boolean] = {
     val txType = CASETYPEREF(

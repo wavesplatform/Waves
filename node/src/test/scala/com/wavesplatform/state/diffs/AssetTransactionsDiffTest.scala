@@ -498,7 +498,7 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)) {
       case (gen, issue, _, _, _) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
-          _ should produce("Script is too complex: 7507 > 4000")
+          _ should produce("Script is too complex: 5207 > 4000")
         }
     }
   }

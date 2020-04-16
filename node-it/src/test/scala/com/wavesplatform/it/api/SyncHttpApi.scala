@@ -339,6 +339,9 @@ object SyncHttpApi extends Assertions {
     def scriptDecompile(code: String): DecompiledScript =
       sync(async(n).scriptDecompile(code))
 
+    def scriptEstimate(code: String): EstimatedScript =
+      sync(async(n).scriptEstimate(code))
+
     def getAddresses: Seq[String] = sync(async(n).getAddresses)
 
     def burn(
