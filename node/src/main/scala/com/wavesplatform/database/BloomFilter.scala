@@ -20,11 +20,11 @@ private[database] class Wrapper(underlying: GBloomFilter[Array[Byte]]) extends B
   override def put(key: Array[Byte]): Unit             = underlying.put(key)
 }
 
-private[database] class BloomFilterImpl(underlying: GBloomFilter[Array[Byte]], directory: String, filterName: String)
+private[database] class BloomFilterImpl(underlying: GBloomFilter[Array[Byte]], directory: String, filterName: String, db: DB)
     extends Wrapper(underlying)
     with ScorexLogging {
   import com.wavesplatform.database.BloomFilter._
-  def save(height: Int): Array[Byte] = {
+  def save(height: Int): Unit = {
     val file = filterFile(directory, filterName)
     log.info(s"Saving bloom filter to ${file.getAbsolutePath}")
     val out = new HashingOutputStream(
@@ -37,8 +37,8 @@ private[database] class BloomFilterImpl(underlying: GBloomFilter[Array[Byte]], d
     } finally out.close()
 
     val checksum = out.hash()
+    db.readWrite(_.put(Keys.bloomFilterChecksum(filterName), checksum.asBytes()))
     log.info(s"Filter hash: $checksum")
-    checksum.asBytes()
   }
 }
 
@@ -72,7 +72,6 @@ object BloomFilter extends ScorexLogging {
       val code   = in.hash()
       require(code.asBytes().sameElements(storedChecksum), "checksum mismatch")
       require(height == expectedHeight, "filter is stale")
-      log.trace(s"Element count: ${filter.approximateElementCount()}")
       filter
     } finally in.close()
   }
@@ -88,12 +87,12 @@ object BloomFilter extends ScorexLogging {
     val ff = filterFile(directory, filterName)
     val underlying = tryLoad(db, filterName, directory, expectedHeight).recover {
       case NonFatal(e) =>
-        log.debug(s"Error loading bloom filter from ${ff.getAbsolutePath}", e)
+        log.debug(s"Could not load bloom filter from ${ff.getAbsolutePath}", e)
         val filter = GBloomFilter.create(Funnels.byteArrayFunnel(), expectedInsertions)
         db.iterateOver(keyTag)(e => filter.put(e.getKey.drop(2)))
         filter
     }.get
 
-    new BloomFilterImpl(underlying, directory, filterName)
+    new BloomFilterImpl(underlying, directory, filterName, db)
   }
 }

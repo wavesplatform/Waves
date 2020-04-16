@@ -58,7 +58,8 @@ class LeasingTransactionsSuite extends BaseTransactionSuite with CancelAfterFail
       nodes.waitForHeightArise()
 
       val newAddress = sender.createAddress()
-      assertBadRequestAndResponse(sender.lease(newAddress, secondAddress, minFee, minFee, version = v), errorMessage)
+      sender.transfer(sender.address, newAddress, minFee, minFee, waitForTx = true)
+      assertBadRequestAndResponse(sender.lease(newAddress, secondAddress, minFee + 1, minFee, version = v), errorMessage)
       nodes.waitForHeightArise()
 
       miner.assertBalances(firstAddress, balance1, eff1)

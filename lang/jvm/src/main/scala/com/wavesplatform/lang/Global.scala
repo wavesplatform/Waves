@@ -37,11 +37,13 @@ object Global extends BaseGlobal {
       result <- Base64.tryDecode(input).toEither.left.map(_ => "can't parse Base64 string")
     } yield result
 
+  private val base16Encoder: BaseEncoding = BaseEncoding.base16().lowerCase()
+
   override def base16EncodeImpl(input: Array[Byte]): Either[String, String] =
-    toEither(BaseEncoding.base16().encode(input))
+    toEither(base16Encoder.encode(input))
 
   override def base16DecodeImpl(input: String): Either[String, Array[Byte]] =
-    toEither(BaseEncoding.base16().decode(input.toUpperCase))
+    toEither(base16Encoder.decode(input.toLowerCase))
 
   private def toEither[A](f: => A): Either[String, A] =
     Try(f).toEither

@@ -8,8 +8,13 @@ import com.wavesplatform.api.http.ApiError._
 import com.wavesplatform.api.http.requests.DataRequest
 import com.wavesplatform.common.utils.{Base58, Base64}
 import com.wavesplatform.crypto
+import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
+import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.Dic
+import com.wavesplatform.lang.script.ContractScript
+import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api
@@ -52,14 +57,27 @@ case class AddressApiRoute(
 
   def scriptInfo: Route = (path("scriptInfo" / AddrSegment) & get) { address =>
     completeLimited {
-      val script = blockchain.accountScript(address)
+      val scriptInfoOpt = blockchain.accountScript(address)
+      val callableComplexitiesOpt =
+        for {
+          scriptInfo <- scriptInfoOpt
+          verifierName <- scriptInfo.script match {
+            case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) => Some(vf.u.name)
+            case _                                              => None
+          }
+          complexities <- scriptInfo.complexitiesByEstimator.get(blockchain.estimator.version)
+        } yield complexities - verifierName
+
+      val callableComplexities = callableComplexitiesOpt.getOrElse(Map[String, Long]())
+
       Json.obj(
-        "address"            -> address.stringRepr,
-        "script"             -> script.map(_.script.bytes().base64),
-        "scriptText"         -> script.map(_.script.expr.toString),
-        "complexity"         -> script.fold(0L)(_.maxComplexity),
-        "callableComplexity" -> script.fold[JsValue](JsNull)(m => Json.obj()),
-        "extraFee"           -> (if (script.isEmpty) 0L else FeeValidation.ScriptExtraFee)
+        "address"              -> address.stringRepr,
+        "script"               -> scriptInfoOpt.map(_.script.bytes().base64),
+        "scriptText"           -> scriptInfoOpt.map(_.script.expr.toString),
+        "complexity"           -> scriptInfoOpt.fold(0L)(_.verifierComplexity),
+        "verifierComplexity"   -> scriptInfoOpt.fold(0L)(_.verifierComplexity),
+        "callableComplexities" -> callableComplexities,
+        "extraFee"             -> (if (scriptInfoOpt.isEmpty) 0L else FeeValidation.ScriptExtraFee)
       )
     }
   }

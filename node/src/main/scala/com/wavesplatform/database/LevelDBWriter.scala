@@ -364,6 +364,7 @@ abstract class LevelDBWriter private[database] (
       reward: Option[Long],
       hitSource: ByteStr,
       scriptResults: Map[ByteStr, InvokeScriptResult],
+      failedTransactionIds: Set[ByteStr],
       continuationStates: Map[Address, EXPR]
   ): Unit = {
     log.trace(s"Persisting block ${block.id()} at height $height")
@@ -492,7 +493,7 @@ abstract class LevelDBWriter private[database] (
       }
 
       for ((id, (tx, num)) <- transactions) {
-        rw.put(Keys.transactionAt(Height(height), num), Some(tx))
+        rw.put(Keys.transactionAt(Height(height), num), Some((tx, !failedTransactionIds.contains(id))))
         rw.put(Keys.transactionHNById(id), Some((Height(height), num)))
       }
 
@@ -540,7 +541,7 @@ abstract class LevelDBWriter private[database] (
             .orElse(rw.get(Keys.transactionHNById(TransactionId(txId))))
             .getOrElse(throw new IllegalArgumentException(s"Couldn't find transaction height and num: $txId"))
 
-          try rw.put(Keys.invokeScriptResult(txHeight, txNum), result)
+          try rw.put(Keys.invokeScriptResult(txHeight, txNum), Some(result))
           catch {
             case NonFatal(e) =>
               throw new RuntimeException(s"Error storing invoke script result for $txId: $result", e)
@@ -749,18 +750,18 @@ abstract class LevelDBWriter private[database] (
   override def transferById(id: ByteStr): Option[(Int, TransferTransaction)] = readOnly { db =>
     for {
       (height, num) <- db.get(Keys.transactionHNById(TransactionId @@ id))
-      tx            <- db.get(Keys.transferTransactionAt(height, num))
-    } yield height -> tx
+      tx  <- db.get(Keys.transferTransactionAt(height, num))
+    } yield (height, tx)
   }
 
-  override def transactionInfo(id: ByteStr): Option[(Int, Transaction)] = readOnly(transactionInfo(id, _))
+  override def transactionInfo(id: ByteStr): Option[(Int, Transaction, Boolean)] = readOnly(transactionInfo(id, _))
 
-  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction)] = {
+  protected def transactionInfo(id: ByteStr, db: ReadOnlyDB): Option[(Int, Transaction, Boolean)] = {
     val txId = TransactionId(id)
     for {
       (height, num) <- db.get(Keys.transactionHNById(txId))
-      tx            <- db.get(Keys.transactionAt(height, num))
-    } yield (height, tx)
+      (tx, status)  <- db.get(Keys.transactionAt(height, num))
+    } yield (height, tx, status)
   }
 
   override def transactionHeight(id: ByteStr): Option[Int] = readOnly { db =>
@@ -777,7 +778,7 @@ abstract class LevelDBWriter private[database] (
 
   override def leaseDetails(leaseId: ByteStr): Option[LeaseDetails] = readOnly { db =>
     transactionInfo(leaseId, db) match {
-      case Some((h, lt: LeaseTransaction)) =>
+      case Some((h, lt: LeaseTransaction, true)) =>
         Some(LeaseDetails(lt.sender, lt.recipient, h, lt.amount, loadLeaseStatus(db, leaseId)))
       case _ => None
     }
@@ -842,7 +843,7 @@ abstract class LevelDBWriter private[database] (
     val activeLeaseTransactions = for {
       leaseId <- activeLeaseIds
       (h, n)  <- db.get(Keys.transactionHNById(TransactionId(leaseId)))
-      tx      <- db.get(Keys.transactionAt(h, n)).collect { case lt: LeaseTransaction if filter(lt) => lt }
+      tx      <- db.get(Keys.transactionAt(h, n)).collect { case (lt: LeaseTransaction, true) if filter(lt) => lt }
     } yield tx
 
     activeLeaseTransactions.toSeq
@@ -906,6 +907,8 @@ abstract class LevelDBWriter private[database] (
   }
 
   private def transactionsAtHeight(h: Height): List[(TxNum, Transaction)] = readOnly { db =>
+    import com.wavesplatform.protobuf.transaction.PBSignedTransaction
+
     val txs = new ListBuffer[(TxNum, Transaction)]()
 
     val prefix = ByteBuffer
@@ -916,12 +919,13 @@ abstract class LevelDBWriter private[database] (
 
     db.iterateOver(prefix) { entry =>
       val k = entry.getKey
-      val v = entry.getValue
 
       for {
         idx <- Try(Shorts.fromByteArray(k.slice(6, 8)))
-        tx = if (v(0) == 1) PBTransactions.vanillaUnsafe(com.wavesplatform.protobuf.transaction.PBSignedTransaction.parseFrom(v.tail))
-        else TransactionParsers.parseBytes(v.tail).get
+        tx = readTransactionBytes(entry.getValue) match {
+          case (_, Left(legacyBytes)) => TransactionParsers.parseBytes(legacyBytes).get
+          case (_, Right(newBytes))   => PBTransactions.vanilla(PBSignedTransaction.parseFrom(newBytes)).explicitGet()
+        }
       } txs.append((TxNum(idx), tx))
     }
 

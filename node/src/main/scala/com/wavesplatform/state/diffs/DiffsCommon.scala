@@ -18,22 +18,6 @@ import com.wavesplatform.transaction.ProvenTransaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 
 object DiffsCommon {
-  def verifierComplexity(script: Script, estimator: ScriptEstimator): Either[String, Long] =
-    Script
-      .complexityInfo(script, estimator)
-      .map(calcVerifierComplexity(script, _))
-
-  private def calcVerifierComplexity(
-      script: Script,
-      complexity: (Long, Map[String, Long])
-  ): Long = {
-    val (totalComplexity, cm) = complexity
-    script match {
-      case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) if cm.contains(vf.u.name) => cm(vf.u.name)
-      case _                                                                        => totalComplexity
-    }
-  }
-
   def countScriptRuns(blockchain: Blockchain, tx: ProvenTransaction): Int =
     tx.checkedAssets.count(blockchain.hasAssetScript) + Some(tx.sender.toAddress).count(blockchain.hasAccountScript)
 
@@ -44,27 +28,28 @@ object DiffsCommon {
 
     val accountComplexity = blockchain
       .accountScript(tx.sender.toAddress)
-      .map(_.maxComplexity)
+      .map(_.verifierComplexity)
 
     assetsComplexity.sum + accountComplexity.getOrElse(0L)
   }
 
   def countVerifierComplexity(
       script: Option[Script],
-      blockchain: Blockchain
+      blockchain: Blockchain,
+      isAsset: Boolean
   ): Either[ValidationError, Option[(Script, Long)]] =
     script
       .traverse { script =>
         val useV1PreCheck =
           blockchain.height > blockchain.settings.functionalitySettings.estimatorPreCheckHeight &&
-          !blockchain.isFeatureActivated(BlockchainFeatures.MultiPaymentInvokeScript)
+          !blockchain.isFeatureActivated(BlockchainFeatures.BlockV5)
 
         val cost =
           if (useV1PreCheck)
-            Script.verifierComplexity(script, ScriptEstimatorV1) *>
-            Script.verifierComplexity(script, ScriptEstimatorV2)
+            Script.verifierComplexity(script, ScriptEstimatorV1, isAsset) *>
+            Script.verifierComplexity(script, ScriptEstimatorV2, isAsset)
           else
-            Script.verifierComplexity(script, blockchain.estimator)
+            Script.verifierComplexity(script, blockchain.estimator, isAsset)
 
         cost.map((script, _))
       }

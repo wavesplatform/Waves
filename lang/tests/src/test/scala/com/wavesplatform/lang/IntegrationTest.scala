@@ -1380,25 +1380,32 @@ class IntegrationTest extends PropSpec with PropertyChecks with ScriptGen with M
   }
 
   property("toBase16String limit 8Kb from V4") {
-    val base16String8Kb = "FEDCBA9876543210" * 1024
+    val base16String8Kb = "fedcba9876543210" * 1024
     def script(base16String: String) = s"toBase16String(base16'$base16String')"
 
     eval(script(base16String8Kb), version = V3) shouldBe CONST_STRING(base16String8Kb)
     eval(script(base16String8Kb), version = V4) shouldBe CONST_STRING(base16String8Kb)
 
-    eval(script(base16String8Kb + "AA"), version = V3) shouldBe CONST_STRING(base16String8Kb + "AA")
-    eval(script(base16String8Kb + "AA"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
+    eval(script(base16String8Kb + "aa"), version = V3) shouldBe CONST_STRING(base16String8Kb + "aa")
+    eval(script(base16String8Kb + "aa"), version = V4) shouldBe Left("Base16 encode input length=8193 should not exceed 8192")
   }
 
   property("fromBase16String limit 32768 digits from V4") {
-    val string32Kb = "FEDCBA9876543210" * (32 * 1024 / 16)
+    val string32Kb = "fedcba9876543210" * (32 * 1024 / 16)
     def script(base16String: String) = s"""fromBase16String("$base16String")"""
-    def bytes(base16String: String) = BaseEncoding.base16().decode(base16String)
+    def bytes(base16String: String) = BaseEncoding.base16().decode(base16String.toUpperCase)
 
     eval(script(string32Kb), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb))
     eval(script(string32Kb), version = V4) shouldBe CONST_BYTESTR(bytes(string32Kb))
 
-    eval(script(string32Kb + "AA"), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb + "AA"))
-    eval(script(string32Kb + "AA"), version = V4) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+    eval(script(string32Kb + "aa"), version = V3) shouldBe CONST_BYTESTR(bytes(string32Kb + "aa"))
+    eval(script(string32Kb + "aa"), version = V4) shouldBe Left("Base16 decode input length=32770 should not exceed 32768")
+  }
+
+  property("fromBase16String supports mixed case input") {
+    val value = "fedcba9876543210FEDCBA9876543210"
+    val script = s"""fromBase16String("$value")"""
+
+    eval(script) shouldBe CONST_BYTESTR(BaseEncoding.base16().decode(value.toUpperCase))
   }
 }

@@ -4775,6 +4775,9 @@
         "confirmations": {
           "type": "integer",
           "format": "int32"
+        },
+        "applicationStatus": {
+          "type": "string"
         }
       }
     }

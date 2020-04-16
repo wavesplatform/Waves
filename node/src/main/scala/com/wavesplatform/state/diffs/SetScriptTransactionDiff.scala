@@ -19,9 +19,9 @@ object SetScriptTransactionDiff {
         case Some(ContractScriptImpl(version, dApp)) => estimate(blockchain, version, dApp)
         case _                                       => Right(Map[Int, Map[String, Long]]())
       }
-      verifierWithComplexity <- DiffsCommon.countVerifierComplexity(tx.script, blockchain)
-      scriptWithComplexities = verifierWithComplexity.map { case (script, maxComplexity) =>
-          AccountScriptInfo(tx.sender, script, maxComplexity, callableComplexities)
+      verifierWithComplexity <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = false)
+      scriptWithComplexities = verifierWithComplexity.map { case (script, verifierComplexity) =>
+          AccountScriptInfo(tx.sender, script, verifierComplexity, callableComplexities)
       }
     } yield Diff(
       tx = tx,

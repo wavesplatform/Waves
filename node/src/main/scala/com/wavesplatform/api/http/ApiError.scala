@@ -40,6 +40,7 @@ object ApiError {
       case TxValidationError.ToSelf                          => ToSelfError
       case TxValidationError.MissingSenderPrivateKey         => MissingSenderPrivateKey
       case TxValidationError.GenericError(ge)                => CustomValidationError(ge)
+      case TxValidationError.InsufficientInvokeActionFee(ge) => CustomValidationError(ge)
       case TxValidationError.AlreadyInTheState(tx, txHeight) => AlreadyInState(tx, txHeight)
       case TxValidationError.AccountBalanceError(errs)       => AccountBalanceErrors(errs)
       case TxValidationError.AliasDoesNotExist(tx)           => AliasDoesNotExist(tx)

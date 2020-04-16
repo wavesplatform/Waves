@@ -4,7 +4,6 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.AssetInfoResponse
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
-import com.wavesplatform.it.BaseSuite
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.api.{BurnInfoResponse, IssueInfoResponse, ReissueInfoResponse, StateChangesDetails}
 import com.wavesplatform.it.sync._
@@ -17,7 +16,7 @@ import com.wavesplatform.protobuf.transaction.{PBRecipients, PBTransactions}
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
-import org.scalatest.{FlatSpec, FreeSpec}
+import org.scalatest.FreeSpec
 
 import scala.util.Random
 
@@ -180,7 +179,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
 
     "Issue 10 assets should not produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
-      val tx  = invokeScript(acc, "issue10Assets")
+      val tx  = invokeScript(acc, "issue10Assets", fee = invocationCost(issuesCount = 10))
       for (nth <- 0 to 9) {
         val assetId = validateIssuedAssets(acc, tx, simpleNonreissuableAsset, nth, CallableMethod)
         assertQuantity(assetId)(simpleNonreissuableAsset.quantity, reissuable = false)
@@ -210,7 +209,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     "More than 10 issue action in one invocation should produce an error" in {
       val acc = createDapp(script(simpleNonreissuableAsset))
       assertGrpcError(
-        invokeScript(acc, "issue11Assets"),
+        invokeScript(acc, "issue11Assets", fee = invocationCost(1)),
         "State check failed. Reason: Too many script actions: max: 10, actual: 11"
       )
     }
@@ -271,7 +270,7 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     "liquid block works" in {
       val acc   = createDapp(script(simpleReissuableAsset))
       val asset = issueValidated(acc, simpleReissuableAsset)
-      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset)
+      val tx    = invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
       def checks(): Unit = {
         assertStateChanges(tx) { sd =>
           sd.issues should have size 2
@@ -352,11 +351,9 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
   }
 
   def assertStateChanges(tx: String)(f: StateChangesDetails => Unit): Unit = {
-    f(grpcStateChanges(tx))
-  }
-
-  def grpcStateChanges(tx: String): StateChangesDetails = {
-    sender.stateChanges(tx)
+    val (transaction, details) = sender.stateChanges(tx)
+    transaction.chainId shouldBe 'I'.toByte
+    f(details)
   }
 
   def grpcBalance(address: KeyPair, assetId: String): Long = {
@@ -410,8 +407,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
   }
 
   def invokeAssetId(tx: String, nth: Int = -1): String = {
-    (if (nth == -1) grpcStateChanges(tx).issues.head
-     else grpcStateChanges(tx).issues(nth)).assetId
+    (if (nth == -1) sender.stateChanges(tx)._2.issues.head
+     else sender.stateChanges(tx)._2.issues(nth)).assetId
   }
 
   def issueValidated(account: KeyPair, data: Asset): String = {
@@ -480,8 +477,8 @@ class GrpcIssueReissueBurnAssetSuite extends FreeSpec with GrpcBaseTransactionSu
     asset.quantity == 1 && asset.decimals == 0
   }
 
-  def invocationCost(aCount: Int, isSmartAcc: Boolean = true, sPCount: Int = 0, sAinActions: Int = 0): Long = {
-    0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * sPCount + 0.004.waves * sAinActions + 1.waves * aCount
+  def invocationCost(issuesCount: Int, isSmartAcc: Boolean = true, smartPaymentCount: Int = 0, smartAssetsInActions: Int = 0): Long = {
+    0.005.waves + (if (isSmartAcc) 0.004.waves else 0L) + 0.004.waves * smartPaymentCount + 0.004.waves * smartAssetsInActions + 1.waves * issuesCount
   }
 
   def script(asset: Asset, function: String = ""): String = {

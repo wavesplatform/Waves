@@ -314,8 +314,8 @@ object SyncHttpApi extends Assertions {
       sync(async(n).debugStateChanges(transactionId, amountsAsStrings))
     }
 
-    def debugStateChangesByAddress(address: String, limit: Int): Seq[DebugStateChanges] = {
-      sync(async(n).debugStateChangesByAddress(address, limit))
+    def debugStateChangesByAddress(address: String, limit: Int, after: Option[String] = None): Seq[DebugStateChanges] = {
+      sync(async(n).debugStateChangesByAddress(address, limit, after))
     }
 
     def payment(sourceAddress: String, recipient: String, amount: Long, fee: Long): Transaction =
@@ -604,8 +604,8 @@ object SyncHttpApi extends Assertions {
     def rawTransactionInfo(txId: String): JsValue =
       sync(async(n).rawTransactionInfo(txId))
 
-    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second): TransactionInfo =
-      sync(async(n).waitForTransaction(txId), 2.minutes)
+    def waitForTransaction(txId: String, retryInterval: FiniteDuration = 1.second, timeout: FiniteDuration = 2.minutes): TransactionInfo =
+      sync(async(n).waitForTransaction(txId), timeout)
 
     def signAndBroadcast(tx: JsValue, waitForTx: Boolean = false): Transaction = {
       maybeWaitForTransaction(sync(async(n).signAndBroadcast(tx)), waitForTx)

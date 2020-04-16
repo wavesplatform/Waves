@@ -371,7 +371,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
            |""".stripMargin
 
       val blockchain = stub[Blockchain]
-      (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+      (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
       val result = runScriptWithCustomContext(script, Coproduct(t), T, V4, blockchain)
       result shouldBe evaluated(true)
@@ -685,7 +685,7 @@ class TransactionBindingsTest extends PropSpec with PropertyChecks with Matchers
 
     val directives = DirectiveSet(V2, Account, Expression).explicitGet()
     val blockchain = stub[Blockchain]
-    (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.MultiPaymentInvokeScript.id -> 0))
+    (blockchain.activatedFeatures _).when().returning(Map(BlockchainFeatures.BlockV5.id -> 0))
 
     val ctx =
       PureContext.build(Global, V2).withEnvironment[Environment] |+|

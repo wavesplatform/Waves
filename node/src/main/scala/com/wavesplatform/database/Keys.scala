@@ -12,13 +12,12 @@ import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.serialization.impl.TransferTxSerializer
 import com.wavesplatform.transaction.transfer.TransferTransaction
 import com.wavesplatform.utils._
 
 object Keys {
   import KeyHelpers._
-  import KeyTags.{InvokeScriptResult => InvokeScriptResultTag, AddressId => AddressIdTag, _}
+  import KeyTags.{AddressId => AddressIdTag, InvokeScriptResult => InvokeScriptResultTag, _}
 
   val version: Key[Int]               = intKey(Version, default = 1)
   val height: Key[Int]                = intKey(Height)
@@ -106,8 +105,8 @@ object Keys {
       unsupported("Can not explicitly write block bytes")
     )
 
-  def transactionAt(height: Height, n: TxNum): Key[Option[Transaction]] =
-    Key.opt[Transaction](
+  def transactionAt(height: Height, n: TxNum): Key[Option[(Transaction, Boolean)]] =
+    Key.opt[(Transaction, Boolean)](
       NthTransactionInfoAtHeight,
       hNum(height, n),
       readTransaction,
@@ -118,7 +117,7 @@ object Keys {
     Key(
       NthTransactionInfoAtHeight,
       hNum(height, n),
-      TransferTxSerializer.tryParseTransfer,
+      bytes => readTransferTransaction(bytes),
       unsupported("Can not explicitly write transfer transaction")
     )
 
@@ -149,8 +148,8 @@ object Keys {
       Longs.toByteArray
     )
 
-  def invokeScriptResult(height: Int, txNum: TxNum): Key[InvokeScriptResult] =
-    Key(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
+  def invokeScriptResult(height: Int, txNum: TxNum): Key[Option[InvokeScriptResult]] =
+    Key.opt(InvokeScriptResultTag, hNum(height, txNum), InvokeScriptResult.fromBytes, InvokeScriptResult.toBytes)
 
   def blockReward(height: Int): Key[Option[Long]] =
     Key.opt(BlockReward, h(height), Longs.fromByteArray, Longs.toByteArray)
