@@ -482,7 +482,7 @@ class AssetTransactionsDiffTest
     val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
       preActivatedFeatures = Map(
         BlockchainFeatures.Ride4DApps.id               -> 0,
-        BlockchainFeatures.MultiPaymentInvokeScript.id -> 0
+        BlockchainFeatures.BlockV5.id -> 0
       )
     )
 
