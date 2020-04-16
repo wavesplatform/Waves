@@ -79,18 +79,15 @@ object ContractEvaluator {
 
   def apply(
       ctx: EvaluationContext[Environment, Id],
-      c: DApp,
+      dApp: DApp,
       i: Invocation,
       version: StdLibVersion
-  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
-    ???
-    /*buildExprFromInvocation(c, i, version)
-      .map(expr => EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr))
-    val (log, result) = EvaluatorV1().applyWithLogging(ctx, expr)
-    result???
-      .flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r, version).map((_, log)))
-      .leftMap((_, log))*/
-  }
+  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
+    for {
+      expr <- buildExprFromInvocation(dApp, i, version).leftMap((_, Nil))
+      (log, evaluation) = EvaluatorV1().applyWithLogging[EVALUATED](ctx, expr)
+      result <- evaluation.flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r, version)).leftMap((_, log))
+    } yield (result, log)
 
   def applyV2(ctx: EvaluationContext[Environment, Id], dApp: DApp, i: Invocation, version: StdLibVersion): Either[String, ScriptResult] =
     buildExprFromInvocation(dApp, i, version)
