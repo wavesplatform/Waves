@@ -1,8 +1,9 @@
 package com.wavesplatform.lang.v1
 
 import cats.implicits._
-import com.wavesplatform.lang.directives.DirectiveSet.contractDirectiveSet
-import com.wavesplatform.lang.directives.values.V3
+import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.lang.directives.DirectiveSet
+import com.wavesplatform.lang.directives.values.{Account, DApp, V4}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.repl.node.ErrorMessageEnvironment
@@ -17,9 +18,9 @@ package object repl {
   val internalFuncPrefix: String = "_"
 
   val initialCtx: CTX[Environment] =
-    CryptoContext.build(global, V3).withEnvironment[Environment] |+|
-    PureContext.build(global, V3).withEnvironment[Environment]   |+|
-    WavesContext.build(contractDirectiveSet)
+    CryptoContext.build(global, V4).withEnvironment[Environment] |+|
+    PureContext.build(global, V4).withEnvironment[Environment]   |+|
+    WavesContext.build(DirectiveSet(V4, Account, DApp).explicitGet())
 
   def buildEnvironment(settings: Option[NodeConnectionSettings]): Environment[Future] =
     settings.fold(ErrorMessageEnvironment: Environment[Future])(WebEnvironment)
