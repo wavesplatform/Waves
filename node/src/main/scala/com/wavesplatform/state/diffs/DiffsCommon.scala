@@ -5,6 +5,7 @@ import com.wavesplatform.account.Address
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider._
+import com.wavesplatform.features.ComplexityCheckPolicyProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
@@ -46,10 +47,10 @@ object DiffsCommon {
 
         val cost =
           if (useV1PreCheck)
-            Script.verifierComplexity(script, ScriptEstimatorV1, isAsset) *>
-            Script.verifierComplexity(script, ScriptEstimatorV2, isAsset)
+            Script.verifierComplexity(script, ScriptEstimatorV1, !isAsset && blockchain.useReducedVerifierComplexityLimit) *>
+            Script.verifierComplexity(script, ScriptEstimatorV2, !isAsset && blockchain.useReducedVerifierComplexityLimit)
           else
-            Script.verifierComplexity(script, blockchain.estimator, isAsset)
+            Script.verifierComplexity(script, blockchain.estimator, !isAsset && blockchain.useReducedVerifierComplexityLimit)
 
         cost.map((script, _))
       }

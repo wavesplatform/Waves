@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction
 
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.protobuf.transaction.PBTransactions
 import com.wavesplatform.transaction.Asset.IssuedAsset
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -14,7 +15,8 @@ trait Transaction {
   def timestamp: Long
   def chainId: Byte
 
-  def bytesSize: Int = bytes().length
+  def bytesSize: Int         = bytes().length
+  val protoSize: Coeval[Int] = Coeval(PBTransactions.protobuf(this).serializedSize)
   val bytes: Coeval[Array[Byte]]
   val json: Coeval[JsObject]
 

@@ -481,8 +481,8 @@ class AssetTransactionsDiffTest
 
     val rideV4Activated = TestFunctionalitySettings.Enabled.copy(
       preActivatedFeatures = Map(
-        BlockchainFeatures.Ride4DApps.id               -> 0,
-        BlockchainFeatures.MultiPaymentInvokeScript.id -> 0
+        BlockchainFeatures.Ride4DApps.id -> 0,
+        BlockchainFeatures.BlockV5.id    -> 0
       )
     )
 
@@ -498,7 +498,7 @@ class AssetTransactionsDiffTest
     forAll(genesisIssueTransferReissue(exprV4WithComplexityAbove4000, V4)) {
       case (gen, issue, _, _, _) =>
         assertDiffEi(Seq(TestBlock.create(gen)), TestBlock.create(Seq(issue)), rideV4Activated) {
-          _ should produce("Script is too complex: 7507 > 4000")
+          _ should produce("Script is too complex: 5207 > 4000")
         }
     }
   }

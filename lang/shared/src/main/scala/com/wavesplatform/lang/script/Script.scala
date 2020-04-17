@@ -74,7 +74,7 @@ object Script {
           .map(complexity => ComplexityInfo(complexity, Map(), complexity))
       case ContractScriptImpl(version, contract @ DApp(_, _, _, verifierFuncOpt)) =>
         for {
-          (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(version, contract, estimator)
+          (maxComplexity, callableComplexities) <- ContractScript.estimateComplexity(version, contract, estimator, useContractVerifierLimit)
           complexityInfo = verifierFuncOpt.fold(
             ComplexityInfo(0L, callableComplexities, maxComplexity)
           )(
@@ -87,7 +87,7 @@ object Script {
     complexityInfo(script, estimator, useContractVerifierLimit)
       .map(_.maxComplexity)
 
-  def verifierComplexity(script: Script, estimator: ScriptEstimator, isAsset: Boolean): Either[String, Long] =
-    complexityInfo(script, estimator, !isAsset)
+  def verifierComplexity(script: Script, estimator: ScriptEstimator, useContractVerifierLimit: Boolean): Either[String, Long] =
+    complexityInfo(script, estimator, useContractVerifierLimit)
       .map(_.verifierComplexity)
 }
