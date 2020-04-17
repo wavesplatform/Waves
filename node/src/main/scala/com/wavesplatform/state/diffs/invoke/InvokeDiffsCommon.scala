@@ -1,52 +1,40 @@
 package com.wavesplatform.state.diffs.invoke
 
 import cats.instances.map._
-import cats.kernel.Monoid
 import cats.syntax.either._
 import cats.syntax.semigroup._
 import com.google.common.base.Throwables
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme, PublicKey}
+import com.wavesplatform.account.{Address, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.features.BlockchainFeatures.BlockV5
 import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.features.FeatureProvider.FeatureProviderExt
-import com.wavesplatform.features.FunctionCallPolicyProvider._
 import com.wavesplatform.features.InvokeScriptSelfPaymentPolicyProvider._
 import com.wavesplatform.features.ScriptTransferValidationProvider._
-import com.wavesplatform.features.BlockchainFeatures._
 import com.wavesplatform.lang._
-import com.wavesplatform.lang.directives.DirectiveSet
-import com.wavesplatform.lang.directives.values.{DApp => DAppType, _}
-import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
+import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.ContractLimits
-import com.wavesplatform.lang.v1.compiler.ContractCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
-import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, ScriptResultV3, ScriptResultV4}
-import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx, ScriptTransfer}
 import com.wavesplatform.lang.v1.traits.domain._
-import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
-import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
+import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError._
 import com.wavesplatform.transaction.assets.IssueTransaction
 import com.wavesplatform.transaction.smart._
 import com.wavesplatform.transaction.smart.script.ScriptRunner
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
-import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, InvokeScriptTrace, TracedResult}
-import com.wavesplatform.transaction.{Asset, Transaction}
+import com.wavesplatform.transaction.smart.script.trace.{AssetVerifierTrace, TracedResult}
 import com.wavesplatform.utils._
-import monix.eval.Coeval
 import shapeless.Coproduct
 
 import scala.util.{Failure, Right, Success, Try}
@@ -355,12 +343,12 @@ object InvokeDiffsCommon {
               val asset = IssuedAsset(issue.id)
 
               DiffsCommon
-                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain)
+                .countVerifierComplexity(None /*issue.compiledScript*/, blockchain, isAsset = true)
                 .map(
                   script =>
                     Diff(
                       tx = itx,
-                      portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                      portfolios = Map(pk.toAddress -> Portfolio(lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
                       issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
                       assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
                     )
@@ -401,7 +389,7 @@ object InvokeDiffsCommon {
             }
 
           val diff = action match {
-            case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(MultiPaymentInvokeScript)) { pk } else { PublicKey(ByteStr.empty) }))
+            case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(BlockV5)) { pk } else { PublicKey(ByteStr.empty) }))
             case d: DataItem[_]   => applyDataItem(d)
             case i: Issue         => applyIssue(tx, pk, i)
             case r: Reissue       => applyReissue(r, pk)

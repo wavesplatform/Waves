@@ -78,7 +78,7 @@ object InvokeScriptTransactionDiff {
             )
           }
 
-          verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity).getOrElse(0)
+          verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity).getOrElse(0L)
 
           scriptResult <- {
             val scriptResultE = stats.invokedScriptExecution.measureForType(InvokeScriptTransaction.typeId)({

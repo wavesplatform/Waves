@@ -10,6 +10,7 @@ import com.wavesplatform.lang.v1.evaluator.{ContractEvaluator, IncompleteResult,
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff}
+import com.wavesplatform.transaction.Transaction
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
@@ -22,16 +23,17 @@ object ContinuationTransactionDiff {
     val invokeScriptTransaction = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
       dAppAddress <- blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias)
-      AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) <- blockchain
+      scriptInfo <- blockchain
         .accountScript(dAppAddress)
         .toRight(GenericError("ERROR"))
+      AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) = scriptInfo
       directives <- DirectiveSet(script.stdLibVersion, Account, DApp).leftMap(GenericError(_))
 
       ctx = PureContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
         CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
         WavesContext.build(directives)
 
-      input <- buildThisValue(Coproduct[TxOrd](invokeScriptTransaction), blockchain, directives, None).leftMap(GenericError(_))
+      input <- buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, None).leftMap(GenericError(_))
 
       environment = new WavesEnvironment(
         AddressScheme.current.chainId,
@@ -42,13 +44,13 @@ object ContinuationTransactionDiff {
         directives,
         tx.invokeScriptTransactionId
       )
-      scriptResult <- ContractEvaluator.applyV2(ctx.evaluationContext(environment), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId)
+      scriptResult <- ContractEvaluator.applyV2(ctx.evaluationContext(environment), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId).leftMap(GenericError(_))
 
       invocationComplexity <- InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
 
       feeInfo <- InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction)
 
-      verifierComplexity = blockchain.accountScript(tx.sender).map(_.maxComplexity).getOrElse(0)
+      verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity).getOrElse(0L)
 
       doProcessActions = InvokeDiffsCommon.processActions(
         _,
