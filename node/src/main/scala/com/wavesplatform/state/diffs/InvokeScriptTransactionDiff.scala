@@ -32,7 +32,6 @@ import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.metrics._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -133,20 +132,25 @@ object InvokeScriptTransactionDiff {
                   )
 
                   val result = for {
-                    evaluator <- ContractEvaluator(
-                      Monoid
-                        .combineAll(
-                          Seq(
-                            PureContext.build(Global, version).withEnvironment[Environment],
-                            CryptoContext.build(Global, version).withEnvironment[Environment],
-                            WavesContext.build(directives)
+                    evaluator <- Try {
+                      ContractEvaluator(
+                        Monoid
+                          .combineAll(
+                            Seq(
+                              PureContext.build(Global, version).withEnvironment[Environment],
+                              CryptoContext.build(Global, version).withEnvironment[Environment],
+                              WavesContext.build(directives)
+                            )
                           )
-                        )
-                        .evaluationContext(environment),
-                      contract,
-                      invocation,
-                      version
-                    )
+                          .evaluationContext(environment),
+                        contract,
+                        invocation,
+                        version
+                      )
+                    } match {
+                      case Success(r) => r
+                      case Failure(e) => Left((e.getMessage, List.empty))
+                    }
                   } yield (evaluator, invocationComplexity)
 
                   result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
@@ -178,18 +182,18 @@ object InvokeScriptTransactionDiff {
 
               dataEntries = dataItems.map(dataItemToEntry)
 
-              _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(GenericError(_))
+              _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(ScriptExecutionError.dApp)
               _ <- TracedResult(
                 Either.cond(
                   actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
                   (),
-                  GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+                  ScriptExecutionError.dApp(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
                 )
               )
 
               _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-              _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
-              _ <- TracedResult(validateOverflow(transferList.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
+              _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.dApp("Negative amount")))
+              _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
               verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity)
               assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
@@ -255,6 +259,15 @@ object InvokeScriptTransactionDiff {
     }
   }
 
+  private def dataItemToEntry(item: DataItem[_]): DataEntry[_] =
+    item match {
+      case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
+      case DataItem.Str(k, b)  => StringDataEntry(k, b)
+      case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
+      case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
+      case DataItem.Delete(k)  => EmptyDataEntry(k)
+    }
+
   private def checkCall(fc: FUNCTION_CALL, blockchain: Blockchain): Either[ExecutionError, Unit] = {
     val (check, expectedTypes) =
       if (blockchain.callableListArgumentsAllowed)
@@ -274,53 +287,29 @@ object InvokeScriptTransactionDiff {
     )
   }
 
-  private def dataItemToEntry(item: DataItem[_]): DataEntry[_] =
-    item match {
-      case DataItem.Bool(k, b) => BooleanDataEntry(k, b)
-      case DataItem.Str(k, b)  => StringDataEntry(k, b)
-      case DataItem.Lng(k, b)  => IntegerDataEntry(k, b)
-      case DataItem.Bin(k, b)  => BinaryDataEntry(k, b)
-      case DataItem.Delete(k)  => EmptyDataEntry(k)
-    }
-
   private def checkSelfPayments(
       dAppAddress: Address,
       blockchain: Blockchain,
       tx: InvokeScriptTransaction,
       version: StdLibVersion,
       transfers: List[AssetTransfer]
-  ): Either[GenericError, Unit] =
+  ): Either[ScriptExecutionError, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
-        GenericError("DApp self-payment is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.dApp("DApp self-payment is forbidden since V4").asLeft[Unit]
       else if (transfers.exists(_.recipient.bytes == dAppAddress.bytes))
-        GenericError("DApp self-transfer is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.dApp("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
-        ().asRight[GenericError]
+        ().asRight[ScriptExecutionError]
     else
-      ().asRight[GenericError]
+      ().asRight[ScriptExecutionError]
 
-  private def paymentsPart(
-      height: Int,
-      tx: InvokeScriptTransaction,
-      dAppAddress: Address,
-      feePart: Map[Address, Portfolio]
-  ): Diff = {
-    val payablePart = tx.payments
-      .map {
-        case InvokeScriptTransaction.Payment(amt, assetId) =>
-          assetId match {
-            case asset @ IssuedAsset(_) =>
-              Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
-                Map(dAppAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
-            case Waves =>
-              Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
-                Map(dAppAddress       -> Portfolio(amt, LeaseBalance.empty, Map.empty))
-          }
-      }
-      .foldLeft(Map[Address, Portfolio]())(_ |+| _)
-
-    Diff(tx = tx, portfolios = feePart |+| payablePart)
+  def checkOverflow(dataList: Traversable[Long]): Either[ScriptExecutionError, Unit] = {
+    Try(dataList.foldLeft(0L)(Math.addExact))
+      .fold(
+        _ => ScriptExecutionError.dApp("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
+        _ => ().asRight[ScriptExecutionError]
+      )
   }
 
   private[this] def checkDataEntries(tx: InvokeScriptTransaction, dataEntries: Seq[DataEntry[_]]): Either[String, Unit] =
@@ -348,6 +337,29 @@ object InvokeScriptTransactionDiff {
         s"Empty keys aren't allowed in tx version >= ${tx.protobufVersion}"
       )
     } yield ()
+
+  private def paymentsPart(
+      height: Int,
+      tx: InvokeScriptTransaction,
+      dAppAddress: Address,
+      feePart: Map[Address, Portfolio]
+  ): Diff = {
+    val payablePart = tx.payments
+      .map {
+        case InvokeScriptTransaction.Payment(amt, assetId) =>
+          assetId match {
+            case asset @ IssuedAsset(_) =>
+              Map(tx.sender.toAddress -> Portfolio(0, LeaseBalance.empty, Map(asset -> -amt))) |+|
+                Map(dAppAddress       -> Portfolio(0, LeaseBalance.empty, Map(asset -> amt)))
+            case Waves =>
+              Map(tx.sender.toAddress -> Portfolio(-amt, LeaseBalance.empty, Map.empty)) |+|
+                Map(dAppAddress       -> Portfolio(amt, LeaseBalance.empty, Map.empty))
+          }
+      }
+      .foldLeft(Map[Address, Portfolio]())(_ |+| _)
+
+    Diff(tx = tx, portfolios = feePart |+| payablePart)
+  }
 
   private def foldActions(sblockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
       ps: List[CallableAction],

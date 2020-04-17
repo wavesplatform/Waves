@@ -61,6 +61,17 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
       )
       .id
 
+    val tx1 = sender.invokeScript(
+      caller,
+      contract,
+      Some("f"),
+      payment = Seq(
+        InvokeScriptTransaction.Payment(10, Asset.fromString(Some(asset1)))
+      ),
+      fee = 1000,
+      waitForTx = true
+    )
+
     assertBadRequestAndMessage(
       sender.invokeScript(
         caller,

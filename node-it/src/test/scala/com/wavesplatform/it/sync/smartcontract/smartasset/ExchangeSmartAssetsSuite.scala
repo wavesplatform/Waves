@@ -83,9 +83,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
 
     sender.setAssetScript(sAsset, firstAddress, setAssetScriptFee, sUpdated, waitForTx = true)
 
-    assertBadRequestAndMessage(
-      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, 3, 2, acc1, acc0, acc2)),
-      errNotAllowedByToken)
+    val tx =
+      sender.signedBroadcast(exchangeTx(smartPair, smartMatcherFee + smartFee, smartMatcherFee + smartFee, ntpTime, 3, 2, acc1, acc0, acc2), waitForTx = true).id
+
+    val status = sender.transactionStatus(Seq(tx)).head
+    status.status shouldBe "confirmed"
+    status.applicationStatus.get shouldBe "scriptExecutionFailed"
 
     setContracts((None, acc0), (None, acc1), (None, acc2))
   }
@@ -145,9 +148,12 @@ class ExchangeSmartAssetsSuite extends BaseTransactionSuite with CancelAfterFail
         amountAsset = IssuedAsset(ByteStr.decodeBase58(assetA).get),
         priceAsset = Waves
       )
-      assertBadRequestAndMessage(
-        sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, 3, 2, acc1, acc0, acc2)),
-        errNotAllowedByToken)
+
+      val tx =
+        sender.signedBroadcast(exchangeTx(incorrectSmartAssetPair, smartMatcherFee, smartMatcherFee, ntpTime, 3, 2, acc1, acc0, acc2), waitForTx = true).id
+      val status = sender.transactionStatus(Seq(tx)).head
+      status.status shouldBe "confirmed"
+      status.applicationStatus.get shouldBe "scriptExecutionFailed"
     }
 
   }

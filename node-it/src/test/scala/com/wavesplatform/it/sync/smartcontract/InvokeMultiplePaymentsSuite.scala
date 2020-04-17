@@ -81,38 +81,29 @@ class InvokeMultiplePaymentsSuite extends BaseTransactionSuite with CancelAfterF
   test("script should sheck if alias not exists") {
     val alias = "unknown"
 
-    assertApiError(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("f"),
-          payment = Seq(Payment(1.waves, Waves)),
-          args = List(CONST_STRING(alias).explicitGet()),
-          waitForTx = true
-        )
-    ) { error =>
-      error.message should include(s"Error while executing account-script: Alias 'alias:I:$alias")
-      error.id shouldBe ScriptExecutionError.Id
-      error.statusCode shouldBe 400
-    }
+    val tx1 = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING(alias).explicitGet()),
+        waitForTx = true
+      )._1.id
 
-    assertApiError(
-      sender
-        .invokeScript(
-          caller,
-          dApp,
-          Some("f"),
-          payment = Seq(Payment(1.waves, Waves)),
-          args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
-          waitForTx = true
-        )
-    ) { error =>
-      error.message should include("Alias should contain only following characters")
-      error.id shouldBe CustomValidationError.Id
-      error.statusCode shouldBe 400
-    }
+    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include(s"Alias 'alias:I:$alias")
 
+    val tx2 = sender
+      .invokeScript(
+        caller,
+        dApp,
+        Some("f"),
+        payment = Seq(Payment(1.waves, Waves)),
+        args = List(CONST_STRING(s"alias:I:$alias").explicitGet()),
+        waitForTx = true
+      )._1.id
+
+    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Alias should contain only following characters")
   }
 
   test("can invoke with no payments") {

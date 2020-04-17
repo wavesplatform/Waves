@@ -90,6 +90,7 @@ object TxValidationError {
 
     def asset(error: String, log: Log[Id], reason: Reason): ScriptExecutionError = ByAssetScript(error, log, reason)
     def dApp(error: String, log: Log[Id]): ScriptExecutionError                  = ByDAppScript(error, log)
+    def dApp(error: String): ScriptExecutionError                                = ByDAppScript(error, List.empty)
 
     def unapply(e: ScriptExecutionError): Option[(String, Log[Id], Boolean)] =
       e match {

@@ -722,6 +722,19 @@ object SyncHttpApi extends Assertions {
       }
     }
 
+    def validateInvokeScript(
+        caller: String,
+        dappAddress: String,
+        func: Option[String] = None,
+        args: List[Terms.EXPR] = List.empty,
+        payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+        fee: Long = smartMinFee,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1
+    ): (JsValue, JsValue) = {
+      sync(async(n).validateInvokeScript(caller, dappAddress, func, args, payment, fee, feeAssetId, version))
+    }
+
     def updateAssetInfo(
         caller: KeyPair,
         assetId: String,
