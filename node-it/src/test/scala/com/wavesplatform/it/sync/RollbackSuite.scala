@@ -48,7 +48,8 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
 
-    val stateAfterFirstTry = nodes.head.debugStateAt(sender.height)
+    val stateHeight = sender.height
+    val stateAfterFirstTry = nodes.head.debugStateAt(stateHeight)
 
     nodes.rollback(startHeight)
 
@@ -56,7 +57,7 @@ class RollbackSuite
 
     nodes.waitForHeightArise()
 
-    val stateAfterSecondTry = nodes.head.debugStateAt(sender.height)
+    val stateAfterSecondTry = nodes.head.debugStateAt(stateHeight)
 
     assert(stateAfterSecondTry.size == stateAfterFirstTry.size)
 

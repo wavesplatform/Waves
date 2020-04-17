@@ -67,36 +67,56 @@ class BlockV5Test
       block.copy(header = f(block.header))
 
     val blockWithBadVotes = updateHeader(block, _.copy(featureVotes = features))
-    Validators.validateBlock(blockWithBadVotes) shouldBe 'left
-    Validators.validateBlock(block) shouldBe 'right
-    Validators.validateBlock(
-      updateHeader(block, _.copy(generator = PublicKey(Array.fill(64)(0.toByte))))
-    ) shouldBe 'left
-    Validators.validateBlock(
-      updateHeader(block, _.copy(version = Block.NgBlockVersion))
-    ) shouldBe 'left
-    Validators.validateBlock(
-      updateHeader(block, _.copy(generationSignature = Array.fill(32)(0.toByte)))
-    ) shouldBe 'left
-    Validators.validateBlock(
-      updateHeader(block, _.copy(featureVotes = Seq[Short](1, 1, 1)))
-    ) shouldBe 'left
-    Validators.validateBlock(
-      updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
-    ) shouldBe 'right
 
-    val serialized1        = BlockSerializer.toBytes(blockWithBadVotes)
-    val deserialized1      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized1)).get
-    val serialized2        = PBBlocks.protobuf(blockWithBadVotes).toByteArray
-    val deserialized2      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized2)).get
-    val serializedHeader   = BlockHeaderSerializer.toBytes(blockWithBadVotes.header)
-    val deserializedHeader = PBBlocks.vanilla(protobuf.block.PBBlockHeader.parseFrom(serializedHeader))
-    serialized1 shouldBe serialized2
-    all(Seq(deserialized1, deserialized2)) should matchPattern {
-      case b: Block if b.transactionsRootValid() && b.signatureValid() => // Pass
+    withClue("validations") {
+      Validators.validateBlock(blockWithBadVotes) shouldBe 'left
+      Validators.validateBlock(block) shouldBe 'right
+      Validators.validateBlock(
+        updateHeader(block, _.copy(generator = PublicKey(Array.fill(64)(0.toByte))))
+      ) shouldBe 'left
+      Validators.validateBlock(
+        updateHeader(block, _.copy(version = Block.NgBlockVersion))
+      ) shouldBe 'left
+      Validators.validateBlock(
+        updateHeader(block, _.copy(generationSignature = Array.fill(32)(0.toByte)))
+      ) shouldBe 'left
+      Validators.validateBlock(
+        updateHeader(block, _.copy(featureVotes = Seq[Short](1, 1, 1)))
+      ) shouldBe 'left
+      Validators.validateBlock(
+        updateHeader(blockWithBadVotes, _.copy(version = Block.NgBlockVersion, generationSignature = Array.fill(32)(0.toByte)))
+      ) shouldBe 'right
     }
-    all(Seq(deserialized1, deserialized2)) shouldBe block
-    deserializedHeader shouldBe block.header
+
+    withClue("preserve feature order") {
+      val serialized1        = BlockSerializer.toBytes(blockWithBadVotes)
+      val deserialized1      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized1)).get
+      val serialized2        = PBBlocks.protobuf(blockWithBadVotes).toByteArray
+      val deserialized2      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized2)).get
+      val serializedHeader   = BlockHeaderSerializer.toBytes(blockWithBadVotes.header)
+      val deserializedHeader = PBBlocks.vanilla(protobuf.block.PBBlockHeader.parseFrom(serializedHeader))
+      serialized1 shouldBe serialized2
+      all(Seq(deserialized1, deserialized2)) should matchPattern {
+        case b: Block if !b.signatureValid() => // Pass
+      }
+      all(Seq(deserialized1, deserialized2)) shouldBe blockWithBadVotes
+      deserializedHeader shouldBe blockWithBadVotes.header
+    }
+
+    withClue("signature valid") {
+      val serialized1        = BlockSerializer.toBytes(block)
+      val deserialized1      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized1)).get
+      val serialized2        = PBBlocks.protobuf(block).toByteArray
+      val deserialized2      = PBBlocks.vanilla(protobuf.block.PBBlock.parseFrom(serialized2)).get
+      val serializedHeader   = BlockHeaderSerializer.toBytes(block.header)
+      val deserializedHeader = PBBlocks.vanilla(protobuf.block.PBBlockHeader.parseFrom(serializedHeader))
+      serialized1 shouldBe serialized2
+      all(Seq(deserialized1, deserialized2)) should matchPattern {
+        case b: Block if b.transactionsRootValid() && b.signatureValid() => // Pass
+      }
+      all(Seq(deserialized1, deserialized2)) shouldBe block
+      deserializedHeader shouldBe block.header
+    }
   }
 
   "Miner" should "generate valid blocks" in forAll(genesis) {

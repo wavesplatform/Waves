@@ -61,12 +61,12 @@ case class AddressApiRoute(
       val callableComplexitiesOpt =
         for {
           scriptInfo <- scriptInfoOpt
-          verifierName <- scriptInfo.script match {
+          verifierName = scriptInfo.script match {
             case ContractScriptImpl(_, DApp(_, _, _, Some(vf))) => Some(vf.u.name)
             case _                                              => None
           }
           complexities <- scriptInfo.complexitiesByEstimator.get(blockchain.estimator.version)
-        } yield complexities - verifierName
+        } yield verifierName.fold(complexities)(complexities - _)
 
       val callableComplexities = callableComplexitiesOpt.getOrElse(Map[String, Long]())
 

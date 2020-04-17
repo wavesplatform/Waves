@@ -11,7 +11,7 @@ import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext.MaxListLengthV4
 import monix.eval.Coeval
 
 object Terms {
-  private val DATA_TX_BYTES_MAX = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
+  val DATA_TX_BYTES_MAX: Int = 150 * 1024 // should be the same as DataTransaction.MAX_BYTES
 
   sealed abstract class DECLARATION {
     def name: String

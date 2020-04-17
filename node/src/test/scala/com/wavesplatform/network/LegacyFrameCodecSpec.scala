@@ -3,7 +3,9 @@ package com.wavesplatform.network
 import java.net.InetSocketAddress
 
 import com.wavesplatform.network.message.{MessageSpec, Message => ScorexMessage}
-import com.wavesplatform.{TransactionGen, crypto}
+import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.{TestValues, TransactionGen, crypto}
 import io.netty.buffer.Unpooled.wrappedBuffer
 import io.netty.buffer.{ByteBuf, Unpooled}
 import io.netty.channel.embedded.EmbeddedChannel
@@ -28,7 +30,7 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
     val decodedBytes = ch.readInbound[RawBytes]()
 
     decodedBytes.code shouldBe TransactionSpec.messageCode
-    decodedBytes.data shouldEqual origTx.bytes()
+    decodedBytes.data.arr shouldEqual origTx.bytes()
   }
 
   "should handle multiple messages" in forAll(Gen.nonEmptyListOf(issueGen)) { origTxs =>
@@ -81,6 +83,14 @@ class LegacyFrameCodecSpec extends FreeSpec with Matchers with MockFactory with 
     ch.writeInbound(buff2)
 
     ch.inboundMessages().size() shouldEqual 2
+  }
+
+  "should pack update asset info in PB message" in {
+    val tx = UpdateAssetInfoTransaction
+      .selfSigned(1, TestValues.keyPair, TestValues.asset.id, "bomz", "", System.currentTimeMillis(), TestValues.fee, Waves)
+      .right
+      .get
+    RawBytes.fromTransaction(tx) shouldBe RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
   }
 
   private def write[T <: AnyRef](buff: ByteBuf, msg: T, spec: MessageSpec[T]): Unit = {

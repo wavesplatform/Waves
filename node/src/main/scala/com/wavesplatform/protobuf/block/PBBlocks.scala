@@ -37,7 +37,7 @@ object PBBlocks {
     ByteString.copyFrom(header.reference),
     header.baseTarget,
     ByteString.copyFrom(header.generationSignature),
-    header.featureVotes.map(_.toInt).sorted,
+    header.featureVotes.map(_.toInt),
     header.timestamp,
     header.version,
     ByteString.copyFrom(header.generator),

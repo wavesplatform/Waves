@@ -5,10 +5,10 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.transaction.Asset.IssuedAsset
+import com.wavesplatform.transaction._
 import com.wavesplatform.transaction.serialization.impl.{BaseTxJson, PBTransactionSerializer}
 import com.wavesplatform.transaction.validation._
 import com.wavesplatform.transaction.validation.impl.UpdateAssetInfoTxValidator
-import com.wavesplatform.transaction._
 import monix.eval.Coeval
 import play.api.libs.json.{JsObject, Json}
 
@@ -27,7 +27,8 @@ case class UpdateAssetInfoTransaction(
     chainId: Byte
 ) extends VersionedTransaction
     with FastHashId
-    with ProvenTransaction { self =>
+    with ProvenTransaction
+    with ProtobufOnly { self =>
 
   override def assetFee: (Asset, TxAmount) = (feeAsset, feeAmount)
 

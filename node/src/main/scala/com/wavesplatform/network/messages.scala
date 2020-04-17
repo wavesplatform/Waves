@@ -7,7 +7,7 @@ import com.wavesplatform.block.Block.BlockId
 import com.wavesplatform.block.{Block, MicroBlock}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.crypto
-import com.wavesplatform.transaction.{LegacyPBSwitch, Signed, Transaction}
+import com.wavesplatform.transaction.{LegacyPBSwitch, ProtobufOnly, Signed, Transaction}
 import monix.eval.Coeval
 
 sealed trait Message
@@ -28,13 +28,14 @@ case class GetBlock(signature: ByteStr) extends Message
 
 case class LocalScoreChanged(newLocalScore: BigInt) extends Message
 
-case class RawBytes(code: Byte, data: Array[Byte]) extends Message {
+case class RawBytes(code: Byte, data: ByteStr) extends Message {
   override def toString: String = s"RawBytes($code, ${data.length} bytes)"
 }
 
 object RawBytes {
   def fromTransaction(tx: Transaction): RawBytes = tx match {
     case p: LegacyPBSwitch if p.isProtobufVersion => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
+    case _: ProtobufOnly                          => RawBytes(PBTransactionSpec.messageCode, PBTransactionSpec.serializeData(tx))
     case tx                                       => RawBytes(TransactionSpec.messageCode, TransactionSpec.serializeData(tx))
   }
 

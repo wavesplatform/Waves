@@ -15,7 +15,7 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 
 class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers with Inside {
   private val estimator = ScriptEstimatorV2
-  
+
   property("compile script with specified version") {
     val script = scriptWithVersion("1".some)
     ScriptCompiler(script, isAssetScript = false, estimator) shouldBe Right((ExprScript(V1, expectedExpr).explicitGet(), 13))
@@ -186,21 +186,21 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
 
   property("complexity border") {
     def buildDirectives(
-                         version:     StdLibVersion,
-                         contentType: ContentType,
-                         scriptType:  ScriptType
-                       ): String =
-    s"""
+        version: StdLibVersion,
+        contentType: ContentType,
+        scriptType: ScriptType
+    ): String =
+      s"""
        | {-# STDLIB_VERSION ${version.value}     #-}
        | {-# CONTENT_TYPE   ${contentType.value} #-}
        | {-# SCRIPT_TYPE    ${scriptType.value}  #-}
      """.stripMargin
 
     def buildScript(
-                     assigns:      Int,
-                     conjunctions: Int,
-                     withVerifier: Boolean
-                   ): String =
+        assigns: Int,
+        conjunctions: Int,
+        withVerifier: Boolean
+    ): String =
       s"""
          | func script() = {
          |   let a0 = base58''
@@ -213,33 +213,39 @@ class ScriptCompilerV1Test extends PropSpec with PropertyChecks with Matchers wi
       """.stripMargin
 
     def checkComplexityBorder(
-                               version:     StdLibVersion,
-                               contentType: ContentType,
-                               scriptType:  ScriptType,
-                               complexity:  Int
-                             ): Unit = {
+        version: StdLibVersion,
+        contentType: ContentType,
+        scriptType: ScriptType,
+        complexity: Int
+    ): Unit = {
 
       val directives = buildDirectives(version, contentType, scriptType)
       val (assigns, conjunctions) = (version, contentType, scriptType) match {
-        case (V3, DApp, Account) => (209, 2)
-        case (V3, Expression, _) => (209, 7)
-        case ( _, Expression, _) => (103, 14)
-        case _ => ???
+        case (V3 | V4, DApp, Account)       => (155, 15)
+        case (V3 | V4, Expression, Account) => (155, 20)
+        case (V3 | V4, Expression, Asset)   => (209, 7)
+        case (_, Expression, _)             => (103, 14)
+        case _                              => ???
       }
-      val withVerifier = contentType == DApp
-      val validScript          = directives + buildScript(assigns, conjunctions,     withVerifier)
+      val withVerifier         = contentType == DApp
+      val validScript          = directives + buildScript(assigns, conjunctions, withVerifier)
       val exceedingLimitScript = directives + buildScript(assigns, conjunctions + 1, withVerifier)
 
       inside(ScriptCompiler.compile(validScript, estimator)) { case Right((_, c)) => c shouldBe complexity }
       ScriptCompiler.compile(exceedingLimitScript, estimator) should produce(s"${complexity + 2} > $complexity")
     }
 
-    checkComplexityBorder(V3, DApp,       Account, 4000)
-    checkComplexityBorder(V3, Expression, Asset,   4000)
-    checkComplexityBorder(V3, Expression, Account, 4000)
-    checkComplexityBorder(V2, Expression, Asset,   2000)
+    checkComplexityBorder(V4, Expression, Asset, 4000)
+    checkComplexityBorder(V3, Expression, Asset, 4000)
+
+    checkComplexityBorder(V4, DApp, Account, 3000)
+    checkComplexityBorder(V3, DApp, Account, 3000)
+    checkComplexityBorder(V4, Expression, Account, 3000)
+    checkComplexityBorder(V3, Expression, Account, 3000)
+
+    checkComplexityBorder(V2, Expression, Asset, 2000)
     checkComplexityBorder(V2, Expression, Account, 2000)
-    checkComplexityBorder(V1, Expression, Asset,   2000)
+    checkComplexityBorder(V1, Expression, Asset, 2000)
     checkComplexityBorder(V1, Expression, Account, 2000)
   }
 
