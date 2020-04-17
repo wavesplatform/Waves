@@ -156,6 +156,7 @@ object InvokeScriptTransactionDiff {
                   List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1._1), scriptResultE.fold(_.log, _._1._2)))
                 )
               }
+
               invocationComplexity = scriptResult._2
               actions = scriptResult._1._1 match {
                 case ScriptResultV3(dataItems, transfers) => dataItems ::: transfers
@@ -163,10 +164,10 @@ object InvokeScriptTransactionDiff {
               }
 
               actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
-              transfers     = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-              issues        = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-              reissues      = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-              burns         = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+              transferList  = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+              issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+              reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+              burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
 
               dataItems = actionsByType
                 .filterKeys(classOf[DataItem[_]].isAssignableFrom)
@@ -186,27 +187,26 @@ object InvokeScriptTransactionDiff {
                 )
               )
 
-              _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transfers))
-              _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
-              _ <- TracedResult(validateOverflow(transfers.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
+              _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
+              _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
+              _ <- TracedResult(validateOverflow(transferList.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
 
               verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity)
-              assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
+              assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
                 .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
                 .map(_._2)
 
               scriptsInvoked <- TracedResult {
                 val smartAssetInvocations =
                   tx.checkedAssets ++
-                    transfers.flatMap(_.assetId).map(IssuedAsset) ++
-                    reissues.map(r => IssuedAsset(r.assetId)) ++
-                    burns.map(b => IssuedAsset(b.assetId))
-                val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1
-                                                                                                    else 0)
-                val minIssueFee = issues.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-                val minWaves    = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
-                val txName      = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-                val assetName   = tx.assetFee._1.fold("WAVES")(_.id.toString)
+                    transferList.flatMap(_.assetId).map(IssuedAsset) ++
+                    reissueList.map(r => IssuedAsset(r.assetId)) ++
+                    burnList.map(b => IssuedAsset(b.assetId))
+                val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
+                val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+                val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
+                val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+                val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
                 Either.cond(
                   minWaves <= wavesFee,
                   totalScriptsInvoked,
@@ -226,14 +226,16 @@ object InvokeScriptTransactionDiff {
 
               val isr = InvokeScriptResult(
                 dataEntries,
-                transfers.toSeq
-                  .filterNot { case (recipient, _) => recipient == dAppAddress }
-                  .flatMap {
-                    case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
-                  },
-                issues,
-                reissues,
-                burns
+                transferList.map { tr =>
+                  InvokeScriptResult.Payment(
+                    Address.fromBytes(tr.recipient.bytes.arr).explicitGet(),
+                    Asset.fromCompatId(tr.assetId),
+                    tr.amount
+                  )
+                },
+                issueList,
+                reissueList,
+                burnList
               )
 
               compositeDiff.copy(
