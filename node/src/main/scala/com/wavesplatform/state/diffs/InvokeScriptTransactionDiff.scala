@@ -84,7 +84,7 @@ object InvokeScriptTransactionDiff {
                   Map(assetInfo.issuer.toAddress -> Portfolio(-wavesFee, LeaseBalance.empty, Map(asset -> tx.fee))))
           })
           wavesFee     = feeInfo._1
-          paymentsDiff = paymentsPart(blockchain.height, tx, dAppAddress, feeInfo._2)
+          paymentsDiff = paymentsPart(tx, dAppAddress, feeInfo._2)
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
           payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
@@ -103,7 +103,6 @@ object InvokeScriptTransactionDiff {
                 s"estimator version = ${blockchain.estimator.version}"
 
             complexity.toRight(GenericError(errorMessage))
-
           })
 
           result <- if (!skipExecution) {
@@ -206,11 +205,12 @@ object InvokeScriptTransactionDiff {
                     transferList.flatMap(_.assetId).map(IssuedAsset) ++
                     reissueList.map(r => IssuedAsset(r.assetId)) ++
                     burnList.map(b => IssuedAsset(b.assetId))
-                val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
-                val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-                val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
-                val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-                val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
+                val totalScriptsInvoked =
+                  smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
+                val minIssueFee = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+                val minWaves    = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
+                val txName      = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+                val assetName   = tx.assetFee._1.fold("WAVES")(_.id.toString)
                 Either.cond(
                   minWaves <= wavesFee,
                   totalScriptsInvoked,
@@ -220,7 +220,7 @@ object InvokeScriptTransactionDiff {
                   )
                 )
               }
-              compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff)
+              compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, pk)(actions, paymentsDiff).leftMap(asFailedScriptError)
             } yield {
               val transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -339,7 +339,6 @@ object InvokeScriptTransactionDiff {
     } yield ()
 
   private def paymentsPart(
-      height: Int,
       tx: InvokeScriptTransaction,
       dAppAddress: Address,
       feePart: Map[Address, Portfolio]
@@ -517,16 +516,25 @@ object InvokeScriptTransactionDiff {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reason.AssetInAction))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reason.AssetInAction))
+        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, FailedScriptError.Reason.AssetInAction))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, FailedScriptError.Reason.AssetInAction))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reason.AssetInAction))
+        case (log, Right(x)) =>
+          Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, FailedScriptError.Reason.AssetInAction))
       }
     } match {
       case Failure(e) =>
         Left(
-          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reason.AssetInAction)
+          ScriptExecutionError
+            .asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, FailedScriptError.Reason.AssetInAction)
         )
       case Success(s) => s
+    }
+
+  private def asFailedScriptError(ve: ValidationError): FailedScriptError =
+    ve match {
+      case e: FailedScriptError => e
+      case e: GenericError      => ScriptExecutionError.dApp(e.err)
+      case e                    => ScriptExecutionError.dApp(e.toString)
     }
 }
