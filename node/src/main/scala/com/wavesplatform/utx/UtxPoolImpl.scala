@@ -343,7 +343,7 @@ class UtxPoolImpl(
           }
 
       @tailrec
-      def pack(seed: PackResult): PackResult = {
+      def loop(seed: PackResult): PackResult = {
         if (isTimeLimitReached && seed.transactions.exists(_.nonEmpty) || (transactions.isEmpty && priorityTransactions.isEmpty)) seed
         else {
           val newSeed = packIteration(
@@ -356,11 +356,11 @@ class UtxPoolImpl(
           } else if (transactions.keys().asScala.forall(newSeed.validatedTransactions)) {
             log.trace("No more transactions to validate")
             newSeed
-          } else pack(newSeed)
+          } else loop(newSeed)
         }
       }
 
-      pack(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
+      loop(PackResult(None, Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }
 
     log.trace(

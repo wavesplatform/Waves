@@ -36,7 +36,7 @@ object TransactionDiffer {
       case result                                                 => result
     }
 
-  /** Validates transaction but skips ability to fail (does not execute asset scripts and dApp script for ExchangeTx and InvokeScriptTx) */
+  /** Validates transaction but since BlockV5 skips ability to fail (does not execute asset scripts and dApp script for ExchangeTx and InvokeScriptTx) */
   def skipFailing(prevBlockTimestamp: Option[Long], currentBlockTimestamp: Long, verify: Boolean = true)(
       blockchain: Blockchain,
       tx: Transaction
@@ -235,7 +235,7 @@ object TransactionDiffer {
     def unapply(result: TracedResult[ValidationError, Diff]): Option[Option[ErrorMessage]] =
       result match {
         case TracedResult(Left(TransactionValidationError(e: FailedScriptError, tx)), _) => Some(errorMessage(e, tx))
-        case _                                                                 => None
+        case _                                                                           => None
       }
 
     def errorMessage(cf: FailedScriptError, tx: Transaction): Option[ErrorMessage] =
