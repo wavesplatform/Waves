@@ -1,11 +1,10 @@
 package com.wavesplatform.transaction.smart
 
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
-import com.wavesplatform.transaction.validation.TxValidator
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
 
@@ -37,13 +36,13 @@ case class ContinuationTransaction(
 }
 
 object ContinuationTransaction extends TransactionParser {
-  override type TransactionT = this.type
+  override type TransactionT = ContinuationTransaction
 
   override def typeId: TxType = 18: Byte
 
   override def supportedVersions: Set[TxVersion] = Set(1)
 
-  override def parseBytes(bytes: Array[Byte]): Try[ContinuationTransaction.type] = ???
+  override def parseBytes(bytes: Array[Byte]): Try[ContinuationTransaction] = ???
 
-  override implicit def validator: TxValidator[ContinuationTransaction.type] = ???
+  override implicit def validator: TxValidator[ContinuationTransaction] = ???
 }

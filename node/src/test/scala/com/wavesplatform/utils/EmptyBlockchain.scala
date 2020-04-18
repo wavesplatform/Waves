@@ -84,5 +84,5 @@ case object EmptyBlockchain extends Blockchain {
     * @note Portfolios passed to `pf` only contain Waves and Leasing balances to improve performance */
   override def collectLposPortfolios[A](pf: PartialFunction[(Address, Portfolio), A]): Map[Address, A] = Map.empty
 
-  override def continuationStates: Map[Address, Terms.EXPR] = Map.empty
+  override def continuationStates: Map[ByteStr, Terms.EXPR] = Map.empty
 }

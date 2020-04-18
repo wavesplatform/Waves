@@ -349,8 +349,8 @@ class UtxPoolImpl(
         }
       }
 
-      val continuationTransactions: Map[ByteStr, (ContinuationTransaction, Set[Address])] =
-        blockchain.continuationStates.map { case (invokeTxId, expr) => invokeTxId -> (ContinuationTransaction(expr, invokeTxId), Set[Address]()) }
+      val continuationTransactions: Map[ByteStr, (ContinuationTransaction, Set[Address], Boolean)] =
+        blockchain.continuationStates.map { case (invokeTxId, expr) => invokeTxId -> (ContinuationTransaction(expr, invokeTxId), Set[Address](), true) }
 
       pack(PackResult(None, Monoid[Diff].empty.copy(transactions = continuationTransactions), initialConstraint, 0, Set.empty, Set.empty))
     }
