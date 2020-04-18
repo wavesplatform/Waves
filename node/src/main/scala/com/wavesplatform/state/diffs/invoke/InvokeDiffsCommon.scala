@@ -139,16 +139,15 @@ object InvokeDiffsCommon {
             transferList.flatMap(_.assetId).map(IssuedAsset) ++
             reissueList.map(r => IssuedAsset(r.assetId)) ++
             burnList.map(b => IssuedAsset(b.assetId))
-        val totalScriptsInvoked =
-          smartAssetInvocations.count(blockchain.hasAssetScript) +
-            (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
-        val minWaves  = totalScriptsInvoked * ScriptExtraFee + stepsNumber * FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit
-        val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
-        val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
+        val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
+        val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
+        val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
+        val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+        val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
         Either.cond(
           minWaves <= feeInfo._1,
           totalScriptsInvoked,
-          GenericError(
+          InsufficientInvokeActionFee(
             s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
               s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES."
           )
@@ -272,7 +271,7 @@ object InvokeDiffsCommon {
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
         case TracedResult(Right(curDiff), _) =>
-          val blockchain = CompositeBlockchain(sblockchain, Some(curDiff))
+          val blockchain   = CompositeBlockchain(sblockchain, Some(curDiff))
           val actionSender = Recipient.Address(tx.dAppAddressOrAlias.bytes)
 
           def applyTransfer(transfer: AssetTransfer, pk: PublicKey): TracedResult[ValidationError, Diff] = {
@@ -314,7 +313,7 @@ object InvokeDiffsCommon {
                       tx.id()
                     )
                     val assetValidationDiff = validatePseudoTxWithSmartAssetScript(blockchain, tx)(pseudoTx, a.id, assetVerifierDiff, script)
-                    val errorOpt = assetValidationDiff.fold(Some(_), _ => None)
+                    val errorOpt            = assetValidationDiff.fold(Some(_), _ => None)
                     TracedResult(
                       assetValidationDiff.map(_ => nextDiff),
                       List(AssetVerifierTrace(id, errorOpt))
@@ -336,7 +335,7 @@ object InvokeDiffsCommon {
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(TooBigArray), List())
             } else if (blockchain.assetDescription(IssuedAsset(issue.id)).isDefined) {
-              TracedResult(Left(ScriptExecutionError(s"Asset ${issue.id} is already issued", List(), false)), List())
+              TracedResult(Left(ScriptExecutionError(s"Asset ${issue.id} is already issued", List(), isAssetScript = false)), List())
             } else {
               val staticInfo = AssetStaticInfo(TransactionId @@ itx.id(), pk, issue.decimals, blockchain.isNFT(issue))
               val volumeInfo = AssetVolumeInfo(issue.isReissuable, BigInt(issue.quantity))
@@ -350,7 +349,7 @@ object InvokeDiffsCommon {
                   script =>
                     Diff(
                       tx = itx,
-                      portfolios = Map(pk.toAddress -> Portfolio(lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
+                      portfolios = Map(pk.toAddress -> Portfolio(balance = 0, lease = LeaseBalance.empty, assets = Map(asset -> issue.quantity))),
                       issuedAssets = Map(asset      -> ((staticInfo, info, volumeInfo))),
                       assetScripts = Map(asset      -> script.map(script => (script._1, script._2)))
                     )
@@ -391,13 +390,19 @@ object InvokeDiffsCommon {
             }
 
           val diff = action match {
-            case t: AssetTransfer => applyTransfer(t, (if(blockchain.isFeatureActivated(BlockV5)) { pk } else { PublicKey(ByteStr.empty) }))
-            case d: DataItem[_]   => applyDataItem(d)
-            case i: Issue         => applyIssue(tx, pk, i)
-            case r: Reissue       => applyReissue(r, pk)
-            case b: Burn          => applyBurn(b, pk)
+            case t: AssetTransfer =>
+              applyTransfer(t, if (blockchain.isFeatureActivated(BlockV5)) {
+                pk
+              } else {
+                PublicKey(ByteStr.empty)
+              })
+            case d: DataItem[_] => applyDataItem(d)
+            case i: Issue       => applyIssue(tx, pk, i)
+            case r: Reissue     => applyReissue(r, pk)
+            case b: Burn        => applyBurn(b, pk)
           }
           diffAcc |+| diff
+
         case _ => diffAcc
       }
     }
@@ -416,10 +421,10 @@ object InvokeDiffsCommon {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError(error, log, isAssetScript = true))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript(log, isAssetScript = true))
+        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reason.AssetInAction))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reason.AssetInAction))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x))     => Left(ScriptExecutionError(s"Script returned not a boolean result, but $x", log, isAssetScript = true))
+        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reason.AssetInAction))
       }
     } match {
       case Failure(e) =>
