@@ -95,10 +95,10 @@ object InvokeDiffsCommon {
       blockTime: Long
   ): TracedResult[ValidationError, Diff] = {
     val actionsByType = actions.groupBy(_.getClass).withDefaultValue(Nil)
-    val transfers     = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
-    val issues        = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
-    val reissues      = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
-    val burns         = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
+    val transferList  = actionsByType(classOf[AssetTransfer]).asInstanceOf[List[AssetTransfer]]
+    val issueList     = actionsByType(classOf[Issue]).asInstanceOf[List[Issue]]
+    val reissueList   = actionsByType(classOf[Reissue]).asInstanceOf[List[Reissue]]
+    val burnList      = actionsByType(classOf[Burn]).asInstanceOf[List[Burn]]
 
     val dataEntries = actionsByType
       .filterKeys(classOf[DataItem[_]].isAssignableFrom)
@@ -118,11 +118,11 @@ object InvokeDiffsCommon {
         )
       )
 
-      _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transfers))
-      _ <- TracedResult(Either.cond(transfers.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
-      _ <- TracedResult(validateOverflow(transfers.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
+      _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
+      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
+      _ <- TracedResult(validateOverflow(transferList.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
 
-      assetsComplexity = (tx.checkedAssets.map(_.id) ++ transfers.flatMap(_.assetId))
+      assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
         .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
         .map(_._2)
 
@@ -136,9 +136,9 @@ object InvokeDiffsCommon {
 
         val smartAssetInvocations =
           tx.checkedAssets ++
-            transfers.flatMap(_.assetId).map(IssuedAsset) ++
-            reissues.map(r => IssuedAsset(r.assetId)) ++
-            burns.map(b => IssuedAsset(b.assetId))
+            transferList.flatMap(_.assetId).map(IssuedAsset) ++
+            reissueList.map(r => IssuedAsset(r.assetId)) ++
+            burnList.map(b => IssuedAsset(b.assetId))
         val totalScriptsInvoked =
           smartAssetInvocations.count(blockchain.hasAssetScript) +
             (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
@@ -167,14 +167,16 @@ object InvokeDiffsCommon {
 
       isr = InvokeScriptResult(
         dataEntries,
-        transfers.toSeq
-          .filterNot { case (recipient, _) => recipient == dAppAddress }
-          .flatMap {
-            case (addr, pf) => InvokeScriptResult.paymentsFromPortfolio(addr, pf)
-          },
-        issues,
-        reissues,
-        burns
+        transferList.map { tr =>
+          InvokeScriptResult.Payment(
+            Address.fromBytes(tr.recipient.bytes.arr).explicitGet(),
+            Asset.fromCompatId(tr.assetId),
+            tr.amount
+          )
+        },
+        issueList,
+        reissueList,
+        burnList
       )
 
       resultDiff = compositeDiff.copy(
