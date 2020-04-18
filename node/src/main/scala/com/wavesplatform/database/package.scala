@@ -233,18 +233,22 @@ package object database extends ScorexLogging {
   }
 
   def readContinuationStates(bytes: Array[Byte]): Map[ByteStr, EXPR] = {
-    val input = newDataInput(bytes)
-    val size = input.readInt()
-    (1 to size).map { _ =>
-      val invokeTxIdLength = input.readByte()
-      val invokeTxId = input.readByteStr(invokeTxIdLength)
+    if (bytes == null || bytes.isEmpty)
+      Map()
+    else {
+      val input = newDataInput(bytes)
+      val size = input.readInt()
+      (1 to size).map { _ =>
+        val invokeTxIdLength = input.readByte()
+        val invokeTxId = input.readByteStr(invokeTxIdLength)
 
-      val exprBytesLength = input.readInt()
-      val exprBytes = input.readBytes(exprBytesLength)
-      val expr = Serde.deserialize(exprBytes).explicitGet()._1
+        val exprBytesLength = input.readInt()
+        val exprBytes = input.readBytes(exprBytesLength)
+        val expr = Serde.deserialize(exprBytes).explicitGet()._1
 
-      (invokeTxId, expr)
-    }.toMap
+        (invokeTxId, expr)
+      }.toMap
+    }
   }
 
   def writeContinuationStates(states: Map[ByteStr, EXPR]): Array[Byte] = {
