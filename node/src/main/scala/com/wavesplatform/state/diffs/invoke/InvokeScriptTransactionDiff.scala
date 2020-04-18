@@ -68,12 +68,13 @@ object InvokeScriptTransactionDiff {
             val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
             val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val stepsInfo = if (stepsNumber > 1) s" with $stepsNumber invocation steps" else ""
             Either.cond(
               feeInfo._1 >= minFee,
               (),
               GenericError(
                 s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-                  s" with $stepsNumber invocation steps does not exceed minimal value of $minFee WAVES."
+                s"$stepsInfo does not exceed minimal value of $minFee WAVES."
               )
             )
           }
