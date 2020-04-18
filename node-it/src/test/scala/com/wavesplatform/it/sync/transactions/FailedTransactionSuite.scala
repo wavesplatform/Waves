@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.google.common.primitives.Longs
+import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAccountScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
@@ -638,6 +639,8 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
   }
 
   override protected def waitForHeightArise(): Unit = nodes.waitForHeightArise()
+
+  override protected def nodeConfigs: Seq[Config] = Configs
 }
 
 object FailedTransactionSuite {
