@@ -15,6 +15,8 @@ import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
 
+import scala.util.Try
+
 object ContractEvaluator {
 
   val DEFAULT_FUNC_NAME = "default"
@@ -100,10 +102,11 @@ object ContractEvaluator {
       transactionId: ByteStr
   ): Either[ExecutionError, ScriptResult] = {
     val evaluator = new EvaluatorV2(ctx, version)
-    val result    = evaluator(expr, ContractLimits.MaxComplexityByVersion(version))
-    result match {
-      case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
-      case (expr: EXPR, unusedComplexity) => Right(IncompleteResult(expr, unusedComplexity))
-    }
+    Try(evaluator(expr, ContractLimits.MaxComplexityByVersion(version))).toEither
+      .leftMap(_.getMessage)
+      .flatMap {
+        case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
+        case (expr: EXPR, unusedComplexity) => Right(IncompleteResult(expr, unusedComplexity))
+      }
   }
 }
