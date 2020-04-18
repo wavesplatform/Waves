@@ -257,8 +257,20 @@ class UtxPoolImpl(
       initialConstraint: MultiDimensionalMiningConstraint,
       maxPackTime: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, maxPackTime)
+  }
 
-    val differ = TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()) _
+  private def cleanUnconfirmed(): Unit =
+    pack(TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime()))(
+      MultiDimensionalMiningConstraint.unlimited,
+      ScalaDuration.Inf
+    )
+
+  private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
+      initialConstraint: MultiDimensionalMiningConstraint,
+      maxPackTime: ScalaDuration
+  ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
+
     val packResult = PoolMetrics.packTimeStats.measure {
       val startTime                   = nanoTimeSource()
       def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
@@ -398,7 +410,7 @@ class UtxPoolImpl(
     def runCleanupAsync(): Unit =
       if ((!transactions.isEmpty || priorityTransactions.nonEmpty) && scheduled.compareAndSet(false, true)) {
         cleanupScheduler.execute { () =>
-          try packUnconfirmed(MultiDimensionalMiningConstraint.unlimited, ScalaDuration.Inf)
+          try cleanUnconfirmed()
           finally scheduled.set(false)
         }
       }
