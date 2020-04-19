@@ -28,7 +28,7 @@ object EvaluatorV2Benchmark {
 @Fork(1)
 @Warmup(iterations = 20)
 @Measurement(iterations = 10)
-class ScriptEvaluatorBenchmark {
+class EvaluatorV2Benchmark {
   @Benchmark
   def funcs(st: Funcs, bh: Blackhole): Unit = bh.consume(evaluatorV2(st.expr, 1000000))
 
