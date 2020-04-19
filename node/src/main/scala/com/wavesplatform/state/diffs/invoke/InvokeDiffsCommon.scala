@@ -133,6 +133,7 @@ object InvokeDiffsCommon {
             invocationComplexity / stepLimit
           else
             invocationComplexity / stepLimit + 1
+        val stepsInfo = if (stepsNumber > 1) s" with $stepsNumber invocation steps" else ""
 
         val smartAssetInvocations =
           tx.checkedAssets ++
@@ -141,7 +142,7 @@ object InvokeDiffsCommon {
             burnList.map(b => IssuedAsset(b.assetId))
         val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
         val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-        val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit + minIssueFee
+        val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber + minIssueFee
         val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
         val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
         Either.cond(
@@ -149,7 +150,7 @@ object InvokeDiffsCommon {
           totalScriptsInvoked,
           InsufficientInvokeActionFee(
             s"Fee in $assetName for $txName (${tx.assetFee._2} in $assetName)" +
-              s" with $totalScriptsInvoked total scripts invoked does not exceed minimal value of $minWaves WAVES."
+              s" with $totalScriptsInvoked total scripts invoked$stepsInfo does not exceed minimal value of $minWaves WAVES."
           )
         )
       }
