@@ -76,6 +76,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
     (blockchainUpdater.blockHeader _).when(*).returns(Some(SignedBlockHeader(genesis.header, genesis.signature)))
     (blockchainUpdater.activatedFeatures _).when().returning(Map.empty)
     (blockchainUpdater.approvedFeatures _).when().returning(Map.empty)
+    (blockchainUpdater.continuationStates _).when().returning(Map.empty)
     (blockchainUpdater.hitSource _).when(*).returns(Some(new Array[Byte](32)))
     (blockchainUpdater.bestLastBlockInfo _)
       .when(*)
