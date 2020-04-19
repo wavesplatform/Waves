@@ -120,7 +120,7 @@ object InvokeScriptTransactionDiff {
                   version
                 )
 
-              result.leftMap { case (error) => ScriptExecutionError(error, Nil, isAssetScript = false) }
+              result.leftMap { case (error) => ScriptExecutionError.dApp(error, Nil) }
             })
             TracedResult(
               scriptResultE,
