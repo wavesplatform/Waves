@@ -47,7 +47,7 @@ class AssetsApiRouteSpec
       reissuable = smartAssetTx.reissuable,
       totalVolume = smartAssetTx.quantity,
       lastUpdatedAt = Height @@ 0,
-      script = Some((script, Script.estimate(script, ScriptEstimatorV1).explicitGet())),
+      script = Some((script, Script.estimate(script, ScriptEstimatorV1, useContractVerifierLimit = false).explicitGet())),
       sponsorship = 0,
       nft = smartAssetTx.decimals == 0 && smartAssetTx.quantity == 1 && !smartAssetTx.reissuable
     )
@@ -55,7 +55,7 @@ class AssetsApiRouteSpec
 
   routePath(s"/details/{id} - smart asset") in forAll(smartIssueAndDetailsGen) {
     case (smartAssetTx, smartAssetDesc) =>
-      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx)))
+      (blockchain.transactionInfo _).when(smartAssetTx.id()).onCall((_: ByteStr) => Some((1, smartAssetTx, true)))
       (blockchain.assetDescription _).when(IssuedAsset(smartAssetTx.id())).onCall((_: IssuedAsset) => Some(smartAssetDesc))
 
       Get(routePath(s"/details/${smartAssetTx.id().toString}")) ~> route ~> check {
@@ -109,7 +109,7 @@ class AssetsApiRouteSpec
 
   routePath(s"/details/{id} - non-smart asset") in forAll(sillyIssueAndDetailsGen) {
     case (sillyAssetTx, sillyAssetDesc) =>
-      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx)))
+      (blockchain.transactionInfo _).when(sillyAssetTx.id()).onCall((_: ByteStr) => Some((1, sillyAssetTx, true)))
       (blockchain.assetDescription _).when(IssuedAsset(sillyAssetTx.id())).onCall((_: IssuedAsset) => Some(sillyAssetDesc))
       Get(routePath(s"/details/${sillyAssetTx.id().toString}")) ~> route ~> check {
         val response = responseAs[JsObject]

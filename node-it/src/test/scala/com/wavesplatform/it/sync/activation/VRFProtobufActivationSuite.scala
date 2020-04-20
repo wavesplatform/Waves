@@ -57,7 +57,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("not able to broadcast tx of new versions before activation") {
     assertApiError(sender.transfer(senderAcc.stringRepr, recipientAcc.stringRepr, transferAmount, version = TxVersion.V3)) { error =>
       error.statusCode shouldBe 400
-      error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
+      error.message shouldBe "State check failed. Reason: ActivationError(Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet)"
       error.id shouldBe 112
     }
   }
@@ -65,7 +65,7 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   test("not able to broadcast UpdateAssetInfoTransaction before activation") {
     assertApiError(sender.updateAssetInfo(senderAcc, otherAssetId, "updatedName", "updatedDescription", minFee)) { error =>
       error.statusCode shouldBe 400
-      error.message shouldBe "State check failed. Reason: ActivationError(VRF and Protobuf feature has not been activated yet)"
+      error.message shouldBe "State check failed. Reason: ActivationError(Ride V4, VRF, Protobuf, Failed transactions feature has not been activated yet)"
       error.id shouldBe 112
     }
   }
@@ -177,27 +177,27 @@ class VRFProtobufActivationSuite extends BaseTransactionSuite {
   }
 
   test("rollback to height before activation/at activation/after activation height") {
-    //rollback to height one block before activation height
-    nodes.rollback(activationHeight - 1, returnToUTX = true)
+    //rollback to activation height
+    nodes.rollback(activationHeight, returnToUTX = true)
 
-    val blockBeforeActivationHeight1 = sender.blockAt(activationHeight - 1)
-    blockBeforeActivationHeight1.version.get shouldBe Block.RewardBlockVersion
-    val returnedTxIds = sender.utx().map(tx => tx.id)
-
-    sender.waitForHeight(activationHeight, 2.minutes)
     val blockAtActivationHeight1 = sender.blockAt(activationHeight)
     blockAtActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
+    val returnedTxIds = sender.utx().map(tx => tx.id)
 
     sender.waitForHeight(activationHeight + 1, 2.minutes)
     val blockAfterActivationHeight1 = sender.blockAt(activationHeight + 1)
     blockAfterActivationHeight1.version.get shouldBe Block.ProtoBlockVersion
     nodes.waitForHeightArise()
 
-    returnedTxIds.foreach(sender.waitForTransaction(_))
+    returnedTxIds.foreach(sender.waitForTransaction(_, timeout = 8 minutes))
 
-    //rollback to activation height
-    nodes.rollback(activationHeight, returnToUTX = false)
+    //rollback to height one block before activation height
+    nodes.rollback(activationHeight - 1, returnToUTX = false)
 
+    val blockBeforeActivationHeight = sender.blockAt(activationHeight - 1)
+    blockBeforeActivationHeight.version.get shouldBe Block.RewardBlockVersion
+
+    sender.waitForHeight(activationHeight, 2.minutes)
     val blockAtActivationHeight2 = sender.blockAt(activationHeight)
     blockAtActivationHeight2.version.get shouldBe Block.ProtoBlockVersion
 

@@ -61,7 +61,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("TransactionNotAllowedByScript"))
+        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
     }
   }
 
@@ -82,7 +82,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
           Seq(TestBlock.create(genesis :+ setScript :+ issue)),
           TestBlock.create(Seq(invoke)),
           features
-        )(_ should produce("TransactionNotAllowedByScript"))
+        )(_ should produce("Transaction is not allowed by token-script", requireFailed = true))
     }
   }
 
@@ -140,7 +140,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     }
   }
 
-  property("trace") {
+  ignore("trace") {
     forAll(multiActionPreconditions(feeMultiplier = 6, withScriptError = true)) {
       case (genesis, setScript, invoke, issue, _, _, _, _, _) =>
         assertDiffEiTraced(
@@ -378,19 +378,20 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
       BlockchainFeatures.SmartAccounts,
       BlockchainFeatures.SmartAssets,
       BlockchainFeatures.Ride4DApps,
-      BlockchainFeatures.MultiPaymentInvokeScript
+      BlockchainFeatures.BlockV5
     ).map(_.id -> 0).toMap
   )
 
   private def issuePreconditions(
       assetScript: Option[Script] = None,
-      feeMultiplier: Int
+      feeMultiplier: Int,
+      issueFeeMultiplier: Int
   ): Gen[(List[Transaction], InvokeScriptTransaction, KeyPair, KeyPair, Long)] =
     for {
       master  <- accountGen
       invoker <- accountGen
       ts      <- timestampGen
-      fee     <- ciFee(feeMultiplier)
+      fee     <- ciFee(feeMultiplier, issueFeeMultiplier)
       amount  <- Gen.choose(1L, 100000000L)
     } yield {
       val dApp = Some(issueDApp(amount))
@@ -418,7 +419,7 @@ class CallableV4DiffTest extends PropSpec with PropertyChecks with Matchers with
     )
 
   property("issue action results state") {
-    forAll(issuePreconditions(feeMultiplier = 7)) {
+    forAll(issuePreconditions(feeMultiplier = 7, issueFeeMultiplier = 1)) {
       case (genesis, invoke, master, invoker, amount) =>
         withDomain() { d =>
           val tb1 = TestBlock.create(genesis)

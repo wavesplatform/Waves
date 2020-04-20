@@ -522,6 +522,8 @@ object AsyncHttpApi extends Assertions {
 
     def scriptDecompile(script: String): Future[DecompiledScript] = post("/utils/script/decompile", script).as[DecompiledScript]
 
+    def scriptEstimate(script: String): Future[EstimatedScript] = post("/utils/script/estimate", script).as[EstimatedScript]
+
     def reissue(sourceAddress: String, assetId: String, quantity: Long, reissuable: Boolean, fee: Long, version: Byte = 1): Future[Transaction] = {
       signAndBroadcast(
         Json.obj(
@@ -552,8 +554,8 @@ object AsyncHttpApi extends Assertions {
     def debugStateChanges(invokeScriptTransactionId: String, amountsAsStrings: Boolean): Future[DebugStateChanges] =
       get(s"/debug/stateChanges/info/$invokeScriptTransactionId", amountsAsStrings).as[DebugStateChanges](amountsAsStrings)
 
-    def debugStateChangesByAddress(address: String, limit: Int = 10000): Future[Seq[DebugStateChanges]] =
-      get(s"/debug/stateChanges/address/$address/limit/$limit").as[Seq[DebugStateChanges]]
+    def debugStateChangesByAddress(address: String, limit: Int = 10000, after: Option[String] = None): Future[Seq[DebugStateChanges]] =
+      get(s"/debug/stateChanges/address/$address/limit/$limit${after.fold("")(a => s"?after=$a")}").as[Seq[DebugStateChanges]]
 
     def assetBalance(address: String, asset: String, amountsAsStrings: Boolean = false): Future[AssetBalance] =
       get(s"/assets/balance/$address/$asset", amountsAsStrings).as[AssetBalance](amountsAsStrings)

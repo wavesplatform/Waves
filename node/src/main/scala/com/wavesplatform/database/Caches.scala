@@ -170,7 +170,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       totalFee: Long,
       reward: Option[Long],
       hitSource: ByteStr,
-      scriptResults: Map[ByteStr, InvokeScriptResult]
+      scriptResults: Map[ByteStr, InvokeScriptResult],
+      failedTransactionIds: Set[ByteStr]
   ): Unit
 
   override def append(diff: Diff, carryFee: Long, totalFee: Long, reward: Option[Long], hitSource: ByteStr, block: Block): Unit = {
@@ -178,9 +179,11 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
 
     val newAddresses = Set.newBuilder[Address]
     newAddresses ++= diff.portfolios.keys.filter(addressIdCache.get(_).isEmpty)
-    for ((_, addresses) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
+    for ((_, addresses, _) <- diff.transactions.values; address <- addresses if addressIdCache.get(address).isEmpty) {
       newAddresses += address
     }
+
+    val failedTransactionIds: Set[ByteStr] = diff.transactions.collect { case (id, (_, _, false)) => id }.toSet
 
     val newAddressIds = (for {
       (address, offset) <- newAddresses.result().zipWithIndex
@@ -199,14 +202,14 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
     val transactionList = diff.transactions.toList
 
     transactionList.foreach {
-      case (_, (tx, _)) =>
+      case (_, (tx, _, _)) =>
         transactionIds.put(tx.id(), newHeight)
     }
 
     val addressTransactions: Map[AddressId, Seq[TransactionId]] =
       transactionList
         .flatMap {
-          case (_, (tx, addrs)) =>
+          case (_, (tx, addrs, _)) =>
             transactionIds.put(tx.id(), newHeight) // be careful here!
 
             addrs.map { addr =>
@@ -239,7 +242,8 @@ abstract class Caches(spendableBalanceChanged: Observer[(Address, Asset)]) exten
       totalFee,
       reward,
       hitSource,
-      diff.scriptResults
+      diff.scriptResults,
+      failedTransactionIds
     )
 
     val emptyData = Map.empty[(Address, String), Option[DataEntry[_]]]

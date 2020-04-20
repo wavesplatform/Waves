@@ -52,6 +52,11 @@ object CompiledScript {
   implicit val compiledScriptFormat: Format[CompiledScript] = Json.format
 }
 
+case class EstimatedScript(script: String, scriptText: String, complexity: Long, extraFee: Long)
+object EstimatedScript {
+  implicit val estimatedScriptFormat: Format[EstimatedScript] = Json.format
+}
+
 case class DecompiledScript(script: String)
 object DecompiledScript {
   implicit val decompiledScriptFormat: Format[DecompiledScript] = Json.format
@@ -286,7 +291,8 @@ case class TransactionStatus(
     id: String,
     status: String,
     confirmations: Option[Int],
-    height: Option[Int]
+    height: Option[Int],
+    applicationStatus: Option[String]
 )
 object TransactionStatus {
   implicit val format: Format[TransactionStatus] = Json.format
@@ -322,7 +328,8 @@ case class StateChangesDetails(
     transfers: Seq[TransfersInfoResponse],
     issues: Seq[IssueInfoResponse],
     reissues: Seq[ReissueInfoResponse],
-    burns: Seq[BurnInfoResponse]
+    burns: Seq[BurnInfoResponse],
+    errorMessage: Option[ErrorMessageInfoResponse]
 )
 object StateChangesDetails {
   implicit val stateChangeResponseFormat: Format[StateChangesDetails] = Json.format[StateChangesDetails]
@@ -601,6 +608,11 @@ object ReissueInfoResponse {
 case class BurnInfoResponse(assetId: String, quantity: Long)
 object BurnInfoResponse {
   implicit val burnInfoFormat: Format[BurnInfoResponse] = Json.format
+}
+
+case class ErrorMessageInfoResponse(code: Int, text: String)
+object ErrorMessageInfoResponse {
+  implicit val errorMessageInfoFormat: Format[ErrorMessageInfoResponse] = Json.format
 }
 
 case class ExchangeTransaction(
