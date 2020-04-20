@@ -86,7 +86,10 @@ case class InvokeScriptTrace(
             case item: DataItem[_]       => dataItemJson(item)     + ("type" -> JsString("dataItem"))
           }
         )
-      case IncompleteResult(expr, unusedComplexity) => ??? // TODO
+      case IncompleteResult(expr, unusedComplexity) =>
+        Json.obj(
+          "incompleteResult" -> unusedComplexity
+        )
     }
 
   private def transferJson(transfer: AssetTransfer) =

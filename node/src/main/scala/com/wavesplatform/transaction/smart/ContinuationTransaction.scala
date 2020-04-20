@@ -1,5 +1,6 @@
 package com.wavesplatform.transaction.smart
 
+import cats.implicits._
 import com.wavesplatform.account.PublicKey
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -17,10 +18,10 @@ case class ContinuationTransaction(
     with FastHashId
     with TxWithFee.InCustomAsset {
 
-  override val builder: TransactionParser          = ContinuationTransaction
-  override val bytes: Coeval[Array[TxVersion]]     = ???
-  override val json: Coeval[JsObject]              = ???
-  override val bodyBytes: Coeval[Array[TxVersion]] = ???
+  override val builder: TransactionParser     = ContinuationTransaction
+  override val bytes: Coeval[Array[Byte]]     = Coeval.delay(Array())
+  override val json: Coeval[JsObject]         = Coeval.delay(JsObject(Seq()))
+  override val bodyBytes: Coeval[Array[Byte]] = Coeval.delay(Array())
 
   override def timestamp: TxTimestamp = ???
 
@@ -32,7 +33,7 @@ case class ContinuationTransaction(
 
   override def proofs: Proofs = ???
 
-  override val sender: PublicKey = ???
+  override val sender: PublicKey = null
 }
 
 object ContinuationTransaction extends TransactionParser {
@@ -44,5 +45,5 @@ object ContinuationTransaction extends TransactionParser {
 
   override def parseBytes(bytes: Array[Byte]): Try[ContinuationTransaction] = ???
 
-  override implicit def validator: TxValidator[ContinuationTransaction] = ???
+  override implicit def validator: TxValidator[ContinuationTransaction] = _.validNel
 }

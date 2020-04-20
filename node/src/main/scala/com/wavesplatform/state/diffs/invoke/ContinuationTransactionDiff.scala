@@ -2,6 +2,7 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
@@ -66,11 +67,15 @@ object ContinuationTransactionDiff {
       )
 
       resultDiff <- scriptResult match {
-        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).resultE
-        case ScriptResultV4(actions)              => doProcessActions(actions).resultE
+        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).resultE.map(removeCurrentState(_, invokeScriptTransaction.id.value()))
+        case ScriptResultV4(actions)              => doProcessActions(actions).resultE.map(removeCurrentState(_, invokeScriptTransaction.id.value()))
         case ir: IncompleteResult                 => Right(Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ir.expr)))
       }
 
     } yield resultDiff
+  }
+
+  private def removeCurrentState(diff: Diff, id: ByteStr) = {
+    diff.copy(continuationStates = diff.continuationStates - id)
   }
 }

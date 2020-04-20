@@ -142,7 +142,8 @@ object InvokeDiffsCommon {
             burnList.map(b => IssuedAsset(b.assetId))
         val totalScriptsInvoked = smartAssetInvocations.count(blockchain.hasAssetScript) + (if (blockchain.hasAccountScript(tx.sender)) 1 else 0)
         val minIssueFee         = issueList.count(i => !blockchain.isNFT(i)) * FeeConstants(IssueTransaction.typeId) * FeeUnit
-        val minWaves            = totalScriptsInvoked * ScriptExtraFee + FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber + minIssueFee
+        val dAppInvocationFee   = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+        val minWaves            = totalScriptsInvoked * ScriptExtraFee + dAppInvocationFee + minIssueFee
         val txName              = Constants.TransactionNames(InvokeScriptTransaction.typeId)
         val assetName           = tx.assetFee._1.fold("WAVES")(_.id.toString)
         Either.cond(
@@ -266,8 +267,8 @@ object InvokeDiffsCommon {
     } yield ()
 
   private def foldActions(sblockchain: Blockchain, blockTime: Long, tx: InvokeScriptTransaction, dAppAddress: Address, pk: PublicKey)(
-    ps: List[CallableAction],
-    paymentsDiff: Diff
+      ps: List[CallableAction],
+      paymentsDiff: Diff
   ): TracedResult[ValidationError, Diff] =
     ps.foldLeft(TracedResult(paymentsDiff.asRight[ValidationError])) { (diffAcc, action) =>
       diffAcc match {
@@ -330,8 +331,8 @@ object InvokeDiffsCommon {
 
           def applyIssue(itx: InvokeScriptTransaction, pk: PublicKey, issue: Issue): TracedResult[ValidationError, Diff] = {
             if (issue.name
-              .getBytes("UTF-8")
-              .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
+                  .getBytes("UTF-8")
+                  .length < IssueTransaction.MinAssetNameLength || issue.name.getBytes("UTF-8").length > IssueTransaction.MaxAssetNameLength) {
               TracedResult(Left(InvalidName), List())
             } else if (issue.description.length > IssueTransaction.MaxAssetDescriptionLength) {
               TracedResult(Left(TooBigArray), List())
@@ -371,10 +372,10 @@ object InvokeDiffsCommon {
           }
 
           def validateActionAsPseudoTx(
-                                        actionDiff: Either[ValidationError, Diff],
-                                        assetId: ByteStr,
-                                        pseudoTx: PseudoTx
-                                      ): TracedResult[ValidationError, Diff] =
+              actionDiff: Either[ValidationError, Diff],
+              assetId: ByteStr,
+              pseudoTx: PseudoTx
+          ): TracedResult[ValidationError, Diff] =
             blockchain.assetScript(IssuedAsset(assetId)) match {
               case None => actionDiff
               case Some((script, _)) =>
@@ -429,7 +430,9 @@ object InvokeDiffsCommon {
       }
     } match {
       case Failure(e) =>
-        Left(ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reason.AssetInAction))
+        Left(
+          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reason.AssetInAction)
+        )
       case Success(s) => s
     }
 

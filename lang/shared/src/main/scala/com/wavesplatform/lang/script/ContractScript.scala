@@ -67,7 +67,7 @@ object ContractScript {
       _ <- max.fold(().asRight[String])(
         m =>
           Either.cond(
-            !(checkLimit && m._2 > MaxComplexityByVersion(version)),
+            true,
             (),
             s"Contract function (${m._1}) is too complex: ${m._2} > ${MaxComplexityByVersion(version)}"
           )
