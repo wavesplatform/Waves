@@ -105,7 +105,7 @@ lazy val root = (project in file("."))
 
 inScope(Global)(
   Seq(
-    scalaVersion := "2.12.9",
+    scalaVersion := "2.13.1",
     organization := "com.wavesplatform",
     organizationName := "Waves Platform",
     V.fallback := (1, 2, 4),
@@ -121,7 +121,6 @@ inScope(Global)(
       "-language:postfixOps",
       "-Ywarn-unused:-implicits",
       "-Xlint",
-      "-Ypartial-unification",
       "-opt:l:inline",
       "-opt-inline-from:**"
     ),
