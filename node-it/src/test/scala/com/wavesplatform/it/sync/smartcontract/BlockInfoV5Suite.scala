@@ -14,7 +14,8 @@ class BlockInfoV5Suite extends BaseTransactionSuite {
   val activationHeight = 4
 
   override protected def nodeConfigs: Seq[Config] =
-    NodeConfigs.Builder(Default, 1, Seq.empty)
+    NodeConfigs
+      .Builder(Default, 1, Seq.empty)
       .overrideBase(_.quorum(0))
       .overrideBase(_.preactivatedFeatures((15, activationHeight)))
       .buildNonConflicting()
@@ -37,7 +38,7 @@ class BlockInfoV5Suite extends BaseTransactionSuite {
       |""".stripMargin
 
   private val caller = firstAddress
-  private val dApp = secondAddress
+  private val dApp   = secondAddress
   test("able to retrieve vrf from block V5") {
     val script = ScriptCompiler.compile(dAppScriptV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
     sender.setScript(dApp, Some(script), waitForTx = true)
@@ -46,14 +47,12 @@ class BlockInfoV5Suite extends BaseTransactionSuite {
   }
 
   test("not able to retrieve vrf from block V4") {
-    assertApiErrorRaised(
-      sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 1)))
-    )
+    val tx = sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 1)), waitForTx = true)._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage shouldBe 'defined
   }
 
   test("not able to retrieve vrf from block V3") {
-    assertApiErrorRaised(
-      sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 2)))
-    )
+    val tx = sender.invokeScript(caller, dApp, func = Some("blockInfo"), args = List(Terms.CONST_LONG(activationHeight - 2)), waitForTx = true)._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage shouldBe 'defined
   }
 }

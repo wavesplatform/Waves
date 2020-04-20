@@ -178,9 +178,9 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBoolAttBytes)).explicitGet()), waitForTx = true)
     sender.getDataByKey(dApp, "attachment").value shouldBe s"${transferTxWithBoolAttachment.attachment.get.asInstanceOf[Bool].value}"
 
-    assertApiError(
-      sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet())),
-      AssertiveApiError(ScriptExecutionError.Id, "Empty description", matchMessage = true)
-    )
+    val tx =
+      sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet()), waitForTx = true)
+          ._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Empty description")
   }
 }

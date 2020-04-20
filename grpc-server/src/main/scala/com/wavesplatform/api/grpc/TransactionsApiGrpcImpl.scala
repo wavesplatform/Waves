@@ -74,7 +74,7 @@ class TransactionsApiGrpcImpl(commonApi: CommonTransactionsApi)(implicit sc: Sch
       val result = Observable(request.transactionIds: _*)
         .flatMap(txId => Observable.fromIterable(commonApi.transactionById(txId.toByteStr)))
         .collect {
-          case (_, Right((tx, Some(isr))), true) =>
+          case (_, Right((tx, Some(isr))), _) =>
             InvokeScriptResultResponse.of(Some(PBTransactions.protobuf(tx)), Some(VISR.toPB(isr)))
         }
 

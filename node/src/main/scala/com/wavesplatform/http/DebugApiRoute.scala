@@ -227,14 +227,13 @@ case class DebugApiRoute(
       val t0 = System.nanoTime
       val tracedDiff = for {
         tx <- TracedResult(TransactionFactory.fromSignedRequest(jsv))
-        _  <- Verifier(blockchain)(tx)
         ei <- TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime())(blockchain, tx)
       } yield ei
       val timeSpent = (System.nanoTime - t0) * 1e-6
       val response = Json.obj(
         "valid"          -> tracedDiff.resultE.isRight,
         "validationTime" -> timeSpent,
-        "trace"          -> tracedDiff.trace.map(_.loggedJson.toString)
+        "trace"          -> tracedDiff.trace.map(_.loggedJson)
       )
       tracedDiff.resultE.fold(
         err => response + ("error" -> JsString(ApiError.fromValidationError(err).message)),

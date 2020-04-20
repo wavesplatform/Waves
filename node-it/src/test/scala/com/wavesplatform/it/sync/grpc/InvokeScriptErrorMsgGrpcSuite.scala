@@ -1,6 +1,7 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
+import com.wavesplatform.api.grpc.TransactionsRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._
@@ -74,17 +75,21 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
       Code.INVALID_ARGUMENT
     )
 
-    assertGrpcError(
-      sender.broadcastInvokeScript(
-        caller,
-        Recipient().withPublicKeyHash(contractAddress),
-        None,
-        payments = payments,
-        fee = 1300000
-      ),
-      "Fee in WAVES for InvokeScriptTransaction .* with 12 total scripts invoked does not exceed minimal value",
-      Code.INVALID_ARGUMENT
+    val tx = sender.broadcastInvokeScript(
+      caller,
+      Recipient().withPublicKeyHash(contractAddress),
+      None,
+      payments = payments,
+      fee = 1300000,
+      waitForTx = true
     )
+
+    sender
+      .stateChanges(tx.id)
+      ._2
+      .errorMessage
+      .get
+      .text should include regex "Fee in WAVES for InvokeScriptTransaction .* with 12 total scripts invoked does not exceed minimal value"
   }
 
 }

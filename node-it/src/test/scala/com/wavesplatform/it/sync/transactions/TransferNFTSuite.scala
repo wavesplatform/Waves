@@ -86,11 +86,9 @@ class TransferNFTSuite extends BaseTransactionSuite with NTPTime {
     }
     val nftPayment = Seq(InvokeScriptTransaction.Payment(1, Asset.fromString(Some(nftAsset))))
 
-    assertApiError(invokeTransfer(caller, "nftTransferToDapp", payment = nftPayment)) { error =>
-      error.message should include("DApp self-transfer is forbidden")
-      error.id shouldBe StateCheckFailed.Id
-      error.statusCode shouldBe 400
-    }
+    val tx = invokeTransfer(caller, "nftTransferToDapp", payment = nftPayment)
+    sender.debugStateChanges(tx.id).stateChanges.get.errorMessage.get.text should include("DApp self-transfer is forbidden")
+
     sender.transfer(caller, dApp, 1, assetId = Some(nftAsset), waitForTx = true)
 
     invokeTransfer(caller, "transferFromDappToAddress", args = List(Terms.CONST_STRING(receiver).explicitGet()))

@@ -6,8 +6,11 @@ import com.wavesplatform.account.KeyPair
 import com.wavesplatform.api.grpc.{ApplicationStatus, TransactionsByIdRequest, TransactionStatus => PBTransactionStatus}
 import com.wavesplatform.api.http.ApiError.TransactionDoesNotExist
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.it.Node
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.NodeConfigs.Default
+import com.wavesplatform.it.{Node, NodeConfigs}
 import com.wavesplatform.it.api.TransactionStatus
+import com.wavesplatform.it.sync.activation.AcceptFailedScriptActivationSuite.{ActivationHeight, MaxTxsInMicroBlock, UpdateInterval}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.protobuf.transaction.{PBSignedTransaction, PBTransactions}
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, ExchangeTransaction, Order}
@@ -303,4 +306,12 @@ object FailedTransactionSuiteLike {
   val configForMinMicroblockAge: Config = ConfigFactory.parseString(s"""
      |waves.miner.min-micro-block-age = 7
      |""".stripMargin)
+
+  val Configs: Seq[Config] =
+    NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .overrideBase(_.raw(s"waves.miner.max-transactions-in-micro-block = 50"))
+      .withDefault(1)
+      .withSpecial(_.nonMiner)
+      .buildNonConflicting()
 }

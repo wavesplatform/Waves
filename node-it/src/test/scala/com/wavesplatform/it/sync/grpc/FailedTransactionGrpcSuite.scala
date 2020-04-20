@@ -2,6 +2,7 @@ package com.wavesplatform.it.sync.grpc
 
 import com.google.common.primitives.Longs
 import com.google.protobuf.ByteString
+import com.typesafe.config.Config
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.api.grpc.TransactionsRequest
 import com.wavesplatform.common.state.ByteStr
@@ -30,8 +31,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   private val contractAddr = PBRecipients.create(Address.fromPublicKey(contract.publicKey)).getPublicKeyHash
   private val caller       = thirdAcc
   private val callerAddr   = PBRecipients.create(Address.fromPublicKey(thirdAcc.publicKey)).getPublicKeyHash
-
-  private val maxTxsInMicroBlock = sender.config.getInt("waves.miner.max-transactions-in-micro-block")
 
   private val assetAmount    = 1000000000L
   private var smartAsset     = ""
@@ -231,7 +230,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val invokeFeeInAsset     = invokeFee / 100000 // assetFee = feeInWaves / feeUnit * sponsorship
     val setAssetScriptMinFee = setAssetScriptFee + smartFee * 2
     val priorityFee          = setAssetScriptMinFee + invokeFee
-    val totalWavesSpend      = invokeFee * maxTxsInMicroBlock * 2
 
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
     updateTikTok("reissue", setAssetScriptMinFee)
@@ -263,7 +261,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         ),
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, _) =>
-      sender.wavesBalance(contractAddr).regular shouldBe prevBalance - totalWavesSpend - priorityFee
+      sender.wavesBalance(contractAddr).regular shouldBe prevBalance - invokeFee * txs.size - priorityFee
       assertFailedTxs(txs)
     }
   }
@@ -524,4 +522,6 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
   }
 
   override protected def waitForHeightArise(): Unit = sender.waitForHeightArise()
+
+  override protected def nodeConfigs: Seq[Config] = Configs
 }

@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -20,10 +19,10 @@ import org.scalatest.CancelAfterFailure
 
 class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfterFailure {
 
-  private val firstContract = firstAddress
+  private val firstContract  = firstAddress
   private val secondContract = secondAddress
-  private val thirdContract = sender.createAddress()
-  private val caller   = thirdAddress
+  private val thirdContract  = sender.createAddress()
+  private val caller         = thirdAddress
 
   protected override def beforeAll(): Unit = {
     super.beforeAll()
@@ -68,14 +67,14 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
         | func biz() = [IntegerEntry("numb", 1)]
         |
         """.stripMargin
-    val script = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
+    val script  = ScriptCompiler.compile(scriptText, ScriptEstimatorV2).explicitGet()._1.bytes().base64
     val script2 = ScriptCompiler.compile(scriptTextV4, ScriptEstimatorV3).explicitGet()._1.bytes().base64
     sender.transfer(firstAddress, thirdContract, 10.waves, minFee, waitForTx = true)
-    val setScriptId = sender.setScript(firstContract, Some(script), setScriptFee, waitForTx = true).id
+    val setScriptId  = sender.setScript(firstContract, Some(script), setScriptFee, waitForTx = true).id
     val setScriptId2 = sender.setScript(secondContract, Some(script), setScriptFee, waitForTx = true).id
     sender.setScript(thirdContract, Some(script2), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(firstContract)
+    val acc0ScriptInfo  = sender.addressScriptInfo(firstContract)
     val acc0ScriptInfo2 = sender.addressScriptInfo(secondContract)
 
     acc0ScriptInfo.script.isEmpty shouldBe false
@@ -90,7 +89,7 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("contract caller invokes a function on a contract") {
-    val arg               = ByteStr(Array(42: Byte))
+    val arg = ByteStr(Array(42: Byte))
     for (v <- invokeScrTxSupportedVersions) {
       val contract = if (v < 2) firstContract else secondContract
       val invokeScriptTx = sender.invokeScript(
@@ -140,30 +139,38 @@ class InvokeScriptTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("not able to set an empty key by InvokeScriptTransaction with version >= 2") {
-    assertApiError(
-      sender.invokeScript(
+    val tx1 = sender
+      .invokeScript(
         caller,
         secondContract,
         func = Some("emptyKey"),
         payment = Seq(),
         fee = 1.waves,
-        version = TxVersion.V2
-      ), AssertiveApiError(StateCheckFailed.Id, "State check failed. Reason: Empty keys aren't allowed in tx version >= 2")
-    )
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+      ._1
+      .id
+
+    sender.debugStateChanges(tx1).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
     sender.getData(secondContract).filter(_.key.isEmpty) shouldBe List.empty
 
-    assertApiError(
-      sender.invokeScript(
+    val tx2 = sender
+      .invokeScript(
         caller,
         thirdContract,
         func = Some("bar"),
         payment = Seq(),
         fee = 1.waves,
-        version = TxVersion.V2
-      ), AssertiveApiError(StateCheckFailed.Id, "State check failed. Reason: Empty keys aren't allowed in tx version >= 2")
-    )
+        version = TxVersion.V2,
+        waitForTx = true
+      )
+      ._1
+      .id
+
+    sender.debugStateChanges(tx2).stateChanges.get.errorMessage.get.text should include("Empty keys aren't allowed in tx version >= 2")
 
     nodes.waitForHeightArise()
     sender.getData(thirdContract).filter(_.key.isEmpty) shouldBe List.empty
