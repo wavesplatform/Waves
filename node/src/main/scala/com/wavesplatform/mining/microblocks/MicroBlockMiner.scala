@@ -12,24 +12,25 @@ import io.netty.channel.group.ChannelGroup
 import monix.eval.Task
 import monix.execution.schedulers.SchedulerService
 
-import scala.concurrent.duration._
-
 trait MicroBlockMiner {
-  def generateMicroBlockSequence(account: KeyPair,
-                                 accumulatedBlock: Block,
-                                 delay: FiniteDuration,
-                                 constraints: MiningConstraints,
-                                 restTotalConstraint: MiningConstraint): Task[Unit]
+  def generateMicroBlockSequence(
+      account: KeyPair,
+      accumulatedBlock: Block,
+      constraints: MiningConstraints,
+      restTotalConstraint: MiningConstraint
+  ): Task[Unit]
 }
 
 object MicroBlockMiner {
-  def apply(debugState: Ref[Task, MinerDebugInfo.State],
-            allChannels: ChannelGroup,
-            blockchainUpdater: BlockchainUpdater with Blockchain,
-            utx: UtxPool,
-            settings: MinerSettings,
-            minerScheduler: SchedulerService,
-            appenderScheduler: SchedulerService): MicroBlockMiner =
+  def apply(
+      debugState: Ref[Task, MinerDebugInfo.State],
+      allChannels: ChannelGroup,
+      blockchainUpdater: BlockchainUpdater with Blockchain,
+      utx: UtxPool,
+      settings: MinerSettings,
+      minerScheduler: SchedulerService,
+      appenderScheduler: SchedulerService
+  ): MicroBlockMiner =
     new MicroBlockMinerImpl(
       debugState,
       allChannels,
@@ -37,6 +38,6 @@ object MicroBlockMiner {
       utx,
       settings,
       minerScheduler,
-      appenderScheduler,
+      appenderScheduler
     )
 }

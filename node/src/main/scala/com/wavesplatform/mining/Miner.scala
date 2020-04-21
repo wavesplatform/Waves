@@ -160,7 +160,7 @@ class MinerImpl(
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
       (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime)
+        utx.packUnconfirmed(mdConstraint, settings.minerSettings.maxPackTime, Duration.Zero)
       )
       unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
@@ -303,7 +303,7 @@ class MinerImpl(
     log.info(s"Start mining microblocks")
     Miner.microMiningStarted.increment()
     microBlockAttempt := microBlockMiner
-      .generateMicroBlockSequence(account, lastBlock, Duration.Zero, constraints, restTotalConstraint)
+      .generateMicroBlockSequence(account, lastBlock, constraints, restTotalConstraint)
       .runAsyncLogErr
     log.trace(s"MicroBlock mining scheduled for acc=${account.toAddress}")
   }

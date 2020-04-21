@@ -128,7 +128,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller).balance
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contract, Some("canThrow"), fee = invokeFee)._1.id,
       () => sender.putData(contract, priorityData, priorityFee, waitForTx = true).id
     ) { (txs, priorityTx) =>
@@ -159,7 +159,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       val prevAssetBalance = sender.assetBalance(contract, smartAsset)
       val prevAssets       = sender.assetsBalance(contract)
 
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
         () => updateTikTok(typeName, priorityFee)
       ) { (txs, priorityTx) =>
@@ -197,7 +197,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val prevAssetBalance = sender.assetBalance(contract, smartAsset)
     val prevAssets       = sender.assetsBalance(contract).balances.map(_.assetId)
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
@@ -241,7 +241,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val prevPaymentAssetBalance = sender.assetBalance(caller, paymentAsset)
     val prevAssets              = sender.assetsBalance(contract).balances.map(_.assetId)
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ =>
         sender
           .invokeScript(
@@ -294,7 +294,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(contract).balance
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFeeInAsset, feeAssetId = Some(sponsoredAsset))._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
@@ -322,7 +322,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     sender.broadcastData(pkByAddress(contract), initialEntries, minFee + smartFee, waitForTx = true)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       i => sender.invokeScript(caller, contract, Some("transferAndWrite"), args = List(Terms.CONST_LONG(i)), fee = invokeFee)._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
@@ -368,7 +368,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller).balance
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
       () =>
         sender
@@ -415,7 +415,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     updateTikTok("reissue", setAssetScriptMinFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
-    val failedTxs = sendTxsAndThenPriorityTx(
+    val failedTxs = sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
       () => updateAssetScript(result = false, smartAsset, contract, priorityFee)
     ) { (txs, priorityTx) =>
@@ -452,7 +452,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.signedBroadcast(tx.json()).id
       }
 
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         txsSend,
         () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee)
       ) { (txs, priorityTx) =>
@@ -481,7 +481,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.signedBroadcast(tx.json()).id
       }
 
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         txsSend,
         () => updateAccountScript(Some(false), invalidAccount, priorityFee)
       ) { (txs, priorityTx) =>
@@ -509,7 +509,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
       sender.signedBroadcast(tx.json()).id
     }
 
-    val failedTxs = sendTxsAndThenPriorityTx(
+    val failedTxs = sendPriorityTxAndThenOtherTxs(
       txsSend,
       () => updateAssetScript(result = false, amountAsset, sellerAddress, priorityFee)
     ) { (txs, priorityTx) =>

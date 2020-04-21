@@ -127,7 +127,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     val putDataFee   = calcDataFee(priorityData)
     val priorityFee  = putDataFee + invokeFee
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ =>
         sender
           .broadcastInvokeScript(
@@ -150,7 +150,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     for (typeName <- Seq("transfer", "issue", "reissue", "burn")) {
       updateTikTok("unknown", setAssetScriptMinFee)
 
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         _ =>
           sender
             .broadcastInvokeScript(
@@ -173,7 +173,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
       updateTikTok(funcName, setAssetScriptMinFee)
       updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         _ =>
           sender
             .broadcastInvokeScript(
@@ -211,7 +211,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
     updateTikTok("unknown", setAssetScriptMinFee)
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ =>
         sender
           .broadcastInvokeScript(
@@ -250,7 +250,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     )
     val prevBalance = sender.wavesBalance(contractAddr).regular
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ =>
         sender.broadcastInvokeScript(
           caller,
@@ -280,7 +280,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     sender.putData(contract, initialEntries, minFee + smartFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       i =>
         sender.broadcastInvokeScript(
           caller,
@@ -334,7 +334,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
 
     val prevBalance = sender.wavesBalance(callerAddr).regular
 
-    sendTxsAndThenPriorityTx(
+    sendPriorityTxAndThenOtherTxs(
       _ =>
         sender.broadcastInvokeScript(
           caller,
@@ -436,7 +436,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         )
         sender.broadcast(tx.transaction.get, tx.proofs)
       }
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         txsSend,
         () => updateAssetScript(result = false, invalidScriptAsset, owner, priorityFee)
       )((txs, _) => assertFailedTxs(txs))
@@ -499,7 +499,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         sender.broadcast(tx.transaction.get, tx.proofs)
       }
 
-      sendTxsAndThenPriorityTx(
+      sendPriorityTxAndThenOtherTxs(
         txsSend,
         () => updateAccountScript(Some(false), invalidAccount, priorityFee)
       )((txs, _) => assertInvalidTxs(txs))
