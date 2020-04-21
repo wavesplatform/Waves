@@ -3,7 +3,6 @@ package com.wavesplatform.it.sync.transactions
 import com.typesafe.config.{Config, ConfigFactory}
 import com.wavesplatform.api.http.ApiError.{InvalidName, StateCheckFailed, TooBigArrayAllocation}
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.it.NodeConfigs
 import com.wavesplatform.it.NodeConfigs.{Miners, NotMiner}
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.api.{Transaction, TransactionInfo}

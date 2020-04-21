@@ -4,24 +4,23 @@ import java.security.{KeyPair, KeyPairGenerator, SecureRandom, Signature}
 
 import cats.Id
 import cats.syntax.monoid._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
-import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.common.state.ByteStr
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
+import com.wavesplatform.lang.Common.{NoShrink, produce}
 import com.wavesplatform.lang.Global
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.v1.CTX
-import com.wavesplatform.lang.Common.produce
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types._
 import com.wavesplatform.lang.v1.evaluator.Contextful.NoContext
-import com.wavesplatform.lang.v1.evaluator.{Contextful, ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV1._
-import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.BaseFunction
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.crypto.RSA._
+import com.wavesplatform.lang.v1.evaluator.ctx.impl.{CryptoContext, PureContext}
+import com.wavesplatform.lang.v1.evaluator.{ContextfulVal, EvaluatorV1}
 import com.wavesplatform.lang.v1.parser.Parser
-import com.wavesplatform.lang.Common.NoShrink
 import org.bouncycastle.jce.provider.BouncyCastleProvider
 import org.scalacheck.{Arbitrary, Gen}
 import org.scalatest._

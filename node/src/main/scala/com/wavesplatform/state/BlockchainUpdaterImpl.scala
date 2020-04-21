@@ -364,20 +364,26 @@ class BlockchainUpdaterImpl(
     log.info(s"Removing blocks after ${blockId.trim} from blockchain")
 
     val prevNgState = ngState
-    val result = if (prevNgState.exists(_.contains(blockId))) {
-      log.trace("Resetting liquid block, no rollback is necessary")
-      blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
-      Right(Seq.empty)
-    } else {
-      val discardedNgBlock = prevNgState.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
-      ngState = None
-      leveldb
-        .rollbackTo(blockId)
-        .map { bs =>
-          blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
-          bs ++ discardedNgBlock
-        }
-        .leftMap(err => GenericError(err))
+
+    val result = prevNgState match {
+      case Some(ng) if ng.contains(blockId) =>
+        log.trace("Resetting liquid block, no rollback necessary")
+        blockchainUpdateTriggers.onMicroBlockRollback(blockId, this.height)
+        Right(Seq.empty)
+      case Some(ng) if ng.base.id() == blockId =>
+        log.trace("Discarding liquid block, no rollback necessary")
+        blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
+        ngState = None
+        Right(Seq((ng.bestLiquidBlock, ng.hitSource)))
+      case maybeNg =>
+        leveldb
+          .rollbackTo(blockId)
+          .map { bs =>
+            ngState = None
+            blockchainUpdateTriggers.onRollback(blockId, leveldb.height)
+            bs ++ maybeNg.map(ng => (ng.bestLiquidBlock, ng.hitSource)).toSeq
+          }
+          .leftMap(err => GenericError(err))
     }
 
     notifyChangedSpendable(prevNgState, ngState)

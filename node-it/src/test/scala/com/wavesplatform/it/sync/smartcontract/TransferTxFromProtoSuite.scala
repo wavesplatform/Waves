@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
