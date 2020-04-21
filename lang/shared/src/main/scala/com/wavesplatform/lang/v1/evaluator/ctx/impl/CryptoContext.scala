@@ -244,7 +244,7 @@ object CryptoContext {
               case CONST_BYTESTR(v) => v.size == 32
               case _ => false
             })) {
-            CONST_BYTESTR(createRoot(value, Math.toIntExact(index), proof.map({
+            CONST_BYTESTR(createRoot(value, Math.toIntExact(index), proof.reverse.map({
                case CONST_BYTESTR(v) => v.arr
                case _ => throw(new Exception("Expect ByteStr"))
             }))) .left.map(_.toString)

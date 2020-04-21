@@ -142,7 +142,7 @@ class MerkleTest extends PropSpec with PropertyChecks with Matchers {
     val levels = mkLevels(leafs)
 
     forAll(Gen.oneOf(leafs.zipWithIndex)) { case (leaf, index) =>
-      val proofs = mkProofs(index, levels)
+      val proofs = mkProofs(index, levels).reverse
 
       eval(scriptCreateRootSrc(proofs, hash(leaf), index), V4) shouldBe CONST_BYTESTR(levels.head.head)
     }
