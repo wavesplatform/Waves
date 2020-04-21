@@ -8,6 +8,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.lang.utils.Serialize._
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import monix.eval.Coeval
 
 import scala.util.Try
@@ -28,7 +29,8 @@ object Serde {
   val FH_USER: Byte   = 1
 
   val E_BLOCK_V2 = 10
-  val E_ARR = 11
+  val E_ARR      = 11
+  val E_CASE_OBJ = 13
 
   val DEC_LET  = 0
   val DEC_FUNC = 1
@@ -64,7 +66,7 @@ object Serde {
           name <- Coeval.now(bb.getString)
           args <- ({
             val argsCnt = bb.getInt
-            if (argsCnt <= (bb.limit() - bb.position())/2 && argsCnt >= 0) {
+            if (argsCnt <= (bb.limit() - bb.position()) / 2 && argsCnt >= 0) {
               Coeval.now(for (_ <- 1 to argsCnt) yield bb.getString)
             } else {
               Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments names too big."))
@@ -86,11 +88,10 @@ object Serde {
           name     <- Coeval.now(bb.getString)
           letValue <- desAux(bb)
           body     <- desAux(bb)
-        } yield
-          LET_BLOCK(
-            let = LET(name, letValue),
-            body = body
-          )
+        } yield LET_BLOCK(
+          let = LET(name, letValue),
+          body = body
+        )
       case E_BLOCK_V2 =>
         for {
           decType <- Coeval.now(bb.get())
@@ -114,24 +115,37 @@ object Serde {
               }
           }
       case E_ARR =>
-        def evaluatedOnly(arg: Coeval[EXPR]): Coeval[EVALUATED] =
-          arg.flatMap {
-            case value: EVALUATED => Coeval.now(value)
-            case other            => Coeval.raiseError(new Exception(s"Unsupported array element: $other"))
-          }
-
-        Coeval.now(bb.getInt)
-          .flatMap(argsCount =>
-            if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
-              (1 to argsCount)
-                .toStream
-                .traverse(_ => evaluatedOnly(desAux(bb)))
-                .map(elements => ARR(elements.toIndexedSeq, false).explicitGet)
-            else
-              tooBigArray(bb)
+        Coeval
+          .now(bb.getInt)
+          .flatMap(
+            argsCount =>
+              if (argsCount <= (bb.limit() - bb.position()) && argsCount >= 0)
+                (1 to argsCount).toStream
+                  .traverse(_ => evaluatedOnly(desAux(bb)))
+                  .map(elements => ARR(elements.toIndexedSeq, limited = false).explicitGet())
+              else
+                tooBigArray(bb)
           )
+      case E_CASE_OBJ =>
+        for {
+          (typeName, fieldsNumber) <- Coeval((bb.getString, bb.getInt))
+          fields <- (1 to fieldsNumber).toStream
+            .traverse(
+              _ =>
+                for {
+                  fieldName  <- Coeval.now(bb.getString)
+                  fieldValue <- evaluatedOnly(desAux(bb))
+                } yield (fieldName, fieldValue)
+            )
+        } yield CaseObj(CASETYPEREF(typeName, Nil), fields.toMap)
     }
   }
+
+  private def evaluatedOnly(arg: Coeval[EXPR]): Coeval[EVALUATED] =
+    arg.flatMap {
+      case value: EVALUATED => Coeval.now(value)
+      case other            => Coeval.raiseError(new Exception(s"Unsupported array element: $other"))
+    }
 
   private def tooBigArray(bb: ByteBuffer) = {
     Coeval.raiseError(new Exception(s"At position ${bb.position()} array of arguments too big."))
@@ -209,11 +223,25 @@ object Serde {
         args.foldLeft(n)((acc, arg) => serAux(out, acc, arg))
 
       case ARR(elements) =>
-        val meta = Coeval.now[Unit] {
+        val dataInfo = Coeval.now[Unit] {
           out.write(E_ARR)
           out.writeInt(elements.size)
         }
-        elements.foldLeft(meta)((acc, element) => serAux(out, acc, element))
+        elements.foldLeft(dataInfo)((acc, element) => serAux(out, acc, element))
+
+      case CaseObj(caseType, fields) =>
+        val dataInfo = Coeval.now[Unit] {
+          out.write(E_CASE_OBJ)
+          out.writeString(caseType.name)
+          out.writeInt(fields.size)
+        }
+        fields.foldLeft(dataInfo) {
+          case (acc, (fieldName, fieldValue)) =>
+            for {
+              _ <- Coeval.now(out.writeString(fieldName))
+              r <- serAux(out, acc, fieldValue)
+            } yield r
+        }
 
       case x =>
         Coeval.raiseError(new Exception(s"Serialization of value $x is unsupported")) //TODO: FIx exhaustivness

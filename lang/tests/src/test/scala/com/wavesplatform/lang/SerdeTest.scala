@@ -7,6 +7,7 @@ import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.script.Script
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Expressions
 import com.wavesplatform.lang.v1.testing.ScriptGen
@@ -18,9 +19,9 @@ import org.scalatestplus.scalacheck.{ScalaCheckPropertyChecks => PropertyChecks}
 class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGen with NoShrink {
 
   "roundtrip" - {
-    "CONST_LONG"    in roundTripTest(CONST_LONG(1))
+    "CONST_LONG" in roundTripTest(CONST_LONG(1))
     "CONST_BYTESTR" in roundTripTest(CONST_BYTESTR(ByteStr.fromBytes(1)).explicitGet())
-    "CONST_STRING"  in roundTripTest(CONST_STRING("foo").explicitGet())
+    "CONST_STRING" in roundTripTest(CONST_STRING("foo").explicitGet())
 
     "IF" in roundTripTest(IF(TRUE, CONST_LONG(0), CONST_LONG(1)))
 
@@ -70,6 +71,20 @@ class SerdeTest extends FreeSpec with PropertyChecks with Matchers with ScriptGe
         FUNCTION_CALL(
           function = FunctionHeader.User("foo"),
           args = List.empty
+        )
+      )
+    }
+
+    "CaseObj" - {
+      "simple" in roundTripTest(
+        CaseObj(
+          CASETYPEREF("Object type", Nil),
+          Map(
+            "field1" -> CONST_BYTESTR(ByteStr.fromBytes(1, 2, 3)).explicitGet(),
+            "field2" -> CONST_STRING("str").explicitGet(),
+            "field3" -> CONST_LONG(5),
+            "field4" -> CONST_BOOLEAN(true)
+          )
         )
       )
     }
