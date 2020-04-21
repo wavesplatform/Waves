@@ -20,6 +20,7 @@ import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: ContinuationTransaction): Either[ValidationError, Diff] = {
+    println(s"START CONTINUATION DIFF")
     val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
     val invokeScriptTransaction = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
@@ -66,16 +67,21 @@ object ContinuationTransactionDiff {
         blockTime
       )
 
+      continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> null))
+
       resultDiff <- scriptResult match {
-        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).resultE.map(removeCurrentState(_, invokeScriptTransaction.id.value()))
-        case ScriptResultV4(actions)              => doProcessActions(actions).resultE.map(removeCurrentState(_, invokeScriptTransaction.id.value()))
+        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).resultE.map(_ |+| continuationStopDiff)
+        case ScriptResultV4(actions)              => doProcessActions(actions).resultE.map(_ |+| continuationStopDiff)
         case ir: IncompleteResult                 => Right(Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ir.expr)))
       }
 
-    } yield resultDiff
+    } yield {
+      println(s"CONTINUATION RESULT DIFF $resultDiff")
+      resultDiff
+    }
   }
 
-  private def removeCurrentState(diff: Diff, id: ByteStr) = {
+/*  private def removeCurrentState(diff: Diff, id: ByteStr) = {
     diff.copy(continuationStates = diff.continuationStates - id)
-  }
+  }*/
 }

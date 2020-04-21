@@ -253,8 +253,9 @@ package object database extends ScorexLogging {
 
   def writeContinuationStates(states: Map[ByteStr, EXPR]): Array[Byte] = {
     val output = newDataOutput()
-    output.writeInt(states.size)
-    states.foreach {
+    val unfinished = states.filterNot(_._2 == null)
+    output.writeInt(unfinished.size)
+    unfinished.foreach {
       case (invokeTxId, expr) =>
         output.writeByte(invokeTxId.length)
         output.writeByteStr(invokeTxId)

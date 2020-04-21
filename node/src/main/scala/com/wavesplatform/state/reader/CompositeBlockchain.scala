@@ -169,8 +169,11 @@ final case class CompositeBlockchain(
 
   override def hitSource(height: Int): Option[ByteStr] = inner.hitSource(height)
 
-  override def continuationStates: Map[ByteStr, Terms.EXPR] =
+  override def continuationStates: Map[ByteStr, Terms.EXPR] = {
+    println("INNER.continuationStates " + inner.continuationStates)
+    println("DIFF.continuationStates " + diff.continuationStates)
     inner.continuationStates ++ diff.continuationStates
+  }
 }
 
 object CompositeBlockchain {

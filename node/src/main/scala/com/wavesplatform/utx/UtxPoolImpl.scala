@@ -6,12 +6,12 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.Monoid
 import cats.syntax.monoid._
-import com.wavesplatform.account.{Address, Alias}
+import com.wavesplatform.account.{Address, Alias, KeyPair}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
+import com.wavesplatform.crypto
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
-import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.metrics._
 import com.wavesplatform.mining.MultiDimensionalMiningConstraint
 import com.wavesplatform.settings.UtxSettings
@@ -349,10 +349,18 @@ class UtxPoolImpl(
         }
       }
 
-      val continuationTransactions: Map[ByteStr, (ContinuationTransaction, Set[Address], Boolean)] =
-        blockchain.continuationStates.map { case (invokeTxId, expr) => (invokeTxId, (ContinuationTransaction(expr, invokeTxId), Set[Address](), true)) }
+      val key = KeyPair(ByteStr.fromBytes(1, 2, 3, 4))
+      val continuationTransactions: Iterable[ContinuationTransaction] =
+        blockchain.continuationStates.filterNot(_._2 == null).map { case (invokeTxId, expr) =>
+          ContinuationTransaction(expr, invokeTxId, time.getTimestamp(), key.publicKey, Proofs(crypto.sign(key.privateKey, ByteStr.empty)))
+        }
 
-      pack(PackResult(None, Monoid[Diff].empty.copy(transactions = continuationTransactions), initialConstraint, 0, Set.empty, Set.empty))
+      if (continuationTransactions.isEmpty)
+        println("UTX: no continuations")
+      else
+        println("UTX: filled continuations " + continuationTransactions)
+
+      pack(PackResult(Some(continuationTransactions.toSeq), Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }
 
     log.trace(

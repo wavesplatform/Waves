@@ -145,7 +145,7 @@ object InvokeScriptTransactionDiff {
             case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
             case ScriptResultV4(actions)              => doProcessActions(actions)
             case ir: IncompleteResult =>
-              TracedResult.wrapValue[Diff, ValidationError](Diff.stateOps(continuationStates = Map(tx.id.value -> ir.expr)))
+              TracedResult.wrapValue[Diff, ValidationError](Diff(tx = tx, continuationStates = Map(tx.id.value -> ir.expr)))
           }
 
         } yield resultDiff

@@ -1,10 +1,12 @@
 package com.wavesplatform.protobuf.transaction
 
+import cats.implicits._
 import com.google.protobuf.ByteString
 import com.wavesplatform.account.{AddressOrAlias, PublicKey}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.script.ScriptReader
+import com.wavesplatform.lang.v1.Serde
 import com.wavesplatform.lang.v1.compiler.Terms.FUNCTION_CALL
 import com.wavesplatform.protobuf.Amount
 import com.wavesplatform.protobuf.transaction.Attachment.Attachment.{BinaryValue, BoolValue, IntValue, StringValue}
@@ -14,6 +16,7 @@ import com.wavesplatform.state.{BinaryDataEntry, BooleanDataEntry, EmptyDataEntr
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
 import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.assets.UpdateAssetInfoTransaction
+import com.wavesplatform.transaction.smart.ContinuationTransaction
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.transfer.MassTransferTransaction
 import com.wavesplatform.transaction.transfer.MassTransferTransaction.ParsedTransfer
@@ -274,6 +277,13 @@ object PBTransactions {
           proofs,
           chainId
         )
+
+      case Data.Continuation(ContinuationTransactionData(invokeTransactionId, expr)) =>
+        Serde
+          .deserialize(expr.toByteArray)
+          .bimap(
+            GenericError(_), { case (expr, _) => ContinuationTransaction(expr, invokeTransactionId, timestamp, sender, proofs) }
+          )
 
       case _ =>
         Left(TxValidationError.UnsupportedTransactionType)
@@ -569,6 +579,10 @@ object PBTransactions {
           .withDescription(description)
 
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
+
+      case tx @ vt.smart.ContinuationTransaction(expr, invokeScriptTransactionId, _, _, _) =>
+        val data = Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId, ByteString.copyFrom(Serde.serialize(expr))))
+        PBTransactions.create(tx.sender, tx.chainId, tx.fee, tx.feeAssetId, tx.timestamp, tx.version, tx.proofs, data)
 
       case _ =>
         throw new IllegalArgumentException(s"Unsupported transaction: $tx")
