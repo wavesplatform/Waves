@@ -34,7 +34,7 @@ object Verifier extends ScorexLogging {
   type ValidationResult[T] = Either[ValidationError, T]
 
   def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = tx match {
-    case _: GenesisTransaction => Right(tx)
+    case _: GenesisTransaction | _: ContinuationTransaction => Right(tx)
     case pt: ProvenTransaction =>
       (pt, blockchain.accountScript(pt.sender).map(_.script)) match {
         case (stx: SignedTransaction, None) =>

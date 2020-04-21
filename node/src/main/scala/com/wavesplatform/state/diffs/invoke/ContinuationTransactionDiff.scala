@@ -52,7 +52,7 @@ object ContinuationTransactionDiff {
 
       feeInfo <- InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction)
 
-      verifierComplexity = blockchain.accountScript(tx.sender).map(_.verifierComplexity).getOrElse(0L)
+      verifierComplexity = blockchain.accountScript(invokeScriptTransaction.sender).map(_.verifierComplexity).getOrElse(0L)
 
       doProcessActions = InvokeDiffsCommon.processActions(
         _,

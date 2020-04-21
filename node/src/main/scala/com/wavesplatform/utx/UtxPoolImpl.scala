@@ -6,10 +6,9 @@ import java.util.concurrent.ConcurrentHashMap
 
 import cats.Monoid
 import cats.syntax.monoid._
-import com.wavesplatform.account.{Address, Alias, KeyPair}
+import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.consensus.TransactionsOrdering
-import com.wavesplatform.crypto
 import com.wavesplatform.events.UtxEvent
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.metrics._
@@ -349,10 +348,9 @@ class UtxPoolImpl(
         }
       }
 
-      val key = KeyPair(ByteStr.fromBytes(1, 2, 3, 4))
       val continuationTransactions: Iterable[ContinuationTransaction] =
         blockchain.continuationStates.filterNot(_._2 == null).map { case (invokeTxId, expr) =>
-          ContinuationTransaction(expr, invokeTxId, time.getTimestamp(), key.publicKey, Proofs(crypto.sign(key.privateKey, ByteStr.empty)))
+          ContinuationTransaction(expr, invokeTxId, time.getTimestamp())
         }
 
       if (continuationTransactions.isEmpty)
