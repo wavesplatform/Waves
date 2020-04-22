@@ -493,6 +493,32 @@ object AsyncHttpApi extends Assertions {
       )
     }
 
+    def validateInvokeScript(
+        caller: String,
+        dappAddress: String,
+        func: Option[String],
+        args: List[Terms.EXPR] = List.empty,
+        payment: Seq[InvokeScriptTransaction.Payment] = Seq.empty,
+        fee: Long = 500000,
+        feeAssetId: Option[String] = None,
+        version: TxVersion = TxVersion.V1
+    ): Future[(JsValue, JsValue)] = {
+      signAndValidate(
+        Json.obj(
+          "type"    -> InvokeScriptTransaction.typeId,
+          "version" -> version,
+          "sender"  -> caller,
+          "dApp"    -> dappAddress,
+          "call" -> {
+            if (func.isDefined) InvokeScriptTransaction.serializer.functionCallToJson(FUNCTION_CALL(FunctionHeader.User(func.get), args)) else JsNull
+          },
+          "payment"    -> payment,
+          "fee"        -> fee,
+          "feeAssetId" -> { if (feeAssetId.isDefined) JsString(feeAssetId.get) else JsNull }
+        )
+      )
+    }
+
     def updateAssetInfo(
         sender: KeyPair,
         assetId: String,
@@ -730,10 +756,14 @@ object AsyncHttpApi extends Assertions {
     def signedTraceBroadcast(json: JsValue): Future[(Transaction, JsValue)] =
       post("/transactions/broadcast?trace=yes", stringify(json)).as[JsValue].map(r => (r.as[Transaction], r))
 
+    def signedValidate(json: JsValue): Future[JsValue] = post("/debug/validate", stringify(json)).as[JsValue]
+
     def signAndBroadcast(json: JsValue, amountsAsStrings: Boolean = false): Future[Transaction] =
       sign(json, amountsAsStrings).flatMap(signedBroadcast(_, amountsAsStrings))
 
     def signAndTraceBroadcast(json: JsValue): Future[(Transaction, JsValue)] = sign(json).flatMap(signedTraceBroadcast)
+
+    def signAndValidate(json: JsValue): Future[(JsValue, JsValue)] = sign(json).flatMap(signed => signedValidate(signed).map((signed, _)))
 
     def signedIssue(issue: IssueRequest): Future[Transaction] =
       signedBroadcast(issue.toTx.explicitGet().json())
@@ -978,8 +1008,8 @@ object AsyncHttpApi extends Assertions {
       for {
         plainBalance <- n.assetBalance(acc, assetIdString)
         pf           <- n.assetsBalance(acc)
-        asset <- n.assetsDetails(assetIdString)
-        nftList <- n.nftList(acc, 100)
+        asset        <- n.assetsDetails(assetIdString)
+        nftList      <- n.nftList(acc, 100)
       } yield {
         plainBalance.balance shouldBe balance
         if (asset.isNFT) {

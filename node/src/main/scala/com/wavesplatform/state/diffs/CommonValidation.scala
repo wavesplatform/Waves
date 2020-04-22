@@ -1,7 +1,6 @@
 package com.wavesplatform.state.diffs
 
 import cats._
-import cats.implicits._
 import com.wavesplatform.account.{Address, AddressScheme}
 import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.features.OverdraftValidationProvider._
@@ -23,7 +22,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction.Payment
 import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTransaction}
 import com.wavesplatform.transaction.transfer._
 
-import scala.util.{Left, Right, Try}
+import scala.util.{Left, Right}
 
 object CommonValidation {
 
@@ -260,12 +259,4 @@ object CommonValidation {
         )
       case _ => Right(tx)
     }
-
-  def validateOverflow(dataList: Traversable[Long], errMsg: String): Either[ValidationError, Unit] = {
-    Try(dataList.foldLeft(0L)(Math.addExact))
-      .fold(
-        _ => GenericError(errMsg).asLeft[Unit],
-        _ => ().asRight[ValidationError]
-      )
-  }
 }

@@ -2,10 +2,9 @@ package com.wavesplatform.lang.v1
 
 import java.util.concurrent.TimeUnit
 
-import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
-import com.wavesplatform.lang.v1.DataFuncs._
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils._
+import com.wavesplatform.lang.v1.DataFuncs._
+import com.wavesplatform.lang.v1.EnvironmentFunctionsBenchmark.randomBytes
 import org.openjdk.jmh.annotations._
 import org.openjdk.jmh.infra.Blackhole
 
