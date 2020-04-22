@@ -12,9 +12,7 @@ import com.wavesplatform.features.EstimatorProvider._
 import com.wavesplatform.http.BroadcastRoute
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.meta.Dic
-import com.wavesplatform.lang.script.ContractScript
 import com.wavesplatform.lang.script.ContractScript.ContractScriptImpl
-import com.wavesplatform.lang.script.v1.ExprScript
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.network.UtxPoolSynchronizer
 import com.wavesplatform.protobuf.api
