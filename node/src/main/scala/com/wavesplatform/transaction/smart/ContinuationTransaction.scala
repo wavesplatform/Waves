@@ -6,6 +6,7 @@ import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
 import com.wavesplatform.transaction.Asset.Waves
 import com.wavesplatform.transaction._
+import com.wavesplatform.transaction.serialization.impl.ContinuationTxSerializer
 import com.wavesplatform.transaction.validation.TxValidator
 import monix.eval.Coeval
 import play.api.libs.json.JsObject
@@ -19,10 +20,10 @@ case class ContinuationTransaction(
 ) extends Transaction
     with VersionedTransaction {
 
-  override val builder: TransactionParser     = ContinuationTransaction
-  override val bytes: Coeval[Array[Byte]]     = Coeval(Array())
-  override val json: Coeval[JsObject]         = Coeval(JsObject(Seq()))
-  override val bodyBytes: Coeval[Array[Byte]] = Coeval(Array())
+  override val builder                        = ContinuationTransaction
+  override val json: Coeval[JsObject]         = Coeval(builder.serializer.toJson(this))
+  override val bodyBytes: Coeval[Array[Byte]] = json.map(_.toString.getBytes())
+  override val bytes: Coeval[Array[Byte]]     = bodyBytes
 
   override def chainId: Byte =
     AddressScheme.current.chainId
@@ -38,11 +39,13 @@ case class ContinuationTransaction(
 }
 
 object ContinuationTransaction extends TransactionParser {
+  val serializer = ContinuationTxSerializer
+
   override type TransactionT = ContinuationTransaction
 
   override def typeId: TxType = 18: Byte
 
-  override def supportedVersions: Set[TxVersion] = Set(1)
+  override def supportedVersions: Set[TxVersion] = Set(TxVersion.V1)
 
   override def parseBytes(bytes: Array[Byte]): Try[ContinuationTransaction] = ???
 
