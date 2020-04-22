@@ -67,11 +67,12 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       version = TxVersion.V2,
       waitForTx = true
     )
-
     nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
-    sender.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", false)
-    sender.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
+    nodes.foreach { node =>
+      node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", false)
+      node.getDataByKey(dApp, "sender") shouldBe BinaryDataEntry("sender", Base58.decode(caller))
+    }
   }
 
   test("insufficient fee") {
