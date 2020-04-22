@@ -1,6 +1,7 @@
 package com.wavesplatform.transaction.smart
 
 import cats.implicits._
+import com.google.common.primitives.Longs
 import com.wavesplatform.account.AddressScheme
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.v1.compiler.Terms.EXPR
@@ -32,7 +33,7 @@ case class ContinuationTransaction(
     TxVersion.V1
 
   override val id: Coeval[ByteStr] =
-    Coeval.now(FastHashId.create(invokeScriptTransactionId.arr))
+    Coeval.now(FastHashId.create(invokeScriptTransactionId.arr ++ Longs.toByteArray(timestamp)))
 
   override def assetFee: (Asset, Long) =
     (Waves, 0)
