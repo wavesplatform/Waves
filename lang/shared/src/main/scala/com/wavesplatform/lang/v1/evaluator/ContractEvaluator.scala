@@ -102,7 +102,7 @@ object ContractEvaluator {
       transactionId: ByteStr
   ): Either[ExecutionError, ScriptResult] = {
     val evaluator = new EvaluatorV2(ctx, version)
-    Try(evaluator(expr, ContractLimits.MaxComplexityByVersion(version))).toEither
+    Try(evaluator(expr.deepCopy, ContractLimits.MaxComplexityByVersion(version))).toEither
       .leftMap(_.getMessage)
       .flatMap {
         case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
