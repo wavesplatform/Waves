@@ -110,29 +110,85 @@ object AssetInfo {
   implicit val AssetInfoFormat: Format[AssetInfo] = Json.format
 }
 
-case class Transaction(_type: Int,
-                       id: String,
-                       chainId: Option[Byte],
-                       fee: Long,
-                       timestamp: Long,
-                       sender: Option[String],
-                       version: Option[Byte],
-                       name: Option[String],
-                       amount: Option[Long],
-                       description: Option[String],
-                       typedAttachment: Option[Attachment],
-                       attachment: Option[String],
-                       price: Option[Long],
-                       sellMatcherFee: Option[Long],
-                       buyMatcherFee: Option[Long],
-                       sellOrderMatcherFee: Option[Long],
-                       buyOrderMatcherFee: Option[Long],
-                       data: Option[Seq[DataEntry[_]]],
-                       minSponsoredAssetFee: Option[Long],
-                       transfers: Option[Seq[Transfer]],
-                       totalAmount: Option[Long]
-                      )
+class Transaction(val _type: Int,
+                  val  id: String,
+                  val  chainId: Option[Byte],
+                  val  fee: Long,
+                  val  timestamp: Long,
+                  val  sender: Option[String],
+                  val  version: Option[Byte],
+                  val  name: Option[String],
+                  val  amount: Option[Long],
+                  val  description: Option[String],
+                  val  typedAttachment: Option[Attachment],
+                  val  attachment: Option[String],
+                  val  price: Option[Long],
+                  val  sellMatcherFee: Option[Long],
+                  val  buyMatcherFee: Option[Long],
+                  val  sellOrderMatcherFee: Option[Long],
+                  val  buyOrderMatcherFee: Option[Long],
+                  val  data: Option[Seq[DataEntry[_]]],
+                  val  minSponsoredAssetFee: Option[Long],
+                  val  transfers: Option[Seq[Transfer]],
+                  val  totalAmount: Option[Long],
+                  val  senderPublicKey: Option[String],
+                  val  recipient: Option[String],
+                  val  proofs: Option[Seq[String]]
+                      ) {
+                        import Transaction._
+                        override def toString = Json.toJson(this).toString
+                      }
 object Transaction {
+  def apply(_type: Int,
+                  id: String,
+                  chainId: Option[Byte],
+                  fee: Long,
+                  timestamp: Long,
+                  sender: Option[String],
+                  version: Option[Byte],
+                  name: Option[String],
+                  amount: Option[Long],
+                  description: Option[String],
+                  typedAttachment: Option[Attachment],
+                  attachment: Option[String],
+                  price: Option[Long],
+                  sellMatcherFee: Option[Long],
+                  buyMatcherFee: Option[Long],
+                  sellOrderMatcherFee: Option[Long],
+                  buyOrderMatcherFee: Option[Long],
+                  data: Option[Seq[DataEntry[_]]],
+                  minSponsoredAssetFee: Option[Long],
+                  transfers: Option[Seq[Transfer]],
+                  totalAmount: Option[Long],
+                  senderPublicKey: Option[String],
+                  recipient: Option[String],
+                  proofs: Option[Seq[String]]
+                      ) : Transaction = new Transaction(_type,
+                  id,
+                  chainId,
+                  fee,
+                  timestamp,
+                  sender,
+                  version,
+                  name,
+                  amount,
+                  description,
+                  typedAttachment,
+                  attachment,
+                  price,
+                  sellMatcherFee,
+                  buyMatcherFee,
+                  sellOrderMatcherFee,
+                  buyOrderMatcherFee,
+                  data,
+                  minSponsoredAssetFee,
+                  transfers,
+                  totalAmount,
+                  senderPublicKey,
+                  recipient,
+                  proofs: Option[Seq[String]]
+                      )
+
   implicit val transactionFormat: Format[Transaction] = Format(
     Reads(jsv =>
       for {
@@ -165,8 +221,11 @@ object Transaction {
         minSponsoredAssetFee <- (jsv \ "minSponsoredAssetFee").validateOpt[Long]
         transfers <- (jsv \ "transfers").validateOpt[Seq[Transfer]]
         totalAmount <- (jsv \ "totalAmount").validateOpt[Long]
+        senderPublicKey <- (jsv \ "senderPublicKey").validateOpt[String]
+        recipient <- (jsv \ "recipient").validateOpt[String]
+        proofs <- (jsv \ "proofs").validateOpt[Seq[String]]
       }
-        yield Transaction(
+        yield new Transaction(
           _type,
           id,
           chainId,
@@ -187,9 +246,38 @@ object Transaction {
           data,
           minSponsoredAssetFee,
           transfers,
-          totalAmount
+          totalAmount,
+          senderPublicKey,
+          recipient,
+          proofs
         )),
-    Json.writes[Transaction]
+    Writes { t =>
+      Json.obj(
+        "type" -> t._type,
+        "id" ->  t.id,
+        "chainId" ->  t.chainId,
+        "fee" ->  t.fee,
+        "timestamp" ->  t.timestamp,
+        "sender" ->  t.sender,
+        "version" ->  t.version,
+        "name" ->  t.name,
+        "amount" ->  t.amount,
+        "description" ->  t.description,
+        "attachment" ->  t.attachment,
+        "price" ->  t.price,
+        "sellMatcherFee" ->  t.sellMatcherFee,
+        "bueMatcherFee" ->  t.buyMatcherFee,
+        "sellOrderFee" ->  t.sellOrderMatcherFee,
+        "bueOrderFee" ->  t.buyOrderMatcherFee,
+        "data" ->  t.data,
+        "minSponsoredAssetFee" ->  t.minSponsoredAssetFee,
+        "transfers" ->  t.transfers,
+        "totalAmount" ->  t.totalAmount,
+        "senderPublicKey" ->  t.senderPublicKey,
+        "recipient" ->  t.recipient,
+        "proofs" ->  t.proofs
+        )
+    }
   )
 }
 
