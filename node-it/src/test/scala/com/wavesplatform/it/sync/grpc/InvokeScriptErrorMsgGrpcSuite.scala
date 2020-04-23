@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.grpc
 
 import com.google.protobuf.ByteString
-import com.wavesplatform.api.grpc.TransactionsRequest
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncGrpcApi._
 import com.wavesplatform.it.sync._

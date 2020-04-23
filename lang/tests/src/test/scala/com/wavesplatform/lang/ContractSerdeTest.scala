@@ -4,7 +4,6 @@ import com.google.protobuf.ByteString
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp._
 import com.wavesplatform.lang.contract.{ContractSerDe, DApp}
-import com.wavesplatform.lang.directives.values.V3
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.protobuf.dapp.DAppMeta.CallableFuncSignature

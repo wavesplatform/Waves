@@ -192,7 +192,7 @@ checkPRRaw := {
 def checkPR: Command = Command.command("checkPR") { state =>
   val updatedState = Project
     .extract(state)
-    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings", "-Ywarn-unused:-imports")), state)
+    .appendWithoutSession(Seq(Global / scalacOptions ++= Seq("-Xfatal-warnings")), state)
   Project.extract(updatedState).runTask(root / checkPRRaw, updatedState)
   state
 }

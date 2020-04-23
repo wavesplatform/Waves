@@ -14,7 +14,7 @@ import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
 import com.wavesplatform.transaction.Asset.IssuedAsset
-import com.wavesplatform.transaction.{Asset, TxVersion}
+import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
 import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler

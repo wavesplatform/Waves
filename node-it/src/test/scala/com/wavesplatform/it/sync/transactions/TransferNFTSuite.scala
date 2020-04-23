@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.transactions
 
 import com.wavesplatform.account.KeyPair
-import com.wavesplatform.api.http.ApiError.StateCheckFailed
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.NTPTime
 import com.wavesplatform.it.api.SyncHttpApi._
