@@ -38,7 +38,7 @@ import org.slf4j.LoggerFactory
 import scala.annotation.tailrec
 import scala.collection.JavaConverters._
 import scala.collection.mutable
-import scala.concurrent.duration.{FiniteDuration, Duration => ScalaDuration}
+import scala.concurrent.duration.{Duration => ScalaDuration}
 import scala.util.{Left, Right}
 
 class UtxPoolImpl(
@@ -255,36 +255,33 @@ class UtxPoolImpl(
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
-      maxPackTime: ScalaDuration,
-      estimate: FiniteDuration
+      estimate: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, maxPackTime, estimate)
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, estimate)
   }
 
   private def cleanUnconfirmed(): Unit =
     pack(TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
-      ScalaDuration.Inf,
-      ScalaDuration.Zero
+      ScalaDuration.Inf
     )
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
-      maxPackTime: ScalaDuration,
-      estimate: FiniteDuration
+      estimate: ScalaDuration
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
     val packResult = PoolMetrics.packTimeStats.measure {
-      val startTime                   = nanoTimeSource()
-      def isTimeLimitReached: Boolean = maxPackTime.isFinite() && (nanoTimeSource() - startTime) >= maxPackTime.toNanos
-      def isEstimateReached: Boolean  = (nanoTimeSource() - startTime) >= estimate.toNanos
+      val startTime                       = nanoTimeSource()
+      def isEstimateReached: Boolean      = estimate.isFinite() && (nanoTimeSource() - startTime) >= estimate.toNanos
+      def isEstimateReachedOrInf: Boolean = !estimate.isFinite() || isEstimateReached
 
       def packIteration(prevResult: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
           .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
           .foldLeft[PackResult](prevResult) {
             case (r, TxEntry(tx, priority)) =>
-              def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
+              def isLimitReached   = r.transactions.exists(_.nonEmpty) && isEstimateReached
               def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
 
               if (r.constraint.isFull || isLimitReached || isAlreadyRemoved)
@@ -350,25 +347,20 @@ class UtxPoolImpl(
       def loop(seed: PackResult): PackResult = {
         def allValidated(seed: PackResult) = (transactions.keys().asScala ++ priorityTransactions.keysIterator).forall(seed.validatedTransactions)
 
-        if (isTimeLimitReached && (seed.transactions.exists(_.nonEmpty) || allValidated(seed))) {
-          log.trace("Time limit reached")
-          seed
+        val newSeed = packIteration(
+          seed.copy(checkedAddresses = Set.empty),
+          this.createTxEntrySeq().iterator
+        )
+        if (newSeed.constraint.isFull) {
+          log.trace(s"Block is full: ${newSeed.constraint}")
+          newSeed
         } else {
-          val newSeed = packIteration(
-            seed.copy(checkedAddresses = Set.empty),
-            this.createTxEntrySeq().iterator
-          )
-          if (newSeed.constraint.isFull) {
-            log.trace(s"Block is full: ${newSeed.constraint}")
+          if (isEstimateReachedOrInf && allValidated(newSeed)) {
+            log.trace("No more transactions to validate")
             newSeed
           } else {
-            if (isEstimateReached && allValidated(newSeed)) {
-              log.trace("No more transactions to validate")
-              newSeed
-            } else {
-              while (!isEstimateReached && allValidated(newSeed)) Thread.sleep(200)
-              loop(newSeed)
-            }
+            while (!isEstimateReachedOrInf && allValidated(newSeed)) Thread.sleep(200)
+            loop(newSeed)
           }
         }
       }
@@ -439,7 +431,9 @@ class UtxPoolImpl(
   }
 
   override def close(): Unit = {
+    import scala.concurrent.duration._
     cleanupScheduler.shutdown()
+    cleanupScheduler.awaitTermination(10 seconds)
   }
 
   //noinspection TypeAnnotation

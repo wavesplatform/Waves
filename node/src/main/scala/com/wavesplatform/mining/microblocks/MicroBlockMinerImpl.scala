@@ -42,14 +42,13 @@ class MicroBlockMinerImpl(
       constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint
   ): Task[Unit] = {
-    Task(generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint))
-      .flatten
+    Task(generateOneMicroBlockTask(account, accumulatedBlock, constraints, restTotalConstraint)).flatten
       .asyncBoundary(minerScheduler)
       .flatMap {
         case Success(newBlock, newConstraint) =>
           generateMicroBlockSequence(account, newBlock, constraints, newConstraint)
         case Retry =>
-          Task.sleep(100 millis).flatMap(_ => generateMicroBlockSequence(account, accumulatedBlock, constraints, restTotalConstraint))
+          Task.sleep(200 millis).flatMap(_ => generateMicroBlockSequence(account, accumulatedBlock, constraints, restTotalConstraint))
         case Stop =>
           debugState
             .set(MinerDebugInfo.MiningBlocks) >>
@@ -64,12 +63,12 @@ class MicroBlockMinerImpl(
       constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint
   ): Task[MicroBlockMiningResult] = {
-    val mdConstraint                       = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
-    val startTime = System.nanoTime()
-    log.info("Starting pack")
-    val (unconfirmed, updatedMdConstraint) = utx.packUnconfirmed(mdConstraint, settings.microBlockInterval, settings.microBlockInterval)
-    log.info(s"Pack was ${(System.nanoTime() - startTime).nanos.toMillis} ms")
-    val updatedTotalConstraint             = updatedMdConstraint.constraints.head
+    val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
+    val (unconfirmed, updatedMdConstraint) =
+      Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock")(
+        utx.packUnconfirmed(mdConstraint, settings.microBlockInterval)
+      )
+    val updatedTotalConstraint = updatedMdConstraint.constraints.head
 
     unconfirmed match {
       case None =>
