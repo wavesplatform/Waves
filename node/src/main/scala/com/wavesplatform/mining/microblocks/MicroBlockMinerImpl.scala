@@ -62,7 +62,7 @@ class MicroBlockMinerImpl(
       accumulatedBlock: Block,
       constraints: MiningConstraints,
       restTotalConstraint: MiningConstraint
-  ): Task[MicroBlockMiningResult] = {
+  ): Task[MicroBlockMiningResult] = Task.defer {
     val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
     val (unconfirmed, updatedMdConstraint) =
       Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock")(
@@ -101,7 +101,7 @@ class MicroBlockMinerImpl(
   }
 
   private def broadcastMicroBlock(account: KeyPair, microBlock: MicroBlock, blockId: BlockId): Task[Unit] =
-    Task(allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
+    Task(if (allChannels != null) allChannels.broadcast(MicroBlockInv(account, blockId, microBlock.reference)))
 
   private def appendMicroBlock(microBlock: MicroBlock): Task[BlockId] =
     MicroblockAppender(blockchainUpdater, utx, appenderScheduler)(microBlock)

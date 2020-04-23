@@ -368,6 +368,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
     val prevBalance = sender.balance(caller).balance
 
+    overflowBlock()
     sendPriorityTxAndThenOtherTxs(
       _ => sender.invokeScript(caller, contract, Some("tikTok"), fee = invokeFee)._1.id,
       () =>
@@ -394,8 +395,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
                 .bytes()
                 .base64
             ),
-            fee = priorityFee,
-            waitForTx = true
+            fee = priorityFee
           )
           .id
     ) { (txs, priorityTx) =>
@@ -564,6 +564,17 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     waitForEmptyUtx()
 
     assertFailedTxs(txs)
+  }
+
+  def overflowBlock(): Unit = {
+    val entries = List.tabulate(4)(n => BinaryDataEntry("test" + n, ByteStr(Array.fill(32767)(n.toByte))))
+    val addr = sender.createAddress()
+    val fee = calcDataFee(entries, 1)
+    waitForHeightArise()
+    sender.transfer(sender.privateKey.stringRepr, addr, fee * 10)
+    waitForEmptyUtx()
+    for (_ <- 1 to 7) sender.putData(addr, entries, fee)
+    waitForEmptyUtx()
   }
 
   def updateTikTok(result: String, fee: Long): String =

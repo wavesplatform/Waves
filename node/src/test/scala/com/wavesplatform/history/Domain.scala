@@ -2,12 +2,14 @@ package com.wavesplatform.history
 
 import cats.syntax.option._
 import com.wavesplatform.account.Address
+import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.api.common.{AddressPortfolio, AddressTransactions}
 import com.wavesplatform.block.Block.BlockId
-import com.wavesplatform.block.{Block, MicroBlock}
+import com.wavesplatform.block.{Block, MicroBlock, SignedBlockHeader}
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.database.{DBExt, LevelDBWriter}
+import com.wavesplatform.database
+import com.wavesplatform.database.{DBExt, Keys, LevelDBWriter}
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.state._
 import com.wavesplatform.transaction.Asset.IssuedAsset
@@ -52,6 +54,8 @@ case class Domain(db: DB, blockchainUpdater: BlockchainUpdaterImpl, levelDBWrite
   }
 
   def portfolio(address: Address): Seq[(IssuedAsset, Long)] = Domain.portfolio(address, db, blockchainUpdater)
+
+  def lastBlock: SignedBlockHeader = blockchainUpdater.lastBlockHeader.get
 }
 
 object Domain {

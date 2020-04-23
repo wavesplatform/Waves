@@ -332,8 +332,8 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
     updateTikTok("unknown", setAssetScriptMinFee)
     updateAssetScript(result = true, smartAsset, contract, setAssetScriptMinFee)
 
+    overflowBlock()
     val prevBalance = sender.wavesBalance(callerAddr).regular
-
     sendPriorityTxAndThenOtherTxs(
       _ =>
         sender.broadcastInvokeScript(
@@ -363,8 +363,7 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
               .toOption
               .map(_._1)
           ),
-          fee = priorityFee,
-          waitForTx = true
+          fee = priorityFee
         )
     ) { (txs, _) =>
       val invalid = assertInvalidTxs(txs)
@@ -499,12 +498,21 @@ class FailedTransactionGrpcSuite extends GrpcBaseTransactionSuite with FailedTra
         sender.broadcast(tx.transaction.get, tx.proofs)
       }
 
+      overflowBlock()
       sendPriorityTxAndThenOtherTxs(
         txsSend,
-        () => updateAccountScript(Some(false), invalidAccount, priorityFee)
+        () => updateAccountScript(Some(false), invalidAccount, priorityFee, waitForTx = false)
       )((txs, _) => assertInvalidTxs(txs))
       updateAccountScript(None, invalidAccount, setScriptFee + smartFee)
     }
+  }
+
+  def overflowBlock(): Unit = {
+    val entries = List.tabulate(4)(n => PBTransactions.toPBDataEntry(BinaryDataEntry("test" + n, ByteStr(Array.fill(32767)(n.toByte)))))
+    val fee = calcDataFee(entries)
+    waitForHeightArise()
+    for (_ <- 1 to 7) sender.putData(sender.privateKey, entries, fee)
+    waitForEmptyUtx()
   }
 
   private def calcDataFee(data: List[DataEntry]): Long = {
