@@ -282,9 +282,8 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
     }
 
     "rollback works" in {
-      val acc         = createDapp(script(simpleReissuableAsset))
-      val asset       = issueValidated(acc, simpleReissuableAsset)
-      val simpleAsset = issue(acc, TransactionMethod, simpleReissuableAsset, 1.1.waves).id
+      val acc   = createDapp(script(simpleReissuableAsset))
+      val asset = issueValidated(acc, simpleReissuableAsset)
 
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>
@@ -293,15 +292,16 @@ class IssueReissueBurnAssetSuite extends BaseSuite {
       val height = nodes.waitForHeightArise()
       nodes.waitForHeightArise()
       invokeScript(acc, "reissueIssueAndNft", assetId = asset, fee = invocationCost(1))
-      burn(acc, CallableMethod, simpleAsset, 5000)
+      burn(acc, CallableMethod, asset, 5000)
       burn(acc, TransactionMethod, asset, 10000)
+      miner.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
       nodes.waitForHeightArise()
 
       nodes.rollback(height, returnToUTX = false)
       assertQuantity(asset)(simpleReissuableAsset.quantity)
       sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
-      sender.assertAssetBalance(acc, simpleAsset, simpleReissuableAsset.quantity)
-      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset, simpleAsset)
+      sender.assertAssetBalance(acc, asset, simpleReissuableAsset.quantity)
+      sender.assetsBalance(acc).balances.map(_.assetId).toSet shouldBe Set(asset, asset)
       sender.nftList(acc, 10) shouldBe empty
       sender.debugStateChangesByAddress(acc, 100).flatMap(_.stateChanges) should matchPattern {
         case Seq(StateChangesDetails(Nil, Nil, Seq(issue), Nil, Nil, None)) if issue.name == simpleReissuableAsset.name =>

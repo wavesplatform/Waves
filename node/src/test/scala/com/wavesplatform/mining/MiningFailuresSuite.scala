@@ -64,6 +64,7 @@ class MiningFailuresSuite extends FlatSpec with Matchers with PrivateMethodTeste
         wallet,
         pos,
         scheduler,
+        scheduler,
         scheduler
       )
     }

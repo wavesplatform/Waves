@@ -98,7 +98,8 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
   private val microblockSynchronizerScheduler = singleThread("microblock-synchronizer", reporter = log.error("Error in Microblock Synchronizer", _))
   private val scoreObserverScheduler          = singleThread("rx-score-observer", reporter = log.error("Error in Score Observer", _))
   private val historyRepliesScheduler         = fixedPool(poolSize = 2, "history-replier", reporter = log.error("Error in History Replier", _))
-  private val minerScheduler                  = fixedPool(poolSize = 2, "miner-pool", reporter = log.error("Error in Miner", _))
+  private val minerScheduler                  = singleThread("block-miner", reporter = log.error("Error in Miner", _))
+  private val microMinerScheduler             = singleThread("micro-miner", reporter = log.error("Error in MB Miner", _))
 
   private val blockchainUpdatesScheduler = singleThread("blockchain-updates", reporter = log.error("Error on sending blockchain updates", _))
   private val blockchainUpdated          = ConcurrentSubject.publish[BlockchainUpdated](scheduler)
@@ -166,7 +167,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
 
     val miner =
       if (settings.minerSettings.enable)
-        new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, appenderScheduler)
+        new MinerImpl(allChannels, blockchainUpdater, settings, time, utxStorage, wallet, pos, minerScheduler, microMinerScheduler, appenderScheduler)
       else Miner.Disabled
 
     val processBlock =
@@ -450,6 +451,7 @@ class Application(val actorSystem: ActorSystem, val settings: WavesSettings, con
       blockchainUpdated.onComplete()
 
       shutdownAndWait(blockchainUpdatesScheduler, "BlockchainUpdated")
+      shutdownAndWait(microMinerScheduler, "MB Miner")
       shutdownAndWait(minerScheduler, "Miner")
       shutdownAndWait(microblockSynchronizerScheduler, "MicroblockSynchronizer")
       shutdownAndWait(scoreObserverScheduler, "ScoreObserver")

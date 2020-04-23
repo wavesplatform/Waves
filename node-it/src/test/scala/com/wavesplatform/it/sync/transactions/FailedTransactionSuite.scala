@@ -23,7 +23,7 @@ import org.scalatest.CancelAfterFailure
 import scala.concurrent.duration._
 import scala.util.Try
 
-class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike[String] {
+class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailure with FailedTransactionSuiteLike[String] with OverflowBlock {
   import FailedTransactionSuite._
   import FailedTransactionSuiteLike._
   import restApi._
@@ -559,31 +559,19 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
     val txs = collection.mutable.ListBuffer[String]()
     sender.waitFor("wait for even height")(n => n.height, (h: Int) => h % 2 == 0, 100.millis)
     sender.waitFor("send until odd height")({ n =>
-      Try(n.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee)._1.id).foreach(txs += _)
+      Try(n.invokeScript(caller, contract, Some("blockIsEven"), fee = invokeFee, waitForTx = true)._1.id).foreach(txs += _)
       n.height
-    }, (h: Int) => h % 2 != 0, 10.millis)
-    waitForEmptyUtx()
+    }, (h: Int) => h % 2 != 0, 1 second)
 
+    miner.waitFor("empty utx")(_.utxSize, (_: Int) == 0, 1 second)
     assertFailedTxs(txs)
-  }
-
-  def overflowBlock(): Unit = {
-    val entries = List.tabulate(4)(n => BinaryDataEntry("test" + n, ByteStr(Array.fill(32767)(n.toByte))))
-    val addr = sender.createAddress()
-    val fee = calcDataFee(entries, 1)
-    waitForHeightArise()
-    sender.transfer(sender.privateKey.stringRepr, addr, fee * 10)
-    waitForEmptyUtx()
-    for (_ <- 1 to 7) sender.putData(addr, entries, fee)
-    waitForEmptyUtx()
   }
 
   def updateTikTok(result: String, fee: Long): String =
     sender.broadcastData(pkByAddress(contract), List(StringDataEntry("tikTok", result)), fee = fee, waitForTx = true).id
 
   private def waitForTxs(txs: Seq[String]): Unit =
-    nodes.waitFor[Boolean]("preconditions")(100.millis)(
-      n => n.transactionStatus(txs).forall(_.status == "confirmed"),
+    nodes.waitFor("preconditions", 100.millis)(_.transactionStatus(txs).forall(_.status == "confirmed"))(
       statuses => statuses.forall(identity)
     )
 

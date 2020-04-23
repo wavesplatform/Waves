@@ -55,6 +55,7 @@ class MinerImpl(
     wallet: Wallet,
     pos: PoSSelector,
     val minerScheduler: SchedulerService,
+    val microMinerScheduler: SchedulerService,
     val appenderScheduler: SchedulerService
 ) extends Miner
     with MinerDebugInfo
@@ -77,7 +78,7 @@ class MinerImpl(
     blockchainUpdater,
     utx,
     settings.minerSettings,
-    minerScheduler,
+    microMinerScheduler,
     appenderScheduler
   )
 
@@ -161,7 +162,7 @@ class MinerImpl(
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
       (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, PackStrategy.Limit(settings.minerSettings.microBlockInterval * 10))
+        utx.packUnconfirmed(mdConstraint, PackStrategy.Limit(settings.minerSettings.microBlockInterval))
       )
       unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")
