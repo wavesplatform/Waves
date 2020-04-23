@@ -56,9 +56,12 @@ object Merkle {
   }
 
   def createRoot(digest: Digest, index: Int, proofs: Seq[Digest]): Digest = {
-    val (calculated, _) = proofs.reverse.foldLeft((digest, index)) {
+    val (calculated, rest) = proofs.reverse.foldLeft((digest, index)) {
       case ((left, idx), right) if isLeft(idx) => (hash(left ++ right), idx / 2)
       case ((right, idx), left)                => (hash(left ++ right), idx / 2)
+    }
+    if(rest != 0) {
+      throw new Exception(s"Index $index out of range allowed by proof list length ${proofs.length}")
     }
     calculated
   }

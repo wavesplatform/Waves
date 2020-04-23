@@ -102,7 +102,5 @@ class RideCreateMerkleRootTestSuite
       )
       node.getDataByKey(sender.address, "root") shouldBe BinaryDataEntry("root", root)
     }
-
-    cscript shouldBe cscript
   }
 }
