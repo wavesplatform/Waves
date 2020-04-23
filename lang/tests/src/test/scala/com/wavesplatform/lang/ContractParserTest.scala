@@ -18,24 +18,24 @@ class ContractParserTest extends PropSpec with PropertyChecks with Matchers with
   }
 
   private def catchParseError(x: String, e: Failure[Char, String]): Nothing = {
-    import e.{index => i}
-    println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
-    println(s"""val code2 = "${escapedCode(x)}"""")
-    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${
-      e.extra.traced.fullStack
-        .mkString("\n")
-    }")
+//    import e.{index => i}
+//    println(s"val code1 = new String(Array[Byte](${x.getBytes("UTF-8").mkString(",")}))")
+//    println(s"""val code2 = "${escapedCode(x)}"""")
+//    println(s"Can't parse (len=${x.length}): <START>\n$x\n<END>\nError: $e\nPosition ($i): '${x.slice(i, i + 1)}'\nTraced:\n${
+//      e.extra.traced.fullStack
+//        .mkString("\n")
+//    }")
     throw new TestFailedException("Test failed", 0)
   }
 
-  private def escapedCode(s: String): String =
-    s.flatMap {
-      case '"' => "\\\""
-      case '\n' => "\\n"
-      case '\r' => "\\r"
-      case '\t' => "\\t"
-      case x => x.toChar.toString
-    }.mkString
+//  private def escapedCode(s: String): String =
+//    s.flatMap {
+//      case '"' => "\\\""
+//      case '\n' => "\\n"
+//      case '\r' => "\\r"
+//      case '\t' => "\\t"
+//      case x => x.toChar.toString
+//    }.mkString
 
   private def cleanOffsets(l: LET): LET =
     l.copy(Pos(0, 0), name = cleanOffsets(l.name), value = cleanOffsets(l.value), types = l.types.map(cleanOffsets(_)))

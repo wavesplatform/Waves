@@ -18,7 +18,7 @@ class TransferTransactionV1Specification extends PropSpec with PropertyChecks wi
     forAll(transferV1Gen) { transfer: TransferTransaction =>
       val recovered = TransferTransaction.parseBytes(transfer.bytes()).get
 
-      recovered.sender.stringRepr shouldEqual transfer.sender.stringRepr
+      recovered.sender shouldEqual transfer.sender
       recovered.assetId shouldBe transfer.assetId
       recovered.feeAssetId shouldBe transfer.feeAssetId
       recovered.timestamp shouldEqual transfer.timestamp

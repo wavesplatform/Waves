@@ -225,7 +225,7 @@ object CryptoContext {
         ("valueBytes", BYTESTR)
       ) {
         case CONST_BYTESTR(root) :: CONST_BYTESTR(proof) :: CONST_BYTESTR(value) :: Nil =>
-          Right(CONST_BOOLEAN(global.merkleVerify(root, proof, value)))
+          Right(CONST_BOOLEAN(global.merkleVerify(root.arr, proof.arr, value.arr)))
         case xs => notImplemented[Id, EVALUATED](s"checkMerkleProof(merkleRoot: ByteVector, merkleProof: ByteVector, valueBytes: ByteVector)", xs)
       }
 
@@ -244,10 +244,10 @@ object CryptoContext {
               case CONST_BYTESTR(v) => v.size == 32
               case _ => false
             })) {
-            CONST_BYTESTR(createRoot(value, Math.toIntExact(index), proof.map({
+            CONST_BYTESTR(ByteStr(createRoot(value.arr, Math.toIntExact(index), proof.map({
                case CONST_BYTESTR(v) => v.arr
                case _ => throw(new Exception("Expect ByteStr"))
-            }))) .left.map(_.toString)
+            }))))
           } else {
             notImplemented[Id, EVALUATED](s"createMerkleRoot(merkleProof: ByteVector, valueBytes: ByteVector)", xs)
           }

@@ -555,7 +555,7 @@ class EvaluatorV1Test extends PropSpec with PropertyChecks with Matchers with Sc
       val expr = FUNCTION_CALL(
         FunctionHeader.Native(FROMBASE16),
         List(
-          FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(xs).explicitGet()))
+          FUNCTION_CALL(FunctionHeader.Native(TOBASE16), List(CONST_BYTESTR(ByteStr(xs)).explicitGet()))
         )
       )
       val actual = ev[EVALUATED](defaultCryptoContext.evaluationContext, expr)

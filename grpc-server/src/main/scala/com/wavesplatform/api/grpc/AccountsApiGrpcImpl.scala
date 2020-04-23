@@ -1,5 +1,6 @@
 package com.wavesplatform.api.grpc
 
+import com.google.protobuf.ByteString
 import com.google.protobuf.wrappers.{BytesValue, StringValue}
 import com.wavesplatform.account.{Address, Alias}
 import com.wavesplatform.api.common.CommonAccountsApi
@@ -84,7 +85,7 @@ class AccountsApiGrpcImpl(commonApi: CommonAccountsApi)(implicit sc: Scheduler) 
       val result = for {
         alias   <- Alias.create(request.value)
         address <- commonApi.resolveAlias(alias)
-      } yield BytesValue(address.bytes)
+      } yield BytesValue(ByteString.copyFrom(address.bytes))
 
       result.explicitGetErr()
     }

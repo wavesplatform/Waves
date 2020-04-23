@@ -74,10 +74,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     genesisBlock = TestBlock.create(
       ntpTime.getTimestamp(),
       Seq(
-        GenesisTransaction.create(sourceAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(issuer, 40000 * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(miner1, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet(),
-        GenesisTransaction.create(miner2, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet()
+        GenesisTransaction.create(sourceAddress.toAddress, (Constants.TotalWaves - 60000) * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(issuer.toAddress, 40000 * Constants.UnitsInWave, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(miner1.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet(),
+        GenesisTransaction.create(miner2.toAddress, InitialMinerBalance, ntpTime.getTimestamp()).explicitGet()
       )
     )
 
@@ -86,7 +86,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
   private val activationScenario = for {
     (sourceAddress, _, miner, _, genesisBlock) <- genesis
     recipient                                  <- accountGen
-    transfers                                  <- Gen.listOfN(10, transferGeneratorP(ntpNow, sourceAddress, recipient, 1000 * Constants.UnitsInWave))
+    transfers                                  <- Gen.listOfN(10, transferGeneratorP(ntpNow, sourceAddress, recipient.toAddress, 1000 * Constants.UnitsInWave))
     b2              = TestBlock.create(ntpNow, genesisBlock.id(), transfers, miner)
     b3              = mkEmptyBlock(b2.id(), miner)
     b4              = mkEmptyBlock(b3.id(), miner)
@@ -216,10 +216,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val ngEmptyScenario = for {
       (sourceAddress, issuer, miner1, miner2, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner1)
       b3        = mkEmptyBlock(b2.id(), miner1)
@@ -261,7 +261,7 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val betterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner)
       b3        = mkEmptyBlock(b2.id(), miner)
@@ -297,10 +297,10 @@ class BlockRewardSpec extends FreeSpec with ScalaCheckPropertyChecks with WithDo
     val sameButBetterBlockScenario = for {
       (sourceAddress, issuer, miner, _, genesisBlock) <- genesis
       tx1 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       tx2 = TransferTransaction
-        .selfSigned(1.toByte, issuer, sourceAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
+        .selfSigned(1.toByte, issuer, sourceAddress.toAddress, Waves, 10 * Constants.UnitsInWave, Waves, OneTotalFee, None, ntpTime.getTimestamp())
         .explicitGet()
       b2        = mkEmptyBlock(genesisBlock.id(), miner)
       b3        = mkEmptyBlock(b2.id(), miner)

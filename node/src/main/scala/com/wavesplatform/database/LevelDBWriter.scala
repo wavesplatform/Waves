@@ -582,7 +582,7 @@ abstract class LevelDBWriter private[database] (
             val address = rw.get(Keys.idToAddress(addressId))
 
             rw.iterateOver(KeyTags.AssetBalanceHistory.prefixBytes ++ addressId.toByteArray) { e =>
-              val assetId = IssuedAsset(e.getKey.takeRight(32))
+              val assetId = IssuedAsset(ByteStr(e.getKey.takeRight(32)))
               val history = readIntSeq(e.getValue)
               if (history.nonEmpty && history.head == currentHeight) {
                 balancesToInvalidate += address -> assetId
@@ -826,9 +826,9 @@ abstract class LevelDBWriter private[database] (
     db.iterateOver(KeyTags.LeaseStatus) { e =>
       val leaseId = e.getKey.slice(2, e.getKey.length - 4)
       if (e.getValue.headOption.contains(1.toByte)) {
-        activeLeaseIds += leaseId
+        activeLeaseIds += ByteStr(leaseId)
       } else {
-        activeLeaseIds -= leaseId
+        activeLeaseIds -= ByteStr(leaseId)
       }
     }
 

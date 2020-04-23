@@ -24,7 +24,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
       firstAcc  <- accountGen
       secondAcc <- accountGen
       ts        <- timestampGen
-      genesis = GenesisTransaction.create(firstAcc, ENOUGH_AMT, ts).explicitGet()
+      genesis = GenesisTransaction.create(firstAcc.toAddress, ENOUGH_AMT, ts).explicitGet()
 
       emptyScript = s"""
                        |{-# STDLIB_VERSION 3 #-}
@@ -42,7 +42,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
 
       issueTransaction = IssueTransaction(
           TxVersion.V2,
-          firstAcc,
+          firstAcc.publicKey,
           "name".utf8Bytes,
           "description".utf8Bytes,
           100,
@@ -51,7 +51,7 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
           Some(emptyExprScript),
           1000000,
           ts
-        ).signWith(firstAcc)
+        ).signWith(firstAcc.privateKey)
 
       asset = IssuedAsset(issueTransaction.id())
 
@@ -75,11 +75,11 @@ class SmartAssetEvalTest extends PropSpec with PropertyChecks with WithState wit
         .explicitGet()
 
       setAssetScriptTransaction = SetAssetScriptTransaction
-        .signed(1.toByte, firstAcc, asset, Some(typedScript), 1000, ts + 10, firstAcc)
+        .signed(1.toByte, firstAcc.publicKey, asset, Some(typedScript), 1000, ts + 10, firstAcc.privateKey)
         .explicitGet()
 
       assetTransferTransaction = TransferTransaction
-        .selfSigned(1.toByte, firstAcc, secondAcc, asset, 1, Waves, 1000, None, ts + 20)
+        .selfSigned(1.toByte, firstAcc, secondAcc.toAddress, asset, 1, Waves, 1000, None, ts + 20)
         .explicitGet()
 
     } yield (genesis, issueTransaction, setAssetScriptTransaction, assetTransferTransaction)

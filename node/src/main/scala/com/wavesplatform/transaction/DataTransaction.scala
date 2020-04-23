@@ -85,5 +85,5 @@ object DataTransaction extends TransactionParser {
       fee: TxAmount,
       timestamp: TxTimestamp
   ): Either[ValidationError, DataTransaction] =
-    signed(version, sender, data, fee, timestamp, sender)
+    signed(version, sender.publicKey, data, fee, timestamp, sender.privateKey)
 }

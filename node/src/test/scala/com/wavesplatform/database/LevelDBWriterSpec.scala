@@ -6,6 +6,7 @@ import com.google.common.primitives.{Ints, Shorts}
 import com.typesafe.config.ConfigFactory
 import com.wavesplatform.account.{Address, KeyPair}
 import com.wavesplatform.block.Block
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.db.DBCacheSettings
 import com.wavesplatform.features.BlockchainFeatures
@@ -63,7 +64,7 @@ class LevelDBWriterSpec
       assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
       resetTest { (_, account) =>
         val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
-        writer.hasAccountScript(account) shouldBe false
+        writer.hasAccountScript(account.toAddress) shouldBe false
       }
     }
 
@@ -72,14 +73,14 @@ class LevelDBWriterSpec
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (_, account) =>
           val writer = TestLevelDB.withFunctionalitySettings(db, ignoreSpendableBalanceChanged, TestFunctionalitySettings.Stub)
-          writer.hasAccountScript(account) shouldBe true
+          writer.hasAccountScript(account.toAddress) shouldBe true
         }
       }
 
       "if there is a script in cache" in {
         assume(BlockchainFeatures.implemented.contains(BlockchainFeatures.SmartAccounts.id))
         test { (defaultWriter, account) =>
-          defaultWriter.hasAccountScript(account) shouldBe true
+          defaultWriter.hasAccountScript(account.toAddress) shouldBe true
         }
       }
     }
@@ -102,7 +103,7 @@ class LevelDBWriterSpec
     }
 
     def baseGen(ts: Long): Gen[(KeyPair, Seq[Block])] = accountGen.map { master =>
-      val genesisTx = GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()
+      val genesisTx = GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()
       val setScriptTx = SetScriptTransaction
         .selfSigned(1.toByte, master, Some(ExprScript(Terms.TRUE).explicitGet()), 5000000, ts)
         .explicitGet()
@@ -168,7 +169,7 @@ class LevelDBWriterSpec
       master    <- accountGen
       recipient <- accountGen
       genesisBlock = TestBlock
-        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
       block1 = TestBlock
         .create(
           ts + 3,
@@ -192,13 +193,13 @@ class LevelDBWriterSpec
     val settings  = settings0.copy(featuresSettings = settings0.featuresSettings.copy(autoShutdownOnUnsupportedFeature = false))
     val bcu       = new BlockchainUpdaterImpl(rw, ignoreSpendableBalanceChanged, settings, ntpTime, ignoreBlockchainUpdateTriggers)
     try {
-      val master    = KeyPair("master".getBytes())
-      val recipient = KeyPair("recipient".getBytes())
+      val master    = KeyPair(ByteStr("master".getBytes()))
+      val recipient = KeyPair(ByteStr("recipient".getBytes()))
 
       val ts = System.currentTimeMillis()
 
       val genesisBlock = TestBlock
-        .create(ts, Seq(GenesisTransaction.create(master, ENOUGH_AMT, ts).explicitGet()))
+        .create(ts, Seq(GenesisTransaction.create(master.toAddress, ENOUGH_AMT, ts).explicitGet()))
       val block1 = TestBlock
         .create(
           ts + 3,

@@ -26,8 +26,8 @@ object SponsorFeeTxSerializer {
       case TxVersion.V1 =>
         Bytes.concat(
           Array(builder.typeId, version),
-          sender,
-          asset.id,
+          sender.arr,
+          asset.id.arr,
           Longs.toByteArray(minSponsoredAssetFee.getOrElse(0)),
           Longs.toByteArray(fee),
           Longs.toByteArray(timestamp)

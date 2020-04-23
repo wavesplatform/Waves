@@ -36,7 +36,7 @@ object MassTransferTxSerializer {
 
         Bytes.concat(
           Array(builder.typeId, version),
-          sender,
+          sender.arr,
           assetId.byteRepr,
           Shorts.toByteArray(transfers.size.toShort),
           Bytes.concat(transferBytes: _*),

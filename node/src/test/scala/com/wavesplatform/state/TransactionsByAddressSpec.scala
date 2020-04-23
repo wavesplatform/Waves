@@ -69,15 +69,15 @@ class TransactionsByAddressSpec extends FreeSpec with ScalaCheckDrivenPropertyCh
             d.blockchainUpdater.processBlock(b, b.header.generationSignature, verify = false)
           }
 
-          Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))
+          Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
 
           d.blockchainUpdater.processBlock(
             TestBlock.create(System.currentTimeMillis(), blocks.last.signature, Seq.empty),
-            new Array[Byte](32),
+            ByteStr(new Array[Byte](32)),
             verify = false
           )
 
-          Seq[Address](sender, r1, r2).foreach(f(_, blocks, d))
+          Seq[Address](sender.toAddress, r1.toAddress, r2.toAddress).foreach(f(_, blocks, d))
         }
     }
   }

@@ -95,7 +95,7 @@ object WavesEnvironmentBenchmark {
 
   @State(Scope.Benchmark)
   class AccountBalanceOfWavesSt extends BaseSt {
-    val accounts: Vector[Array[Byte]] = load("accounts", benchSettings.accountsFile)(x => AddressOrAlias.fromString(x).explicitGet().bytes.arr)
+    val accounts: Vector[Array[Byte]] = load("accounts", benchSettings.accountsFile)(x => AddressOrAlias.fromString(x).explicitGet().bytes)
   }
 
   @State(Scope.Benchmark)

@@ -36,7 +36,7 @@ object Verifier extends ScorexLogging {
   def apply(blockchain: Blockchain)(tx: Transaction): TracedResult[ValidationError, Transaction] = tx match {
     case _: GenesisTransaction => Right(tx)
     case pt: ProvenTransaction =>
-      (pt, blockchain.accountScript(pt.sender).map(_.script)) match {
+      (pt, blockchain.accountScript(pt.sender.toAddress).map(_.script)) match {
         case (stx: SignedTransaction, None) =>
           stats.signatureVerification
             .measureForType(stx.typeId)(stx.signaturesValid())
@@ -97,7 +97,7 @@ object Verifier extends ScorexLogging {
     val senderAddress = transaction.asInstanceOf[Authorized].sender.toAddress
 
     val txE = Try {
-      val containerAddress = assetIdOpt.getOrElse(senderAddress.bytes)
+      val containerAddress = assetIdOpt.getOrElse(ByteStr(senderAddress.bytes))
       val eval             = ScriptRunner(Coproduct[TxOrd](transaction), blockchain, script, isAsset, containerAddress)
       val scriptResult = eval match {
         case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAsset))
@@ -132,7 +132,7 @@ object Verifier extends ScorexLogging {
   def verifyOrder(blockchain: Blockchain, script: Script, order: Order): ValidationResult[Order] =
     for {
       result <- Try {
-        val eval = ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, order.sender.toAddress.bytes)
+        val eval = ScriptRunner(Coproduct[ScriptRunner.TxOrd](order), blockchain, script, isAssetScript = false, ByteStr(order.sender.toAddress.bytes))
         val scriptResult = eval match {
           case (log, Left(execError)) => Left(ScriptExecutionError(execError, log, isAssetScript = false))
           case (log, Right(FALSE))    => Left(TransactionNotAllowedByScript(log, isAssetScript = false))
@@ -195,7 +195,7 @@ object Verifier extends ScorexLogging {
   def verifyAsEllipticCurveSignature[T <: Proven with Authorized](pt: T): Either[GenericError, T] =
     pt.proofs.proofs match {
       case p +: Nil =>
-        Either.cond(crypto.verify(p.arr, pt.bodyBytes(), pt.sender), pt, GenericError(s"Proof doesn't validate as signature for $pt"))
+        Either.cond(crypto.verify(p, pt.bodyBytes(), pt.sender), pt, GenericError(s"Proof doesn't validate as signature for $pt"))
       case _ => Left(GenericError("Transactions from non-scripted accounts must have exactly 1 proof"))
     }
 

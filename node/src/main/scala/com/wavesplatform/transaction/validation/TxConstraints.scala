@@ -102,7 +102,7 @@ object TxConstraints {
     asset.fold(Validated.validNel[ValidationError, A](asset)) { ia =>
       Validated
         .condNel(
-          ia.id.length == com.wavesplatform.crypto.DigestLength,
+          ia.id.arr.length == com.wavesplatform.crypto.DigestLength,
           asset,
           TxValidationError.InvalidAssetId
         )

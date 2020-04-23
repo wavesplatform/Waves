@@ -129,7 +129,7 @@ class AssetsApiRouteSpec
     (response \ "assetId").as[String] shouldBe tx.id().toString
     (response \ "issueHeight").as[Long] shouldBe 1
     (response \ "issueTimestamp").as[Long] shouldBe tx.timestamp
-    (response \ "issuer").as[String] shouldBe tx.sender.stringRepr
+    (response \ "issuer").as[String] shouldBe tx.sender.toAddress.toString
     (response \ "name").as[String] shouldBe tx.name.toStringUtf8
     (response \ "description").as[String] shouldBe tx.description.toStringUtf8
     (response \ "decimals").as[Int] shouldBe tx.decimals

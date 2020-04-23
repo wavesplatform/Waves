@@ -63,11 +63,11 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
     val seed     = Address.fromString("3MydsP4UeQdGwBq7yDbMvf9MzfB2pxFoUKU").explicitGet()
     val master   = Address.fromString("3N1w8y9Udv3k9NCSv9EE3QvMTRnGFTDQSzu").explicitGet()
     val genesis1 = GenesisTransaction.create(master, 1000000000, 0).explicitGet()
-    val genesis2 = GenesisTransaction.create(KeyPair(master.bytes), 1000000000, 0).explicitGet()
+    val genesis2 = GenesisTransaction.create(KeyPair(master.bytes).toAddress, 1000000000, 0).explicitGet()
 
     val issueTransaction = IssueTransaction(
       TxVersion.V2,
-      KeyPair(seed.bytes),
+      KeyPair(seed.bytes).publicKey,
       "name".utf8Bytes,
       "description".utf8Bytes,
       100,
@@ -76,7 +76,7 @@ class TransactionValidationErrorPrintTest extends PropSpec with Inside with With
       Some(preTypedScript),
       10000000,
       0
-    ).signWith(KeyPair(seed.bytes))
+    ).signWith(KeyPair(seed.bytes).privateKey)
 
     val preTransferTransaction = TransferTransaction
       .selfSigned(

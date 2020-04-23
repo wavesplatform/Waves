@@ -22,7 +22,7 @@ object LeaseTxSerializer {
 
   def bodyBytes(tx: LeaseTransaction): Array[Byte] = {
     import tx._
-    val baseBytes = Bytes.concat(sender, recipient.bytes.arr, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
+    val baseBytes = Bytes.concat(sender.arr, recipient.bytes, Longs.toByteArray(amount), Longs.toByteArray(fee), Longs.toByteArray(timestamp))
 
     version match {
       case TxVersion.V1 => Bytes.concat(Array(typeId), baseBytes)
@@ -32,7 +32,7 @@ object LeaseTxSerializer {
   }
 
   def toBytes(tx: LeaseTransaction): Array[Byte] = tx.version match {
-    case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature)
+    case TxVersion.V1 => Bytes.concat(this.bodyBytes(tx), tx.proofs.toSignature.arr)
     case TxVersion.V2 => Bytes.concat(Array(0: Byte), this.bodyBytes(tx), tx.proofs.bytes())
     case _            => PBTransactionSerializer.bytes(tx)
   }

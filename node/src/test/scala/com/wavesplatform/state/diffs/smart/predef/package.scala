@@ -1,7 +1,7 @@
 package com.wavesplatform.state.diffs.smart
 
 import com.wavesplatform.common.state.ByteStr
-import com.wavesplatform.common.utils.EitherExt2
+import com.wavesplatform.common.utils.{Base64, EitherExt2}
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values._
 import com.wavesplatform.lang.utils._
@@ -78,15 +78,14 @@ package object predef {
        | let sumByteVector = match tx {
        |     case d0: DataTransaction =>
        |      let body = d0.bodyBytes
-       |      body + base64'${ByteStr(tx.bodyBytes.apply()).base64}' == base64'${ByteStr(tx.bodyBytes.apply()).base64}' + base64'${ByteStr(
-         tx.bodyBytes.apply()).base64}'
+       |      body + base64'${Base64.encode(tx.bodyBytes())}' == base64'${Base64.encode(tx.bodyBytes())}' + base64'${Base64.encode(tx.bodyBytes())}'
        |     case _: TransferTransaction => true
        |     case _ => false
        |   }
        |
        | let eqUnion = match tx {
        |   case _: DataTransaction => true
-       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.bytes.toString}')
+       |   case t0: TransferTransaction => t0.recipient == Address(base58'${t.recipient.toString}')
        |   case _ => false
        | }
        |
@@ -163,7 +162,7 @@ package object predef {
        |     dataByKey && dataByIndex
        |
        |   case _: TransferTransaction =>
-       |     let add = Address(base58'${t.recipient.bytes.toString}')
+       |     let add = Address(base58'${t.recipient}')
        |     let long = extract(getInteger(add,"${tx.data(0).key}")) == ${tx.data(0).value}
        |     let bool1 = extract(getBoolean(add,"${tx.data(1).key}")) == ${tx.data(1).value}
        |     let bin = extract(getBinary(add,"${tx.data(2).key}")) ==  base58'${tx.data(2).value}'
@@ -177,8 +176,8 @@ package object predef {
        |
        | let aFromPK = addressFromPublicKey(tx.senderPublicKey) == tx.sender
        | let aFromStrOrRecip = match tx {
-       |   case _: DataTransaction => addressFromString("${tx.sender.stringRepr}") == Address(base58'${tx.sender.bytes.toString}')
-       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient.bytes.toString}')
+       |   case _: DataTransaction => addressFromString("${tx.sender.toAddress}") == Address(base58'${tx.sender.toAddress}')
+       |   case t1: TransferTransaction => addressFromRecipient(t1.recipient) == Address(base58'${t.recipient}')
        |   case _ => false
        | }
        |

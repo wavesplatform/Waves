@@ -15,13 +15,13 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
         val sender    = KeyPair(senderSeed)
         val recipient = KeyPair(recipientSeed)
 
-        val tx = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
+        val tx = createWavesTransfer(sender, recipient.toAddress, amount, fee, time).explicitGet()
 
         tx.timestamp shouldEqual time
         tx.amount shouldEqual amount
         tx.fee shouldEqual fee
         tx.sender shouldEqual sender.publicKey
-        tx.recipient.stringRepr shouldEqual recipient.stringRepr
+        tx.recipient shouldEqual recipient.toAddress
     }
   }
 
@@ -30,7 +30,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
         val sender    = KeyPair(senderSeed)
         val recipient = KeyPair(recipientSeed)
-        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
+        val tx        = createWavesTransfer(sender, recipient.toAddress, amount, fee, time).explicitGet()
         val txAfter   = TransferTransaction.parseBytes(tx.bytes()).get
 
         txAfter.getClass.shouldBe(tx.getClass)
@@ -49,7 +49,7 @@ class TransactionSpecification extends PropSpec with PropertyChecks with Matcher
       (senderSeed: Array[Byte], recipientSeed: Array[Byte], time: Long, amount: Long, fee: Long) =>
         val sender    = KeyPair(senderSeed)
         val recipient = KeyPair(recipientSeed)
-        val tx        = createWavesTransfer(sender, recipient, amount, fee, time).explicitGet()
+        val tx        = createWavesTransfer(sender, recipient.toAddress, amount, fee, time).explicitGet()
         val txAfter   = TransactionParsers.parseBytes(tx.bytes()).get.asInstanceOf[TransferTransaction]
 
         txAfter.getClass.shouldBe(tx.getClass)
