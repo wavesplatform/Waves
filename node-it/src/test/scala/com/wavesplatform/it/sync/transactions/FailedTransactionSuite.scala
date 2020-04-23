@@ -481,9 +481,10 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
         sender.signedBroadcast(tx.json()).id
       }
 
+      overflowBlock()
       sendPriorityTxAndThenOtherTxs(
         txsSend,
-        () => updateAccountScript(Some(false), invalidAccount, priorityFee)
+        () => updateAccountScript(Some(false), invalidAccount, priorityFee, waitForTx = false)
       ) { (txs, priorityTx) =>
         logPriorityTx(priorityTx)
         assertInvalidTxs(txs)

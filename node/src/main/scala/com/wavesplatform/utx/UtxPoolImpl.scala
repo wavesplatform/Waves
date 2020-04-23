@@ -27,6 +27,7 @@ import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.trace.TracedResult
 import com.wavesplatform.transaction.transfer._
 import com.wavesplatform.utils.{LoggerFacade, Schedulers, ScorexLogging, Time}
+import com.wavesplatform.utx.UtxPool.PackStrategy
 import kamon.Kamon
 import kamon.metric.MeasurementUnit
 import monix.execution.ExecutionModel
@@ -255,33 +256,42 @@ class UtxPoolImpl(
 
   override def packUnconfirmed(
       initialConstraint: MultiDimensionalMiningConstraint,
-      estimate: ScalaDuration
+      strategy: PackStrategy
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
-    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, estimate)
+    pack(TransactionDiffer(blockchain.lastBlockTimestamp, time.correctedTime()))(initialConstraint, strategy)
   }
 
   private def cleanUnconfirmed(): Unit =
     pack(TransactionDiffer.skipFailing(blockchain.lastBlockTimestamp, time.correctedTime()))(
       MultiDimensionalMiningConstraint.unlimited,
-      ScalaDuration.Inf
+      PackStrategy.Unlimited
     )
 
   private def pack(differ: (Blockchain, Transaction) => TracedResult[ValidationError, Diff])(
       initialConstraint: MultiDimensionalMiningConstraint,
-      estimate: ScalaDuration
+      strategy: PackStrategy
   ): (Option[Seq[Transaction]], MultiDimensionalMiningConstraint) = {
 
     val packResult = PoolMetrics.packTimeStats.measure {
-      val startTime                       = nanoTimeSource()
-      def isEstimateReached: Boolean      = estimate.isFinite() && (nanoTimeSource() - startTime) >= estimate.toNanos
-      def isEstimateReachedOrInf: Boolean = !estimate.isFinite() || isEstimateReached
+      val startTime = nanoTimeSource()
+
+      def isTimeLimitReached: Boolean = strategy match {
+        case PackStrategy.Limit(time)    => (nanoTimeSource() - startTime) >= time.toNanos
+        case PackStrategy.Estimate(time) => (nanoTimeSource() - startTime) >= time.toNanos
+        case PackStrategy.Unlimited      => false
+      }
+
+      def isTimeEstimateReached: Boolean = strategy match {
+        case PackStrategy.Estimate(time) => (nanoTimeSource() - startTime) >= time.toNanos
+        case _                           => true
+      }
 
       def packIteration(prevResult: PackResult, sortedTransactions: Iterator[TxEntry]): PackResult =
         sortedTransactions
           .filterNot(e => prevResult.validatedTransactions(e.tx.id()))
           .foldLeft[PackResult](prevResult) {
             case (r, TxEntry(tx, priority)) =>
-              def isLimitReached   = r.transactions.exists(_.nonEmpty) && isEstimateReached
+              def isLimitReached   = r.transactions.exists(_.nonEmpty) && isTimeLimitReached
               def isAlreadyRemoved = !priority && !transactions.containsKey(tx.id())
 
               if (r.constraint.isFull || isLimitReached || isAlreadyRemoved)
@@ -355,11 +365,11 @@ class UtxPoolImpl(
           log.trace(s"Block is full: ${newSeed.constraint}")
           newSeed
         } else {
-          if (isEstimateReachedOrInf && allValidated(newSeed)) {
+          if (isTimeEstimateReached && allValidated(newSeed)) {
             log.trace("No more transactions to validate")
             newSeed
           } else {
-            while (!isEstimateReachedOrInf && allValidated(newSeed)) Thread.sleep(200)
+            while (!isTimeEstimateReached && allValidated(newSeed)) Thread.sleep(200)
             loop(newSeed)
           }
         }

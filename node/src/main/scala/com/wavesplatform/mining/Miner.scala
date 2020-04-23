@@ -18,6 +18,7 @@ import com.wavesplatform.state.appender.BlockAppender
 import com.wavesplatform.transaction.TxValidationError.BlockFromFuture
 import com.wavesplatform.transaction._
 import com.wavesplatform.utils.{ScorexLogging, Time}
+import com.wavesplatform.utx.UtxPool.PackStrategy
 import com.wavesplatform.utx.UtxPoolImpl
 import com.wavesplatform.wallet.Wallet
 import io.netty.channel.group.ChannelGroup
@@ -160,7 +161,7 @@ class MinerImpl(
       estimators   = MiningConstraints(blockchainUpdater, height, Some(minerSettings))
       mdConstraint = MultiDimensionalMiningConstraint(estimators.total, estimators.keyBlock)
       (maybeUnconfirmed, updatedMdConstraint) = Instrumented.logMeasure(log, "packing unconfirmed transactions for block")(
-        utx.packUnconfirmed(mdConstraint, Duration.Inf)
+        utx.packUnconfirmed(mdConstraint, PackStrategy.Limit(settings.minerSettings.microBlockInterval * 10))
       )
       unconfirmed = maybeUnconfirmed.getOrElse(Seq.empty)
       _           = log.debug(s"Adding ${unconfirmed.size} unconfirmed transaction(s) to new block")

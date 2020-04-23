@@ -128,7 +128,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
         .id
     }
 
-    def updateAccountScript(result: Option[Boolean], account: String, fee: Long): String = {
+    def updateAccountScript(result: Option[Boolean], account: String, fee: Long, waitForTx: Boolean = true): String = {
       sender
         .setScript(
           account,
@@ -155,7 +155,7 @@ trait FailedTransactionSuiteLike[T] extends ScorexLogging { _: Matchers =>
 
           },
           fee = fee,
-          waitForTx = true
+          waitForTx = waitForTx
         )
         .id
     }

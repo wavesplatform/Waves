@@ -61,7 +61,12 @@ class MicroBlockMinerSpec extends FlatSpec with Matchers with PrivateMethodTeste
         val result = task.runSyncUnsafe()
         result match {
           case MicroBlockMinerImpl.Success(b, totalConstraint) =>
-            (System.nanoTime() - startTime).nanos.toMillis shouldBe settings.minerSettings.microBlockInterval.toMillis +- 1000
+            val isFirstBlock = block.transactionData.isEmpty
+            val elapsed = (System.nanoTime() - startTime).nanos.toMillis
+
+            if (isFirstBlock) elapsed should be < 1000L
+            else elapsed shouldBe settings.minerSettings.microBlockInterval.toMillis +- 1000
+
             generateBlocks(b, totalConstraint)
           case MicroBlockMinerImpl.Stop =>
             d.blockchainUpdater.liquidBlock(d.blockchainUpdater.lastBlockId.get).get

@@ -16,6 +16,7 @@ import com.wavesplatform.state.appender.MicroblockAppender
 import com.wavesplatform.transaction.{BlockchainUpdater, Transaction}
 import com.wavesplatform.utils.ScorexLogging
 import com.wavesplatform.utx.UtxPool
+import com.wavesplatform.utx.UtxPool.PackStrategy
 import io.netty.channel.group.ChannelGroup
 import kamon.Kamon
 import monix.eval.Task
@@ -66,7 +67,11 @@ class MicroBlockMinerImpl(
     val mdConstraint = MultiDimensionalMiningConstraint(restTotalConstraint, constraints.micro)
     val (unconfirmed, updatedMdConstraint) =
       Instrumented.logMeasure(log, "packing unconfirmed transactions for microblock")(
-        utx.packUnconfirmed(mdConstraint, settings.microBlockInterval)
+        utx.packUnconfirmed(
+          mdConstraint,
+          if (accumulatedBlock.transactionData.isEmpty) PackStrategy.Limit(settings.microBlockInterval)
+          else PackStrategy.Estimate(settings.microBlockInterval)
+        )
       )
     val updatedTotalConstraint = updatedMdConstraint.constraints.head
 
