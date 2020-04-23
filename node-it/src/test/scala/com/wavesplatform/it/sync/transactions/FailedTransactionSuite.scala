@@ -169,7 +169,7 @@ class FailedTransactionSuite extends BaseTransactionSuite with CancelAfterFailur
 
         sender.balance(caller).balance shouldBe prevBalance - txs.size * invokeFee
         sender.assetBalance(contract, smartAsset) shouldBe prevAssetBalance
-        sender.assetsBalance(contract).balances should contain theSameElementsAs prevAssets.balances
+        sender.assetsBalance(contract).balances.map(_.toString) should contain theSameElementsAs prevAssets.balances.map(_.toString)
 
         val minFee        = if (typeName == "issue") invokeFee + issueFee else invokeFee + smartFee
         val scriptInvoked = if (typeName == "issue") 0 else 1
