@@ -119,7 +119,7 @@ object InvokeDiffsCommon {
       )
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
-      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
+      _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), ScriptExecutionError.dApp("Negative amount")))
       _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
       assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
