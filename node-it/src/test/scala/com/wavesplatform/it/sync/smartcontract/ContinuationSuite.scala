@@ -41,7 +41,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
           |
           | @Callable(inv)
           | func foo() = {
-          |  let a = ${List.fill(100)("sigVerify(base64'',base64'',base64'')").mkString("||")}
+          |  let a = ${List.fill(40)("sigVerify(base64'',base64'',base64'')").mkString("||")}
           |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
           | }
           |
@@ -67,7 +67,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       version = TxVersion.V2,
       waitForTx = true
     )
-    nodes.waitForHeight(nodes.height.max + 2)
+    nodes.waitForHeightAriseAndTxPresent(invokeScriptTx._1.id)
 
     nodes.foreach { node =>
       node.getDataByKey(dApp, "a") shouldBe BooleanDataEntry("a", false)
@@ -90,8 +90,8 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
       invokeScriptTx,
       "State check failed. Reason: " +
         "Fee in WAVES for InvokeScriptTransaction (900000 in WAVES) " +
-        "with 6 invocation steps " +
-        "does not exceed minimal value of 3000000 WAVES."
+        "with 3 invocation steps " +
+        "does not exceed minimal value of 1500000 WAVES."
     )
   }
 }
