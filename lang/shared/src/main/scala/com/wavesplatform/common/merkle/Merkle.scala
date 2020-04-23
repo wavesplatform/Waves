@@ -74,6 +74,6 @@ object Merkle {
     * @param root merkle root
     */
   def verify(digest: Digest, index: Int, proofs: Seq[Digest], root: Digest): Boolean = {
-    createRoot(digest, index, proofs) sameElements root
+    (1 << proofs.length) > index && index >= 0 && (createRoot(digest, index, proofs) sameElements root)
   }
 }
