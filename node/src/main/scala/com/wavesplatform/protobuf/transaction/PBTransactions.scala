@@ -280,7 +280,7 @@ object PBTransactions {
 
       case Data.Continuation(ContinuationTransactionData(invokeTransactionId, expr)) =>
         Serde
-          .deserialize(expr.toByteArray)
+          .deserialize(expr.toByteArray, allowObjects = true)
           .bimap(
             GenericError(_), { case (expr, _) => ContinuationTransaction(expr, invokeTransactionId, timestamp) }
           )
@@ -581,7 +581,9 @@ object PBTransactions {
         PBTransactions.create(sender, chainId, feeAmount, feeAsset, timestamp, version, proofs, Data.UpdateAssetInfo(data))
 
       case tx @ vt.smart.ContinuationTransaction(expr, invokeScriptTransactionId, _) =>
-        val data = Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId, ByteString.copyFrom(Serde.serialize(expr))))
+        val exprBytes = ByteString.copyFrom(Serde.serialize(expr, allowObjects = true))
+        val data =
+          Data.Continuation(ContinuationTransactionData(invokeScriptTransactionId, exprBytes))
         PBTransactions.create(chainId = tx.chainId, timestamp = tx.timestamp, version = tx.version, data = data)
 
       case _ =>
