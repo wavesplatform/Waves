@@ -365,11 +365,6 @@ class UtxPoolImpl(
           ContinuationTransaction(expr, invokeTxId, time.getTimestamp())
         }
 
-      if (continuationTransactions.isEmpty)
-        println("UTX: no continuations")
-      else
-        println("UTX: filled continuations " + continuationTransactions)
-
       loop(PackResult(Some(continuationTransactions.toSeq), Monoid[Diff].empty, initialConstraint, 0, Set.empty, Set.empty))
     }
 

@@ -19,7 +19,6 @@ import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
   def apply(blockchain: Blockchain, blockTime: Long)(tx: ContinuationTransaction): Either[ValidationError, Diff] = {
-    println(s"START CONTINUATION DIFF")
     val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
     val invokeScriptTransaction = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
@@ -74,13 +73,6 @@ object ContinuationTransactionDiff {
         case ir: IncompleteResult                 => Right(Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ir.expr)))
       }
 
-    } yield {
-      println(s"CONTINUATION RESULT DIFF $resultDiff")
-      resultDiff
-    }
+    } yield resultDiff
   }
-
-/*  private def removeCurrentState(diff: Diff, id: ByteStr) = {
-    diff.copy(continuationStates = diff.continuationStates - id)
-  }*/
 }
