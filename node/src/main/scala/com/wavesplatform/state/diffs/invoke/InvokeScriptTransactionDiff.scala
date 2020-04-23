@@ -124,11 +124,11 @@ object InvokeScriptTransactionDiff {
                       )
                     } match {
                       case Success(r) => r
-                      case Failure(e) => Left((e.getMessage, List.empty))
+                      case Failure(e) => Left(e.getMessage)
                     }
                   } yield evaluator
 
-                  result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
+                  result.leftMap { case (error) => ScriptExecutionError.dApp(error, Nil) } //TODO trace
                 })
                 TracedResult(
                   scriptResultE,
