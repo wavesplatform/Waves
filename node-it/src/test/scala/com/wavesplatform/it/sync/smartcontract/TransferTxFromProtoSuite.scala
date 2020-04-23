@@ -1,7 +1,6 @@
 package com.wavesplatform.it.sync.smartcontract
 
 import com.wavesplatform.account.AddressOrAlias
-import com.wavesplatform.api.http.ApiError.ScriptExecutionError
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -178,9 +177,9 @@ class TransferTxFromProtoSuite extends BaseTransactionSuite {
     sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxBoolAttBytes)).explicitGet()), waitForTx = true)
     sender.getDataByKey(dApp, "attachment").value shouldBe s"${transferTxWithBoolAttachment.attachment.get.asInstanceOf[Bool].value}"
 
-    assertApiError(
-      sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet())),
-      AssertiveApiError(ScriptExecutionError.Id, "Empty description", matchMessage = true)
-    )
+    val tx =
+      sender.invokeScript(source, dApp, func = Some("foo"), args = List(Terms.CONST_BYTESTR(ByteStr(protoTransferTxNoneAttBytes)).explicitGet()), waitForTx = true)
+          ._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Empty description")
   }
 }

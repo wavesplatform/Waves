@@ -105,10 +105,9 @@ class InvokeScriptPayAndTransferSameAssetSuite extends BaseTransactionSuite with
     val paymentAmount = 10
     val fee           = smartMinFee + smartFee * 2
 
-    assertBadRequestAndMessage(
-      invoke("resendPayment", paymentAmount, issued(rejAssetId), fee),
-      "token-script"
-    )
+    val tx = invoke("resendPayment", paymentAmount, issued(rejAssetId), fee)
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include regex "token-script"
+
   }
 
   test("dApp can transfer payed Waves if its own balance is 0") {

@@ -2,17 +2,21 @@ package com.wavesplatform.it.sync.activation
 
 import com.typesafe.config.Config
 import com.wavesplatform.api.http.ApiError.StateCheckFailed
+import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
+import com.wavesplatform.it.api.TransactionStatus
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
 import com.wavesplatform.it.util._
 import com.wavesplatform.it.{NTPTime, NodeConfigs}
 import com.wavesplatform.lang.v1.estimator.v3.ScriptEstimatorV3
+import com.wavesplatform.transaction.Asset.IssuedAsset
 import com.wavesplatform.transaction.TxVersion
 import com.wavesplatform.transaction.assets.exchange.{AssetPair, Order}
+import com.wavesplatform.transaction.smart.InvokeScriptTransaction
 import com.wavesplatform.transaction.smart.script.ScriptCompiler
 import play.api.libs.json.JsObject
 
@@ -41,6 +45,11 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
          |@Callable(i)
          |func transfer() = {
          |  TransferSet([ScriptTransfer(i.caller, $minInvokeFee, asset)])
+         |}
+         |
+         |@Callable(i)
+         |func error() = {
+         |  throw("Error in DApp")
          |}
          |
          |@Callable(i)
@@ -141,7 +150,121 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     check() // hardened
   }
 
-  test("Reject withdrawal of InvokeScriptTransaction fee from the funds received as a result of the script call execution") {
+  test("accept invalid by asset script InvokeScriptTransaction to utx and save it as failed after activation height") {
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
+
+    val txs =
+      (1 to MaxTxsInMicroBlock * 2).map { _ =>
+        sender.invokeScript(caller, dApp, Some("transfer"), fee = minInvokeFee)._1.id
+      }
+
+    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+
+    def check(): Unit = {
+      val failed = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
+      failed.size shouldBe MaxTxsInMicroBlock * 2
+
+      all(failed.map(_.status)) shouldBe "confirmed"
+      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+    }
+
+    check() // liquid
+    nodes.waitForHeightArise()
+    check() // hardened
+  }
+
+  test("accept invalid by asset script in payment InvokeScriptTransaction to utx and save it as failed after activation height") {
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(true), waitForTx = true)
+
+    val callerBalance = sender.balance(caller).balance
+    val callerAssetBalance = {
+      val balance = sender.assetBalance(caller, asset).balance
+      if (balance < MaxTxsInMicroBlock * 2) {
+        sender.transfer(dApp, caller, MaxTxsInMicroBlock * 2 - balance, minFee + 2 * smartFee, Some(asset), waitForTx = true)
+      }
+      sender.assetBalance(caller, asset).balance
+    }
+    val dAppAssetBalance = sender.assetBalance(dApp, asset).balance
+
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(false), waitForTx = true)
+
+    val txs =
+      (1 to MaxTxsInMicroBlock * 2).map { _ =>
+        sender
+          .invokeScript(
+            caller,
+            dApp,
+            Some("write"),
+            payment = Seq(InvokeScriptTransaction.Payment(2, IssuedAsset(ByteStr.decodeBase58(asset).get))),
+            fee = minInvokeFee
+          )
+          ._1
+          .id
+      }
+
+    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+
+    def check(): Unit = {
+      val failed = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
+      failed.size shouldBe MaxTxsInMicroBlock * 2
+
+      all(failed.map(_.status)) shouldBe "confirmed"
+      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+
+      sender.balance(caller).balance shouldBe callerBalance - MaxTxsInMicroBlock * 2 * minInvokeFee
+      sender.assetBalance(caller, asset).balance shouldBe callerAssetBalance
+      sender.assetBalance(dApp, asset).balance shouldBe dAppAssetBalance
+
+      assertApiError(
+        sender
+          .invokeScript(
+            caller,
+            dApp,
+            Some("write"),
+            payment = Seq(InvokeScriptTransaction.Payment(callerAssetBalance + 1, IssuedAsset(ByteStr.decodeBase58(asset).get))),
+            fee = minInvokeFee
+          )
+          ._1
+          .id
+      ) { e =>
+        e.id shouldBe StateCheckFailed.Id
+        e.statusCode shouldBe StateCheckFailed.Code.intValue
+        e.message should include("Attempt to transfer unavailable funds")
+      }
+    }
+
+    check() // liquid
+    nodes.waitForHeightArise()
+    check() // hardened
+  }
+
+  test("accept invalid by DApp script InvokeScriptTransaction to utx and save it as failed after activation height") {
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(true), waitForTx = true)
+
+    val txs =
+      (1 to MaxTxsInMicroBlock * 2).map { _ =>
+        sender.invokeScript(caller, dApp, Some("error"), fee = minInvokeFee)._1.id
+      }
+
+    sender.waitFor("empty utx")(n => n.utxSize, (utxSize: Int) => utxSize == 0, 100.millis)
+
+    def check(): Unit = {
+      val failed = sender.transactionStatus(txs).sortWith { case (f, s) => txs.indexOf(f.status) < txs.indexOf(s.status) }
+      failed.size shouldBe MaxTxsInMicroBlock * 2
+
+      all(failed.map(_.status)) shouldBe "confirmed"
+      all(failed.map(_.applicationStatus)) shouldBe 'defined
+      all(failed.flatMap(_.applicationStatus)) shouldBe "scriptExecutionFailed"
+    }
+
+    check() // liquid
+    nodes.waitForHeightArise()
+    check() // hardened
+  }
+
+  test("reject withdrawal of InvokeScriptTransaction fee from the funds received as a result of the script call execution") {
     sender.setAssetScript(asset, dApp, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
 
     sender.transfer(otherCaller, caller, sender.balance(otherCaller).balance - minFee, fee = minFee, waitForTx = true)
@@ -154,7 +277,7 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
     }
   }
 
-  test("Reject withdrawal of matcher fee from orders in ExchangeTransaction") {
+  test("reject withdrawal of matcher fee from orders in ExchangeTransaction") {
     sender.transfer(caller, otherCaller, issueFee, waitForTx = true)
     val tradeAsset = sender.issue(otherCaller, "Trade", decimals = 8: Byte, waitForTx = true).id
 
@@ -203,6 +326,120 @@ class AcceptFailedScriptActivationSuite extends BaseTransactionSuite with NTPTim
       e.id shouldBe StateCheckFailed.Id
       e.message should include("Accounts balance errors")
     }
+  }
+
+  test("accept invalid by order asset scripts ExchangeTransaction to utx and save it as failed after activation height") {
+    sender.setAssetScript(asset, dApp, priorityFee, assetScript(true), waitForTx = true)
+    sender.transfer(sender.address, dApp, 100.waves, waitForTx = true)
+    val tradeAsset =
+      sender
+        .issue(dApp, "TradeAsset", quantity = someAssetAmount, decimals = 8: Byte, script = assetScript(true), fee = priorityFee, waitForTx = true)
+        .id
+    val feeAsset =
+      sender
+        .issue(dApp, "FeeAsset", quantity = someAssetAmount, decimals = 8: Byte, script = assetScript(true), fee = priorityFee, waitForTx = true)
+        .id
+
+    val preconditions = Seq(
+      sender.transfer(dApp, caller, someAssetAmount / 3, assetId = Some(tradeAsset), fee = minFee + 2 * smartFee).id,
+      sender.transfer(dApp, caller, someAssetAmount / 3, assetId = Some(feeAsset), fee = minFee + 2 * smartFee).id,
+      sender.transfer(dApp, otherCaller, someAssetAmount / 3, assetId = Some(tradeAsset), fee = minFee + 2 * smartFee).id,
+      sender.transfer(dApp, otherCaller, someAssetAmount / 3, assetId = Some(feeAsset), fee = minFee + 2 * smartFee).id
+    )
+
+    sender.waitFor("preconditions")(
+      n => n.transactionStatus(preconditions),
+      (statuses: Seq[TransactionStatus]) => statuses.forall(_.status == "confirmed"),
+      100.millis
+    )
+
+    val assetPair = AssetPair.createAssetPair("WAVES", tradeAsset).get
+
+    def orders: (Order, Order) = {
+      val ts = ntpTime.getTimestamp()
+      val buy = Order.buy(
+        Order.V4,
+        otherCallerKP,
+        dAppKP.publicKey,
+        assetPair,
+        10,
+        100,
+        ts,
+        ts + Order.MaxLiveTime,
+        smartMatcherFee,
+        matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+      )
+      val sell =
+        Order.sell(
+          Order.V4,
+          callerKP,
+          dAppKP.publicKey,
+          assetPair,
+          10,
+          100,
+          ts,
+          ts + Order.MaxLiveTime,
+          smartMatcherFee,
+          matcherFeeAssetId = IssuedAsset(ByteStr.decodeBase58(feeAsset).get)
+        )
+      (buy, sell)
+    }
+
+    {
+      val (buy, sell) = orders
+      sender.setAssetScript(tradeAsset, dApp, setAssetScriptFee + smartFee, assetScript(false), waitForTx = true)
+      val tx = sender
+        .broadcastExchange(
+          dAppKP,
+          buy,
+          sell,
+          buy.amount,
+          buy.price,
+          buy.matcherFee,
+          sell.matcherFee,
+          priorityFee,
+          matcherFeeAssetId = Some(feeAsset),
+          version = TxVersion.V3
+        )
+        .id
+
+      val status = sender.waitFor("exchange accepted and saved as failed")(
+        n => n.transactionStatus(Seq(tx)).head,
+        (s: TransactionStatus) => s.status == "confirmed",
+        100.millis
+      )
+
+      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+    }
+
+    {
+      val (buy, sell) = orders
+      sender.setAssetScript(tradeAsset, dApp, setAssetScriptFee + smartFee, assetScript(true), waitForTx = true)
+      sender.setAssetScript(feeAsset, dApp, setAssetScriptFee + smartFee, assetScript(false), waitForTx = true)
+      val tx = sender
+        .broadcastExchange(
+          dAppKP,
+          buy,
+          sell,
+          buy.amount,
+          buy.price,
+          buy.matcherFee,
+          sell.matcherFee,
+          priorityFee,
+          matcherFeeAssetId = Some(feeAsset),
+          version = TxVersion.V3
+        )
+        .id
+
+      val status = sender.waitFor("exchange accepted and saved as failed")(
+        n => n.transactionStatus(Seq(tx)).head,
+        (s: TransactionStatus) => s.status == "confirmed",
+        100.millis
+      )
+
+      status.applicationStatus shouldBe Some("scriptExecutionFailed")
+    }
+
   }
 
   override protected def nodeConfigs: Seq[Config] = Configs

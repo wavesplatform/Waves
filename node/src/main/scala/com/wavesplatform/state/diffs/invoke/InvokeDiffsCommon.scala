@@ -120,7 +120,7 @@ object InvokeDiffsCommon {
 
       _ <- TracedResult(checkSelfPayments(dAppAddress, blockchain, tx, version, transferList))
       _ <- TracedResult(Either.cond(transferList.map(_.amount).forall(_ >= 0), (), NegativeAmount(-42, "")))
-      _ <- TracedResult(validateOverflow(transferList.map(_.amount), "Attempt to transfer unavailable funds in contract payment"))
+      _ <- TracedResult(checkOverflow(transferList.map(_.amount)))
 
       assetsComplexity = (tx.checkedAssets.map(_.id) ++ transferList.flatMap(_.assetId))
         .flatMap(id => blockchain.assetScript(IssuedAsset(id)))
@@ -158,7 +158,7 @@ object InvokeDiffsCommon {
 
       paymentsAndFeeDiff = paymentsPart(tx, dAppAddress, feeInfo._2)
 
-      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff)
+      compositeDiff <- foldActions(blockchain, blockTime, tx, dAppAddress, dAppPublicKey)(actions, paymentsAndFeeDiff).leftMap(asFailedScriptError)
 
       transfers = compositeDiff.portfolios |+| feeInfo._2.mapValues(_.negate)
 
@@ -189,10 +189,10 @@ object InvokeDiffsCommon {
     } yield resultDiff
   }
 
-  private def paymentsPart(
-      tx: InvokeScriptTransaction,
-      dAppAddress: Address,
-      feePart: Map[Address, Portfolio]
+  def paymentsPart(
+    tx: InvokeScriptTransaction,
+    dAppAddress: Address,
+    feePart: Map[Address, Portfolio]
   ): Diff = {
     val payablePart = tx.payments
       .map {
@@ -226,16 +226,24 @@ object InvokeDiffsCommon {
       tx: InvokeScriptTransaction,
       version: StdLibVersion,
       transfers: List[AssetTransfer]
-  ): Either[GenericError, Unit] =
+  ): Either[ScriptExecutionError, Unit] =
     if (blockchain.disallowSelfPayment && version >= V4)
       if (tx.payments.nonEmpty && tx.sender.toAddress == dAppAddress)
-        GenericError("DApp self-payment is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.dApp("DApp self-payment is forbidden since V4").asLeft[Unit]
       else if (transfers.exists(_.recipient.bytes == dAppAddress.bytes))
-        GenericError("DApp self-transfer is forbidden since V4").asLeft[Unit]
+        ScriptExecutionError.dApp("DApp self-transfer is forbidden since V4").asLeft[Unit]
       else
-        ().asRight[GenericError]
+        ().asRight[ScriptExecutionError]
     else
-      ().asRight[GenericError]
+      ().asRight[ScriptExecutionError]
+
+  private def checkOverflow(dataList: Traversable[Long]): Either[ScriptExecutionError, Unit] = {
+    Try(dataList.foldLeft(0L)(Math.addExact))
+      .fold(
+        _ => ScriptExecutionError.dApp("Attempt to transfer unavailable funds in contract payment").asLeft[Unit],
+        _ => ().asRight[ScriptExecutionError]
+      )
+  }
 
   private[this] def checkDataEntries(
       tx: InvokeScriptTransaction,
@@ -423,17 +431,24 @@ object InvokeDiffsCommon {
         isAssetScript = true,
         scriptContainerAddress = if (blockchain.passCorrectAssetId) assetId else tx.dAppAddressOrAlias.bytes
       ) match {
-        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, CanFail.Reason.AssetInAction))
-        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, CanFail.Reason.AssetInAction))
+        case (log, Left(error))  => Left(ScriptExecutionError.asset(error, log, FailedScriptError.Reason.AssetInAction))
+        case (log, Right(FALSE)) => Left(TransactionNotAllowedByScript.asset(log, FailedScriptError.Reason.AssetInAction))
         case (_, Right(TRUE))    => Right(nextDiff)
-        case (log, Right(x))     => Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, CanFail.Reason.AssetInAction))
+        case (log, Right(x)) =>
+          Left(ScriptExecutionError.asset(s"Script returned not a boolean result, but $x", log, FailedScriptError.Reason.AssetInAction))
       }
     } match {
       case Failure(e) =>
         Left(
-          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, CanFail.Reason.AssetInAction)
+          ScriptExecutionError.asset(s"Uncaught execution error: ${Throwables.getStackTraceAsString(e)}", List.empty, FailedScriptError.Reason.AssetInAction)
         )
       case Success(s) => s
     }
 
+  private def asFailedScriptError(ve: ValidationError): FailedScriptError =
+    ve match {
+      case e: FailedScriptError => e
+      case e: GenericError      => ScriptExecutionError.dApp(e.err)
+      case e                    => ScriptExecutionError.dApp(e.toString)
+    }
 }

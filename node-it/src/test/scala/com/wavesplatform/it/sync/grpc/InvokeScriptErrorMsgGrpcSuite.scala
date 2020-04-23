@@ -74,17 +74,21 @@ class InvokeScriptErrorMsgGrpcSuite extends GrpcBaseTransactionSuite {
       Code.INVALID_ARGUMENT
     )
 
-    assertGrpcError(
-      sender.broadcastInvokeScript(
-        caller,
-        Recipient().withPublicKeyHash(contractAddress),
-        None,
-        payments = payments,
-        fee = 1300000
-      ),
-      "Fee in WAVES for InvokeScriptTransaction .* with 12 total scripts invoked does not exceed minimal value",
-      Code.INVALID_ARGUMENT
+    val tx = sender.broadcastInvokeScript(
+      caller,
+      Recipient().withPublicKeyHash(contractAddress),
+      None,
+      payments = payments,
+      fee = 1300000,
+      waitForTx = true
     )
+
+    sender
+      .stateChanges(tx.id)
+      ._2
+      .errorMessage
+      .get
+      .text should include regex "Fee in WAVES for InvokeScriptTransaction .* with 12 total scripts invoked does not exceed minimal value"
   }
 
 }

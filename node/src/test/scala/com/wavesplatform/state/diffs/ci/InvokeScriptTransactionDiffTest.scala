@@ -30,7 +30,6 @@ import com.wavesplatform.protobuf.dapp.DAppMeta
 import com.wavesplatform.settings.{TestFunctionalitySettings, TestSettings}
 import com.wavesplatform.state._
 import com.wavesplatform.state.diffs.FeeValidation.FeeConstants
-import com.wavesplatform.state.diffs.TransactionDiffer.TransactionValidationError
 import com.wavesplatform.state.diffs.invoke.InvokeScriptTransactionDiff
 import com.wavesplatform.state.diffs.{ENOUGH_AMT, FeeValidation, produce}
 import com.wavesplatform.transaction.Asset.{IssuedAsset, Waves}
@@ -1159,7 +1158,7 @@ class InvokeScriptTransactionDiffTest
             .selfSigned(2.toByte, master, acc, IssuedAsset(asset.id()), asset.quantity / 10, Waves, enoughFee, None, ts)
             .explicitGet()
         assertDiffEi(Seq(TestBlock.create(genesis ++ Seq(asset, t, setScript))), TestBlock.create(Seq(ci)), fs) { blockDiffEi =>
-          blockDiffEi should produce("NegativeAmount")
+          blockDiffEi should produce("Negative amount")
         }
     }
   }
@@ -1824,7 +1823,7 @@ class InvokeScriptTransactionDiffTest
         .explicitGet()
     } yield (invokeTx, Seq(genesis1Tx, genesis2Tx, setScriptTx))
 
-  property("duplicate issuing asset should produce error") {
+  property("duplicate issuing asset should produce diff error") {
     forAll(doubleAssetIdScenario) {
       case (invoke, genesisTxs) =>
         tempDb { db =>
@@ -1833,9 +1832,7 @@ class InvokeScriptTransactionDiffTest
           )
           assertDiffEi(Seq(TestBlock.create(genesisTxs)), TestBlock.create(Seq(invoke), Block.ProtoBlockVersion), features) { ei =>
             inside(ei) {
-              case Left(TransactionValidationError(ScriptExecutionError(m, _, false), i)) =>
-                i shouldBe invoke
-                m should endWith("is already issued")
+              case Right(diff) => diff.scriptResults(invoke.id()).errorMessage.get.text should include("is already issued")
             }
           }
         }

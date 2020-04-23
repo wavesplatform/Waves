@@ -1,6 +1,5 @@
 package com.wavesplatform.it.sync.smartcontract
 
-import com.wavesplatform.api.http.ApiError.TransactionNotAllowedByAssetScript
 import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.common.utils.EitherExt2
 import com.wavesplatform.it.api.SyncHttpApi._
@@ -113,19 +112,15 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
   test("not able to burn asset if required senderPublicKey didn't match") {
     val smartAssetQuantityBefore = sender.assetsDetails(firstAssetId).quantity
     val burnedQuantity = 100000
-    assertApiError(
-      sender.invokeScript(
-        caller,
-        secondDApp,
-        func = Some("burnAsset"),
-        args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)),
-        fee = smartMinFee + smartFee
-      )
-        ) { error =>
-          error.message should include("Transaction is not allowed by token-script")
-          error.id shouldBe TransactionNotAllowedByAssetScript.Id
-          error.statusCode shouldBe 400
-        }
+    val tx = sender.invokeScript(
+      caller,
+      secondDApp,
+      func = Some("burnAsset"),
+      args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_LONG(burnedQuantity)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
   }
@@ -133,42 +128,34 @@ class PseudoTxSenderPubKeySuite extends BaseTransactionSuite {
   test("not able to reissue asset if required senderPublicKey didn't match") {
     val smartAssetQuantityBefore = sender.assetsDetails(secondAssetId).quantity
     val addedQuantity = 100000
-    assertApiError(
-      sender.invokeScript(
-        caller,
-        secondDApp,
-        func = Some("reissueAsset"),
-        args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_BOOLEAN(true), Terms.CONST_LONG(addedQuantity)),
-        fee = smartMinFee + smartFee
-      )
-    ) { error =>
-      error.message should include("Transaction is not allowed by token-script")
-      error.id shouldBe TransactionNotAllowedByAssetScript.Id
-      error.statusCode shouldBe 400
-    }
+    val tx = sender.invokeScript(
+      caller,
+      secondDApp,
+      func = Some("reissueAsset"),
+      args = List(Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(), Terms.CONST_BOOLEAN(true), Terms.CONST_LONG(addedQuantity)),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
 
     sender.assetsDetails(secondAssetId).quantity shouldBe smartAssetQuantityBefore
   }
 
   test("not able to transfer asset if required senderPublicKey didn't match") {
     val smartAssetBalanceBefore = sender.assetBalance(firstDApp, secondAssetId).balance
-    assertApiError(
-      sender.invokeScript(
-        caller,
-        secondDApp,
-        func = Some("transferAsset"),
-        args = List(
-          Terms.CONST_BYTESTR(ByteStr.decodeBase58(firstDApp).get).explicitGet(),
-          Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(),
-          Terms.CONST_LONG(transferAmount)
-        ),
-        fee = smartMinFee + smartFee
-      )
-    ) { error =>
-      error.message should include("Transaction is not allowed by token-script")
-      error.id shouldBe TransactionNotAllowedByAssetScript.Id
-      error.statusCode shouldBe 400
-    }
+    val tx = sender.invokeScript(
+      caller,
+      secondDApp,
+      func = Some("transferAsset"),
+      args = List(
+        Terms.CONST_BYTESTR(ByteStr.decodeBase58(firstDApp).get).explicitGet(),
+        Terms.CONST_BYTESTR(ByteStr.decodeBase58(secondAssetId).get).explicitGet(),
+        Terms.CONST_LONG(transferAmount)
+      ),
+      fee = smartMinFee + smartFee,
+      waitForTx = true
+    )._1.id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Transaction is not allowed by token-script")
 
     sender.assetBalance(firstDApp, secondAssetId).balance shouldBe smartAssetBalanceBefore
   }

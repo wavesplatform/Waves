@@ -121,17 +121,17 @@ class HodlContractTransactionSuite extends BaseTransactionSuite with CancelAfter
   }
 
   test("caller can't withdraw more than owns") {
-    assertBadRequestAndMessage(
-      sender.invokeScript(
-        caller,
-        contract,
-        func = Some("withdraw"),
-        args = List(CONST_LONG(1.51.waves)),
-        payment = Seq(),
-        fee = 1.waves
-      ),
-      "Not enough balance"
-    )
+    val tx = sender.invokeScript(
+      caller,
+      contract,
+      func = Some("withdraw"),
+      args = List(CONST_LONG(1.51.waves)),
+      payment = Seq(),
+      fee = 1.waves,
+      waitForTx = true
+    )._1.id
+
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include("Not enough balance")
   }
 
   test("caller can withdraw less than he owns") {

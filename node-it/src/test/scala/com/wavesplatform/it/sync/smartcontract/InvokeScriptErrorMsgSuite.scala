@@ -75,17 +75,21 @@ class InvokeScriptErrorMsgSuite extends BaseTransactionSuite with CancelAfterFai
         " Requires 400000 extra fee. Fee for InvokeScriptTransaction (1000 in WAVES) does not exceed minimal value of 1300000 WAVES."
     )
 
-    assertBadRequestAndMessage(
-      sender.invokeScript(
+    val tx = sender
+      .invokeScript(
         caller,
         contract,
         Some("f"),
         payment = Seq(
           InvokeScriptTransaction.Payment(10, Asset.fromString(Some(asset1)))
         ),
-        fee = 1300000
-      ),
-      "State check failed. Reason: Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
+        fee = 1300000,
+        waitForTx = true
+      )
+      ._1
+      .id
+    sender.debugStateChanges(tx).stateChanges.get.errorMessage.get.text should include(
+      "Fee in WAVES for InvokeScriptTransaction (1300000 in WAVES) with 12 total scripts invoked does not exceed minimal value of 5300000 WAVES."
     )
   }
 }

@@ -2,15 +2,15 @@ package com.wavesplatform.state
 
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
-import com.wavesplatform.account.{Address, AddressScheme}
+import com.wavesplatform.account.Address
 import com.wavesplatform.common.utils._
-import com.wavesplatform.utils._
 import com.wavesplatform.lang.v1.traits.domain.{Burn, Issue, Reissue}
 import com.wavesplatform.protobuf.transaction.{PBAmounts, PBTransactions, InvokeScriptResult => PBInvokeScriptResult}
 import com.wavesplatform.protobuf.utils.PBUtils
 import com.wavesplatform.state.InvokeScriptResult.ErrorMessage
 import com.wavesplatform.transaction.Asset
 import com.wavesplatform.transaction.Asset.Waves
+import com.wavesplatform.utils._
 import play.api.libs.json._
 
 final case class InvokeScriptResult(

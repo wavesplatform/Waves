@@ -3,7 +3,6 @@ package com.wavesplatform.lang.compiler
 import cats.kernel.Monoid
 import com.google.protobuf.ByteString
 import com.wavesplatform.common.utils.EitherExt2
-import com.wavesplatform.lang.Common
 import com.wavesplatform.lang.Common.NoShrink
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.{CallableAnnotation, CallableFunction}
