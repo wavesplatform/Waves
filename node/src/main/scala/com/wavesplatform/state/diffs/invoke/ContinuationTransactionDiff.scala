@@ -2,7 +2,6 @@ package com.wavesplatform.state.diffs.invoke
 
 import cats.implicits._
 import com.wavesplatform.account.AddressScheme
-import com.wavesplatform.common.state.ByteStr
 import com.wavesplatform.lang.directives.DirectiveSet
 import com.wavesplatform.lang.directives.values.{Account, DApp}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext

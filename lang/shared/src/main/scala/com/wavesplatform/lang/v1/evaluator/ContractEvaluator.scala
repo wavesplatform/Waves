@@ -1,4 +1,5 @@
 package com.wavesplatform.lang.v1.evaluator
+
 import cats.Id
 import cats.implicits._
 import com.wavesplatform.common.state.ByteStr
@@ -6,14 +7,12 @@ import com.wavesplatform.lang.ExecutionError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
-import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 import com.wavesplatform.lang.v1.compiler.Terms._
+import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
-import com.wavesplatform.lang.v1.task.imports
-import com.wavesplatform.lang.v1.task.imports.raiseError
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
+import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
 import scala.util.Try
 
