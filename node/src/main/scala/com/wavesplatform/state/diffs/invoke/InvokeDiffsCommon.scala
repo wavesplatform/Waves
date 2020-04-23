@@ -22,7 +22,6 @@ import com.wavesplatform.lang.v1.traits.domain.Tx.{BurnPseudoTx, ReissuePseudoTx
 import com.wavesplatform.lang.v1.traits.domain._
 import com.wavesplatform.settings.Constants
 import com.wavesplatform.state._
-import com.wavesplatform.state.diffs.CommonValidation._
 import com.wavesplatform.state.diffs.DiffsCommon
 import com.wavesplatform.state.diffs.FeeValidation._
 import com.wavesplatform.state.reader.CompositeBlockchain

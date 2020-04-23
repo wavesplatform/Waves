@@ -9,7 +9,7 @@ import com.google.common.io.ByteStreams.{newDataInput, newDataOutput}
 import com.google.common.io.{ByteArrayDataInput, ByteArrayDataOutput}
 import com.google.common.primitives.{Bytes, Ints, Longs, Shorts}
 import com.google.protobuf.{ByteString, CodedInputStream, WireFormat}
-import com.wavesplatform.account.{Address, PublicKey}
+import com.wavesplatform.account.PublicKey
 import com.wavesplatform.api.BlockMeta
 import com.wavesplatform.block.validation.Validators
 import com.wavesplatform.block.{Block, BlockHeader}
