@@ -20,6 +20,7 @@ object BlockchainFeatures {
   val BlockReward                     = BlockchainFeature(14, "Block Reward and Community Driven Monetary Policy")
   val BlockV5                         = BlockchainFeature(15, "Ride V4, VRF, Protobuf, Failed transactions")
   val LeaseExpiration                 = BlockchainFeature(16, "Lease Expiration")
+  val ContinuationTransaction         = BlockchainFeature(17, "Continuation Transaction")
 
   // When next fork-parameter is created, you must replace all uses of the DummyFeature with the new one.
   val Dummy = BlockchainFeature(-1, "Non Votable!")

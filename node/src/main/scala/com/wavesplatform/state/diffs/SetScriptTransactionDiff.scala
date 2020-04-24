@@ -1,8 +1,10 @@
 package com.wavesplatform.state.diffs
 
 import cats.implicits._
-import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.BlockchainFeatures
 import com.wavesplatform.features.ComplexityCheckPolicyProvider._
+import com.wavesplatform.features.EstimatorProvider._
+import com.wavesplatform.features.FeatureProvider._
 import com.wavesplatform.lang.ValidationError
 import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.directives.values.StdLibVersion
@@ -14,13 +16,14 @@ import com.wavesplatform.transaction.TxValidationError.GenericError
 import com.wavesplatform.transaction.smart.SetScriptTransaction
 
 object SetScriptTransactionDiff {
-  def apply(blockchain: Blockchain)(tx: SetScriptTransaction): Either[ValidationError, Diff] =
+  def apply(blockchain: Blockchain)(tx: SetScriptTransaction): Either[ValidationError, Diff] = {
+    val allowContinuation = blockchain.isFeatureActivated(BlockchainFeatures.ContinuationTransaction)
     for {
       callableComplexities <- tx.script match {
-        case Some(ContractScriptImpl(version, dApp)) => estimate(blockchain, version, dApp)
+        case Some(ContractScriptImpl(version, dApp)) => estimate(blockchain, version, dApp, allowContinuation)
         case _                                       => Right(Map[Int, Map[String, Long]]())
       }
-      verifierWithComplexity <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = false)
+      verifierWithComplexity <- DiffsCommon.countVerifierComplexity(tx.script, blockchain, isAsset = false, allowContinuation)
       scriptWithComplexities = verifierWithComplexity.map {
         case (script, verifierComplexity) =>
           AccountScriptInfo(tx.sender, script, verifierComplexity, callableComplexities)
@@ -31,17 +34,25 @@ object SetScriptTransactionDiff {
       scripts = Map(tx.sender.toAddress    -> scriptWithComplexities),
       scriptsRun = DiffsCommon.countScriptRuns(blockchain, tx)
     )
+  }
 
   private def estimate(
       blockchain: Blockchain,
       version: StdLibVersion,
-      dApp: DApp
+      dApp: DApp,
+      allowContinuation: Boolean
   ): Either[GenericError, Map[Int, Map[String, Long]]] = {
     val callables = dApp.copy(verifierFuncOpt = None)
     val actualComplexities =
       for {
-        currentComplexity <- ContractScript.estimateComplexity(version, callables, blockchain.estimator, blockchain.useReducedVerifierComplexityLimit, checkLimit = false) //TODO
-        nextComplexities  <- estimateNext(blockchain, version, callables)
+        currentComplexity <- ContractScript.estimateComplexity(
+          version,
+          callables,
+          blockchain.estimator,
+          blockchain.useReducedVerifierComplexityLimit,
+          allowContinuation = allowContinuation
+        )
+        nextComplexities <- estimateNext(blockchain, version, callables)
         complexitiesByEstimator = (currentComplexity :: nextComplexities).mapWithIndex {
           case ((_, complexitiesByCallable), i) => (i + blockchain.estimator.version, complexitiesByCallable)
         }.toMap

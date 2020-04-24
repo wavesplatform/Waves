@@ -32,6 +32,8 @@ object ContractLimits {
   val MaxCallableActionsAmount = 10
   val MaxAttachedPaymentAmount = 2
 
+  val MaxContinuationSteps = 10
+
   // Data weight related constants
   val OBJ_WEIGHT      = 40L
   val FIELD_WEIGHT    = 30L
