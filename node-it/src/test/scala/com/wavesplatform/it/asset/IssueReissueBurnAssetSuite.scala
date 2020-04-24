@@ -17,6 +17,11 @@ import com.wavesplatform.transaction.smart.{InvokeScriptTransaction, SetScriptTr
 import scala.concurrent.duration._
 
 class IssueReissueBurnAssetSuite extends BaseSuite {
+  override def nodeConfigs =
+    com.wavesplatform.it.NodeConfigs.newBuilder
+      .overrideBase(_.quorum(0))
+      .withDefault(1)
+      .buildNonConflicting()
   private val initialWavesBalance = 100.waves
   private val setScriptPrice      = 0.01.waves
 
