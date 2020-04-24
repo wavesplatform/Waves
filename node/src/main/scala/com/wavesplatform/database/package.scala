@@ -260,7 +260,7 @@ package object database extends ScorexLogging {
         output.writeByte(invokeTxId.length)
         output.writeByteStr(invokeTxId)
 
-        val exprBytes = Serde.serialize(expr)
+        val exprBytes = Serde.serialize(expr, allowObjects = true)
         output.writeInt(exprBytes.length)
         output.write(exprBytes)
     }
