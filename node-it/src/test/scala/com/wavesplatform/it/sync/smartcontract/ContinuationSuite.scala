@@ -1,6 +1,10 @@
 package com.wavesplatform.it.sync.smartcontract
 
+import com.typesafe.config.Config
 import com.wavesplatform.common.utils.{Base58, EitherExt2}
+import com.wavesplatform.features.BlockchainFeatures
+import com.wavesplatform.it.NodeConfigs
+import com.wavesplatform.it.NodeConfigs.Default
 import com.wavesplatform.it.api.SyncHttpApi._
 import com.wavesplatform.it.sync._
 import com.wavesplatform.it.transactions.BaseTransactionSuite
@@ -17,6 +21,13 @@ import monix.eval.Coeval
 import org.scalatest.CancelAfterFailure
 
 class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
+  private val activationHeight = 6
+
+  override protected def nodeConfigs: Seq[Config] =
+    NodeConfigs
+      .Builder(Default, 2, Seq.empty)
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, activationHeight - 1)))
+      .buildNonConflicting()
 
   private val dApp   = firstAddress
   private val caller = secondAddress
@@ -31,29 +42,41 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
     ): Either[String, Long] = Right(1)
   }
 
+  private val script = {
+    val scriptText =
+      s"""
+         |{-# STDLIB_VERSION 4 #-}
+         |{-# CONTENT_TYPE DAPP #-}
+         |
+         | @Callable(inv)
+         | func foo() = {
+         |  let a = ${List.fill(40)("sigVerify(base64'',base64'',base64'')").mkString("||")}
+         |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
+         | }
+         |
+       """.stripMargin
+    ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
+  }
+
   protected override def beforeAll(): Unit = {
     super.beforeAll()
-    val script = {
-      val scriptText =
-        s"""
-          |{-# STDLIB_VERSION 4 #-}
-          |{-# CONTENT_TYPE DAPP #-}
-          |
-          | @Callable(inv)
-          | func foo() = {
-          |  let a = ${List.fill(40)("sigVerify(base64'',base64'',base64'')").mkString("||")}
-          |  [BooleanEntry("a", a), BinaryEntry("sender", inv.caller.bytes)]
-          | }
-          |
-        """.stripMargin
-      ScriptCompiler.compile(scriptText, dummyEstimator).explicitGet()._1.bytes().base64
-    }
+    lazy val setScriptTx = sender.setScript(dApp, Some(script), setScriptFee)
+
+    assertBadRequestAndMessage(
+      setScriptTx,
+      "State check failed. Reason: Contract function (foo) is too complex: 8175 > 4000"
+    )
+  }
+
+  test("can set continuation after activation") {
+    nodes.waitForHeight(activationHeight)
     sender.setScript(dApp, Some(script), setScriptFee, waitForTx = true).id
 
-    val acc0ScriptInfo = sender.addressScriptInfo(dApp)
-    acc0ScriptInfo.script.isEmpty shouldBe false
-    acc0ScriptInfo.scriptText.isEmpty shouldBe false
-    acc0ScriptInfo.script.get.startsWith("base64:") shouldBe true
+    val scriptInfo = sender.addressScriptInfo(dApp)
+    scriptInfo.script.isEmpty shouldBe false
+    scriptInfo.scriptText.isEmpty shouldBe false
+    scriptInfo.script.get.startsWith("base64:") shouldBe true
+
   }
 
   test("successful continuation") {
