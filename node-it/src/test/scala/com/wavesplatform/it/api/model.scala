@@ -137,6 +137,12 @@ class Transaction(val _type: Int,
                       ) {
                         import Transaction._
                         override def toString = Json.toJson(this).toString
+                        override def equals(x: Any) = {
+                          x match {
+                            case t: Transaction => id == t.id
+                            case _ => false
+                          }
+                        }
                       }
 object Transaction {
   def apply(_type: Int,
