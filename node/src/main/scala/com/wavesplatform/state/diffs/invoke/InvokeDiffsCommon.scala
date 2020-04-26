@@ -108,12 +108,12 @@ object InvokeDiffsCommon {
       .map(dataItemToEntry)
 
     for {
-      _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(GenericError(_))
+      _ <- TracedResult(checkDataEntries(tx, dataEntries)).leftMap(ScriptExecutionError.dApp)
       _ <- TracedResult(
         Either.cond(
           actions.length - dataEntries.length <= ContractLimits.MaxCallableActionsAmount,
           (),
-          GenericError(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
+          ScriptExecutionError.dApp(s"Too many script actions: max: ${ContractLimits.MaxCallableActionsAmount}, actual: ${actions.length}")
         )
       )
 
