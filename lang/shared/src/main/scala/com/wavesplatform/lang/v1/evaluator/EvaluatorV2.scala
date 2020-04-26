@@ -6,23 +6,23 @@ import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.Types.CASETYPEREF
-import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, NativeFunction, UserFunction}
+import com.wavesplatform.lang.v1.evaluator.ctx.{LoggedEvaluationContext, NativeFunction, UserFunction}
 import com.wavesplatform.lang.v1.traits.Environment
 
 import scala.annotation.tailrec
 
 class EvaluatorV2(
-  val ctx: EvaluationContext[Environment, Id],
-  val stdLibVersion: StdLibVersion
+    val ctx: LoggedEvaluationContext[Environment, Id],
+    val stdLibVersion: StdLibVersion
 ) {
 
   def apply(expr: EXPR, limit: Int): (EXPR, Int) = {
-    var ref = expr
+    var ref    = expr
     val unused = root(expr, ref = _, limit, Nil)
     (ref, unused)
   }
 
-  private def root(expr: EXPR, update: EXPR => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int = {
+  private def root(expr: EXPR, update: EXPR => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int =
     expr match {
       case b: BLOCK_DEF =>
         root(
@@ -79,12 +79,13 @@ class EvaluatorV2(
               limit = unused - 1,
               parentBlocks = parentBlocks
             )
-          case e: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
-          case _ => unused
+          case _: EVALUATED => throw new IllegalArgumentException("Non-boolean result in cond")
+          case _            => unused
         }
 
       case REF(key) =>
-        ctx.letDefs.get(key)
+        ctx.ec.letDefs
+          .get(key)
           .map { v =>
             val globalValue = v.value.value.explicitGet()
             update(globalValue)
@@ -108,19 +109,20 @@ class EvaluatorV2(
         if (fc.args.forall(_.isInstanceOf[EVALUATED])) {
           fc.function match {
             case FunctionHeader.Native(_) =>
-              val NativeFunction(_, costByVersion, _, ev, _) = ctx.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
-              val cost = costByVersion(stdLibVersion).toInt
+              val NativeFunction(_, costByVersion, _, ev, _) = ctx.ec.functions(fc.function).asInstanceOf[NativeFunction[Environment]]
+              val cost                                       = costByVersion(stdLibVersion).toInt
               if (unusedArgsEval < cost) {
                 unusedArgsEval
               } else {
-                update(ev[Id]((ctx.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
+                update(ev[Id]((ctx.ec.environment, fc.args.asInstanceOf[List[EVALUATED]])).explicitGet())
                 unusedArgsEval - cost
               }
             case FunctionHeader.User(_, name) =>
               if (unusedArgsEval > 0)
-                ctx.functions.get(fc.function)
+                ctx.ec.functions
+                  .get(fc.function)
                   .map(_.asInstanceOf[UserFunction[Environment]])
-                  .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.environment)))
+                  .map(f => FUNC(f.name, f.args.toList, f.ev[Id](ctx.ec.environment)))
                   .orElse(findUserFunction(name, parentBlocks))
                   .map { signature =>
                     val argsWithExpr =
@@ -133,11 +135,10 @@ class EvaluatorV2(
                     root(argsWithExpr, update, unusedArgsEval, parentBlocks)
                   }
                   .getOrElse {
-                    val objectType = ctx.typeDefs(name).asInstanceOf[CASETYPEREF]  // todo handle absence
-                    val fields = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
+                    val objectType = ctx.ec.typeDefs(name).asInstanceOf[CASETYPEREF] // todo handle absence
+                    val fields     = objectType.fields.map(_._1) zip fc.args.asInstanceOf[List[EVALUATED]]
                     root(CaseObj(objectType, fields.toMap), update, unusedArgsEval, parentBlocks)
-                  }
-              else
+                  } else
                 unusedArgsEval
           }
         } else {
@@ -149,7 +150,6 @@ class EvaluatorV2(
 
       case f: FAILED_EXPR => throw new Error(s"Unexpected $f")
     }
-  }
 
   @tailrec
   private def visitRef(key: String, update: EVALUATED => Unit, limit: Int, parentBlocks: List[BLOCK_DEF]): Int =
@@ -161,25 +161,31 @@ class EvaluatorV2(
     }
 
   private def evaluateRef(
-    update: EVALUATED => Unit,
-    limit: Int,
-    let: LET,
-    nextParentBlocks: List[BLOCK_DEF]
+      update: EVALUATED => Unit,
+      limit: Int,
+      let: LET,
+      nextParentBlocks: List[BLOCK_DEF]
   ) = {
-      val unused = root(
-        expr = let.value,
-        update = let.value = _,
-        limit = limit,
-        parentBlocks = nextParentBlocks
-      )
-      if (unused < 0) throw new Error("Unused < 0")
+    val unused = root(
+      expr = let.value,
+      update = let.value = _,
+      limit = limit,
+      parentBlocks = nextParentBlocks
+    )
+    if (unused < 0) throw new Error("Unused < 0")
+    else
       let.value match {
         case ev: EVALUATED if unused > 0 =>
+          ctx.l(let.name)(Right(ev))
           update(ev)
           unused - 1
+        case ev: EVALUATED =>
+          ctx.l(let.name)(Right(ev))
+          unused
         case _ =>
           unused
       }
+
   }
 
   @tailrec

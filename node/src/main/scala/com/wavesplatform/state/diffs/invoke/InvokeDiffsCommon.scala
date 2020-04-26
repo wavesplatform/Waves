@@ -42,7 +42,7 @@ object InvokeDiffsCommon {
   def calcFee(
       blockchain: Blockchain,
       tx: InvokeScriptTransaction
-  ): Either[GenericError, (Long, Map[Address, Portfolio])] = {
+  ): Either[ValidationError, (Long, Map[Address, Portfolio])] = {
     tx.assetFee._1 match {
       case Waves => Right((tx.fee, Map(tx.sender.toAddress -> Portfolio(-tx.fee, LeaseBalance.empty, Map.empty))))
       case asset @ IssuedAsset(_) =>
@@ -66,7 +66,7 @@ object InvokeDiffsCommon {
       tx: InvokeScriptTransaction,
       callableComplexities: Map[Int, Map[String, Long]],
       dAppAddress: Address
-  ): Either[GenericError, Long] = {
+  ): Either[ValidationError, Long] = {
     val complexityOpt =
       for {
         complexitiesByCallable <- callableComplexities.get(blockchain.estimator.version)

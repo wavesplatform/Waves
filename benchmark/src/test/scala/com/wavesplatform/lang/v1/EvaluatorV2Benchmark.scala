@@ -8,7 +8,7 @@ import com.wavesplatform.lang.directives.values.V1
 import com.wavesplatform.lang.v1.EvaluatorV2Benchmark._
 import com.wavesplatform.lang.v1.compiler.ExpressionCompiler
 import com.wavesplatform.lang.v1.evaluator.EvaluatorV2
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.parser.Parser
 import com.wavesplatform.lang.v1.traits.Environment
@@ -19,7 +19,7 @@ import org.openjdk.jmh.infra.Blackhole
 object EvaluatorV2Benchmark {
   val pureContext: CTX[Environment]                       = PureContext.build(Global, V1).withEnvironment[Environment]
   val pureEvalContext: EvaluationContext[Environment, Id] = pureContext.evaluationContext(Common.emptyBlockchainEnvironment())
-  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(pureEvalContext, V1)
+  val evaluatorV2: EvaluatorV2                            = new EvaluatorV2(LoggedEvaluationContext(_ => _ => Unit, pureEvalContext), V1)
 }
 
 @OutputTimeUnit(TimeUnit.MILLISECONDS)

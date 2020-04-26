@@ -35,7 +35,9 @@ object InvokeScriptTransactionDiff {
   private val stats = TxProcessingStats
   import stats.TxTimerExt
 
-  def apply(blockchain: Blockchain, blockTime: Long, skipExecution: Boolean = false)(tx: InvokeScriptTransaction): TracedResult[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long, skipExecution: Boolean = false)(
+      tx: InvokeScriptTransaction
+  ): TracedResult[ValidationError, Diff] = {
 
     val dAppAddressEi = blockchain.resolveAlias(tx.dAppAddressOrAlias)
     val accScriptEi   = dAppAddressEi.map(blockchain.accountScript)
@@ -44,14 +46,14 @@ object InvokeScriptTransactionDiff {
     accScriptEi match {
       case Right(Some(AccountScriptInfo(pk, ContractScriptImpl(version, contract), _, callableComplexities))) =>
         for {
-          _ <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(GenericError.apply))
+          _           <- TracedResult.wrapE(checkCall(functionCall, blockchain).leftMap(GenericError.apply))
           dAppAddress <- TracedResult(dAppAddressEi)
 
           feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, tx))
 
           directives <- TracedResult.wrapE(DirectiveSet(version, Account, DAppType).leftMap(GenericError.apply))
-          payments <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
-          input <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
+          payments   <- TracedResult.wrapE(AttachedPaymentExtractor.extractPayments(tx, version, blockchain, DApp).leftMap(GenericError.apply))
+          input      <- TracedResult.wrapE(buildThisValue(Coproduct[TxOrd](tx: Transaction), blockchain, directives, None).leftMap(GenericError.apply))
 
           invocationComplexity <- TracedResult {
             InvokeDiffsCommon.getInvocationComplexity(blockchain, tx, callableComplexities, dAppAddress)
@@ -65,9 +67,9 @@ object InvokeScriptTransactionDiff {
               else
                 invocationComplexity / stepLimit + 1
 
-            val minFee = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
+            val minFee    = FeeConstants(InvokeScriptTransaction.typeId) * FeeUnit * stepsNumber
             val assetName = tx.assetFee._1.fold("WAVES")(_.id.toString)
-            val txName = Constants.TransactionNames(InvokeScriptTransaction.typeId)
+            val txName    = Constants.TransactionNames(InvokeScriptTransaction.typeId)
             val stepsInfo = if (stepsNumber > 1) s" with $stepsNumber invocation steps" else ""
             Either.cond(
               feeInfo._1 >= minFee,
@@ -124,18 +126,17 @@ object InvokeScriptTransactionDiff {
                       )
                     } match {
                       case Success(r) => r
-                      case Failure(e) => Left(e.getMessage)
+                      case Failure(e) => Left((e.getMessage, List.empty))
                     }
                   } yield evaluator
 
-                  result.leftMap { case (error) => ScriptExecutionError.dApp(error, Nil) } //TODO trace
+                  result.leftMap { case (error, log) => ScriptExecutionError.dApp(error, log) }
                 })
                 TracedResult(
                   scriptResultE,
-                  List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE, scriptResultE.fold(_.log, _ => Nil))) // TODO Nil
+                  List(InvokeScriptTrace(tx.dAppAddressOrAlias, functionCall, scriptResultE.map(_._1), scriptResultE.fold(_.log, _._2)))
                 )
               }
-
 
               doProcessActions = InvokeDiffsCommon.processActions(
                 _,
@@ -150,9 +151,9 @@ object InvokeScriptTransactionDiff {
                 blockTime
               )
 
-              resultDiff <- scriptResult match {
+              resultDiff <- scriptResult._1 match {
                 case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers)
-                case ScriptResultV4(actions) => doProcessActions(actions)
+                case ScriptResultV4(actions)              => doProcessActions(actions)
                 case ir: IncompleteResult =>
                   TracedResult.wrapValue[Diff, ValidationError](Diff(tx = tx, continuationStates = Map(tx.id.value -> ir.expr)))
               }

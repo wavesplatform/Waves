@@ -8,12 +8,13 @@ import com.wavesplatform.lang.contract.DApp
 import com.wavesplatform.lang.contract.DApp.VerifierFunction
 import com.wavesplatform.lang.directives.values.StdLibVersion
 import com.wavesplatform.lang.v1.compiler.Terms._
-import com.wavesplatform.lang.v1.evaluator.ctx.EvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.Bindings
+import com.wavesplatform.lang.v1.evaluator.ctx.{EvaluationContext, LoggedEvaluationContext}
 import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.v1.traits.domain.{AttachedPayments, Ord, Recipient, Tx}
 import com.wavesplatform.lang.v1.{ContractLimits, FunctionHeader}
 
+import scala.collection.mutable.ListBuffer
 import scala.util.Try
 
 object ContractEvaluator {
@@ -90,8 +91,14 @@ object ContractEvaluator {
       result <- evaluation.flatMap(r => ScriptResult.fromObj(ctx, i.transactionId, r, version)).leftMap((_, log))
     } yield (result, log)
 
-  def applyV2(ctx: EvaluationContext[Environment, Id], dApp: DApp, i: Invocation, version: StdLibVersion): Either[String, ScriptResult] =
+  def applyV2(
+      ctx: EvaluationContext[Environment, Id],
+      dApp: DApp,
+      i: Invocation,
+      version: StdLibVersion
+  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] =
     buildExprFromInvocation(dApp, i, version)
+      .leftMap((_, Nil))
       .flatMap(applyV2(ctx, _, version, i.transactionId))
 
   def applyV2(
@@ -99,13 +106,16 @@ object ContractEvaluator {
       expr: EXPR,
       version: StdLibVersion,
       transactionId: ByteStr
-  ): Either[ExecutionError, ScriptResult] = {
-    val evaluator = new EvaluatorV2(ctx, version)
+  ): Either[(ExecutionError, Log[Id]), (ScriptResult, Log[Id])] = {
+    val log       = ListBuffer[LogItem[Id]]()
+    val loggedCtx = LoggedEvaluationContext[Environment, Id](name => value => log.append((name, value)), ctx)
+    val evaluator = new EvaluatorV2(loggedCtx, version)
     Try(evaluator(expr.deepCopy, ContractLimits.MaxComplexityByVersion(version))).toEither
       .leftMap(_.getMessage)
       .flatMap {
         case (value: EVALUATED, _)          => ScriptResult.fromObj(ctx, transactionId, value, version)
         case (expr: EXPR, unusedComplexity) => Right(IncompleteResult(expr, unusedComplexity))
       }
+      .bimap((_, log.toList), (_, log.toList))
   }
 }

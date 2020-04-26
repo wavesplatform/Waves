@@ -8,6 +8,7 @@ import com.wavesplatform.lang.directives.values.V4
 import com.wavesplatform.lang.v1.FunctionHeader
 import com.wavesplatform.lang.v1.compiler.Terms._
 import com.wavesplatform.lang.v1.compiler.{Decompiler, ExpressionCompiler}
+import com.wavesplatform.lang.v1.evaluator.ctx.LoggedEvaluationContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.PureContext
 import com.wavesplatform.lang.v1.evaluator.ctx.impl.waves.WavesContext
 import com.wavesplatform.lang.v1.evaluator.{EvaluatorV2, FunctionIds}
@@ -29,7 +30,7 @@ class EvaluatorV2Test extends PropSpec with PropertyChecks with ScriptGen with M
 
   private val environment = Common.emptyBlockchainEnvironment()
   private val evaluator =
-    new EvaluatorV2(ctx.evaluationContext(environment), version)
+    new EvaluatorV2(LoggedEvaluationContext(_ => _ => Unit, ctx.evaluationContext(environment)), version)
 
   private def eval(expr: EXPR, limit: Int): (EXPR, String, Int) = {
     val (result, unusedComplexity) = evaluator(expr, limit)

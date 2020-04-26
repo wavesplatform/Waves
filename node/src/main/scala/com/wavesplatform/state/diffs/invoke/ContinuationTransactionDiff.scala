@@ -11,29 +11,39 @@ import com.wavesplatform.lang.v1.traits.Environment
 import com.wavesplatform.lang.{Global, ValidationError}
 import com.wavesplatform.state.{AccountScriptInfo, Blockchain, Diff}
 import com.wavesplatform.transaction.Transaction
-import com.wavesplatform.transaction.TxValidationError.GenericError
+import com.wavesplatform.transaction.TxValidationError.{GenericError, ScriptExecutionError}
 import com.wavesplatform.transaction.smart.script.ScriptRunner.TxOrd
+import com.wavesplatform.transaction.smart.script.trace.{InvokeScriptTrace, TracedResult}
 import com.wavesplatform.transaction.smart.{ContinuationTransaction, InvokeScriptTransaction, WavesEnvironment, buildThisValue}
 import monix.eval.Coeval
 import shapeless.Coproduct
 
 object ContinuationTransactionDiff {
-  def apply(blockchain: Blockchain, blockTime: Long)(tx: ContinuationTransaction): Either[ValidationError, Diff] = {
+  def apply(blockchain: Blockchain, blockTime: Long)(tx: ContinuationTransaction): TracedResult[ValidationError, Diff] = {
     val (invokeHeight, foundTx, status) = blockchain.transactionInfo(tx.invokeScriptTransactionId).get
-    val invokeScriptTransaction = foundTx.asInstanceOf[InvokeScriptTransaction]
+    val invokeScriptTransaction         = foundTx.asInstanceOf[InvokeScriptTransaction]
     for {
-      dAppAddress <- blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias)
-      scriptInfo <- blockchain
-        .accountScript(dAppAddress)
-        .toRight(GenericError("ERROR"))
+      _ <- TracedResult(
+        Either.cond(status, (), GenericError(s"Cannot continue failed invoke script transaction with id=${tx.invokeScriptTransactionId}"))
+      )
+      dAppAddress <- TracedResult(blockchain.resolveAlias(invokeScriptTransaction.dAppAddressOrAlias))
+      scriptInfo <- TracedResult(
+        blockchain
+          .accountScript(dAppAddress)
+          .toRight(GenericError("ERROR"))
+      )
       AccountScriptInfo(dAppPublicKey, script, _, callableComplexities) = scriptInfo
-      directives <- DirectiveSet(script.stdLibVersion, Account, DApp).leftMap(GenericError(_))
+      directives <- TracedResult(
+        DirectiveSet(script.stdLibVersion, Account, DApp).left.map(GenericError(_))
+      )
 
       ctx = PureContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
         CryptoContext.build(Global, script.stdLibVersion).withEnvironment[Environment] |+|
         WavesContext.build(directives)
 
-      input <- buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, None).leftMap(GenericError(_))
+      input <- TracedResult(
+        buildThisValue(Coproduct[TxOrd](invokeScriptTransaction: Transaction), blockchain, directives, None).left.map(GenericError(_))
+      )
 
       environment = new WavesEnvironment(
         AddressScheme.current.chainId,
@@ -44,11 +54,22 @@ object ContinuationTransactionDiff {
         directives,
         tx.invokeScriptTransactionId
       )
-      scriptResult <- ContractEvaluator.applyV2(ctx.evaluationContext(environment), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId).leftMap(GenericError(_))
+      scriptResult <- {
+        val r = ContractEvaluator
+          .applyV2(ctx.evaluationContext(environment), tx.expr, script.stdLibVersion, tx.invokeScriptTransactionId)
+          .left
+          .map { case (error, log) => ScriptExecutionError.dApp(error, log) }
+        TracedResult(
+          r,
+          List(InvokeScriptTrace(invokeScriptTransaction.dAppAddressOrAlias, invokeScriptTransaction.funcCall, r.map(_._1), r.fold(_.log, _._2)))
+        )
+      }
 
-      invocationComplexity <- InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
+      invocationComplexity <- TracedResult(
+        InvokeDiffsCommon.getInvocationComplexity(blockchain, invokeScriptTransaction, callableComplexities, dAppAddress)
+      )
 
-      feeInfo <- InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction)
+      feeInfo <- TracedResult(InvokeDiffsCommon.calcFee(blockchain, invokeScriptTransaction))
 
       verifierComplexity = blockchain.accountScript(invokeScriptTransaction.sender).map(_.verifierComplexity).getOrElse(0L)
 
@@ -67,10 +88,11 @@ object ContinuationTransactionDiff {
 
       continuationStopDiff = Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> null))
 
-      resultDiff <- scriptResult match {
-        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).resultE.map(_ |+| continuationStopDiff)
-        case ScriptResultV4(actions)              => doProcessActions(actions).resultE.map(_ |+| continuationStopDiff)
-        case ir: IncompleteResult                 => Right(Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ir.expr)))
+      resultDiff <- scriptResult._1 match {
+        case ScriptResultV3(dataItems, transfers) => doProcessActions(dataItems ::: transfers).map(_ |+| continuationStopDiff)
+        case ScriptResultV4(actions)              => doProcessActions(actions).map(_ |+| continuationStopDiff)
+        case ir: IncompleteResult =>
+          TracedResult.wrapValue[Diff, ValidationError](Diff.stateOps(continuationStates = Map(tx.invokeScriptTransactionId -> ir.expr)))
       }
 
     } yield resultDiff
