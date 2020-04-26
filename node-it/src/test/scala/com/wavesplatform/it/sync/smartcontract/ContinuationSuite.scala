@@ -26,7 +26,7 @@ class ContinuationSuite extends BaseTransactionSuite with CancelAfterFailure {
   override protected def nodeConfigs: Seq[Config] =
     NodeConfigs
       .Builder(Default, 2, Seq.empty)
-      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, activationHeight - 1)))
+      .overrideBase(_.preactivatedFeatures((BlockchainFeatures.ContinuationTransaction.id, activationHeight)))
       .buildNonConflicting()
 
   private val dApp   = firstAddress
