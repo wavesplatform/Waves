@@ -473,6 +473,16 @@ object Types {
       )
   }
 
+  val balanceDetailsType = CASETYPEREF(
+    "BalanceDetails",
+    List(
+      "available" -> LONG,
+      "regular" -> LONG,
+      "generating" -> LONG,
+      "effective" -> LONG
+      )
+  )
+
   def buildWavesTypes(proofsEnabled: Boolean, v: StdLibVersion): Seq[FINAL] = {
     val activeTxTypes                       = buildActiveTransactionTypes(proofsEnabled, v)
     val obsoleteTxTypes                     = buildObsoleteTransactionTypes(proofsEnabled)
@@ -488,6 +498,6 @@ object Types {
       transactionsCommonType
     ) ++
       transactionTypes ++
-      (if (v >= V4) deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
+      (if (v >= V4) balanceDetailsType :: deleteDataEntry :: typedDataEntries else Seq(genericDataEntry))
   }
 }

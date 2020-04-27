@@ -24,8 +24,16 @@ object WavesContext {
       addressFromPublicKeyF,
       addressFromStringF,
       addressFromRecipientF,
+      )
+  private val balanceV123Functions =
+    Array(
       assetBalanceF,
       wavesBalanceF
+    )
+  private val balanceV4Functions =
+    Array(
+      assetBalanceV4F,
+      wavesBalanceV4F
     )
 
   private val invariableCtx =
@@ -88,9 +96,9 @@ object WavesContext {
 
     val versionSpecificFuncs =
       version match {
-        case V1 | V2 => Array(txByIdF(proofsEnabled, version))
-        case V3      => fromV3Funcs(proofsEnabled, version)
-        case V4      => fromV4Funcs(proofsEnabled, version)
+        case V1 | V2 => Array(txByIdF(proofsEnabled, version)) ++ balanceV123Functions
+        case V3      => fromV3Funcs(proofsEnabled, version) ++ balanceV123Functions
+        case V4      => fromV4Funcs(proofsEnabled, version) ++ balanceV4Functions
      }
     commonFuncs ++ versionSpecificFuncs
   }

@@ -7,6 +7,18 @@ import shapeless._
 import scala.language.higherKinds
 
 object Environment {
+  import io.circe.{Decoder, HCursor}
+
+  case class BalanceDetails(available: Long, regular: Long, generating: Long, effective: Long)
+
+  implicit val BalanceDetailsDecoder: Decoder[BalanceDetails] = (c: HCursor) =>
+    for {
+      available <- c.downField("available").as[Long]
+      regular <- c.downField("regular").as[Long]
+      generating <- c.downField("generating").as[Long]
+      effective <- c.downField("effective").as[Long]
+    } yield BalanceDetails(available, regular, generating, effective)
+
   type InputEntity = Tx :+: Ord :+: PseudoTx :+: CNil
 }
 
@@ -24,6 +36,7 @@ trait Environment[F[_]] {
   def data(addressOrAlias: Recipient, key: String, dataType: DataType): F[Option[Any]]
   def resolveAlias(name: String): F[Either[String, Recipient.Address]]
   def accountBalanceOf(addressOrAlias: Recipient, assetId: Option[Array[Byte]]): F[Either[String, Long]]
+  def accountWavesBalanceOf(addressOrAlias: Recipient): F[Either[String, Environment.BalanceDetails]]
   def multiPaymentAllowed: Boolean
   def txId: ByteStr
   def transferTransactionFromProto(b: Array[Byte]): Option[Tx.Transfer]

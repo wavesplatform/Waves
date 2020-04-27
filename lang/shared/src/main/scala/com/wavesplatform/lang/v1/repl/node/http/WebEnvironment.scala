@@ -62,6 +62,14 @@ private[repl] case class WebEnvironment(settings: NodeConnectionSettings) extend
      entity  <- getEntity[Either[String, ?], BalanceResponse, Long](s"/addresses/balance/$address")
     } yield entity
 
+  override def accountWavesBalanceOf(
+    recipient: Recipient
+  ): Future[Either[String, Environment.BalanceDetails]] =
+    for {
+     address <- extractAddress(recipient)
+     entity  <- client.get[Either[String, ?], Environment.BalanceDetails](s"/addresses/balance/detail/$address")
+    } yield entity
+
   private def extractAddress(addressOrAlias: Recipient): Future[String] =
     addressOrAlias match {
       case Address(bytes) => Future.successful(bytes.toString)
